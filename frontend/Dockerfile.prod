@@ -1,0 +1,40 @@
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# 의존성 파일 복사 및 설치
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+# 소스 코드 복사
+COPY . .
+
+# 프로덕션 빌드
+RUN npm run build
+
+# 실행 이미지
+FROM node:18-alpine AS runner
+
+WORKDIR /app
+
+# 환경 변수 설정
+ENV NODE_ENV=production
+
+# 필요한 파일만 복사
+COPY --from=builder /app/next.config.js ./
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+
+# 사용자 변경 (보안 강화)
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+RUN chown -R nextjs:nodejs /app
+USER nextjs
+
+# 노출 포트
+EXPOSE 3000
+
+# 서버 실행
+CMD ["npm", "start"] 
