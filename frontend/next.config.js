@@ -7,7 +7,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/:path*`, // 백엔드 API 프록시
+        destination: 'http://localhost:5001/api/:path*', // 백엔드 API 프록시
       },
     ];
   },
