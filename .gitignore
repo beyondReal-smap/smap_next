@@ -1,0 +1,59 @@
+node_modules
+package-lock.json
+yarn.lock
+.pnp
+.pnp.js
+
+# 빌드 출력물
+.next/
+out/
+build/
+dist/
+
+# 환경 변수 파일
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 디버그 로그
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE 및 편집기 설정
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+*.sublime-workspace
+
+# 테스트 커버리지
+coverage/
+
+# 타입스크립트
+*.tsbuildinfo
+next-env.d.ts
+
+# PWA 파일
+public/sw.js
+public/workbox-*.js
+
+# 로컬 개발 환경 설정
+.vercel
+.netlify
+
+# 백업 파일
+*.bak
+*.backup
+*~
+
+# 기타 임시 파일
+.cache/
+tmp/
+temp/
+
+
+./frontend/src/app/smap_php/

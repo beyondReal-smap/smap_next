@@ -1,14 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
+  --foreground-rgb: 50, 50, 50;
+  --background-start-rgb: 250, 250, 250;
   --background-end-rgb: 255, 255, 255;
+  
+  /* 메인 색상 */
+  --primary-color: 79, 70, 229; /* 인디고 600 */
+  --primary-hover: 67, 56, 202; /* 인디고 700 */
+  --secondary-color: 209, 213, 219; /* 그레이 300 */
+  --accent-color: 245, 158, 11; /* 앰버 500 */
+  
+  /* 텍스트 색상 */
+  --text-primary: 31, 41, 55; /* 그레이 800 */
+  --text-secondary: 107, 114, 128; /* 그레이 500 */
+  --text-light: 229, 231, 235; /* 그레이 200 */
+  
+  /* 그림자 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  
+  /* 테두리 반경 */
+  --border-radius-sm: 0.25rem;
+  --border-radius-md: 0.375rem;
+  --border-radius-lg: 0.5rem;
+  --border-radius-xl: 1rem;
+  --border-radius-full: 9999px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+    --foreground-rgb: 229, 231, 235;
+    --background-start-rgb: 17, 24, 39;
+    --background-end-rgb: 31, 41, 55;
+    
+    /* 어두운 모드 색상 */
+    --text-primary: 229, 231, 235; /* 그레이 200 */
+    --text-secondary: 156, 163, 175; /* 그레이 400 */
   }
 }
 
@@ -24,4 +55,76 @@ body {
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
     Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+}
+
+.font-suite {
+  font-family: var(--font-lineseed), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* 모바일 최적화 input 스타일 */
+input, select, textarea {
+  @apply appearance-none rounded-md bg-white text-gray-800 border border-gray-300 p-3 shadow-sm w-full;
+  font-family: inherit;
+  font-size: 16px; /* 모바일에서 자동 확대 방지 */
+}
+
+input:focus, select:focus, textarea:focus {
+  @apply outline-none ring-2 ring-indigo-500 border-indigo-500;
+}
+
+/* 버튼 스타일 */
+.btn {
+  @apply inline-flex justify-center items-center px-4 py-3 border border-transparent rounded-md shadow-sm font-medium transition-colors;
+  font-family: inherit;
+}
+
+.btn-primary {
+  @apply bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 text-gray-800 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400;
+}
+
+.btn-accent {
+  @apply bg-amber-500 text-white hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-400;
+}
+
+/* 카드 스타일 */
+.card {
+  @apply bg-white rounded-lg shadow-md overflow-hidden;
+}
+
+/* 애니메이션 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* 모바일 최적화 레이아웃 */
+.container-mobile {
+  @apply w-full max-w-md mx-auto px-4;
+}
+
+/* 반응형 타이포그래피 */
+h1 {
+  @apply text-2xl sm:text-3xl md:text-4xl font-bold;
+}
+
+h2 {
+  @apply text-xl sm:text-2xl md:text-3xl font-semibold;
+}
+
+p {
+  @apply text-base leading-relaxed;
 } 
