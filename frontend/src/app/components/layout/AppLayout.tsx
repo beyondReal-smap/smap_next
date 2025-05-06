@@ -56,6 +56,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
     ? 'h-full' // /schedule/add 또는 simplifiedHeaderPages 페이지에서는 패딩 없이 높이 100%
     : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6'; // 기존 패딩
   
+  // 메인 영역 배경색 결정
+  const mainBgClass = isSimplifiedHeader ? 'bg-gray-50' : ''; // simplifiedHeader 페이지에 배경색 적용
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* 헤더 (조건부 렌더링 제거) */}
@@ -272,8 +275,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
         )}
       </AnimatePresence>
 
-      {/* 메인 컨텐츠 */}
-      <main className={`flex-grow ${mainMarginTopClass} overflow-auto`}>
+      {/* 메인 컨텐츠 - 배경색 조건부 적용 */}
+      <main className={`flex-grow ${mainMarginTopClass} overflow-auto ${mainBgClass}`}>
         <div className={mainContentWrapperClass}>
           {children}
         </div>

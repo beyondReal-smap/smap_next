@@ -4,65 +4,52 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import dayjs from 'dayjs';
 import 'dayjs/locale/ko';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import koLocale from '@fullcalendar/core/locales/ko';
-import axios from 'axios';
+import { DayPicker, Modifiers } from 'react-day-picker';
+import 'react-day-picker/dist/style.css';
+import { format } from 'date-fns';
+import { ko, Locale } from 'date-fns/locale';
 import { PageContainer, Card, Button } from '../components/layout';
+import { FaPlus } from 'react-icons/fa6';
+import { RiKakaoTalkFill } from 'react-icons/ri';
+import { FiLink, FiChevronRight } from 'react-icons/fi';
+import { MdOutlineMessage } from 'react-icons/md';
 
-// 모의 데이터 (실제 구현 시에는 API에서 가져옵니다)
-const MOCK_EVENTS = [
-  {
-    id: '1',
-    title: '미팅',
-    start: dayjs().add(1, 'day').hour(10).minute(0).second(0).format('YYYY-MM-DD HH:mm:ss'),
-    end: dayjs().add(1, 'day').hour(12).minute(0).second(0).format('YYYY-MM-DD HH:mm:ss'),
-    backgroundColor: '#4f46e5',
-    borderColor: '#4f46e5',
-    textColor: '#ffffff',
-    allDay: false,
-    extendedProps: {
-      location: '강남구 역삼동',
-      description: '프로젝트 개발 회의',
-      participants: ['김철수', '이영희']
-    }
-  },
-  {
-    id: '2',
-    title: '프로젝트 데드라인',
-    start: dayjs().add(3, 'day').format('YYYY-MM-DD'),
-    backgroundColor: '#ef4444',
-    borderColor: '#ef4444',
-    textColor: '#ffffff',
-    allDay: true,
-    extendedProps: {
-      description: '최종 결과물 제출'
-    }
-  },
-  {
-    id: '3',
-    title: '팀 회식',
-    start: dayjs().add(5, 'day').hour(19).minute(0).second(0).format('YYYY-MM-DD HH:mm:ss'),
-    end: dayjs().add(5, 'day').hour(22).minute(0).second(0).format('YYYY-MM-DD HH:mm:ss'),
-    backgroundColor: '#10b981',
-    borderColor: '#10b981',
-    textColor: '#ffffff',
-    allDay: false,
-    extendedProps: {
-      location: '서울 강남구 소재 식당',
-      description: '월간 프로젝트 완료 기념 회식'
-    }
-  }
+// 한국어 로케일 설정
+dayjs.locale('ko');
+
+// 모의 데이터 (react-day-picker에 맞게 이벤트 날짜만 추출)
+const MOCK_EVENTS_DATES = [
+  dayjs().add(1, 'day').startOf('day').toDate(),
+  dayjs().add(3, 'day').startOf('day').toDate(),
+  dayjs().add(5, 'day').startOf('day').toDate(),
+  new Date(2025, 4, 3), // 2025년 5월 3일 (0-indexed month)
+  new Date(2025, 4, 6), // 2025년 5월 6일
+  new Date(2025, 4, 10),
+  new Date(2025, 4, 17),
+  new Date(2025, 4, 24),
+  new Date(2025, 4, 31),
 ];
 
+interface NewEvent {
+  title: string;
+  start: string;
+  end: string;
+  allDay: boolean;
+  backgroundColor: string;
+  location: string;
+  description: string;
+}
+
 export default function SchedulePage() {
-  const [events, setEvents] = useState(MOCK_EVENTS);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [eventDates, setEventDates] = useState<Date[]>(MOCK_EVENTS_DATES);
+  const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedEventDetails, setSelectedEventDetails] = useState<any>(null);
+  
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
-  const [newEvent, setNewEvent] = useState({
+  const [newEvent, setNewEvent] = useState<NewEvent>({
     title: '',
     start: '',
     end: '',
@@ -71,89 +58,32 @@ export default function SchedulePage() {
     location: '',
     description: ''
   });
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const router = useRouter();
 
-  // 실제 구현 시에는 API에서 일정 데이터를 가져옵니다
-  useEffect(() => {
-    // 예시: 실제 API 호출
-    /*
-    const fetchEvents = async () => {
-      try {
-        const response = await axios.get('/api/schedule');
-        if (response.data.success) {
-          setEvents(response.data.events);
-        }
-      } catch (error) {
-        console.error('일정을 불러오는 중 오류가 발생했습니다.', error);
-      }
-    };
+  const handleDayClick = (
+    day: Date | undefined,
+    selectedDay: Date,
+    modifiers: Modifiers,
+    e: React.MouseEvent
+  ) => {
+    if (!day) return;
 
-    fetchEvents();
-    */
-  }, []);
-
-  // 이벤트 클릭 시 상세 정보 표시
-  const handleEventClick = (clickInfo: any) => {
-    setSelectedEvent(clickInfo.event);
-    setIsModalOpen(true);
-  };
-
-  // 날짜 클릭 시 이벤트 추가 모달
-  const handleDateClick = (info: any) => {
-    const clickedDate = dayjs(info.date);
-    
-    setNewEvent({
-      ...newEvent,
-      start: clickedDate.format('YYYY-MM-DDTHH:mm'),
-      end: clickedDate.add(1, 'hour').format('YYYY-MM-DDTHH:mm'),
-      allDay: info.allDay
-    });
-    
+    setSelectedDay(day);
+    const clickedDateStr = dayjs(day).format('YYYY-MM-DDTHH:mm');
+    setNewEvent(prev => ({
+        ...prev,
+        start: clickedDateStr,
+        end: dayjs(day).add(1, 'hour').format('YYYY-MM-DDTHH:mm'),
+        allDay: true
+    }));
     setIsAddEventModalOpen(true);
   };
 
-  // 새 이벤트 추가
   const handleAddEvent = () => {
-    const eventToAdd = {
-      id: String(events.length + 1),
-      title: newEvent.title,
-      start: newEvent.start,
-      end: newEvent.end,
-      backgroundColor: newEvent.backgroundColor,
-      borderColor: newEvent.backgroundColor,
-      textColor: '#ffffff',
-      allDay: newEvent.allDay,
-      extendedProps: {
-        location: newEvent.location,
-        description: newEvent.description
-      }
-    };
-
-    // 실제 구현 시에는 API에 저장합니다
-    /*
-    axios.post('/api/schedule', eventToAdd)
-      .then(response => {
-        if (response.data.success) {
-          setEvents([...events, eventToAdd]);
-          setIsAddEventModalOpen(false);
-          setNewEvent({
-            title: '',
-            start: '',
-            end: '',
-            allDay: false,
-            backgroundColor: '#4f46e5',
-            location: '',
-            description: ''
-          });
-        }
-      })
-      .catch(error => {
-        console.error('일정 추가 중 오류가 발생했습니다.', error);
-      });
-    */
-    
-    // 모의 데이터 저장 (API 연동 전 테스트용)
-    setEvents([...events, eventToAdd]);
+    if (!newEvent.start || !newEvent.title) return;
+    const newEventDate = dayjs(newEvent.start).startOf('day').toDate();
+    setEventDates([...eventDates, newEventDate]);
     setIsAddEventModalOpen(false);
     setNewEvent({
       title: '',
@@ -166,129 +96,202 @@ export default function SchedulePage() {
     });
   };
 
-  // 이벤트 삭제
   const handleDeleteEvent = () => {
-    if (!selectedEvent) return;
-    
-    // 실제 구현 시에는 API에서 삭제합니다
-    /*
-    axios.delete(`/api/schedule/${selectedEvent.id}`)
-      .then(response => {
-        if (response.data.success) {
-          setEvents(events.filter(event => event.id !== selectedEvent.id));
-          setIsModalOpen(false);
-          setSelectedEvent(null);
-        }
-      })
-      .catch(error => {
-        console.error('일정 삭제 중 오류가 발생했습니다.', error);
-      });
-    */
-    
-    // 모의 데이터 삭제 (API 연동 전 테스트용)
-    setEvents(events.filter(event => event.id !== selectedEvent.id));
+    if (!selectedEventDetails || !selectedEventDetails.start) return;
+    const eventToDeleteDate = dayjs(selectedEventDetails.start).startOf('day').toDate();
+    setEventDates(eventDates.filter(date => !dayjs(date).isSame(eventToDeleteDate, 'day')));
     setIsModalOpen(false);
-    setSelectedEvent(null);
+    setSelectedEventDetails(null);
   };
 
-  // 이벤트 수정 페이지로 이동
   const handleEditEvent = () => {
-    if (!selectedEvent) return;
-    router.push(`/schedule/edit/${selectedEvent.id}`);
+    if (!selectedEventDetails) return;
+    console.log("Edit event (not implemented for DayPicker yet):", selectedEventDetails);
+    setIsModalOpen(false);
+  };
+  
+  const weekendStyles = {
+    saturday: { color: 'blue' },
+    sunday: { color: 'red' },
   };
 
-  // 추가 버튼 렌더링
+  const eventModifiers = {
+    event: eventDates,
+    saturday: (day: Date) => day.getDay() === 6,
+    sunday: (day: Date) => day.getDay() === 0,
+  };
+
+  const eventModifiersStyles = {
+    event: { position: 'relative' } as React.CSSProperties,
+    ...weekendStyles,
+  };
+
+  const formatDay = (day: Date): string => format(day, 'd');
+  const formatCaption = (date: Date, options?: { locale?: Locale }): string => format(date, 'yyyy.MM', { locale: options?.locale });
+  const formatWeekdayName = (day: Date): string => format(day, 'EEE', { locale: ko });
+
   const AddEventButton = (
     <Button
-      onClick={() => setIsAddEventModalOpen(true)}
-      icon={
-        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-        </svg>
-      }
+      onClick={() => {
+        const todayStr = dayjs().format('YYYY-MM-DDTHH:mm');
+        setNewEvent({
+            title: '',
+            start: todayStr,
+            end: dayjs().add(1, 'hour').format('YYYY-MM-DDTHH:mm'),
+            allDay: false,
+            backgroundColor: '#4f46e5',
+            location: '',
+            description: ''
+        });
+        setIsAddEventModalOpen(true);
+      }}
+      icon={<FaPlus className="h-5 w-5" />}
     >
       새 일정
     </Button>
   );
+
+  const ShareButton = (
+    <Button
+      onClick={() => setIsShareModalOpen(true)}
+      className="ml-2"
+    >
+      그룹원 초대
+    </Button>
+  );
+
+  const handleGoToToday = () => {
+    const today = new Date();
+    setCurrentMonth(today);
+    setSelectedDay(today);
+    const todayStr = dayjs(today).format('YYYY-MM-DDTHH:mm');
+    setNewEvent(prev => ({
+        ...prev,
+        start: todayStr,
+        end: dayjs(today).add(1, 'hour').format('YYYY-MM-DDTHH:mm'),
+        allDay: false
+    }));
+  };
+  
+  const handleShareKakao = () => {
+    console.log("Share via Kakao: Not yet implemented. URL: ", window.location.href);
+    alert('카카오톡 공유 기능은 준비 중입니다.');
+  };
+
+  const handleCopyLink = () => {
+    const urlToCopy = window.location.href; 
+    navigator.clipboard.writeText(urlToCopy)
+      .then(() => {
+        alert('초대 링크가 복사되었습니다!');
+        setIsShareModalOpen(false);
+      })
+      .catch(err => {
+        console.error('Failed to copy link: ', err);
+        alert('링크 복사에 실패했습니다.');
+      });
+  };
+
+  const handleShareSms = () => {
+    console.log("Share via SMS: Not yet implemented. URL: ", window.location.href);
+    alert('문자 공유 기능은 준비 중입니다.');
+  };
 
   return (
     <PageContainer 
       title="일정 관리" 
       description="일정을 생성하고 관리하세요"
       showHeader={false}
-      actions={AddEventButton}
+      showBackButton={false}
+      actions={<div className="flex space-x-2">{AddEventButton}{ShareButton}</div>}
+      className="bg-gray-50"
     >
-      <Card noPadding>
-        <div className="h-[calc(100vh-280px)] w-full">
-          <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay'
-            }}
-            events={events}
-            eventClick={handleEventClick}
-            dateClick={handleDateClick}
-            editable={true}
-            selectable={true}
-            selectMirror={true}
-            dayMaxEvents={true}
-            weekends={true}
-            locale={koLocale}
-            allDayText="종일"
-            buttonText={{
-              today: '오늘',
-              month: '월',
-              week: '주',
-              day: '일',
-              list: '목록'
-            }}
+      <Card className="w-full max-w-4xl mx-auto flex flex-col items-center justify-center">
+        <style>{`
+          .day-with-event::after {
+            content: "";
+            position: absolute;
+            bottom: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background-color: #f87171;
+          }
+          
+          .rdp-day_outside .rdp-day_button { 
+            color: #d1d5db; 
+            pointer-events: none; 
+          }
+          .rdp-day_today .rdp-day_button { 
+            position: relative; 
+            overflow: visible; 
+          }
+          .rdp-day_today .rdp-day_button::after { 
+            content: "Today";
+            position: absolute;
+            top: -10px; 
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #3b82f6; 
+            color: white;
+            padding: 1px 4px;
+            border-radius: 4px;
+            font-size: 0.6rem; 
+            line-height: 1;
+            z-index: 1; 
+          }
+        `}</style>
+        <div className="w-full flex justify-end mb-2 px-2 sm:px-3 md:px-4">
+            <Button onClick={handleGoToToday} variant="outline" size="sm">
+                오늘
+            </Button>
+        </div>
+        <div className="w-full">
+          <DayPicker
+            mode="single"
+            required
+            selected={selectedDay}
+            onSelect={handleDayClick}
+            month={currentMonth}
+            onMonthChange={setCurrentMonth}
+            locale={ko}
+            defaultMonth={currentMonth}
+            modifiers={eventModifiers}
+            modifiersClassNames={{ event: 'day-with-event' }}
+            modifiersStyles={eventModifiersStyles}
+            showOutsideDays
+            formatters={{ formatDay, formatCaption, formatWeekdayName }}
           />
         </div>
       </Card>
 
-      {/* 이벤트 상세 정보 모달 */}
-      {isModalOpen && selectedEvent && (
+      {isModalOpen && selectedEventDetails && ( 
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-lg w-full" title={selectedEvent.title}>
+          <Card className="max-w-lg w-full" title={selectedEventDetails.title || '일정 상세'}>
             <div className="space-y-4">
               <div>
                 <h4 className="text-sm font-medium text-gray-500">일시</h4>
                 <p className="mt-1">
-                  {selectedEvent.allDay 
-                    ? dayjs(selectedEvent.start).format('YYYY년 MM월 DD일') + ' (종일)'
-                    : dayjs(selectedEvent.start).format('YYYY년 MM월 DD일 HH:mm') + ' ~ ' + 
-                      (selectedEvent.end ? dayjs(selectedEvent.end).format('HH:mm') : '')
+                  {selectedEventDetails.allDay 
+                    ? dayjs(selectedEventDetails.start).format('YYYY년 MM월 DD일') + ' (종일)'
+                    : dayjs(selectedEventDetails.start).format('YYYY년 MM월 DD일 HH:mm') + 
+                      (selectedEventDetails.end ? ' ~ ' + dayjs(selectedEventDetails.end).format('HH:mm') : '')
                   }
                 </p>
               </div>
               
-              {selectedEvent.extendedProps.location && (
+              {selectedEventDetails.extendedProps?.location && (
                 <div>
                   <h4 className="text-sm font-medium text-gray-500">장소</h4>
-                  <p className="mt-1">{selectedEvent.extendedProps.location}</p>
+                  <p className="mt-1">{selectedEventDetails.extendedProps.location}</p>
                 </div>
               )}
               
-              {selectedEvent.extendedProps.description && (
+              {selectedEventDetails.extendedProps?.description && (
                 <div>
                   <h4 className="text-sm font-medium text-gray-500">설명</h4>
-                  <p className="mt-1">{selectedEvent.extendedProps.description}</p>
-                </div>
-              )}
-              
-              {selectedEvent.extendedProps.participants && selectedEvent.extendedProps.participants.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">참석자</h4>
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    {selectedEvent.extendedProps.participants.map((participant: string, index: number) => (
-                      <span key={index} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                        {participant}
-                      </span>
-                    ))}
-                  </div>
+                  <p className="mt-1">{selectedEventDetails.extendedProps.description}</p>
                 </div>
               )}
             </div>
@@ -308,7 +311,6 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {/* 새 이벤트 추가 모달 */}
       {isAddEventModalOpen && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
@@ -330,7 +332,7 @@ export default function SchedulePage() {
                 <input
                   type="text"
                   id="event-title"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2"
                   value={newEvent.title}
                   onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
                   required
@@ -343,7 +345,7 @@ export default function SchedulePage() {
                   <input
                     type="datetime-local"
                     id="event-start"
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2"
                     value={newEvent.start}
                     onChange={(e) => setNewEvent({...newEvent, start: e.target.value})}
                     required
@@ -354,10 +356,9 @@ export default function SchedulePage() {
                   <input
                     type="datetime-local"
                     id="event-end"
-                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2"
                     value={newEvent.end}
                     onChange={(e) => setNewEvent({...newEvent, end: e.target.value})}
-                    required
                   />
                 </div>
               </div>
@@ -378,7 +379,7 @@ export default function SchedulePage() {
                 <input
                   type="text"
                   id="event-location"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2"
                   value={newEvent.location}
                   onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
                 />
@@ -389,26 +390,12 @@ export default function SchedulePage() {
                 <textarea
                   id="event-description"
                   rows={3}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2"
                   value={newEvent.description}
                   onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
                 ></textarea>
               </div>
-
-              <div>
-                <label htmlFor="event-color" className="block text-sm font-medium text-gray-700">색상</label>
-                <div className="mt-1 flex space-x-2">
-                  {['#4f46e5', '#ef4444', '#10b981', '#f59e0b', '#6366f1'].map((color) => (
-                    <div 
-                      key={color}
-                      className={`h-8 w-8 rounded-full cursor-pointer ${newEvent.backgroundColor === color ? 'ring-2 ring-offset-2 ring-gray-500' : ''}`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setNewEvent({...newEvent, backgroundColor: color})}
-                    ></div>
-                  ))}
-                </div>
-              </div>
-
+              
               <div className="mt-6 flex justify-end space-x-3">
                 <button
                   type="button"
@@ -421,11 +408,76 @@ export default function SchedulePage() {
                   type="button"
                   onClick={handleAddEvent}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  disabled={!newEvent.title || !newEvent.start}
                 >
                   저장
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {isShareModalOpen && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-medium text-gray-900 font-suite">어떻게 초대장을 보낼까요?</h3>
+              <button
+                onClick={() => setIsShareModalOpen(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-2">
+              <ul className="space-y-1">
+                <li>
+                  <button
+                    onClick={handleShareKakao}
+                    className="w-full flex items-center justify-between p-3 hover:bg-gray-100 rounded-md text-left"
+                  >
+                    <div className="flex items-center">
+                      <RiKakaoTalkFill className="h-7 w-7 mr-3 text-[#3C1E1E] bg-[#FEE500] rounded-full p-0.5" />
+                      <span className="text-sm font-medium text-gray-700">카카오톡으로 공유</span>
+                    </div>
+                    <FiChevronRight className="h-5 w-5 text-gray-400" />
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={handleCopyLink}
+                    className="w-full flex items-center justify-between p-3 hover:bg-gray-100 rounded-md text-left"
+                  >
+                    <div className="flex items-center">
+                      <FiLink className="h-7 w-7 mr-3 text-white bg-gray-500 rounded-full p-1.5" />
+                      <span className="text-sm font-medium text-gray-700">초대 링크 복사</span>
+                    </div>
+                    <FiChevronRight className="h-5 w-5 text-gray-400" />
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={handleShareSms}
+                    className="w-full flex items-center justify-between p-3 hover:bg-gray-100 rounded-md text-left"
+                  >
+                    <div className="flex items-center">
+                      <MdOutlineMessage className="h-7 w-7 mr-3 text-white bg-green-500 rounded-full p-1.5" />
+                      <span className="text-sm font-medium text-gray-700">문자/주소록으로 공유</span>
+                    </div>
+                    <FiChevronRight className="h-5 w-5 text-gray-400" />
+                  </button>
+                </li>
+              </ul>
+            </div>
+            <div className="p-4 border-t text-right">
+                <Button variant="outline" onClick={() => setIsShareModalOpen(false)}>
+                  닫기
+                </Button>
+              </div>
           </div>
         </div>
       )}

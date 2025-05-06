@@ -55,7 +55,7 @@ const MOCK_GROUP_MEMBERS = [
   { 
     id: '1', 
     name: '김철수', 
-    photo: '/images/eun.png', 
+    photo: '/images/avatar3.png', 
     isSelected: false,
     location: { lat: 37.5642 + 0.005, lng: 127.0016 + 0.002 },
     schedules: [
@@ -66,7 +66,7 @@ const MOCK_GROUP_MEMBERS = [
   { 
     id: '2', 
     name: '이영희', 
-    photo: '/images/jin.png', 
+    photo: '/images/avatar1.png', 
     isSelected: false,
     location: { lat: 37.5642 - 0.003, lng: 127.0016 - 0.005 },
     schedules: [
@@ -76,7 +76,7 @@ const MOCK_GROUP_MEMBERS = [
   { 
     id: '3', 
     name: '박민수', 
-    photo: '/images/sil.png', 
+    photo: '/images/avatar2.png', 
     isSelected: false,
     location: { lat: 37.5642 + 0.002, lng: 127.0016 - 0.003 },
     schedules: [
@@ -1139,9 +1139,9 @@ export default function HomePage() {
     }
   };
 
-  // 다음 5일 가져오기
-  const getNext5Days = () => {
-    return Array.from({ length: 5 }, (_, i) => {
+  // 다음 7일 가져오기 (수정됨)
+  const getNext7Days = () => {
+    return Array.from({ length: 7 }, (_, i) => { // length를 7로 수정
       const date = addDays(new Date(), i);
       return {
         value: format(date, 'yyyy-MM-dd'),
@@ -1318,7 +1318,7 @@ export default function HomePage() {
               </h2>
               <div className="mb-3 overflow-x-auto pb-2 hide-scrollbar">
                 <div className="flex space-x-2">
-                  {getNext5Days().map((day, idx) => (
+                  {getNext7Days().map((day, idx) => ( // 호출부를 getNext7Days로 수정
                     <button
                       key={idx}
                       onClick={() => handleDateSelect(day.value)}
