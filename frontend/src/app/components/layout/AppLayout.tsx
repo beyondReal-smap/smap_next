@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BottomNavBar } from './index';
 
@@ -12,6 +12,10 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const memberName = searchParams.get('memberName');
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
   // 모바일 메뉴 토글
@@ -36,17 +40,42 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const isHomePage = pathname.startsWith('/home');
   
   // 현재 페이지의 타이틀 가져오기
-  const currentPageTitle = navItems.find(item => pathname.startsWith(item.path))?.name || '홈';
+  let currentPageTitle = navItems.find(item => pathname.startsWith(item.path))?.name || '홈';
+  if (pathname === '/schedule/add') {
+    currentPageTitle = memberName ? `${memberName}의 일정 입력` : 'siri의 일정 입력';
+  }
+  
+  // main 태그의 상단 마진 클래스를 원래대로 복원 (헤더가 항상 있으므로)
+  const mainMarginTopClass = isHomePage || isSimplifiedHeader ? 'mt-12' : 'mt-16';
+
+  // /schedule/add 페이지인지 확인
+  const isScheduleAddPage = pathname === '/schedule/add';
+
+  // children을 감싸는 div의 클래스를 동적으로 결정
+  const mainContentWrapperClass = isScheduleAddPage
+    ? 'h-full' // /schedule/add 페이지에서는 패딩 없이 높이 100% (또는 필요한 경우 bg-white 추가)
+    : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6'; // 기존 패딩
   
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* 헤더 */}
+      {/* 헤더 (조건부 렌더링 제거) */}
       <header className="bg-white shadow-sm fixed top-0 left-0 right-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {isSimplifiedHeader ? (
-            // 간소화된 헤더 (그룹, 일정, 내장소, 로그 페이지)
+            // 간소화된 헤더 (그룹, 일정, 내장소, 로그 페이지, /schedule/add 포함)
             <div className="flex items-center h-12">
-              <h1 className="text-lg font-medium text-gray-900">{currentPageTitle}</h1>
+              {pathname === '/schedule/add' && (
+                <button
+                  onClick={() => router.back()}
+                  aria-label="뒤로 가기"
+                  className="p-2 mr-2 -ml-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              )}
+              <h1 className="text-lg font-medium text-gray-900 truncate">{currentPageTitle}</h1>
             </div>
           ) : isHomePage ? (
             // 홈 페이지 헤더 (홈 텍스트 없이, 높이 동일하게)
@@ -244,8 +273,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </AnimatePresence>
 
       {/* 메인 콘텐츠 */}
-      <main className={`flex-1 ${isHomePage || isSimplifiedHeader ? 'mt-12' : 'mt-16'} bg-gradient-to-b from-indigo-50/50 to-white pb-24 md:pb-16`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className={`flex-1 ${mainMarginTopClass} ${isScheduleAddPage ? 'bg-gray-50 pb-0' : 'bg-gradient-to-b from-indigo-50/50 to-white pb-24 md:pb-16'}`}>
+        <div className={mainContentWrapperClass}>
           {children}
         </div>
       </main>

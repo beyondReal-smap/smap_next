@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { format, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -54,7 +55,7 @@ const MOCK_GROUP_MEMBERS = [
   { 
     id: '1', 
     name: '김철수', 
-    photo: '/frontend/public/images/eun.png', 
+    photo: '/images/eun.png', 
     isSelected: false,
     location: { lat: 37.5642 + 0.005, lng: 127.0016 + 0.002 },
     schedules: [
@@ -65,7 +66,7 @@ const MOCK_GROUP_MEMBERS = [
   { 
     id: '2', 
     name: '이영희', 
-    photo: '/frontend/public/images/jin.png', 
+    photo: '/images/jin.png', 
     isSelected: false,
     location: { lat: 37.5642 - 0.003, lng: 127.0016 - 0.005 },
     schedules: [
@@ -75,7 +76,7 @@ const MOCK_GROUP_MEMBERS = [
   { 
     id: '3', 
     name: '박민수', 
-    photo: '/frontend/public/images/sil.png', 
+    photo: '/images/sil.png', 
     isSelected: false,
     location: { lat: 37.5642 + 0.002, lng: 127.0016 - 0.003 },
     schedules: [
@@ -339,11 +340,11 @@ const modalAnimation = `
 }
 
 .members-section {
-  background: linear-gradient(to right, rgba(79, 70, 229, 0.03), transparent);
+  background: linear-gradient(to right, rgba(22, 163, 74, 0.03), transparent); /* Indigo to Green gradient */
 }
 
 .members-section::before {
-  background-color: #4F46E5; /* 인디고 색상 */
+  background-color: #16A34A; /* Indigo (#4F46E5) to Green-600 (#16A34A) */
 }
 
 .schedule-section {
@@ -373,6 +374,7 @@ const modalAnimation = `
 `;
 
 export default function HomePage() {
+  const router = useRouter();
   const [userName, setUserName] = useState('사용자');
   const [userLocation, setUserLocation] = useState<Location>({ lat: 37.5642, lng: 127.0016 }); // 기본: 서울
   const [locationName, setLocationName] = useState('서울시');
@@ -1250,11 +1252,14 @@ export default function HomePage() {
             <div className="content-section members-section">
               <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
                 그룹 멤버
-                <Link href="/group" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
-                  그룹 관리
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                <Link 
+                  href="/group" 
+                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
                   </svg>
+                  그룹 관리
                 </Link>
               </h2>
               {groupMembers.length > 0 ? (
@@ -1292,12 +1297,26 @@ export default function HomePage() {
             <div className="content-section schedule-section">
               <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
                 {groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정' : '오늘의 일정'}
-                <Link href="/schedule" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
-                  더보기
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                  </svg>
-                </Link>
+                {
+                  groupMembers.some(m => m.isSelected) ? (
+                    <button 
+                      onClick={() => router.push('/schedule/add')}
+                      className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                      </svg>
+                      일정 추가
+                    </button>
+                  ) : (
+                    <Link href="/schedule" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
+                      더보기
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </Link>
+                  )
+                }
               </h2>
               <div className="mb-3 overflow-x-auto pb-2 hide-scrollbar">
                 <div className="flex space-x-2">
@@ -1361,7 +1380,10 @@ export default function HomePage() {
               <div className="content-section places-section mb-12">
                 <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
                   내 주변 장소
-                  <Link href="/location/nearby" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
+                  <Link 
+                    href="/location/nearby" 
+                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
                     더보기
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />

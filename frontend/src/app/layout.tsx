@@ -1,11 +1,12 @@
 import './globals.css'
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
-import { Inter } from 'next/font/google'
+// import { Inter } from 'next/font/google' // Inter 폰트 사용 제거
+import { lineSeed } from './fonts'; // LINE SEED 폰트 임포트
 import { BottomNavBar } from './components/layout'
 import config, { APP_INFO, getLocalizedAppInfo } from '../config'
 
-const inter = Inter({ subsets: ['latin'] })
+// const inter = Inter({ subsets: ['latin'] }) // Inter 폰트 인스턴스 제거
 
 // 언어 설정에 따른 메타데이터 생성
 const getMetadata = (): Metadata => {
@@ -39,7 +40,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className={inter.className}>
+      {/* lineSeed.variable을 사용하여 폰트 변수 적용 및 기본 sans 클래스 추가 */}
+      <body className={`${lineSeed.variable} font-sans`}>
         <div className="min-h-screen bg-gray-50 pb-20">
           <main className="max-w-lg mx-auto px-4 py-6">{children}</main>
           <BottomNavBar />
