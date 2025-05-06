@@ -52,8 +52,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const isScheduleAddPage = pathname === '/schedule/add';
 
   // children을 감싸는 div의 클래스를 동적으로 결정
-  const mainContentWrapperClass = isScheduleAddPage
-    ? 'h-full' // /schedule/add 페이지에서는 패딩 없이 높이 100% (또는 필요한 경우 bg-white 추가)
+  const mainContentWrapperClass = isScheduleAddPage || isSimplifiedHeader
+    ? 'h-full' // /schedule/add 또는 simplifiedHeaderPages 페이지에서는 패딩 없이 높이 100%
     : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6'; // 기존 패딩
   
   return (
@@ -272,14 +272,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
         )}
       </AnimatePresence>
 
-      {/* 메인 콘텐츠 */}
-      <main className={`flex-1 ${mainMarginTopClass} ${isScheduleAddPage ? 'bg-gray-50 pb-0' : 'bg-gradient-to-b from-indigo-50/50 to-white pb-24 md:pb-16'}`}>
+      {/* 메인 컨텐츠 */}
+      <main className={`flex-grow ${mainMarginTopClass} overflow-auto`}>
         <div className={mainContentWrapperClass}>
           {children}
         </div>
       </main>
 
-      {/* 모바일 하단 네비게이션 */}
+      {/* 하단 네비게이션 바 (조건부 렌더링 제거) */}
       <BottomNavBar />
     </div>
   );
