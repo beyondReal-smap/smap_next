@@ -2,17 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import dayjs from 'dayjs';
+import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ko';
-import { DayPicker, Modifiers } from 'react-day-picker';
-import 'react-day-picker/dist/style.css';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
+import { PickersCalendarHeader, PickersCalendarHeaderProps } from '@mui/x-date-pickers/PickersCalendarHeader';
+import { PickersDay, PickersDayProps } from '@mui/x-date-pickers/PickersDay';
 import { format } from 'date-fns';
-import { ko, Locale } from 'date-fns/locale';
+import { ko } from 'date-fns/locale';
 import { PageContainer, Card, Button } from '../components/layout';
-import { FaPlus } from 'react-icons/fa6';
-import { RiKakaoTalkFill } from 'react-icons/ri';
-import { FiLink, FiChevronRight } from 'react-icons/fi';
-import { MdOutlineMessage } from 'react-icons/md';
+import { IconButton, Box, Typography, Button as MuiButton } from '@mui/material';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 // 한국어 로케일 설정
 dayjs.locale('ko');
@@ -40,9 +42,51 @@ interface NewEvent {
   description: string;
 }
 
+// PickersCalendarHeaderProps에 onGoToToday 추가
+interface CustomCalendarHeaderProps extends PickersCalendarHeaderProps {
+  onGoToToday: () => void;
+}
+
+// 커스텀 캘린더 헤더
+function CustomCalendarHeader(props: CustomCalendarHeaderProps) {
+  const { currentMonth, onMonthChange, onGoToToday } = props;
+
+  const handlePrevMonth = () => {
+    onMonthChange(dayjs(currentMonth).subtract(1, 'month'));
+  };
+
+  const handleNextMonth = () => {
+    onMonthChange(dayjs(currentMonth).add(1, 'month'));
+  };
+
+  // onGoToToday prop을 직접 호출
+  const handleGoToTodayFromHeader = () => {
+    onGoToToday(); 
+  };
+
+  return (
+    <Box display="flex" justifyContent="space-between" alignItems="center" p={1} sx={{ borderBottom: '1px solid #e0e0e0' }}>
+      <IconButton onClick={handlePrevMonth} size="small" aria-label="Previous month">
+        <ChevronLeftIcon />
+      </IconButton>
+      <Typography variant="subtitle1" component="div" sx={{ fontSize: '1.25rem' }}>
+        {dayjs(currentMonth).format('YYYY년 MMMM')}
+      </Typography>
+      <Box>
+        <MuiButton onClick={handleGoToTodayFromHeader} variant="text" size="small" sx={{ marginRight: '8px', fontSize: '0.875rem' }}>
+          오늘
+        </MuiButton>
+        <IconButton onClick={handleNextMonth} size="small" aria-label="Next month">
+          <ChevronRightIcon />
+        </IconButton>
+      </Box>
+    </Box>
+  );
+}
+
 export default function SchedulePage() {
   const [eventDates, setEventDates] = useState<Date[]>(MOCK_EVENTS_DATES);
-  const [selectedDay, setSelectedDay] = useState<Date | undefined>(new Date());
+  const [selectedDay, setSelectedDay] = useState<Dayjs | null>(dayjs());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -58,23 +102,19 @@ export default function SchedulePage() {
     location: '',
     description: ''
   });
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const router = useRouter();
 
   const handleDayClick = (
-    day: Date | undefined,
-    selectedDay: Date,
-    modifiers: Modifiers,
-    e: React.MouseEvent
+    newValue: Dayjs | null
   ) => {
-    if (!day) return;
-
-    setSelectedDay(day);
-    const clickedDateStr = dayjs(day).format('YYYY-MM-DDTHH:mm');
+    if (!newValue) return;
+    const newSelectedDay = newValue.startOf('day');
+    setSelectedDay(newSelectedDay);
+    const clickedDateStr = newValue.format('YYYY-MM-DDTHH:mm');
     setNewEvent(prev => ({
         ...prev,
         start: clickedDateStr,
-        end: dayjs(day).add(1, 'hour').format('YYYY-MM-DDTHH:mm'),
+        end: newValue.add(1, 'hour').format('YYYY-MM-DDTHH:mm'),
         allDay: true
     }));
     setIsAddEventModalOpen(true);
@@ -110,60 +150,9 @@ export default function SchedulePage() {
     setIsModalOpen(false);
   };
   
-  const weekendStyles = {
-    saturday: { color: 'blue' },
-    sunday: { color: 'red' },
-  };
-
-  const eventModifiers = {
-    event: eventDates,
-    saturday: (day: Date) => day.getDay() === 6,
-    sunday: (day: Date) => day.getDay() === 0,
-  };
-
-  const eventModifiersStyles = {
-    event: { position: 'relative' } as React.CSSProperties,
-    ...weekendStyles,
-  };
-
-  const formatDay = (day: Date): string => format(day, 'd');
-  const formatCaption = (date: Date, options?: { locale?: Locale }): string => format(date, 'yyyy.MM', { locale: options?.locale });
-  const formatWeekdayName = (day: Date): string => format(day, 'EEE', { locale: ko });
-
-  const AddEventButton = (
-    <Button
-      onClick={() => {
-        const todayStr = dayjs().format('YYYY-MM-DDTHH:mm');
-        setNewEvent({
-            title: '',
-            start: todayStr,
-            end: dayjs().add(1, 'hour').format('YYYY-MM-DDTHH:mm'),
-            allDay: false,
-            backgroundColor: '#4f46e5',
-            location: '',
-            description: ''
-        });
-        setIsAddEventModalOpen(true);
-      }}
-      icon={<FaPlus className="h-5 w-5" />}
-    >
-      새 일정
-    </Button>
-  );
-
-  const ShareButton = (
-    <Button
-      onClick={() => setIsShareModalOpen(true)}
-      className="ml-2"
-    >
-      그룹원 초대
-    </Button>
-  );
-
   const handleGoToToday = () => {
-    const today = new Date();
-    setCurrentMonth(today);
-    setSelectedDay(today);
+    const today = dayjs();
+    setSelectedDay(today.startOf('day'));
     const todayStr = dayjs(today).format('YYYY-MM-DDTHH:mm');
     setNewEvent(prev => ({
         ...prev,
@@ -172,29 +161,31 @@ export default function SchedulePage() {
         allDay: false
     }));
   };
+
+  // 커스텀 Day 컴포넌트 정의 (주말 스타일링)
+  function CustomDay(props: PickersDayProps) {
+    const { day, outsideCurrentMonth, ...other } = props;
+    
+    const isSaturday = day.day() === 6; // 토요일 (0: 일요일, 6: 토요일)
+    const isSunday = day.day() === 0; // 일요일
   
-  const handleShareKakao = () => {
-    console.log("Share via Kakao: Not yet implemented. URL: ", window.location.href);
-    alert('카카오톡 공유 기능은 준비 중입니다.');
-  };
+    const sxProps: any = { // sx prop을 위한 객체
+      fontSize: '1.1rem', // 날짜 숫자 폰트 크기 키움
+      // margin: '0.3rem', // 사용자 설정값, 컨테이너 gap으로 대체 예정이므로 주석 처리
+    };
 
-  const handleCopyLink = () => {
-    const urlToCopy = window.location.href; 
-    navigator.clipboard.writeText(urlToCopy)
-      .then(() => {
-        alert('초대 링크가 복사되었습니다!');
-        setIsShareModalOpen(false);
-      })
-      .catch(err => {
-        console.error('Failed to copy link: ', err);
-        alert('링크 복사에 실패했습니다.');
-      });
-  };
-
-  const handleShareSms = () => {
-    console.log("Share via SMS: Not yet implemented. URL: ", window.location.href);
-    alert('문자 공유 기능은 준비 중입니다.');
-  };
+    if (!outsideCurrentMonth) { // 현재 월의 날짜에만 스타일 적용
+      if (isSaturday) {
+        sxProps.color = 'blue'; // 토요일 색상
+      } else if (isSunday) {
+        sxProps.color = 'red'; // 일요일 색상
+      }
+    }
+  
+    return (
+      <PickersDay {...other} day={day} outsideCurrentMonth={outsideCurrentMonth} sx={sxProps} />
+    );
+  }
 
   return (
     <PageContainer 
@@ -202,92 +193,65 @@ export default function SchedulePage() {
       description="일정을 생성하고 관리하세요"
       showHeader={false}
       showBackButton={false}
-      actions={<div className="flex space-x-2">{AddEventButton}{ShareButton}</div>}
       className="bg-gray-50"
     >
-      <Card className="w-full max-w-4xl mx-auto flex flex-col items-center justify-center">
-        <style>{`
-          .day-with-event::after {
-            content: "";
-            position: absolute;
-            bottom: 4px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 5px;
-            height: 5px;
-            border-radius: 50%;
-            background-color: #f87171;
-          }
-          
-          .rdp-day_outside .rdp-day_button { 
-            color: #d1d5db; 
-            pointer-events: none; 
-          }
-          .rdp-day_today .rdp-day_button { 
-            position: relative; 
-            overflow: visible; 
-          }
-          .rdp-day_today .rdp-day_button::after { 
-            content: "Today";
-            position: absolute;
-            top: -10px; 
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: #3b82f6; 
-            color: white;
-            padding: 1px 4px;
-            border-radius: 4px;
-            font-size: 0.6rem; 
-            line-height: 1;
-            z-index: 1; 
-          }
-        `}</style>
-        <div className="w-full flex justify-end mb-2 px-2 sm:px-3 md:px-4">
-            <Button onClick={handleGoToToday} variant="outline" size="sm">
-                오늘
-            </Button>
-        </div>
-        <div className="w-full">
-          <DayPicker
-            mode="single"
-            required
-            selected={selectedDay}
-            onSelect={handleDayClick}
-            month={currentMonth}
-            onMonthChange={setCurrentMonth}
-            locale={ko}
-            defaultMonth={currentMonth}
-            modifiers={eventModifiers}
-            modifiersClassNames={{ event: 'day-with-event' }}
-            modifiersStyles={eventModifiersStyles}
-            showOutsideDays
-            formatters={{ formatDay, formatCaption, formatWeekdayName }}
-          />
+      <Card className="w-full max-w-4xl mx-auto flex flex-col items-center justify-center font-['Line_Seed']">
+        <div className="w-full p-2">
+          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
+            <DateCalendar 
+              value={selectedDay} 
+              onChange={handleDayClick}
+              slots={{ 
+                day: CustomDay, 
+                calendarHeader: (headerProps) => (
+                  <CustomCalendarHeader 
+                    {...headerProps} 
+                    onGoToToday={handleGoToToday}
+                  />
+                )
+              }}
+              sx={{
+                '& .MuiDayCalendar-weekDayLabel': {
+                  fontSize: '0.9rem',
+                  textTransform: 'none',
+                  margin: '0 0.5rem',
+                },
+                '& .MuiDayCalendar-monthContainer': {
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.4rem',
+                },
+                '& .MuiDayCalendar-weekContainer': {
+                  display: 'flex',
+                  gap: '0.4rem',
+                },
+              }}
+            />
+          </LocalizationProvider>
         </div>
       </Card>
 
-      {isModalOpen && selectedEventDetails && ( 
+      {isModalOpen && selectedEventDetails && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
           <Card className="max-w-lg w-full" title={selectedEventDetails.title || '일정 상세'}>
             <div className="space-y-4">
               <div>
                 <h4 className="text-sm font-medium text-gray-500">일시</h4>
                 <p className="mt-1">
-                  {selectedEventDetails.allDay 
+                  {selectedEventDetails.allDay
                     ? dayjs(selectedEventDetails.start).format('YYYY년 MM월 DD일') + ' (종일)'
-                    : dayjs(selectedEventDetails.start).format('YYYY년 MM월 DD일 HH:mm') + 
-                      (selectedEventDetails.end ? ' ~ ' + dayjs(selectedEventDetails.end).format('HH:mm') : '')
-                  }
+                    : dayjs(selectedEventDetails.start).format('YYYY년 MM월 DD일 HH:mm') +
+                      (selectedEventDetails.end ? ' ~ ' + dayjs(selectedEventDetails.end).format('HH:mm') : '')}
                 </p>
               </div>
-              
+
               {selectedEventDetails.extendedProps?.location && (
                 <div>
                   <h4 className="text-sm font-medium text-gray-500">장소</h4>
                   <p className="mt-1">{selectedEventDetails.extendedProps.location}</p>
                 </div>
               )}
-              
+
               {selectedEventDetails.extendedProps?.description && (
                 <div>
                   <h4 className="text-sm font-medium text-gray-500">설명</h4>
@@ -295,7 +259,7 @@ export default function SchedulePage() {
                 </div>
               )}
             </div>
-            
+
             <div className="mt-6 flex justify-end space-x-3">
               <Button variant="outline" onClick={() => setIsModalOpen(false)}>
                 닫기
@@ -316,7 +280,7 @@ export default function SchedulePage() {
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex justify-between items-start">
               <h3 className="text-lg font-medium text-gray-900 font-suite">새 일정 추가</h3>
-              <button 
+              <button
                 onClick={() => setIsAddEventModalOpen(false)}
                 className="text-gray-400 hover:text-gray-500"
               >
@@ -325,7 +289,7 @@ export default function SchedulePage() {
                 </svg>
               </button>
             </div>
-            
+
             <form className="mt-4 space-y-4">
               <div>
                 <label htmlFor="event-title" className="block text-sm font-medium text-gray-700">제목</label>
@@ -334,7 +298,7 @@ export default function SchedulePage() {
                   id="event-title"
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2"
                   value={newEvent.title}
-                  onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
+                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
                   required
                 />
               </div>
@@ -347,7 +311,7 @@ export default function SchedulePage() {
                     id="event-start"
                     className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2"
                     value={newEvent.start}
-                    onChange={(e) => setNewEvent({...newEvent, start: e.target.value})}
+                    onChange={(e) => setNewEvent({ ...newEvent, start: e.target.value })}
                     required
                   />
                 </div>
@@ -358,7 +322,7 @@ export default function SchedulePage() {
                     id="event-end"
                     className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2"
                     value={newEvent.end}
-                    onChange={(e) => setNewEvent({...newEvent, end: e.target.value})}
+                    onChange={(e) => setNewEvent({ ...newEvent, end: e.target.value })}
                   />
                 </div>
               </div>
@@ -369,7 +333,7 @@ export default function SchedulePage() {
                   id="event-allday"
                   className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                   checked={newEvent.allDay}
-                  onChange={(e) => setNewEvent({...newEvent, allDay: e.target.checked})}
+                  onChange={(e) => setNewEvent({ ...newEvent, allDay: e.target.checked })}
                 />
                 <label htmlFor="event-allday" className="ml-2 block text-sm text-gray-700">하루 종일</label>
               </div>
@@ -381,7 +345,7 @@ export default function SchedulePage() {
                   id="event-location"
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2"
                   value={newEvent.location}
-                  onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
+                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
                 />
               </div>
 
@@ -392,10 +356,10 @@ export default function SchedulePage() {
                   rows={3}
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2"
                   value={newEvent.description}
-                  onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
+                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
                 ></textarea>
               </div>
-              
+
               <div className="mt-6 flex justify-end space-x-3">
                 <button
                   type="button"
@@ -414,70 +378,6 @@ export default function SchedulePage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {isShareModalOpen && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex justify-between items-center p-4 border-b">
-              <h3 className="text-lg font-medium text-gray-900 font-suite">어떻게 초대장을 보낼까요?</h3>
-              <button
-                onClick={() => setIsShareModalOpen(false)}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-2">
-              <ul className="space-y-1">
-                <li>
-                  <button
-                    onClick={handleShareKakao}
-                    className="w-full flex items-center justify-between p-3 hover:bg-gray-100 rounded-md text-left"
-                  >
-                    <div className="flex items-center">
-                      <RiKakaoTalkFill className="h-7 w-7 mr-3 text-[#3C1E1E] bg-[#FEE500] rounded-full p-0.5" />
-                      <span className="text-sm font-medium text-gray-700">카카오톡으로 공유</span>
-                    </div>
-                    <FiChevronRight className="h-5 w-5 text-gray-400" />
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={handleCopyLink}
-                    className="w-full flex items-center justify-between p-3 hover:bg-gray-100 rounded-md text-left"
-                  >
-                    <div className="flex items-center">
-                      <FiLink className="h-7 w-7 mr-3 text-white bg-gray-500 rounded-full p-1.5" />
-                      <span className="text-sm font-medium text-gray-700">초대 링크 복사</span>
-                    </div>
-                    <FiChevronRight className="h-5 w-5 text-gray-400" />
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={handleShareSms}
-                    className="w-full flex items-center justify-between p-3 hover:bg-gray-100 rounded-md text-left"
-                  >
-                    <div className="flex items-center">
-                      <MdOutlineMessage className="h-7 w-7 mr-3 text-white bg-green-500 rounded-full p-1.5" />
-                      <span className="text-sm font-medium text-gray-700">문자/주소록으로 공유</span>
-                    </div>
-                    <FiChevronRight className="h-5 w-5 text-gray-400" />
-                  </button>
-                </li>
-              </ul>
-            </div>
-            <div className="p-4 border-t text-right">
-                <Button variant="outline" onClick={() => setIsShareModalOpen(false)}>
-                  닫기
-                </Button>
-              </div>
           </div>
         </div>
       )}
