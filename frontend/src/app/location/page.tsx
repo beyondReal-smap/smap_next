@@ -5,9 +5,11 @@ import axios from 'axios';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { FiSearch, FiPlus, FiEdit2, FiTrash2, FiMapPin } from 'react-icons/fi';
+import { API_KEYS, MAP_CONFIG } from '../../config';
+import { PageContainer } from '../components/layout';
 
 // Mapbox 토큰 설정
-mapboxgl.accessToken = 'pk.eyJ1Ijoic21hcHVzZXIiLCJhIjoiY2xuMnJ5cDN5MGE3dzJrcGR0ZnY1dXRweSJ9.JWqim9aXdkPOeQI7GbyBqA';
+mapboxgl.accessToken = API_KEYS.MAPBOX_ACCESS_TOKEN;
 
 // 모의 위치 데이터
 const MOCK_LOCATIONS = [
@@ -74,20 +76,32 @@ export default function LocationPage() {
   // Mapbox 초기화
   useEffect(() => {
     if (mapContainer.current && !map.current) {
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/streets-v11',
-        center: [127.0016, 37.5642], // 서울 중심
-        zoom: 11
-      });
+      // Mapbox 액세스 토큰이 없는 경우 초기화 건너뛰기
+      if (!API_KEYS.MAPBOX_ACCESS_TOKEN) {
+        console.warn('Mapbox 액세스 토큰이 설정되지 않았습니다. 지도 초기화를 건너뜁니다.');
+        return;
+      }
+      
+      mapboxgl.accessToken = API_KEYS.MAPBOX_ACCESS_TOKEN;
+      
+      try {
+        map.current = new mapboxgl.Map({
+          container: mapContainer.current,
+          ...MAP_CONFIG.MAPBOX.DEFAULT_OPTIONS,
+          center: [127.0016, 37.5642], // 서울 중심
+          zoom: 11
+        });
 
-      // 줌 및 내비게이션 컨트롤 추가
-      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+        // 줌 및 내비게이션 컨트롤 추가
+        map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-      // 맵 로드 완료 후 마커 추가
-      map.current.on('load', () => {
-        addMarkersToMap();
-      });
+        // 맵 로드 완료 후 마커 추가
+        map.current.on('load', () => {
+          addMarkersToMap();
+        });
+      } catch (error) {
+        console.error('Mapbox 초기화 중 오류가 발생했습니다:', error);
+      }
     }
 
     // 컴포넌트 언마운트 시 맵 제거
@@ -128,80 +142,88 @@ export default function LocationPage() {
   const addMarkersToMap = () => {
     if (!map.current) return;
     
-    // 기존 마커 모두 제거
-    Object.values(markers.current).forEach(marker => marker.remove());
-    markers.current = {};
-    
-    // 필터링된 위치에 마커 추가
-    filteredLocations.forEach(location => {
-      const el = document.createElement('div');
-      el.className = 'marker';
-      el.style.width = '24px';
-      el.style.height = '24px';
-      el.style.backgroundImage = `url('https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png')`;
-      el.style.backgroundSize = 'cover';
-      el.style.cursor = 'pointer';
+    try {
+      // 기존 마커 모두 제거
+      Object.values(markers.current).forEach(marker => marker.remove());
+      markers.current = {};
       
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat(location.coordinates as [number, number])
-        .setPopup(
-          new mapboxgl.Popup({ offset: 25 }).setHTML(
-            `<h3 class="font-bold">${location.name}</h3>
-             <p>${location.address}</p>`
-          )
-        );
-      
-      if (map.current) {
-        marker.addTo(map.current);
-      }
-      
-      // 마커 클릭 시 해당 위치 선택
-      el.addEventListener('click', () => {
-        setSelectedLocation(location);
+      // 필터링된 위치에 마커 추가
+      filteredLocations.forEach(location => {
+        const el = document.createElement('div');
+        el.className = 'marker';
+        el.style.width = '24px';
+        el.style.height = '24px';
+        el.style.backgroundImage = `url('https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png')`;
+        el.style.backgroundSize = 'cover';
+        el.style.cursor = 'pointer';
+        
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat(location.coordinates as [number, number])
+          .setPopup(
+            new mapboxgl.Popup({ offset: 25 }).setHTML(
+              `<h3 class="font-bold">${location.name}</h3>
+              <p>${location.address}</p>`
+            )
+          );
+        
+        if (map.current) {
+          marker.addTo(map.current);
+        }
+        
+        // 마커 클릭 시 해당 위치 선택
+        el.addEventListener('click', () => {
+          setSelectedLocation(location);
+        });
+        
+        markers.current[location.id] = marker;
       });
-      
-      markers.current[location.id] = marker;
-    });
+    } catch (error) {
+      console.error('마커 추가 중 오류가 발생했습니다:', error);
+    }
   };
 
   // 마커 업데이트
   const updateMarkers = (locations: any[]) => {
     if (!map.current) return;
     
-    // 기존 마커 모두 제거
-    Object.values(markers.current).forEach(marker => marker.remove());
-    markers.current = {};
-    
-    // 새 마커 추가
-    locations.forEach(location => {
-      const el = document.createElement('div');
-      el.className = 'marker';
-      el.style.width = '24px';
-      el.style.height = '24px';
-      el.style.backgroundImage = `url('https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png')`;
-      el.style.backgroundSize = 'cover';
-      el.style.cursor = 'pointer';
+    try {
+      // 기존 마커 모두 제거
+      Object.values(markers.current).forEach(marker => marker.remove());
+      markers.current = {};
       
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat(location.coordinates as [number, number])
-        .setPopup(
-          new mapboxgl.Popup({ offset: 25 }).setHTML(
-            `<h3 class="font-bold">${location.name}</h3>
-             <p>${location.address}</p>`
-          )
-        );
-      
-      if (map.current) {
-        marker.addTo(map.current);
-      }
-      
-      // 마커 클릭 이벤트
-      el.addEventListener('click', () => {
-        setSelectedLocation(location);
+      // 새 마커 추가
+      locations.forEach(location => {
+        const el = document.createElement('div');
+        el.className = 'marker';
+        el.style.width = '24px';
+        el.style.height = '24px';
+        el.style.backgroundImage = `url('https://docs.mapbox.com/mapbox-gl-js/assets/custom_marker.png')`;
+        el.style.backgroundSize = 'cover';
+        el.style.cursor = 'pointer';
+        
+        const marker = new mapboxgl.Marker(el)
+          .setLngLat(location.coordinates as [number, number])
+          .setPopup(
+            new mapboxgl.Popup({ offset: 25 }).setHTML(
+              `<h3 class="font-bold">${location.name}</h3>
+              <p>${location.address}</p>`
+            )
+          );
+        
+        if (map.current) {
+          marker.addTo(map.current);
+        }
+        
+        // 마커 클릭 이벤트
+        el.addEventListener('click', () => {
+          setSelectedLocation(location);
+        });
+        
+        markers.current[location.id] = marker;
       });
-      
-      markers.current[location.id] = marker;
-    });
+    } catch (error) {
+      console.error('마커 업데이트 중 오류가 발생했습니다:', error);
+    }
   };
 
   // 위치 선택
@@ -210,14 +232,18 @@ export default function LocationPage() {
     
     // 선택된 위치로 지도 이동
     if (map.current) {
-      map.current.flyTo({
-        center: location.coordinates,
-        zoom: 15,
-        essential: true
-      });
-      
-      // 해당 마커의 팝업 표시
-      markers.current[location.id]?.togglePopup();
+      try {
+        map.current.flyTo({
+          center: location.coordinates,
+          zoom: 15,
+          essential: true
+        });
+        
+        // 해당 마커의 팝업 표시
+        markers.current[location.id]?.togglePopup();
+      } catch (error) {
+        console.error('지도 이동 중 오류가 발생했습니다:', error);
+      }
     }
   };
 
@@ -311,15 +337,10 @@ export default function LocationPage() {
   };
 
   return (
-    <div className="animate-fadeIn">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 font-suite">위치 관리</h1>
-        <p className="mt-2 text-gray-600">저장된 위치를 관리하고 일정에 활용하세요</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <PageContainer title="내 장소" description="자주 가는 장소를 저장하고 관리하세요" showHeader={false}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 위치 목록 패널 */}
-        <div className="lg:col-span-1 bg-white p-4 rounded-xl shadow-md h-[calc(100vh-200px)] flex flex-col">
+        <div className="md:col-span-1 bg-white p-4 rounded-xl shadow-md h-[calc(100vh-200px)] flex flex-col">
           {/* 검색 및 필터 */}
           <div className="mb-4">
             <div className="relative mb-3">
@@ -409,7 +430,7 @@ export default function LocationPage() {
         </div>
 
         {/* 지도 영역 */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-md overflow-hidden h-[calc(100vh-200px)]">
+        <div className="md:col-span-2 bg-white rounded-xl shadow-md overflow-hidden h-[calc(100vh-200px)]">
           <div 
             ref={mapContainer} 
             className="w-full h-full"
@@ -567,6 +588,6 @@ export default function LocationPage() {
       )}
 
       {/* 위치 편집 모달 - 실제 구현 시에는 isEditModalOpen 조건 추가 */}
-    </div>
+    </PageContainer>
   );
 } 

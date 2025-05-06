@@ -215,6 +215,7 @@ export default function SchedulePage() {
     <PageContainer 
       title="일정 관리" 
       description="일정을 생성하고 관리하세요"
+      showHeader={false}
       actions={AddEventButton}
     >
       <Card noPadding>

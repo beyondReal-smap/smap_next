@@ -116,6 +116,12 @@ input:focus, select:focus, textarea:focus {
   @apply w-full max-w-md mx-auto px-4;
 }
 
+/* 지도 컨테이너 스타일 */
+.map-container-full {
+  @apply -mt-6;
+  margin-top: -24px !important;
+}
+
 /* 반응형 타이포그래피 */
 h1 {
   @apply text-2xl sm:text-3xl md:text-4xl font-bold;

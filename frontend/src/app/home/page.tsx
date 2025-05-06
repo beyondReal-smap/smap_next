@@ -6,7 +6,6 @@ import axios from 'axios';
 import { format, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { PageContainer, Card, Button } from '../components/layout';
-import Script from 'next/script';
 import { Loader } from '@googlemaps/js-api-loader';
 // 공통 설정 및 서비스 임포트
 import config, { API_KEYS, detectLanguage, MAP_CONFIG } from '../../config';
@@ -50,18 +49,333 @@ const RECOMMENDED_PLACES = [
   }
 ];
 
+// 그룹멤버 더미 데이터 - 위치 정보 추가
+const MOCK_GROUP_MEMBERS = [
+  { 
+    id: '1', 
+    name: '김철수', 
+    photo: '/frontend/public/images/eun.png', 
+    isSelected: false,
+    location: { lat: 37.5642 + 0.005, lng: 127.0016 + 0.002 },
+    schedules: [
+      { id: 'm1-1', title: '팀 회의', date: '오늘 14:00', location: '강남 사무실' },
+      { id: 'm1-2', title: '저녁 약속', date: '오늘 19:00', location: '이탈리안 레스토랑' }
+    ]
+  },
+  { 
+    id: '2', 
+    name: '이영희', 
+    photo: '/frontend/public/images/jin.png', 
+    isSelected: false,
+    location: { lat: 37.5642 - 0.003, lng: 127.0016 - 0.005 },
+    schedules: [
+      { id: 'm2-1', title: '프로젝트 발표', date: '내일 10:00', location: '회의실 A' }
+    ]
+  },
+  { 
+    id: '3', 
+    name: '박민수', 
+    photo: '/frontend/public/images/sil.png', 
+    isSelected: false,
+    location: { lat: 37.5642 + 0.002, lng: 127.0016 - 0.003 },
+    schedules: [
+      { id: 'm3-1', title: '주간 회의', date: '수요일 11:00', location: '본사 대회의실' },
+      { id: 'm3-2', title: '고객 미팅', date: '목요일 15:00', location: '강남 오피스' }
+    ]
+  }
+];
+
 // 지도 타입 정의 (기존 타입 정의 제거 및 서비스의 타입 사용)
 type MapType = MapTypeService;
 
-// 각 지도 API 로드 상태 추적
-const scriptStatus = {
+// 그룹멤버 타입 정의
+interface GroupMember {
+  id: string;
+  name: string;
+  photo: string;
+  isSelected: boolean;
+  location: Location;
+  schedules: Schedule[];
+}
+
+// 일정 타입 정의
+interface Schedule {
+  id: string;
+  title: string;
+  date: string;
+  location: string;
+}
+
+// 전역 로더 인스턴스 생성 (싱글톤 패턴)
+const googleMapsLoader = new Loader({
+  apiKey: GOOGLE_MAPS_API_KEY,
+  version: 'weekly',
+  libraries: ['places'],
+  id: 'google-maps-script'
+});
+
+// API 로드 상태 추적을 위한 전역 객체
+const apiLoadStatus = {
   google: false,
   naver: false
 };
 
+// CSS 애니메이션 키프레임 스타일 (최상단에 추가)
+const modalAnimation = `
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+/* 지도 화면 전체 차지하기 위한 스타일 */
+.full-map-container {
+  position: fixed;
+  top: 0; /* 헤더 아래부터 시작하지 않고 화면 최상단부터 시작 */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  z-index: 5;
+}
+
+.map-wrapper {
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 60px; /* 헤더 높이만큼 아래에서 시작 */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* Bottom Sheet 스타일 */
+.bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: white;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 40;
+  max-height: 90vh;
+  overflow-y: auto;
+  touch-action: pan-y;
+  padding-bottom: 50px; /* 하단 패딩 추가 */
+}
+
+.bottom-sheet-handle {
+  width: 40px;
+  height: 5px;
+  background-color: #e2e8f0;
+  border-radius: 3px;
+  margin: 8px auto;
+  cursor: grab;
+}
+
+.bottom-sheet-handle:active {
+  cursor: grabbing;
+}
+
+.bottom-sheet-collapsed {
+  transform: translateY(calc(100% - 140px)); /* 150px 높이로 표시 (기존 120px에서 증가) */
+  height: 100vh;
+}
+
+.bottom-sheet-middle {
+  transform: translateY(58%); /* 37vh에 맞게 조정 */
+  height: 100vh;
+}
+
+.bottom-sheet-expanded {
+  transform: translateY(0);
+  height: 100vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* iOS 스크롤 부드럽게 */
+}
+
+/* 맵 헤더 스타일 - 바텀시트 위치에 따라 이동하도록 수정 */
+.map-header {
+  position: fixed;
+  left: 16px;
+  right: auto;
+  width: 60px;
+  z-index: 100;
+  background-color: rgba(255, 255, 255, 0.95);
+  padding: 6px 8px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 60px;
+}
+
+.map-controls {
+  position: fixed;
+  right: 16px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 바텀시트 상태에 따른 헤더 위치 */
+.header-collapsed {
+  bottom: 160px; /* 바텀시트 높이(150px) + 간격(15px) */
+  top: auto;
+  opacity: 1;
+}
+
+.header-middle {
+  bottom: calc(39vh + 10px); /* 바텀시트 중간 높이 + 간격(15px) */
+  top: auto;
+  opacity: 1;
+}
+
+.header-expanded {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* 컨트롤 버튼 위치 별도 관리 */
+.controls-collapsed {
+  bottom: 160px; /* 바텀시트 높이(150px) + 간격(15px) - 헤더와 동일한 위치 */
+  top: auto;
+  opacity: 1;
+}
+
+.controls-middle {
+  bottom: calc(39vh + 10px); /* 바텀시트 중간 높이 + 간격(15px) - 헤더와 동일한 위치 */
+  top: auto;
+  opacity: 1;
+}
+
+.controls-expanded {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.map-control-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #4F46E5;
+  transition: all 0.2s;
+}
+
+.map-control-button:hover {
+  background-color: #EEF2FF;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.15);
+}
+
+/* 섹션 구분선 스타일 추가 */
+.section-divider {
+  height: 1px;
+  background: #f2f2f2;
+  margin: 16px 0;
+  width: 100%;
+}
+
+.section-title {
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  color: #424242;
+  font-weight: 600;
+}
+
+.content-section {
+  padding: 16px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.content-section::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.members-section {
+  background: linear-gradient(to right, rgba(79, 70, 229, 0.03), transparent);
+}
+
+.members-section::before {
+  background-color: #4F46E5; /* 인디고 색상 */
+}
+
+.schedule-section {
+  background: linear-gradient(to right, rgba(236, 72, 153, 0.03), transparent);
+}
+
+.schedule-section::before {
+  background-color: #EC4899; /* 핑크 색상 */
+}
+
+.places-section {
+  background: linear-gradient(to right, rgba(234, 179, 8, 0.03), transparent);
+}
+
+.places-section::before {
+  background-color: #EAB308; /* 노란색 색상 */
+}
+
+/* 스크롤바 숨김 스타일 */
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+`;
+
 export default function HomePage() {
   const [userName, setUserName] = useState('사용자');
   const [userLocation, setUserLocation] = useState<Location>({ lat: 37.5642, lng: 127.0016 }); // 기본: 서울
+  const [locationName, setLocationName] = useState('서울시');
   const [recommendedPlaces, setRecommendedPlaces] = useState(RECOMMENDED_PLACES);
   const [recentSchedules, setRecentSchedules] = useState([
     { id: '1', title: '팀 미팅', date: '오늘 14:00', location: '강남 사무실' },
@@ -72,16 +386,13 @@ export default function HomePage() {
     { id: '1', name: '회사', address: '서울시 강남구 테헤란로 123' },
     { id: '2', name: '자주 가는 카페', address: '서울시 강남구 역삼동 234' },
   ]);
-  const [groupMembers, setGroupMembers] = useState([
-    { id: '1', name: '김철수', photo: '/default-avatar.png', isSelected: false },
-    { id: '2', name: '이영희', photo: '/default-avatar.png', isSelected: false },
-    { id: '3', name: '박민수', photo: '/default-avatar.png', isSelected: false },
-  ]);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>(MOCK_GROUP_MEMBERS);
+  const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [todayWeather, setTodayWeather] = useState({ temp: '22°C', condition: '맑음', icon: '☀️' });
   const [isMapLoading, setIsMapLoading] = useState(true);
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
-  const [mapType, setMapType] = useState<MapType>('google'); // 기본값은 구글맵
+  const [mapType, setMapType] = useState<MapType>('naver'); // 기본값을 네이버 지도로 변경
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
   
@@ -92,6 +403,7 @@ export default function HomePage() {
   const marker = useRef<any>(null);
   const naverMap = useRef<any>(null);
   const naverMarker = useRef<any>(null);
+  const memberMarkers = useRef<any[]>([]);
   
   // 스크립트 로드 및 지도 초기화 상태 추적
   const [mapsInitialized, setMapsInitialized] = useState({
@@ -99,7 +411,201 @@ export default function HomePage() {
     naver: false
   });
 
-  // 사용자 위치 가져오기
+  // Bottom Sheet 상태 관리 추가 - 3단계로 확장 (접힘, 중간, 펼쳐짐)
+  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'middle' | 'expanded'>('collapsed');
+  const bottomSheetRef = useRef<HTMLDivElement>(null);
+  const startDragY = useRef<number | null>(null);
+  const lastY = useRef<number | null>(null);
+  const dragStartTime = useRef<number | null>(null);
+
+  // Bottom Sheet 상태를 클래스 이름으로 변환
+  const getBottomSheetClassName = () => {
+    switch (bottomSheetState) {
+      case 'collapsed': return 'bottom-sheet-collapsed';
+      case 'middle': return 'bottom-sheet-middle';
+      case 'expanded': return 'bottom-sheet-expanded';
+      default: return 'bottom-sheet-collapsed';
+    }
+  };
+
+  // Bottom Sheet 드래그 핸들러 수정
+  const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    startDragY.current = clientY;
+    lastY.current = clientY;
+    dragStartTime.current = Date.now();
+    
+    if (bottomSheetRef.current) {
+      // 트랜지션 효과 일시적으로 제거하여 드래그 시 즉시 반응하도록 함
+      bottomSheetRef.current.style.transition = 'none';
+      
+      // 날씨 영역과 컨트롤 버튼 트랜지션도 제거
+      const mapHeader = document.querySelector('.map-header') as HTMLElement;
+      const mapControls = document.querySelector('.map-controls') as HTMLElement;
+      
+      if (mapHeader) {
+        mapHeader.style.transition = 'none';
+      }
+      
+      if (mapControls) {
+        mapControls.style.transition = 'none';
+      }
+    }
+  };
+
+  // Bottom Sheet 드래그 핸들러 수정
+  const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (startDragY.current === null || !bottomSheetRef.current) return;
+    
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const delta = clientY - startDragY.current;
+    lastY.current = clientY;
+    
+    // 바텀시트 현재 상태에 따른 기본 위치 계산
+    let basePosition = 0;
+    let baseHeaderBottom = 0;
+    
+    if (bottomSheetState === 'collapsed') {
+      basePosition = window.innerHeight - 140; // 접힌 상태 높이
+      baseHeaderBottom = 160; // 헤더 접힌 상태 높이
+    } else if (bottomSheetState === 'middle') {
+      basePosition = window.innerHeight * 0.58; // 중간 상태 위치 (58% 변환)
+      baseHeaderBottom = window.innerHeight * 0.39 + 10; // 39vh + 10px
+    } else {
+      basePosition = 0; // 완전히 펼쳐진 상태
+      baseHeaderBottom = 0;
+    }
+    
+    // 상태 변경없이 직접 transform 적용 (부드러운 드래그 효과)
+    if (delta > 0) { // 아래로 드래그
+      bottomSheetRef.current.style.transform = `translateY(${delta}px)`;
+      
+      // 날씨 영역과 컨트롤 버튼도 함께 움직임
+      const mapHeader = document.querySelector('.map-header') as HTMLElement;
+      const mapControls = document.querySelector('.map-controls') as HTMLElement;
+      
+      if (mapHeader && baseHeaderBottom > 0) {
+        // 드래그 비율에 따라 헤더 위치 계산 (바텀시트가 내려가면 헤더도 내려감)
+        const ratio = delta / basePosition; // 드래그 양 / 기본 위치
+        const headerDelta = ratio * baseHeaderBottom * 0.5; // 헤더 이동 거리 (50% 비율로 따라가게)
+        mapHeader.style.bottom = `${baseHeaderBottom - headerDelta}px`;
+      }
+      
+      if (mapControls && baseHeaderBottom > 0) {
+        // 컨트롤 버튼도 동일하게 적용
+        const ratio = delta / basePosition;
+        const controlsDelta = ratio * baseHeaderBottom * 0.5;
+        mapControls.style.bottom = `${baseHeaderBottom - controlsDelta}px`;
+      }
+    } else if (bottomSheetState !== 'expanded') { // 위로 드래그하면서 완전히 펼쳐진 상태가 아닐 때
+      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
+      if (currentTransform !== 'none') {
+        bottomSheetRef.current.style.transform = `translateY(${delta}px)`;
+        
+        // 날씨 영역과 컨트롤 버튼도 함께 움직임
+        const mapHeader = document.querySelector('.map-header') as HTMLElement;
+        const mapControls = document.querySelector('.map-controls') as HTMLElement;
+        
+        if (mapHeader && baseHeaderBottom > 0) {
+          const ratio = Math.abs(delta) / basePosition;
+          const headerDelta = ratio * baseHeaderBottom * 0.5;
+          mapHeader.style.bottom = `${baseHeaderBottom + headerDelta}px`;
+        }
+        
+        if (mapControls && baseHeaderBottom > 0) {
+          const ratio = Math.abs(delta) / basePosition;
+          const controlsDelta = ratio * baseHeaderBottom * 0.5;
+          mapControls.style.bottom = `${baseHeaderBottom + controlsDelta}px`;
+        }
+      }
+    }
+  };
+
+  // 드래그 종료 핸들러 수정
+  const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
+    if (startDragY.current === null || !bottomSheetRef.current || lastY.current === null) return;
+    
+    // 트랜지션 효과 복원
+    bottomSheetRef.current.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+    
+    // 날씨 영역과 컨트롤 버튼 트랜지션 복원
+    const mapHeader = document.querySelector('.map-header') as HTMLElement;
+    const mapControls = document.querySelector('.map-controls') as HTMLElement;
+    
+    if (mapHeader) {
+      mapHeader.style.transition = 'bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+      mapHeader.style.bottom = '';  // 스타일 초기화하여 CSS 클래스 적용되도록
+    }
+    
+    if (mapControls) {
+      mapControls.style.transition = 'bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+      mapControls.style.bottom = '';  // 스타일 초기화하여 CSS 클래스 적용되도록
+    }
+    
+    const clientY = 'touches' in e ? e.changedTouches[0].clientY : e.clientY;
+    const deltaY = clientY - startDragY.current;
+    const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
+    const velocity = deltaTime > 0 ? deltaY / deltaTime : 0;
+    
+    // 빠른 스와이프 감지 (속도 기반)
+    if (Math.abs(velocity) > 0.5) {
+      if (velocity > 0) { // 빠르게 아래로 스와이프
+        if (bottomSheetState === 'expanded') {
+          setBottomSheetState('middle');
+        } else if (bottomSheetState === 'middle') {
+          setBottomSheetState('collapsed');
+        } else {
+          setBottomSheetState('collapsed');
+        }
+      } else { // 빠르게 위로 스와이프
+        if (bottomSheetState === 'collapsed') {
+          setBottomSheetState('middle');
+        } else if (bottomSheetState === 'middle') {
+          setBottomSheetState('expanded');
+        } else {
+          setBottomSheetState('expanded');
+        }
+      }
+    } else {
+      // 일반 드래그 (위치 기반)
+      if (deltaY > 50) { // 아래로 드래그
+        if (bottomSheetState === 'expanded') {
+          setBottomSheetState('middle');
+        } else if (bottomSheetState === 'middle') {
+          setBottomSheetState('collapsed');
+        } else {
+          setBottomSheetState('collapsed');
+        }
+      } else if (deltaY < -50) { // 위로 드래그
+        if (bottomSheetState === 'collapsed') {
+          setBottomSheetState('middle');
+        } else if (bottomSheetState === 'middle') {
+          setBottomSheetState('expanded');
+        } else {
+          setBottomSheetState('expanded');
+        }
+      } else {
+        // 원래 상태 유지
+        setBottomSheetState(bottomSheetState);
+      }
+    }
+    
+    // 상태 초기화
+    bottomSheetRef.current.style.transform = '';
+    startDragY.current = null;
+    lastY.current = null;
+    dragStartTime.current = null;
+  };
+
+  const toggleBottomSheet = () => {
+    setBottomSheetState(prev => {
+      if (prev === 'collapsed') return 'middle';
+      if (prev === 'middle') return 'expanded';
+      return 'collapsed';
+    });
+  };
+
+  // 사용자 위치 및 지역명 가져오기
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -107,6 +613,9 @@ export default function HomePage() {
           const { longitude, latitude } = position.coords;
           setUserLocation({ lat: latitude, lng: longitude });
           setIsLocationEnabled(true);
+          
+          // 정적 위치 정보 설정 (Geocoding API 대신 간단한 해결책)
+          setLocationName("현재 위치");
         },
         (error) => {
           console.log('위치 정보를 가져올 수 없습니다:', error);
@@ -118,28 +627,76 @@ export default function HomePage() {
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
-    // 개발 환경에서는 기본적으로 구글 지도 사용 (네이버 지도 인증 문제 회피)
-    if (process.env.NODE_ENV === 'development' && 
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      setMapType('google');
-    }
+    // 네이버 지도를 기본으로 사용 (개발 환경에서도 네이버 지도 사용)
+    setMapType('naver');
   }, []);
 
-  // Google Maps API 스크립트 로드 핸들러
-  const handleGoogleMapsLoad = () => {
-    console.log('Google Maps API loaded');
-    scriptStatus.google = true;
-    setGoogleMapsLoaded(true);
+  // Google Maps API 로드 함수
+  const loadGoogleMapsAPI = async () => {
+    // 이미 로드된 경우 중복 로드 방지
+    if (apiLoadStatus.google || window.google?.maps) {
+      console.log('Google Maps API가 이미 로드되어 있습니다.');
+      setGoogleMapsLoaded(true);
+      apiLoadStatus.google = true;
+      return;
+    }
+
+    try {
+      console.log('Google Maps API 로드 시작');
+      // Loader를 사용하여 비동기적으로 API 로드
+      await googleMapsLoader.load();
+      console.log('Google Maps API가 성공적으로 로드되었습니다.');
+      apiLoadStatus.google = true;
+      setGoogleMapsLoaded(true);
+    } catch (error) {
+      console.error('Google Maps API 로드 오류:', error);
+    }
   };
 
-  // Naver Maps API 스크립트 로드 핸들러
-  const handleNaverMapsLoad = () => {
-    console.log('Naver Maps API loaded');
-    scriptStatus.naver = true;
-    setNaverMapsLoaded(true);
+  // Naver Maps API 로드 함수
+  const loadNaverMapsAPI = () => {
+    // 이미 로드된 경우 중복 로드 방지
+    if (apiLoadStatus.naver || window.naver?.maps) {
+      console.log('Naver Maps API가 이미 로드되어 있습니다.');
+      setNaverMapsLoaded(true);
+      apiLoadStatus.naver = true;
+      return;
+    }
+
+    console.log('Naver Maps API 로드 시작');
+    // 네이버 지도 API 로드용 URL 생성
+    const naverMapUrl = new URL(`https://openapi.map.naver.com/openapi/v3/maps.js`);
+    naverMapUrl.searchParams.append('ncpClientId', NAVER_MAPS_CLIENT_ID);
+    naverMapUrl.searchParams.append('submodules', 'panorama,geocoder,drawing,visualization');
+    
+    // script 요소 생성 및 로드
+    const script = document.createElement('script');
+    script.src = naverMapUrl.toString();
+    script.async = true;
+    script.defer = true;
+    script.id = 'naver-maps-script';
+    
+    script.onload = () => {
+      console.log('Naver Maps API가 성공적으로 로드되었습니다.');
+      apiLoadStatus.naver = true;
+      setNaverMapsLoaded(true);
+    };
+    
+    script.onerror = () => {
+      console.error('네이버 지도 스크립트 로드 실패');
+      setMapType('google'); // 로드 실패 시 구글 지도로 전환
+    };
+    
+    // 중복 로드 방지를 위해 기존 스크립트 제거
+    const existingScript = document.getElementById('naver-maps-script');
+    if (existingScript) {
+      existingScript.remove();
+    }
+    
+    document.head.appendChild(script);
   };
 
-  // Google 지도 초기화
+  // Google 지도 초기화 (로고 제거 옵션 추가)
   const initGoogleMap = () => {
     if (!googleMapContainer.current || !googleMapsLoaded || !window.google || !window.google.maps) {
       console.log('Google Maps 초기화를 위한 조건이 충족되지 않음');
@@ -163,7 +720,13 @@ export default function HomePage() {
       // 지도 생성
       const mapOptions = {
         ...MAP_CONFIG.GOOGLE.DEFAULT_OPTIONS,
-        center: userLocation
+        center: userLocation,
+        // 로고 및 UI 컨트롤 숨김 옵션 추가
+        disableDefaultUI: true,
+        zoomControl: false,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false
       };
       
       map.current = new window.google.maps.Map(googleMapContainer.current, mapOptions);
@@ -224,23 +787,6 @@ export default function HomePage() {
       const currentUrl = `${currentDomain}${currentPort ? ':'+currentPort : ''}`;
       console.log(`현재 도메인: ${currentUrl}`);
       console.log(`네이버 지도 허용 도메인 목록:`, MAP_CONFIG.NAVER.ALLOWED_DOMAINS);
-      
-      // 현재 도메인이 허용 목록에 있는지 확인
-      const isDomainAllowed = MAP_CONFIG.NAVER.ALLOWED_DOMAINS.some(domain => 
-        currentDomain === domain || 
-        currentDomain.endsWith(`.${domain}`)
-      );
-      
-      if (!isDomainAllowed) {
-        console.warn(`현재 도메인(${currentUrl})이 네이버 지도 API 허용 목록에 없습니다. 인증 오류가 발생할 수 있습니다.`);
-        // 개발 환경에서는 즉시 Google 지도로 전환
-        if (process.env.NODE_ENV === 'development' && (currentDomain === 'localhost' || currentDomain === '127.0.0.1')) {
-          console.info('개발 환경에서는 Google 지도를 사용합니다.');
-          setMapType('google');
-          setIsMapLoading(false);
-          return; // 네이버 지도 초기화 중단
-        }
-      }
 
       // 인증 상태 확인 변수
       let authFailed = false;
@@ -251,23 +797,22 @@ export default function HomePage() {
         console.error('네이버 지도 인증 실패:', error);
         console.error(`현재 URL(${window.location.href})이 네이버 지도 API에 등록되어 있는지 확인하세요.`);
         console.error('네이버 클라우드 플랫폼 콘솔에서 "Application > Maps > Web 호스팅 URL"에 현재 도메인을 추가해야 합니다.');
-        
-        // 구글 지도로 전환
-        setMapType('google');
         setIsMapLoading(false);
-        
-        // 사용자에게 알림 표시
-        const useGoogleInstead = window.confirm('네이버 지도를 불러올 수 없습니다. 구글 지도를 사용하시겠습니까?');
-        if (!useGoogleInstead) {
-          setIsMapLoading(false);
-        }
       });
 
       try {
-        // 지도 옵션에 MAP_CONFIG의 기본 설정 사용
+        // 지도 옵션에 MAP_CONFIG의 기본 설정 사용 + 로고 및 저작권 표시 숨김
         const mapOptions = {
           ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
-          center: new window.naver.maps.LatLng(userLocation.lat, userLocation.lng)
+          center: new window.naver.maps.LatLng(userLocation.lat, userLocation.lng),
+          // 로고 및 저작권 정보 비표시 옵션 추가
+          logoControl: false,
+          logoControlOptions: {
+            position: window.naver.maps.Position.BOTTOM_LEFT
+          },
+          mapDataControl: false,
+          scaleControl: false,
+          mapTypeControl: false
         };
         
         naverMap.current = new window.naver.maps.Map(naverMapContainer.current, mapOptions);
@@ -304,184 +849,258 @@ export default function HomePage() {
       } catch (innerError) {
         console.error('Naver Maps 객체 생성 오류:', innerError);
         window.naver.maps.Event.removeListener(errorListener);
-        setMapType('google'); // 구글 지도로 전환
+        setIsMapLoading(false);
       }
       
     } catch (error) {
       console.error('Naver Maps 초기화 오류:', error);
       setIsMapLoading(false);
-      setMapType('google'); // 구글 지도로 전환
     }
   };
 
-  // 지도 스크립트 로드 관리
+  // 지도 API 로드 관리
   useEffect(() => {
-    // 현재 선택된 지도 타입에 맞게 스크립트 로드
-    if (mapType === 'google' && !scriptStatus.google) {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-      script.id = 'google-maps-script';
-      script.onload = () => {
-        scriptStatus.google = true;
-        setGoogleMapsLoaded(true);
-      };
-      document.head.appendChild(script);
-      
-      return () => {
-        // 스크립트 제거 함수
-        const existingScript = document.getElementById('google-maps-script');
-        if (existingScript && existingScript.parentNode) {
-          existingScript.parentNode.removeChild(existingScript);
-        }
-      };
-    } else if (mapType === 'naver' && !scriptStatus.naver) {
-      // 개발 환경에서 네이버 맵 인증 오류 방지용 파라미터 추가
-      const naverMapUrl = new URL(`https://openapi.map.naver.com/openapi/v3/maps.js`);
-      naverMapUrl.searchParams.append('ncpClientId', NAVER_MAPS_CLIENT_ID);
-      
-      // 개발 환경일 경우 구글 지도로 즉시 전환 (옵션)
-      if (process.env.NODE_ENV === 'development' && 
-          (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-        console.info('개발 환경에서는 네이버 지도 API 인증 제한으로 인해 구글 지도를 사용합니다.');
-        setMapType('google');
-        return;
-      }
-      
-      // submodules 파라미터 추가
-      naverMapUrl.searchParams.append('submodules', 'panorama,geocoder,drawing,visualization');
-      
-      const script = document.createElement('script');
-      script.src = naverMapUrl.toString();
-      script.async = true;
-      script.defer = true;
-      script.id = 'naver-maps-script';
-      script.onload = () => {
-        scriptStatus.naver = true;
-        setNaverMapsLoaded(true);
-      };
-      script.onerror = () => {
-        console.error('네이버 지도 스크립트 로드 실패');
-        setMapType('google'); // 로드 실패 시 구글 지도로 전환
-      };
-      document.head.appendChild(script);
-      
-      return () => {
-        // 스크립트 제거 함수
-        const existingScript = document.getElementById('naver-maps-script');
-        if (existingScript && existingScript.parentNode) {
-          existingScript.parentNode.removeChild(existingScript);
-        }
-      };
+    // 네이버 지도 API를 우선적으로 로드
+    if (mapType === 'naver' && !apiLoadStatus.naver) {
+      loadNaverMapsAPI();
+    } else if (mapType === 'google' && !apiLoadStatus.google) {
+      loadGoogleMapsAPI();
     }
   }, [mapType]);
 
   // 지도 타입 변경 & 지도 업데이트
   useEffect(() => {
     // 컴포넌트 마운트 시 또는 지도 타입 변경 시 지도 초기화
-    if (mapType === 'google' && googleMapsLoaded) {
-      // 구글 맵 표시, 네이버 맵 숨김
-      if (googleMapContainer.current) googleMapContainer.current.style.display = 'block';
-      if (naverMapContainer.current) naverMapContainer.current.style.display = 'none';
-      
-      // 네이버 지도 리소스 정리
-      if (naverMap.current) {
-        if (naverMarker.current) {
-          naverMarker.current.setMap(null);
-          naverMarker.current = null;
-        }
-        if (typeof naverMap.current.destroy === 'function') {
-          naverMap.current.destroy();
-        }
-        naverMap.current = null;
-      }
-      
-      initGoogleMap();
-    } else if (mapType === 'naver' && naverMapsLoaded) {
+    if (mapType === 'naver' && naverMapsLoaded) {
       // 네이버 맵 표시, 구글 맵 숨김
       if (googleMapContainer.current) googleMapContainer.current.style.display = 'none';
       if (naverMapContainer.current) naverMapContainer.current.style.display = 'block';
       
       // 구글 지도 리소스 정리
-      if (map.current) {
-        if (marker.current) {
-          marker.current.setMap(null);
-          marker.current = null;
-        }
-        map.current = null;
-      }
+      cleanupGoogleMap(map, marker);
       
       initNaverMap();
-    }
-
-    // 컴포넌트 언마운트 시 지도 인스턴스 정리
-    return () => {
-      // 구글 맵 인스턴스 정리
-      if (map.current && marker.current) {
-        marker.current.setMap(null);
-        marker.current = null;
-      }
+    } else if (mapType === 'google' && googleMapsLoaded) {
+      // 구글 맵 표시, 네이버 맵 숨김
+      if (googleMapContainer.current) googleMapContainer.current.style.display = 'block';
+      if (naverMapContainer.current) naverMapContainer.current.style.display = 'none';
       
-      // 네이버 맵 인스턴스 정리
-      if (naverMap.current) {
-        if (naverMarker.current) {
-          naverMarker.current.setMap(null);
-          naverMarker.current = null;
-        }
-        // 네이버 지도는 명시적으로 제거 가능
-        if (typeof naverMap.current.destroy === 'function') {
-          naverMap.current.destroy();
-        }
-        naverMap.current = null;
-      }
-    };
+      // 네이버 지도 리소스 정리
+      cleanupNaverMap(naverMap, naverMarker);
+      
+      initGoogleMap();
+    }
   }, [userLocation, mapType, googleMapsLoaded, naverMapsLoaded]);
   
-  // 컴포넌트 마운트/언마운트 시 전체 정리
+  // 컴포넌트 언마운트 시 리소스 정리
   useEffect(() => {
     return () => {
-      // 구글 맵 인스턴스 정리
-      if (map.current && marker.current) {
-        marker.current.setMap(null);
-        marker.current = null;
-        map.current = null;
-      }
+      // 네이버 맵 리소스 정리
+      cleanupNaverMap(naverMap, naverMarker);
       
-      // 네이버 맵 인스턴스 정리
-      if (naverMap.current) {
-        if (naverMarker.current) {
-          naverMarker.current.setMap(null);
-          naverMarker.current = null;
-        }
-        if (typeof naverMap.current.destroy === 'function') {
-          naverMap.current.destroy();
-        }
-        naverMap.current = null;
-      }
+      // 구글 맵 리소스 정리
+      cleanupGoogleMap(map, marker);
       
-      // 스크립트 태그 정리
-      const googleScript = document.getElementById('google-maps-script');
-      if (googleScript) document.head.removeChild(googleScript);
-      
+      // 네이버 지도 스크립트 제거
       const naverScript = document.getElementById('naver-maps-script');
       if (naverScript) document.head.removeChild(naverScript);
       
-      // 초기화 상태 리셋
-      scriptStatus.google = false;
-      scriptStatus.naver = false;
+      // API 로드 상태 초기화
+      apiLoadStatus.google = false;
+      apiLoadStatus.naver = false;
     };
   }, []);
 
-  // 그룹 멤버 선택 핸들러
+  // 컴포넌트 마운트 시 첫 번째 멤버 자동 선택 - 지도 초기화 후에 실행되도록 수정
+  useEffect(() => {
+    // 지도가 초기화된 후에만 첫 번째 멤버 선택
+    if (groupMembers.length > 0 && 
+        ((mapType === 'naver' && mapsInitialized.naver) || 
+         (mapType === 'google' && mapsInitialized.google))) {
+      console.log('지도 초기화 완료 후 첫 번째 멤버 선택:', groupMembers[0].name);
+      
+      // 약간의 지연 후 멤버 선택 (지도 렌더링이 완전히 완료되도록)
+      const timerId = setTimeout(() => {
+        handleMemberSelect(groupMembers[0].id);
+      }, 500);
+      
+      // 클린업 함수로 타이머 정리
+      return () => clearTimeout(timerId);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);  // 빈 의존성 배열로 변경하여 마운트 시 한 번만 실행
+
+  // 지도 초기화 상태 변경 감지를 위한 별도 useEffect
+  useEffect(() => {
+    // 지도가 초기화되면 첫 번째 멤버 선택
+    if ((mapType === 'naver' && mapsInitialized.naver) || 
+        (mapType === 'google' && mapsInitialized.google)) {
+      if (groupMembers.length > 0) {
+        console.log('지도 초기화 감지 - 첫 번째 멤버 선택:', groupMembers[0].name);
+        
+        const timerId = setTimeout(() => {
+          handleMemberSelect(groupMembers[0].id);
+        }, 500);
+        
+        return () => clearTimeout(timerId);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapsInitialized.naver, mapsInitialized.google, mapType]);
+
+  // 그룹 멤버 선택 핸들러 수정 - 한 번에 한 명만 선택 가능하도록 변경
   const handleMemberSelect = (id: string) => {
-    setGroupMembers(
-      groupMembers.map(member => 
-        member.id === id 
-          ? { ...member, isSelected: !member.isSelected } 
-          : member
-      )
+    console.log('멤버 선택 실행:', id);
+    
+    // 멤버 선택 상태 업데이트 - 한 명만 선택되도록 수정
+    const updatedMembers = groupMembers.map(member => 
+      member.id === id 
+        ? { ...member, isSelected: !member.isSelected } 
+        : { ...member, isSelected: false }  // 다른 멤버는 모두 선택 해제
     );
+    setGroupMembers(updatedMembers);
+    
+    // 선택된 멤버 찾기
+    const selectedMember = updatedMembers.find(member => member.isSelected);
+    
+    // 선택된 멤버의 일정 또는 기본 일정 표시
+    if (selectedMember) {
+      setFilteredSchedules(selectedMember.schedules);
+      console.log('선택된 멤버:', selectedMember.name, selectedMember.location);
+    } else {
+      // 선택된 멤버가 없으면 기본 일정 표시
+      setFilteredSchedules(recentSchedules);
+    }
+    
+    // 지도에 선택된 멤버 마커 표시
+    updateMemberMarkers(updatedMembers);
+  };
+
+  // 멤버 마커 업데이트 함수
+  const updateMemberMarkers = (members: GroupMember[]) => {
+    // 기존 마커 삭제
+    if (memberMarkers.current.length > 0) {
+      memberMarkers.current.forEach(marker => {
+        if (mapType === 'naver' && naverMap.current) {
+          marker.setMap(null);
+        } else if (mapType === 'google' && map.current) {
+          marker.setMap(null);
+        }
+      });
+      memberMarkers.current = [];
+    }
+    
+    // 선택된 멤버 마커 추가
+    const selectedMembers = members.filter(member => member.isSelected);
+    
+    if (selectedMembers.length > 0) {
+      selectedMembers.forEach(member => {
+        if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
+          // 네이버 지도 마커
+          const marker = new window.naver.maps.Marker({
+            position: new window.naver.maps.LatLng(member.location.lat, member.location.lng),
+            map: naverMap.current,
+            icon: {
+              content: `
+                <div style="position: relative; text-align: center;">
+                  <div style="width: 40px; height: 40px; background-color: white; border: 2px solid #4F46E5; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                    <img src="${member.photo}" alt="${member.name}" style="width: 100%; height: 100%; object-fit: cover;" />
+                  </div>
+                  <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background-color: #4F46E5; color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px;">
+                    ${member.name}
+                  </div>
+                </div>
+              `,
+              size: new window.naver.maps.Size(40, 40),
+              anchor: new window.naver.maps.Point(20, 20)
+            }
+          });
+          memberMarkers.current.push(marker);
+        } else if (mapType === 'google' && map.current && googleMapsLoaded) {
+          // 구글 지도 마커
+          const marker = new window.google.maps.Marker({
+            position: member.location,
+            map: map.current,
+            title: member.name,
+            icon: {
+              url: member.photo,
+              scaledSize: new window.google.maps.Size(40, 40),
+              origin: new window.google.maps.Point(0, 0),
+              anchor: new window.google.maps.Point(20, 20),
+              labelOrigin: new window.google.maps.Point(20, 50)
+            },
+            label: {
+              text: member.name,
+              color: 'white',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              background: '#4F46E5',
+              padding: '4px 8px',
+              borderRadius: '4px'
+            }
+          });
+          memberMarkers.current.push(marker);
+        }
+      });
+      
+      // 선택된 멤버 위치로 지도 이동 (항상 수행되도록 수정)
+      if (selectedMembers.length === 1) {
+        const selectedMember = selectedMembers[0];
+        
+        if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
+          // 네이버 지도 이동 및 줌 레벨 조정
+          naverMap.current.setCenter(new window.naver.maps.LatLng(selectedMember.location.lat, selectedMember.location.lng));
+          naverMap.current.setZoom(15); // 적절한 줌 레벨 설정
+          console.log('네이버 지도 중심 이동:', selectedMember.name, selectedMember.location);
+        } else if (mapType === 'google' && map.current && googleMapsLoaded) {
+          // 구글 지도 이동 및 줌 레벨 조정
+          map.current.panTo(selectedMember.location);
+          map.current.setZoom(15); // 적절한 줌 레벨 설정
+          console.log('구글 지도 중심 이동:', selectedMember.name, selectedMember.location);
+        }
+      } else if (selectedMembers.length > 1) {
+        // 여러 멤버가 선택된 경우 모든 마커가 보이도록 지도 조정
+        if (mapType === 'naver' && naverMap.current) {
+          const bounds = new window.naver.maps.LatLngBounds();
+          selectedMembers.forEach(member => {
+            bounds.extend(new window.naver.maps.LatLng(member.location.lat, member.location.lng));
+          });
+          naverMap.current.fitBounds(bounds);
+        } else if (mapType === 'google' && map.current) {
+          const bounds = new window.google.maps.LatLngBounds();
+          selectedMembers.forEach(member => {
+            bounds.extend(member.location);
+          });
+          map.current.fitBounds(bounds);
+        }
+      }
+    }
+  };
+
+  // 선택된 날짜 변경 핸들러
+  const handleDateSelect = (date: string) => {
+    setSelectedDate(date);
+    // 실제 구현 시에는 해당 날짜의 일정 및 위치 데이터를 불러옵니다
+  };
+
+  // 초기 실행 시 일정 필터링 설정
+  useEffect(() => {
+    setFilteredSchedules(recentSchedules);
+  }, [recentSchedules]);
+
+  // 지도 타입 변경 시 멤버 마커 업데이트
+  useEffect(() => {
+    if (
+      (mapType === 'naver' && naverMapsLoaded && naverMap.current) || 
+      (mapType === 'google' && googleMapsLoaded && map.current)
+    ) {
+      updateMemberMarkers(groupMembers);
+    }
+  }, [mapType, naverMapsLoaded, googleMapsLoaded]);
+
+  // 지도 타입 변경 핸들러
+  const handleMapTypeChange = () => {
+    setMapType(prevType => prevType === 'google' ? 'naver' : 'google');
   };
 
   // 위치 정보를 지도에 업데이트
@@ -492,21 +1111,22 @@ export default function HomePage() {
           const { longitude, latitude } = position.coords;
           setUserLocation({ lat: latitude, lng: longitude });
           setIsLocationEnabled(true);
+          setLocationName("현재 위치");
           
-          if (mapType === 'google' && map.current && googleMapsLoaded) {
-            map.current.panTo({ lat: latitude, lng: longitude });
-            map.current.setZoom(14);
-            
-            if (marker.current) {
-              marker.current.setPosition({ lat: latitude, lng: longitude });
-            }
-          } else if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
+          if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
             const naverLatLng = new window.naver.maps.LatLng(latitude, longitude);
             naverMap.current.setCenter(naverLatLng);
             naverMap.current.setZoom(14);
             
             if (naverMarker.current) {
               naverMarker.current.setPosition(naverLatLng);
+            }
+          } else if (mapType === 'google' && map.current && googleMapsLoaded) {
+            map.current.panTo({ lat: latitude, lng: longitude });
+            map.current.setZoom(14);
+            
+            if (marker.current) {
+              marker.current.setPosition({ lat: latitude, lng: longitude });
             }
           }
         },
@@ -515,17 +1135,6 @@ export default function HomePage() {
         }
       );
     }
-  };
-
-  // 지도 타입 변경 핸들러
-  const handleMapTypeChange = () => {
-    setMapType(prevType => prevType === 'google' ? 'naver' : 'google');
-  };
-
-  // 날짜 선택 핸들러
-  const handleDateSelect = (date: string) => {
-    setSelectedDate(date);
-    // 실제 구현 시에는 해당 날짜의 일정 및 위치 데이터를 불러옵니다
   };
 
   // 다음 5일 가져오기
@@ -544,267 +1153,252 @@ export default function HomePage() {
     return km < 1 ? `${(km * 1000).toFixed(0)}m` : `${km.toFixed(1)}km`;
   };
 
+  // 헤더와 컨트롤 버튼의 클래스를 상태에 따라 결정하는 함수 수정
+  const getHeaderClassName = () => {
+    switch (bottomSheetState) {
+      case 'collapsed': return 'header-collapsed';
+      case 'middle': return 'header-middle';
+      case 'expanded': return 'header-expanded';
+      default: return 'header-collapsed';
+    }
+  };
+
+  // 컨트롤 버튼 클래스 별도 관리
+  const getControlsClassName = () => {
+    switch (bottomSheetState) {
+      case 'collapsed': return 'controls-collapsed';
+      case 'middle': return 'controls-middle';
+      case 'expanded': return 'controls-expanded';
+      default: return 'controls-collapsed';
+    }
+  };
+
   return (
-    <div className="animate-fadeIn">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 font-suite">안녕하세요, {userName}님</h1>
-        <div className="mt-2 flex justify-between items-center">
-          <p className="text-gray-600">오늘의 일정과 자주 찾는 장소를 확인하세요</p>
-          <div className="flex items-center space-x-2 text-sm text-gray-600">
-            <span>{todayWeather.icon}</span>
-            <span>{todayWeather.temp}</span>
-            <span>{todayWeather.condition}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 주요 메뉴 바로가기 */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <Link href="/group" className="bg-white p-4 rounded-xl shadow-sm text-center hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 mx-auto bg-indigo-100 rounded-full flex items-center justify-center mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          </div>
-          <span className="text-sm font-medium text-gray-700">그룹</span>
-        </Link>
-        
-        <Link href="/schedule" className="bg-white p-4 rounded-xl shadow-sm text-center hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 mx-auto bg-indigo-100 rounded-full flex items-center justify-center mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-          <span className="text-sm font-medium text-gray-700">일정</span>
-        </Link>
-        
-        <Link href="/location" className="bg-white p-4 rounded-xl shadow-sm text-center hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 mx-auto bg-indigo-100 rounded-full flex items-center justify-center mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            </svg>
-          </div>
-          <span className="text-sm font-medium text-gray-700">내장소</span>
-        </Link>
-        
-        <Link href="/logs" className="bg-white p-4 rounded-xl shadow-sm text-center hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 mx-auto bg-indigo-100 rounded-full flex items-center justify-center mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          </div>
-          <span className="text-sm font-medium text-gray-700">로그</span>
-        </Link>
-      </div>
-
-      {/* 지도 영역 */}
-      <Card className="mb-8 relative overflow-hidden" noPadding>
-        <div className="w-full h-64 relative">
-          {/* 구글 지도 컨테이너 */}
+    <>
+      <style jsx global>{modalAnimation}</style>
+      <PageContainer title="홈" showTitle={false} showBackButton={false} showHeader={false} className="p-0 m-0 w-full h-screen">
+        {/* 지도 영역 (화면 100% 차지, fixed 포지션으로 고정) */}
+        <div className="full-map-container">
+          {/* 지도 컨테이너 */}
+          {isMapLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+            </div>
+          )}
           <div 
             ref={googleMapContainer} 
-            className="w-full h-full absolute inset-0" 
-            style={{ display: mapType === 'google' ? 'block' : 'none' }}
+            className="w-full h-full absolute top-0 left-0" 
+            style={{ display: mapType === 'google' ? 'block' : 'none', zIndex: 6 }}
           ></div>
-          
-          {/* 네이버 지도 컨테이너 */}
           <div 
             ref={naverMapContainer} 
-            className="w-full h-full absolute inset-0" 
-            style={{ display: mapType === 'naver' ? 'block' : 'none' }}
+            className="w-full h-full absolute top-0 left-0" 
+            style={{ display: mapType === 'naver' ? 'block' : 'none', zIndex: 6 }}
           ></div>
-          
-          {/* 로딩 인디케이터 */}
-          {isMapLoading && (
-            <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-10">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-              </div>
-            </div>
+        </div>
+
+        {/* 지도 헤더 - 바텀시트 상태에 따라 위치 변경 */}
+        <div className={`map-header ${getHeaderClassName()}`}>
+          {isLocationEnabled && (
+            <span className="absolute top-1 right-1 inline-flex items-center justify-center w-2 h-2">
+              <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+            </span>
           )}
-          
-          {/* 지도 컨트롤 버튼 */}
-          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white py-2 px-4 rounded-full shadow-md text-sm z-10 flex space-x-2">
-            {!isLocationEnabled ? (
-              <button onClick={updateMapPosition} className="text-indigo-600 font-medium flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                </svg>
-                내 위치 사용
-              </button>
-            ) : (
-              <button onClick={updateMapPosition} className="text-indigo-600 font-medium flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                </svg>
-                내 위치 업데이트
-              </button>
-            )}
-            <button 
-              onClick={handleMapTypeChange} 
-              className="bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full font-medium text-xs"
-            >
-              {mapType === 'google' ? '네이버 지도로 보기' : '구글 지도로 보기'}
-            </button>
+          <div className="flex flex-col items-center w-full">
+            <span className="text-lg">{todayWeather.icon}</span>
+            <span className="text-sm font-medium">{todayWeather.temp}</span>
+            <span className="text-xs text-gray-600">{todayWeather.condition}</span>
           </div>
         </div>
-      </Card>
-
-      {/* 날짜 선택 바 */}
-      <div className="mb-6 flex overflow-x-auto py-2 -mx-4 px-4 space-x-2">
-        {getNext5Days().map((day) => (
-          <button
-            key={day.value}
-            onClick={() => handleDateSelect(day.value)}
-            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium ${
-              selectedDate === day.value
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {day.display}
-          </button>
-        ))}
-      </div>
-
-      {/* 그룹 멤버 선택 영역 */}
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">그룹원 일정</h2>
-        <div className="flex overflow-x-auto py-2 -mx-4 px-4 space-x-4">
-          {groupMembers.map((member) => (
-            <div
-              key={member.id}
-              onClick={() => handleMemberSelect(member.id)}
-              className={`flex-shrink-0 flex flex-col items-center cursor-pointer transition-all ${
-                member.isSelected ? 'opacity-100 scale-105' : 'opacity-70 hover:opacity-100'
-              }`}
-            >
-              <div 
-                className={`w-16 h-16 rounded-full mb-2 overflow-hidden ${
-                  member.isSelected ? 'ring-2 ring-indigo-600' : 'ring-1 ring-gray-200'
-                }`}
-              >
-                <img 
-                  src={member.photo} 
-                  alt={member.name} 
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://via.placeholder.com/150?text=User';
-                  }}
-                />
-              </div>
-              <span className="text-xs text-center font-medium">{member.name}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 다가오는 일정 */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">다가오는 일정</h2>
-          <Link href="/schedule" className="text-sm text-indigo-600 hover:text-indigo-700">
-            더보기
-          </Link>
-        </div>
         
-        <div className="space-y-3">
-          {recentSchedules.length > 0 ? (
-            recentSchedules.map(schedule => (
-              <div key={schedule.id} className="bg-white p-4 rounded-lg shadow-sm">
-                <h3 className="font-medium text-gray-900">{schedule.title}</h3>
-                <div className="mt-2 flex items-start text-sm text-gray-500">
-                  <div className="flex-shrink-0 mr-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <span>{schedule.date}</span>
+        {/* 지도 컨트롤 버튼들 - 바텀시트 상태에 따라 위치 변경 */}
+        <div className={`map-controls ${getControlsClassName()}`}>
+          <button 
+            onClick={() => updateMapPosition()}
+            className="map-control-button"
+            aria-label="내 위치로 이동"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Bottom Sheet - 끌어올리거나 내릴 수 있는 패널 */}
+        <div 
+          ref={bottomSheetRef}
+          className={`bottom-sheet ${getBottomSheetClassName()}`}
+        >
+          {/* 드래그 핸들 */}
+          <div 
+            className="bottom-sheet-handle" 
+            onTouchStart={handleDragStart}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+            onMouseDown={handleDragStart}
+            onMouseMove={handleDragMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
+            onClick={toggleBottomSheet}
+          ></div>
+
+          {/* Bottom Sheet 내용 */}
+          <div className="px-4 pb-8">
+            {/* 그룹 멤버 (최상단으로 이동) */}
+            <div className="content-section members-section">
+              <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+                그룹 멤버
+                <Link href="/group" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
+                  그룹 관리
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                </Link>
+              </h2>
+              {groupMembers.length > 0 ? (
+                <div className="grid grid-cols-4 gap-3 mb-2">
+                  {groupMembers.map((member) => (
+                    <div key={member.id} className="flex flex-col items-center">
+                      <button
+                        onClick={() => handleMemberSelect(member.id)}
+                        className={`w-full flex flex-col items-center transition-all duration-200 ${
+                          member.isSelected ? 'scale-105' : 'scale-100'
+                        }`}
+                      >
+                        <div className={`w-14 h-14 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 ${
+                          member.isSelected ? 'border-indigo-500' : 'border-transparent'
+                        }`}>
+                          <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
+                        </div>
+                        <span className={`block text-sm font-medium mt-1 ${
+                          member.isSelected ? 'text-indigo-700' : 'text-gray-900'
+                        }`}>
+                          {member.name}
+                        </span>
+                      </button>
+                    </div>
+                  ))}
                 </div>
-                <div className="mt-1 flex items-start text-sm text-gray-500">
-                  <div className="flex-shrink-0 mr-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    </svg>
-                  </div>
-                  <span>{schedule.location}</span>
+              ) : (
+                <div className="text-center py-3 text-gray-500">
+                  <p>그룹에 참여한 멤버가 없습니다</p>
+                </div>
+              )}
+            </div>
+
+            {/* 오늘의 일정 - 선택된 멤버의 일정을 표시 */}
+            <div className="content-section schedule-section">
+              <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+                {groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정' : '오늘의 일정'}
+                <Link href="/schedule" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
+                  더보기
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                  </svg>
+                </Link>
+              </h2>
+              <div className="mb-3 overflow-x-auto pb-2 hide-scrollbar">
+                <div className="flex space-x-2">
+                  {getNext5Days().map((day, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleDateSelect(day.value)}
+                      className={`px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors ${
+                        selectedDate === day.value
+                          ? 'bg-gray-900 text-white font-medium shadow-sm'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <div className="text-center">
+                        <div className="text-xs">{day.display}</div>
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="bg-white p-6 rounded-lg shadow-sm text-center text-gray-500">
-              일정이 없습니다
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 추천 장소 영역 */}
-      <div className="mb-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">주변 추천 장소</h2>
-        <div className="space-y-3">
-          {recommendedPlaces.map(place => (
-            <div key={place.id} className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-orange-400">
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="inline-block px-2 py-1 bg-orange-100 text-orange-600 text-xs font-medium rounded mb-2">
-                    추천 장소
-                  </div>
-                  <h3 className="font-medium text-gray-900">{place.title} <span className="text-xs text-gray-500">({formatDistance(place.distance)})</span></h3>
-                  <p className="text-sm text-gray-500 mt-1">{place.address}</p>
-                  <p className="text-sm text-gray-500">{place.tel}</p>
+              
+              {filteredSchedules.length > 0 ? (
+                <ul className="space-y-3">
+                  {filteredSchedules.map((schedule) => (
+                    <li key={schedule.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <Link href={`/schedule/${schedule.id}`} className="flex justify-between items-center">
+                        <div>
+                          <h3 className="font-medium text-gray-900">{schedule.title}</h3>
+                          <div className="text-sm text-gray-500 mt-1">
+                            <span className="inline-flex items-center mr-3">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {schedule.date}
+                            </span>
+                            <span className="inline-flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              </svg>
+                              {schedule.location}
+                            </span>
+                          </div>
+                        </div>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                  <p>{groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}</p>
                 </div>
-                {place.url && (
-                  <a 
-                    href={place.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-orange-500 p-1 rounded-full hover:bg-orange-50"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              )}
+            </div>
+
+            {/* 확장됐을 때만 표시되는 나머지 내용 */}
+            <div className={`transition-all duration-300 ${bottomSheetState === 'expanded' ? 'opacity-100' : 'opacity-0 hidden'}`}>
+              {/* 추천 장소 */}
+              <div className="content-section places-section mb-12">
+                <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+                  내 주변 장소
+                  <Link href="/location/nearby" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
+                    더보기
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                     </svg>
-                  </a>
+                  </Link>
+                </h2>
+                {recommendedPlaces.length > 0 ? (
+                  <ul className="space-y-3">
+                    {recommendedPlaces.map((place) => (
+                      <li key={place.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <Link href={`/location/place/${place.id}`} className="block">
+                          <div className="flex justify-between">
+                            <h3 className="font-medium text-gray-900">{place.title}</h3>
+                            <span className="text-sm text-indigo-600 font-medium">
+                              {formatDistance(place.distance)}
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-500 mt-1">
+                            <div className="inline-flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              </svg>
+                              {place.address}
+                            </div>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-center py-3 text-gray-500">주변 장소가 없습니다</div>
                 )}
               </div>
             </div>
-          ))}
+          </div>
         </div>
-      </div>
-
-      {/* 즐겨찾는 장소 */}
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">즐겨찾는 장소</h2>
-          <Link href="/location" className="text-sm text-indigo-600 hover:text-indigo-700">
-            더보기
-          </Link>
-        </div>
-        
-        <div className="space-y-3">
-          {favoriteLocations.length > 0 ? (
-            favoriteLocations.map(location => (
-              <div key={location.id} className="bg-white p-4 rounded-lg shadow-sm">
-                <h3 className="font-medium text-gray-900">{location.name}</h3>
-                <div className="mt-1 flex items-start text-sm text-gray-500">
-                  <div className="flex-shrink-0 mr-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                    </svg>
-                  </div>
-                  <span>{location.address}</span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="bg-white p-6 rounded-lg shadow-sm text-center text-gray-500">
-              저장된 장소가 없습니다
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      </PageContainer>
+    </>
   );
 } 

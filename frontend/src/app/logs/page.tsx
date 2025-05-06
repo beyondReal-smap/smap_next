@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { PageContainer } from '../components/layout';
 
 // 모의 로그 데이터
 const MOCK_LOGS = [
@@ -157,12 +158,7 @@ export default function LogsPage() {
   };
 
   return (
-    <div className="animate-fadeIn">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 font-suite">활동 로그</h1>
-        <p className="mt-2 text-gray-600">일정, 장소, 그룹 관련 활동 기록을 확인하세요</p>
-      </div>
-
+    <PageContainer title="활동 로그" description="일정, 장소, 그룹 관련 활동 기록을 확인하세요" showHeader={false}>
       {/* 필터 및 검색 */}
       <div className="bg-white p-4 rounded-xl shadow-md mb-6">
         <div className="flex flex-col sm:flex-row gap-4">
@@ -233,6 +229,6 @@ export default function LogsPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 } 

@@ -3,6 +3,36 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { PageContainer } from '../components/layout';
+
+// CSS 애니메이션 키프레임 스타일 (최상단에 추가)
+const modalAnimation = `
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+`;
 
 // 모의 그룹 데이터
 const MOCK_GROUPS = [
@@ -29,11 +59,18 @@ const MOCK_GROUPS = [
   }
 ];
 
+// 새 그룹 폼 타입 정의
+interface GroupForm {
+  name: string;
+  description: string;
+}
+
 export default function GroupPage() {
   const [groups, setGroups] = useState(MOCK_GROUPS);
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [newGroup, setNewGroup] = useState<GroupForm>({ name: '', description: '' });
   const router = useRouter();
 
   // 그룹 선택
@@ -52,49 +89,53 @@ export default function GroupPage() {
     setIsAddModalOpen(true);
   };
 
+  // 모달 닫기
+  const handleCloseModal = () => {
+    setIsAddModalOpen(false);
+    setNewGroup({ name: '', description: '' });
+  };
+
+  // 새 그룹 입력 핸들러
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setNewGroup(prev => ({ ...prev, [name]: value }));
+  };
+
+  // 새 그룹 저장
+  const handleSaveGroup = () => {
+    if (newGroup.name.trim() === '') return;
+    
+    const newGroupItem = {
+      id: `${groups.length + 1}`,
+      name: newGroup.name,
+      description: newGroup.description,
+      members: []
+    };
+    
+    setGroups([...groups, newGroupItem]);
+    handleCloseModal();
+  };
+
   return (
-    <div className="animate-fadeIn">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 font-suite">그룹 관리</h1>
-        <p className="mt-2 text-gray-600">그룹을 생성하고 관리하여 일정과 장소를 공유하세요</p>
-      </div>
-
-      {/* 검색 및 추가 버튼 */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <input
-            type="text"
-            placeholder="그룹 검색..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-            </svg>
-          </div>
-        </div>
-        <button
-          onClick={handleAddGroup}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center justify-center"
-        >
-          <svg className="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-          </svg>
-          새 그룹 만들기
-        </button>
-      </div>
-
+    <PageContainer title="그룹 관리" description="그룹을 생성하고 관리하여 일정과 장소를 공유하세요" showHeader={false}>
       {/* 그룹 목록 및 상세 정보 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {/* 그룹 목록 */}
-        <div className="md:col-span-1">
+        <div className="md:col-span-2">
           <div className="bg-white rounded-xl shadow-md overflow-hidden">
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-2 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-lg font-medium text-gray-900">내 그룹 목록</h2>
+              <button 
+                onClick={handleAddGroup}
+                className="inline-flex items-center justify-center p-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                aria-label="새 그룹 추가"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
+              </button>
             </div>
-            <div className="divide-y divide-gray-200 max-h-[60vh] overflow-y-auto">
+            <div className="divide-y divide-gray-200 max-h-[70vh] overflow-y-auto">
               {filteredGroups.length > 0 ? (
                 filteredGroups.map(group => (
                   <div
@@ -117,10 +158,10 @@ export default function GroupPage() {
         </div>
 
         {/* 그룹 상세 정보 */}
-        <div className="md:col-span-2">
+        <div className="md:col-span-3">
           {selectedGroup ? (
             <div className="bg-white rounded-xl shadow-md overflow-hidden">
-              <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <div className="p-2 border-b border-gray-200 flex justify-between items-center">
                 <h2 className="text-lg font-medium text-gray-900">{selectedGroup.name}</h2>
                 <div className="flex space-x-2">
                   <button className="p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-indigo-600">
@@ -176,20 +217,86 @@ export default function GroupPage() {
               <svg className="h-16 w-16 text-gray-300 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
-              <p className="text-gray-500 text-center">그룹을 선택하거나 새 그룹을 만들어보세요</p>
-              <button
-                onClick={handleAddGroup}
-                className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center"
-              >
-                <svg className="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                </svg>
-                새 그룹 만들기
-              </button>
+              <p className="text-gray-500 text-center">그룹을 선택하세요</p>
             </div>
           )}
         </div>
       </div>
-    </div>
+
+      {/* 새 그룹 추가 모달 */}
+      {isAddModalOpen && (
+        <>
+          <style jsx global>{modalAnimation}</style>
+          <div className="fixed inset-0 z-50 overflow-hidden">
+            <div className="flex items-end md:items-center justify-center min-h-screen text-center md:p-4">
+              <div className="fixed inset-0 transition-opacity backdrop-blur-sm" aria-hidden="true">
+                <div className="absolute inset-0 bg-gray-500 opacity-70 animate-fadeIn"></div>
+              </div>
+
+              <div className="relative w-full md:inline-block md:align-middle md:max-w-lg bg-white md:rounded-lg text-left overflow-hidden shadow-xl transform transition-all animate-slideUp md:animate-fadeIn">
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <svg className="h-6 w-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900">새 그룹 만들기</h3>
+                      <div className="mt-4 space-y-4">
+                        <div>
+                          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                            그룹명
+                          </label>
+                          <input
+                            type="text"
+                            name="name"
+                            id="name"
+                            value={newGroup.name}
+                            onChange={handleInputChange}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                            placeholder="그룹 이름을 입력하세요"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                            그룹 설명
+                          </label>
+                          <textarea
+                            name="description"
+                            id="description"
+                            rows={3}
+                            value={newGroup.description}
+                            onChange={handleInputChange}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+                            placeholder="그룹에 대한 설명을 입력하세요"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={handleSaveGroup}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    그룹 만들기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </PageContainer>
   );
 } 

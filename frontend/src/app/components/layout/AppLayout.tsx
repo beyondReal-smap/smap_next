@@ -28,79 +28,134 @@ export default function AppLayout({ children }: AppLayoutProps) {
     { name: '로그', path: '/logs', icon: 'list' },
   ];
   
+  // 특정 페이지 확인 (그룹, 일정, 내장소, 로그)
+  const simplifiedHeaderPages = ['/group', '/schedule', '/location', '/logs'];
+  const isSimplifiedHeader = simplifiedHeaderPages.some(path => pathname.startsWith(path));
+  
+  // 현재 페이지가 홈 페이지인지 확인
+  const isHomePage = pathname.startsWith('/home');
+  
+  // 현재 페이지의 타이틀 가져오기
+  const currentPageTitle = navItems.find(item => pathname.startsWith(item.path))?.name || '홈';
+  
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* 헤더 */}
       <header className="bg-white shadow-sm fixed top-0 left-0 right-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* 로고 */}
-            <Link href="/home" className="flex items-center">
-              <div className="h-10 w-10 bg-indigo-600 rounded-full flex items-center justify-center">
-                <span className="text-white text-xl font-bold font-suite">S</span>
-              </div>
-              <span className="ml-2 text-xl text-gray-900 font-medium font-suite">SMAP</span>
-            </Link>
-            
-            {/* 페이지 타이틀 - 모바일에서만 표시 */}
-            <div className="md:hidden text-lg font-medium text-gray-900">
-              {navItems.find(item => pathname.startsWith(item.path))?.name || '홈'}
+          {isSimplifiedHeader ? (
+            // 간소화된 헤더 (그룹, 일정, 내장소, 로그 페이지)
+            <div className="flex items-center h-12">
+              <h1 className="text-lg font-medium text-gray-900">{currentPageTitle}</h1>
             </div>
-            
-            {/* 데스크톱 네비게이션 */}
-            <nav className="hidden md:flex space-x-8">
-              {navItems.map((item) => (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors duration-300 ${
-                    pathname.startsWith(item.path)
-                      ? 'text-indigo-600 border-b-2 border-indigo-600'
-                      : 'text-gray-700 hover:text-indigo-500'
-                  }`}
-                >
-                  <span>{item.name}</span>
-                </Link>
-              ))}
-            </nav>
-            
-            {/* 프로필 아이콘 */}
-            <div className="flex items-center">
-              <Link
-                href="/profile"
-                className="ml-3 p-1 rounded-full text-gray-500 hover:text-gray-700 transition-colors duration-300"
-              >
-                <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
+          ) : isHomePage ? (
+            // 홈 페이지 헤더 (홈 텍스트 없이, 높이 동일하게)
+            <div className="flex justify-between items-center h-12">
+              {/* 로고 */}
+              <Link href="/home" className="flex items-center">
+                <img 
+                  src="/images/smap_logo.webp" 
+                  alt="SMAP 로고" 
+                  className="h-5"
+                />
               </Link>
               
-              {/* 모바일 메뉴 버튼 */}
-              <button
-                type="button"
-                className="ml-3 md:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none"
-                onClick={toggleMenu}
-              >
-                <svg
-                  className="h-6 w-6"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
+              {/* 아이콘 모음 */}
+              <div className="flex items-center space-x-2">
+                {/* 알림 메시지 아이콘 */}
+                <Link
+                  href="/notice"
+                  className="p-1.5 rounded-full text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
-                  />
-                </svg>
-              </button>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </Link>
+                
+                {/* 설정 아이콘 */}
+                <Link
+                  href="/setting"
+                  className="p-1.5 rounded-full text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </Link>
+              </div>
             </div>
-          </div>
+          ) : (
+            // 기타 페이지 헤더 (기본 레이아웃)
+            <div className="flex justify-between items-center h-16">
+              {/* 로고 */}
+              <Link href="/home" className="flex items-center">
+                <img 
+                  src="/images/smap_logo.webp" 
+                  alt="SMAP 로고" 
+                  className="h-5"
+                />
+              </Link>
+              
+              {/* 페이지 타이틀 - 모바일에서만 표시 */}
+              <div className="md:hidden text-lg font-medium text-gray-900">
+                {currentPageTitle}
+              </div>
+              
+              {/* 데스크톱 네비게이션 */}
+              <nav className="hidden md:flex space-x-8">
+                {navItems.map((item) => (
+                  <Link
+                    key={item.path}
+                    href={item.path}
+                    className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors duration-300 ${
+                      pathname.startsWith(item.path)
+                        ? 'text-indigo-600 border-b-2 border-indigo-600'
+                        : 'text-gray-700 hover:text-indigo-500'
+                    }`}
+                  >
+                    <span>{item.name}</span>
+                  </Link>
+                ))}
+              </nav>
+              
+              {/* 프로필 아이콘 */}
+              <div className="flex items-center">
+                <Link
+                  href="/profile"
+                  className="ml-3 p-1 rounded-full text-gray-500 hover:text-gray-700 transition-colors duration-300"
+                >
+                  <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                </Link>
+                
+                {/* 모바일 메뉴 버튼 */}
+                <button
+                  type="button"
+                  className="ml-3 md:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none"
+                  onClick={toggleMenu}
+                >
+                  <svg
+                    className="h-6 w-6"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"}
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
@@ -124,14 +179,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <div className="p-4 border-b">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <div className="h-10 w-10 bg-indigo-600 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xl font-bold font-suite">S</span>
-                    </div>
-                    <span className="ml-2 text-xl text-gray-900 font-medium font-suite">SMAP</span>
+                    <img 
+                      src="/images/smap_logo.webp" 
+                      alt="SMAP 로고" 
+                      className="h-4"
+                    />
                   </div>
                   <button
                     type="button"
-                    className="p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none"
+                    className="p-2 rounded-md text-gray-500 hover:text-indigo-700 hover:bg-indigo-50 focus:outline-none transition-colors duration-300"
                     onClick={toggleMenu}
                   >
                     <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -188,7 +244,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </AnimatePresence>
 
       {/* 메인 콘텐츠 */}
-      <main className="flex-1 mt-16 bg-gradient-to-b from-indigo-50/50 to-white pb-24 md:pb-16">
+      <main className={`flex-1 ${isHomePage || isSimplifiedHeader ? 'mt-12' : 'mt-16'} bg-gradient-to-b from-indigo-50/50 to-white pb-24 md:pb-16`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {children}
         </div>

@@ -43,7 +43,7 @@ export default function BottomNavBar() {
                   : 'text-gray-500 hover:text-indigo-500'
               }`}
             >
-              <div className={`p-1 rounded-full ${isActive ? 'bg-indigo-100' : ''}`}>
+              <div className="p-1 rounded-full">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className={`h-6 w-6 ${isActive ? 'stroke-2' : 'stroke-1'}`}
@@ -69,7 +69,6 @@ export default function BottomNavBar() {
                 </svg>
               </div>
               <span className={`text-xs mt-0.5 font-medium ${isActive ? 'font-semibold' : ''}`}>{item.name}</span>
-              {isActive && <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full absolute -top-0.5"></div>}
             </Link>
           );
         })}
