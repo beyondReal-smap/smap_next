@@ -213,7 +213,7 @@ const modalAnimation = `
 }
 
 .bottom-sheet-middle {
-  transform: translateY(58%); /* 37vh에 맞게 조정 */
+  transform: translateY(56%); /* 37vh에 맞게 조정 */
   height: 100vh;
 }
 
@@ -251,13 +251,13 @@ const modalAnimation = `
 
 /* 바텀시트 상태에 따른 헤더 위치 */
 .header-collapsed {
-  bottom: 160px; /* 바텀시트 높이(150px) + 간격(15px) */
+  bottom: 150px; /* 바텀시트 높이(150px) + 간격(15px) */
   top: auto;
   opacity: 1;
 }
 
 .header-middle {
-  bottom: calc(39vh + 10px); /* 바텀시트 중간 높이 + 간격(15px) */
+  bottom: calc(40vh + 10px); /* 바텀시트 중간 높이 + 간격(15px) */
   top: auto;
   opacity: 1;
 }
@@ -269,13 +269,13 @@ const modalAnimation = `
 
 /* 컨트롤 버튼 위치 별도 관리 */
 .controls-collapsed {
-  bottom: 160px; /* 바텀시트 높이(150px) + 간격(15px) - 헤더와 동일한 위치 */
+  bottom: 150px; /* 바텀시트 높이(150px) + 간격(15px) - 헤더와 동일한 위치 */
   top: auto;
   opacity: 1;
 }
 
 .controls-middle {
-  bottom: calc(39vh + 10px); /* 바텀시트 중간 높이 + 간격(15px) - 헤더와 동일한 위치 */
+  bottom: calc(40vh + 10px); /* 바텀시트 중간 높이 + 간격(15px) - 헤더와 동일한 위치 */
   top: auto;
   opacity: 1;
 }
@@ -1052,12 +1052,12 @@ export default function HomePage() {
         if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
           // 네이버 지도 이동 및 줌 레벨 조정
           naverMap.current.setCenter(new window.naver.maps.LatLng(selectedMember.location.lat, selectedMember.location.lng));
-          naverMap.current.setZoom(15); // 적절한 줌 레벨 설정
+          naverMap.current.setZoom(17); // 15에서 17로 수정
           console.log('네이버 지도 중심 이동:', selectedMember.name, selectedMember.location);
         } else if (mapType === 'google' && map.current && googleMapsLoaded) {
           // 구글 지도 이동 및 줌 레벨 조정
           map.current.panTo(selectedMember.location);
-          map.current.setZoom(15); // 적절한 줌 레벨 설정
+          map.current.setZoom(17); // 15에서 17로 수정
           console.log('구글 지도 중심 이동:', selectedMember.name, selectedMember.location);
         }
       } else if (selectedMembers.length > 1) {
@@ -1263,21 +1263,19 @@ export default function HomePage() {
                 </Link>
               </h2>
               {groupMembers.length > 0 ? (
-                <div className="grid grid-cols-4 gap-3 mb-2">
+                <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2">
                   {groupMembers.map((member) => (
-                    <div key={member.id} className="flex flex-col items-center">
+                    <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
                       <button
                         onClick={() => handleMemberSelect(member.id)}
-                        className={`w-full flex flex-col items-center transition-all duration-200 ${
-                          member.isSelected ? 'scale-105' : 'scale-100'
-                        }`}
+                        className={`flex flex-col items-center`}
                       >
-                        <div className={`w-14 h-14 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 ${
+                        <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-transform duration-200 ${
                           member.isSelected ? 'border-indigo-500' : 'border-transparent'
                         }`}>
                           <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
                         </div>
-                        <span className={`block text-sm font-medium mt-1 ${
+                        <span className={`block text-xs font-medium mt-1 ${
                           member.isSelected ? 'text-indigo-700' : 'text-gray-900'
                         }`}>
                           {member.name}

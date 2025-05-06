@@ -42,7 +42,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   // 현재 페이지의 타이틀 가져오기
   let currentPageTitle = navItems.find(item => pathname.startsWith(item.path))?.name || '홈';
   if (pathname === '/schedule/add') {
-    currentPageTitle = memberName ? `${memberName}의 일정 입력` : 'siri의 일정 입력';
+    currentPageTitle = memberName ? `${memberName}의 일정 입력` : '김철수의 일정 입력';
   }
   
   // main 태그의 상단 마진 클래스를 원래대로 복원 (헤더가 항상 있으므로)

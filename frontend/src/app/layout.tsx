@@ -46,6 +46,8 @@ export default function RootLayout({
           <main className="max-w-lg mx-auto px-4 py-6">{children}</main>
           <BottomNavBar />
         </div>
+        {/* DatePicker 캘린더 포털용 div 추가 */}
+        <div id="root-portal"></div>
       </body>
     </html>
   )

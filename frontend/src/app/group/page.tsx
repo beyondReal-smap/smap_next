@@ -117,13 +117,13 @@ export default function GroupPage() {
   };
 
   return (
-    <PageContainer title="그룹 관리" description="그룹을 생성하고 관리하여 일정과 장소를 공유하세요" showHeader={false}>
+    <PageContainer title="그룹 관리" description="그룹을 생성하고 관리하여 일정과 장소를 공유하세요" showHeader={false} showBackButton={false} className="h-full flex flex-col">
       {/* 그룹 목록 및 상세 정보 */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 h-full overflow-y-auto p-2">
         {/* 그룹 목록 */}
-        <div className="md:col-span-2">
-          <div className="bg-white rounded-xl shadow-md overflow-hidden">
-            <div className="p-2 border-b border-gray-200 flex justify-between items-center">
+        <div className="md:col-span-2 h-full flex flex-col">
+          <div className="bg-white rounded-xl shadow-md overflow-hidden flex-grow flex flex-col">
+            <div className="p-2 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
               <h2 className="text-lg font-medium text-gray-900">내 그룹 목록</h2>
               <button 
                 onClick={handleAddGroup}
@@ -135,7 +135,7 @@ export default function GroupPage() {
                 </svg>
               </button>
             </div>
-            <div className="divide-y divide-gray-200 max-h-[70vh] overflow-y-auto">
+            <div className="divide-y divide-gray-200 overflow-y-auto flex-grow">
               {filteredGroups.length > 0 ? (
                 filteredGroups.map(group => (
                   <div
@@ -158,10 +158,10 @@ export default function GroupPage() {
         </div>
 
         {/* 그룹 상세 정보 */}
-        <div className="md:col-span-3">
+        <div className="md:col-span-3 h-full flex flex-col">
           {selectedGroup ? (
-            <div className="bg-white rounded-xl shadow-md overflow-hidden">
-              <div className="p-2 border-b border-gray-200 flex justify-between items-center">
+            <div className="bg-white rounded-xl shadow-md overflow-hidden flex-grow flex flex-col">
+              <div className="p-2 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
                 <h2 className="text-lg font-medium text-gray-900">{selectedGroup.name}</h2>
                 <div className="flex space-x-2">
                   <button className="p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-indigo-600">
@@ -176,7 +176,7 @@ export default function GroupPage() {
                   </button>
                 </div>
               </div>
-              <div className="p-4">
+              <div className="p-4 overflow-y-auto flex-grow">
                 <p className="text-gray-700">{selectedGroup.description}</p>
 
                 <div className="mt-6">
