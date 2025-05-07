@@ -1294,7 +1294,7 @@ export default function HomePage() {
             {/* 오늘의 일정 - 선택된 멤버의 일정을 표시 */}
             <div className="content-section schedule-section">
               <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
-                {groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정' : '오늘의 일정'}
+                {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
                 {
                   groupMembers.some(m => m.isSelected) ? (
                     <button 

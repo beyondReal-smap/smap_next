@@ -225,13 +225,8 @@ const pageStyles = `
   height: 100vh;
 }
 
-.bottom-sheet-middle {
-  transform: translateY(calc(100% - 42vh)); /* 예시 높이, 추후 조정 */
-  height: 100vh;
-}
-
 .bottom-sheet-expanded {
-  transform: translateY(0);
+  transform: translateY(54%); /* 37vh에 맞게 조정 */
   height: 100vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -326,7 +321,7 @@ export default function LogsPage() {
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true); 
 
-  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'middle' | 'expanded'>('collapsed');
+  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'expanded'>('collapsed');
   const bottomSheetRef = useRef<HTMLDivElement>(null);
   const startDragY = useRef<number | null>(null);
   const currentDragY = useRef<number | null>(null);
@@ -422,7 +417,6 @@ export default function LogsPage() {
   const getBottomSheetClassName = () => {
     switch (bottomSheetState) {
       case 'collapsed': return 'bottom-sheet-collapsed';
-      case 'middle': return 'bottom-sheet-middle';
       case 'expanded': return 'bottom-sheet-expanded';
       default: return 'bottom-sheet-collapsed';
     }
@@ -467,25 +461,18 @@ export default function LogsPage() {
         currentSheetY = matrix.m42;
     }
     const windowHeight = window.innerHeight;
-    const expandedThreshold = windowHeight * 0.1;
-    const middleThresholdOpen = windowHeight * 0.4; 
-    const middleThresholdClose = windowHeight * 0.6; // 중간 닫힘 기준 조정 (50vh)
+    const expandedThreshold = windowHeight * 0.1; // 위로 당길 때 expanded로 판단하는 기준 (화면 상단에서 10%)
+    const collapsedThreshold = windowHeight * 0.7; // 아래로 내릴 때 collapsed로 판단하는 기준 (화면 상단에서 70%)
 
-    if (Math.abs(velocity) > 0.3) {
-        if (velocity < 0) { 
-            if (bottomSheetState === 'collapsed') setBottomSheetState('middle');
-            else setBottomSheetState('expanded');
-        } else { 
-            if (bottomSheetState === 'expanded') setBottomSheetState('middle');
-            else setBottomSheetState('collapsed');
-        }
-    } else { 
-        if (currentSheetY < expandedThreshold) {
+    if (Math.abs(velocity) > 0.3) { // 빠른 스와이프
+        if (velocity < 0) { // 위로 스와이프
             setBottomSheetState('expanded');
-        } else if (currentSheetY < middleThresholdOpen && deltaYOverall < 0) { 
-            setBottomSheetState('middle');
-        } else if (currentSheetY < middleThresholdClose && currentSheetY >= expandedThreshold) {
-            setBottomSheetState('middle');
+        } else { // 아래로 스와이프
+            setBottomSheetState('collapsed');
+        }
+    } else { // 느린 드래그
+        if (currentSheetY < (expandedThreshold + collapsedThreshold) / 2) { // 현재 시트 위치가 중간보다 위에 있으면
+            setBottomSheetState('expanded');
         } else {
             setBottomSheetState('collapsed');
         }
@@ -497,8 +484,7 @@ export default function LogsPage() {
   };
   const toggleBottomSheet = () => {
     setBottomSheetState(prev => {
-      if (prev === 'collapsed') return 'middle';
-      if (prev === 'middle') return 'expanded';
+      if (prev === 'collapsed') return 'expanded';
       return 'collapsed';
     });
   };
