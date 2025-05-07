@@ -44,7 +44,10 @@ export default function RootLayout({
       <body className={`${lineSeed.variable} font-sans`}>
         <div className="min-h-screen bg-gray-50 pb-20">
           <main className="max-w-lg mx-auto px-4 py-6">{children}</main>
-          <BottomNavBar />
+          {/* BottomNavBar를 Suspense로 감싸기 */}
+          <Suspense fallback={<div></div>}> 
+            <BottomNavBar />
+          </Suspense>
         </div>
         {/* DatePicker 캘린더 포털용 div 추가 */}
         <div id="root-portal"></div>

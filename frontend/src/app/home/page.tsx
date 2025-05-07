@@ -1008,7 +1008,7 @@ export default function HomePage() {
                   <div style="width: 40px; height: 40px; background-color: white; border: 2px solid #4F46E5; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;">
                     <img src="${member.photo}" alt="${member.name}" style="width: 100%; height: 100%; object-fit: cover;" />
                   </div>
-                  <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background-color: #4F46E5; color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px;">
+                  <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background-color:rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px;">
                     ${member.name}
                   </div>
                 </div>
