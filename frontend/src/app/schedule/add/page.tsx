@@ -952,7 +952,7 @@ export default function AddSchedulePage() {
                   type="search"
                   value={locationSearchQuery}
                   onChange={(e) => setLocationSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearchLocation()} // Enter 키로 검색
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearchLocation(locationSearchQuery)} // locationSearchQuery 전달
                   className="flex-grow w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border placeholder-gray-400"
                   placeholder="도로명, 지번, 건물명 검색"
                   autoFocus
@@ -960,7 +960,7 @@ export default function AddSchedulePage() {
                 <Button
                   type="button"
                   variant="primary"
-                  onClick={handleSearchLocation}
+                  onClick={() => handleSearchLocation(locationSearchQuery)} // locationSearchQuery 전달
                   disabled={isSearchingLocation}
                   className="flex-shrink-0"
                 >

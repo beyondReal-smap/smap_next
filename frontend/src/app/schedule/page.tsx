@@ -51,7 +51,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     groupName: '프론트엔드팀',
     groupColor: 'bg-sky-200', // Changed color and name
     memberName: '김민지',
-    memberPhoto: '/images/avatars/1.png',
+    memberPhoto: '/images/avatar1.png',
   },
   {
     id: '2',
@@ -63,7 +63,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     groupName: '백엔드팀',
     groupColor: 'bg-teal-200', // Changed color and name
     memberName: '이준호',
-    memberPhoto: '/images/avatars/2.png',
+    memberPhoto: '/images/avatar2.png',
   },
   {
     id: '3',
@@ -74,7 +74,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     groupName: '디자인팀',
     groupColor: 'bg-amber-200', // Changed color and name
     memberName: '박서연',
-    memberPhoto: '/images/avatars/3.png',
+    memberPhoto: '/images/avatar3.png',
   },
   {
     id: '4',
@@ -86,7 +86,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     groupName: '전체팀',
     groupColor: 'bg-indigo-200', // Changed color and name
     memberName: '최현우',
-    memberPhoto: '/images/avatars/4.png',
+    memberPhoto: '/images/avatar4.png',
   },
   {
     id: '5',
@@ -98,7 +98,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     groupName: '인프라팀',
     groupColor: 'bg-rose-200', // Changed color and name
     memberName: '정다은',
-    memberPhoto: '/images/avatars/5.png',
+    memberPhoto: '/images/avatar5.png',
   },
   {
     id: '6',
@@ -109,6 +109,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     groupName: 'HR팀',
     groupColor: 'bg-lime-200', // Changed color and name
     memberName: '홍길동',
+    memberPhoto: '/images/avar1.png',
   },
   {
     id: '7',
@@ -119,6 +120,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     groupName: '마케팅팀',
     groupColor: 'bg-fuchsia-200', // Changed color and name
     memberName: '고은별',
+    memberPhoto: '/images/avar2.png',
   },
 ];
 
