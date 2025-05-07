@@ -172,18 +172,19 @@ const statusBgColorMap = {
 };
 
 // CustomCalendarHeaderProps 및 CustomCalendarHeader 함수 (컴포넌트 외부 또는 SchedulePage 내부 상단)
-interface CustomCalendarHeaderProps extends PickersCalendarHeaderProps { onGoToToday: () => void; }
+interface CustomCalendarHeaderProps extends PickersCalendarHeaderProps<Dayjs> { onGoToToday: () => void; }
 function CustomCalendarHeader(props: CustomCalendarHeaderProps) {
   const { currentMonth, onMonthChange, onGoToToday } = props;
-  const handlePrevMonth = () => { onMonthChange(dayjs(currentMonth).subtract(1, 'month')); };
-  const handleNextMonth = () => { onMonthChange(dayjs(currentMonth).add(1, 'month')); };
-  const handleGoToTodayFromHeader = () => { onGoToToday(); };
+  const handlePrevMonth = () => { onMonthChange(dayjs(currentMonth).subtract(1, 'month'), 'left'); };
+  const handleNextMonth = () => { onMonthChange(dayjs(currentMonth).add(1, 'month'), 'right'); };
+  const monthName = dayjs(currentMonth).format('YYYY년 MMMM');
+
   return (
     <Box display="flex" justifyContent="space-between" alignItems="center" p={1} sx={{ borderBottom: '1px solid #e0e0e0' }}>
       <IconButton onClick={handlePrevMonth} size="small" aria-label="Previous month"><ChevronLeftIcon /></IconButton>
-      <Typography variant="subtitle1" component="div" sx={{ fontSize: '1.25rem' }}>{dayjs(currentMonth).format('YYYY년 MMMM')}</Typography>
+      <Typography variant="subtitle1" component="div" sx={{ fontSize: '1.25rem' }}>{monthName}</Typography>
       <Box>
-        <MuiButton onClick={handleGoToTodayFromHeader} variant="text" size="small" sx={{ marginRight: '8px', fontSize: '0.875rem' }}>오늘</MuiButton>
+        <MuiButton onClick={onGoToToday} variant="text" size="small" sx={{ marginRight: '8px', fontSize: '0.875rem' }}>오늘</MuiButton>
         <IconButton onClick={handleNextMonth} size="small" aria-label="Next month"><ChevronRightIcon /></IconButton>
       </Box>
     </Box>
@@ -191,7 +192,7 @@ function CustomCalendarHeader(props: CustomCalendarHeaderProps) {
 }
 
 // CustomDay Props 정의에 hasEvent 추가
-interface CustomDayProps extends PickersDayProps {
+interface CustomDayProps extends PickersDayProps<Dayjs> {
   hasEvent?: boolean;
 }
 

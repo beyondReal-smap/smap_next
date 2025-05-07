@@ -614,10 +614,10 @@ export default function LogsPage() {
           <div className="px-4 pb-4">
             <div 
               ref={logSwipeContainerRef}
-              className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar mb-2"
+              className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar mb-2 gap-2 bg-white"
               onScroll={handleLogSwipeScroll}
             >
-              <div className="w-full flex-shrink-0 snap-start pr-2">
+              <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
                 <div className="content-section members-section min-h-[220px] max-h-[220px] overflow-y-auto">
                   <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
                     그룹 멤버
@@ -672,7 +672,7 @@ export default function LogsPage() {
                 </div>
               </div>
 
-              <div className="w-full flex-shrink-0 snap-start pl-2">
+              <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
                 <div className="content-section summary-section min-h-[220px] max-h-[220px] overflow-y-auto flex flex-col">
                   <div>
                     <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-2">
