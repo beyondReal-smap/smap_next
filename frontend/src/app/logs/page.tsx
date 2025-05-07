@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { format, addDays, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { PageContainer, Button } from '../components/layout';
-import { FiPlus } from 'react-icons/fi';
+import { FiPlus, FiTrendingUp, FiClock, FiZap } from 'react-icons/fi';
 import { API_KEYS, MAP_CONFIG } from '../../config'; 
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
@@ -66,6 +66,20 @@ const RECENT_SCHEDULES_HOME: Schedule[] = [
   { id: 'h_rs_2_log', title: '프로젝트 발표 (로그)', date: '내일 10:00', location: '회의실 A' },
 ];
 // --- home/page.tsx에서 가져온 인터페이스 및 데이터 끝 ---
+
+// 위치기록 요약 데이터 인터페이스
+interface LocationSummary {
+  distance: string;
+  time: string;
+  steps: string;
+}
+
+// 모의 위치기록 요약 데이터
+const MOCK_LOCATION_SUMMARY: LocationSummary = {
+  distance: '12.5 km',
+  time: '2시간 30분',
+  steps: '15,203 걸음',
+};
 
 // 모의 로그 데이터
 const MOCK_LOGS = [
@@ -207,7 +221,7 @@ const pageStyles = `
 }
 
 .bottom-sheet-collapsed {
-  transform: translateY(calc(100% - 200px)); /* 예시 높이, 추후 조정 */
+  transform: translateY(calc(100% - 140px)); /* 예시 높이, 추후 조정 */
   height: 100vh;
 }
 
@@ -309,6 +323,11 @@ export default function LogsPage() {
   const currentDragY = useRef<number | null>(null);
   const dragStartTime = useRef<number | null>(null);
 
+  // 로그 페이지 뷰 상태 및 Ref
+  const [activeLogView, setActiveLogView] = useState<'members' | 'summary'>('members');
+  const logSwipeContainerRef = useRef<HTMLDivElement>(null);
+  const [locationSummary, setLocationSummary] = useState<LocationSummary>(MOCK_LOCATION_SUMMARY);
+
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
       setNaverMapsLoaded(true);
@@ -369,11 +388,22 @@ export default function LogsPage() {
   }, [naverMapsLoaded]);
 
   const getRecentDays = () => {
-    return Array.from({ length: 8 }, (_, i) => {
-      const date = subDays(new Date(), 7 - i); // 오늘부터 7일전까지 (오늘 포함 8일)
+    return Array.from({ length: 15 }, (_, i) => { // 오늘부터 14일전까지 (오늘 포함 15일)
+      const date = subDays(new Date(), 14 - i);
+      const dateString = format(date, 'yyyy-MM-dd');
+      const hasLogs = MOCK_LOGS.some(log => log.timestamp.startsWith(dateString));
+      
+      let displayString = format(date, 'MM.dd (E)', { locale: ko });
+      if (i === 14) {
+        displayString = '오늘';
+      } else if (i === 13) {
+        displayString = '어제';
+      } // 필요시 '그저께' 등 추가 가능
+
       return {
-        value: format(date, 'yyyy-MM-dd'),
-        display: i === 7 ? '오늘' : format(date, 'MM.dd (E)', { locale: ko })
+        value: dateString,
+        display: displayString,
+        hasLogs: hasLogs,
       };
     });
   };
@@ -492,14 +522,29 @@ export default function LogsPage() {
   };
 
   const handleMemberSelect = (id: string) => {
-    const updatedMembers = groupMembers.map(member => member.id === id ? { ...member, isSelected: !member.isSelected } : { ...member, isSelected: false });
+    const updatedMembers = groupMembers.map(member => 
+      member.id === id ? { ...member, isSelected: !member.isSelected } : { ...member, isSelected: false }
+    );
     setGroupMembers(updatedMembers);
     updateMemberMarkers(updatedMembers);
+    setActiveLogView('members'); // 멤버 선택/해제 시 멤버 뷰로 전환
   };
 
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
-    // 이 날짜를 기준으로 실제 데이터 필터링/로딩 로직은 현재 없음
+    // TODO: 선택된 날짜에 해당하는 실제 로그 및 위치 요약 데이터 필터링/로딩 로직 추가
+    // 임시로, 날짜가 변경될 때마다 MOCK_LOCATION_SUMMARY의 값을 약간씩 변경 (실제로는 API 호출)
+    const newDistance = (Math.random() * 20).toFixed(1);
+    const newTimeHours = Math.floor(Math.random() * 5);
+    const newTimeMinutes = Math.floor(Math.random() * 60);
+    const newSteps = Math.floor(Math.random() * 20000).toLocaleString();
+
+    setLocationSummary({
+      distance: `${newDistance} km`,
+      time: `${newTimeHours}시간 ${newTimeMinutes}분`,
+      steps: `${newSteps} 걸음`
+    });
+    setActiveLogView('members'); // 날짜 선택 시에도 우선 멤버 뷰 (필요시 변경)
   };
 
   useEffect(() => {
@@ -507,6 +552,32 @@ export default function LogsPage() {
       if (!groupMembers.some(m => m.isSelected)) { handleMemberSelect(groupMembers[0].id); }
     }
   }, [naverMapsLoaded, map.current, groupMembers]);
+
+  // 로그 뷰 스크롤 이벤트 핸들러
+  const handleLogSwipeScroll = () => {
+    if (logSwipeContainerRef.current) {
+      const { scrollLeft, offsetWidth } = logSwipeContainerRef.current;
+      if (scrollLeft >= offsetWidth / 2 && activeLogView !== 'summary') {
+        setActiveLogView('summary');
+      } else if (scrollLeft < offsetWidth / 2 && activeLogView !== 'members') {
+        setActiveLogView('members');
+      }
+    }
+  };
+
+  // activeLogView 변경 시 스크롤 위치 조정
+  useEffect(() => {
+    if (logSwipeContainerRef.current) {
+      if (activeLogView === 'members') {
+        logSwipeContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        const secondChild = logSwipeContainerRef.current.children[1] as HTMLElement;
+        if (secondChild) {
+          logSwipeContainerRef.current.scrollTo({ left: secondChild.offsetLeft, behavior: 'smooth' });
+        }
+      }
+    }
+  }, [activeLogView]);
 
   return (
     <>
@@ -519,38 +590,114 @@ export default function LogsPage() {
           <div className="bottom-sheet-handle" onTouchStart={handleDragStart} onTouchMove={handleDragMove} onTouchEnd={handleDragEnd} onMouseDown={handleDragStart} onMouseMove={handleDragMove} onMouseUp={handleDragEnd} onMouseLeave={handleDragEnd} onClick={toggleBottomSheet}></div>
           
           <div className="px-4 pb-4">
-            <div className="content-section members-section">
-              <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
-                그룹 멤버
-                <Link href="/group" className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                  <FiPlus className="h-3 w-3 mr-1" />그룹 관리
-                </Link>
-              </h2>
-              {groupMembers.length > 0 ? (
-                <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
-                  {groupMembers.map((member) => (
-                    <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
-                      <button onClick={() => handleMemberSelect(member.id)} className={`flex flex-col items-center focus:outline-none`}>
-                        <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'}`}>
-                          <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
+            <div 
+              ref={logSwipeContainerRef}
+              className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar mb-2"
+              onScroll={handleLogSwipeScroll}
+            >
+              <div className="w-full flex-shrink-0 snap-start pr-2">
+                <div className="content-section members-section min-h-[220px] max-h-[220px] overflow-y-auto">
+                  <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+                    그룹 멤버
+                    <Link href="/group" className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                      <FiPlus className="h-3 w-3 mr-1" />그룹 관리
+                    </Link>
+                  </h2>
+                  {groupMembers.length > 0 ? (
+                    <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
+                      {groupMembers.map((member) => (
+                        <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
+                          <button onClick={() => handleMemberSelect(member.id)} className={`flex flex-col items-center focus:outline-none`}>
+                            <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'}`}>
+                              <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
+                            </div>
+                            <span className={`block text-xs font-medium mt-1.5 ${member.isSelected ? 'text-indigo-700' : 'text-gray-700'}`}>{member.name}</span>
+                          </button>
                         </div>
-                        <span className={`block text-xs font-medium mt-1.5 ${member.isSelected ? 'text-indigo-700' : 'text-gray-700'}`}>{member.name}</span>
-                      </button>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="text-center py-3 text-gray-500"><p>그룹에 참여한 멤버가 없습니다</p></div>
+                  )}
+                  <div className="mt-3 mb-1 flex space-x-2 overflow-x-auto pb-2 hide-scrollbar">
+                    {getRecentDays().map((day, idx) => {
+                      let buttonClass = `px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors text-xs min-w-[60px] h-10 flex flex-col justify-center items-center `;
+                      const isSelected = selectedDate === day.value;
+
+                      if (isSelected) {
+                        buttonClass += 'bg-green-600 text-white font-semibold shadow-md'; 
+                        if (!day.hasLogs) {
+                           buttonClass += ' opacity-70 cursor-not-allowed'; // 선택되었지만 로그 없는 경우 스타일 추가
+                        }
+                      } else if (day.hasLogs) {
+                        buttonClass += 'bg-green-100 text-green-700 hover:bg-green-200 font-medium';
+                      } else {
+                        buttonClass += 'bg-red-100 text-red-700 opacity-70 cursor-not-allowed font-medium';
+                      }
+
+                      return (
+                        <button 
+                          key={idx} 
+                          onClick={() => day.hasLogs && handleDateSelect(day.value)}
+                          disabled={!day.hasLogs}
+                          className={buttonClass}
+                        >
+                          <div className="text-center"><div className="leading-tight">{day.display.split(' ')[0]}</div><div className="leading-tight text-[10px]">{day.display.split(' ')[1] || ''}</div></div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-3 text-gray-500"><p>그룹에 참여한 멤버가 없습니다</p></div>
-              )}
-              <div className="mt-3 mb-1 overflow-x-auto pb-2 hide-scrollbar">
-                {getRecentDays().map((day, idx) => (
-                  <button key={idx} onClick={() => handleDateSelect(day.value)}
-                    className={`px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors ${selectedDate === day.value ? 'bg-gray-900 text-white font-medium shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                    <div className="text-center"><div className="text-xs">{day.display}</div></div>
-                  </button>
-                ))}
               </div>
             </div>
+
+            <div className="w-full flex-shrink-0 snap-start pl-2">
+              <div className="content-section min-h-[220px] max-h-[220px] overflow-y-auto" style={{borderColor: '#FBBF24'}}>
+                <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title" style={{borderBottomColor: 'rgba(251, 191, 36, 0.2)'}}>
+                  위치기록 요약
+                </h2>
+                <div className="space-y-3 p-2">
+                  <div className="flex items-center">
+                    <FiTrendingUp className="w-5 h-5 text-amber-500 mr-3" />
+                    <div>
+                      <p className="text-xs text-gray-500">이동거리</p>
+                      <p className="text-md font-semibold text-gray-700">{locationSummary.distance}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <FiClock className="w-5 h-5 text-amber-500 mr-3" />
+                    <div>
+                      <p className="text-xs text-gray-500">이동시간</p>
+                      <p className="text-md font-semibold text-gray-700">{locationSummary.time}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <FiZap className="w-5 h-5 text-amber-500 mr-3" />
+                    <div>
+                      <p className="text-xs text-gray-500">걸음 수</p>
+                      <p className="text-md font-semibold text-gray-700">{locationSummary.steps}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-center items-center pb-2">
+            <button
+              onClick={() => setActiveLogView('members')}
+              className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
+                activeLogView === 'members' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
+              } transition-all duration-300`}
+              aria-label="멤버 뷰로 전환"
+            />
+            <button
+              onClick={() => setActiveLogView('summary')}
+              className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
+                activeLogView === 'summary' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
+              } transition-all duration-300`}
+              aria-label="요약 뷰로 전환"
+            />
           </div>
         </div>
       </PageContainer>
