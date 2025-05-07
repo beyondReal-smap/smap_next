@@ -2,18 +2,70 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { PageContainer } from '../components/layout';
-// Naver Maps 관련 설정 추가 (location/page.tsx 참고)
+import Link from 'next/link';
+import { format, addDays, subDays } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { PageContainer, Button } from '../components/layout';
+import { FiPlus } from 'react-icons/fi';
 import { API_KEYS, MAP_CONFIG } from '../../config'; 
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
 declare global {
   interface Window {
     naver: any;
+    // google: any; // google은 logs 페이지에서 아직 사용하지 않으므로 주석 처리 또는 필요시 추가
   }
 }
 
 const NAVER_MAPS_CLIENT_ID = API_KEYS.NAVER_MAPS_CLIENT_ID;
+
+// --- home/page.tsx에서 가져온 인터페이스 및 데이터 시작 ---
+interface Location { // home/page.tsx의 Location 인터페이스 (필요시 logs의 기존 LocationData와 병합/조정)
+  lat: number;
+  lng: number;
+}
+
+interface Schedule {
+  id: string;
+  title: string;
+  date: string;
+  location: string;
+}
+
+interface GroupMember {
+  id: string;
+  name: string;
+  photo: string;
+  isSelected: boolean;
+  location: Location; // 위에서 정의한 Location 사용
+  schedules: Schedule[];
+}
+
+const MOCK_GROUP_MEMBERS_HOME: GroupMember[] = [
+  { 
+    id: 'h_gm_1', // ID 중복 방지를 위해 접두사 추가
+    name: '김철수', 
+    photo: '/images/avatar3.png', 
+    isSelected: false,
+    location: { lat: 37.5642 + 0.005, lng: 127.0016 + 0.002 },
+    schedules: []
+  },
+  { 
+    id: 'h_gm_2', 
+    name: '이영희', 
+    photo: '/images/avatar1.png', 
+    isSelected: false,
+    location: { lat: 37.5642 - 0.003, lng: 127.0016 - 0.005 },
+    schedules: []
+  },
+  // 추가 멤버 필요 시 여기에...
+];
+
+const RECENT_SCHEDULES_HOME: Schedule[] = [
+  { id: 'h_rs_1_log', title: '팀 미팅 (로그)', date: '오늘 14:00', location: '강남 사무실' },
+  { id: 'h_rs_2_log', title: '프로젝트 발표 (로그)', date: '내일 10:00', location: '회의실 A' },
+];
+// --- home/page.tsx에서 가져온 인터페이스 및 데이터 끝 ---
 
 // 모의 로그 데이터
 const MOCK_LOGS = [
@@ -155,12 +207,12 @@ const pageStyles = `
 }
 
 .bottom-sheet-collapsed {
-  transform: translateY(calc(100% - 220px)); /* 로그 페이지는 기본 높이를 조금 더 확보 */
+  transform: translateY(calc(100% - 200px)); /* 예시 높이, 추후 조정 */
   height: 100vh;
 }
 
 .bottom-sheet-middle {
-  transform: translateY(calc(100% - 50vh)); /* 중간 높이 50vh */
+  transform: translateY(calc(100% - 40vh)); /* 예시 높이, 추후 조정 */
   height: 100vh;
 }
 
@@ -186,22 +238,70 @@ const pageStyles = `
 .modal-content {
   z-index: 51;
 }
+
+/* --- home/page.tsx 에서 가져온 스타일 추가 시작 --- */
+.section-divider {
+  height: 1px;
+  background: #f2f2f2;
+  margin: 16px 0;
+  width: 100%;
+}
+
+.section-title {
+  margin-bottom: 10px; 
+  padding-bottom: 6px; 
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  color: #424242;
+  font-weight: 600;
+}
+
+.content-section {
+  padding: 10px 16px; 
+  background-color: #ffffff;
+  border-radius: 12px;
+  margin-bottom: 10px; 
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.content-section::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.members-section { /* home 스타일과 다른 색상 적용 가능 */
+  background: linear-gradient(to right, rgba(79, 70, 229, 0.03), transparent); 
+}
+
+.members-section::before {
+  background-color: #4F46E5; 
+}
+
+.schedule-section { /* home 스타일과 다른 색상 적용 가능 */
+  background: linear-gradient(to right, rgba(20, 184, 166, 0.03), transparent); 
+}
+
+.schedule-section::before {
+  background-color: #0D9488; 
+}
+/* --- home/page.tsx 에서 가져온 스타일 추가 끝 --- */
 `;
 
 export default function LogsPage() {
-  // 기존 로그 관련 상태
-  const [logs, setLogs] = useState(MOCK_LOGS);
-  const [filteredLogs, setFilteredLogs] = useState(MOCK_LOGS);
-  const [selectedType, setSelectedType] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
-
-  // 지도 및 바텀시트 관련 상태 및 Ref (location/page.tsx 참고)
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>(MOCK_GROUP_MEMBERS_HOME);
+  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  
   const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<any>(null); // Naver Map 인스턴스
-  const markers = useRef<{ [key: string]: any }>({}); // Naver Marker 인스턴스
+  const map = useRef<any>(null); 
+  const memberNaverMarkers = useRef<any[]>([]); 
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
-  const [isMapLoading, setIsMapLoading] = useState(true); // 지도 로딩 상태
+  const [isMapLoading, setIsMapLoading] = useState(true); 
 
   const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'middle' | 'expanded'>('collapsed');
   const bottomSheetRef = useRef<HTMLDivElement>(null);
@@ -209,7 +309,6 @@ export default function LogsPage() {
   const currentDragY = useRef<number | null>(null);
   const dragStartTime = useRef<number | null>(null);
 
-  // Naver Maps API 로드 함수 (location/page.tsx와 동일)
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
       setNaverMapsLoaded(true);
@@ -234,7 +333,6 @@ export default function LogsPage() {
     }
   };
 
-  // 지도 초기화 useEffect (location/page.tsx와 유사)
   useEffect(() => {
     loadNaverMapsAPI();
   }, []);
@@ -243,19 +341,17 @@ export default function LogsPage() {
     if (naverMapsLoaded && mapContainer.current && !map.current) {
       setIsMapLoading(true);
       try {
-        // 로그 페이지의 초기 지도 중심 (서울 시청 근처)
         const initialCenter = new window.naver.maps.LatLng(37.5665, 126.9780);
         const mapOptions = {
             ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
             center: initialCenter,
-            zoom: MAP_CONFIG.NAVER.DEFAULT_OPTIONS?.zoom || 10, // 로그는 넓은 범위로 시작
+            zoom: MAP_CONFIG.NAVER.DEFAULT_OPTIONS?.zoom || 10, 
             logoControl: false,
             mapDataControl: false,
         };
         map.current = new window.naver.maps.Map(mapContainer.current, mapOptions);
         window.naver.maps.Event.addListener(map.current, 'init', () => {
             console.log('Naver Map initialized for LogsPage');
-            // addMarkersToMapForLogs(); // 로그용 마커 함수 (추후 구현)
             setIsMapLoading(false);
             if(map.current) map.current.refresh(true);
         });
@@ -272,27 +368,16 @@ export default function LogsPage() {
     };
   }, [naverMapsLoaded]);
 
-  // 기존 로그 필터링 useEffect (유지)
-  useEffect(() => {
-    let filtered = logs;
-    if (selectedType !== 'all') {
-      filtered = filtered.filter(log => log.type === selectedType);
-    }
-    if (searchQuery) {
-      filtered = filtered.filter(log => 
-        log.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        log.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.user.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    setFilteredLogs(filtered);
-    // 지도와 연동된 마커 업데이트 (추후 구현)
-    // if (map.current && window.naver?.maps && naverMapsLoaded) {
-    //     updateLogMarkers(filtered);
-    // }
-  }, [logs, selectedType, searchQuery, naverMapsLoaded]);
+  const getRecentDays = () => {
+    return Array.from({ length: 8 }, (_, i) => {
+      const date = subDays(new Date(), 7 - i); // 오늘부터 7일전까지 (오늘 포함 8일)
+      return {
+        value: format(date, 'yyyy-MM-dd'),
+        display: i === 7 ? '오늘' : format(date, 'MM.dd (E)', { locale: ko })
+      };
+    });
+  };
 
-  // 바텀시트 핸들러 함수들 (location/page.tsx와 동일)
   const getBottomSheetClassName = () => {
     switch (bottomSheetState) {
       case 'collapsed': return 'bottom-sheet-collapsed';
@@ -377,173 +462,94 @@ export default function LogsPage() {
     });
   };
 
-  // 기존 로그 관련 함수 (유지)
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return new Intl.DateTimeFormat('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
-  };
-  const getLogTypeStyles = (type: string) => {
-    switch(type) {
-      case 'schedule':
-        return {
-          icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          ),
-          bgColor: 'bg-blue-100',
-          textColor: 'text-blue-600'
-        };
-      case 'location':
-        return {
-          icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            </svg>
-          ),
-          bgColor: 'bg-green-100',
-          textColor: 'text-green-600'
-        };
-      case 'group':
-        return {
-          icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          ),
-          bgColor: 'bg-purple-100',
-          textColor: 'text-purple-600'
-        };
-      default:
-        return {
-          icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          ),
-          bgColor: 'bg-gray-100',
-          textColor: 'text-gray-600'
-        };
+  const updateMemberMarkers = (members: GroupMember[]) => {
+    if (!map.current || !window.naver?.maps || !naverMapsLoaded) return;
+    memberNaverMarkers.current.forEach(marker => marker.setMap(null));
+    memberNaverMarkers.current = [];
+    const selectedMembers = members.filter(member => member.isSelected);
+    selectedMembers.forEach(member => {
+      const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
+      const marker = new window.naver.maps.Marker({
+        position: position, map: map.current,
+        icon: { content: `<div style="position: relative; text-align: center;"><div style="width: 32px; height: 32px; background-color: white; border: 2px solid #4F46E5; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"><img src="${member.photo}" alt="${member.name}" style="width: 100%; height: 100%; object-fit: cover;" /></div><div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">${member.name}</div></div>`, size: new window.naver.maps.Size(36, 48), anchor: new window.naver.maps.Point(18, 42) }, zIndex: 150
+      });
+      memberNaverMarkers.current.push(marker);
+    });
+    if (selectedMembers.length === 1) {
+      const member = selectedMembers[0];
+      if (map.current && member.location) {
+        const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
+        map.current.panTo(position);
+        if (map.current.getZoom() < 14) map.current.setZoom(14); // Zoom 레벨 조정
+      }
+    } else if (selectedMembers.length > 1) {
+      const bounds = new window.naver.maps.LatLngBounds();
+      selectedMembers.forEach(member => {
+        if (member.location) bounds.extend(new window.naver.maps.LatLng(member.location.lat, member.location.lng));
+      });
+      if (!bounds.isEmpty()) map.current.fitBounds(bounds);
     }
   };
+
+  const handleMemberSelect = (id: string) => {
+    const updatedMembers = groupMembers.map(member => member.id === id ? { ...member, isSelected: !member.isSelected } : { ...member, isSelected: false });
+    setGroupMembers(updatedMembers);
+    updateMemberMarkers(updatedMembers);
+  };
+
+  const handleDateSelect = (date: string) => {
+    setSelectedDate(date);
+    // 이 날짜를 기준으로 실제 데이터 필터링/로딩 로직은 현재 없음
+  };
+
+  useEffect(() => {
+    if (naverMapsLoaded && map.current && groupMembers.length > 0) {
+      if (!groupMembers.some(m => m.isSelected)) { handleMemberSelect(groupMembers[0].id); }
+    }
+  }, [naverMapsLoaded, map.current, groupMembers]);
 
   return (
     <>
       <style jsx global>{pageStyles}</style>
       <PageContainer title="활동 로그" showHeader={false} showBackButton={false} className="p-0 m-0 w-full h-screen overflow-hidden">
-        {isMapLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
-            </div>
-        )}
-        <div className="full-map-container">
-          <div 
-            ref={mapContainer} 
-            className="w-full h-full"
-          />
-        </div>
+        {isMapLoading && ( <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-50"> <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div> </div> )}
+        <div className="full-map-container"><div ref={mapContainer} className="w-full h-full" /></div>
 
-        <div
-          ref={bottomSheetRef}
-          className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}
-        >
-          <div 
-            className="bottom-sheet-handle"
-            onTouchStart={handleDragStart}
-            onTouchMove={handleDragMove}
-            onTouchEnd={handleDragEnd}
-            onMouseDown={handleDragStart}
-            onMouseMove={handleDragMove}
-            onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
-            onClick={toggleBottomSheet}
-          ></div>
-
-          {/* 바텀시트 내용: 기존 로그 필터 및 목록 */}
+        <div ref={bottomSheetRef} className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}>
+          <div className="bottom-sheet-handle" onTouchStart={handleDragStart} onTouchMove={handleDragMove} onTouchEnd={handleDragEnd} onMouseDown={handleDragStart} onMouseMove={handleDragMove} onMouseUp={handleDragEnd} onMouseLeave={handleDragEnd} onClick={toggleBottomSheet}></div>
+          
           <div className="px-4 pb-4">
-            {/* 필터 및 검색 (기존 UI 유지) */}
-            <div className="bg-white p-4 rounded-xl shadow-md mb-6 sticky top-0 z-10">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">활동 로그</h2> {/* 바텀시트용 헤더 추가 */} 
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="w-full sm:w-auto">
-                  <select
-                    className="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    value={selectedType}
-                    onChange={(e) => setSelectedType(e.target.value)}
-                  >
-                    <option value="all">전체 유형</option>
-                    <option value="schedule">일정</option>
-                    <option value="location">장소</option>
-                    <option value="group">그룹</option>
-                  </select>
-                </div>
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    placeholder="검색..."
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 로그 목록 (스크롤 영역 높이 조절) */}
-            <div 
-              className="overflow-y-auto"
-              style={{
-                maxHeight: bottomSheetState === 'expanded' 
-                  ? 'calc(90vh - 180px)' // 확장 시 (핸들 + 필터 영역 높이 고려)
-                  : bottomSheetState === 'middle'
-                  ? 'calc(50vh - 150px)' // 중간 시
-                  : 'calc(220px - 150px)'   // 축소 시 (최소 높이)
-              }}
-            >
-              {filteredLogs.length > 0 ? (
-                <div className="divide-y divide-gray-200">
-                  {filteredLogs.map(log => {
-                    const { icon, bgColor, textColor } = getLogTypeStyles(log.type);
-                    return (
-                      <div key={log.id} className="p-4 hover:bg-gray-50">
-                        <div className="flex items-start">
-                          <div className={`flex-shrink-0 rounded-md p-2 ${bgColor} ${textColor}`}>
-                            {icon}
-                          </div>
-                          <div className="ml-4 flex-1">
-                            <div className="flex justify-between items-start">
-                              <h3 className="text-sm font-medium text-gray-900">{log.title}</h3>
-                              <span className="text-xs text-gray-500 whitespace-nowrap">{formatTimestamp(log.timestamp)}</span>
-                            </div>
-                            <p className="mt-1 text-sm text-gray-600 break-all">{log.description}</p>
-                            <div className="mt-2 text-xs text-gray-500">
-                              <span>작업자: {log.user}</span>
-                            </div>
-                          </div>
+            <div className="content-section members-section">
+              <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+                그룹 멤버
+                <Link href="/group" className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                  <FiPlus className="h-3 w-3 mr-1" />그룹 관리
+                </Link>
+              </h2>
+              {groupMembers.length > 0 ? (
+                <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
+                  {groupMembers.map((member) => (
+                    <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
+                      <button onClick={() => handleMemberSelect(member.id)} className={`flex flex-col items-center focus:outline-none`}>
+                        <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'}`}>
+                          <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
                         </div>
-                      </div>
-                    );
-                  })}
+                        <span className={`block text-xs font-medium mt-1.5 ${member.isSelected ? 'text-indigo-700' : 'text-gray-700'}`}>{member.name}</span>
+                      </button>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <div className="p-8 text-center text-gray-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p>표시할 로그가 없습니다.</p>
-                </div>
+                <div className="text-center py-3 text-gray-500"><p>그룹에 참여한 멤버가 없습니다</p></div>
               )}
+              <div className="mt-3 mb-1 overflow-x-auto pb-2 hide-scrollbar">
+                {getRecentDays().map((day, idx) => (
+                  <button key={idx} onClick={() => handleDateSelect(day.value)}
+                    className={`px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors ${selectedDate === day.value ? 'bg-gray-900 text-white font-medium shadow-sm' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                    <div className="text-center"><div className="text-xs">{day.display}</div></div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
