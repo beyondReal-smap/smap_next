@@ -1461,17 +1461,16 @@ export default function LocationPage() {
         <div
           ref={bottomSheetRef}
           className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}
+          onTouchStart={handleDragStart}
+          onTouchMove={handleDragMove}
+          onTouchEnd={handleDragEnd}
+          onMouseDown={handleDragStart}
+          onMouseMove={handleDragMove}
+          onMouseUp={handleDragEnd} // 사용자가 마우스를 브라우저 창 밖으로 드래그했다가 놓는 경우를 위해 onMouseLeave에도 handleDragEnd를 추가하는 것이 좋을 수 있습니다.
         >
           <div 
             className="bottom-sheet-handle"
-            onTouchStart={handleDragStart}
-            onTouchMove={handleDragMove}
-            onTouchEnd={handleDragEnd}
-            onMouseDown={handleDragStart}
-            onMouseMove={handleDragMove}
-            onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
-            onClick={toggleBottomSheet}
+            onClick={toggleBottomSheet} // 핸들에는 클릭 이벤트만 남김
           ></div>
           <div className="px-4 pb-4"> 
             <div

@@ -594,8 +594,21 @@ export default function LogsPage() {
         {isMapLoading && ( <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-50"> <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div> </div> )}
         <div className="full-map-container"><div ref={mapContainer} className="w-full h-full" /></div>
 
-        <div ref={bottomSheetRef} className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}>
-          <div className="bottom-sheet-handle" onTouchStart={handleDragStart} onTouchMove={handleDragMove} onTouchEnd={handleDragEnd} onMouseDown={handleDragStart} onMouseMove={handleDragMove} onMouseUp={handleDragEnd} onMouseLeave={handleDragEnd} onClick={toggleBottomSheet}></div>
+        <div 
+          ref={bottomSheetRef} 
+          className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}
+          onTouchStart={handleDragStart}
+          onTouchMove={handleDragMove}
+          onTouchEnd={handleDragEnd}
+          onMouseDown={handleDragStart}
+          onMouseMove={handleDragMove}
+          onMouseUp={handleDragEnd}
+          onMouseLeave={handleDragEnd}
+        >
+          <div 
+            className="bottom-sheet-handle" 
+            onClick={toggleBottomSheet} // 핸들에는 클릭 이벤트만 남김
+          ></div>
           
           <div className="px-4 pb-4">
             <div 

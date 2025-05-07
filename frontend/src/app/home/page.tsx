@@ -1241,17 +1241,17 @@ export default function HomePage() {
         <div 
           ref={bottomSheetRef}
           className={`bottom-sheet ${getBottomSheetClassName()}`}
+          onTouchStart={handleDragStart}
+          onTouchMove={handleDragMove}
+          onTouchEnd={handleDragEnd}
+          onMouseDown={handleDragStart}
+          onMouseMove={handleDragMove}
+          onMouseUp={handleDragEnd}
+          onMouseLeave={handleDragEnd}
         >
           {/* 드래그 핸들 */}
           <div 
             className="bottom-sheet-handle" 
-            onTouchStart={handleDragStart}
-            onTouchMove={handleDragMove}
-            onTouchEnd={handleDragEnd}
-            onMouseDown={handleDragStart}
-            onMouseMove={handleDragMove}
-            onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
             onClick={toggleBottomSheet}
           ></div>
 
