@@ -231,7 +231,8 @@ const modalAnimation = `
   right: auto;
   width: 60px;
   z-index: 100;
-  background-color: rgba(255, 255, 255, 0.95);
+  background-color: rgba(0, 0, 0, 0.7); /* 어두운 배경색으로 변경 */
+  color: white; /* 텍스트 색상을 흰색으로 변경 */
   padding: 6px 8px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -292,14 +293,14 @@ const modalAnimation = `
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: white;
+  background-color: rgba(0, 0, 0, 0.7);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  color: #4F46E5;
+  color: #EEF2FF;
   transition: all 0.2s;
 }
 
 .map-control-button:hover {
-  background-color: #EEF2FF;
+  background-color: rgba(0, 0, 0, 0.7);
   transform: translateY(-1px);
   box-shadow: 0 3px 5px rgba(0, 0, 0, 0.15);
 }
@@ -1203,14 +1204,14 @@ export default function HomePage() {
         <div className={`map-header ${getHeaderClassName()}`}>
           {isLocationEnabled && (
             <span className="absolute top-1 right-1 inline-flex items-center justify-center w-2 h-2">
-              <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-indigo-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-pink-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
             </span>
           )}
           <div className="flex flex-col items-center w-full">
             <span className="text-lg">{todayWeather.icon}</span>
             <span className="text-sm font-medium">{todayWeather.temp}</span>
-            <span className="text-xs text-gray-600">{todayWeather.condition}</span>
+            <span className="text-xs text-white">{todayWeather.condition}</span>
           </div>
         </div>
         
