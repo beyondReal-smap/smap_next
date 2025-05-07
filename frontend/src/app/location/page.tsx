@@ -274,7 +274,7 @@ const pageStyles = `
 }
 .location-info-panel {
   position: absolute;
-  top: 0px; /* 헤더 높이(50px 가정) + 10px 여백 */
+  top: 5px; /* 헤더 높이(50px 가정) + 10px 여백 */
   left: 50%;
   transform: translateX(-50%);
   width: calc(100% - 30px); /* 양쪽 여백 20px */
