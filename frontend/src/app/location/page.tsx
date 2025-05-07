@@ -332,6 +332,7 @@ const pageStyles = `
 
 .places-section { /* Teal or other color */
   background: linear-gradient(to right, rgba(236, 72, 153, 0.03), transparent);
+  margin-left: 1px; /* 그룹멤버 오른쪽 세로선과 겹침 방지 */
 }
 
 .places-section::before {
