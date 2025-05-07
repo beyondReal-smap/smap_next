@@ -1,4 +1,5 @@
 import { API_KEYS } from '../config';
+import React from 'react';
 
 // 지도 API 타입 정의
 export type MapType = 'google' | 'naver';
@@ -54,21 +55,25 @@ export const loadNaverMapsAPI = (callback: () => void): void => {
 };
 
 // Google 지도 인스턴스 정리 유틸리티
-export const cleanupGoogleMap = (map: any, marker: any): void => {
-  if (marker) {
-    marker.setMap(null);
+export const cleanupGoogleMap = (map: React.MutableRefObject<any>, marker: React.MutableRefObject<any>): void => {
+  if (marker.current) {
+    marker.current.setMap(null);
+    marker.current = null;
   }
+  map.current = null;
   // Google Maps는 명시적 제거 메서드가 없음
 };
 
 // Naver 지도 인스턴스 정리 유틸리티
-export const cleanupNaverMap = (map: any, marker: any): void => {
-  if (marker) {
-    marker.setMap(null);
+export const cleanupNaverMap = (map: React.MutableRefObject<any>, marker: React.MutableRefObject<any>): void => {
+  if (marker.current) {
+    marker.current.setMap(null);
+    marker.current = null;
   }
-  if (map && typeof map.destroy === 'function') {
-    map.destroy();
+  if (map.current && typeof map.current.destroy === 'function') {
+    map.current.destroy();
   }
+  map.current = null;
 };
 
 export default {

@@ -50,10 +50,12 @@ export const API_KEYS = {
   GOOGLE_MAPS_API_KEY: 'AIzaSyBkWlND5fvW4tmxaj11y24XNs_LQfplwpw', // com.dmonster.smap
   NAVER_MAPS_CLIENT_ID: 'unxdi5mt3f',
   NAVER_MAPS_API_KEY: 'bKRzkFBbAvfdHDTZB0mJ81jmO8ufULvQavQIQZmp',
+  MAPBOX_ACCESS_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '',
   
   // 소셜/메시징 API 키
   KAKAO_JAVASCRIPT_KEY: 'e7e1c921e506e190875b4c8f4321c5ac',
   KAKAO_NATIVEAPP_KEY: '56b34b5e5e538073805559cabc81e1d8',
+  KAKAO_REST_API_KEY: 'bc7899314df5dc2bebcb2a7960ac89bf', // 카카오 로컬 API용 REST API 키 추가
   FIREBASEKEY: 'BOCzkX45zE3u0HFfNpfZDbUHH33OHNoe3k5KeTalEesHgnaBqCykjJUxnDcS6mv9MPSxU8EV3QHCL61gmwzkXlE',
   
   // NCP 관련 키
@@ -79,7 +81,7 @@ export const MAP_CONFIG = {
     DEFAULT_OPTIONS: {
       mapTypeControl: false,
       scaleControl: false,
-      zoom: 14
+      zoom: 16
     }
   },
   // Google Maps 설정
@@ -88,7 +90,14 @@ export const MAP_CONFIG = {
       mapTypeControl: false,
       fullscreenControl: false,
       streetViewControl: false,
-      zoom: 14
+      zoom: 16
+    }
+  },
+  // Mapbox 설정
+  MAPBOX: {
+    DEFAULT_OPTIONS: {
+      style: 'mapbox://styles/mapbox/streets-v11',
+      zoom: 16
     }
   }
 };

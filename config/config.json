@@ -1,0 +1,24 @@
+{
+  "development": {
+    "username": "root",
+    "password": "",
+    "database": "smap2_local_db",
+    "host": "127.0.0.1",
+    "dialect": "sqlite",
+    "storage": "./smap2_local.sqlite"
+  },
+  "test": {
+    "username": "root",
+    "password": "",
+    "database": "smap2_local_db_test",
+    "host": "127.0.0.1",
+    "dialect": "mysql"
+  },
+  "production": {
+    "username": "root",
+    "password": "",
+    "database": "smap2_local_db_prod",
+    "host": "127.0.0.1",
+    "dialect": "mysql"
+  }
+} 

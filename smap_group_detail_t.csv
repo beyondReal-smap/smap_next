@@ -1,0 +1,5 @@
+"sgdt_idx","sgt_idx","mt_idx","sgdt_owner_chk","sgdt_leader_chk","sgdt_discharge","sgdt_group_chk","sgdt_exit","sgdt_show","sgdt_push_chk","sgdt_wdate","sgdt_udate","sgdt_ddate","sgdt_xdate","sgdt_adate"
+983,641,1186,Y,N,N,D,N,Y,Y,2024-10-11 17:42:17.000,,,,
+990,641,1194,N,Y,N,Y,N,Y,Y,2024-10-12 00:51:05.000,2024-10-23 17:14:34.000,,,2024-10-24 09:00:00.000
+991,641,282,N,N,N,Y,N,Y,Y,2024-10-12 01:08:11.000,2024-10-23 16:25:58.000,,,
+995,641,1200,N,N,N,Y,N,Y,Y,2024-10-12 20:34:54.000,2024-10-12 20:35:03.000,,,

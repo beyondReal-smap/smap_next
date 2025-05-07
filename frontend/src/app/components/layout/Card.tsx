@@ -4,7 +4,7 @@ import React from 'react';
 
 interface CardProps {
   children: React.ReactNode;
-  title?: string;
+  title?: React.ReactNode;
   subtitle?: string;
   footer?: React.ReactNode;
   className?: string;
@@ -14,20 +14,22 @@ interface CardProps {
 export default function Card({
   children,
   title,
-  subtitle,
   footer,
   className = '',
   noPadding = false,
 }: CardProps) {
   return (
     <div className={`bg-white rounded-xl shadow-md overflow-hidden ${className}`}>
-      {(title || subtitle) && (
-        <div className="px-6 py-4 border-b border-gray-200">
-          {title && <h3 className="text-lg font-medium text-gray-900">{title}</h3>}
-          {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+      {title && (
+        <div className="px-4 py-3 border-b border-gray-200 sm:px-6">
+          {typeof title === 'string' ? (
+            <h3 className="text-lg leading-6 font-medium text-gray-900">{title}</h3>
+          ) : (
+            title
+          )}
         </div>
       )}
-      <div className={noPadding ? '' : 'p-6'}>
+      <div className={noPadding ? '' : 'p-2'}>
         {children}
       </div>
       {footer && (

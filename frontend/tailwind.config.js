@@ -1,9 +1,12 @@
+const { fontFamily } = require('tailwindcss/defaultTheme');
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/smap_php/**/*.{html,js,php}',
   ],
   theme: {
     extend: {
@@ -14,10 +17,22 @@ module.exports = {
       },
       fontFamily: {
         'suite': ['var(--font-lineseed)', 'ui-sans-serif', 'system-ui'],
-        'sans': ['var(--font-system)', 'ui-sans-serif', 'system-ui'],
+        sans: ['var(--font-line-seed)', ...fontFamily.sans],
       },
       colors: {
         primary: {
+          50: '#f0f5ff',
+          100: '#e0eaff',
+          200: '#c9d5ff',
+          300: '#a6b6ff',
+          400: '#8091ff',
+          500: '#5c69f5',
+          600: '#4f46e5', // 인디고 600
+          700: '#3832a8',
+          800: '#292980',
+          900: '#1e1b5b',
+        },
+        smap_indigo: {
           50: '#f0f5ff',
           100: '#e0eaff',
           200: '#c9d5ff',

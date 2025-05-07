@@ -112,4 +112,65 @@ MIT License
 
 프로젝트 관리자 - [email@example.com](mailto:email@example.com)
 
-프로젝트 링크: [https://github.com/yourusername/smap](https://github.com/yourusername/smap) 
+프로젝트 링크: [https://github.com/yourusername/smap](https://github.com/yourusername/smap)
+
+# SMap Local DB Test
+
+Local Express.js application to test the database schema based on `db_info.csv` using Sequelize and MySQL.
+
+## Setup
+
+1.  **Install Node.js:** If you haven't already, install Node.js (which includes npm) from [https://nodejs.org/](https://nodejs.org/).
+2.  **Install MySQL:** Install MySQL server locally. You can download it from [https://dev.mysql.com/downloads/mysql/](https://dev.mysql.com/downloads/mysql/) or use a package manager like Homebrew (`brew install mysql`).
+3.  **Start MySQL Server:** Ensure your local MySQL server is running.
+4.  **Create Database:** Connect to your local MySQL server and create the database specified in `config/config.json` (default: `smap2_local_db`):
+    ```sql
+    CREATE DATABASE smap2_local_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    ```
+5.  **Configure Database Connection:** Edit `config/config.json` and update the `development` section with your local MySQL username and password if they differ from the defaults (`root`/`""`).
+6.  **Install Dependencies:** Navigate to the project directory in your terminal and run:
+    ```bash
+    npm install
+    ```
+
+## Running the Server
+
+To start the Express server, run:
+
+```bash
+npm start
+```
+
+Or directly:
+
+```bash
+node server.js
+```
+
+The server will start on `http://localhost:3000`.
+
+## Testing Database Connection
+
+Open your web browser or use a tool like `curl` to access `http://localhost:3000/test-db`.
+
+-   If successful, you should see "Database connection successful!".
+-   If it fails, check the server console output for errors and verify your MySQL server status and connection details in `config/config.json`.
+
+## Database Schema and Models
+
+-   The target database schema is documented in `db_info.csv`.
+-   This project uses Sequelize ORM.
+-   An example model (`models/member.js`) based on `member_t` is provided.
+-   You can create database tables based on your models using Sequelize migrations or the `sync()` method (see commented-out code in `server.js`). 
+    -   **Caution:** `sync({ force: true })` will drop existing tables!
+    -   `sync({ alter: true })` will attempt to modify tables to match models.
+-   To automatically generate tables from the defined models (like `member_t`), you can uncomment the `db.sequelize.sync()` line in `server.js` (use `alter: true` or `force: true` carefully) or use `sequelize-cli` migrations.
+
+## Adding More Models
+
+To add more models based on `db_info.csv`:
+
+1.  Create a new file in the `models/` directory (e.g., `models/coupon.js` for `coupon_t`).
+2.  Define the Sequelize model in that file, similar to `models/member.js`, mapping the columns and data types from the CSV.
+3.  Sequelize will automatically pick up the new model file.
+4.  You might need to run `db.sequelize.sync({ alter: true })` again (or use migrations) to create/update the corresponding table in the database. 

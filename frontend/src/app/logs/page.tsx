@@ -1,7 +1,85 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { format, addDays, subDays } from 'date-fns';
+import { ko } from 'date-fns/locale';
+import { PageContainer, Button } from '../components/layout';
+import { FiPlus, FiTrendingUp, FiClock, FiZap, FiPlayCircle } from 'react-icons/fi';
+import { API_KEYS, MAP_CONFIG } from '../../config'; 
+
+// window 전역 객체에 naver 프로퍼티 타입 선언
+declare global {
+  interface Window {
+    naver: any;
+    // google: any; // google은 logs 페이지에서 아직 사용하지 않으므로 주석 처리 또는 필요시 추가
+  }
+}
+
+const NAVER_MAPS_CLIENT_ID = API_KEYS.NAVER_MAPS_CLIENT_ID;
+
+// --- home/page.tsx에서 가져온 인터페이스 및 데이터 시작 ---
+interface Location { // home/page.tsx의 Location 인터페이스 (필요시 logs의 기존 LocationData와 병합/조정)
+  lat: number;
+  lng: number;
+}
+
+interface Schedule {
+  id: string;
+  title: string;
+  date: string;
+  location: string;
+}
+
+interface GroupMember {
+  id: string;
+  name: string;
+  photo: string;
+  isSelected: boolean;
+  location: Location; // 위에서 정의한 Location 사용
+  schedules: Schedule[];
+}
+
+const MOCK_GROUP_MEMBERS_HOME: GroupMember[] = [
+  { 
+    id: 'h_gm_1', // ID 중복 방지를 위해 접두사 추가
+    name: '김철수', 
+    photo: '/images/avatar3.png', 
+    isSelected: false,
+    location: { lat: 37.5642 + 0.005, lng: 127.0016 + 0.002 },
+    schedules: []
+  },
+  { 
+    id: 'h_gm_2', 
+    name: '이영희', 
+    photo: '/images/avatar1.png', 
+    isSelected: false,
+    location: { lat: 37.5642 - 0.003, lng: 127.0016 - 0.005 },
+    schedules: []
+  },
+  // 추가 멤버 필요 시 여기에...
+];
+
+const RECENT_SCHEDULES_HOME: Schedule[] = [
+  { id: 'h_rs_1_log', title: '팀 미팅 (로그)', date: '오늘 14:00', location: '강남 사무실' },
+  { id: 'h_rs_2_log', title: '프로젝트 발표 (로그)', date: '내일 10:00', location: '회의실 A' },
+];
+// --- home/page.tsx에서 가져온 인터페이스 및 데이터 끝 ---
+
+// 위치기록 요약 데이터 인터페이스
+interface LocationSummary {
+  distance: string;
+  time: string;
+  steps: string;
+}
+
+// 모의 위치기록 요약 데이터
+const MOCK_LOCATION_SUMMARY: LocationSummary = {
+  distance: '12.5 km',
+  time: '2시간 30분',
+  steps: '15,203 걸음',
+};
 
 // 모의 로그 데이터
 const MOCK_LOGS = [
@@ -70,169 +148,579 @@ const MOCK_LOGS = [
   }
 ];
 
+// pageStyles 복사 (location/page.tsx와 동일하게)
+const pageStyles = `
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slideUp {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.full-map-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  z-index: 5;
+}
+
+.bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: white;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 40;
+  max-height: 90vh;
+  overflow-y: auto;
+  touch-action: pan-y;
+  padding-bottom: 20px;
+}
+
+.bottom-sheet-handle {
+  width: 40px;
+  height: 5px;
+  background-color: #e2e8f0;
+  border-radius: 3px;
+  margin: 8px auto;
+  cursor: grab;
+}
+
+.bottom-sheet-handle:active {
+  cursor: grabbing;
+}
+
+.bottom-sheet-collapsed {
+  transform: translateY(calc(100% - 140px)); /* 예시 높이, 추후 조정 */
+  height: 100vh;
+}
+
+.bottom-sheet-expanded {
+  transform: translateY(54%); /* 37vh에 맞게 조정 */
+  height: 100vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* z-index는 location/page.tsx와 동일하게 유지 (모달 등 다른 요소 고려) */
+.modal-overlay {
+  z-index: 50;
+}
+.modal-content {
+  z-index: 51;
+}
+
+/* --- home/page.tsx 에서 가져온 스타일 추가 시작 --- */
+.section-divider {
+  height: 1px;
+  background: #f2f2f2;
+  margin: 16px 0;
+  width: 100%;
+}
+
+.section-title {
+  margin-bottom: 10px; 
+  padding-bottom: 6px; 
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  color: #424242;
+  font-weight: 600;
+}
+
+.content-section {
+  padding: 10px 16px; 
+  background-color: #ffffff;
+  border-radius: 12px;
+  margin-bottom: 10px; 
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.content-section::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.members-section { /* home 스타일과 다른 색상 적용 가능 */
+  background: linear-gradient(to right, rgba(22, 163, 74, 0.03), transparent); /* Indigo to Green gradient */
+}
+
+.members-section::before {
+  background-color: #16A34A; /* Green-500 for green line */
+}
+
+.schedule-section { /* home 스타일과 다른 색상 적용 가능 */
+  background: linear-gradient(to right, rgba(236, 72, 153, 0.03), transparent);
+}
+
+.schedule-section::before {
+  background-color: #EC4899;
+}
+
+/* --- 위치기록 요약 섹션 스타일 추가 --- */
+.summary-section {
+  background: linear-gradient(to right, rgba(236, 72, 153, 0.03), transparent);
+}
+
+.summary-section::before {
+  background-color: #EC4899;
+}
+/* --- home/page.tsx 에서 가져온 스타일 추가 끝 --- */
+`;
+
 export default function LogsPage() {
-  const [logs, setLogs] = useState(MOCK_LOGS);
-  const [filteredLogs, setFilteredLogs] = useState(MOCK_LOGS);
-  const [selectedType, setSelectedType] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>(MOCK_GROUP_MEMBERS_HOME);
+  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<any>(null); 
+  const memberNaverMarkers = useRef<any[]>([]); 
+  const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
+  const [isMapLoading, setIsMapLoading] = useState(true); 
 
-  // 필터링 적용
+  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'expanded'>('collapsed');
+  const bottomSheetRef = useRef<HTMLDivElement>(null);
+  const startDragY = useRef<number | null>(null);
+  const currentDragY = useRef<number | null>(null);
+  const dragStartTime = useRef<number | null>(null);
+
+  // 로그 페이지 뷰 상태 및 Ref
+  const [activeLogView, setActiveLogView] = useState<'members' | 'summary'>('members');
+  const logSwipeContainerRef = useRef<HTMLDivElement>(null);
+  const [locationSummary, setLocationSummary] = useState<LocationSummary>(MOCK_LOCATION_SUMMARY);
+  const [sliderValue, setSliderValue] = useState(60); // 슬라이더 초기 값 (0-100)
+  const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
+
+  const loadNaverMapsAPI = () => {
+    if (window.naver?.maps) {
+      setNaverMapsLoaded(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.id = 'naver-maps-script-logs'; // 스크립트 ID 변경 (다른 페이지와 충돌 방지)
+    script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${NAVER_MAPS_CLIENT_ID}&submodules=geocoder,drawing,visualization`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      console.log('Naver Maps API loaded for LogsPage.');
+      setNaverMapsLoaded(true);
+    };
+    script.onerror = () => {
+      console.error('Failed to load Naver Maps API for LogsPage.');
+      setIsMapLoading(false);
+    };
+    const existingScript = document.getElementById('naver-maps-script-logs');
+    if (!existingScript) {
+      document.head.appendChild(script);
+    }
+  };
+
   useEffect(() => {
-    let filtered = logs;
-    
-    // 유형 필터링
-    if (selectedType !== 'all') {
-      filtered = filtered.filter(log => log.type === selectedType);
-    }
-    
-    // 검색어 필터링
-    if (searchQuery) {
-      filtered = filtered.filter(log => 
-        log.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        log.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        log.user.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    
-    setFilteredLogs(filtered);
-  }, [logs, selectedType, searchQuery]);
+    loadNaverMapsAPI();
+  }, []);
 
-  // 타임스탬프 포맷팅
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    return new Intl.DateTimeFormat('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(date);
+  useEffect(() => {
+    if (naverMapsLoaded && mapContainer.current && !map.current) {
+      setIsMapLoading(true);
+      try {
+        const initialCenter = new window.naver.maps.LatLng(37.5665, 126.9780);
+        const mapOptions = {
+            ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
+            center: initialCenter,
+            zoom: MAP_CONFIG.NAVER.DEFAULT_OPTIONS?.zoom || 10, 
+            logoControl: false,
+            mapDataControl: false,
+        };
+        map.current = new window.naver.maps.Map(mapContainer.current, mapOptions);
+        window.naver.maps.Event.addListener(map.current, 'init', () => {
+            console.log('Naver Map initialized for LogsPage');
+            setIsMapLoading(false);
+            if(map.current) map.current.refresh(true);
+        });
+      } catch (error) {
+        console.error('Naver Maps 초기화 중 오류(LogsPage):', error);
+        setIsMapLoading(false);
+      }
+    }
+    return () => {
+      if (map.current && typeof map.current.destroy === 'function') {
+         map.current.destroy();
+      }
+      map.current = null;
+    };
+  }, [naverMapsLoaded]);
+
+  const getRecentDays = () => {
+    return Array.from({ length: 15 }, (_, i) => { // 오늘부터 14일전까지 (오늘 포함 15일)
+      const date = subDays(new Date(), 14 - i);
+      const dateString = format(date, 'yyyy-MM-dd');
+      const hasLogs = MOCK_LOGS.some(log => log.timestamp.startsWith(dateString));
+      
+      let displayString = format(date, 'MM.dd(E)', { locale: ko }); // 예: "05.07(수)"
+      if (i === 14) {
+        displayString = `오늘(${format(date, 'E', { locale: ko })})`;
+      } else if (i === 13) {
+        displayString = `어제(${format(date, 'E', { locale: ko })})`;
+      } 
+
+      return {
+        value: dateString,
+        display: displayString,
+        hasLogs: hasLogs,
+      };
+    });
   };
 
-  // 로그 유형 아이콘 및 배경색 지정
-  const getLogTypeStyles = (type: string) => {
-    switch(type) {
-      case 'schedule':
-        return {
-          icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          ),
-          bgColor: 'bg-blue-100',
-          textColor: 'text-blue-600'
-        };
-      case 'location':
-        return {
-          icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            </svg>
-          ),
-          bgColor: 'bg-green-100',
-          textColor: 'text-green-600'
-        };
-      case 'group':
-        return {
-          icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          ),
-          bgColor: 'bg-purple-100',
-          textColor: 'text-purple-600'
-        };
-      default:
-        return {
-          icon: (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          ),
-          bgColor: 'bg-gray-100',
-          textColor: 'text-gray-600'
-        };
+  const getBottomSheetClassName = () => {
+    switch (bottomSheetState) {
+      case 'collapsed': return 'bottom-sheet-collapsed';
+      case 'expanded': return 'bottom-sheet-expanded';
+      default: return 'bottom-sheet-collapsed';
     }
   };
+  const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    startDragY.current = clientY;
+    currentDragY.current = clientY;
+    dragStartTime.current = Date.now();
+    if (bottomSheetRef.current) {
+      bottomSheetRef.current.style.transition = 'none';
+    }
+  };
+  const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const deltaY = clientY - currentDragY.current;
+    currentDragY.current = clientY;
+    const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
+    let currentTranslateY = 0;
+    if (currentTransform !== 'none') {
+      const matrix = new DOMMatrixReadOnly(currentTransform);
+      currentTranslateY = matrix.m42;
+    }
+    let newTranslateY = currentTranslateY + deltaY;
+    const expandedY = 0;
+    const collapsedY = window.innerHeight - 220; // 바텀시트 collapsed 높이 반영
+    newTranslateY = Math.max(expandedY - (window.innerHeight * 0.1), Math.min(newTranslateY, collapsedY + 50));
+    bottomSheetRef.current.style.transform = `translateY(${newTranslateY}px)`;
+  };
+  const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
+    if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
+    bottomSheetRef.current.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+    const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
+    const deltaYOverall = clientY - startDragY.current;
+    const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
+    const velocity = deltaTime > 0 ? deltaYOverall / deltaTime : 0;
+    const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
+    let currentSheetY = 0;
+    if (currentTransform !== 'none') {
+        const matrix = new DOMMatrixReadOnly(currentTransform);
+        currentSheetY = matrix.m42;
+    }
+    const windowHeight = window.innerHeight;
+    const expandedThreshold = windowHeight * 0.1; // 위로 당길 때 expanded로 판단하는 기준 (화면 상단에서 10%)
+    const collapsedThreshold = windowHeight * 0.7; // 아래로 내릴 때 collapsed로 판단하는 기준 (화면 상단에서 70%)
+
+    if (Math.abs(velocity) > 0.3) { // 빠른 스와이프
+        if (velocity < 0) { // 위로 스와이프
+            setBottomSheetState('expanded');
+        } else { // 아래로 스와이프
+            setBottomSheetState('collapsed');
+        }
+    } else { // 느린 드래그
+        if (currentSheetY < (expandedThreshold + collapsedThreshold) / 2) { // 현재 시트 위치가 중간보다 위에 있으면
+            setBottomSheetState('expanded');
+        } else {
+            setBottomSheetState('collapsed');
+        }
+    }
+    bottomSheetRef.current.style.transform = '';
+    startDragY.current = null;
+    currentDragY.current = null;
+    dragStartTime.current = null;
+  };
+  const toggleBottomSheet = () => {
+    setBottomSheetState(prev => {
+      if (prev === 'collapsed') return 'expanded';
+      return 'collapsed';
+    });
+  };
+
+  const updateMemberMarkers = (members: GroupMember[]) => {
+    if (!map.current || !window.naver?.maps || !naverMapsLoaded) return;
+    memberNaverMarkers.current.forEach(marker => marker.setMap(null));
+    memberNaverMarkers.current = [];
+    const selectedMembers = members.filter(member => member.isSelected);
+    selectedMembers.forEach(member => {
+      const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
+      const marker = new window.naver.maps.Marker({
+        position: position, map: map.current,
+        icon: { content: `<div style="position: relative; text-align: center;"><div style="width: 32px; height: 32px; background-color: white; border: 2px solid #4F46E5; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"><img src="${member.photo}" alt="${member.name}" style="width: 100%; height: 100%; object-fit: cover;" /></div><div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">${member.name}</div></div>`, size: new window.naver.maps.Size(36, 48), anchor: new window.naver.maps.Point(18, 42) }, zIndex: 150
+      });
+      memberNaverMarkers.current.push(marker);
+    });
+    if (selectedMembers.length === 1) {
+      const member = selectedMembers[0];
+      if (map.current && member.location) {
+        const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
+        map.current.panTo(position);
+        if (map.current.getZoom() < 14) map.current.setZoom(14); // Zoom 레벨 조정
+      }
+    } else if (selectedMembers.length > 1) {
+      const bounds = new window.naver.maps.LatLngBounds();
+      selectedMembers.forEach(member => {
+        if (member.location) bounds.extend(new window.naver.maps.LatLng(member.location.lat, member.location.lng));
+      });
+      if (!bounds.isEmpty()) map.current.fitBounds(bounds);
+    }
+  };
+
+  const handleMemberSelect = (id: string) => {
+    const updatedMembers = groupMembers.map(member => 
+      member.id === id ? { ...member, isSelected: !member.isSelected } : { ...member, isSelected: false }
+    );
+    setGroupMembers(updatedMembers);
+    updateMemberMarkers(updatedMembers);
+    setActiveLogView('members'); // 멤버 선택/해제 시 멤버 뷰로 전환
+  };
+
+  const handleDateSelect = (date: string) => {
+    setSelectedDate(date);
+    const newDistance = (Math.random() * 20).toFixed(1);
+    const newTimeHours = Math.floor(Math.random() * 5);
+    const newTimeMinutes = Math.floor(Math.random() * 60);
+    const newSteps = Math.floor(Math.random() * 20000).toLocaleString();
+
+    setLocationSummary({
+      distance: `${newDistance} km`,
+      time: `${newTimeHours}시간 ${newTimeMinutes}분`,
+      steps: `${newSteps} 걸음`
+    });
+    setSliderValue(Math.floor(Math.random() * 101)); // 날짜 변경 시 슬라이더 값도 임의로 변경
+    setActiveLogView('members');
+  };
+
+  useEffect(() => {
+    if (naverMapsLoaded && map.current && groupMembers.length > 0) {
+      if (!groupMembers.some(m => m.isSelected)) { handleMemberSelect(groupMembers[0].id); }
+    }
+  }, [naverMapsLoaded, map.current, groupMembers]);
+
+  // 로그 뷰 스크롤 이벤트 핸들러
+  const handleLogSwipeScroll = () => {
+    if (logSwipeContainerRef.current) {
+      const { scrollLeft, offsetWidth } = logSwipeContainerRef.current;
+      if (scrollLeft >= offsetWidth / 2 && activeLogView !== 'summary') {
+        setActiveLogView('summary');
+      } else if (scrollLeft < offsetWidth / 2 && activeLogView !== 'members') {
+        setActiveLogView('members');
+      }
+    }
+  };
+
+  // activeLogView 변경 시 스크롤 위치 조정
+  useEffect(() => {
+    if (logSwipeContainerRef.current) {
+      if (activeLogView === 'members') {
+        logSwipeContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+      } else {
+        const secondChild = logSwipeContainerRef.current.children[1] as HTMLElement;
+        if (secondChild) {
+          logSwipeContainerRef.current.scrollTo({ left: secondChild.offsetLeft, behavior: 'smooth' });
+        }
+      }
+    }
+  }, [activeLogView]);
+
+  // 날짜 버튼 초기 스크롤 위치 설정
+  useEffect(() => {
+    if (dateScrollContainerRef.current) {
+      // setTimeout을 사용하여 DOM 렌더링 후 스크롤 실행
+      setTimeout(() => {
+        if (dateScrollContainerRef.current) { // setTimeout 콜백 내에서 다시 한번 current 확인
+          dateScrollContainerRef.current.scrollLeft = dateScrollContainerRef.current.scrollWidth;
+        }
+      }, 0);
+    }
+  }, []); // 빈 배열로 전달하여 컴포넌트 마운트 시 1회 실행
 
   return (
-    <div className="animate-fadeIn">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 font-suite">활동 로그</h1>
-        <p className="mt-2 text-gray-600">일정, 장소, 그룹 관련 활동 기록을 확인하세요</p>
-      </div>
+    <>
+      <style jsx global>{pageStyles}</style>
+      <PageContainer title="활동 로그" showHeader={false} showBackButton={false} className="p-0 m-0 w-full h-screen overflow-hidden">
+        {isMapLoading && ( <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-50"> <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div> </div> )}
+        <div className="full-map-container"><div ref={mapContainer} className="w-full h-full" /></div>
 
-      {/* 필터 및 검색 */}
-      <div className="bg-white p-4 rounded-xl shadow-md mb-6">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="w-full sm:w-auto">
-            <select
-              className="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
+        <div ref={bottomSheetRef} className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}>
+          <div className="bottom-sheet-handle" onTouchStart={handleDragStart} onTouchMove={handleDragMove} onTouchEnd={handleDragEnd} onMouseDown={handleDragStart} onMouseMove={handleDragMove} onMouseUp={handleDragEnd} onMouseLeave={handleDragEnd} onClick={toggleBottomSheet}></div>
+          
+          <div className="px-4 pb-4">
+            <div 
+              ref={logSwipeContainerRef}
+              className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar mb-2 gap-2 bg-white"
+              onScroll={handleLogSwipeScroll}
             >
-              <option value="all">전체 유형</option>
-              <option value="schedule">일정</option>
-              <option value="location">장소</option>
-              <option value="group">그룹</option>
-            </select>
-          </div>
-          <div className="relative flex-1">
-            <input
-              type="text"
-              placeholder="검색..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 로그 목록 */}
-      <div className="bg-white rounded-xl shadow-md overflow-hidden">
-        {filteredLogs.length > 0 ? (
-          <div className="divide-y divide-gray-200">
-            {filteredLogs.map(log => {
-              const { icon, bgColor, textColor } = getLogTypeStyles(log.type);
-              
-              return (
-                <div key={log.id} className="p-4 hover:bg-gray-50">
-                  <div className="flex items-start">
-                    <div className={`flex-shrink-0 rounded-md p-2 ${bgColor} ${textColor}`}>
-                      {icon}
+              <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
+                <div className="content-section members-section min-h-[220px] max-h-[220px] overflow-y-auto">
+                  <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+                    그룹 멤버
+                    <Link href="/group" className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                      <FiPlus className="h-3 w-3 mr-1" />그룹 관리
+                    </Link>
+                  </h2>
+                  {groupMembers.length > 0 ? (
+                    <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
+                      {groupMembers.map((member) => (
+                        <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
+                          <button onClick={() => handleMemberSelect(member.id)} className={`flex flex-col items-center focus:outline-none`}>
+                            <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'}`}>
+                              <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
+                            </div>
+                            <span className={`block text-xs font-medium mt-1.5 ${member.isSelected ? 'text-indigo-700' : 'text-gray-700'}`}>{member.name}</span>
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                    
-                    <div className="ml-4 flex-1">
-                      <div className="flex justify-between items-start">
-                        <h3 className="text-sm font-medium text-gray-900">{log.title}</h3>
-                        <span className="text-xs text-gray-500">{formatTimestamp(log.timestamp)}</span>
+                  ) : (
+                    <div className="text-center py-3 text-gray-500"><p>그룹에 참여한 멤버가 없습니다</p></div>
+                  )}
+                  <div ref={dateScrollContainerRef} className="mt-2 mb-1 flex space-x-2 overflow-x-auto pb-1.5 hide-scrollbar"> {/* mt, mb, pb 조정 */}
+                    {getRecentDays().map((day, idx) => {
+                      let buttonClass = `px-2.5 py-1 rounded-lg flex-shrink-0 focus:outline-none transition-colors text-xs min-w-[75px] h-8 flex flex-col justify-center items-center `;
+                      const isSelected = selectedDate === day.value;
+
+                      if (isSelected) {
+                        buttonClass += 'bg-gray-900 text-white font-semibold shadow-md'; 
+                        if (!day.hasLogs) {
+                           buttonClass += ' line-through cursor-not-allowed'; // opacity-70 제거
+                        }
+                      } else if (day.hasLogs) {
+                        buttonClass += 'bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+                      } else {
+                        buttonClass += 'bg-gray-100 text-gray-400 line-through cursor-not-allowed font-medium'; // opacity-70 제거, 배경색 조정
+                      }
+
+                      return (
+                        <button 
+                          key={idx} 
+                          onClick={() => day.hasLogs && handleDateSelect(day.value)}
+                          disabled={!day.hasLogs && !isSelected} // 선택된 날짜도 로그 없으면 클릭은 막되, 스타일은 isSelected에서 처리
+                          className={buttonClass}
+                        >
+                          <div className="text-center text-xs whitespace-nowrap">{day.display}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
+                <div className="content-section summary-section min-h-[220px] max-h-[220px] overflow-y-auto flex flex-col">
+                  <div>
+                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-2">
+                      {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 위치기록 요약` : "위치기록 요약"}
+                    </h2>
+                    <div className="mb-2 px-1 flex items-center">
+                      <FiPlayCircle className="w-6 h-6 text-amber-500 mr-2" />
+                      <h4 className="text-sm font-medium text-gray-700">경로 따라가기</h4>
+                    </div>
+                    <div className="px-2 pt-2 mb-6">
+                      <div className="relative w-full h-1.5 bg-gray-200 rounded-full">
+                        <div 
+                          className="absolute top-0 left-0 h-1.5 bg-indigo-600 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${sliderValue}%` }} 
+                        ></div>
+                        <div 
+                          className="absolute top-1/2 w-4 h-4 bg-indigo-600 rounded-full border-2 border-white shadow transform -translate-y-1/2 transition-all duration-300 ease-out"
+                          style={{ left: `calc(${sliderValue}% - 8px)` }}
+                        ></div>
                       </div>
-                      <p className="mt-1 text-sm text-gray-600">{log.description}</p>
-                      <div className="mt-2 text-xs text-gray-500">
-                        <span>작업자: {log.user}</span>
+                    </div>
+                    <div className="flex justify-around text-center px-1">
+                      <div className="flex flex-col items-center">
+                        <FiTrendingUp className="w-6 h-6 text-amber-500 mb-1" />
+                        <p className="text-xs text-gray-500">이동거리</p>
+                        <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.distance}</p>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <FiClock className="w-6 h-6 text-amber-500 mb-1" />
+                        <p className="text-xs text-gray-500">이동시간</p>
+                        <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.time}</p>
+                      </div>
+                      <div className="flex flex-col items-center">
+                        <FiZap className="w-6 h-6 text-amber-500 mb-1" />
+                        <p className="text-xs text-gray-500">걸음 수</p>
+                        <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.steps}</p>
                       </div>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            </div>
+
+            <div className="flex justify-center items-center pb-2">
+              <button
+                onClick={() => setActiveLogView('members')}
+                className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
+                  activeLogView === 'members' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
+                } transition-all duration-300`}
+                aria-label="멤버 뷰로 전환"
+              />
+              <button
+                onClick={() => setActiveLogView('summary')}
+                className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
+                  activeLogView === 'summary' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
+                } transition-all duration-300`}
+                aria-label="요약 뷰로 전환"
+              />
+            </div>
           </div>
-        ) : (
-          <div className="p-8 text-center text-gray-500">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p>표시할 로그가 없습니다.</p>
-          </div>
-        )}
-      </div>
-    </div>
+        </div>
+      </PageContainer>
+    </>
   );
 } 
