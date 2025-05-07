@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PageContainer } from '../components/layout';
@@ -87,7 +87,8 @@ interface GroupForm {
   description: string;
 }
 
-export default function GroupPage() {
+// 기존 페이지 로직을 포함하는 내부 컴포넌트
+function GroupPageContent() {
   const [groups, setGroups] = useState(MOCK_GROUPS);
   const [selectedGroup, setSelectedGroup] = useState<any>(MOCK_GROUPS[0]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -290,7 +291,7 @@ export default function GroupPage() {
         </div>
       </div>
 
-      {/* 새 그룹 추가 모달 - 디자인 개선 */}
+      {/* 새 그룹 추가 모달 */}
       {isAddModalOpen && (
         <>
           <style jsx global>{modalAnimation}</style>
@@ -431,8 +432,17 @@ export default function GroupPage() {
               </div>
             </div>
           </div>
-        </>
+        </> 
       )}
     </PageContainer>
+  );
+}
+
+// 페이지를 Suspense로 감싸는 기본 export 함수
+export default function GroupPageWithSuspense() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}> 
+      <GroupPageContent />
+    </Suspense>
   );
 } 
