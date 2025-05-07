@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { format, addDays, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { PageContainer, Button } from '../components/layout';
-import { FiPlus, FiTrendingUp, FiClock, FiZap } from 'react-icons/fi';
+import { FiPlus, FiTrendingUp, FiClock, FiZap, FiPlayCircle } from 'react-icons/fi';
 import { API_KEYS, MAP_CONFIG } from '../../config'; 
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
@@ -289,28 +289,28 @@ const pageStyles = `
 }
 
 .members-section { /* home 스타일과 다른 색상 적용 가능 */
-  background: linear-gradient(to right, rgba(79, 70, 229, 0.03), transparent); 
+  background: linear-gradient(to right, rgba(22, 163, 74, 0.03), transparent); /* Indigo to Green gradient */
 }
 
 .members-section::before {
-  background-color: #4F46E5; 
+  background-color: #16A34A; /* Green-500 for green line */
 }
 
 .schedule-section { /* home 스타일과 다른 색상 적용 가능 */
-  background: linear-gradient(to right, rgba(20, 184, 166, 0.03), transparent); 
+  background: linear-gradient(to right, rgba(236, 72, 153, 0.03), transparent);
 }
 
 .schedule-section::before {
-  background-color: #0D9488; 
+  background-color: #EC4899;
 }
 
 /* --- 위치기록 요약 섹션 스타일 추가 --- */
 .summary-section {
-  background: linear-gradient(to right, rgba(251, 191, 36, 0.03), transparent); /* Yellow gradient */
+  background: linear-gradient(to right, rgba(236, 72, 153, 0.03), transparent);
 }
 
 .summary-section::before {
-  background-color: #FBBF24; /* Amber-400 for yellow */
+  background-color: #EC4899;
 }
 /* --- home/page.tsx 에서 가져온 스타일 추가 끝 --- */
 `;
@@ -336,6 +336,7 @@ export default function LogsPage() {
   const [activeLogView, setActiveLogView] = useState<'members' | 'summary'>('members');
   const logSwipeContainerRef = useRef<HTMLDivElement>(null);
   const [locationSummary, setLocationSummary] = useState<LocationSummary>(MOCK_LOCATION_SUMMARY);
+  const [sliderValue, setSliderValue] = useState(60); // 슬라이더 초기 값 (0-100)
 
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
@@ -402,12 +403,12 @@ export default function LogsPage() {
       const dateString = format(date, 'yyyy-MM-dd');
       const hasLogs = MOCK_LOGS.some(log => log.timestamp.startsWith(dateString));
       
-      let displayString = format(date, 'MM.dd (E)', { locale: ko });
+      let displayString = format(date, 'd일(E)', { locale: ko }); // 예: "20일(금)"
       if (i === 14) {
-        displayString = '오늘';
+        displayString = `오늘(${format(date, 'E', { locale: ko })})`; // 예: "오늘(토)"
       } else if (i === 13) {
-        displayString = '어제';
-      } // 필요시 '그저께' 등 추가 가능
+        displayString = `어제(${format(date, 'E', { locale: ko })})`; // 예: "어제(금)"
+      } 
 
       return {
         value: dateString,
@@ -541,8 +542,6 @@ export default function LogsPage() {
 
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
-    // TODO: 선택된 날짜에 해당하는 실제 로그 및 위치 요약 데이터 필터링/로딩 로직 추가
-    // 임시로, 날짜가 변경될 때마다 MOCK_LOCATION_SUMMARY의 값을 약간씩 변경 (실제로는 API 호출)
     const newDistance = (Math.random() * 20).toFixed(1);
     const newTimeHours = Math.floor(Math.random() * 5);
     const newTimeMinutes = Math.floor(Math.random() * 60);
@@ -553,7 +552,8 @@ export default function LogsPage() {
       time: `${newTimeHours}시간 ${newTimeMinutes}분`,
       steps: `${newSteps} 걸음`
     });
-    setActiveLogView('members'); // 날짜 선택 시에도 우선 멤버 뷰 (필요시 변경)
+    setSliderValue(Math.floor(Math.random() * 101)); // 날짜 변경 시 슬라이더 값도 임의로 변경
+    setActiveLogView('members');
   };
 
   useEffect(() => {
@@ -630,28 +630,28 @@ export default function LogsPage() {
                   )}
                   <div className="mt-3 mb-1 flex space-x-2 overflow-x-auto pb-2 hide-scrollbar">
                     {getRecentDays().map((day, idx) => {
-                      let buttonClass = `px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors text-xs min-w-[60px] h-10 flex flex-col justify-center items-center `;
+                      let buttonClass = `px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors text-xs min-w-[70px] h-10 flex flex-col justify-center items-center `;
                       const isSelected = selectedDate === day.value;
 
                       if (isSelected) {
-                        buttonClass += 'bg-green-600 text-white font-semibold shadow-md'; 
+                        buttonClass += 'bg-gray-900 text-white font-semibold shadow-md'; 
                         if (!day.hasLogs) {
-                           buttonClass += ' opacity-70 cursor-not-allowed'; // 선택되었지만 로그 없는 경우 스타일 추가
+                           buttonClass += ' line-through opacity-70 cursor-not-allowed'; 
                         }
                       } else if (day.hasLogs) {
-                        buttonClass += 'bg-green-100 text-green-700 hover:bg-green-200 font-medium';
+                        buttonClass += 'bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
                       } else {
-                        buttonClass += 'bg-red-100 text-red-700 opacity-70 cursor-not-allowed font-medium';
+                        buttonClass += 'bg-gray-50 text-gray-400 line-through opacity-70 cursor-not-allowed font-medium';
                       }
 
                       return (
                         <button 
                           key={idx} 
                           onClick={() => day.hasLogs && handleDateSelect(day.value)}
-                          disabled={!day.hasLogs}
+                          disabled={!day.hasLogs && !isSelected} // 선택된 날짜도 로그 없으면 클릭은 막되, 스타일은 isSelected에서 처리
                           className={buttonClass}
                         >
-                          <div className="text-center"><div className="leading-tight">{day.display.split(' ')[0]}</div><div className="leading-tight text-[10px]">{day.display.split(' ')[1] || ''}</div></div>
+                          <div className="text-center text-xs whitespace-nowrap">{day.display}</div>
                         </button>
                       );
                     })}
@@ -662,33 +662,40 @@ export default function LogsPage() {
               <div className="w-full flex-shrink-0 snap-start pl-2">
                 <div className="content-section summary-section min-h-[220px] max-h-[220px] overflow-y-auto flex flex-col justify-between">
                   <div>
-                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-4">
-                      위치기록 요약
+                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-3">
+                      {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 위치기록 요약` : "위치기록 요약"}
                     </h2>
-                    <div className="flex justify-around text-center px-2">
-                      <div>
-                        <p className="text-xs text-gray-500 mb-0.5">이동거리</p>
-                        <p className="text-lg font-semibold text-gray-700">{locationSummary.distance}</p>
+                    <div className="flex justify-around text-center px-1">
+                      <div className="flex flex-col items-center">
+                        <FiTrendingUp className="w-6 h-6 text-amber-500 mb-1" />
+                        <p className="text-xs text-gray-500">이동거리</p>
+                        <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.distance}</p>
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-0.5">이동시간</p>
-                        <p className="text-lg font-semibold text-gray-700">{locationSummary.time}</p>
+                      <div className="flex flex-col items-center">
+                        <FiClock className="w-6 h-6 text-amber-500 mb-1" />
+                        <p className="text-xs text-gray-500">이동시간</p>
+                        <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.time}</p>
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-0.5">걸음 수</p>
-                        <p className="text-lg font-semibold text-gray-700">{locationSummary.steps}</p>
+                      <div className="flex flex-col items-center">
+                        <FiZap className="w-6 h-6 text-amber-500 mb-1" />
+                        <p className="text-xs text-gray-500">걸음 수</p>
+                        <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.steps}</p>
                       </div>
                     </div>
                   </div>
-                  <div className="px-2 pt-4 mt-auto">
+                  <div className="px-2 pt-2 mt-2">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
+                      <FiPlayCircle className="w-4 h-4 mr-1.5 text-indigo-600" />
+                      경로 따라가기
+                    </h4>
                     <div className="relative w-full h-1.5 bg-gray-200 rounded-full">
                       <div 
-                        className="absolute top-0 left-0 h-1.5 bg-indigo-600 rounded-full"
-                        style={{ width: '60%' }}
+                        className="absolute top-0 left-0 h-1.5 bg-indigo-600 rounded-full transition-all duration-300 ease-out"
+                        style={{ width: `${sliderValue}%` }} 
                       ></div>
                       <div 
-                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-indigo-600 rounded-full border-2 border-white shadow"
-                        style={{ left: '60%' }}
+                        className="absolute top-1/2 w-4 h-4 bg-indigo-600 rounded-full border-2 border-white shadow transform -translate-y-1/2 transition-all duration-300 ease-out"
+                        style={{ left: `calc(${sliderValue}% - 8px)` }} // 핸들 너비(16px)의 절반(8px)만큼 빼서 중앙 정렬
                       ></div>
                     </div>
                   </div>

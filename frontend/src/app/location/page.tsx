@@ -323,19 +323,19 @@ const pageStyles = `
 }
 
 .members-section {
-  background: linear-gradient(to right, rgba(79, 70, 229, 0.03), transparent); /* Indigo gradient */
+  background: linear-gradient(to right, rgba(22, 163, 74, 0.03), transparent); /* Indigo to Green gradient */
 }
 
 .members-section::before {
-  background-color: #4F46E5; /* Indigo-600 */
+  background-color: #16A34A; /* Indigo-600 */
 }
 
 .places-section { /* Teal or other color */
-  background: linear-gradient(to right, rgba(20, 184, 166, 0.03), transparent); /* Teal-500 gradient */
+  background: linear-gradient(to right, rgba(236, 72, 153, 0.03), transparent);
 }
 
 .places-section::before {
-  background-color: #0D9488; /* Teal-600 */
+  background-color: #EC4899;
 }
 
 .section-title {
