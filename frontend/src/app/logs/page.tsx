@@ -226,7 +226,7 @@ const pageStyles = `
 }
 
 .bottom-sheet-middle {
-  transform: translateY(calc(100% - 40vh)); /* 예시 높이, 추후 조정 */
+  transform: translateY(calc(100% - 42vh)); /* 예시 높이, 추후 조정 */
   height: 100vh;
 }
 
@@ -302,6 +302,15 @@ const pageStyles = `
 
 .schedule-section::before {
   background-color: #0D9488; 
+}
+
+/* --- 위치기록 요약 섹션 스타일 추가 --- */
+.summary-section {
+  background: linear-gradient(to right, rgba(251, 191, 36, 0.03), transparent); /* Yellow gradient */
+}
+
+.summary-section::before {
+  background-color: #FBBF24; /* Amber-400 for yellow */
 }
 /* --- home/page.tsx 에서 가져온 스타일 추가 끝 --- */
 `;
@@ -649,55 +658,60 @@ export default function LogsPage() {
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="w-full flex-shrink-0 snap-start pl-2">
-              <div className="content-section min-h-[220px] max-h-[220px] overflow-y-auto" style={{borderColor: '#FBBF24'}}>
-                <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title" style={{borderBottomColor: 'rgba(251, 191, 36, 0.2)'}}>
-                  위치기록 요약
-                </h2>
-                <div className="space-y-3 p-2">
-                  <div className="flex items-center">
-                    <FiTrendingUp className="w-5 h-5 text-amber-500 mr-3" />
-                    <div>
-                      <p className="text-xs text-gray-500">이동거리</p>
-                      <p className="text-md font-semibold text-gray-700">{locationSummary.distance}</p>
+              <div className="w-full flex-shrink-0 snap-start pl-2">
+                <div className="content-section summary-section min-h-[220px] max-h-[220px] overflow-y-auto flex flex-col justify-between">
+                  <div>
+                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-4">
+                      위치기록 요약
+                    </h2>
+                    <div className="flex justify-around text-center px-2">
+                      <div>
+                        <p className="text-xs text-gray-500 mb-0.5">이동거리</p>
+                        <p className="text-lg font-semibold text-gray-700">{locationSummary.distance}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 mb-0.5">이동시간</p>
+                        <p className="text-lg font-semibold text-gray-700">{locationSummary.time}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 mb-0.5">걸음 수</p>
+                        <p className="text-lg font-semibold text-gray-700">{locationSummary.steps}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center">
-                    <FiClock className="w-5 h-5 text-amber-500 mr-3" />
-                    <div>
-                      <p className="text-xs text-gray-500">이동시간</p>
-                      <p className="text-md font-semibold text-gray-700">{locationSummary.time}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <FiZap className="w-5 h-5 text-amber-500 mr-3" />
-                    <div>
-                      <p className="text-xs text-gray-500">걸음 수</p>
-                      <p className="text-md font-semibold text-gray-700">{locationSummary.steps}</p>
+                  <div className="px-2 pt-4 mt-auto">
+                    <div className="relative w-full h-1.5 bg-gray-200 rounded-full">
+                      <div 
+                        className="absolute top-0 left-0 h-1.5 bg-indigo-600 rounded-full"
+                        style={{ width: '60%' }}
+                      ></div>
+                      <div 
+                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-indigo-600 rounded-full border-2 border-white shadow"
+                        style={{ left: '60%' }}
+                      ></div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex justify-center items-center pb-2">
-            <button
-              onClick={() => setActiveLogView('members')}
-              className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
-                activeLogView === 'members' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
-              } transition-all duration-300`}
-              aria-label="멤버 뷰로 전환"
-            />
-            <button
-              onClick={() => setActiveLogView('summary')}
-              className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
-                activeLogView === 'summary' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
-              } transition-all duration-300`}
-              aria-label="요약 뷰로 전환"
-            />
+            <div className="flex justify-center items-center pb-2">
+              <button
+                onClick={() => setActiveLogView('members')}
+                className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
+                  activeLogView === 'members' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
+                } transition-all duration-300`}
+                aria-label="멤버 뷰로 전환"
+              />
+              <button
+                onClick={() => setActiveLogView('summary')}
+                className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
+                  activeLogView === 'summary' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
+                } transition-all duration-300`}
+                aria-label="요약 뷰로 전환"
+              />
+            </div>
           </div>
         </div>
       </PageContainer>
