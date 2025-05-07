@@ -977,9 +977,9 @@ export default function AddSchedulePage() {
                   <ul className="divide-y divide-gray-200">
                     {locationSearchResults.map((place) => (
                       <li key={place.temp_id} className="py-3 flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{place.place_name}</p>
-                          <p className="text-xs text-gray-500">{place.road_address_name || place.address_name}</p> {/* 지번 주소도 고려 */} 
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">{place.place_name}</p>
+                          <p className="text-xs text-gray-500 truncate">{place.road_address_name || place.address_name}</p>
                         </div>
                         <Button
                           type="button"
