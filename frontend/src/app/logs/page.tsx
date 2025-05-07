@@ -337,6 +337,7 @@ export default function LogsPage() {
   const logSwipeContainerRef = useRef<HTMLDivElement>(null);
   const [locationSummary, setLocationSummary] = useState<LocationSummary>(MOCK_LOCATION_SUMMARY);
   const [sliderValue, setSliderValue] = useState(60); // 슬라이더 초기 값 (0-100)
+  const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
 
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
@@ -403,11 +404,11 @@ export default function LogsPage() {
       const dateString = format(date, 'yyyy-MM-dd');
       const hasLogs = MOCK_LOGS.some(log => log.timestamp.startsWith(dateString));
       
-      let displayString = format(date, 'd일(E)', { locale: ko }); // 예: "20일(금)"
+      let displayString = format(date, 'MM.dd(E)', { locale: ko }); // 예: "05.07(수)"
       if (i === 14) {
-        displayString = `오늘(${format(date, 'E', { locale: ko })})`; // 예: "오늘(토)"
+        displayString = `오늘(${format(date, 'E', { locale: ko })})`;
       } else if (i === 13) {
-        displayString = `어제(${format(date, 'E', { locale: ko })})`; // 예: "어제(금)"
+        displayString = `어제(${format(date, 'E', { locale: ko })})`;
       } 
 
       return {
@@ -588,6 +589,18 @@ export default function LogsPage() {
     }
   }, [activeLogView]);
 
+  // 날짜 버튼 초기 스크롤 위치 설정
+  useEffect(() => {
+    if (dateScrollContainerRef.current) {
+      // setTimeout을 사용하여 DOM 렌더링 후 스크롤 실행
+      setTimeout(() => {
+        if (dateScrollContainerRef.current) { // setTimeout 콜백 내에서 다시 한번 current 확인
+          dateScrollContainerRef.current.scrollLeft = dateScrollContainerRef.current.scrollWidth;
+        }
+      }, 0);
+    }
+  }, []); // 빈 배열로 전달하여 컴포넌트 마운트 시 1회 실행
+
   return (
     <>
       <style jsx global>{pageStyles}</style>
@@ -628,20 +641,20 @@ export default function LogsPage() {
                   ) : (
                     <div className="text-center py-3 text-gray-500"><p>그룹에 참여한 멤버가 없습니다</p></div>
                   )}
-                  <div className="mt-3 mb-1 flex space-x-2 overflow-x-auto pb-2 hide-scrollbar">
+                  <div ref={dateScrollContainerRef} className="mt-2 mb-1 flex space-x-2 overflow-x-auto pb-1.5 hide-scrollbar"> {/* mt, mb, pb 조정 */}
                     {getRecentDays().map((day, idx) => {
-                      let buttonClass = `px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors text-xs min-w-[70px] h-10 flex flex-col justify-center items-center `;
+                      let buttonClass = `px-2.5 py-1 rounded-lg flex-shrink-0 focus:outline-none transition-colors text-xs min-w-[75px] h-8 flex flex-col justify-center items-center `;
                       const isSelected = selectedDate === day.value;
 
                       if (isSelected) {
                         buttonClass += 'bg-gray-900 text-white font-semibold shadow-md'; 
                         if (!day.hasLogs) {
-                           buttonClass += ' line-through opacity-70 cursor-not-allowed'; 
+                           buttonClass += ' line-through cursor-not-allowed'; // opacity-70 제거
                         }
                       } else if (day.hasLogs) {
                         buttonClass += 'bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
                       } else {
-                        buttonClass += 'bg-gray-50 text-gray-400 line-through opacity-70 cursor-not-allowed font-medium';
+                        buttonClass += 'bg-gray-100 text-gray-400 line-through cursor-not-allowed font-medium'; // opacity-70 제거, 배경색 조정
                       }
 
                       return (
@@ -660,11 +673,27 @@ export default function LogsPage() {
               </div>
 
               <div className="w-full flex-shrink-0 snap-start pl-2">
-                <div className="content-section summary-section min-h-[220px] max-h-[220px] overflow-y-auto flex flex-col justify-between">
+                <div className="content-section summary-section min-h-[220px] max-h-[220px] overflow-y-auto flex flex-col">
                   <div>
-                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-3">
+                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-2">
                       {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 위치기록 요약` : "위치기록 요약"}
                     </h2>
+                    <div className="mb-2 px-1 flex items-center">
+                      <FiPlayCircle className="w-6 h-6 text-amber-500 mr-2" />
+                      <h4 className="text-sm font-medium text-gray-700">경로 따라가기</h4>
+                    </div>
+                    <div className="px-2 pt-2 mb-6">
+                      <div className="relative w-full h-1.5 bg-gray-200 rounded-full">
+                        <div 
+                          className="absolute top-0 left-0 h-1.5 bg-indigo-600 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${sliderValue}%` }} 
+                        ></div>
+                        <div 
+                          className="absolute top-1/2 w-4 h-4 bg-indigo-600 rounded-full border-2 border-white shadow transform -translate-y-1/2 transition-all duration-300 ease-out"
+                          style={{ left: `calc(${sliderValue}% - 8px)` }}
+                        ></div>
+                      </div>
+                    </div>
                     <div className="flex justify-around text-center px-1">
                       <div className="flex flex-col items-center">
                         <FiTrendingUp className="w-6 h-6 text-amber-500 mb-1" />
@@ -681,22 +710,6 @@ export default function LogsPage() {
                         <p className="text-xs text-gray-500">걸음 수</p>
                         <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.steps}</p>
                       </div>
-                    </div>
-                  </div>
-                  <div className="px-2 pt-2 mt-2">
-                    <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center">
-                      <FiPlayCircle className="w-4 h-4 mr-1.5 text-indigo-600" />
-                      경로 따라가기
-                    </h4>
-                    <div className="relative w-full h-1.5 bg-gray-200 rounded-full">
-                      <div 
-                        className="absolute top-0 left-0 h-1.5 bg-indigo-600 rounded-full transition-all duration-300 ease-out"
-                        style={{ width: `${sliderValue}%` }} 
-                      ></div>
-                      <div 
-                        className="absolute top-1/2 w-4 h-4 bg-indigo-600 rounded-full border-2 border-white shadow transform -translate-y-1/2 transition-all duration-300 ease-out"
-                        style={{ left: `calc(${sliderValue}% - 8px)` }} // 핸들 너비(16px)의 절반(8px)만큼 빼서 중앙 정렬
-                      ></div>
                     </div>
                   </div>
                 </div>
