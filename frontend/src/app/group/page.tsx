@@ -316,45 +316,34 @@ function GroupPageContent() {
               </div>
 
               {/* 모달 본문 수정 */}
-              <div className="px-4 py-5 sm:p-6"> 
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                      그룹명
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      id="name"
-                      value={newGroup.name}
-                      onChange={handleInputChange}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:ring-2 focus:ring-offset-1 sm:text-sm p-3 border"
-                      placeholder="그룹 이름을 입력하세요"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                      그룹 설명
-                    </label>
-                    <textarea
-                      name="description"
-                      id="description"
-                      rows={4}
-                      value={newGroup.description}
-                      onChange={handleInputChange}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 focus:ring-2 focus:ring-offset-1 sm:text-sm p-3 border"
-                      placeholder="그룹에 대한 설명을 입력하세요 (선택 사항)"
-                    />
-                  </div>
-                </div>
+              <div className="px-5 pt-8 pb-4 flex flex-col">
+                <label htmlFor="name" className="mb-2 font-semibold text-gray-700">그룹명</label>
+                <input
+                  type="text"
+                  name="name"
+                  id="name"
+                  value={newGroup.name}
+                  onChange={handleInputChange}
+                  className="w-full bg-gray-100 rounded-2xl px-4 py-4 text-base placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 border-none"
+                  placeholder="그룹 이름을 입력하세요"
+                />
+                <label htmlFor="description" className="mb-2 font-semibold text-gray-700">그룹 설명</label>
+                <textarea
+                  name="description"
+                  id="description"
+                  rows={4}
+                  value={newGroup.description}
+                  onChange={handleInputChange}
+                  className="w-full bg-gray-100 rounded-2xl px-4 py-4 text-base placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 border-none resize-none"
+                  placeholder="그룹에 대한 설명을 입력하세요 (선택 사항)"
+                />
               </div>
-              
               {/* 모달 푸터 수정 */}
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-gray-200 sm:space-x-3">
+              <div className="flex flex-col gap-2 mt-2">
                 <button
                   type="button"
                   onClick={handleSaveGroup}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm disabled:opacity-50"
+                  className="w-full max-w-xs mx-auto py-4 rounded-2xl bg-indigo-600 text-white text-lg font-bold shadow-md active:bg-indigo-700 transition disabled:opacity-50"
                   disabled={newGroup.name.trim() === ''}
                 >
                   그룹 만들기
@@ -362,7 +351,7 @@ function GroupPageContent() {
                 <button
                   type="button"
                   onClick={handleCloseModal}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm"
+                  className="w-full max-w-xs mx-auto py-4 rounded-2xl bg-gray-100 text-gray-700 text-lg font-bold shadow-md active:bg-gray-200 transition mb-6"
                 >
                   취소
                 </button>
@@ -381,55 +370,26 @@ function GroupPageContent() {
             onClick={() => setIsShareModalOpen(false)}
           >
             <div 
-              className="bg-white rounded-lg shadow-xl max-w-md w-full animate-scaleIn"
+              className="bg-white rounded-2xl shadow-xl max-w-md w-full px-5 pt-8 pb-4 flex flex-col relative"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="flex justify-between items-center p-4 sm:p-5 border-b">
-                <h3 className="text-xl leading-6 font-semibold text-gray-900 font-light">"{selectedGroup.name}" 그룹 초대</h3>
-                <button
-                  onClick={() => setIsShareModalOpen(false)}
-                  className="p-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                >
-                  <FaXmark className="h-5 w-5" />
+              <div className="text-xl font-extrabold text-center mb-8">그룹 초대</div>
+              <div className="space-y-3 mb-6">
+                <button onClick={handleShareKakao} className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-[#FEE500] text-[#3C1E1E] font-bold text-base shadow-sm hover:bg-yellow-200 transition">
+                  <RiKakaoTalkFill className="h-7 w-7" />
+                  카카오톡으로 공유
+                </button>
+                <button onClick={handleCopyLink} className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-gray-100 text-gray-700 font-bold text-base shadow-sm hover:bg-gray-200 transition">
+                  <FiLink className="h-7 w-7 text-gray-500" />
+                  초대 링크 복사
+                </button>
+                <button onClick={handleShareSms} className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-green-100 text-green-700 font-bold text-base shadow-sm hover:bg-green-200 transition">
+                  <MdOutlineMessage className="h-7 w-7 text-green-500" />
+                  문자/주소록으로 공유
                 </button>
               </div>
-
-              {/* Modal Body */}
-              <div className="p-2">
-                <ul className="space-y-1">
-                  <li>
-                    <button onClick={handleShareKakao} className="w-full flex items-center justify-between p-3 hover:bg-gray-100 rounded-md text-left">
-                      <div className="flex items-center">
-                        <RiKakaoTalkFill className="h-7 w-7 mr-3 text-[#3C1E1E] bg-[#FEE500] rounded-full p-0.5" />
-                        <span className="text-sm font-medium text-gray-700">카카오톡으로 공유</span>
-                      </div>
-                      <FiChevronRight className="h-5 w-5 text-gray-400" />
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={handleCopyLink} className="w-full flex items-center justify-between p-3 hover:bg-gray-100 rounded-md text-left">
-                      <div className="flex items-center">
-                        <FiLink className="h-7 w-7 mr-3 text-white bg-gray-500 rounded-full p-1.5" />
-                        <span className="text-sm font-medium text-gray-700">초대 링크 복사</span>
-                      </div>
-                      <FiChevronRight className="h-5 w-5 text-gray-400" />
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={handleShareSms} className="w-full flex items-center justify-between p-3 hover:bg-gray-100 rounded-md text-left">
-                      <div className="flex items-center">
-                        <MdOutlineMessage className="h-7 w-7 mr-3 text-white bg-green-500 rounded-full p-1.5" />
-                        <span className="text-sm font-medium text-gray-700">문자/주소록으로 공유</span>
-                      </div>
-                      <FiChevronRight className="h-5 w-5 text-gray-400" />
-                    </button>
-                  </li>
-                </ul>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 text-right border-t">
-                <button type="button" onClick={() => setIsShareModalOpen(false)} className="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm">닫기</button>
-              </div>
+              <button type="button" onClick={() => setIsShareModalOpen(false)} className="w-full max-w-xs mx-auto py-4 rounded-2xl bg-gray-100 text-gray-700 text-lg font-bold shadow-md active:bg-gray-200 transition mb-2 mt-2">닫기</button>
             </div>
           </div>
         </> 

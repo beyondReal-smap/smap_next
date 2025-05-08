@@ -84,16 +84,13 @@ export default function SettingsPage() {
       items: [
         { label: '계정설정', href: '/setting/account' },
         { label: '매뉴얼', href: '/setting/manual' },
-        { label: '알림설정', href: '/setting/notifications' },
         { label: '약관 및 동의 관리', href: '/setting/terms' },
       ]
     },
     {
       items: [
-        { label: '지도선택', href: '/setting/map' },
         { label: '1:1 문의', href: '/setting/inquiry' },
         { label: '공지사항', href: '/setting/notice' },
-        { label: 'FAQ', href: '/setting/faq' },
       ]
     },
     {
@@ -139,7 +136,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="bg-[#fff] min-h-screen pb-24">
+    <div className="bg-[#fff] min-h-screen pb-10">
       <Header title="설정" />
       {/* 프로필 영역 */}
       <div className="flex flex-col items-center pt-6 pb-4">
@@ -166,27 +163,28 @@ export default function SettingsPage() {
         </div>
         <div className="mt-3 text-lg font-bold">{profile.name}</div>
         <div className="text-xs text-gray-500 mt-1">{profile.plan}</div>
-        <div className="text-sm text-blue-600 font-medium mt-1">{profile.phone}</div>
+        <div className="text-sm text-indigo-600 font-medium mt-1">{profile.phone}</div>
       </div>
 
       {/* 액션시트 모달 */}
       {showSheet && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black bg-opacity-30" onClick={() => setShowSheet(false)}>
-          <div className="w-full max-w-md bg-white rounded-t-2xl p-6 pb-4 shadow-lg" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md bg-white rounded-t-2xl p-6 pb-4 shadow-lg flex flex-col items-center" onClick={e => e.stopPropagation()}>
+            <div className="text-lg font-extrabold text-center mb-6">프로필 사진 변경</div>
             <button
-              className="w-full py-3 text-base font-semibold text-gray-800 border-b border-gray-100"
+              className="w-full max-w-xs mx-auto py-4 mb-2 rounded-2xl bg-white text-gray-900 text-base font-bold shadow-sm border border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition"
               onClick={() => handleSelect('camera')}
             >
               카메라로 촬영
             </button>
             <button
-              className="w-full py-3 text-base font-semibold text-gray-800"
+              className="w-full max-w-xs mx-auto py-4 mb-2 rounded-2xl bg-white text-gray-900 text-base font-bold shadow-sm border border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition"
               onClick={() => handleSelect('album')}
             >
               앨범에서 선택
             </button>
             <button
-              className="w-full py-3 mt-2 text-base font-semibold text-red-500"
+              className="w-full max-w-xs mx-auto py-4 mt-2 rounded-2xl bg-gray-100 text-gray-700 text-base font-bold shadow-sm active:bg-gray-200 transition"
               onClick={() => setShowSheet(false)}
             >
               취소
