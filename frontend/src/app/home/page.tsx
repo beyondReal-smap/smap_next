@@ -186,12 +186,13 @@ const modalAnimation = `
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 40;
   max-height: 90vh;
   overflow-y: auto;
   touch-action: pan-y;
-  padding-bottom: 50px; /* 하단 패딩 추가 */
+  padding-bottom: 20px;
+  will-change: transform;
 }
 
 .bottom-sheet-handle {
@@ -208,20 +209,20 @@ const modalAnimation = `
 }
 
 .bottom-sheet-collapsed {
-  transform: translateY(calc(100% - 140px)); /* 150px 높이로 표시 (기존 120px에서 증가) */
+  transform: translateY(calc(100% - 100px));
   height: 100vh;
 }
 
 .bottom-sheet-middle {
-  transform: translateY(56%); /* 37vh에 맞게 조정 */
+  transform: translateY(65%);
   height: 100vh;
 }
 
 .bottom-sheet-expanded {
-  transform: translateY(0);
+  transform: translateY(0%);
   height: 100vh;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch; /* iOS 스크롤 부드럽게 */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 맵 헤더 스타일 - 바텀시트 위치에 따라 이동하도록 수정 */
@@ -252,13 +253,13 @@ const modalAnimation = `
 
 /* 바텀시트 상태에 따른 헤더 위치 */
 .header-collapsed {
-  bottom: 150px; /* 바텀시트 높이(150px) + 간격(15px) */
+  bottom: 120px; /* 바텀시트 높이(150px) + 간격(15px) */
   top: auto;
   opacity: 1;
 }
 
 .header-middle {
-  bottom: calc(40vh + 10px); /* 바텀시트 중간 높이 + 간격(15px) */
+  bottom: calc(33vh + 10px); 
   top: auto;
   opacity: 1;
 }
@@ -270,13 +271,13 @@ const modalAnimation = `
 
 /* 컨트롤 버튼 위치 별도 관리 */
 .controls-collapsed {
-  bottom: 150px; /* 바텀시트 높이(150px) + 간격(15px) - 헤더와 동일한 위치 */
+  bottom: 120px; /* 바텀시트 높이(150px) + 간격(15px) - 헤더와 동일한 위치 */
   top: auto;
   opacity: 1;
 }
 
 .controls-middle {
-  bottom: calc(40vh + 10px); /* 바텀시트 중간 높이 + 간격(15px) - 헤더와 동일한 위치 */
+  bottom: calc(33vh + 10px); /* 바텀시트 중간 높이 + 간격(15px) - 헤더와 동일한 위치 */
   top: auto;
   opacity: 1;
 }
@@ -419,7 +420,7 @@ export default function HomePage() {
   const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'middle' | 'expanded'>('collapsed');
   const bottomSheetRef = useRef<HTMLDivElement>(null);
   const startDragY = useRef<number | null>(null);
-  const lastY = useRef<number | null>(null);
+  const currentDragY = useRef<number | null>(null);
   const dragStartTime = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
   const initialScrollTopRef = useRef<number>(0);
@@ -438,7 +439,7 @@ export default function HomePage() {
   const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     startDragY.current = clientY;
-    lastY.current = clientY;
+    currentDragY.current = clientY;
     dragStartTime.current = Date.now();
     isDraggingRef.current = true;
     initialScrollTopRef.current = bottomSheetRef.current?.scrollTop || 0;
@@ -460,113 +461,80 @@ export default function HomePage() {
   };
 
   const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (startDragY.current === null || !bottomSheetRef.current || lastY.current === null || !isDraggingRef.current) return;
+    if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
     
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const delta = clientY - (lastY.current || clientY); 
-    lastY.current = clientY;
-
-    if (delta < 0 && bottomSheetState === 'expanded' && bottomSheetRef.current && bottomSheetRef.current.scrollTop > 0) {
-        if (initialScrollTopRef.current === 0) {
-        } else {
-            return; 
-        }
-    }
+    const deltaY = clientY - currentDragY.current;
     
-    if (delta > 0 && bottomSheetState === 'expanded' && bottomSheetRef.current && bottomSheetRef.current.scrollTop === 0) {
-    } else if (delta > 0 && bottomSheetState === 'expanded' && bottomSheetRef.current && bottomSheetRef.current.scrollTop > 0) {
-      return; 
-    }
-
-    let currentTransformY = 0;
-    if (bottomSheetRef.current) {
-        const style = getComputedStyle(bottomSheetRef.current);
-        const matrix = new DOMMatrixReadOnly(style.transform);
-        currentTransformY = matrix.m42;
-    }
-
-    let newY = currentTransformY + delta;
-
-    if (bottomSheetRef.current) {
-        bottomSheetRef.current.style.transform = `translateY(${newY}px)`;
+    if (Math.abs(deltaY) > 5) {
+      currentDragY.current = clientY;
+      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
+      let currentTranslateY = 0;
+      if (currentTransform !== 'none') {
+        const matrix = new DOMMatrixReadOnly(currentTransform);
+        currentTranslateY = matrix.m42;
+      }
+      let newTranslateY = currentTranslateY + deltaY;
+      const expandedY = 0;
+      const collapsedY = window.innerHeight * 0.6;
+      newTranslateY = Math.max(expandedY - (window.innerHeight * 0.1), Math.min(newTranslateY, collapsedY + 50));
+      bottomSheetRef.current.style.transform = `translateY(${newTranslateY}px)`;
+      bottomSheetRef.current.style.transition = 'none';
     }
   };
 
   // 드래그 종료 핸들러 수정
   const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
-    if (startDragY.current === null || !bottomSheetRef.current || lastY.current === null || !isDraggingRef.current) return;
-    isDraggingRef.current = false; 
-
-    bottomSheetRef.current.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
-
-    const mapHeader = document.querySelector('.map-header') as HTMLElement;
-    const mapControls = document.querySelector('.map-controls') as HTMLElement;
-    
-    if (mapHeader) {
-      mapHeader.style.transition = 'bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
-      mapHeader.style.bottom = '';
-    }
-    
-    if (mapControls) {
-      mapControls.style.transition = 'bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
-      mapControls.style.bottom = ''; 
-    }
+    if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
 
     const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
-    const deltaY = clientY - startDragY.current;
+    const deltaYOverall = clientY - startDragY.current;
     const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
-    const velocity = deltaTime > 0 ? deltaY / deltaTime : 0; 
+    
+    const isDrag = Math.abs(deltaYOverall) > 10 || deltaTime > 200;
 
-    const sheetHeight = bottomSheetRef.current.offsetHeight;
-    const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
-    let currentSheetY = 0;
-    if (currentTransform !== 'none') {
+    if (isDrag) {
+      bottomSheetRef.current.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+      const velocity = deltaTime > 0 ? deltaYOverall / deltaTime : 0;
+      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
+      let currentSheetY = 0;
+      if (currentTransform !== 'none') {
         const matrix = new DOMMatrixReadOnly(currentTransform);
         currentSheetY = matrix.m42;
-    }
-
-    const windowHeight = window.innerHeight;
-    const expandedY = 0;
-    const middleY = windowHeight * 0.44; 
-    const collapsedY = windowHeight - 140;
-
-    let determinedNextState = bottomSheetState;
-
-    if (Math.abs(velocity) > 0.5) { 
-      if (velocity < 0) { 
-        if (bottomSheetState === 'collapsed') determinedNextState = 'middle';
-        else if (bottomSheetState === 'middle') determinedNextState = 'expanded';
-      } else { 
-        if (bottomSheetState === 'expanded') determinedNextState = 'middle';
-        else if (bottomSheetState === 'middle') determinedNextState = 'collapsed';
       }
-    } else {
-      const distToExpanded = Math.abs(currentSheetY - expandedY);
-      const distToMiddle = Math.abs(currentSheetY - middleY);
-      const distToCollapsed = Math.abs(currentSheetY - collapsedY);
+      const windowHeight = window.innerHeight;
+      const upperThreshold = windowHeight * 0.2;  // 상단 20%
+      const middleThreshold = windowHeight * 0.5;  // 중간 50%
 
-      if (distToExpanded <= distToMiddle && distToExpanded <= distToCollapsed) {
-        determinedNextState = 'expanded';
-      } else if (distToMiddle <= distToExpanded && distToMiddle <= distToCollapsed) {
-        determinedNextState = 'middle';
-      } else {
-        determinedNextState = 'collapsed';
-      }
-    }
-    
-    if (bottomSheetState === 'expanded' && determinedNextState === 'middle' && deltaY > 0 && deltaY < 100 && (bottomSheetRef.current?.scrollTop || 0) > 0) {
-        if (initialScrollTopRef.current > 0) { 
-             determinedNextState = 'expanded';
+      let finalState: 'expanded' | 'middle' | 'collapsed';
+      
+      if (Math.abs(velocity) > 0.5) {
+        // 빠른 스와이프 동작 처리
+        if (velocity < 0) {
+          // 위로 스와이프
+          finalState = currentSheetY < middleThreshold ? 'expanded' : 'middle';
+        } else {
+          // 아래로 스와이프
+          finalState = currentSheetY > middleThreshold ? 'collapsed' : 'middle';
         }
+      } else {
+        // 일반적인 드래그 동작 처리
+        if (currentSheetY < upperThreshold) {
+          finalState = 'expanded';
+        } else if (currentSheetY < middleThreshold) {
+          finalState = 'middle';
+        } else {
+          finalState = 'collapsed';
+        }
+      }
+      
+      setBottomSheetState(finalState);
     }
 
-    setBottomSheetState(determinedNextState);
-
-    bottomSheetRef.current.style.transform = ''; 
+    bottomSheetRef.current.style.transform = '';
     startDragY.current = null;
-    lastY.current = null;
+    currentDragY.current = null;
     dragStartTime.current = null;
-    initialScrollTopRef.current = 0; 
   };
 
   const toggleBottomSheet = () => {
@@ -1217,14 +1185,8 @@ export default function HomePage() {
           onMouseUp={handleDragEnd}
           onMouseLeave={handleDragEnd}
         >
-          {/* 드래그 핸들 */}
-          <div 
-            className="bottom-sheet-handle" 
-            onClick={toggleBottomSheet}
-          ></div>
-
-          {/* Bottom Sheet 내용 */}
-          <div className="px-4 pb-8">
+          <div className="bottom-sheet-handle"></div>
+          <div className="px-4 pb-8" onClick={(e) => e.stopPropagation()}>
             {/* 그룹 멤버 (최상단으로 이동) */}
             <div className="content-section members-section">
               <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
@@ -1275,7 +1237,12 @@ export default function HomePage() {
                 {
                   groupMembers.some(m => m.isSelected) ? (
                     <button 
-                      onClick={() => router.push('/schedule/add')}
+                      onClick={() => {
+                        const selectedMember = groupMembers.find(m => m.isSelected);
+                        if (selectedMember) {
+                          router.push(`/schedule/add?memberId=${selectedMember.id}&memberName=${selectedMember.name}&from=home`);
+                        }
+                      }}
                       className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">

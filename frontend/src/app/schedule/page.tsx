@@ -182,7 +182,7 @@ function CustomCalendarHeader(props: CustomCalendarHeaderProps) {
   return (
     <Box display="flex" justifyContent="space-between" alignItems="center" p={1} sx={{ borderBottom: '1px solid #e0e0e0' }}>
       <IconButton onClick={handlePrevMonth} size="small" aria-label="Previous month"><ChevronLeftIcon /></IconButton>
-      <Typography variant="subtitle1" component="div" sx={{ fontSize: '1.25rem' }}>{monthName}</Typography>
+      <Typography variant="subtitle1" component="div" sx={{ fontSize: '1.25rem', color: 'black' }}>{monthName}</Typography>
       <Box>
         <MuiButton onClick={onGoToToday} variant="text" size="small" sx={{ marginRight: '8px', fontSize: '0.875rem' }}>오늘</MuiButton>
         <IconButton onClick={handleNextMonth} size="small" aria-label="Next month"><ChevronRightIcon /></IconButton>
@@ -377,7 +377,7 @@ export default function SchedulePage() {
           className="w-full max-w-6xl mx-auto font-['Line_Seed'] mt-6 border-r-4 border-yellow-500"
           title={
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <Typography variant="h6" component="span" sx={{ fontWeight: 'normal', color: 'gray.800' }}>
+              <Typography variant="h6" component="span" sx={{ fontWeight: 'normal', color: 'black' }}>
                 {selectedDay.format('M월 D일')} 일정
               </Typography>
               <Chip label={`${eventsForSelectedDay.length}개 일정`} size="small" color="primary" variant="outlined" />
