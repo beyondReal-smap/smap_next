@@ -391,13 +391,14 @@ export default function HomePage() {
   ]);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>(MOCK_GROUP_MEMBERS);
   const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedDate, setSelectedDate] = useState<string>(''); // 초기값을 빈 문자열로 변경
   const [todayWeather, setTodayWeather] = useState({ temp: '22°C', condition: '맑음', icon: '☀️' });
   const [isMapLoading, setIsMapLoading] = useState(true);
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
   const [mapType, setMapType] = useState<MapType>('naver'); // 기본값을 네이버 지도로 변경
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
+  const [daysForCalendar, setDaysForCalendar] = useState<{ value: string; display: string; }[]>([]); // 달력 날짜 상태 추가
   
   // 별도의 컨테이너 사용 - 지도 타입 전환 시 DOM 충돌 방지
   const googleMapContainer = useRef<HTMLDivElement>(null);
@@ -1140,16 +1141,23 @@ export default function HomePage() {
     }
   };
 
-  // 다음 7일 가져오기 (수정됨)
-  const getNext7Days = () => {
+  // 다음 7일 가져오기 (수정됨 - baseDate 인자 추가)
+  const getNext7Days = (baseDate: Date) => {
     return Array.from({ length: 7 }, (_, i) => { // length를 7로 수정
-      const date = addDays(new Date(), i);
+      const date = addDays(baseDate, i);
       return {
         value: format(date, 'yyyy-MM-dd'),
         display: i === 0 ? '오늘' : format(date, 'MM.dd (E)', { locale: ko })
       };
     });
   };
+
+  // useEffect를 사용하여 클라이언트 사이드에서 날짜 관련 상태 초기화
+  useEffect(() => {
+    const today = new Date();
+    setSelectedDate(format(today, 'yyyy-MM-dd'));
+    setDaysForCalendar(getNext7Days(today));
+  }, []); // 빈 배열로 전달하여 마운트 시 1회 실행
 
   // 거리 포맷팅 함수
   const formatDistance = (km: number) => {
@@ -1233,17 +1241,17 @@ export default function HomePage() {
         <div 
           ref={bottomSheetRef}
           className={`bottom-sheet ${getBottomSheetClassName()}`}
+          onTouchStart={handleDragStart}
+          onTouchMove={handleDragMove}
+          onTouchEnd={handleDragEnd}
+          onMouseDown={handleDragStart}
+          onMouseMove={handleDragMove}
+          onMouseUp={handleDragEnd}
+          onMouseLeave={handleDragEnd}
         >
           {/* 드래그 핸들 */}
           <div 
             className="bottom-sheet-handle" 
-            onTouchStart={handleDragStart}
-            onTouchMove={handleDragMove}
-            onTouchEnd={handleDragEnd}
-            onMouseDown={handleDragStart}
-            onMouseMove={handleDragMove}
-            onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
             onClick={toggleBottomSheet}
           ></div>
 
@@ -1319,7 +1327,7 @@ export default function HomePage() {
               </h2>
               <div className="mb-3 overflow-x-auto pb-2 hide-scrollbar">
                 <div className="flex space-x-2">
-                  {getNext7Days().map((day, idx) => ( // 호출부를 getNext7Days로 수정
+                  {daysForCalendar.map((day, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleDateSelect(day.value)}
