@@ -221,7 +221,7 @@ const pageStyles = `
 }
 
 .bottom-sheet-collapsed {
-  transform: translateY(calc(100% - 140px)); /* 예시 높이, 추후 조정 */
+  transform: translateY(calc(100% - 134px)); /* 예시 높이, 추후 조정 */
   height: 100vh;
 }
 
@@ -261,7 +261,7 @@ const pageStyles = `
   padding-bottom: 6px; 
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   color: #424242;
-  font-weight: 600;
+  font-weight: normal;
 }
 
 .content-section {
@@ -618,7 +618,7 @@ export default function LogsPage() {
             >
               <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
                 <div className="content-section members-section min-h-[220px] max-h-[220px] overflow-y-auto">
-                  <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+                  <h2 className="text-lg font-normal text-gray-900 flex justify-between items-center section-title">
                     그룹 멤버
                     <Link href="/group" className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                       <FiPlus className="h-3 w-3 mr-1" />그룹 관리
@@ -674,7 +674,7 @@ export default function LogsPage() {
               <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
                 <div className="content-section summary-section min-h-[220px] max-h-[220px] overflow-y-auto flex flex-col">
                   <div>
-                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-2">
+                    <h2 className="text-lg font-normal text-gray-900 flex justify-between items-center section-title mb-2">
                       {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 위치기록 요약` : "위치기록 요약"}
                     </h2>
                     <div className="mb-2 px-1 flex items-center">

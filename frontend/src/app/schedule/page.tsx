@@ -377,8 +377,8 @@ export default function SchedulePage() {
           className="w-full max-w-6xl mx-auto font-['Line_Seed'] mt-6 border-r-4 border-yellow-500"
           title={
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <Typography variant="h6" component="span" sx={{ fontWeight: 'bold' }}>
-                {selectedDay.format('YYYY년 MM월 DD일')} 일정
+              <Typography variant="h6" component="span" sx={{ fontWeight: 'normal', color: 'gray.800' }}>
+                {selectedDay.format('M월 D일')} 일정
               </Typography>
               <Chip label={`${eventsForSelectedDay.length}개 일정`} size="small" color="primary" variant="outlined" />
             </Box>

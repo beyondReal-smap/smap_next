@@ -142,11 +142,11 @@ const modalAnimation = `
 }
 
 .animate-slideUp {
-  animation: slideUp 0.3s ease-out forwards;
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.2s ease-out forwards;
+  animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 /* 지도 화면 전체 차지하기 위한 스타일 */
@@ -186,7 +186,7 @@ const modalAnimation = `
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 40;
   max-height: 90vh;
   overflow-y: auto;
@@ -236,7 +236,7 @@ const modalAnimation = `
   padding: 6px 8px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   max-width: 60px;
 }
 
@@ -247,7 +247,7 @@ const modalAnimation = `
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* 바텀시트 상태에 따른 헤더 위치 */
@@ -318,7 +318,7 @@ const modalAnimation = `
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   color: #424242;
-  font-weight: 600;
+  font-weight: normal;
 }
 
 .content-section {
@@ -421,6 +421,8 @@ export default function HomePage() {
   const startDragY = useRef<number | null>(null);
   const lastY = useRef<number | null>(null);
   const dragStartTime = useRef<number | null>(null);
+  const isDraggingRef = useRef(false);
+  const initialScrollTopRef = useRef<number>(0);
 
   // Bottom Sheet 상태를 클래스 이름으로 변환
   const getBottomSheetClassName = () => {
@@ -438,12 +440,12 @@ export default function HomePage() {
     startDragY.current = clientY;
     lastY.current = clientY;
     dragStartTime.current = Date.now();
-    
+    isDraggingRef.current = true;
+    initialScrollTopRef.current = bottomSheetRef.current?.scrollTop || 0;
+
     if (bottomSheetRef.current) {
-      // 트랜지션 효과 일시적으로 제거하여 드래그 시 즉시 반응하도록 함
       bottomSheetRef.current.style.transition = 'none';
       
-      // 날씨 영역과 컨트롤 버튼 트랜지션도 제거
       const mapHeader = document.querySelector('.map-header') as HTMLElement;
       const mapControls = document.querySelector('.map-controls') as HTMLElement;
       
@@ -457,148 +459,114 @@ export default function HomePage() {
     }
   };
 
-  // Bottom Sheet 드래그 핸들러 수정
   const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (startDragY.current === null || !bottomSheetRef.current) return;
+    if (startDragY.current === null || !bottomSheetRef.current || lastY.current === null || !isDraggingRef.current) return;
     
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const delta = clientY - startDragY.current;
+    const delta = clientY - (lastY.current || clientY); 
     lastY.current = clientY;
-    
-    // 바텀시트 현재 상태에 따른 기본 위치 계산
-    let basePosition = 0;
-    let baseHeaderBottom = 0;
-    
-    if (bottomSheetState === 'collapsed') {
-      basePosition = window.innerHeight - 140; // 접힌 상태 높이
-      baseHeaderBottom = 160; // 헤더 접힌 상태 높이
-    } else if (bottomSheetState === 'middle') {
-      basePosition = window.innerHeight * 0.58; // 중간 상태 위치 (58% 변환)
-      baseHeaderBottom = window.innerHeight * 0.39 + 10; // 39vh + 10px
-    } else {
-      basePosition = 0; // 완전히 펼쳐진 상태
-      baseHeaderBottom = 0;
+
+    if (delta < 0 && bottomSheetState === 'expanded' && bottomSheetRef.current && bottomSheetRef.current.scrollTop > 0) {
+        if (initialScrollTopRef.current === 0) {
+        } else {
+            return; 
+        }
     }
     
-    // 상태 변경없이 직접 transform 적용 (부드러운 드래그 효과)
-    if (delta > 0) { // 아래로 드래그
-      bottomSheetRef.current.style.transform = `translateY(${delta}px)`;
-      
-      // 날씨 영역과 컨트롤 버튼도 함께 움직임
-      const mapHeader = document.querySelector('.map-header') as HTMLElement;
-      const mapControls = document.querySelector('.map-controls') as HTMLElement;
-      
-      if (mapHeader && baseHeaderBottom > 0) {
-        // 드래그 비율에 따라 헤더 위치 계산 (바텀시트가 내려가면 헤더도 내려감)
-        const ratio = delta / basePosition; // 드래그 양 / 기본 위치
-        const headerDelta = ratio * baseHeaderBottom * 0.5; // 헤더 이동 거리 (50% 비율로 따라가게)
-        mapHeader.style.bottom = `${baseHeaderBottom - headerDelta}px`;
-      }
-      
-      if (mapControls && baseHeaderBottom > 0) {
-        // 컨트롤 버튼도 동일하게 적용
-        const ratio = delta / basePosition;
-        const controlsDelta = ratio * baseHeaderBottom * 0.5;
-        mapControls.style.bottom = `${baseHeaderBottom - controlsDelta}px`;
-      }
-    } else if (bottomSheetState !== 'expanded') { // 위로 드래그하면서 완전히 펼쳐진 상태가 아닐 때
-      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
-      if (currentTransform !== 'none') {
-        bottomSheetRef.current.style.transform = `translateY(${delta}px)`;
-        
-        // 날씨 영역과 컨트롤 버튼도 함께 움직임
-        const mapHeader = document.querySelector('.map-header') as HTMLElement;
-        const mapControls = document.querySelector('.map-controls') as HTMLElement;
-        
-        if (mapHeader && baseHeaderBottom > 0) {
-          const ratio = Math.abs(delta) / basePosition;
-          const headerDelta = ratio * baseHeaderBottom * 0.5;
-          mapHeader.style.bottom = `${baseHeaderBottom + headerDelta}px`;
-        }
-        
-        if (mapControls && baseHeaderBottom > 0) {
-          const ratio = Math.abs(delta) / basePosition;
-          const controlsDelta = ratio * baseHeaderBottom * 0.5;
-          mapControls.style.bottom = `${baseHeaderBottom + controlsDelta}px`;
-        }
-      }
+    if (delta > 0 && bottomSheetState === 'expanded' && bottomSheetRef.current && bottomSheetRef.current.scrollTop === 0) {
+    } else if (delta > 0 && bottomSheetState === 'expanded' && bottomSheetRef.current && bottomSheetRef.current.scrollTop > 0) {
+      return; 
+    }
+
+    let currentTransformY = 0;
+    if (bottomSheetRef.current) {
+        const style = getComputedStyle(bottomSheetRef.current);
+        const matrix = new DOMMatrixReadOnly(style.transform);
+        currentTransformY = matrix.m42;
+    }
+
+    let newY = currentTransformY + delta;
+
+    if (bottomSheetRef.current) {
+        bottomSheetRef.current.style.transform = `translateY(${newY}px)`;
     }
   };
 
   // 드래그 종료 핸들러 수정
   const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
-    if (startDragY.current === null || !bottomSheetRef.current || lastY.current === null) return;
-    
-    // 트랜지션 효과 복원
-    bottomSheetRef.current.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
-    
-    // 날씨 영역과 컨트롤 버튼 트랜지션 복원
+    if (startDragY.current === null || !bottomSheetRef.current || lastY.current === null || !isDraggingRef.current) return;
+    isDraggingRef.current = false; 
+
+    bottomSheetRef.current.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+
     const mapHeader = document.querySelector('.map-header') as HTMLElement;
     const mapControls = document.querySelector('.map-controls') as HTMLElement;
     
     if (mapHeader) {
-      mapHeader.style.transition = 'bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
-      mapHeader.style.bottom = '';  // 스타일 초기화하여 CSS 클래스 적용되도록
+      mapHeader.style.transition = 'bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+      mapHeader.style.bottom = '';
     }
     
     if (mapControls) {
-      mapControls.style.transition = 'bottom 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
-      mapControls.style.bottom = '';  // 스타일 초기화하여 CSS 클래스 적용되도록
+      mapControls.style.transition = 'bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+      mapControls.style.bottom = ''; 
     }
-    
-    const clientY = 'touches' in e ? e.changedTouches[0].clientY : e.clientY;
+
+    const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
     const deltaY = clientY - startDragY.current;
     const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
-    const velocity = deltaTime > 0 ? deltaY / deltaTime : 0;
-    
-    // 빠른 스와이프 감지 (속도 기반)
-    if (Math.abs(velocity) > 0.5) {
-      if (velocity > 0) { // 빠르게 아래로 스와이프
-        if (bottomSheetState === 'expanded') {
-          setBottomSheetState('middle');
-        } else if (bottomSheetState === 'middle') {
-          setBottomSheetState('collapsed');
-        } else {
-          setBottomSheetState('collapsed');
-        }
-      } else { // 빠르게 위로 스와이프
-        if (bottomSheetState === 'collapsed') {
-          setBottomSheetState('middle');
-        } else if (bottomSheetState === 'middle') {
-          setBottomSheetState('expanded');
-        } else {
-          setBottomSheetState('expanded');
-        }
+    const velocity = deltaTime > 0 ? deltaY / deltaTime : 0; 
+
+    const sheetHeight = bottomSheetRef.current.offsetHeight;
+    const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
+    let currentSheetY = 0;
+    if (currentTransform !== 'none') {
+        const matrix = new DOMMatrixReadOnly(currentTransform);
+        currentSheetY = matrix.m42;
+    }
+
+    const windowHeight = window.innerHeight;
+    const expandedY = 0;
+    const middleY = windowHeight * 0.44; 
+    const collapsedY = windowHeight - 140;
+
+    let determinedNextState = bottomSheetState;
+
+    if (Math.abs(velocity) > 0.5) { 
+      if (velocity < 0) { 
+        if (bottomSheetState === 'collapsed') determinedNextState = 'middle';
+        else if (bottomSheetState === 'middle') determinedNextState = 'expanded';
+      } else { 
+        if (bottomSheetState === 'expanded') determinedNextState = 'middle';
+        else if (bottomSheetState === 'middle') determinedNextState = 'collapsed';
       }
     } else {
-      // 일반 드래그 (위치 기반)
-      if (deltaY > 50) { // 아래로 드래그
-        if (bottomSheetState === 'expanded') {
-          setBottomSheetState('middle');
-        } else if (bottomSheetState === 'middle') {
-          setBottomSheetState('collapsed');
-        } else {
-          setBottomSheetState('collapsed');
-        }
-      } else if (deltaY < -50) { // 위로 드래그
-        if (bottomSheetState === 'collapsed') {
-          setBottomSheetState('middle');
-        } else if (bottomSheetState === 'middle') {
-          setBottomSheetState('expanded');
-        } else {
-          setBottomSheetState('expanded');
-        }
+      const distToExpanded = Math.abs(currentSheetY - expandedY);
+      const distToMiddle = Math.abs(currentSheetY - middleY);
+      const distToCollapsed = Math.abs(currentSheetY - collapsedY);
+
+      if (distToExpanded <= distToMiddle && distToExpanded <= distToCollapsed) {
+        determinedNextState = 'expanded';
+      } else if (distToMiddle <= distToExpanded && distToMiddle <= distToCollapsed) {
+        determinedNextState = 'middle';
       } else {
-        // 원래 상태 유지
-        setBottomSheetState(bottomSheetState);
+        determinedNextState = 'collapsed';
       }
     }
     
-    // 상태 초기화
-    bottomSheetRef.current.style.transform = '';
+    if (bottomSheetState === 'expanded' && determinedNextState === 'middle' && deltaY > 0 && deltaY < 100 && (bottomSheetRef.current?.scrollTop || 0) > 0) {
+        if (initialScrollTopRef.current > 0) { 
+             determinedNextState = 'expanded';
+        }
+    }
+
+    setBottomSheetState(determinedNextState);
+
+    bottomSheetRef.current.style.transform = ''; 
     startDragY.current = null;
     lastY.current = null;
     dragStartTime.current = null;
+    initialScrollTopRef.current = 0; 
   };
 
   const toggleBottomSheet = () => {
@@ -1259,7 +1227,7 @@ export default function HomePage() {
           <div className="px-4 pb-8">
             {/* 그룹 멤버 (최상단으로 이동) */}
             <div className="content-section members-section">
-              <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+              <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
                 그룹 멤버
                 <Link 
                   href="/group" 
@@ -1302,7 +1270,7 @@ export default function HomePage() {
 
             {/* 오늘의 일정 - 선택된 멤버의 일정을 표시 */}
             <div className="content-section schedule-section">
-              <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+              <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
                 {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
                 {
                   groupMembers.some(m => m.isSelected) ? (
@@ -1385,7 +1353,7 @@ export default function HomePage() {
             <div className={`transition-all duration-300 ${bottomSheetState === 'expanded' ? 'opacity-100' : 'opacity-0 hidden'}`}>
               {/* 추천 장소 */}
               <div className="content-section places-section mb-12">
-                <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+                <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
                   내 주변 장소
                   <Link 
                     href="/location/nearby" 

@@ -175,7 +175,7 @@ function GroupPageContent() {
             <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
               <div className="flex items-center">
                 <FaUsers className="w-5 h-5 text-blue-600 mr-2 flex-shrink-0" />
-                <h2 className="text-lg font-semibold text-gray-900">내 그룹 목록</h2>
+                <h2 className="text-lg text-gray-900 font-normal">내 그룹 목록</h2>
               </div>
               <button 
                 onClick={handleAddGroup}
@@ -229,7 +229,7 @@ function GroupPageContent() {
               <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
                 <div className="flex items-center">
                   <FaLayerGroup className="w-5 h-5 text-orange-600 mr-2 flex-shrink-0" />
-                  <h2 className="text-lg font-semibold text-gray-900">{selectedGroup.name}</h2>
+                  <h2 className="text-lg text-gray-900 font-normal">{selectedGroup.name}</h2>
                 </div>
                 {/* 액션 버튼 그룹: 수정, 삭제, 그룹원 추가 순서로 변경 */}
                 <div className="flex items-center space-x-2">
@@ -305,7 +305,7 @@ function GroupPageContent() {
             >
               {/* 모달 헤더 수정 */}
               <div className="flex justify-between items-center p-4 sm:p-5 border-b border-gray-200">
-                <h3 className="text-xl leading-6 font-semibold text-gray-900">새 그룹 만들기</h3>
+                <h3 className="text-xl leading-6 font-semibold text-gray-900 font-light">새 그룹 만들기</h3>
                 <button 
                   onClick={handleCloseModal}
                   className="p-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
@@ -386,7 +386,7 @@ function GroupPageContent() {
             >
               {/* Modal Header */}
               <div className="flex justify-between items-center p-4 sm:p-5 border-b">
-                <h3 className="text-xl leading-6 font-semibold text-gray-900">"{selectedGroup.name}" 그룹 초대</h3>
+                <h3 className="text-xl leading-6 font-semibold text-gray-900 font-light">"{selectedGroup.name}" 그룹 초대</h3>
                 <button
                   onClick={() => setIsShareModalOpen(false)}
                   className="p-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
