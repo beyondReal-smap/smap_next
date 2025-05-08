@@ -344,7 +344,7 @@ const pageStyles = `
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
   color: #424242;
-  font-weight: 600;
+  font-weight: normal;
 }
 /* --- END: home/page.tsx 에서 가져온 스타일 --- */
 `;
