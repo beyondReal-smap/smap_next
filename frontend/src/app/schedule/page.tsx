@@ -397,8 +397,10 @@ export default function SchedulePage() {
                       onClick={() => handleEventItemClick(event)}
                       sx={{
                         mb: 1.5, p: 2, 
-                        borderLeft: '1px solid #eee', borderRight: '1px solid #eee', borderBottom: '1px solid #eee',
-                        borderRadius: '4px', alignItems: 'flex-start', 
+                        border: '1px solid #eee',
+                        borderRadius: '16px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                        alignItems: 'flex-start', 
                         backgroundColor: bgColor,
                         transition: 'box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out, background-color 0.2s ease-in-out',
                         '&:hover': { 
