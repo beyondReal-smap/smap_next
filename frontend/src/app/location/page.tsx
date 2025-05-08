@@ -420,8 +420,8 @@ export default function LocationPage() {
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
       setNaverMapsLoaded(true);
-        return;
-      }
+      return;
+    }
     const script = document.createElement('script');
     script.id = 'naver-maps-script'; 
     script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${NAVER_MAPS_CLIENT_ID}&submodules=geocoder,drawing,visualization`;
@@ -429,7 +429,16 @@ export default function LocationPage() {
     script.defer = true;
     script.onload = () => {
       console.log('Naver Maps API loaded.');
-      setNaverMapsLoaded(true);
+      // API가 로드된 후 Service 객체가 초기화될 때까지 잠시 대기
+      setTimeout(() => {
+        if (window.naver?.maps?.Service) {
+          console.log('Naver Maps Service is ready.');
+          setNaverMapsLoaded(true);
+        } else {
+          console.error('Naver Maps Service failed to initialize.');
+          setIsMapLoading(false);
+        }
+      }, 1000);
     };
     script.onerror = () => {
       console.error('Failed to load Naver Maps API.');
@@ -451,19 +460,19 @@ export default function LocationPage() {
       try {
         const initialCenter = new window.naver.maps.LatLng(37.4979, 127.0276);
         const mapOptions = {
-            ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
-            center: initialCenter,
-            zoom: MAP_CONFIG.NAVER.DEFAULT_OPTIONS?.zoom || 14,
-            logoControl: false,
-            mapDataControl: false,
+          ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
+          center: initialCenter,
+          zoom: MAP_CONFIG.NAVER.DEFAULT_OPTIONS?.zoom || 14,
+          logoControl: false,
+          mapDataControl: false,
         };
         map.current = new window.naver.maps.Map(mapContainer.current, mapOptions);
         
         window.naver.maps.Event.addListener(map.current, 'init', () => {
-            console.log('Naver Map initialized event triggered');
-            setIsMapLoading(false);
-            setIsMapInitialized(true);
-            if(map.current) map.current.refresh(true);
+          console.log('Naver Map initialized event triggered');
+          setIsMapLoading(false);
+          setIsMapInitialized(true);
+          if(map.current) map.current.refresh(true);
         });
 
         window.naver.maps.Event.addListener(map.current, 'click', async (e: { coord: NaverCoord, pointerEvent: MouseEvent }) => { 
@@ -478,7 +487,7 @@ export default function LocationPage() {
             name: '', 
             address: '', 
             coordinates: [e.coord.x, e.coord.y],
-            notifications: false, // Added
+            notifications: false,
           });
 
           if (tempMarker.current) tempMarker.current.setMap(null);
@@ -488,38 +497,41 @@ export default function LocationPage() {
           });
 
           try {
-            window.naver.maps.Service.reverseGeocode({
-                coords: e.coord,
-                orders: [window.naver.maps.Service.OrderType.ADDR, window.naver.maps.Service.OrderType.ROAD_ADDR].join(',')
+            // Service 객체가 완전히 초기화되었는지 확인
+            if (!window.naver?.maps?.Service) {
+              console.warn('Naver Maps Service is not initialized yet');
+              setNewLocation(prev => ({...prev, address: '주소 정보를 가져올 수 없습니다.'}));
+              setIsLocationInfoPanelOpen(true);
+              setBottomSheetState('collapsed');
+              return;
+            }
+
+            // reverseGeocode 호출 전에 Service 객체 확인
+            const service = window.naver.maps.Service;
+            if (!service || typeof service.reverseGeocode !== 'function') {
+              throw new Error('Reverse geocode service is not available');
+            }
+
+            service.reverseGeocode({
+              coords: e.coord,
+              orders: [service.OrderType.ADDR, service.OrderType.ROAD_ADDR].join(',')
             }, function(status: any, response: any) {
-                if (status !== window.naver.maps.Service.Status.OK) {
-                    setNewLocation(prev => ({...prev, address: ''}));
-                    // toast.error('선택한 위치의 주소를 가져올 수 없습니다.');
-                } else {
-                    const result = response.v2;
-                    const roadAddr = result.address.jibunAddress || result.address.roadAddress;
-                    const fullAddress = roadAddr?.addressElements?.length > 0 ? roadAddr.addressElements.map((el:any)=>el.longName).join(' ') : (roadAddr || '주소 정보 없음');
-                    setNewLocation(prev => ({...prev, address: fullAddress}));
-                }
-                console.log("[Map Click] Before setIsLocationInfoPanelOpen(true) in reverseGeocode callback.");
-                console.log("[Map Click] Current bottomSheetState:", bottomSheetState, "Panel will open.");
-                setIsLocationInfoPanelOpen(true);
-                // Always collapse bottom sheet when map click opens the new location panel
-                setBottomSheetState('collapsed'); 
-                console.log("[Map Click] Bottom sheet set to collapsed.");
-                console.log("[Map Click] After setIsLocationInfoPanelOpen(true) in reverseGeocode callback. New state will be pending.");
+              if (status !== service.Status.OK) {
+                setNewLocation(prev => ({...prev, address: ''}));
+              } else {
+                const result = response.v2;
+                const roadAddr = result.address.jibunAddress || result.address.roadAddress;
+                const fullAddress = roadAddr?.addressElements?.length > 0 ? roadAddr.addressElements.map((el:any)=>el.longName).join(' ') : (roadAddr || '주소 정보 없음');
+                setNewLocation(prev => ({...prev, address: fullAddress}));
+              }
+              setIsLocationInfoPanelOpen(true);
+              setBottomSheetState('collapsed');
             });
-          } catch(geoError){ 
-            setNewLocation(prev => ({...prev, address: ''}));
-            // toast.error('주소 변환 중 오류가 발생했습니다.');
+          } catch(geoError) { 
             console.error('Reverse geocode error:', geoError);
-            console.log("[Map Click] Before setIsLocationInfoPanelOpen(true) in catch block (reverseGeocode error).");
-            console.log("[Map Click] Current bottomSheetState:", bottomSheetState, "Panel will open.");
+            setNewLocation(prev => ({...prev, address: '주소 변환 중 오류가 발생했습니다.'}));
             setIsLocationInfoPanelOpen(true);
-            // Always collapse bottom sheet when map click opens the new location panel
             setBottomSheetState('collapsed');
-            console.log("[Map Click] Bottom sheet set to collapsed.");
-            console.log("[Map Click] After setIsLocationInfoPanelOpen(true) in catch block. New state will be pending.");
           } 
         });
 
@@ -530,7 +542,7 @@ export default function LocationPage() {
     }
     return () => {
       if (map.current && typeof map.current.destroy === 'function') {
-         map.current.destroy();
+        map.current.destroy();
       }
       map.current = null;
       setIsMapInitialized(false);
