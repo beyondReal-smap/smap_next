@@ -199,12 +199,13 @@ const pageStyles = `
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 40;
   max-height: 90vh;
   overflow-y: auto;
   touch-action: pan-y;
   padding-bottom: 20px;
+  will-change: transform;
 }
 
 .bottom-sheet-handle {
@@ -221,12 +222,12 @@ const pageStyles = `
 }
 
 .bottom-sheet-collapsed {
-  transform: translateY(calc(100% - 134px)); /* 예시 높이, 추후 조정 */
+  transform: translateY(calc(100% - 100px));
   height: 100vh;
 }
 
 .bottom-sheet-expanded {
-  transform: translateY(54%); /* 37vh에 맞게 조정 */
+  transform: translateY(58%);
   height: 100vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -432,51 +433,57 @@ export default function LogsPage() {
   };
   const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
     if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
+    
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const deltaY = clientY - currentDragY.current;
-    currentDragY.current = clientY;
-    const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
-    let currentTranslateY = 0;
-    if (currentTransform !== 'none') {
-      const matrix = new DOMMatrixReadOnly(currentTransform);
-      currentTranslateY = matrix.m42;
+    
+    if (Math.abs(deltaY) > 5) {
+      currentDragY.current = clientY;
+      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
+      let currentTranslateY = 0;
+      if (currentTransform !== 'none') {
+        const matrix = new DOMMatrixReadOnly(currentTransform);
+        currentTranslateY = matrix.m42;
+      }
+      let newTranslateY = currentTranslateY + deltaY;
+      const expandedY = 0;
+      const collapsedY = window.innerHeight * 0.6;
+      newTranslateY = Math.max(expandedY - (window.innerHeight * 0.1), Math.min(newTranslateY, collapsedY + 50));
+      bottomSheetRef.current.style.transform = `translateY(${newTranslateY}px)`;
+      bottomSheetRef.current.style.transition = 'none';
     }
-    let newTranslateY = currentTranslateY + deltaY;
-    const expandedY = 0;
-    const collapsedY = window.innerHeight - 220; // 바텀시트 collapsed 높이 반영
-    newTranslateY = Math.max(expandedY - (window.innerHeight * 0.1), Math.min(newTranslateY, collapsedY + 50));
-    bottomSheetRef.current.style.transform = `translateY(${newTranslateY}px)`;
   };
   const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
     if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
-    bottomSheetRef.current.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+
     const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
     const deltaYOverall = clientY - startDragY.current;
     const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
-    const velocity = deltaTime > 0 ? deltaYOverall / deltaTime : 0;
-    const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
-    let currentSheetY = 0;
-    if (currentTransform !== 'none') {
+    
+    const isDrag = Math.abs(deltaYOverall) > 10 || deltaTime > 200;
+
+    if (isDrag) {
+      bottomSheetRef.current.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+      const velocity = deltaTime > 0 ? deltaYOverall / deltaTime : 0;
+      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
+      let currentSheetY = 0;
+      if (currentTransform !== 'none') {
         const matrix = new DOMMatrixReadOnly(currentTransform);
         currentSheetY = matrix.m42;
-    }
-    const windowHeight = window.innerHeight;
-    const expandedThreshold = windowHeight * 0.1; // 위로 당길 때 expanded로 판단하는 기준 (화면 상단에서 10%)
-    const collapsedThreshold = windowHeight * 0.7; // 아래로 내릴 때 collapsed로 판단하는 기준 (화면 상단에서 70%)
+      }
+      const windowHeight = window.innerHeight;
+      const threshold = windowHeight * 0.3;
 
-    if (Math.abs(velocity) > 0.3) { // 빠른 스와이프
-        if (velocity < 0) { // 위로 스와이프
-            setBottomSheetState('expanded');
-        } else { // 아래로 스와이프
-            setBottomSheetState('collapsed');
-        }
-    } else { // 느린 드래그
-        if (currentSheetY < (expandedThreshold + collapsedThreshold) / 2) { // 현재 시트 위치가 중간보다 위에 있으면
-            setBottomSheetState('expanded');
-        } else {
-            setBottomSheetState('collapsed');
-        }
+      let finalState: 'expanded' | 'collapsed';
+      if (Math.abs(velocity) > 0.3) {
+        finalState = velocity < 0 ? 'expanded' : 'collapsed';
+      } else {
+        finalState = currentSheetY < threshold ? 'expanded' : 'collapsed';
+      }
+      
+      setBottomSheetState(finalState);
     }
+
     bottomSheetRef.current.style.transform = '';
     startDragY.current = null;
     currentDragY.current = null;
@@ -489,42 +496,98 @@ export default function LogsPage() {
     });
   };
 
-  const updateMemberMarkers = (members: GroupMember[]) => {
-    if (!map.current || !window.naver?.maps || !naverMapsLoaded) return;
-    memberNaverMarkers.current.forEach(marker => marker.setMap(null));
-    memberNaverMarkers.current = [];
-    const selectedMembers = members.filter(member => member.isSelected);
-    selectedMembers.forEach(member => {
-      const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
-      const marker = new window.naver.maps.Marker({
-        position: position, map: map.current,
-        icon: { content: `<div style="position: relative; text-align: center;"><div style="width: 32px; height: 32px; background-color: white; border: 2px solid #4F46E5; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"><img src="${member.photo}" alt="${member.name}" style="width: 100%; height: 100%; object-fit: cover;" /></div><div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">${member.name}</div></div>`, size: new window.naver.maps.Size(36, 48), anchor: new window.naver.maps.Point(18, 42) }, zIndex: 150
-      });
-      memberNaverMarkers.current.push(marker);
+  const handleMemberSelect = (id: string, e: React.MouseEvent) => {
+    // 이벤트 전파 중단
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('Member selection started:', id);
+    
+    // 현재 바텀시트 상태 유지
+    const currentBottomSheetState = bottomSheetState;
+    
+    const updatedMembers = groupMembers.map(member => {
+      const isSelected = member.id === id;
+      console.log(`Updating member ${member.name}: isSelected = ${isSelected}`);
+      return {
+        ...member,
+        isSelected: isSelected
+      };
     });
-    if (selectedMembers.length === 1) {
-      const member = selectedMembers[0];
-      if (map.current && member.location) {
-        const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
-        map.current.panTo(position);
-        if (map.current.getZoom() < 14) map.current.setZoom(14); // Zoom 레벨 조정
-      }
-    } else if (selectedMembers.length > 1) {
-      const bounds = new window.naver.maps.LatLngBounds();
-      selectedMembers.forEach(member => {
-        if (member.location) bounds.extend(new window.naver.maps.LatLng(member.location.lat, member.location.lng));
-      });
-      if (!bounds.isEmpty()) map.current.fitBounds(bounds);
-    }
-  };
-
-  const handleMemberSelect = (id: string) => {
-    const updatedMembers = groupMembers.map(member => 
-      member.id === id ? { ...member, isSelected: !member.isSelected } : { ...member, isSelected: false }
-    );
+    
+    console.log('Updated members:', updatedMembers);
+    
     setGroupMembers(updatedMembers);
     updateMemberMarkers(updatedMembers);
-    setActiveLogView('members'); // 멤버 선택/해제 시 멤버 뷰로 전환
+    setActiveLogView('members');
+    
+    // 바텀시트 상태 유지
+    setBottomSheetState(currentBottomSheetState);
+    
+    // 선택 상태 변경 확인을 위한 로그
+    const selectedMember = updatedMembers.find(m => m.isSelected);
+    console.log('Selected member:', selectedMember?.name);
+  };
+
+  const updateMemberMarkers = (members: GroupMember[]) => {
+    // 지도 초기화 체크 로직 개선
+    if (!map.current) {
+      console.warn('Map is not initialized');
+      return;
+    }
+    
+    if (!window.naver?.maps) {
+      console.warn('Naver Maps API is not loaded');
+      return;
+    }
+    
+    // 기존 마커 제거
+    memberNaverMarkers.current.forEach(marker => marker.setMap(null));
+    memberNaverMarkers.current = [];
+    
+    const selectedMembers = members.filter(member => member.isSelected);
+    
+    // 선택된 멤버가 있는 경우에만 마커 생성 및 지도 이동
+    if (selectedMembers.length > 0) {
+      selectedMembers.forEach(member => {
+        try {
+          const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
+          const marker = new window.naver.maps.Marker({
+            position: position,
+            map: map.current,
+            icon: {
+              content: `<div style="position: relative; text-align: center;">
+                <div style="width: 32px; height: 32px; background-color: white; border: 2px solid #4F46E5; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
+                  <img src="${member.photo}" alt="${member.name}" style="width: 100%; height: 100%; object-fit: cover;" />
+                </div>
+                <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
+                  ${member.name}
+                </div>
+              </div>`,
+              size: new window.naver.maps.Size(36, 48),
+              anchor: new window.naver.maps.Point(18, 42)
+            },
+            zIndex: 150
+          });
+          memberNaverMarkers.current.push(marker);
+        } catch (error) {
+          console.error('Error creating marker:', error);
+        }
+      });
+
+      // 단일 멤버 선택 시 해당 위치로 지도 이동
+      if (selectedMembers.length === 1) {
+        const member = selectedMembers[0];
+        try {
+          const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
+          map.current.panTo(position);
+          map.current.setZoom(14);
+          console.log('Map moved to member location:', member.name, member.location);
+        } catch (error) {
+          console.error('Error moving map:', error);
+        }
+      }
+    }
   };
 
   const handleDateSelect = (date: string) => {
@@ -545,7 +608,21 @@ export default function LogsPage() {
 
   useEffect(() => {
     if (naverMapsLoaded && map.current && groupMembers.length > 0) {
-      if (!groupMembers.some(m => m.isSelected)) { handleMemberSelect(groupMembers[0].id); }
+      if (!groupMembers.some(m => m.isSelected)) {
+        // 이벤트 객체 없이 직접 호출
+        const id = groupMembers[0].id;
+        const currentBottomSheetState = bottomSheetState;
+        
+        const updatedMembers = groupMembers.map(member => ({
+          ...member,
+          isSelected: member.id === id
+        }));
+        
+        setGroupMembers(updatedMembers);
+        updateMemberMarkers(updatedMembers);
+        setActiveLogView('members');
+        setBottomSheetState(currentBottomSheetState);
+      }
     }
   }, [naverMapsLoaded, map.current, groupMembers]);
 
@@ -595,7 +672,7 @@ export default function LogsPage() {
         <div className="full-map-container"><div ref={mapContainer} className="w-full h-full" /></div>
 
         <div 
-          ref={bottomSheetRef} 
+          ref={bottomSheetRef}
           className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}
           onTouchStart={handleDragStart}
           onTouchMove={handleDragMove}
@@ -605,11 +682,7 @@ export default function LogsPage() {
           onMouseUp={handleDragEnd}
           onMouseLeave={handleDragEnd}
         >
-          <div 
-            className="bottom-sheet-handle" 
-            onClick={toggleBottomSheet} // 핸들에는 클릭 이벤트만 남김
-          ></div>
-          
+          <div className="bottom-sheet-handle"></div>
           <div className="px-4 pb-4">
             <div 
               ref={logSwipeContainerRef}
@@ -618,7 +691,7 @@ export default function LogsPage() {
             >
               <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
                 <div className="content-section members-section min-h-[220px] max-h-[220px] overflow-y-auto">
-                  <h2 className="text-lg font-normal text-gray-900 flex justify-between items-center section-title">
+                  <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
                     그룹 멤버
                     <Link href="/group" className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                       <FiPlus className="h-3 w-3 mr-1" />그룹 관리
@@ -628,11 +701,30 @@ export default function LogsPage() {
                     <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
                       {groupMembers.map((member) => (
                         <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
-                          <button onClick={() => handleMemberSelect(member.id)} className={`flex flex-col items-center focus:outline-none`}>
-                            <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'}`}>
-                              <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
+                          <button 
+                            onClick={(e) => handleMemberSelect(member.id, e)}
+                            className={`flex flex-col items-center focus:outline-none`}
+                            style={{ touchAction: 'manipulation' }}
+                          >
+                            <div 
+                              className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
+                                member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
+                              }`}
+                            >
+                              <img 
+                                src={member.photo} 
+                                alt={member.name} 
+                                className="w-full h-full object-cover"
+                                draggable="false"
+                              />
                             </div>
-                            <span className={`block text-xs font-medium mt-1.5 ${member.isSelected ? 'text-indigo-700' : 'text-gray-700'}`}>{member.name}</span>
+                            <span 
+                              className={`block text-xs font-medium mt-1.5 ${
+                                member.isSelected ? 'text-indigo-700' : 'text-gray-700'
+                              }`}
+                            >
+                              {member.name}
+                            </span>
                           </button>
                         </div>
                       ))}
@@ -674,7 +766,7 @@ export default function LogsPage() {
               <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
                 <div className="content-section summary-section min-h-[220px] max-h-[220px] overflow-y-auto flex flex-col">
                   <div>
-                    <h2 className="text-lg font-normal text-gray-900 flex justify-between items-center section-title mb-2">
+                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-2">
                       {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 위치기록 요약` : "위치기록 요약"}
                     </h2>
                     <div className="mb-2 px-1 flex items-center">

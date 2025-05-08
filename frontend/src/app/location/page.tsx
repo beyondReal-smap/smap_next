@@ -219,12 +219,13 @@ const pageStyles = `
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
-  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 40;
   max-height: 90vh;
   overflow-y: auto;
   touch-action: pan-y;
   padding-bottom: 20px;
+  will-change: transform;
 }
 
 .bottom-sheet-handle {
@@ -241,12 +242,12 @@ const pageStyles = `
 }
 
 .bottom-sheet-collapsed {
-  transform: translateY(calc(100% - 140px)); /* 150px 높이로 표시 (기존 120px에서 증가) */
+  transform: translateY(calc(100% - 100px));
   height: 100vh;
 }
 
 .bottom-sheet-expanded {
-  transform: translateY(58%); /* 37vh에 맞게 조정 */
+  transform: translateY(58%);
   height: 100vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -274,25 +275,25 @@ const pageStyles = `
 }
 .location-info-panel {
   position: absolute;
-  top: 5px; /* 헤더 높이(50px 가정) + 10px 여백 */
+  top: 160px; /* 헤더 아래 여백을 더 늘림 */
   left: 50%;
   transform: translateX(-50%);
-  width: calc(100% - 30px); /* 양쪽 여백 20px */
-  max-width: 480px; /* 최대 너비 */
+  width: calc(100% - 30px);
+  max-width: 480px;
   background-color: white;
   border-radius: 12px;
   box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-  z-index: 45; /* 바텀시트(40)보다 높게, 모달(50)보다 낮게 */
+  z-index: 45;
   padding: 20px;
   opacity: 0;
   visibility: hidden;
-  transform: translateX(-50%) scale(0.95); /* Apply translateX before scale */
-  transition: opacity 0.3s ease-out, visibility 0.3s ease-out, transform 0.3s ease-out; 
+  transform: translateX(-50%) scale(0.95);
+  transition: opacity 0.3s ease-out, visibility 0.3s ease-out, transform 0.3s ease-out;
 }
 .location-info-panel.open {
   opacity: 1;
   visibility: visible;
-  transform: translateX(-50%) scale(1); /* Apply translateX before scale */
+  transform: translateX(-50%) scale(1);
 }
 .address-search-results-in-panel {
   max-height: 150px; /* 패널 내 검색 결과 높이 제한 */
@@ -419,8 +420,8 @@ export default function LocationPage() {
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
       setNaverMapsLoaded(true);
-        return;
-      }
+      return;
+    }
     const script = document.createElement('script');
     script.id = 'naver-maps-script'; 
     script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${NAVER_MAPS_CLIENT_ID}&submodules=geocoder,drawing,visualization`;
@@ -428,7 +429,16 @@ export default function LocationPage() {
     script.defer = true;
     script.onload = () => {
       console.log('Naver Maps API loaded.');
-      setNaverMapsLoaded(true);
+      // API가 로드된 후 Service 객체가 초기화될 때까지 잠시 대기
+      setTimeout(() => {
+        if (window.naver?.maps?.Service) {
+          console.log('Naver Maps Service is ready.');
+          setNaverMapsLoaded(true);
+        } else {
+          console.error('Naver Maps Service failed to initialize.');
+          setIsMapLoading(false);
+        }
+      }, 1000);
     };
     script.onerror = () => {
       console.error('Failed to load Naver Maps API.');
@@ -450,19 +460,19 @@ export default function LocationPage() {
       try {
         const initialCenter = new window.naver.maps.LatLng(37.4979, 127.0276);
         const mapOptions = {
-            ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
-            center: initialCenter,
-            zoom: MAP_CONFIG.NAVER.DEFAULT_OPTIONS?.zoom || 14,
-            logoControl: false,
-            mapDataControl: false,
+          ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
+          center: initialCenter,
+          zoom: MAP_CONFIG.NAVER.DEFAULT_OPTIONS?.zoom || 14,
+          logoControl: false,
+          mapDataControl: false,
         };
         map.current = new window.naver.maps.Map(mapContainer.current, mapOptions);
         
         window.naver.maps.Event.addListener(map.current, 'init', () => {
-            console.log('Naver Map initialized event triggered');
-            setIsMapLoading(false);
-            setIsMapInitialized(true);
-            if(map.current) map.current.refresh(true);
+          console.log('Naver Map initialized event triggered');
+          setIsMapLoading(false);
+          setIsMapInitialized(true);
+          if(map.current) map.current.refresh(true);
         });
 
         window.naver.maps.Event.addListener(map.current, 'click', async (e: { coord: NaverCoord, pointerEvent: MouseEvent }) => { 
@@ -477,7 +487,7 @@ export default function LocationPage() {
             name: '', 
             address: '', 
             coordinates: [e.coord.x, e.coord.y],
-            notifications: false, // Added
+            notifications: false,
           });
 
           if (tempMarker.current) tempMarker.current.setMap(null);
@@ -487,38 +497,41 @@ export default function LocationPage() {
           });
 
           try {
-            window.naver.maps.Service.reverseGeocode({
-                coords: e.coord,
-                orders: [window.naver.maps.Service.OrderType.ADDR, window.naver.maps.Service.OrderType.ROAD_ADDR].join(',')
+            // Service 객체가 완전히 초기화되었는지 확인
+            if (!window.naver?.maps?.Service) {
+              console.warn('Naver Maps Service is not initialized yet');
+              setNewLocation(prev => ({...prev, address: '주소 정보를 가져올 수 없습니다.'}));
+              setIsLocationInfoPanelOpen(true);
+              setBottomSheetState('collapsed');
+              return;
+            }
+
+            // reverseGeocode 호출 전에 Service 객체 확인
+            const service = window.naver.maps.Service;
+            if (!service || typeof service.reverseGeocode !== 'function') {
+              throw new Error('Reverse geocode service is not available');
+            }
+
+            service.reverseGeocode({
+              coords: e.coord,
+              orders: [service.OrderType.ADDR, service.OrderType.ROAD_ADDR].join(',')
             }, function(status: any, response: any) {
-                if (status !== window.naver.maps.Service.Status.OK) {
-                    setNewLocation(prev => ({...prev, address: ''}));
-                    // toast.error('선택한 위치의 주소를 가져올 수 없습니다.');
-                } else {
-                    const result = response.v2;
-                    const roadAddr = result.address.jibunAddress || result.address.roadAddress;
-                    const fullAddress = roadAddr?.addressElements?.length > 0 ? roadAddr.addressElements.map((el:any)=>el.longName).join(' ') : (roadAddr || '주소 정보 없음');
-                    setNewLocation(prev => ({...prev, address: fullAddress}));
-                }
-                console.log("[Map Click] Before setIsLocationInfoPanelOpen(true) in reverseGeocode callback.");
-                console.log("[Map Click] Current bottomSheetState:", bottomSheetState, "Panel will open.");
-                setIsLocationInfoPanelOpen(true);
-                // Always collapse bottom sheet when map click opens the new location panel
-                setBottomSheetState('collapsed'); 
-                console.log("[Map Click] Bottom sheet set to collapsed.");
-                console.log("[Map Click] After setIsLocationInfoPanelOpen(true) in reverseGeocode callback. New state will be pending.");
+              if (status !== service.Status.OK) {
+                setNewLocation(prev => ({...prev, address: ''}));
+              } else {
+                const result = response.v2;
+                const roadAddr = result.address.jibunAddress || result.address.roadAddress;
+                const fullAddress = roadAddr?.addressElements?.length > 0 ? roadAddr.addressElements.map((el:any)=>el.longName).join(' ') : (roadAddr || '주소 정보 없음');
+                setNewLocation(prev => ({...prev, address: fullAddress}));
+              }
+              setIsLocationInfoPanelOpen(true);
+              setBottomSheetState('collapsed');
             });
-          } catch(geoError){ 
-            setNewLocation(prev => ({...prev, address: ''}));
-            // toast.error('주소 변환 중 오류가 발생했습니다.');
+          } catch(geoError) { 
             console.error('Reverse geocode error:', geoError);
-            console.log("[Map Click] Before setIsLocationInfoPanelOpen(true) in catch block (reverseGeocode error).");
-            console.log("[Map Click] Current bottomSheetState:", bottomSheetState, "Panel will open.");
+            setNewLocation(prev => ({...prev, address: '주소 변환 중 오류가 발생했습니다.'}));
             setIsLocationInfoPanelOpen(true);
-            // Always collapse bottom sheet when map click opens the new location panel
             setBottomSheetState('collapsed');
-            console.log("[Map Click] Bottom sheet set to collapsed.");
-            console.log("[Map Click] After setIsLocationInfoPanelOpen(true) in catch block. New state will be pending.");
           } 
         });
 
@@ -529,7 +542,7 @@ export default function LocationPage() {
     }
     return () => {
       if (map.current && typeof map.current.destroy === 'function') {
-         map.current.destroy();
+        map.current.destroy();
       }
       map.current = null;
       setIsMapInitialized(false);
@@ -564,77 +577,78 @@ export default function LocationPage() {
     currentDragY.current = clientY;
     dragStartTime.current = Date.now();
     if (bottomSheetRef.current) {
-      bottomSheetRef.current.style.transition = 'none'; // Add this to disable CSS transition during drag
+      bottomSheetRef.current.style.transition = 'none';
     }
   };
   const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
     if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
+    
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const deltaY = clientY - currentDragY.current;
-    currentDragY.current = clientY;
-    const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
-    let currentTranslateY = 0;
-    if (currentTransform !== 'none') {
-      const matrix = new DOMMatrixReadOnly(currentTransform);
-      currentTranslateY = matrix.m42;
+    
+    // 드래그 시작 후 일정 거리 이상 움직였을 때만 드래그로 처리
+    if (Math.abs(deltaY) > 5) {
+      currentDragY.current = clientY;
+      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
+      let currentTranslateY = 0;
+      if (currentTransform !== 'none') {
+        const matrix = new DOMMatrixReadOnly(currentTransform);
+        currentTranslateY = matrix.m42;
+      }
+      let newTranslateY = currentTranslateY + deltaY;
+      const expandedY = 0;
+      const collapsedY = window.innerHeight * 0.6;
+      newTranslateY = Math.max(expandedY - (window.innerHeight * 0.1), Math.min(newTranslateY, collapsedY + 50));
+      bottomSheetRef.current.style.transform = `translateY(${newTranslateY}px)`;
+      bottomSheetRef.current.style.transition = 'none';
     }
-    let newTranslateY = currentTranslateY + deltaY;
-    const expandedY = 0; // 완전히 펼쳐졌을 때의 Y 위치
-    const collapsedY = window.innerHeight * 0.6; // 화면의 60% 지점 (40% 차지)
-    // 드래그 범위를 제한하여 너무 많이 올라가거나 내려가지 않도록 함
-    newTranslateY = Math.max(expandedY - (window.innerHeight * 0.1) , Math.min(newTranslateY, collapsedY + 50)); 
-    bottomSheetRef.current.style.transform = `translateY(${newTranslateY}px)`;
   };
   const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
     if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
 
-    const currentBottomSheetRef = bottomSheetRef.current;
-
-    const { clientY } = 'changedTouches' in e ? e.changedTouches[0] : e;
+    const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
     const deltaYOverall = clientY - startDragY.current;
     const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
-    const velocity = deltaTime > 0 ? deltaYOverall / deltaTime : 0;
     
-    const currentTransform = getComputedStyle(currentBottomSheetRef).transform;
-    let currentSheetY = 0;
-    if (currentTransform !== 'none') {
+    // 드래그로 판단할 최소 거리와 시간 설정
+    const isDrag = Math.abs(deltaYOverall) > 10 || deltaTime > 200;
+
+    if (isDrag) {
+      bottomSheetRef.current.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+      const velocity = deltaTime > 0 ? deltaYOverall / deltaTime : 0;
+      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
+      let currentSheetY = 0;
+      if (currentTransform !== 'none') {
         const matrix = new DOMMatrixReadOnly(currentTransform);
         currentSheetY = matrix.m42;
-    }
+      }
+      const windowHeight = window.innerHeight;
+      const threshold = windowHeight * 0.3;
 
-    const windowHeight = window.innerHeight;
-    const threshold = windowHeight * 0.3; 
-
-    let finalState: 'expanded' | 'collapsed';
-    if (Math.abs(velocity) > 0.3) { 
+      let finalState: 'expanded' | 'collapsed';
+      if (Math.abs(velocity) > 0.3) {
         finalState = velocity < 0 ? 'expanded' : 'collapsed';
-    } else { 
+      } else {
         finalState = currentSheetY < threshold ? 'expanded' : 'collapsed';
-    }
-    
-    currentBottomSheetRef.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
-    setBottomSheetState(finalState);
+      }
+      
+      setBottomSheetState(finalState);
 
-    if (finalState === 'collapsed') {
+      if (finalState === 'collapsed') {
         setIsLocationInfoPanelOpen(false);
         if (tempMarker.current) {
-            tempMarker.current.setMap(null);
+          tempMarker.current.setMap(null);
         }
-        // Similar logic to toggleBottomSheet for resetting markers if needed
         const currentSelectedMember = groupMembers.find(m => m.isSelected);
         if (currentSelectedMember) {
           addMarkersToMap(currentSelectedMember.savedLocations || []);
         } else {
-          addMarkersToMap([]); 
+          addMarkersToMap([]);
         }
+      }
     }
 
-    requestAnimationFrame(() => {
-        if (currentBottomSheetRef) { 
-            currentBottomSheetRef.style.transform = '';
-        }
-    });
-
+    bottomSheetRef.current.style.transform = '';
     startDragY.current = null;
     currentDragY.current = null;
     dragStartTime.current = null;
@@ -1466,13 +1480,11 @@ export default function LocationPage() {
           onTouchEnd={handleDragEnd}
           onMouseDown={handleDragStart}
           onMouseMove={handleDragMove}
-          onMouseUp={handleDragEnd} // 사용자가 마우스를 브라우저 창 밖으로 드래그했다가 놓는 경우를 위해 onMouseLeave에도 handleDragEnd를 추가하는 것이 좋을 수 있습니다.
+          onMouseUp={handleDragEnd}
+          onMouseLeave={handleDragEnd}
         >
-          <div 
-            className="bottom-sheet-handle"
-            onClick={toggleBottomSheet} // 핸들에는 클릭 이벤트만 남김
-          ></div>
-          <div className="px-4 pb-4"> 
+          <div className="bottom-sheet-handle"></div>
+          <div className="px-4 pb-4">
             <div
               ref={swipeContainerRef}
               className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar"

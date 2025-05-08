@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageContainer, Card, Button } from '../../components/layout';
-import { FaPencil, FaClock, FaArrowsRotate, FaBell, FaMapPin, FaBriefcase, FaFileLines, FaCalendarDays } from 'react-icons/fa6';
+import { FaPencil, FaClock, FaArrowsRotate, FaBell, FaMapPin, FaBriefcase, FaFileLines, FaCalendarDays, FaUsers } from 'react-icons/fa6';
 import { FaSearch, FaExclamationTriangle } from 'react-icons/fa';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
@@ -34,6 +34,56 @@ const weekdaySelectedOverrideClasses = [
   '!bg-blue-500 !hover:bg-blue-600 !focus:ring-blue-300',       // 목
   '!bg-indigo-500 !hover:bg-indigo-600 !focus:ring-indigo-300',    // 금
   '!bg-violet-500 !hover:bg-violet-600 !focus:ring-violet-300'   // 토
+];
+
+// 그룹 멤버 관련 인터페이스 추가
+interface Location {
+  lat: number;
+  lng: number;
+}
+
+interface Schedule {
+  id: string;
+  title: string;
+  date: string;
+  location: string;
+}
+
+interface GroupMember {
+  id: string;
+  name: string;
+  photo: string;
+  isSelected: boolean;
+  location: Location;
+  schedules: Schedule[];
+}
+
+// 목업 데이터 추가
+const MOCK_GROUP_MEMBERS_HOME: GroupMember[] = [
+  { 
+    id: '1', 
+    name: '김철수', 
+    photo: '/images/avatar3.png', 
+    isSelected: false,
+    location: { lat: 37.5642 + 0.005, lng: 127.0016 + 0.002 },
+    schedules: []
+  },
+  { 
+    id: '2', 
+    name: '이영희', 
+    photo: '/images/avatar1.png', 
+    isSelected: false,
+    location: { lat: 37.5642 - 0.003, lng: 127.0016 - 0.005 },
+    schedules: []
+  },
+  { 
+    id: '3', 
+    name: '박민수', 
+    photo: '/images/avatar2.png', 
+    isSelected: false,
+    location: { lat: 37.5642 + 0.002, lng: 127.0016 - 0.003 },
+    schedules: []
+  }
 ];
 
 // 폼 데이터 타입 정의
@@ -93,6 +143,65 @@ export default function AddSchedulePage() {
   const endDateRef = useRef<DatePicker>(null);
   const endTimeRef = useRef<DatePicker>(null);
   const startDateRef = useRef<DatePicker>(null);
+
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [isFromHome, setIsFromHome] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>(MOCK_GROUP_MEMBERS_HOME);
+  const [selectedMemberName, setSelectedMemberName] = useState<string | null>(null);
+
+  // URL 파라미터 처리를 위한 useEffect
+  useEffect(() => {
+    // Next.js 13 App Router에서 URL 파라미터 가져오기
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      const memberId = url.searchParams.get('memberId');
+      const fromHome = url.searchParams.get('from') === 'home';
+
+      console.log('URL Params:', { memberId, fromHome, url: window.location.href }); // 디버깅용
+
+      if (memberId && fromHome) {
+        setSelectedMemberId(memberId);
+        setIsFromHome(true);
+
+        // 해당 멤버 찾기 및 상태 업데이트
+        const member = MOCK_GROUP_MEMBERS_HOME.find(m => m.id === memberId);
+        console.log('Looking for member with ID:', memberId); // 디버깅용
+        console.log('Available members:', MOCK_GROUP_MEMBERS_HOME); // 디버깅용
+        console.log('Found member:', member); // 디버깅용
+
+        if (member) {
+          setSelectedMemberName(member.name);
+          setGroupMembers(prev => prev.map(m => ({
+            ...m,
+            isSelected: m.id === memberId
+          })));
+        }
+      }
+    }
+  }, []);
+
+  // 디버깅용 useEffect 추가
+  useEffect(() => {
+    console.log('Current state:', {
+      selectedMemberId,
+      isFromHome,
+      selectedMemberName,
+      groupMembers: groupMembers.map(m => ({ id: m.id, name: m.name, isSelected: m.isSelected }))
+    });
+  }, [selectedMemberId, isFromHome, selectedMemberName, groupMembers]);
+
+  // 멤버 선택 핸들러
+  const handleMemberSelect = (memberId: string) => {
+    const member = groupMembers.find(m => m.id === memberId);
+    setSelectedMemberId(memberId);
+    if (member) {
+      setSelectedMemberName(member.name);
+    }
+    setGroupMembers(prev => prev.map(m => ({
+      ...m,
+      isSelected: m.id === memberId
+    })));
+  };
 
   useEffect(() => {
     // 클라이언트 측에서만 document.body에 접근하여 portal 컨테이너 설정
@@ -420,29 +529,70 @@ export default function AddSchedulePage() {
 
   return (
     <PageContainer 
-      title="" 
+      title={selectedMemberName && isFromHome ? 
+        `${selectedMemberName}의 일정 입력` : 
+        "새 일정 입력"} 
       description="" 
-      showHeader={false} 
-      showBackButton={false} 
-      showTitle={false} 
-      className="h-full flex flex-col" // 부모 높이(AppLayout의 mainContentWrapper)를 채우고, 내부 div가 flex 아이템으로 동작하도록 변경
+      showHeader={false}
+      showBackButton={false}
+      showTitle={false}
+      className="h-full flex flex-col"
     >
-      {/* Card 대신 직접 스타일링 */}
-      {/* 좌우 패딩을 줄여 카드 너비 확보 (py-4 px-2) */}
-      <div className="flex-grow space-y-6 overflow-y-auto py-4 px-2"> 
-        {/* 폼 시작 */}
+      <div className="flex-grow space-y-6 overflow-y-auto py-4 px-2">
         <form onSubmit={(e) => { e.preventDefault(); handleSaveSchedule(); }} className="space-y-6">
+          {/* 홈에서 진입하지 않은 경우에만 그룹 멤버 선택 UI 표시 */}
+          {!isFromHome && (
+            <div className="bg-white rounded-lg shadow-lg p-5 border-t-4 border-indigo-200">
+              <div className="flex items-center mb-5">
+                <FaUsers className="w-6 h-6 text-indigo-500 mr-3 flex-shrink-0" />
+                <h3 className="text-lg font-semibold text-gray-800">그룹 멤버 선택</h3>
+              </div>
+              <div className="border-t border-gray-100 pt-5">
+                <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-3">
+                  {groupMembers.map((member) => (
+                    <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleMemberSelect(member.id)}
+                        className="flex flex-col items-center focus:outline-none"
+                      >
+                        <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
+                          member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
+                        }`}>
+                          <img 
+                            src={member.photo} 
+                            alt={member.name} 
+                            className="w-full h-full object-cover"
+                            draggable="false"
+                          />
+                        </div>
+                        <span className={`block text-xs font-medium mt-1.5 ${
+                          member.isSelected ? 'text-indigo-700' : 'text-gray-700'
+                        }`}>
+                          {member.name}
+                        </span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {!selectedMemberId && (
+                  <p className="text-sm text-red-500 mt-2">
+                    일정을 등록할 그룹 멤버를 선택해주세요.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
           
           {/* 일정 내용 (제목) 카드 */}
-          <div className="bg-white rounded-lg shadow-lg p-5 border-t-4 border-indigo-200"> 
-            {/* 카드 제목 및 아이콘 추가 */}
+          <div className="bg-white rounded-lg shadow-lg p-5 border-t-4 border-indigo-200">
             <div className="flex items-center mb-4">
-              <FaPencil className="w-6 h-6 text-blue-500 mr-3 flex-shrink-0" /> 
+              <FaPencil className="w-6 h-6 text-blue-500 mr-3 flex-shrink-0" />
               <h3 className="text-lg font-semibold text-gray-800">일정 내용</h3>
             </div>
-            {/* 내용 영역 - 구분선 및 패딩 추가 */} 
+            {/* 내용 영역 - 구분선 및 패딩 추가 */}
             <div className="border-t border-gray-100 pt-4">
-              <label htmlFor="title" className="sr-only">일정 내용</label> 
+              <label htmlFor="title" className="sr-only">일정 내용</label>
               <input
                 type="text"
                 name="title"
