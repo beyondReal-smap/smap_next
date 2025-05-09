@@ -25,7 +25,7 @@ export default function CouponPage() {
         <div style={{height: '50px'}} />
         <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
           <div className="mb-4">
-            <div className="text-xl font-semibold leading-snug mb-6">제공받으신 쿠폰번호를<br />입력해주세요.</div>
+            <div className="text-gray-900 text-xl font-semibold leading-snug mb-6">제공받으신 쿠폰번호를<br />입력해주세요.</div>
           </div>
           <div className="mb-2 font-normal text-gray-800">쿠폰번호</div>
           <input

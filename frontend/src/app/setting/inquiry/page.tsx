@@ -29,7 +29,7 @@ export default function InquiryPage() {
         <div style={{height: '50px'}} />
         <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
           <div className="mb-4">
-            <div className="text-xl font-semibold leading-snug mb-6">문의사항을 남겨주시면<br />빠르게 답변드립니다.</div>
+            <div className="text-gray-900 text-xl font-semibold leading-snug mb-6">문의사항을 남겨주시면<br />빠르게 답변드립니다.</div>
           </div>
           <div className="mb-2 font-normal text-gray-800">문의 내용</div>
           <textarea
