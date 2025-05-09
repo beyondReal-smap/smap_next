@@ -168,23 +168,23 @@ export default function SettingsPage() {
 
       {/* 액션시트 모달 */}
       {showSheet && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black bg-opacity-30" onClick={() => setShowSheet(false)}>
-          <div className="w-full max-w-md bg-white rounded-t-2xl p-6 pb-4 shadow-lg flex flex-col items-center" onClick={e => e.stopPropagation()}>
-            <div className="text-lg font-extrabold text-center mb-6">프로필 사진 변경</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30" onClick={() => setShowSheet(false)}>
+          <div className="w-full max-w-xs bg-white rounded-2xl p-6 pb-4 shadow-lg flex flex-col items-center" onClick={e => e.stopPropagation()}>
+            <div className="text-lg font-semibold text-center mb-6">프로필 사진 변경</div>
             <button
-              className="w-full max-w-xs mx-auto py-4 mb-2 rounded-2xl bg-white text-gray-900 text-base font-bold shadow-sm border border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition"
+              className="w-full py-4 mb-2 rounded-2xl bg-pink-600 text-white text-base font-normal shadow-sm border border-pink-600 hover:bg-indigo-700 active:bg-indigo-800 transition"
               onClick={() => handleSelect('camera')}
             >
               카메라로 촬영
             </button>
             <button
-              className="w-full max-w-xs mx-auto py-4 mb-2 rounded-2xl bg-white text-gray-900 text-base font-bold shadow-sm border border-gray-200 hover:bg-gray-50 active:bg-gray-100 transition"
+              className="w-full py-4 mb-2 rounded-2xl bg-indigo-600 text-white text-base font-normal shadow-sm border border-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 transition"
               onClick={() => handleSelect('album')}
             >
               앨범에서 선택
             </button>
             <button
-              className="w-full max-w-xs mx-auto py-4 mt-2 rounded-2xl bg-gray-100 text-gray-700 text-base font-bold shadow-sm active:bg-gray-200 transition"
+              className="w-full py-4 mt-2 rounded-2xl bg-gray-100 text-gray-700 text-base font-normal shadow-sm active:bg-gray-200 transition"
               onClick={() => setShowSheet(false)}
             >
               취소
@@ -196,7 +196,7 @@ export default function SettingsPage() {
       {/* 메뉴 리스트 */}
       <div className="space-y-4 px-3">
         {menuSections.map((section, idx) => (
-          <div key={idx} className="bg-[#fafbfc] rounded-2xl shadow-sm p-1">
+          <div key={idx} className="bg-[#f5f6f7] rounded-2xl shadow-sm p-1">
             {section.items.map((item, i) => (
               <Link
                 key={item.label}

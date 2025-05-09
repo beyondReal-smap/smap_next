@@ -33,7 +33,7 @@ export default function PasswordChangePage() {
     <div className="bg-gray-50 min-h-screen flex flex-col">
       <Header title="비밀번호 변경" />
       <div className="px-4 flex-1 max-w-md mx-auto w-full">
-        <div style={{height: '30px'}} />
+        <div style={{height: '50px'}} />
         <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
           <div className="mb-5">
             <label className="mb-2 font-semibold text-gray-700 block flex items-center gap-1">
@@ -93,7 +93,7 @@ export default function PasswordChangePage() {
           </div>
           {error && <div className="text-red-500 text-sm mb-3">{error}</div>}
           <button
-            className="w-full py-3 rounded-2xl bg-indigo-600 text-white text-base font-bold shadow-md active:bg-indigo-700 transition mt-2"
+            className="w-full py-4 rounded-2xl bg-indigo-600 text-white text-lg font-normal shadow-md active:bg-indigo-700 transition"
             onClick={handleSave}
           >
             저장

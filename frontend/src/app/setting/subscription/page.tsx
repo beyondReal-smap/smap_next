@@ -11,8 +11,8 @@ export default function SubscriptionPage() {
       <Header title="구독 관리" />
       {/* Plus 뱃지 및 안내 */}
       <div className="flex items-center mb-2">
-        <span className="bg-blue-600 text-white text-xs font-bold rounded-full px-3 py-1 mr-2">Plus</span>
-        <span className="text-lg font-bold">SMAP의 모든 기능을 제한없이<br /> 경험해 보세요.</span>
+        <span className="bg-blue-600 text-white text-xs font-semibold rounded-full px-3 py-1 mr-2">Plus</span>
+        <span className="text-lg font-semibold">SMAP의 모든 기능을 제한없이<br /> 경험해 보세요.</span>
       </div>
       <ul className="mt-4 mb-8 space-y-1 text-base text-gray-800">
         <li className="flex items-center"><span className="text-blue-500 mr-2">✓</span>내 장소를 마음껏 저장해보세요.</li>
