@@ -139,7 +139,7 @@ export default function SettingsPage() {
     <div className="bg-[#fff] min-h-screen pb-10">
       <Header title="설정" />
       {/* 프로필 영역 */}
-      <div className="flex flex-col items-center pt-6 pb-4">
+      <div className="flex flex-col items-center pt-12 pb-4">
         <div className="relative">
           <button type="button" onClick={() => setShowSheet(true)}>
             <Image
