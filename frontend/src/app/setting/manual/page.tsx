@@ -3,12 +3,11 @@ import Header from '@/components/Header';
 import React from 'react';
 
 const videos = [
-    
-  { title: '소개1', url: 'https://youtube.com/embed/xOqCizxr2uk' },
-  { title: '소개2', url: 'https://youtube.com/embed/fRLxsHCvwuQ' },
-  { title: '그룹', url: 'https://youtube.com/embed/Bvzaz5vFyAo' },
-  { title: '일정', url: 'https://youtube.com/embed/Ba83-yfjvBQ' },
-  { title: '내장소', url: 'https://youtube.com/embed/EDcvCwZmF38' },
+  { title: '소개1', url: 'https://www.youtube.com/embed/fRLxsHCvwuQ' },
+  { title: '소개2', url: 'https://www.youtube.com/embed/xOqCizxr2uk' },
+  { title: '그룹', url: 'https://www.youtube.com/embed/Bvzaz5vFyAo' },
+  { title: '일정', url: 'https://www.youtube.com/embed/Ba83-yfjvBQ' },
+  { title: '내장소', url: 'https://www.youtube.com/embed/EDcvCwZmF38' },
 ];
 
 export default function ManualPage() {
