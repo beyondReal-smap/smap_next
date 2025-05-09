@@ -15,7 +15,7 @@ const MOCK_PURCHASES = [
     id: 2,
     type: '월간 구독',
     amount: 4900,
-    round: 3,
+    round: 2,
     date: '2024-04-01',
   },
   // 데이터가 없으면 빈 배열로 테스트 가능
@@ -40,7 +40,7 @@ export default function PurchasePage() {
               <div key={item.id} className="bg-gray-50 rounded-2xl shadow p-5 flex items-center justify-between">
                 <div>
                   <div className="flex items-center mb-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold mr-2 ${item.type === '연간 구독' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{item.type}</span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold mr-2 ${item.type === '연간 구독' ? 'bg-indigo-100 text-indigo-700' : 'bg-pink-100 text-pink-700'}`}>{item.type}</span>
                     <span className="text-gray-400 text-xs">{item.round}회차</span>
                   </div>
                   <div className="text-2xl font-bold text-gray-900 mb-1">₩{item.amount.toLocaleString()}</div>
