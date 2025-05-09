@@ -3,6 +3,7 @@ import Header from '@/components/Header';
 import React, { useState } from 'react';
 import { FiUser, FiPhone, FiCalendar, FiUserCheck, FiLock, FiLogOut, FiTrash2, FiInfo } from 'react-icons/fi';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 const GENDER_OPTIONS = [
   { value: 'male', label: '남성' },
@@ -11,12 +12,23 @@ const GENDER_OPTIONS = [
 ];
 
 export default function AccountPage() {
+  const router = useRouter();
   const [nickname, setNickname] = useState('길동이');
   const [name, setName] = useState('홍길동');
   const [phone, setPhone] = useState('010-1234-5678');
   const [birth, setBirth] = useState('1990-01-01');
   const [gender, setGender] = useState('male');
   const [originalNickname] = useState('길동이');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const handleConfirmLogout = () => {
+    // TODO: 실제 로그아웃 처리 (토큰 삭제 등)
+    router.push('/login');
+  };
 
   return (
     <div className="bg-gray-50 min-h-screen flex flex-col">
@@ -27,10 +39,10 @@ export default function AccountPage() {
         <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
           <div className="flex items-center mb-5">
             <FiInfo className="text-indigo-500 w-6 h-6 mr-2" />
-            <span className="text-lg font-extrabold text-gray-900">기본 정보</span>
+            <span className="text-lg font-normal text-gray-900">기본 정보</span>
           </div>
           <div className="mb-5">
-            <label className="mb-1 font-semibold text-gray-700 flex items-center"><FiUser className="mr-1 text-blue-400" /> 닉네임</label>
+            <label className="mb-1 font-normal text-gray-800 flex items-center"><FiUser className="mr-1 text-blue-400" /> 닉네임</label>
             <input
               type="text"
               value={nickname}
@@ -40,7 +52,7 @@ export default function AccountPage() {
             />
           </div>
           <div className="mb-5">
-            <label className="mb-1 font-semibold text-gray-700 flex items-center"><FiUserCheck className="mr-1 text-orange-400" /> 성명</label>
+            <label className="mb-1 font-normal text-gray-800 flex items-center"><FiUserCheck className="mr-1 text-orange-400" /> 성명</label>
             <input
               type="text"
               value={name}
@@ -50,7 +62,7 @@ export default function AccountPage() {
             />
           </div>
           <div className="mb-5">
-            <label className="mb-1 font-semibold text-gray-700 flex items-center"><FiPhone className="mr-1 text-green-500" /> 전화번호</label>
+            <label className="mb-1 font-normal text-gray-800 flex items-center"><FiPhone className="mr-1 text-green-500" /> 전화번호</label>
             <input
               type="tel"
               value={phone}
@@ -60,7 +72,7 @@ export default function AccountPage() {
             />
           </div>
           <div className="mb-5">
-            <label className="mb-1 font-semibold text-gray-700 flex items-center"><FiCalendar className="mr-1 text-purple-500" /> 생년월일</label>
+            <label className="mb-1 font-normal text-gray-800 flex items-center"><FiCalendar className="mr-1 text-purple-500" /> 생년월일</label>
             <input
               type="date"
               value={birth}
@@ -70,7 +82,7 @@ export default function AccountPage() {
             />
           </div>
           <div>
-            <label className="mb-1 font-semibold text-gray-700 flex items-center"><FiUser className="mr-1 text-pink-400" /> 성별</label>
+            <label className="mb-1 font-normal text-gray-800 flex items-center"><FiUser className="mr-1 text-pink-400" /> 성별</label>
             <select
               value={gender}
               onChange={e => setGender(e.target.value)}
@@ -93,7 +105,7 @@ export default function AccountPage() {
         <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
           <div className="flex items-center mb-5">
             <FiLock className="text-indigo-500 w-6 h-6 mr-2" />
-            <span className="text-lg font-extrabold text-gray-900">계정 관리</span>
+            <span className="text-lg font-normal text-gray-900">계정 관리</span>
           </div>
           <button className="w-full py-3 rounded-2xl bg-indigo-600 text-white text-base font-normal shadow-md active:bg-indigo-700 transition mb-3 flex items-center justify-center gap-2"
             type="button"
@@ -102,14 +114,42 @@ export default function AccountPage() {
               <FiLock className="w-5 h-5" /> 비밀번호 변경
             </Link>
           </button>
-          <button className="w-full py-3 rounded-2xl bg-gray-100 text-gray-700 text-base font-normal shadow-md active:bg-gray-200 transition mb-3 flex items-center justify-center gap-2">
+          <button className="w-full py-3 rounded-2xl bg-gray-100 text-gray-700 text-base font-normal shadow-md active:bg-gray-200 transition mb-3 flex items-center justify-center gap-2"
+            onClick={handleLogout}
+          >
             <FiLogOut className="w-5 h-5" /> 로그아웃
           </button>
-          <button className="w-full py-3 rounded-2xl bg-red-100 text-red-600 text-base font-normal shadow-md active:bg-red-200 transition flex items-center justify-center gap-2">
+          <button className="w-full py-3 rounded-2xl bg-gray-100 text-gray-600 text-base font-normal shadow-md active:bg-gray-200 transition flex items-center justify-center gap-2"
+            onClick={() => router.push('/setting/account/withdraw')}
+          >
             <FiTrash2 className="w-5 h-5" /> 회원탈퇴
           </button>
         </div>
       </div>
+
+      {/* 로그아웃 확인 모달 */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-[90%] max-w-sm">
+            <div className="text-lg font-semibold mb-4">로그아웃</div>
+            <div className="text-gray-600 mb-6">로그아웃 하시겠습니까?</div>
+            <div className="flex gap-3">
+              <button
+                className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-700 font-medium"
+                onClick={() => setShowLogoutModal(false)}
+              >
+                취소
+              </button>
+              <button
+                className="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-medium"
+                onClick={handleConfirmLogout}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

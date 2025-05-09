@@ -1188,7 +1188,7 @@ export default function HomePage() {
           <div className="bottom-sheet-handle"></div>
           <div className="px-4 pb-8" onClick={(e) => e.stopPropagation()}>
             {/* 그룹 멤버 (최상단으로 이동) */}
-            <div className="content-section members-section">
+            <div className="content-section members-section min-h-[180px] max-h-[180px] overflow-y-auto">
               <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
                 그룹 멤버
                 <Link 
@@ -1202,15 +1202,15 @@ export default function HomePage() {
                 </Link>
               </h2>
               {groupMembers.length > 0 ? (
-                <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2">
+                <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
                   {groupMembers.map((member) => (
                     <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
                       <button
                         onClick={() => handleMemberSelect(member.id)}
                         className={`flex flex-col items-center`}
                       >
-                        <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-transform duration-200 ${
-                          member.isSelected ? 'border-indigo-500' : 'border-transparent'
+                        <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
+                          member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
                         }`}>
                           <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
                         </div>

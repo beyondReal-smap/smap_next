@@ -374,22 +374,22 @@ function GroupPageContent() {
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="text-xl font-extrabold text-center mb-8">그룹 초대</div>
+              <div className="text-xl font-semibold text-center mb-8">그룹 초대</div>
               <div className="space-y-3 mb-6">
-                <button onClick={handleShareKakao} className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-[#FEE500] text-[#3C1E1E] font-bold text-base shadow-sm hover:bg-yellow-200 transition">
+                <button onClick={handleShareKakao} className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-[#FEE500] text-[#3C1E1E] font-normal text-base shadow-sm hover:bg-yellow-200 transition">
                   <RiKakaoTalkFill className="h-7 w-7" />
                   카카오톡으로 공유
                 </button>
-                <button onClick={handleCopyLink} className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-gray-100 text-gray-700 font-bold text-base shadow-sm hover:bg-gray-200 transition">
-                  <FiLink className="h-7 w-7 text-gray-500" />
+                <button onClick={handleCopyLink} className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-pink-700 text-white font-normal text-base shadow-sm hover:bg-pink-900 transition">
+                  <FiLink className="h-7 w-7 text-pink-200" />
                   초대 링크 복사
                 </button>
-                <button onClick={handleShareSms} className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-green-100 text-green-700 font-bold text-base shadow-sm hover:bg-green-200 transition">
-                  <MdOutlineMessage className="h-7 w-7 text-green-500" />
+                <button onClick={handleShareSms} className="w-full flex items-center gap-3 px-4 py-4 rounded-2xl bg-indigo-700 text-white font-normal text-base shadow-sm hover:bg-green-200 transition">
+                  <MdOutlineMessage className="h-7 w-7 text-indigo-200" />
                   문자/주소록으로 공유
                 </button>
               </div>
-              <button type="button" onClick={() => setIsShareModalOpen(false)} className="w-full max-w-xs mx-auto py-4 rounded-2xl bg-gray-100 text-gray-700 text-lg font-bold shadow-md active:bg-gray-200 transition mb-2 mt-2">닫기</button>
+              <button type="button" onClick={() => setIsShareModalOpen(false)} className="w-full max-w-xs mx-auto py-4 rounded-2xl bg-gray-100 text-gray-700 text-lg font-normal shadow-sm active:bg-gray-200 transition mb-2 mt-2">닫기</button>
             </div>
           </div>
         </> 

@@ -28,7 +28,7 @@ export default function PurchasePage() {
   return (
     <div className="bg-white min-h-screen pb-24">
       <Header title="구매 내역" />
-      <div className="px-4 pt-8">
+      <div className="px-4 pt-12">
         {purchases.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-gray-400">
             <svg className="w-14 h-14 mb-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21.75c4.97 0 9-4.03 9-9s-4.03-9-9-9-9 4.03-9 9 4.03 9 9 9Zm0-4.5v-3m0 0a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" /></svg>

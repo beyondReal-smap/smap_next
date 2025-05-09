@@ -162,7 +162,7 @@ function NoticeContent() {
       </header>
       {/* 안내문구 */}
       <div className="pt-10 px-4 pb-2">
-        <p className="text-gray-600 text-sm">앱에서 받은 푸시 알림 내역입니다. 일정, 그룹, 위치 등 다양한 알림을 한눈에 확인하세요.</p>
+        <p className="text-gray-600 text-sm">푸시 알림 내역을 확인하세요.</p>
       </div>
       {/* 날짜별 그룹 */}
       <div className="px-2 pb-8">
