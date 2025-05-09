@@ -142,7 +142,7 @@ function GroupPageContent() {
   };
 
   // 공유 기능 함수들
-  const handleShareKakao = () => {
+  const handleShareKakao: () => void = () => {
     console.log("Share via Kakao: Not yet implemented. Group ID: ", selectedGroup?.id);
     alert('카카오톡 공유 기능은 준비 중입니다.');
   };
