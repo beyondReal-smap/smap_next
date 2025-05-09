@@ -28,7 +28,7 @@ export default function TermsPage() {
         <div className="space-y-4">
           {terms.map(term => (
             <div key={term.title} className="bg-white rounded-2xl shadow-md p-6">
-              <div className="text-lg font-bold mb-1">{term.title}</div>
+              <div className="text-lg font-bold text-gray-900 mb-1">{term.title}</div>
               <div className="text-gray-500 text-sm mb-2">{term.description}</div>
               <a href={term.link} className="text-indigo-600 text-sm font-medium hover:underline">자세히 보기</a>
             </div>
