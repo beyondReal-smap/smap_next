@@ -17,7 +17,7 @@ export default function ManualPage() {
       <div className="flex-1 px-4 py-12 space-y-8">
         {videos.map((video, idx) => (
           <div key={video.title}>
-            <div className="text-lg font-bold mb-2">{video.title}</div>
+            <div className="text-lg font-bold text-gray-900 mb-2">{video.title}</div>
             <div className="aspect-w-16 aspect-h-9 w-full rounded-xl overflow-hidden bg-black">
               <iframe
                 src={video.url}
