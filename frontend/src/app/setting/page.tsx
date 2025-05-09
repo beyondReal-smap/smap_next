@@ -161,7 +161,7 @@ export default function SettingsPage() {
             onChange={handleFileChange}
           />
         </div>
-        <div className="mt-3 text-lg font-bold">{profile.name}</div>
+        <div className="mt-3 text-lg font-bold text-gray-900">{profile.name}</div>
         <div className="text-xs text-gray-500 mt-1">{profile.plan}</div>
         <div className="text-sm text-indigo-600 font-medium mt-1">{profile.phone}</div>
       </div>
