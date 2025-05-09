@@ -25,7 +25,7 @@ export default function ReferrerPage() {
         <div style={{height: '50px'}} />
         <div className="bg-white rounded-2xl shadow-md p-6 mb-8">
           <div className="mb-4">
-            <div className="text-xl font-semibold leading-snug mb-2">추천인 전화번호 입력 시<br />1개월 무료 이용</div>
+            <div className="text-xl font-semibold text-gray-900 leading-snug mb-2">추천인 전화번호 입력 시<br />1개월 무료 이용</div>
             <div className="text-gray-400 text-sm mb-8">특별한 혜택을 드려요!</div>
           </div>
           <div className="mb-2 font-normal text-gray-800">추천인 코드</div>
