@@ -1,28 +1,44 @@
-FROM node:18-alpine
+# Python 3.10 Alpine 이미지 사용
+FROM python:3.10-alpine
 
+# 작업 디렉토리 설정
 WORKDIR /app
 
-# 필요한 패키지 설치 (MySQL 클라이언트 포함)
-RUN apk add --no-cache mysql-client
+# 시스템 패키지 설치
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    python3-dev \
+    libffi-dev \
+    openssl-dev \
+    mariadb-dev \
+    mariadb-connector-c-dev \
+    curl
 
-# 의존성 파일 복사 및 설치
-COPY package.json ./
-RUN npm install --omit=dev
+# 보안을 위한 비특권 사용자 생성
+RUN addgroup --system appgroup && \
+    adduser --system --ingroup appgroup appuser
+
+# requirements.txt 복사 및 의존성 설치
+COPY --chown=appuser:appgroup requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 소스 코드 복사
-COPY . .
+COPY --chown=appuser:appgroup . .
 
 # 환경 변수 설정
-ENV NODE_ENV=production
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-# 사용자 변경 (보안 강화)
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 appuser
-RUN chown -R appuser:nodejs /app
-USER appuser
+# 사용자 전환
+USER root
 
-# 노출 포트
+# 헬스체크
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# 포트 노출
 EXPOSE 5000
 
-# 서버 실행
-CMD ["node", "index.js"] 
+# FastAPI 서버 실행 (Uvicorn 사용)
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 5000"] 

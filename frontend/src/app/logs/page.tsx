@@ -227,7 +227,7 @@ const pageStyles = `
 }
 
 .bottom-sheet-expanded {
-  transform: translateY(58%);
+  transform: translateY(calc(58% - 40px));
   height: 100vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;

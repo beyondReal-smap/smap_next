@@ -4,105 +4,12 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-
-// 알림 데이터 타입 정의
-interface PushItem {
-  id: string;
-  type: string;
-  icon: string;
-  title: string;
-  content: string;
-  date: string; // ISO string
-}
-
-// 예시용 알림 데이터 (실제 데이터 구조에 맞게 수정)
-const MOCK_PUSHES: PushItem[] = [
-  {
-    id: '1',
-    type: 'alarm',
-    icon: '⏰',
-    title: '일정 시작알림',
-    content: "'집' 일정 30분 전 입니다.",
-    date: '2025-05-08T18:30:00',
-  },
-  {
-    id: '2',
-    type: 'report',
-    icon: '🧑‍🤝‍🧑',
-    title: '오늘의 그룹원 동향 리포트',
-    content: '그룹원들의 하루 동선이 궁금하신가요?\n로그에서 모든 것을 확인하세요!',
-    date: '2025-05-08T18:00:00',
-  },
-  {
-    id: '3',
-    type: 'alarm',
-    icon: '⏰',
-    title: '일정 시작알림',
-    content: "'미래탑구' 일정 30분 전 입니다.",
-    date: '2025-05-08T14:30:00',
-  },
-  {
-    id: '4',
-    type: 'info',
-    icon: '👀',
-    title: '그룹원 동향을 한눈에!',
-    content: "'내 장소'를 설정하고 스마트하게 관리하세요.\n100m 반경 내 그룹원 출입 시 알림을 받을 수 있어요. 🔔",
-    date: '2025-05-08T14:00:00',
-  },
-  {
-    id: '5',
-    type: 'weather',
-    icon: '☁️',
-    title: '날씨 정보',
-    content: '서울특별시 영등포구/여의동\n강수확률 : 0%\n최저기온 : 9.0°C\n최고기온 : 23.0°C',
-    date: '2025-05-08T08:12:00',
-  },
-  {
-    id: '6',
-    type: 'alarm',
-    icon: '⏰',
-    title: '일정 시작알림',
-    content: "'학교' 일정 30분 전 입니다.",
-    date: '2025-05-08T08:10:00',
-  },
-  {
-    id: '7',
-    type: 'alarm',
-    icon: '⏰',
-    title: '일정 시작알림',
-    content: "'집' 일정 30분 전 입니다.",
-    date: '2025-05-07T23:35:00',
-  },
-  {
-    id: '8',
-    type: 'alarm',
-    icon: '⏰',
-    title: '일정 시작알림',
-    content: "'집' 일정 30분 전 입니다.",
-    date: '2025-05-07T18:30:00',
-  },
-  {
-    id: '9',
-    type: 'timeline',
-    icon: '🕰️',
-    title: '그룹원들의 하루 타임라인',
-    content: '시간별로 그룹원들의 활동을 정리했어요.\n오늘 하루는 어떻게 흘러갔는지 로그에서 확인하세요!🙊',
-    date: '2025-05-07T18:00:00',
-  },
-  {
-    id: '10',
-    type: 'info',
-    icon: '👀',
-    title: '그룹원 동향을 한눈에!',
-    content: "'내 장소'를 설정하고 스마트하게 관리하세요.\n100m 반경 내 그룹원 출입 시 알림을 받을 수 있어요. 🔔",
-    date: '2025-05-07T14:00:00',
-  },
-];
+import { PushLog, DeleteAllResponse } from '@/types/push';
 
 // 날짜별 그룹핑 함수
-function groupByDate(list: PushItem[]): Record<string, PushItem[]> {
-  return list.reduce((acc: Record<string, PushItem[]>, item: PushItem) => {
-    const date = item.date.slice(0, 10); // 'YYYY-MM-DD'
+function groupByDate(list: PushLog[]): Record<string, PushLog[]> {
+  return list.reduce((acc: Record<string, PushLog[]>, item: PushLog) => {
+    const date = item.plt_sdate.slice(0, 10); // 'YYYY-MM-DD'
     if (!acc[date]) acc[date] = [];
     acc[date].push(item);
     return acc;
@@ -112,21 +19,64 @@ function groupByDate(list: PushItem[]): Record<string, PushItem[]> {
 function NoticeContent() {
   const router = useRouter();
   // 알림 상태 관리
-  const [notices, setNotices] = useState<PushItem[]>(MOCK_PUSHES);
+  const [notices, setNotices] = useState<PushLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 알림 목록 조회
+  useEffect(() => {
+    const fetchNotices = async () => {
+      try {
+        const response = await fetch('http://118.67.130.71:5000/api/v1/push-logs/member/1186');
+        if (!response.ok) {
+          throw new Error('Failed to fetch notices');
+        }
+        const data = await response.json();
+        setNotices(data);
+      } catch (error) {
+        console.error('Error fetching notices:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNotices();
+  }, []);
 
   // 날짜별 그룹핑 및 정렬
-  const sorted: PushItem[] = [...notices].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const sorted: PushLog[] = [...notices].sort((a, b) => new Date(b.plt_sdate).getTime() - new Date(a.plt_sdate).getTime());
   const grouped = groupByDate(sorted);
   Object.keys(grouped).forEach(date => {
-    grouped[date].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    grouped[date].sort((a, b) => new Date(b.plt_sdate).getTime() - new Date(a.plt_sdate).getTime());
   });
 
   // 전체 삭제 핸들러
-  const handleDeleteAll = () => {
+  const handleDeleteAll = async () => {
     if (window.confirm('정말 모든 알림을 삭제하시겠습니까?')) {
-      setNotices([]);
+      try {
+        const response = await fetch('http://118.67.130.71:5000/api/v1/push-logs/delete-all', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ mt_idx: 1186 }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to delete notices');
+        }
+
+        const data: DeleteAllResponse = await response.json();
+        console.log(data.message);
+        setNotices([]);
+      } catch (error) {
+        console.error('Error deleting notices:', error);
+      }
     }
   };
+
+  if (loading) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">로딩 중...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -173,18 +123,27 @@ function NoticeContent() {
             <section key={date} className="mb-8">
               <div className="text-base font-bold text-indigo-600 mb-2 px-2">
                 {format(new Date(date), 'yyyy.MM.dd (E)', { locale: ko })}
+                {date === format(new Date(), 'yyyy-MM-dd') && (
+                  <span className="text-primary ml-2">오늘의 알림</span>
+                )}
               </div>
               <div className="bg-white rounded-xl shadow px-3 py-4">
                 <div className="space-y-3">
                   {grouped[date].map(item => (
-                    <div key={item.id} className="flex items-start border-b last:border-b-0 border-gray-100 pb-3 last:pb-0">
-                      <div className="text-2xl ml-2 mr-3 mt-1 select-none">{item.icon}</div>
+                    <div key={item.plt_idx} className="flex items-start border-b last:border-b-0 border-gray-100 pb-3 last:pb-0">
+                      <div className="text-2xl ml-2 mr-3 mt-1 select-none">
+                        {item.plt_title.match(/\p{Extended_Pictographic}/u)?.[0] || '📢'}
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-gray-900 text-sm leading-tight">{item.title}</span>
+                          <span className="font-bold text-gray-900 text-sm leading-tight">
+                            {item.plt_title.replace(/\p{Extended_Pictographic}/u, '').trim()}
+                          </span>
                         </div>
-                        <div className="text-gray-700 text-sm whitespace-normal mt-0.5 leading-snug">{item.content}</div>
-                        <div className="text-xs text-gray-400 mt-1">{format(new Date(item.date), 'a h:mm', { locale: ko })}</div>
+                        <div className="text-gray-700 text-sm whitespace-normal mt-0.5 leading-snug">{item.plt_content}</div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {format(new Date(item.plt_sdate), 'a h:mm', { locale: ko })}
+                        </div>
                       </div>
                     </div>
                   ))}
