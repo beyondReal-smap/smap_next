@@ -4,21 +4,20 @@ services:
   nextjs:
     container_name: smap_next_frontend
     build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod
+      context: .
+      dockerfile: frontend/Dockerfile.prod
     restart: always
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=development
-      - NEXT_PUBLIC_API_URL=http://118.67.130.71:83/api
-      - HOSTNAME=0.0.0.0
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      HOSTNAME: 0.0.0.0
+      INTERNAL_BACKEND_URL: ${INTERNAL_BACKEND_URL:-http://backend:5000}
     networks:
       - smap_next_network
     volumes:
       - next_build:/app/.next
-      - ./frontend/public:/app/public
-      - ./frontend/src:/app/src
     depends_on:
       - backend
 
@@ -29,23 +28,18 @@ services:
       dockerfile: Dockerfile.prod
     restart: always
     ports:
-      - "5001:5000"
-    environment:
-      - NODE_ENV=production
-      - CORS_ORIGIN=http://118.67.130.71:83
-      - DB_HOST=${DB_HOST:-host.docker.internal}
-      - DB_USER=${DB_USER:-smap2}
-      - DB_PASSWORD=${DB_PASSWORD:-dmonster}
-      - DB_NAME=${DB_NAME:-smap2_db}
-      - DB_PORT=${DB_PORT:-3306}
-      - DB_TYPE=${DB_TYPE:-mysql}
+      - "8000:5000"
     networks:
       - smap_next_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     volumes:
-      - ./backend/app:/app/app
-      - ./backend/requirements.txt:/app/requirements.txt
+      - ./backend:/app
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "host.docker.internal:host-gateway" # For Linux to resolve host.docker.internal
 
 networks:
   smap_next_network:
