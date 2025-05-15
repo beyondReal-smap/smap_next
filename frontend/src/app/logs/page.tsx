@@ -323,6 +323,7 @@ export default function LogsPage() {
   const memberNaverMarkers = useRef<any[]>([]); 
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true); 
+  const [isMapInitializedLogs, setIsMapInitializedLogs] = useState(false); // Logs 페이지용 지도 초기화 상태
 
   const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'expanded'>('collapsed');
   const bottomSheetRef = useRef<HTMLDivElement>(null);
@@ -381,6 +382,7 @@ export default function LogsPage() {
         window.naver.maps.Event.addListener(map.current, 'init', () => {
             console.log('Naver Map initialized for LogsPage');
             setIsMapLoading(false);
+            setIsMapInitializedLogs(true); // 지도 초기화 완료 상태 설정
             if(map.current) map.current.refresh(true);
         });
       } catch (error) {
@@ -582,11 +584,18 @@ export default function LogsPage() {
         const member = selectedMembers[0];
         try {
           const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
-          map.current.panTo(position);
+          console.log('[LogsPage] Attempting to set map center to:', position, 'Current center:', map.current.getCenter());
+          map.current.setCenter(position);
           map.current.setZoom(14);
-          console.log('Map moved to member location:', member.name, member.location);
+          map.current.refresh(true); 
+          console.log('[LogsPage] Map center set to member location:', member.name, member.location, 'New center:', map.current.getCenter());
+          setTimeout(() => {
+            if (map.current) {
+              console.log('[LogsPage] Center after 100ms delay (setCenter):', map.current.getCenter());
+            }
+          }, 100);
         } catch (error) {
-          console.error('Error moving map:', error);
+          console.error('[LogsPage] Error setting map center:', error);
         }
       }
     }
@@ -608,25 +617,30 @@ export default function LogsPage() {
     setActiveLogView('members');
   };
 
+  // useEffect for auto-selecting the first member (only sets state)
   useEffect(() => {
-    if (naverMapsLoaded && map.current && groupMembers.length > 0) {
-      if (!groupMembers.some(m => m.isSelected)) {
-        // 이벤트 객체 없이 직접 호출
-        const id = groupMembers[0].id;
-        const currentBottomSheetState = bottomSheetState;
-        
-        const updatedMembers = groupMembers.map(member => ({
-          ...member,
-          isSelected: member.id === id
-        }));
-        
-        setGroupMembers(updatedMembers);
-        updateMemberMarkers(updatedMembers);
-        setActiveLogView('members');
-        setBottomSheetState(currentBottomSheetState);
-      }
+    if (isMapInitializedLogs && groupMembers.length > 0 && !groupMembers.some(m => m.isSelected)) {
+      console.log("[LogsPage] Auto-selection: Setting first member as selected.");
+      const updatedMembers = groupMembers.map((member, index) => ({
+        ...member,
+        isSelected: index === 0,
+      }));
+      setGroupMembers(updatedMembers);
+      // setActiveLogView('members'); // setActiveLogView 호출은 아래 map update effect로 이동하거나 유지 결정 필요
     }
-  }, [naverMapsLoaded, map.current, groupMembers]);
+  }, [isMapInitializedLogs, groupMembers]);
+
+  // useEffect for updating map and view based on groupMember selection
+  useEffect(() => {
+    if (isMapInitializedLogs && groupMembers.some(m => m.isSelected)) {
+      console.log("[LogsPage] Member selection detected or map initialized with selection. Updating markers and view.");
+      updateMemberMarkers(groupMembers);
+      setActiveLogView('members'); // 멤버 선택/지도 업데이트 시 members 뷰 활성화
+    } else if (isMapInitializedLogs) {
+      // 선택된 멤버가 없을 경우 (예: 모든 선택 해제 시)
+      // updateMemberMarkers([]); // 필요하다면 마커를 지우는 로직
+    }
+  }, [groupMembers, isMapInitializedLogs]); // updateMemberMarkers는 의존성 배열에서 제외 (함수가 재생성되지 않는다면)
 
   // 로그 뷰 스크롤 이벤트 핸들러
   const handleLogSwipeScroll = () => {

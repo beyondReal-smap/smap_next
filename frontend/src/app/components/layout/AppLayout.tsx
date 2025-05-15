@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BottomNavBar } from './index';
@@ -70,6 +71,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
           {isSimplifiedHeader ? (
             // 간소화된 헤더 (그룹, 일정, 내장소, 로그 페이지, /schedule/add 포함)
             <div className="flex items-center h-12">
+              <Link href="/home" className="flex items-center mr-2">
+                <Image 
+                  src="/images/smap_logo.webp" 
+                  alt="SMAP 로고" 
+                  width={32} 
+                  height={32} 
+                  className="h-10 w-auto"
+                  priority
+                />
+              </Link>
               {pathname === '/schedule/add' && (
                 <button
                   onClick={() => router.back()}
