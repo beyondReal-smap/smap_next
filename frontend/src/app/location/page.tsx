@@ -1,8 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic'; // Add this line
-
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 // import mapboxgl from 'mapbox-gl'; // Mapbox 임포트 제거
 // import 'mapbox-gl/dist/mapbox-gl.css'; // Mapbox CSS 제거
@@ -191,11 +189,11 @@ const pageStyles = `
 }
 
 .animate-slideUp {
-  animation: slideUp 1s ease-out forwards;
+  animation: slideUp 0.3s ease-out forwards;
 }
 
 .animate-fadeIn {
-  animation: fadeIn 1s ease-out forwards;
+  animation: fadeIn 0.2s ease-out forwards;
 }
 
 .full-map-container {
@@ -1262,10 +1260,11 @@ export default function LocationPage() {
     <>
       <style jsx global>{pageStyles}</style>
       <PageContainer 
-        title="내 장소" 
-        showHeader={false} 
+        title="위치 관리"
+        description="위치 및 장소를 관리하고 공유하세요"
+        showHeader={false} // true에서 false로 변경
         showBackButton={false}
-        className="p-0 m-0 w-full h-screen overflow-hidden relative"
+        className="flex flex-col h-full overflow-hidden"
       >
         {isMapLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-50">

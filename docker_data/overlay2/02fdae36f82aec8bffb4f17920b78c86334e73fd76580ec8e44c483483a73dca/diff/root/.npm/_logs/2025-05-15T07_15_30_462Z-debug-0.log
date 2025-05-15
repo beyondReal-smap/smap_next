@@ -10,3 +10,9 @@
 9 verbose logfile logs-max:10 dir:/root/.npm/_logs/2025-05-15T07_15_30_462Z-
 10 verbose logfile /root/.npm/_logs/2025-05-15T07_15_30_462Z-debug-0.log
 11 silly logfile done cleaning log files
+12 verbose cwd /app
+13 verbose os Linux 4.15.0-213-generic
+14 verbose node v18.20.8
+15 verbose npm  v10.8.2
+16 verbose exit 0
+17 info ok

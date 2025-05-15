@@ -30352,3 +30352,1112 @@ TypeError: 'slt_fine_location' is an invalid keyword argument for Location
 2025-05-15 07:46:18,306 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:47:18 UTC)" executed successfully
 2025-05-15 07:46:34,553 - app.main - INFO - Request started: GET http://localhost:5000/health
 2025-05-15 07:46:34,555 - app.main - INFO - Response status: 200
+2025-05-15 07:47:05,000 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:47:05,007 - app.main - INFO - Response status: 200
+2025-05-15 07:47:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:48:18 UTC)" (scheduled at 2025-05-15 07:47:18.304751+00:00)
+2025-05-15 07:47:18,307 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:47:18,308 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:48:18 UTC)" executed successfully
+2025-05-15 07:47:35,653 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:47:35,659 - app.main - INFO - Response status: 200
+2025-05-15 07:48:05,872 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:48:05,872 - app.main - INFO - Response status: 200
+2025-05-15 07:48:18,306 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:49:18 UTC)" (scheduled at 2025-05-15 07:48:18.304751+00:00)
+2025-05-15 07:48:18,307 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:48:18,307 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:49:18 UTC)" executed successfully
+2025-05-15 07:48:35,979 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:48:35,980 - app.main - INFO - Response status: 200
+2025-05-15 07:49:06,142 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:49:06,143 - app.main - INFO - Response status: 200
+2025-05-15 07:49:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:50:18 UTC)" (scheduled at 2025-05-15 07:49:18.304751+00:00)
+2025-05-15 07:49:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:49:18,306 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:50:18 UTC)" executed successfully
+2025-05-15 07:49:36,469 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:49:37,160 - app.main - INFO - Response status: 200
+2025-05-15 07:50:07,327 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:50:07,328 - app.main - INFO - Response status: 200
+2025-05-15 07:50:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:51:18 UTC)" (scheduled at 2025-05-15 07:50:18.304751+00:00)
+2025-05-15 07:50:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:50:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:51:18 UTC)" executed successfully
+2025-05-15 07:50:37,771 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:50:37,772 - app.main - INFO - Response status: 200
+2025-05-15 07:51:07,922 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:51:07,923 - app.main - INFO - Response status: 200
+2025-05-15 07:51:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:52:18 UTC)" (scheduled at 2025-05-15 07:51:18.304751+00:00)
+2025-05-15 07:51:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:51:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:52:18 UTC)" executed successfully
+2025-05-15 07:51:38,066 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:51:38,067 - app.main - INFO - Response status: 200
+2025-05-15 07:52:08,237 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:52:08,243 - app.main - INFO - Response status: 200
+2025-05-15 07:52:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:53:18 UTC)" (scheduled at 2025-05-15 07:52:18.304751+00:00)
+2025-05-15 07:52:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:52:18,306 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:53:18 UTC)" executed successfully
+2025-05-15 07:52:38,428 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:52:38,429 - app.main - INFO - Response status: 200
+2025-05-15 07:53:08,551 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:53:08,552 - app.main - INFO - Response status: 200
+2025-05-15 07:53:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:54:18 UTC)" (scheduled at 2025-05-15 07:53:18.304751+00:00)
+2025-05-15 07:53:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:53:18,306 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:54:18 UTC)" executed successfully
+2025-05-15 07:53:38,727 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:53:38,728 - app.main - INFO - Response status: 200
+2025-05-15 07:54:08,974 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:54:08,974 - app.main - INFO - Response status: 200
+2025-05-15 07:54:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:55:18 UTC)" (scheduled at 2025-05-15 07:54:18.304751+00:00)
+2025-05-15 07:54:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:54:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:55:18 UTC)" executed successfully
+2025-05-15 07:54:39,116 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:54:39,117 - app.main - INFO - Response status: 200
+2025-05-15 07:55:09,363 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:55:09,364 - app.main - INFO - Response status: 200
+2025-05-15 07:55:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:56:18 UTC)" (scheduled at 2025-05-15 07:55:18.304751+00:00)
+2025-05-15 07:55:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:55:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:56:18 UTC)" executed successfully
+2025-05-15 07:55:39,534 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:55:39,535 - app.main - INFO - Response status: 200
+2025-05-15 07:56:09,747 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:56:09,751 - app.main - INFO - Response status: 200
+2025-05-15 07:56:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:57:18 UTC)" (scheduled at 2025-05-15 07:56:18.304751+00:00)
+2025-05-15 07:56:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:56:18,306 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:57:18 UTC)" executed successfully
+2025-05-15 07:56:40,024 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:56:40,039 - app.main - INFO - Response status: 200
+2025-05-15 07:57:10,182 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:57:10,184 - app.main - INFO - Response status: 200
+2025-05-15 07:57:18,311 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:58:18 UTC)" (scheduled at 2025-05-15 07:57:18.304751+00:00)
+2025-05-15 07:57:18,311 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:57:18,311 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:58:18 UTC)" executed successfully
+2025-05-15 07:57:40,376 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:57:40,383 - app.main - INFO - Response status: 200
+2025-05-15 07:58:18,064 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:58:18,071 - app.main - INFO - Response status: 200
+2025-05-15 07:58:18,306 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:59:18 UTC)" (scheduled at 2025-05-15 07:58:18.304751+00:00)
+2025-05-15 07:58:18,307 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:58:18,307 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 07:59:18 UTC)" executed successfully
+2025-05-15 07:58:48,263 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:58:48,264 - app.main - INFO - Response status: 200
+2025-05-15 07:59:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:00:18 UTC)" (scheduled at 2025-05-15 07:59:18.304751+00:00)
+2025-05-15 07:59:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 07:59:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:00:18 UTC)" executed successfully
+2025-05-15 07:59:18,409 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:59:18,411 - app.main - INFO - Response status: 200
+2025-05-15 07:59:48,541 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 07:59:48,541 - app.main - INFO - Response status: 200
+2025-05-15 08:00:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:01:18 UTC)" (scheduled at 2025-05-15 08:00:18.304751+00:00)
+2025-05-15 08:00:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:00:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:01:18 UTC)" executed successfully
+2025-05-15 08:00:18,633 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:00:18,633 - app.main - INFO - Response status: 200
+2025-05-15 08:00:48,714 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:00:48,715 - app.main - INFO - Response status: 200
+2025-05-15 08:01:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:02:18 UTC)" (scheduled at 2025-05-15 08:01:18.304751+00:00)
+2025-05-15 08:01:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:01:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:02:18 UTC)" executed successfully
+2025-05-15 08:01:18,797 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:01:18,797 - app.main - INFO - Response status: 200
+2025-05-15 08:01:48,890 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:01:48,890 - app.main - INFO - Response status: 200
+2025-05-15 08:02:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:03:18 UTC)" (scheduled at 2025-05-15 08:02:18.304751+00:00)
+2025-05-15 08:02:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:02:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:03:18 UTC)" executed successfully
+2025-05-15 08:02:18,968 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:02:18,969 - app.main - INFO - Response status: 200
+2025-05-15 08:02:49,055 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:02:49,056 - app.main - INFO - Response status: 200
+2025-05-15 08:03:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:04:18 UTC)" (scheduled at 2025-05-15 08:03:18.304751+00:00)
+2025-05-15 08:03:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:03:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:04:18 UTC)" executed successfully
+2025-05-15 08:03:19,151 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:03:19,152 - app.main - INFO - Response status: 200
+2025-05-15 08:03:49,227 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:03:49,228 - app.main - INFO - Response status: 200
+2025-05-15 08:04:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:05:18 UTC)" (scheduled at 2025-05-15 08:04:18.304751+00:00)
+2025-05-15 08:04:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:04:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:05:18 UTC)" executed successfully
+2025-05-15 08:04:19,308 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:04:19,309 - app.main - INFO - Response status: 200
+2025-05-15 08:04:49,429 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:04:49,430 - app.main - INFO - Response status: 200
+2025-05-15 08:05:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:06:18 UTC)" (scheduled at 2025-05-15 08:05:18.304751+00:00)
+2025-05-15 08:05:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:05:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:06:18 UTC)" executed successfully
+2025-05-15 08:05:19,507 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:05:19,508 - app.main - INFO - Response status: 200
+2025-05-15 08:05:49,596 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:05:49,597 - app.main - INFO - Response status: 200
+2025-05-15 08:06:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:07:18 UTC)" (scheduled at 2025-05-15 08:06:18.304751+00:00)
+2025-05-15 08:06:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:06:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:07:18 UTC)" executed successfully
+2025-05-15 08:06:19,675 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:06:19,676 - app.main - INFO - Response status: 200
+2025-05-15 08:06:49,758 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:06:49,758 - app.main - INFO - Response status: 200
+2025-05-15 08:07:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:08:18 UTC)" (scheduled at 2025-05-15 08:07:18.304751+00:00)
+2025-05-15 08:07:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:07:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:08:18 UTC)" executed successfully
+2025-05-15 08:07:19,838 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:07:19,839 - app.main - INFO - Response status: 200
+2025-05-15 08:07:49,940 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:07:49,941 - app.main - INFO - Response status: 200
+2025-05-15 08:08:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:09:18 UTC)" (scheduled at 2025-05-15 08:08:18.304751+00:00)
+2025-05-15 08:08:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:08:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:09:18 UTC)" executed successfully
+2025-05-15 08:08:20,073 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:08:20,074 - app.main - INFO - Response status: 200
+2025-05-15 08:08:50,232 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:08:50,232 - app.main - INFO - Response status: 200
+2025-05-15 08:09:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:10:18 UTC)" (scheduled at 2025-05-15 08:09:18.304751+00:00)
+2025-05-15 08:09:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:09:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:10:18 UTC)" executed successfully
+2025-05-15 08:09:20,389 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:09:20,390 - app.main - INFO - Response status: 200
+2025-05-15 08:09:50,475 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:09:50,475 - app.main - INFO - Response status: 200
+2025-05-15 08:10:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:11:18 UTC)" (scheduled at 2025-05-15 08:10:18.304751+00:00)
+2025-05-15 08:10:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:10:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:11:18 UTC)" executed successfully
+2025-05-15 08:10:20,557 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:10:20,558 - app.main - INFO - Response status: 200
+2025-05-15 08:10:50,661 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:10:50,662 - app.main - INFO - Response status: 200
+2025-05-15 08:11:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:12:18 UTC)" (scheduled at 2025-05-15 08:11:18.304751+00:00)
+2025-05-15 08:11:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:11:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:12:18 UTC)" executed successfully
+2025-05-15 08:11:20,737 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:11:20,737 - app.main - INFO - Response status: 200
+2025-05-15 08:11:50,832 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:11:50,833 - app.main - INFO - Response status: 200
+2025-05-15 08:12:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:13:18 UTC)" (scheduled at 2025-05-15 08:12:18.304751+00:00)
+2025-05-15 08:12:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:12:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:13:18 UTC)" executed successfully
+2025-05-15 08:12:20,909 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:12:20,909 - app.main - INFO - Response status: 200
+2025-05-15 08:12:50,995 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:12:50,996 - app.main - INFO - Response status: 200
+2025-05-15 08:13:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:14:18 UTC)" (scheduled at 2025-05-15 08:13:18.304751+00:00)
+2025-05-15 08:13:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:13:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:14:18 UTC)" executed successfully
+2025-05-15 08:13:21,120 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:13:21,121 - app.main - INFO - Response status: 200
+2025-05-15 08:13:51,246 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:13:51,247 - app.main - INFO - Response status: 200
+2025-05-15 08:14:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:15:18 UTC)" (scheduled at 2025-05-15 08:14:18.304751+00:00)
+2025-05-15 08:14:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:14:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:15:18 UTC)" executed successfully
+2025-05-15 08:14:21,344 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:14:21,345 - app.main - INFO - Response status: 200
+2025-05-15 08:14:51,435 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:14:51,436 - app.main - INFO - Response status: 200
+2025-05-15 08:15:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:16:18 UTC)" (scheduled at 2025-05-15 08:15:18.304751+00:00)
+2025-05-15 08:15:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:15:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:16:18 UTC)" executed successfully
+2025-05-15 08:15:21,531 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:15:21,532 - app.main - INFO - Response status: 200
+2025-05-15 08:15:51,606 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:15:51,606 - app.main - INFO - Response status: 200
+2025-05-15 08:16:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:17:18 UTC)" (scheduled at 2025-05-15 08:16:18.304751+00:00)
+2025-05-15 08:16:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:16:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:17:18 UTC)" executed successfully
+2025-05-15 08:16:21,759 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:16:21,760 - app.main - INFO - Response status: 200
+2025-05-15 08:16:51,844 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:16:51,845 - app.main - INFO - Response status: 200
+2025-05-15 08:17:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:18:18 UTC)" (scheduled at 2025-05-15 08:17:18.304751+00:00)
+2025-05-15 08:17:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:17:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:18:18 UTC)" executed successfully
+2025-05-15 08:17:21,930 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:17:21,931 - app.main - INFO - Response status: 200
+2025-05-15 08:17:52,022 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:17:52,022 - app.main - INFO - Response status: 200
+2025-05-15 08:18:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:19:18 UTC)" (scheduled at 2025-05-15 08:18:18.304751+00:00)
+2025-05-15 08:18:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:18:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:19:18 UTC)" executed successfully
+2025-05-15 08:18:22,120 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:18:22,121 - app.main - INFO - Response status: 200
+2025-05-15 08:18:52,193 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:18:52,193 - app.main - INFO - Response status: 200
+2025-05-15 08:19:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:20:18 UTC)" (scheduled at 2025-05-15 08:19:18.304751+00:00)
+2025-05-15 08:19:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:19:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:20:18 UTC)" executed successfully
+2025-05-15 08:19:22,391 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:19:22,391 - app.main - INFO - Response status: 200
+2025-05-15 08:19:52,489 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:19:52,490 - app.main - INFO - Response status: 200
+2025-05-15 08:20:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:21:18 UTC)" (scheduled at 2025-05-15 08:20:18.304751+00:00)
+2025-05-15 08:20:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:20:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:21:18 UTC)" executed successfully
+2025-05-15 08:20:22,577 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:20:22,577 - app.main - INFO - Response status: 200
+2025-05-15 08:20:52,650 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:20:52,651 - app.main - INFO - Response status: 200
+2025-05-15 08:21:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:22:18 UTC)" (scheduled at 2025-05-15 08:21:18.304751+00:00)
+2025-05-15 08:21:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:21:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:22:18 UTC)" executed successfully
+2025-05-15 08:21:22,728 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:21:22,729 - app.main - INFO - Response status: 200
+2025-05-15 08:21:52,821 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:21:52,822 - app.main - INFO - Response status: 200
+2025-05-15 08:22:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:23:18 UTC)" (scheduled at 2025-05-15 08:22:18.304751+00:00)
+2025-05-15 08:22:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:22:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:23:18 UTC)" executed successfully
+2025-05-15 08:22:23,019 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:22:23,020 - app.main - INFO - Response status: 200
+2025-05-15 08:22:53,108 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:22:53,109 - app.main - INFO - Response status: 200
+2025-05-15 08:23:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:24:18 UTC)" (scheduled at 2025-05-15 08:23:18.304751+00:00)
+2025-05-15 08:23:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:23:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:24:18 UTC)" executed successfully
+2025-05-15 08:23:23,227 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:23:23,227 - app.main - INFO - Response status: 200
+2025-05-15 08:23:53,313 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:23:53,314 - app.main - INFO - Response status: 200
+2025-05-15 08:24:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:25:18 UTC)" (scheduled at 2025-05-15 08:24:18.304751+00:00)
+2025-05-15 08:24:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:24:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:25:18 UTC)" executed successfully
+2025-05-15 08:24:23,397 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:24:23,398 - app.main - INFO - Response status: 200
+2025-05-15 08:24:53,504 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:24:53,505 - app.main - INFO - Response status: 200
+2025-05-15 08:25:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:26:18 UTC)" (scheduled at 2025-05-15 08:25:18.304751+00:00)
+2025-05-15 08:25:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:25:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:26:18 UTC)" executed successfully
+2025-05-15 08:25:23,582 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:25:23,582 - app.main - INFO - Response status: 200
+2025-05-15 08:25:53,707 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:25:53,708 - app.main - INFO - Response status: 200
+2025-05-15 08:26:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:27:18 UTC)" (scheduled at 2025-05-15 08:26:18.304751+00:00)
+2025-05-15 08:26:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:26:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:27:18 UTC)" executed successfully
+2025-05-15 08:26:23,797 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:26:23,799 - app.main - INFO - Response status: 200
+2025-05-15 08:26:53,899 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:26:53,899 - app.main - INFO - Response status: 200
+2025-05-15 08:27:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:28:18 UTC)" (scheduled at 2025-05-15 08:27:18.304751+00:00)
+2025-05-15 08:27:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:27:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:28:18 UTC)" executed successfully
+2025-05-15 08:27:23,985 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:27:23,985 - app.main - INFO - Response status: 200
+2025-05-15 08:27:54,068 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:27:54,069 - app.main - INFO - Response status: 200
+2025-05-15 08:28:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:29:18 UTC)" (scheduled at 2025-05-15 08:28:18.304751+00:00)
+2025-05-15 08:28:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:28:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:29:18 UTC)" executed successfully
+2025-05-15 08:28:24,145 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:28:24,149 - app.main - INFO - Response status: 200
+2025-05-15 08:28:54,227 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:28:54,227 - app.main - INFO - Response status: 200
+2025-05-15 08:29:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:30:18 UTC)" (scheduled at 2025-05-15 08:29:18.304751+00:00)
+2025-05-15 08:29:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:29:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:30:18 UTC)" executed successfully
+2025-05-15 08:29:24,307 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:29:24,308 - app.main - INFO - Response status: 200
+2025-05-15 08:29:54,403 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:29:54,403 - app.main - INFO - Response status: 200
+2025-05-15 08:30:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:31:18 UTC)" (scheduled at 2025-05-15 08:30:18.304751+00:00)
+2025-05-15 08:30:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:30:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:31:18 UTC)" executed successfully
+2025-05-15 08:30:24,483 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:30:24,484 - app.main - INFO - Response status: 200
+2025-05-15 08:30:54,592 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:30:54,592 - app.main - INFO - Response status: 200
+2025-05-15 08:31:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:32:18 UTC)" (scheduled at 2025-05-15 08:31:18.304751+00:00)
+2025-05-15 08:31:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:31:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:32:18 UTC)" executed successfully
+2025-05-15 08:31:24,674 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:31:24,674 - app.main - INFO - Response status: 200
+2025-05-15 08:31:54,772 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:31:54,772 - app.main - INFO - Response status: 200
+2025-05-15 08:32:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:33:18 UTC)" (scheduled at 2025-05-15 08:32:18.304751+00:00)
+2025-05-15 08:32:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:32:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:33:18 UTC)" executed successfully
+2025-05-15 08:32:24,870 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:32:24,871 - app.main - INFO - Response status: 200
+2025-05-15 08:32:54,954 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:32:54,955 - app.main - INFO - Response status: 200
+2025-05-15 08:33:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:34:18 UTC)" (scheduled at 2025-05-15 08:33:18.304751+00:00)
+2025-05-15 08:33:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:33:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:34:18 UTC)" executed successfully
+2025-05-15 08:33:25,035 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:33:25,035 - app.main - INFO - Response status: 200
+2025-05-15 08:33:55,183 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:33:55,183 - app.main - INFO - Response status: 200
+2025-05-15 08:34:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:35:18 UTC)" (scheduled at 2025-05-15 08:34:18.304751+00:00)
+2025-05-15 08:34:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:34:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:35:18 UTC)" executed successfully
+2025-05-15 08:34:25,266 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:34:25,267 - app.main - INFO - Response status: 200
+2025-05-15 08:34:55,377 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:34:55,377 - app.main - INFO - Response status: 200
+2025-05-15 08:35:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:36:18 UTC)" (scheduled at 2025-05-15 08:35:18.304751+00:00)
+2025-05-15 08:35:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:35:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:36:18 UTC)" executed successfully
+2025-05-15 08:35:25,517 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:35:25,518 - app.main - INFO - Response status: 200
+2025-05-15 08:35:55,606 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:35:55,606 - app.main - INFO - Response status: 200
+2025-05-15 08:36:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:37:18 UTC)" (scheduled at 2025-05-15 08:36:18.304751+00:00)
+2025-05-15 08:36:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:36:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:37:18 UTC)" executed successfully
+2025-05-15 08:36:25,688 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:36:25,689 - app.main - INFO - Response status: 200
+2025-05-15 08:36:55,999 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:36:55,999 - app.main - INFO - Response status: 200
+2025-05-15 08:37:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:38:18 UTC)" (scheduled at 2025-05-15 08:37:18.304751+00:00)
+2025-05-15 08:37:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:37:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:38:18 UTC)" executed successfully
+2025-05-15 08:37:26,079 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:37:26,079 - app.main - INFO - Response status: 200
+2025-05-15 08:37:56,166 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:37:56,167 - app.main - INFO - Response status: 200
+2025-05-15 08:38:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:39:18 UTC)" (scheduled at 2025-05-15 08:38:18.304751+00:00)
+2025-05-15 08:38:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:38:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:39:18 UTC)" executed successfully
+2025-05-15 08:38:26,247 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:38:26,248 - app.main - INFO - Response status: 200
+2025-05-15 08:38:56,348 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:38:56,348 - app.main - INFO - Response status: 200
+2025-05-15 08:39:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:40:18 UTC)" (scheduled at 2025-05-15 08:39:18.304751+00:00)
+2025-05-15 08:39:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:39:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:40:18 UTC)" executed successfully
+2025-05-15 08:39:26,423 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:39:26,423 - app.main - INFO - Response status: 200
+2025-05-15 08:39:56,503 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:39:56,504 - app.main - INFO - Response status: 200
+2025-05-15 08:40:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:41:18 UTC)" (scheduled at 2025-05-15 08:40:18.304751+00:00)
+2025-05-15 08:40:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:40:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:41:18 UTC)" executed successfully
+2025-05-15 08:40:26,590 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:40:26,591 - app.main - INFO - Response status: 200
+2025-05-15 08:40:56,681 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:40:56,682 - app.main - INFO - Response status: 200
+2025-05-15 08:41:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:42:18 UTC)" (scheduled at 2025-05-15 08:41:18.304751+00:00)
+2025-05-15 08:41:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:41:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:42:18 UTC)" executed successfully
+2025-05-15 08:41:26,767 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:41:26,768 - app.main - INFO - Response status: 200
+2025-05-15 08:41:56,896 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:41:56,896 - app.main - INFO - Response status: 200
+2025-05-15 08:42:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:43:18 UTC)" (scheduled at 2025-05-15 08:42:18.304751+00:00)
+2025-05-15 08:42:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:42:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:43:18 UTC)" executed successfully
+2025-05-15 08:42:26,980 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:42:26,980 - app.main - INFO - Response status: 200
+2025-05-15 08:42:57,082 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:42:57,083 - app.main - INFO - Response status: 200
+2025-05-15 08:43:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:44:18 UTC)" (scheduled at 2025-05-15 08:43:18.304751+00:00)
+2025-05-15 08:43:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:43:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:44:18 UTC)" executed successfully
+2025-05-15 08:43:27,159 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:43:27,160 - app.main - INFO - Response status: 200
+2025-05-15 08:43:57,287 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:43:57,288 - app.main - INFO - Response status: 200
+2025-05-15 08:44:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:45:18 UTC)" (scheduled at 2025-05-15 08:44:18.304751+00:00)
+2025-05-15 08:44:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:44:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:45:18 UTC)" executed successfully
+2025-05-15 08:44:27,408 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:44:27,409 - app.main - INFO - Response status: 200
+2025-05-15 08:44:57,505 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:44:57,506 - app.main - INFO - Response status: 200
+2025-05-15 08:45:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:46:18 UTC)" (scheduled at 2025-05-15 08:45:18.304751+00:00)
+2025-05-15 08:45:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:45:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:46:18 UTC)" executed successfully
+2025-05-15 08:45:27,581 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:45:27,581 - app.main - INFO - Response status: 200
+2025-05-15 08:45:57,679 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:45:57,680 - app.main - INFO - Response status: 200
+2025-05-15 08:46:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:47:18 UTC)" (scheduled at 2025-05-15 08:46:18.304751+00:00)
+2025-05-15 08:46:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:46:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:47:18 UTC)" executed successfully
+2025-05-15 08:46:27,752 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:46:27,752 - app.main - INFO - Response status: 200
+2025-05-15 08:46:57,852 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:46:57,853 - app.main - INFO - Response status: 200
+2025-05-15 08:47:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:48:18 UTC)" (scheduled at 2025-05-15 08:47:18.304751+00:00)
+2025-05-15 08:47:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:47:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:48:18 UTC)" executed successfully
+2025-05-15 08:47:27,932 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:47:27,933 - app.main - INFO - Response status: 200
+2025-05-15 08:47:58,034 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:47:58,035 - app.main - INFO - Response status: 200
+2025-05-15 08:48:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:49:18 UTC)" (scheduled at 2025-05-15 08:48:18.304751+00:00)
+2025-05-15 08:48:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:48:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:49:18 UTC)" executed successfully
+2025-05-15 08:48:28,127 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:48:28,127 - app.main - INFO - Response status: 200
+2025-05-15 08:48:58,217 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:48:58,218 - app.main - INFO - Response status: 200
+2025-05-15 08:49:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:50:18 UTC)" (scheduled at 2025-05-15 08:49:18.304751+00:00)
+2025-05-15 08:49:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:49:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:50:18 UTC)" executed successfully
+2025-05-15 08:49:28,329 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:49:28,330 - app.main - INFO - Response status: 200
+2025-05-15 08:49:58,428 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:49:58,429 - app.main - INFO - Response status: 200
+2025-05-15 08:50:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:51:18 UTC)" (scheduled at 2025-05-15 08:50:18.304751+00:00)
+2025-05-15 08:50:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:50:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:51:18 UTC)" executed successfully
+2025-05-15 08:50:28,510 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:50:28,511 - app.main - INFO - Response status: 200
+2025-05-15 08:50:58,633 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:50:58,634 - app.main - INFO - Response status: 200
+2025-05-15 08:51:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:52:18 UTC)" (scheduled at 2025-05-15 08:51:18.304751+00:00)
+2025-05-15 08:51:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:51:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:52:18 UTC)" executed successfully
+2025-05-15 08:51:28,718 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:51:28,719 - app.main - INFO - Response status: 200
+2025-05-15 08:51:58,887 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:51:58,887 - app.main - INFO - Response status: 200
+2025-05-15 08:52:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:53:18 UTC)" (scheduled at 2025-05-15 08:52:18.304751+00:00)
+2025-05-15 08:52:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:52:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:53:18 UTC)" executed successfully
+2025-05-15 08:52:28,964 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:52:28,965 - app.main - INFO - Response status: 200
+2025-05-15 08:52:59,046 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:52:59,047 - app.main - INFO - Response status: 200
+2025-05-15 08:53:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:54:18 UTC)" (scheduled at 2025-05-15 08:53:18.304751+00:00)
+2025-05-15 08:53:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:53:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:54:18 UTC)" executed successfully
+2025-05-15 08:53:29,192 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:53:29,193 - app.main - INFO - Response status: 200
+2025-05-15 08:53:59,293 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:53:59,294 - app.main - INFO - Response status: 200
+2025-05-15 08:54:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:55:18 UTC)" (scheduled at 2025-05-15 08:54:18.304751+00:00)
+2025-05-15 08:54:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:54:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:55:18 UTC)" executed successfully
+2025-05-15 08:54:29,388 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:54:29,389 - app.main - INFO - Response status: 200
+2025-05-15 08:54:59,487 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:54:59,487 - app.main - INFO - Response status: 200
+2025-05-15 08:55:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:56:18 UTC)" (scheduled at 2025-05-15 08:55:18.304751+00:00)
+2025-05-15 08:55:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:55:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:56:18 UTC)" executed successfully
+2025-05-15 08:55:29,575 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:55:29,575 - app.main - INFO - Response status: 200
+2025-05-15 08:55:59,675 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:55:59,676 - app.main - INFO - Response status: 200
+2025-05-15 08:56:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:57:18 UTC)" (scheduled at 2025-05-15 08:56:18.304751+00:00)
+2025-05-15 08:56:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:56:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:57:18 UTC)" executed successfully
+2025-05-15 08:56:29,782 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:56:29,782 - app.main - INFO - Response status: 200
+2025-05-15 08:56:59,883 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:56:59,883 - app.main - INFO - Response status: 200
+2025-05-15 08:57:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:58:18 UTC)" (scheduled at 2025-05-15 08:57:18.304751+00:00)
+2025-05-15 08:57:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:57:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:58:18 UTC)" executed successfully
+2025-05-15 08:57:29,962 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:57:29,963 - app.main - INFO - Response status: 200
+2025-05-15 08:58:00,142 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:58:00,143 - app.main - INFO - Response status: 200
+2025-05-15 08:58:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:59:18 UTC)" (scheduled at 2025-05-15 08:58:18.304751+00:00)
+2025-05-15 08:58:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:58:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 08:59:18 UTC)" executed successfully
+2025-05-15 08:58:30,220 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:58:30,221 - app.main - INFO - Response status: 200
+2025-05-15 08:59:00,328 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:59:00,329 - app.main - INFO - Response status: 200
+2025-05-15 08:59:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:00:18 UTC)" (scheduled at 2025-05-15 08:59:18.304751+00:00)
+2025-05-15 08:59:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 08:59:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:00:18 UTC)" executed successfully
+2025-05-15 08:59:30,412 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 08:59:30,413 - app.main - INFO - Response status: 200
+2025-05-15 09:00:00,509 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:00:00,509 - app.main - INFO - Response status: 200
+2025-05-15 09:00:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:01:18 UTC)" (scheduled at 2025-05-15 09:00:18.304751+00:00)
+2025-05-15 09:00:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:00:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:01:18 UTC)" executed successfully
+2025-05-15 09:00:30,589 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:00:30,590 - app.main - INFO - Response status: 200
+2025-05-15 09:01:00,694 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:01:00,695 - app.main - INFO - Response status: 200
+2025-05-15 09:01:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:02:18 UTC)" (scheduled at 2025-05-15 09:01:18.304751+00:00)
+2025-05-15 09:01:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:01:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:02:18 UTC)" executed successfully
+2025-05-15 09:01:31,019 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:01:31,020 - app.main - INFO - Response status: 200
+2025-05-15 09:02:01,124 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:02:01,124 - app.main - INFO - Response status: 200
+2025-05-15 09:02:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:03:18 UTC)" (scheduled at 2025-05-15 09:02:18.304751+00:00)
+2025-05-15 09:02:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:02:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:03:18 UTC)" executed successfully
+2025-05-15 09:02:31,201 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:02:31,201 - app.main - INFO - Response status: 200
+2025-05-15 09:03:01,297 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:03:01,298 - app.main - INFO - Response status: 200
+2025-05-15 09:03:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:04:18 UTC)" (scheduled at 2025-05-15 09:03:18.304751+00:00)
+2025-05-15 09:03:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:03:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:04:18 UTC)" executed successfully
+2025-05-15 09:03:31,385 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:03:31,386 - app.main - INFO - Response status: 200
+2025-05-15 09:04:01,487 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:04:01,488 - app.main - INFO - Response status: 200
+2025-05-15 09:04:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:05:18 UTC)" (scheduled at 2025-05-15 09:04:18.304751+00:00)
+2025-05-15 09:04:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:04:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:05:18 UTC)" executed successfully
+2025-05-15 09:04:31,582 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:04:31,583 - app.main - INFO - Response status: 200
+2025-05-15 09:05:01,687 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:05:01,688 - app.main - INFO - Response status: 200
+2025-05-15 09:05:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:06:18 UTC)" (scheduled at 2025-05-15 09:05:18.304751+00:00)
+2025-05-15 09:05:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:05:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:06:18 UTC)" executed successfully
+2025-05-15 09:05:31,776 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:05:31,777 - app.main - INFO - Response status: 200
+2025-05-15 09:06:01,873 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:06:01,873 - app.main - INFO - Response status: 200
+2025-05-15 09:06:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:07:18 UTC)" (scheduled at 2025-05-15 09:06:18.304751+00:00)
+2025-05-15 09:06:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:06:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:07:18 UTC)" executed successfully
+2025-05-15 09:06:31,986 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:06:31,986 - app.main - INFO - Response status: 200
+2025-05-15 09:07:02,096 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:07:02,098 - app.main - INFO - Response status: 200
+2025-05-15 09:07:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:08:18 UTC)" (scheduled at 2025-05-15 09:07:18.304751+00:00)
+2025-05-15 09:07:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:07:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:08:18 UTC)" executed successfully
+2025-05-15 09:07:32,182 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:07:32,183 - app.main - INFO - Response status: 200
+2025-05-15 09:08:02,345 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:08:02,346 - app.main - INFO - Response status: 200
+2025-05-15 09:08:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:09:18 UTC)" (scheduled at 2025-05-15 09:08:18.304751+00:00)
+2025-05-15 09:08:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:08:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:09:18 UTC)" executed successfully
+2025-05-15 09:08:32,447 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:08:32,448 - app.main - INFO - Response status: 200
+2025-05-15 09:09:02,540 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:09:02,540 - app.main - INFO - Response status: 200
+2025-05-15 09:09:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:10:18 UTC)" (scheduled at 2025-05-15 09:09:18.304751+00:00)
+2025-05-15 09:09:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:09:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:10:18 UTC)" executed successfully
+2025-05-15 09:09:32,659 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:09:32,660 - app.main - INFO - Response status: 200
+2025-05-15 09:10:02,761 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:10:02,762 - app.main - INFO - Response status: 200
+2025-05-15 09:10:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:11:18 UTC)" (scheduled at 2025-05-15 09:10:18.304751+00:00)
+2025-05-15 09:10:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:10:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:11:18 UTC)" executed successfully
+2025-05-15 09:10:32,845 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:10:32,846 - app.main - INFO - Response status: 200
+2025-05-15 09:11:02,967 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:11:02,967 - app.main - INFO - Response status: 200
+2025-05-15 09:11:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:12:18 UTC)" (scheduled at 2025-05-15 09:11:18.304751+00:00)
+2025-05-15 09:11:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:11:18,306 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:12:18 UTC)" executed successfully
+2025-05-15 09:11:33,046 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:11:33,047 - app.main - INFO - Response status: 200
+2025-05-15 09:12:03,147 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:12:03,148 - app.main - INFO - Response status: 200
+2025-05-15 09:12:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:13:18 UTC)" (scheduled at 2025-05-15 09:12:18.304751+00:00)
+2025-05-15 09:12:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:12:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:13:18 UTC)" executed successfully
+2025-05-15 09:12:33,227 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:12:33,228 - app.main - INFO - Response status: 200
+2025-05-15 09:13:03,306 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:13:03,307 - app.main - INFO - Response status: 200
+2025-05-15 09:13:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:14:18 UTC)" (scheduled at 2025-05-15 09:13:18.304751+00:00)
+2025-05-15 09:13:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:13:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:14:18 UTC)" executed successfully
+2025-05-15 09:13:33,493 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:13:33,499 - app.main - INFO - Response status: 200
+2025-05-15 09:14:03,597 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:14:03,598 - app.main - INFO - Response status: 200
+2025-05-15 09:14:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:15:18 UTC)" (scheduled at 2025-05-15 09:14:18.304751+00:00)
+2025-05-15 09:14:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:14:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:15:18 UTC)" executed successfully
+2025-05-15 09:14:33,688 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:14:33,689 - app.main - INFO - Response status: 200
+2025-05-15 09:15:03,796 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:15:03,797 - app.main - INFO - Response status: 200
+2025-05-15 09:15:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:16:18 UTC)" (scheduled at 2025-05-15 09:15:18.304751+00:00)
+2025-05-15 09:15:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:15:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:16:18 UTC)" executed successfully
+2025-05-15 09:15:33,883 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:15:33,884 - app.main - INFO - Response status: 200
+2025-05-15 09:16:03,972 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:16:03,973 - app.main - INFO - Response status: 200
+2025-05-15 09:16:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:17:18 UTC)" (scheduled at 2025-05-15 09:16:18.304751+00:00)
+2025-05-15 09:16:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:16:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:17:18 UTC)" executed successfully
+2025-05-15 09:16:34,079 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:16:34,080 - app.main - INFO - Response status: 200
+2025-05-15 09:17:04,182 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:17:04,183 - app.main - INFO - Response status: 200
+2025-05-15 09:17:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:18:18 UTC)" (scheduled at 2025-05-15 09:17:18.304751+00:00)
+2025-05-15 09:17:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:17:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:18:18 UTC)" executed successfully
+2025-05-15 09:17:34,286 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:17:34,287 - app.main - INFO - Response status: 200
+2025-05-15 09:18:04,452 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:18:04,452 - app.main - INFO - Response status: 200
+2025-05-15 09:18:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:19:18 UTC)" (scheduled at 2025-05-15 09:18:18.304751+00:00)
+2025-05-15 09:18:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:18:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:19:18 UTC)" executed successfully
+2025-05-15 09:18:34,527 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:18:34,527 - app.main - INFO - Response status: 200
+2025-05-15 09:19:04,623 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:19:04,624 - app.main - INFO - Response status: 200
+2025-05-15 09:19:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:20:18 UTC)" (scheduled at 2025-05-15 09:19:18.304751+00:00)
+2025-05-15 09:19:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:19:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:20:18 UTC)" executed successfully
+2025-05-15 09:19:34,724 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:19:34,725 - app.main - INFO - Response status: 200
+2025-05-15 09:20:04,801 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:20:04,802 - app.main - INFO - Response status: 200
+2025-05-15 09:20:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:21:18 UTC)" (scheduled at 2025-05-15 09:20:18.304751+00:00)
+2025-05-15 09:20:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:20:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:21:18 UTC)" executed successfully
+2025-05-15 09:20:34,925 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:20:34,926 - app.main - INFO - Response status: 200
+2025-05-15 09:21:05,597 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:21:05,599 - app.main - INFO - Response status: 200
+2025-05-15 09:21:18,309 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:22:18 UTC)" (scheduled at 2025-05-15 09:21:18.304751+00:00)
+2025-05-15 09:21:18,315 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:21:18,316 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:22:18 UTC)" executed successfully
+2025-05-15 09:21:36,612 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:21:36,622 - app.main - INFO - Response status: 200
+2025-05-15 09:22:26,128 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:23:18 UTC)" was missed by 0:00:03.445132
+2025-05-15 09:23:20,069 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:23:20,073 - app.main - INFO - Response status: 200
+2025-05-15 09:23:20,963 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:24:18 UTC)" was missed by 0:00:02.659106
+2025-05-15 09:23:52,915 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:23:52,999 - app.main - INFO - Response status: 200
+2025-05-15 09:24:19,942 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:25:18 UTC)" was missed by 0:00:01.164233
+2025-05-15 09:24:47,107 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:24:47,114 - app.main - INFO - Response status: 200
+2025-05-15 09:25:19,493 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:26:18 UTC)" was missed by 0:00:01.189135
+2025-05-15 09:25:56,180 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:25:57,357 - app.main - INFO - Response status: 200
+2025-05-15 09:26:18,649 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:27:18 UTC)" (scheduled at 2025-05-15 09:26:18.304751+00:00)
+2025-05-15 09:26:19,189 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:26:19,207 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:27:18 UTC)" executed successfully
+2025-05-15 09:27:26,042 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:28:18 UTC)" was missed by 0:00:06.416392
+2025-05-15 09:28:22,054 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:29:18 UTC)" was missed by 0:00:03.750167
+2025-05-15 09:29:22,744 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:30:18 UTC)" was missed by 0:00:03.677516
+2025-05-15 09:30:34,642 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:31:18 UTC)" was missed by 0:00:10.039572
+2025-05-15 09:31:32,262 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:32:18 UTC)" was missed by 0:00:11.652645
+2025-05-15 09:32:23,785 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:33:18 UTC)" was missed by 0:00:05.295058
+2025-05-15 09:33:22,186 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:34:18 UTC)" was missed by 0:00:02.119976
+2025-05-15 09:34:22,033 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:35:18 UTC)" was missed by 0:00:02.903544
+2025-05-15 09:35:19,803 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:36:18 UTC)" was missed by 0:00:01.368821
+2025-05-15 09:36:18,319 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:37:18 UTC)" (scheduled at 2025-05-15 09:36:18.304751+00:00)
+2025-05-15 09:36:18,327 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:36:18,327 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:37:18 UTC)" executed successfully
+2025-05-15 09:36:40,161 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:36:40,163 - app.main - INFO - Response status: 200
+2025-05-15 09:37:10,265 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:37:10,265 - app.main - INFO - Response status: 200
+2025-05-15 09:37:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:38:18 UTC)" (scheduled at 2025-05-15 09:37:18.304751+00:00)
+2025-05-15 09:37:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:37:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:38:18 UTC)" executed successfully
+2025-05-15 09:37:40,350 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:37:40,351 - app.main - INFO - Response status: 200
+2025-05-15 09:38:10,424 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:38:10,425 - app.main - INFO - Response status: 200
+2025-05-15 09:38:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:39:18 UTC)" (scheduled at 2025-05-15 09:38:18.304751+00:00)
+2025-05-15 09:38:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:38:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:39:18 UTC)" executed successfully
+2025-05-15 09:38:40,500 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:38:40,501 - app.main - INFO - Response status: 200
+2025-05-15 09:39:10,580 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:39:10,580 - app.main - INFO - Response status: 200
+2025-05-15 09:39:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:40:18 UTC)" (scheduled at 2025-05-15 09:39:18.304751+00:00)
+2025-05-15 09:39:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:39:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:40:18 UTC)" executed successfully
+2025-05-15 09:39:40,671 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:39:40,672 - app.main - INFO - Response status: 200
+2025-05-15 09:40:10,769 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:40:10,769 - app.main - INFO - Response status: 200
+2025-05-15 09:40:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:41:18 UTC)" (scheduled at 2025-05-15 09:40:18.304751+00:00)
+2025-05-15 09:40:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:40:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:41:18 UTC)" executed successfully
+2025-05-15 09:40:40,875 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:40:40,875 - app.main - INFO - Response status: 200
+2025-05-15 09:41:10,975 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:41:10,976 - app.main - INFO - Response status: 200
+2025-05-15 09:41:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:42:18 UTC)" (scheduled at 2025-05-15 09:41:18.304751+00:00)
+2025-05-15 09:41:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:41:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:42:18 UTC)" executed successfully
+2025-05-15 09:41:41,058 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:41:41,059 - app.main - INFO - Response status: 200
+2025-05-15 09:42:11,138 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:42:11,139 - app.main - INFO - Response status: 200
+2025-05-15 09:42:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:43:18 UTC)" (scheduled at 2025-05-15 09:42:18.304751+00:00)
+2025-05-15 09:42:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:42:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:43:18 UTC)" executed successfully
+2025-05-15 09:42:41,233 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:42:41,234 - app.main - INFO - Response status: 200
+2025-05-15 09:43:11,319 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:43:11,319 - app.main - INFO - Response status: 200
+2025-05-15 09:43:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:44:18 UTC)" (scheduled at 2025-05-15 09:43:18.304751+00:00)
+2025-05-15 09:43:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:43:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:44:18 UTC)" executed successfully
+2025-05-15 09:43:41,398 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:43:41,398 - app.main - INFO - Response status: 200
+2025-05-15 09:44:11,485 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:44:11,486 - app.main - INFO - Response status: 200
+2025-05-15 09:44:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:45:18 UTC)" (scheduled at 2025-05-15 09:44:18.304751+00:00)
+2025-05-15 09:44:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:44:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:45:18 UTC)" executed successfully
+2025-05-15 09:44:41,570 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:44:41,571 - app.main - INFO - Response status: 200
+2025-05-15 09:45:11,662 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:45:11,662 - app.main - INFO - Response status: 200
+2025-05-15 09:45:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:46:18 UTC)" (scheduled at 2025-05-15 09:45:18.304751+00:00)
+2025-05-15 09:45:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:45:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:46:18 UTC)" executed successfully
+2025-05-15 09:45:41,741 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:45:41,742 - app.main - INFO - Response status: 200
+2025-05-15 09:46:11,822 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:46:11,823 - app.main - INFO - Response status: 200
+2025-05-15 09:46:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:47:18 UTC)" (scheduled at 2025-05-15 09:46:18.304751+00:00)
+2025-05-15 09:46:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:46:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:47:18 UTC)" executed successfully
+2025-05-15 09:46:41,909 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:46:41,909 - app.main - INFO - Response status: 200
+2025-05-15 09:47:12,006 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:47:12,007 - app.main - INFO - Response status: 200
+2025-05-15 09:47:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:48:18 UTC)" (scheduled at 2025-05-15 09:47:18.304751+00:00)
+2025-05-15 09:47:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:47:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:48:18 UTC)" executed successfully
+2025-05-15 09:47:42,088 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:47:42,088 - app.main - INFO - Response status: 200
+2025-05-15 09:48:12,179 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:48:12,180 - app.main - INFO - Response status: 200
+2025-05-15 09:48:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:49:18 UTC)" (scheduled at 2025-05-15 09:48:18.304751+00:00)
+2025-05-15 09:48:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:48:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:49:18 UTC)" executed successfully
+2025-05-15 09:48:42,274 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:48:42,275 - app.main - INFO - Response status: 200
+2025-05-15 09:49:12,354 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:49:12,355 - app.main - INFO - Response status: 200
+2025-05-15 09:49:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:50:18 UTC)" (scheduled at 2025-05-15 09:49:18.304751+00:00)
+2025-05-15 09:49:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:49:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:50:18 UTC)" executed successfully
+2025-05-15 09:49:42,428 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:49:42,429 - app.main - INFO - Response status: 200
+2025-05-15 09:50:12,512 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:50:12,513 - app.main - INFO - Response status: 200
+2025-05-15 09:50:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:51:18 UTC)" (scheduled at 2025-05-15 09:50:18.304751+00:00)
+2025-05-15 09:50:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:50:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:51:18 UTC)" executed successfully
+2025-05-15 09:50:42,592 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:50:42,592 - app.main - INFO - Response status: 200
+2025-05-15 09:51:12,674 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:51:12,674 - app.main - INFO - Response status: 200
+2025-05-15 09:51:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:52:18 UTC)" (scheduled at 2025-05-15 09:51:18.304751+00:00)
+2025-05-15 09:51:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:51:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:52:18 UTC)" executed successfully
+2025-05-15 09:51:42,759 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:51:42,760 - app.main - INFO - Response status: 200
+2025-05-15 09:52:12,853 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:52:12,854 - app.main - INFO - Response status: 200
+2025-05-15 09:52:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:53:18 UTC)" (scheduled at 2025-05-15 09:52:18.304751+00:00)
+2025-05-15 09:52:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:52:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:53:18 UTC)" executed successfully
+2025-05-15 09:52:42,940 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:52:42,941 - app.main - INFO - Response status: 200
+2025-05-15 09:53:13,049 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:53:13,049 - app.main - INFO - Response status: 200
+2025-05-15 09:53:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:54:18 UTC)" (scheduled at 2025-05-15 09:53:18.304751+00:00)
+2025-05-15 09:53:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:53:18,306 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:54:18 UTC)" executed successfully
+2025-05-15 09:53:43,144 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:53:43,145 - app.main - INFO - Response status: 200
+2025-05-15 09:54:13,227 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:54:13,227 - app.main - INFO - Response status: 200
+2025-05-15 09:54:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:55:18 UTC)" (scheduled at 2025-05-15 09:54:18.304751+00:00)
+2025-05-15 09:54:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:54:18,306 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:55:18 UTC)" executed successfully
+2025-05-15 09:54:43,319 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:54:43,319 - app.main - INFO - Response status: 200
+2025-05-15 09:55:13,401 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:55:13,402 - app.main - INFO - Response status: 200
+2025-05-15 09:55:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:56:18 UTC)" (scheduled at 2025-05-15 09:55:18.304751+00:00)
+2025-05-15 09:55:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:55:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:56:18 UTC)" executed successfully
+2025-05-15 09:55:43,474 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:55:43,474 - app.main - INFO - Response status: 200
+2025-05-15 09:56:13,550 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:56:13,551 - app.main - INFO - Response status: 200
+2025-05-15 09:56:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:57:18 UTC)" (scheduled at 2025-05-15 09:56:18.304751+00:00)
+2025-05-15 09:56:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:56:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:57:18 UTC)" executed successfully
+2025-05-15 09:56:43,645 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:56:43,646 - app.main - INFO - Response status: 200
+2025-05-15 09:57:13,724 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:57:13,725 - app.main - INFO - Response status: 200
+2025-05-15 09:57:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:58:18 UTC)" (scheduled at 2025-05-15 09:57:18.304751+00:00)
+2025-05-15 09:57:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:57:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:58:18 UTC)" executed successfully
+2025-05-15 09:57:43,828 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:57:43,829 - app.main - INFO - Response status: 200
+2025-05-15 09:58:13,911 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:58:13,912 - app.main - INFO - Response status: 200
+2025-05-15 09:58:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:59:18 UTC)" (scheduled at 2025-05-15 09:58:18.304751+00:00)
+2025-05-15 09:58:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:58:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 09:59:18 UTC)" executed successfully
+2025-05-15 09:58:44,005 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:58:44,006 - app.main - INFO - Response status: 200
+2025-05-15 09:59:14,107 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:59:14,108 - app.main - INFO - Response status: 200
+2025-05-15 09:59:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:00:18 UTC)" (scheduled at 2025-05-15 09:59:18.304751+00:00)
+2025-05-15 09:59:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 09:59:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:00:18 UTC)" executed successfully
+2025-05-15 09:59:44,185 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 09:59:44,185 - app.main - INFO - Response status: 200
+2025-05-15 10:00:14,282 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:00:14,283 - app.main - INFO - Response status: 200
+2025-05-15 10:00:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:01:18 UTC)" (scheduled at 2025-05-15 10:00:18.304751+00:00)
+2025-05-15 10:00:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:00:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:01:18 UTC)" executed successfully
+2025-05-15 10:00:44,388 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:00:44,389 - app.main - INFO - Response status: 200
+2025-05-15 10:01:14,463 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:01:14,463 - app.main - INFO - Response status: 200
+2025-05-15 10:01:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:02:18 UTC)" (scheduled at 2025-05-15 10:01:18.304751+00:00)
+2025-05-15 10:01:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:01:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:02:18 UTC)" executed successfully
+2025-05-15 10:01:44,540 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:01:44,540 - app.main - INFO - Response status: 200
+2025-05-15 10:02:14,679 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:02:14,681 - app.main - INFO - Response status: 200
+2025-05-15 10:02:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:03:18 UTC)" (scheduled at 2025-05-15 10:02:18.304751+00:00)
+2025-05-15 10:02:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:02:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:03:18 UTC)" executed successfully
+2025-05-15 10:02:45,052 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:02:45,053 - app.main - INFO - Response status: 200
+2025-05-15 10:03:15,246 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:03:15,247 - app.main - INFO - Response status: 200
+2025-05-15 10:03:18,307 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:04:18 UTC)" (scheduled at 2025-05-15 10:03:18.304751+00:00)
+2025-05-15 10:03:18,307 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:03:18,307 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:04:18 UTC)" executed successfully
+2025-05-15 10:03:45,339 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:03:45,339 - app.main - INFO - Response status: 200
+2025-05-15 10:04:15,494 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:04:15,496 - app.main - INFO - Response status: 200
+2025-05-15 10:04:18,307 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:05:18 UTC)" (scheduled at 2025-05-15 10:04:18.304751+00:00)
+2025-05-15 10:04:18,307 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:04:18,308 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:05:18 UTC)" executed successfully
+2025-05-15 10:04:45,606 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:04:45,609 - app.main - INFO - Response status: 200
+2025-05-15 10:05:15,735 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:05:15,736 - app.main - INFO - Response status: 200
+2025-05-15 10:05:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:06:18 UTC)" (scheduled at 2025-05-15 10:05:18.304751+00:00)
+2025-05-15 10:05:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:05:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:06:18 UTC)" executed successfully
+2025-05-15 10:05:45,833 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:05:45,834 - app.main - INFO - Response status: 200
+2025-05-15 10:06:15,911 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:06:15,912 - app.main - INFO - Response status: 200
+2025-05-15 10:06:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:07:18 UTC)" (scheduled at 2025-05-15 10:06:18.304751+00:00)
+2025-05-15 10:06:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:06:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:07:18 UTC)" executed successfully
+2025-05-15 10:06:46,015 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:06:46,016 - app.main - INFO - Response status: 200
+2025-05-15 10:07:16,099 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:07:16,100 - app.main - INFO - Response status: 200
+2025-05-15 10:07:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:08:18 UTC)" (scheduled at 2025-05-15 10:07:18.304751+00:00)
+2025-05-15 10:07:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:07:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:08:18 UTC)" executed successfully
+2025-05-15 10:07:46,216 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:07:46,217 - app.main - INFO - Response status: 200
+2025-05-15 10:08:16,304 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:08:16,305 - app.main - INFO - Response status: 200
+2025-05-15 10:08:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:09:18 UTC)" (scheduled at 2025-05-15 10:08:18.304751+00:00)
+2025-05-15 10:08:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:08:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:09:18 UTC)" executed successfully
+2025-05-15 10:08:46,381 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:08:46,381 - app.main - INFO - Response status: 200
+2025-05-15 10:09:16,466 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:09:16,467 - app.main - INFO - Response status: 200
+2025-05-15 10:09:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:10:18 UTC)" (scheduled at 2025-05-15 10:09:18.304751+00:00)
+2025-05-15 10:09:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:09:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:10:18 UTC)" executed successfully
+2025-05-15 10:09:46,550 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:09:46,551 - app.main - INFO - Response status: 200
+2025-05-15 10:10:16,640 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:10:16,640 - app.main - INFO - Response status: 200
+2025-05-15 10:10:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:11:18 UTC)" (scheduled at 2025-05-15 10:10:18.304751+00:00)
+2025-05-15 10:10:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:10:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:11:18 UTC)" executed successfully
+2025-05-15 10:10:46,741 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:10:46,742 - app.main - INFO - Response status: 200
+2025-05-15 10:11:16,823 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:11:16,824 - app.main - INFO - Response status: 200
+2025-05-15 10:11:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:12:18 UTC)" (scheduled at 2025-05-15 10:11:18.304751+00:00)
+2025-05-15 10:11:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:11:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:12:18 UTC)" executed successfully
+2025-05-15 10:11:47,006 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:11:47,006 - app.main - INFO - Response status: 200
+2025-05-15 10:12:17,118 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:12:17,119 - app.main - INFO - Response status: 200
+2025-05-15 10:12:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:13:18 UTC)" (scheduled at 2025-05-15 10:12:18.304751+00:00)
+2025-05-15 10:12:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:12:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:13:18 UTC)" executed successfully
+2025-05-15 10:12:47,232 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:12:47,232 - app.main - INFO - Response status: 200
+2025-05-15 10:13:17,401 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:13:17,402 - app.main - INFO - Response status: 200
+2025-05-15 10:13:18,310 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:14:18 UTC)" (scheduled at 2025-05-15 10:13:18.304751+00:00)
+2025-05-15 10:13:18,311 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:13:18,311 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:14:18 UTC)" executed successfully
+2025-05-15 10:13:47,501 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:13:47,502 - app.main - INFO - Response status: 200
+2025-05-15 10:14:17,663 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:14:17,664 - app.main - INFO - Response status: 200
+2025-05-15 10:14:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:15:18 UTC)" (scheduled at 2025-05-15 10:14:18.304751+00:00)
+2025-05-15 10:14:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:14:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:15:18 UTC)" executed successfully
+2025-05-15 10:14:47,754 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:14:47,755 - app.main - INFO - Response status: 200
+2025-05-15 10:15:17,879 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:15:17,880 - app.main - INFO - Response status: 200
+2025-05-15 10:15:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:16:18 UTC)" (scheduled at 2025-05-15 10:15:18.304751+00:00)
+2025-05-15 10:15:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:15:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:16:18 UTC)" executed successfully
+2025-05-15 10:15:47,967 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:15:47,968 - app.main - INFO - Response status: 200
+2025-05-15 10:16:18,050 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:16:18,050 - app.main - INFO - Response status: 200
+2025-05-15 10:16:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:17:18 UTC)" (scheduled at 2025-05-15 10:16:18.304751+00:00)
+2025-05-15 10:16:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:16:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:17:18 UTC)" executed successfully
+2025-05-15 10:16:48,167 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:16:48,168 - app.main - INFO - Response status: 200
+2025-05-15 10:17:18,254 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:17:18,255 - app.main - INFO - Response status: 200
+2025-05-15 10:17:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:18:18 UTC)" (scheduled at 2025-05-15 10:17:18.304751+00:00)
+2025-05-15 10:17:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:17:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:18:18 UTC)" executed successfully
+2025-05-15 10:17:48,360 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:17:48,361 - app.main - INFO - Response status: 200
+2025-05-15 10:18:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:19:18 UTC)" (scheduled at 2025-05-15 10:18:18.304751+00:00)
+2025-05-15 10:18:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:18:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:19:18 UTC)" executed successfully
+2025-05-15 10:18:18,463 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:18:18,463 - app.main - INFO - Response status: 200
+2025-05-15 10:18:48,579 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:18:48,580 - app.main - INFO - Response status: 200
+2025-05-15 10:19:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:20:18 UTC)" (scheduled at 2025-05-15 10:19:18.304751+00:00)
+2025-05-15 10:19:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:19:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:20:18 UTC)" executed successfully
+2025-05-15 10:19:18,665 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:19:18,666 - app.main - INFO - Response status: 200
+2025-05-15 10:19:48,745 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:19:48,746 - app.main - INFO - Response status: 200
+2025-05-15 10:20:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:21:18 UTC)" (scheduled at 2025-05-15 10:20:18.304751+00:00)
+2025-05-15 10:20:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:20:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:21:18 UTC)" executed successfully
+2025-05-15 10:20:18,926 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:20:18,927 - app.main - INFO - Response status: 200
+2025-05-15 10:20:49,083 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:20:49,083 - app.main - INFO - Response status: 200
+2025-05-15 10:21:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:22:18 UTC)" (scheduled at 2025-05-15 10:21:18.304751+00:00)
+2025-05-15 10:21:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:21:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:22:18 UTC)" executed successfully
+2025-05-15 10:21:19,289 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:21:19,289 - app.main - INFO - Response status: 200
+2025-05-15 10:21:49,419 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:21:49,420 - app.main - INFO - Response status: 200
+2025-05-15 10:22:18,319 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:23:18 UTC)" (scheduled at 2025-05-15 10:22:18.304751+00:00)
+2025-05-15 10:22:18,351 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:22:18,356 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:23:18 UTC)" executed successfully
+2025-05-15 10:22:20,790 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:22:20,807 - app.main - INFO - Response status: 200
+2025-05-15 10:23:23,693 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:24:18 UTC)" was missed by 0:00:02.957954
+2025-05-15 10:23:52,260 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:23:52,299 - app.main - INFO - Response status: 200
+2025-05-15 10:24:19,813 - apscheduler.executors.default - WARNING - Run time of job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:25:18 UTC)" was missed by 0:00:01.508590
+2025-05-15 10:24:22,874 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:24:22,875 - app.main - INFO - Response status: 200
+2025-05-15 10:24:52,976 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:24:52,976 - app.main - INFO - Response status: 200
+2025-05-15 10:25:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:26:18 UTC)" (scheduled at 2025-05-15 10:25:18.304751+00:00)
+2025-05-15 10:25:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:25:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:26:18 UTC)" executed successfully
+2025-05-15 10:25:23,081 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:25:23,082 - app.main - INFO - Response status: 200
+2025-05-15 10:25:53,171 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:25:53,172 - app.main - INFO - Response status: 200
+2025-05-15 10:26:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:27:18 UTC)" (scheduled at 2025-05-15 10:26:18.304751+00:00)
+2025-05-15 10:26:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:26:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:27:18 UTC)" executed successfully
+2025-05-15 10:26:23,351 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:26:23,351 - app.main - INFO - Response status: 200
+2025-05-15 10:26:53,432 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:26:53,432 - app.main - INFO - Response status: 200
+2025-05-15 10:27:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:28:18 UTC)" (scheduled at 2025-05-15 10:27:18.304751+00:00)
+2025-05-15 10:27:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:27:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:28:18 UTC)" executed successfully
+2025-05-15 10:27:23,515 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:27:23,517 - app.main - INFO - Response status: 200
+2025-05-15 10:27:53,622 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:27:53,622 - app.main - INFO - Response status: 200
+2025-05-15 10:28:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:29:18 UTC)" (scheduled at 2025-05-15 10:28:18.304751+00:00)
+2025-05-15 10:28:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:28:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:29:18 UTC)" executed successfully
+2025-05-15 10:28:23,757 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:28:23,758 - app.main - INFO - Response status: 200
+2025-05-15 10:28:53,872 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:28:53,872 - app.main - INFO - Response status: 200
+2025-05-15 10:29:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:30:18 UTC)" (scheduled at 2025-05-15 10:29:18.304751+00:00)
+2025-05-15 10:29:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:29:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:30:18 UTC)" executed successfully
+2025-05-15 10:29:23,950 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:29:23,951 - app.main - INFO - Response status: 200
+2025-05-15 10:29:54,073 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:29:54,074 - app.main - INFO - Response status: 200
+2025-05-15 10:30:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:31:18 UTC)" (scheduled at 2025-05-15 10:30:18.304751+00:00)
+2025-05-15 10:30:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:30:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:31:18 UTC)" executed successfully
+2025-05-15 10:30:24,146 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:30:24,147 - app.main - INFO - Response status: 200
+2025-05-15 10:30:54,263 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:30:54,264 - app.main - INFO - Response status: 200
+2025-05-15 10:31:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:32:18 UTC)" (scheduled at 2025-05-15 10:31:18.304751+00:00)
+2025-05-15 10:31:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:31:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:32:18 UTC)" executed successfully
+2025-05-15 10:31:24,443 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:31:24,444 - app.main - INFO - Response status: 200
+2025-05-15 10:31:55,070 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:31:55,076 - app.main - INFO - Response status: 200
+2025-05-15 10:32:18,306 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:33:18 UTC)" (scheduled at 2025-05-15 10:32:18.304751+00:00)
+2025-05-15 10:32:18,310 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:32:18,311 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:33:18 UTC)" executed successfully
+2025-05-15 10:32:25,514 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:32:25,516 - app.main - INFO - Response status: 200
+2025-05-15 10:32:55,772 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:32:55,775 - app.main - INFO - Response status: 200
+2025-05-15 10:33:18,306 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:34:18 UTC)" (scheduled at 2025-05-15 10:33:18.304751+00:00)
+2025-05-15 10:33:18,307 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:33:18,307 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:34:18 UTC)" executed successfully
+2025-05-15 10:33:25,929 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:33:25,929 - app.main - INFO - Response status: 200
+2025-05-15 10:33:56,084 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:33:56,085 - app.main - INFO - Response status: 200
+2025-05-15 10:34:18,306 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:35:18 UTC)" (scheduled at 2025-05-15 10:34:18.304751+00:00)
+2025-05-15 10:34:18,306 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:34:18,306 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:35:18 UTC)" executed successfully
+2025-05-15 10:34:26,177 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:34:26,178 - app.main - INFO - Response status: 200
+2025-05-15 10:34:56,267 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:34:56,268 - app.main - INFO - Response status: 200
+2025-05-15 10:35:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:36:18 UTC)" (scheduled at 2025-05-15 10:35:18.304751+00:00)
+2025-05-15 10:35:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:35:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:36:18 UTC)" executed successfully
+2025-05-15 10:35:26,417 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:35:26,418 - app.main - INFO - Response status: 200
+2025-05-15 10:35:56,516 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:35:56,517 - app.main - INFO - Response status: 200
+2025-05-15 10:36:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:37:18 UTC)" (scheduled at 2025-05-15 10:36:18.304751+00:00)
+2025-05-15 10:36:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:36:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:37:18 UTC)" executed successfully
+2025-05-15 10:36:26,704 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:36:26,705 - app.main - INFO - Response status: 200
+2025-05-15 10:36:56,777 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:36:56,778 - app.main - INFO - Response status: 200
+2025-05-15 10:37:18,305 - apscheduler.executors.default - INFO - Running job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:38:18 UTC)" (scheduled at 2025-05-15 10:37:18.304751+00:00)
+2025-05-15 10:37:18,305 - app.core.scheduler - INFO - Background task running...
+2025-05-15 10:37:18,305 - apscheduler.executors.default - INFO - Job "BackgroundTasks._run_background_task (trigger: interval[0:01:00], next run at: 2025-05-15 10:38:18 UTC)" executed successfully
+2025-05-15 10:37:26,878 - app.main - INFO - Request started: GET http://localhost:5000/health
+2025-05-15 10:37:26,879 - app.main - INFO - Response status: 200

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+// import Image from 'next/image'; // 더 이상 사용하지 않으므로 주석 처리 또는 삭제
 import { PageContainer } from '../components/layout';
 import { FaUsers, FaLayerGroup, FaXmark, FaUserPlus, FaPlus } from 'react-icons/fa6';
 import { RiKakaoTalkFill } from 'react-icons/ri';
@@ -176,6 +177,7 @@ function GroupPageContent() {
           <div className="bg-white rounded-xl shadow-lg overflow-hidden flex-grow flex flex-col border-r-4 border-blue-500">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
               <div className="flex items-center">
+                {/* 로고 제거: <Image src="/images/smap_logo.webp" alt="SMAP Logo" width={24} height={24} className="mr-2" /> */}
                 <FaUsers className="w-5 h-5 text-blue-600 mr-2 flex-shrink-0" />
                 <h2 className="text-lg text-gray-900 font-normal">내 그룹 목록</h2>
               </div>
@@ -230,6 +232,7 @@ function GroupPageContent() {
             <div className="bg-white rounded-xl shadow-lg overflow-hidden flex-grow flex flex-col border-r-4 border-orange-500">
               <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
                 <div className="flex items-center">
+                  {/* 로고 제거: <Image src="/images/smap_logo.webp" alt="SMAP Logo" width={24} height={24} className="mr-2" /> */}
                   <FaLayerGroup className="w-5 h-5 text-orange-600 mr-2 flex-shrink-0" />
                   <h2 className="text-lg text-gray-900 font-normal">{selectedGroup.name}</h2>
                 </div>

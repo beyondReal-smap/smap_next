@@ -386,3 +386,211 @@
 {"log":" ✓ Compiled in 8.2s (2404 modules)\n","stream":"stdout","time":"2025-05-15T07:45:44.637604202Z"}
 {"log":" GET /schedule 200 in 6720ms\n","stream":"stdout","time":"2025-05-15T07:45:45.829995245Z"}
 {"log":" ✓ Compiled in 1589ms (1146 modules)\n","stream":"stdout","time":"2025-05-15T07:45:46.23902882Z"}
+{"log":" ○ Compiling / ...\n","stream":"stdout","time":"2025-05-15T07:52:10.521303194Z"}
+{"log":" ✓ Compiled / in 6.4s (2397 modules)\n","stream":"stdout","time":"2025-05-15T07:52:16.078941088Z"}
+{"log":" GET / 200 in 7052ms\n","stream":"stdout","time":"2025-05-15T07:52:16.681846099Z"}
+{"log":" GET / 200 in 68ms\n","stream":"stdout","time":"2025-05-15T07:52:42.460596958Z"}
+{"log":" GET / 200 in 181ms\n","stream":"stdout","time":"2025-05-15T07:55:12.561237453Z"}
+{"log":" ○ Compiling /group ...\n","stream":"stdout","time":"2025-05-15T07:55:20.600693345Z"}
+{"log":" ✓ Compiled /group in 65.5s (2444 modules)\n","stream":"stdout","time":"2025-05-15T07:56:24.403092604Z"}
+{"log":" GET /group 200 in 69506ms\n","stream":"stdout","time":"2025-05-15T07:56:28.378237634Z"}
+{"log":" ✓ Compiled in 3.6s (1169 modules)\n","stream":"stdout","time":"2025-05-15T07:56:29.110122415Z"}
+{"log":" GET /schedule 200 in 435ms\n","stream":"stdout","time":"2025-05-15T07:56:57.502323628Z"}
+{"log":" ○ Compiling /schedule/add ...\n","stream":"stdout","time":"2025-05-15T07:57:11.127646908Z"}
+{"log":" ✓ Compiled /schedule/add in 34s (4154 modules)\n","stream":"stdout","time":"2025-05-15T07:57:43.930788677Z"}
+{"log":" GET /schedule/add?date=2025-05-15 200 in 35439ms\n","stream":"stdout","time":"2025-05-15T07:57:45.290488277Z"}
+{"log":" ✓ Compiled in 1495ms (2024 modules)\n","stream":"stdout","time":"2025-05-15T07:57:45.842962113Z"}
+{"log":" ✓ Compiled in 703ms (2024 modules)\n","stream":"stdout","time":"2025-05-15T07:57:46.922863154Z"}
+{"log":"\n","stream":"stdout","time":"2025-05-15T07:58:20.161988563Z"}
+{"log":"\u003e smap-frontend@0.1.0 dev\n","stream":"stdout","time":"2025-05-15T07:58:20.163609682Z"}
+{"log":"\u003e next dev\n","stream":"stdout","time":"2025-05-15T07:58:20.163621397Z"}
+{"log":"\n","stream":"stdout","time":"2025-05-15T07:58:20.163626497Z"}
+{"log":"   ▲ Next.js 15.3.2\n","stream":"stdout","time":"2025-05-15T07:58:23.682284341Z"}
+{"log":"   - Local:        http://localhost:3000\n","stream":"stdout","time":"2025-05-15T07:58:23.685326447Z"}
+{"log":"   - Network:      http://172.27.0.3:3000\n","stream":"stdout","time":"2025-05-15T07:58:23.685357341Z"}
+{"log":"   - Environments: .env.local\n","stream":"stdout","time":"2025-05-15T07:58:23.68536318Z"}
+{"log":"\n","stream":"stdout","time":"2025-05-15T07:58:23.685383316Z"}
+{"log":" ✓ Starting...\n","stream":"stdout","time":"2025-05-15T07:58:23.685388671Z"}
+{"log":" ✓ Ready in 5.1s\n","stream":"stdout","time":"2025-05-15T07:58:28.235524815Z"}
+{"log":" ○ Compiling /location ...\n","stream":"stdout","time":"2025-05-15T07:58:28.934004758Z"}
+{"log":" ✓ Compiled /location in 24.8s (1559 modules)\n","stream":"stdout","time":"2025-05-15T07:58:53.178309745Z"}
+{"log":" GET /location 200 in 24613ms\n","stream":"stdout","time":"2025-05-15T07:58:54.226098275Z"}
+{"log":" GET /location 200 in 25962ms\n","stream":"stdout","time":"2025-05-15T07:58:54.228843949Z"}
+{"log":" GET /location 200 in 1415ms\n","stream":"stdout","time":"2025-05-15T07:58:54.999780695Z"}
+{"log":" ✓ Compiled in 896ms (727 modules)\n","stream":"stdout","time":"2025-05-15T07:58:55.037309468Z"}
+{"log":" ○ Compiling /logs ...\n","stream":"stdout","time":"2025-05-15T07:59:05.707807905Z"}
+{"log":" ✓ Compiled /logs in 8.2s (2662 modules)\n","stream":"stdout","time":"2025-05-15T07:59:13.331033971Z"}
+{"log":" GET /logs 200 in 8491ms\n","stream":"stdout","time":"2025-05-15T07:59:13.65169259Z"}
+{"log":" ○ Compiling /home ...\n","stream":"stdout","time":"2025-05-15T07:59:20.561424261Z"}
+{"log":" ✓ Compiled /home in 2.5s (2683 modules)\n","stream":"stdout","time":"2025-05-15T07:59:22.517878886Z"}
+{"log":" GET /home 200 in 2684ms\n","stream":"stdout","time":"2025-05-15T07:59:22.683749025Z"}
+{"log":" GET /home 200 in 386ms\n","stream":"stdout","time":"2025-05-15T08:13:01.036607861Z"}
+{"log":" ⚠ Cross origin request detected from 118.67.130.71 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure \"allowedDevOrigins\" in next.config to allow this.\n","stream":"stderr","time":"2025-05-15T08:13:01.835611976Z"}
+{"log":"Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins\n","stream":"stderr","time":"2025-05-15T08:13:01.83565414Z"}
+{"log":" ○ Compiling /group ...\n","stream":"stdout","time":"2025-05-15T08:13:06.817246022Z"}
+{"log":" ✓ Compiled /group in 24.9s (2686 modules)\n","stream":"stdout","time":"2025-05-15T08:13:31.231155378Z"}
+{"log":" GET /group 200 in 887ms\n","stream":"stdout","time":"2025-05-15T08:13:31.921874565Z"}
+{"log":" GET /group 200 in 25626ms\n","stream":"stdout","time":"2025-05-15T08:13:31.923943889Z"}
+{"log":" ✓ Compiled in 372ms (1300 modules)\n","stream":"stdout","time":"2025-05-15T08:13:32.270995258Z"}
+{"log":" ○ Compiling /schedule ...\n","stream":"stdout","time":"2025-05-15T08:13:55.410242659Z"}
+{"log":" ✓ Compiled /schedule in 8.2s (3597 modules)\n","stream":"stdout","time":"2025-05-15T08:14:03.088352406Z"}
+{"log":" GET /schedule 200 in 9278ms\n","stream":"stdout","time":"2025-05-15T08:14:04.145790526Z"}
+{"log":" ✓ Compiled in 683ms (1753 modules)\n","stream":"stdout","time":"2025-05-15T08:14:04.365075257Z"}
+{"log":" ○ Compiling /location ...\n","stream":"stdout","time":"2025-05-15T08:14:12.743437314Z"}
+{"log":" ✓ Compiled /location in 3.6s (1858 modules)\n","stream":"stdout","time":"2025-05-15T08:14:15.859244129Z"}
+{"log":" GET /location 200 in 3761ms\n","stream":"stdout","time":"2025-05-15T08:14:15.998849932Z"}
+{"log":" ○ Compiling /logs ...\n","stream":"stdout","time":"2025-05-15T08:14:26.900755082Z"}
+{"log":" ✓ Compiled /logs in 3.1s (1870 modules)\n","stream":"stdout","time":"2025-05-15T08:14:29.513473292Z"}
+{"log":" GET /logs 200 in 3225ms\n","stream":"stdout","time":"2025-05-15T08:14:29.612736946Z"}
+{"log":" GET /home 200 in 35ms\n","stream":"stdout","time":"2025-05-15T08:14:48.392559316Z"}
+{"log":" ○ Compiling /notice ...\n","stream":"stdout","time":"2025-05-15T08:14:56.025409247Z"}
+{"log":" ✓ Compiled /notice in 14s (3666 modules)\n","stream":"stdout","time":"2025-05-15T08:15:09.488699891Z"}
+{"log":" GET /notice 200 in 15468ms\n","stream":"stdout","time":"2025-05-15T08:15:10.982921606Z"}
+{"log":" ✓ Compiled in 505ms (1773 modules)\n","stream":"stdout","time":"2025-05-15T08:15:11.462890537Z"}
+{"log":" GET /group 200 in 131ms\n","stream":"stdout","time":"2025-05-15T09:21:00.956442969Z"}
+{"log":" GET /home 200 in 104ms\n","stream":"stdout","time":"2025-05-15T09:21:12.982588779Z"}
+{"log":"\n","stream":"stdout","time":"2025-05-15T09:36:13.871978573Z"}
+{"log":"\u003e smap-frontend@0.1.0 dev\n","stream":"stdout","time":"2025-05-15T09:36:13.872951397Z"}
+{"log":"\u003e next dev\n","stream":"stdout","time":"2025-05-15T09:36:13.872962338Z"}
+{"log":"\n","stream":"stdout","time":"2025-05-15T09:36:13.87296794Z"}
+{"log":"   ▲ Next.js 15.3.2\n","stream":"stdout","time":"2025-05-15T09:36:17.322013967Z"}
+{"log":"   - Local:        http://localhost:3000\n","stream":"stdout","time":"2025-05-15T09:36:17.322555166Z"}
+{"log":"   - Network:      http://172.27.0.3:3000\n","stream":"stdout","time":"2025-05-15T09:36:17.322995951Z"}
+{"log":"   - Environments: .env.local\n","stream":"stdout","time":"2025-05-15T09:36:17.323154295Z"}
+{"log":"\n","stream":"stdout","time":"2025-05-15T09:36:17.323464077Z"}
+{"log":" ✓ Starting...\n","stream":"stdout","time":"2025-05-15T09:36:17.323870802Z"}
+{"log":" ✓ Ready in 4.5s\n","stream":"stdout","time":"2025-05-15T09:36:21.332553592Z"}
+{"log":" ○ Compiling /home ...\n","stream":"stdout","time":"2025-05-15T10:02:10.827321286Z"}
+{"log":" ✓ Compiled /home in 68.5s (2665 modules)\n","stream":"stdout","time":"2025-05-15T10:03:18.82172607Z"}
+{"log":" GET /signin 200 in 71331ms\n","stream":"stdout","time":"2025-05-15T10:03:21.488642989Z"}
+{"log":" GET /home 200 in 71481ms\n","stream":"stdout","time":"2025-05-15T10:03:21.617058724Z"}
+{"log":" ✓ Compiled in 1351ms (1275 modules)\n","stream":"stdout","time":"2025-05-15T10:03:22.182138723Z"}
+{"log":" ⚠ Cross origin request detected from 118.67.130.71 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure \"allowedDevOrigins\" in next.config to allow this.\n","stream":"stderr","time":"2025-05-15T10:03:24.000954571Z"}
+{"log":"Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins\n","stream":"stderr","time":"2025-05-15T10:03:24.001001855Z"}
+{"log":" ✓ Compiled in 2.5s (1289 modules)\n","stream":"stdout","time":"2025-05-15T10:09:19.671597668Z"}
+{"log":" GET /signin 200 in 96ms\n","stream":"stdout","time":"2025-05-15T10:09:19.917627677Z"}
+{"log":" GET /home 200 in 109ms\n","stream":"stdout","time":"2025-05-15T10:09:19.936934115Z"}
+{"log":" ✓ Compiled in 963ms (1289 modules)\n","stream":"stdout","time":"2025-05-15T10:09:58.229879147Z"}
+{"log":" GET /signin 200 in 24ms\n","stream":"stdout","time":"2025-05-15T10:09:58.327003726Z"}
+{"log":" GET /home 200 in 29ms\n","stream":"stdout","time":"2025-05-15T10:09:58.371078473Z"}
+{"log":" ✓ Compiled in 868ms (1289 modules)\n","stream":"stdout","time":"2025-05-15T10:10:18.224115947Z"}
+{"log":" GET /signin 200 in 49ms\n","stream":"stdout","time":"2025-05-15T10:10:18.296877942Z"}
+{"log":" GET /home 200 in 51ms\n","stream":"stdout","time":"2025-05-15T10:10:18.297897842Z"}
+{"log":" ✓ Compiled in 803ms (1289 modules)\n","stream":"stdout","time":"2025-05-15T10:10:28.18649032Z"}
+{"log":" GET /signin 200 in 59ms\n","stream":"stdout","time":"2025-05-15T10:10:28.302886847Z"}
+{"log":" GET /home 200 in 61ms\n","stream":"stdout","time":"2025-05-15T10:10:28.303866829Z"}
+{"log":" ✓ Compiled in 1064ms (1289 modules)\n","stream":"stdout","time":"2025-05-15T10:11:23.554487975Z"}
+{"log":" GET /signin 200 in 66ms\n","stream":"stdout","time":"2025-05-15T10:11:23.63823446Z"}
+{"log":" GET /home 200 in 71ms\n","stream":"stdout","time":"2025-05-15T10:11:23.645814224Z"}
+{"log":" ○ Compiling /schedule ...\n","stream":"stdout","time":"2025-05-15T10:11:24.431274169Z"}
+{"log":" ✓ Compiled /schedule in 13.2s (3562 modules)\n","stream":"stdout","time":"2025-05-15T10:11:37.138944405Z"}
+{"log":" GET /schedule 200 in 14493ms\n","stream":"stdout","time":"2025-05-15T10:11:38.38761937Z"}
+{"log":" ✓ Compiled in 747ms (1728 modules)\n","stream":"stdout","time":"2025-05-15T10:11:38.63815553Z"}
+{"log":" GET /schedule 200 in 303ms\n","stream":"stdout","time":"2025-05-15T10:11:38.652427934Z"}
+{"log":" ✓ Compiled in 31.3s (3576 modules)\n","stream":"stdout","time":"2025-05-15T10:13:28.522121364Z"}
+{"log":" GET /signin 200 in 354ms\n","stream":"stdout","time":"2025-05-15T10:13:28.931708395Z"}
+{"log":" ⚠ The \"images.domains\" configuration is deprecated. Please use \"images.remotePatterns\" configuration instead.\n","stream":"stderr","time":"2025-05-15T10:13:28.972550506Z"}
+{"log":" GET /schedule 200 in 743ms\n","stream":"stdout","time":"2025-05-15T10:13:29.321975734Z"}
+{"log":" ✓ Compiled in 3.2s (3576 modules)\n","stream":"stdout","time":"2025-05-15T10:13:35.059603391Z"}
+{"log":" GET /signin 200 in 4231ms\n","stream":"stdout","time":"2025-05-15T10:13:39.352130651Z"}
+{"log":" GET /schedule 200 in 4245ms\n","stream":"stdout","time":"2025-05-15T10:13:39.366870549Z"}
+{"log":" ✓ Compiled in 4.9s (3576 modules)\n","stream":"stdout","time":"2025-05-15T10:13:43.211660615Z"}
+{"log":" GET /signin 200 in 333ms\n","stream":"stdout","time":"2025-05-15T10:13:43.602828861Z"}
+{"log":" GET /schedule 200 in 71ms\n","stream":"stdout","time":"2025-05-15T10:13:43.865309169Z"}
+{"log":" ✓ Compiled in 957ms (1742 modules)\n","stream":"stdout","time":"2025-05-15T10:13:52.279861291Z"}
+{"log":" GET /signin 200 in 50ms\n","stream":"stdout","time":"2025-05-15T10:13:53.174837124Z"}
+{"log":" GET /schedule 200 in 52ms\n","stream":"stdout","time":"2025-05-15T10:13:53.175978856Z"}
+{"log":" ✓ Compiled in 4.8s (1742 modules)\n","stream":"stdout","time":"2025-05-15T10:14:12.445414529Z"}
+{"log":" GET /signin 200 in 166ms\n","stream":"stdout","time":"2025-05-15T10:14:12.641964241Z"}
+{"log":" GET /schedule 200 in 183ms\n","stream":"stdout","time":"2025-05-15T10:14:12.659041413Z"}
+{"log":" ✓ Compiled in 23.9s (3576 modules)\n","stream":"stdout","time":"2025-05-15T10:14:42.382836525Z"}
+{"log":" GET /signin 200 in 307ms\n","stream":"stdout","time":"2025-05-15T10:14:43.650099782Z"}
+{"log":" GET /schedule 200 in 474ms\n","stream":"stdout","time":"2025-05-15T10:14:43.65227704Z"}
+{"log":" ✓ Compiled in 937ms (1728 modules)\n","stream":"stdout","time":"2025-05-15T10:14:43.838318776Z"}
+{"log":" ✓ Compiled in 694ms (1742 modules)\n","stream":"stdout","time":"2025-05-15T10:14:44.868054202Z"}
+{"log":" GET /signin 200 in 55ms\n","stream":"stdout","time":"2025-05-15T10:14:44.940120912Z"}
+{"log":" GET /schedule 200 in 58ms\n","stream":"stdout","time":"2025-05-15T10:14:44.944310391Z"}
+{"log":" ✓ Compiled in 635ms (1834 modules)\n","stream":"stdout","time":"2025-05-15T10:14:51.905400389Z"}
+{"log":" ○ Compiling /location ...\n","stream":"stdout","time":"2025-05-15T10:14:59.359451734Z"}
+{"log":" ✓ Compiled /location in 13s (3604 modules)\n","stream":"stdout","time":"2025-05-15T10:15:07.54029243Z"}
+{"log":" GET /location 200 in 10883ms\n","stream":"stdout","time":"2025-05-15T10:15:09.67865871Z"}
+{"log":" GET /signin 200 in 1855ms\n","stream":"stdout","time":"2025-05-15T10:15:09.748182825Z"}
+{"log":" ✓ Compiled in 1820ms (1740 modules)\n","stream":"stdout","time":"2025-05-15T10:15:10.075110231Z"}
+{"log":" GET /location 200 in 376ms\n","stream":"stdout","time":"2025-05-15T10:15:10.092599658Z"}
+{"log":" ○ Compiling /_not-found ...\n","stream":"stdout","time":"2025-05-15T10:15:11.188771438Z"}
+{"log":" ✓ Compiled /_not-found in 702ms (3594 modules)\n","stream":"stdout","time":"2025-05-15T10:15:11.228575252Z"}
+{"log":" GET /_next/static/css/app/location/ReactToastify.css.map 404 in 989ms\n","stream":"stdout","time":"2025-05-15T10:15:11.625046486Z"}
+{"log":" GET /_next/static/chunks/app/location/react-toastify.esm.mjs.map 404 in 1102ms\n","stream":"stdout","time":"2025-05-15T10:15:11.625738299Z"}
+{"log":" GET /home 200 in 47ms\n","stream":"stdout","time":"2025-05-15T10:15:16.584451221Z"}
+{"log":" ○ Compiling /group ...\n","stream":"stdout","time":"2025-05-15T10:16:34.652620373Z"}
+{"log":" ✓ Compiled /group in 20s (3615 modules)\n","stream":"stdout","time":"2025-05-15T10:16:51.064176461Z"}
+{"log":" GET /group 200 in 19947ms\n","stream":"stdout","time":"2025-05-15T10:16:53.814449683Z"}
+{"log":" GET /signin 200 in 1561ms\n","stream":"stdout","time":"2025-05-15T10:16:53.904516971Z"}
+{"log":" ✓ Compiled in 2s (1750 modules)\n","stream":"stdout","time":"2025-05-15T10:16:54.187574351Z"}
+{"log":" GET /group 200 in 1351ms\n","stream":"stdout","time":"2025-05-15T10:16:54.20020411Z"}
+{"log":" ✓ Compiled in 336ms (1750 modules)\n","stream":"stdout","time":"2025-05-15T10:16:54.843551847Z"}
+{"log":" GET /group 200 in 41ms\n","stream":"stdout","time":"2025-05-15T10:20:22.030779164Z"}
+{"log":" GET /schedule 200 in 36ms\n","stream":"stdout","time":"2025-05-15T10:20:23.775274262Z"}
+{"log":" GET /home 200 in 65ms\n","stream":"stdout","time":"2025-05-15T10:20:25.241148278Z"}
+{"log":" GET /location 200 in 44ms\n","stream":"stdout","time":"2025-05-15T10:20:26.665235918Z"}
+{"log":" ○ Compiling /_not-found ...\n","stream":"stdout","time":"2025-05-15T10:20:27.725637078Z"}
+{"log":" ✓ Compiled /logs in 16.8s (3638 modules)\n","stream":"stdout","time":"2025-05-15T10:20:43.507766868Z"}
+{"log":" GET /logs 200 in 15746ms\n","stream":"stdout","time":"2025-05-15T10:20:43.821402865Z"}
+{"log":" ✓ Compiled in 1869ms (3638 modules)\n","stream":"stdout","time":"2025-05-15T10:20:45.380132486Z"}
+{"log":" GET /_next/static/css/app/location/ReactToastify.css.map 404 in 18995ms\n","stream":"stdout","time":"2025-05-15T10:20:45.736246279Z"}
+{"log":" ✓ Compiled in 16.7s (3633 modules)\n","stream":"stdout","time":"2025-05-15T10:31:14.76950583Z"}
+{"log":" GET /signin 200 in 484ms\n","stream":"stdout","time":"2025-05-15T10:31:15.292959825Z"}
+{"log":" ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload\n","stream":"stderr","time":"2025-05-15T10:31:15.300484627Z"}
+{"log":" GET /logs 200 in 601ms\n","stream":"stdout","time":"2025-05-15T10:31:15.411886999Z"}
+{"log":" ✓ Compiled in 909ms (1757 modules)\n","stream":"stdout","time":"2025-05-15T10:31:16.111768212Z"}
+{"log":" GET /logs 200 in 818ms\n","stream":"stdout","time":"2025-05-15T10:31:16.123445279Z"}
+{"log":" GET /logs 200 in 175ms\n","stream":"stdout","time":"2025-05-15T10:31:59.33167849Z"}
+{"log":" GET /location 200 in 148ms\n","stream":"stdout","time":"2025-05-15T10:32:11.261948575Z"}
+{"log":" ○ Compiling /_not-found ...\n","stream":"stdout","time":"2025-05-15T10:32:13.582438315Z"}
+{"log":" ✓ Compiled /_not-found in 2.3s (3623 modules)\n","stream":"stdout","time":"2025-05-15T10:32:15.323609792Z"}
+{"log":" GET /_next/static/css/app/location/ReactToastify.css.map 404 in 2653ms\n","stream":"stdout","time":"2025-05-15T10:32:15.804175414Z"}
+{"log":" GET /_next/static/chunks/app/location/react-toastify.esm.mjs.map 404 in 2767ms\n","stream":"stdout","time":"2025-05-15T10:32:15.804202887Z"}
+{"log":" GET /logs 200 in 64ms\n","stream":"stdout","time":"2025-05-15T10:32:17.758891197Z"}
+{"log":" ✓ Compiled in 4s (3637 modules)\n","stream":"stdout","time":"2025-05-15T10:32:50.400199381Z"}
+{"log":" GET /signin 200 in 134ms\n","stream":"stdout","time":"2025-05-15T10:32:50.562480829Z"}
+{"log":" GET /logs 200 in 164ms\n","stream":"stdout","time":"2025-05-15T10:32:50.606451325Z"}
+{"log":" ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload\n","stream":"stderr","time":"2025-05-15T10:32:50.624867192Z"}
+{"log":" GET /logs 200 in 321ms\n","stream":"stdout","time":"2025-05-15T10:32:50.950657313Z"}
+{"log":" GET /logs 200 in 93ms\n","stream":"stdout","time":"2025-05-15T10:33:05.852622566Z"}
+{"log":" ✓ Compiled in 6s (3633 modules)\n","stream":"stdout","time":"2025-05-15T10:34:21.099733385Z"}
+{"log":" GET /signin 200 in 216ms\n","stream":"stdout","time":"2025-05-15T10:34:21.376414625Z"}
+{"log":" GET /logs 200 in 222ms\n","stream":"stdout","time":"2025-05-15T10:34:21.384538544Z"}
+{"log":" ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload\n","stream":"stderr","time":"2025-05-15T10:34:21.404371982Z"}
+{"log":" GET /logs 200 in 452ms\n","stream":"stdout","time":"2025-05-15T10:34:21.859814813Z"}
+{"log":" ✓ Compiled in 400ms (1757 modules)\n","stream":"stdout","time":"2025-05-15T10:34:22.154415715Z"}
+{"log":" ✓ Compiled in 1979ms (3633 modules)\n","stream":"stdout","time":"2025-05-15T10:34:42.959081055Z"}
+{"log":" GET /signin 200 in 151ms\n","stream":"stdout","time":"2025-05-15T10:34:43.129153353Z"}
+{"log":" GET /logs 200 in 981ms\n","stream":"stdout","time":"2025-05-15T10:34:43.961813941Z"}
+{"log":" ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload\n","stream":"stderr","time":"2025-05-15T10:34:43.988181621Z"}
+{"log":" GET /logs 200 in 262ms\n","stream":"stdout","time":"2025-05-15T10:34:44.255112095Z"}
+{"log":" GET /location 200 in 66ms\n","stream":"stdout","time":"2025-05-15T10:34:48.008722861Z"}
+{"log":" ○ Compiling /_not-found ...\n","stream":"stdout","time":"2025-05-15T10:34:49.67893223Z"}
+{"log":" ✓ Compiled /_not-found in 2.2s (3623 modules)\n","stream":"stdout","time":"2025-05-15T10:34:51.010949395Z"}
+{"log":" GET /_next/static/css/app/location/ReactToastify.css.map 404 in 1125ms\n","stream":"stdout","time":"2025-05-15T10:34:51.311122252Z"}
+{"log":" GET /_next/static/chunks/app/location/react-toastify.esm.mjs.map 404 in 2535ms\n","stream":"stdout","time":"2025-05-15T10:34:51.312022938Z"}
+{"log":" GET /logs 200 in 2606ms\n","stream":"stdout","time":"2025-05-15T10:34:54.449253436Z"}
+{"log":" GET /location 200 in 35ms\n","stream":"stdout","time":"2025-05-15T10:35:00.286373487Z"}
+{"log":" GET /_next/static/css/app/location/ReactToastify.css.map 404 in 41ms\n","stream":"stdout","time":"2025-05-15T10:35:00.483711103Z"}
+{"log":" GET /logs 200 in 19ms\n","stream":"stdout","time":"2025-05-15T10:35:03.603210509Z"}
+{"log":" ✓ Compiled in 11.2s (3633 modules)\n","stream":"stdout","time":"2025-05-15T10:36:21.996540576Z"}
+{"log":" GET /signin 200 in 214ms\n","stream":"stdout","time":"2025-05-15T10:36:22.873832373Z"}
+{"log":" ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload\n","stream":"stderr","time":"2025-05-15T10:36:22.883349137Z"}
+{"log":" GET /logs 200 in 230ms\n","stream":"stdout","time":"2025-05-15T10:36:22.891040883Z"}
+{"log":" GET /logs 200 in 343ms\n","stream":"stdout","time":"2025-05-15T10:36:23.227825929Z"}
+{"log":" ✓ Compiled in 6.7s (3633 modules)\n","stream":"stdout","time":"2025-05-15T10:36:35.737459582Z"}
+{"log":" GET /signin 200 in 176ms\n","stream":"stdout","time":"2025-05-15T10:36:35.928900732Z"}
+{"log":" GET /logs 200 in 180ms\n","stream":"stdout","time":"2025-05-15T10:36:35.933864661Z"}
+{"log":" ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload\n","stream":"stderr","time":"2025-05-15T10:36:35.978321147Z"}
+{"log":" GET /logs 200 in 355ms\n","stream":"stdout","time":"2025-05-15T10:36:36.338358266Z"}
+{"log":" ✓ Compiled in 396ms (1757 modules)\n","stream":"stdout","time":"2025-05-15T10:36:36.646012462Z"}
+{"log":" GET /location 200 in 48ms\n","stream":"stdout","time":"2025-05-15T10:36:39.964891507Z"}
+{"log":" ○ Compiling /_not-found ...\n","stream":"stdout","time":"2025-05-15T10:36:41.917789685Z"}
+{"log":" ✓ Compiled /_not-found in 810ms (3623 modules)\n","stream":"stdout","time":"2025-05-15T10:36:42.198607106Z"}
+{"log":" GET /_next/static/css/app/location/ReactToastify.css.map 404 in 921ms\n","stream":"stdout","time":"2025-05-15T10:36:42.406655938Z"}
+{"log":" GET /_next/static/chunks/app/location/react-toastify.esm.mjs.map 404 in 1024ms\n","stream":"stdout","time":"2025-05-15T10:36:42.409478644Z"}
+{"log":" GET /logs 200 in 106ms\n","stream":"stdout","time":"2025-05-15T10:36:45.627715045Z"}
