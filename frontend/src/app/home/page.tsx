@@ -8,6 +8,7 @@ import { format, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { PageContainer, Card, Button } from '../components/layout';
 import { Loader } from '@googlemaps/js-api-loader';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 // 공통 설정 및 서비스 임포트
 import config, { API_KEYS, detectLanguage, MAP_CONFIG } from '../../config';
 import mapService, { 
@@ -142,11 +143,11 @@ const modalAnimation = `
 }
 
 .animate-slideUp {
-  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: slideUp 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: fadeIn 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 /* 지도 화면 전체 차지하기 위한 스타일 */
@@ -210,17 +211,17 @@ const modalAnimation = `
 
 .bottom-sheet-collapsed {
   transform: translateY(calc(100% - 100px));
-  height: 100vh;
+  min-height: 100vh;
 }
 
 .bottom-sheet-middle {
   transform: translateY(65%);
-  height: 100vh;
+  min-height: 100vh;
 }
 
 .bottom-sheet-expanded {
   transform: translateY(0%);
-  height: 100vh;
+  min-height: 100vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -374,6 +375,8 @@ const modalAnimation = `
   display: none; /* Chrome, Safari, Opera */
 }
 `;
+
+export const dynamic = 'force-dynamic';
 
 export default function HomePage() {
   const router = useRouter();
@@ -1123,14 +1126,12 @@ export default function HomePage() {
   return (
     <>
       <style jsx global>{modalAnimation}</style>
-      <PageContainer title="홈" showTitle={false} showBackButton={false} showHeader={false} className="p-0 m-0 w-full h-screen">
+      <PageContainer title="홈" showTitle={false} showBackButton={false} showHeader={false} className="p-0 m-0 w-full h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
         {/* 지도 영역 (화면 100% 차지, fixed 포지션으로 고정) */}
         <div className="full-map-container">
           {/* 지도 컨테이너 */}
           {isMapLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
-            </div>
+            <LoadingSpinner message="지도를 불러오는 중입니다..." />
           )}
           <div 
             ref={googleMapContainer} 
@@ -1188,7 +1189,7 @@ export default function HomePage() {
           <div className="bottom-sheet-handle"></div>
           <div className="px-4 pb-8" onClick={(e) => e.stopPropagation()}>
             {/* 그룹 멤버 (최상단으로 이동) */}
-            <div className="content-section members-section min-h-[180px] max-h-[180px] overflow-y-auto">
+            <div className="content-section members-section min-h-[180px] max-h-[180px] overflow-y-auto mb-3 sm:mb-0">
               <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
                 그룹 멤버
                 <Link 

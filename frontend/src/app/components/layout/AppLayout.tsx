@@ -14,7 +14,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const memberName = searchParams.get('memberName');
+  const memberName = searchParams?.get('memberName');
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
@@ -34,15 +34,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
   
   // 특정 페이지 확인 (그룹, 일정, 내장소, 로그)
   const simplifiedHeaderPages = ['/group', '/schedule', '/location', '/logs'];
-  const isSimplifiedHeader = simplifiedHeaderPages.some(path => pathname.startsWith(path));
+  const isSimplifiedHeader = simplifiedHeaderPages.some(path => pathname?.startsWith(path) ?? false);
   
   // 현재 페이지가 홈 페이지인지 확인
-  const isHomePage = pathname.startsWith('/home');
+  const isHomePage = pathname?.startsWith('/home') ?? false;
   
   // 현재 페이지의 타이틀 가져오기
-  let currentPageTitle = navItems.find(item => pathname.startsWith(item.path))?.name || '홈';
-  if (pathname === '/schedule/add') {
-    currentPageTitle = memberName ? `${memberName}의 일정 입력` : '새 일정 입력';
+  let currentPageTitle = '홈'; // 기본값 \'홈\'으로 초기화
+  if (pathname) { // pathname이 null이 아닐 경우에만 아래 로직 수행
+    currentPageTitle = navItems.find(item => pathname.startsWith(item.path))?.name || currentPageTitle;
+    if (pathname === '/schedule/add') {
+      currentPageTitle = memberName ? `${memberName}의 일정 입력` : '새 일정 입력';
+    }
   }
   
   // main 태그의 상단 마진 클래스를 원래대로 복원 (헤더가 항상 있으므로)
@@ -88,10 +91,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <img 
                   src="/images/smap_logo.webp" 
                   alt="SMAP 로고" 
-                  className="h-5"
+                  className="h-10"
                 />
+                <span className="ml-1 text-lg font-normal text-gray-900">SMAP</span>
               </Link>
-              
               {/* 아이콘 모음 */}
               <div className="flex items-center space-x-2">
                 {/* 알림 메시지 아이콘 */}
@@ -99,7 +102,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   href="/notice"
                   className="p-1.5 rounded-full text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
                 </Link>
@@ -109,7 +112,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   href="/setting"
                   className="p-1.5 rounded-full text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
@@ -124,7 +127,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <img 
                   src="/images/smap_logo.webp" 
                   alt="SMAP 로고" 
-                  className="h-5"
+                  className="h-10"
                 />
               </Link>
               
@@ -140,7 +143,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     key={item.path}
                     href={item.path}
                     className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors duration-300 ${
-                      pathname.startsWith(item.path)
+                      (pathname && pathname.startsWith(item.path)) // pathname 존재 여부 확인
                         ? 'text-indigo-600 border-b-2 border-indigo-600'
                         : 'text-gray-700 hover:text-indigo-500'
                     }`}
@@ -214,7 +217,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     <img 
                       src="/images/smap_logo.webp" 
                       alt="SMAP 로고" 
-                      className="h-4"
+                      className="h-10"
                     />
                   </div>
                   <button
@@ -235,7 +238,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       <Link
                         href={item.path}
                         className={`block px-3 py-2 rounded-md ${
-                          pathname.startsWith(item.path)
+                          (pathname && pathname.startsWith(item.path)) // pathname 존재 여부 확인
                             ? 'bg-indigo-50 text-indigo-600'
                             : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-500'
                         }`}

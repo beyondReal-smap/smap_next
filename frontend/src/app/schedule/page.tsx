@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+export const dynamic = 'force-dynamic';
+
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ko';
@@ -344,264 +346,270 @@ export default function SchedulePage() {
   const handleEventItemClick = (event: ScheduleEvent) => { setSelectedEventDetails(event); setIsModalOpen(true); };
 
   return (
-    <PageContainer title="일정 관리" description="일정을 생성하고 관리하세요" showHeader={false} showBackButton={false} className="bg-gray-50 pb-2">
-      {/* Calendar Card - 오른쪽 보더 굵기 수정 */}
-      <Card className="w-full max-w-4xl mx-auto flex flex-col items-center justify-center font-['Line_Seed'] mb-6 border-r-4 border-black">
-        <div className="w-full p-2">
-          <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
-            <DateCalendar 
-              value={selectedDay} 
-              onChange={handleDayClick}
-              slots={{ 
-                // day 슬롯 수정: hasEvent prop 전달
-                day: (props) => {
-                  const dayStr = props.day.format('YYYY-MM-DD');
-                  const hasEvent = eventDays.has(dayStr);
-                  return <CustomDay {...props} hasEvent={hasEvent} />;
-                },
-                calendarHeader: (headerProps) => <CustomCalendarHeader {...headerProps} onGoToToday={handleGoToToday} /> 
-              }}
-              sx={{
-                '& .MuiDayCalendar-weekDayLabel': { fontSize: '0.9rem', textTransform: 'none', margin: '0 0.5rem' },
-                '& .MuiDayCalendar-monthContainer': { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
-                '& .MuiDayCalendar-weekContainer': { display: 'flex', gap: '0.4rem' },
-              }}
-            />
-          </LocalizationProvider>
-        </div>
-      </Card>
-
-      {/* Selected Day Events Card - 오른쪽 보더로 변경 */}
-      {selectedDay && (
-        <Card 
-          className="w-full max-w-6xl mx-auto font-['Line_Seed'] mt-6 border-r-4 border-yellow-500"
-          title={
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <Typography variant="h6" component="span" sx={{ fontWeight: 'normal', color: 'black' }}>
-                {selectedDay.format('M월 D일')} 일정
-              </Typography>
-              <Chip label={`${eventsForSelectedDay.length}개 일정`} size="small" color="primary" variant="outlined" />
-            </Box>
-          }
-        >
-          <div className="p-2 pt-2">
-            {eventsForSelectedDay.length > 0 ? (
-              <List sx={{paddingTop: 0}}>
-                {eventsForSelectedDay.map((event) => {
-                  const status = getEventStatus(event);
-                  const borderColor = statusColorMap[status.color] || statusColorMap.default;
-                  const bgColor = statusBgColorMap[status.color] || statusBgColorMap.default;
-                  return (
-                    <ListItemButton 
-                      key={event.id} 
-                      onClick={() => handleEventItemClick(event)}
-                      sx={{
-                        mb: 1.5, p: 2, 
-                        border: '1px solid #eee',
-                        borderRadius: '16px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                        alignItems: 'flex-start', 
-                        backgroundColor: bgColor,
-                        transition: 'box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out, background-color 0.2s ease-in-out',
-                        '&:hover': { 
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.08)', 
-                        }
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', width: '100%', gap: 0 }}>
-                        <Box sx={{ 
-                          mr: 2,
-                          pr: 2,
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          alignItems: 'center', 
-                          flexShrink: 0, 
-                          minWidth: '75px',
-                          borderRight: '1px solid #e0e0e0'
-                        }}>
-                          <Typography variant="subtitle1" component="div" sx={{ fontWeight: 'bold', color: '#374151' }}>
-                            {event.startTime}
-                          </Typography>
-                          {event.endTime && (
-                            <Typography variant="caption" component="div" color="text.secondary" sx={{lineHeight: 1.2}}>
-                              {`~ ${event.endTime}`}
-                            </Typography>
-                          )}
-                          <Chip label={status.text} color={status.color} size="small" sx={{ mt: 0.75, fontWeight: 500 }} />
-                        </Box>
-                        <Box sx={{ 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          flexGrow: 1, 
-                          pl: 2
-                        }}>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3, mb: 0.5, color: '#111827' }}>
-                            {event.title}
-                          </Typography>
-                          {(event.groupName || event.memberName || event.content) && (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}>
-                              {event.groupName && (
-                                <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                                  {event.groupName}
-                                </Typography>
-                              )}
-                              {event.memberName && (
-                                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                  <Avatar src={event.memberPhoto} sx={{ width: 20, height: 20, mr: 1, fontSize: '0.7rem', bgcolor: '#e0e0e0' }}>
-                                    {!event.memberPhoto && event.memberName.substring(0,1)}
-                                  </Avatar>
-                                  <Typography variant="body2" color="text.secondary">
-                                    {event.memberName}
-                                  </Typography>
-                                </Box>
-                              )}
-                            </Box>
-                          )}
-                        </Box>
-                      </Box>
-                    </ListItemButton>
-                  );
-                })}
-              </List>
-            ) : (
-              <Paper elevation={0} sx={{ textAlign: 'center', py: 4, backgroundColor: 'transparent', borderRadius: '8px' }}>
-                <Typography variant="subtitle1" color="text.secondary">선택된 날짜에 일정이 없습니다.</Typography>
-              </Paper>
-            )}
-          </div>
-           <div className="p-4 border-t border-gray-200 text-right">
-            <Button 
-              variant="primary" 
-              onClick={() => {
-                if (selectedDay) {
-                  const dateQueryParam = selectedDay.format('YYYY-MM-DD');
-                  router.push(`/schedule/add?date=${dateQueryParam}`);
-                }
-              }}
-              disabled={!selectedDay}
-            >
-              새 일정 추가
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {/* 상세 정보 모달 (isModalOpen) */}
-      {isModalOpen ? selectedEventDetails && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <Card className="max-w-lg w-full" title={selectedEventDetails.title || '일정 상세'}>
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium text-gray-500">일시</h4>
-                <p className="mt-1">
-                  {dayjs(selectedEventDetails.date).format('YYYY년 MM월 DD일')} {selectedEventDetails.startTime}
-                  {selectedEventDetails.endTime ? ` ~ ${selectedEventDetails.endTime}` : ''}
-                </p>
-              </div>
-              {selectedEventDetails.groupName && ( 
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">그룹</h4>
-                  <Chip 
-                    label={selectedEventDetails.groupName} 
-                    size="small" 
-                    sx={{ 
-                      backgroundColor: selectedEventDetails.groupColor || 'default', 
-                      color: selectedEventDetails.groupColor ? 'black': 'inherit', 
-                      mt: 0.5 
-                    }} 
-                  />
-                </div>
-              )}
-              {selectedEventDetails.memberName && ( 
-                 <div>
-                  <h4 className="text-sm font-medium text-gray-500">담당자</h4>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                    {selectedEventDetails.memberPhoto && (
-                      <Avatar 
-                        alt={selectedEventDetails.memberName} 
-                        src={selectedEventDetails.memberPhoto} 
-                        sx={{ width: 24, height: 24, mr: 1 }} 
-                      />
-                    )}
-                    <p>{selectedEventDetails.memberName}</p>
-                  </Box>
-                </div>
-              )}
-              {selectedEventDetails.content && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">내용</h4>
-                  <p className="mt-1 whitespace-pre-wrap">{selectedEventDetails.content}</p>
-                </div>
-              )}
-            </div>
-            <div className="mt-6 flex justify-end space-x-3">
-              <Button variant="outline" onClick={() => setIsModalOpen(false)}>닫기</Button>
-              <Button variant="primary" onClick={handleOpenEditModal}>수정</Button>
-              <Button variant="danger" onClick={handleDeleteEvent}>삭제</Button>
+    <PageContainer title="일정 관리" description="일정을 생성하고 관리하세요" showHeader={false} showBackButton={false} className="h-full flex flex-col bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 flex-grow p-6 overflow-auto">
+        {/* Calendar Card - 오른쪽 보더 굵기 수정 */}
+        <div className="md:col-span-2 flex flex-col md:mb-0">
+          <Card className="w-full mx-auto flex flex-col items-center justify-center font-['Line_Seed'] border-r-4 border-blue-500">
+            <div className="w-full p-2">
+              <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
+                <DateCalendar 
+                  value={selectedDay} 
+                  onChange={handleDayClick}
+                  slots={{ 
+                    // day 슬롯 수정: hasEvent prop 전달
+                    day: (props) => {
+                      const dayStr = props.day.format('YYYY-MM-DD');
+                      const hasEvent = eventDays.has(dayStr);
+                      return <CustomDay {...props} hasEvent={hasEvent} />;
+                    },
+                    calendarHeader: (headerProps) => <CustomCalendarHeader {...headerProps} onGoToToday={handleGoToToday} /> 
+                  }}
+                  sx={{
+                    '& .MuiDayCalendar-weekDayLabel': { fontSize: '0.9rem', textTransform: 'none', margin: '0 0.5rem' },
+                    '& .MuiDayCalendar-monthContainer': { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
+                    '& .MuiDayCalendar-weekContainer': { display: 'flex', gap: '0.4rem' },
+                  }}
+                />
+              </LocalizationProvider>
             </div>
           </Card>
         </div>
-      ) : null}
 
-      {/* 추가/수정 모달 (isAddEventModalOpen) */}
-      {isAddEventModalOpen ? (
-         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <div className="flex justify-between items-start">
-              <h3 className="text-lg font-medium text-gray-900 font-suite">{newEvent.id ? '일정 수정' : '새 일정 추가'}</h3>
-              <button onClick={() => { setIsAddEventModalOpen(false); setNewEvent(initialNewEventState); setSelectedEventDetails(null); }} className="text-gray-400 hover:text-gray-500">
-                <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <form className="mt-4 space-y-4" onSubmit={(e) => { e.preventDefault(); handleSaveEvent(); }}>
-              <div>
-                <label htmlFor="event-title" className="block text-sm font-medium text-gray-700">제목</label>
-                <input type="text" id="event-title" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} required />
+        {/* Selected Day Events Card - 오른쪽 보더로 변경 */}
+        {selectedDay && (
+          <div className="md:col-span-3 flex flex-col pb-16">
+            <Card 
+              className="w-full mx-auto font-['Line_Seed'] border-r-4 border-orange-500"
+              title={
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <Typography variant="h6" component="span" sx={{ fontWeight: 'normal', color: 'black' }}>
+                    {selectedDay.format('M월 D일')} 일정
+                  </Typography>
+                  <Chip label={`${eventsForSelectedDay.length}개 일정`} size="small" color="primary" variant="outlined" />
+                </Box>
+              }
+            >
+              <div className="p-2 pt-2">
+                {eventsForSelectedDay.length > 0 ? (
+                  <List sx={{paddingTop: 0}}>
+                    {eventsForSelectedDay.map((event) => {
+                      const status = getEventStatus(event);
+                      const borderColor = statusColorMap[status.color] || statusColorMap.default;
+                      const bgColor = statusBgColorMap[status.color] || statusBgColorMap.default;
+                      return (
+                        <ListItemButton 
+                          key={event.id} 
+                          onClick={() => handleEventItemClick(event)}
+                          sx={{
+                            mb: 1.5, p: 2, 
+                            border: '1px solid #eee',
+                            borderRadius: '16px',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                            alignItems: 'flex-start', 
+                            backgroundColor: bgColor,
+                            transition: 'box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out, background-color 0.2s ease-in-out',
+                            '&:hover': { 
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.08)', 
+                            }
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', width: '100%', gap: 0 }}>
+                            <Box sx={{ 
+                              mr: 2,
+                              pr: 2,
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              alignItems: 'center', 
+                              flexShrink: 0, 
+                              minWidth: '75px',
+                              borderRight: '1px solid #e0e0e0'
+                            }}>
+                              <Typography variant="subtitle1" component="div" sx={{ fontWeight: 'bold', color: '#374151' }}>
+                                {event.startTime}
+                              </Typography>
+                              {event.endTime && (
+                                <Typography variant="caption" component="div" color="text.secondary" sx={{lineHeight: 1.2}}>
+                                  {`~ ${event.endTime}`}
+                                </Typography>
+                              )}
+                              <Chip label={status.text} color={status.color} size="small" sx={{ mt: 0.75, fontWeight: 500 }} />
+                            </Box>
+                            <Box sx={{ 
+                              display: 'flex', 
+                              flexDirection: 'column', 
+                              flexGrow: 1, 
+                              pl: 2
+                            }}>
+                              <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3, mb: 0.5, color: '#111827' }}>
+                                {event.title}
+                              </Typography>
+                              {(event.groupName || event.memberName || event.content) && (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}>
+                                  {event.groupName && (
+                                    <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                      {event.groupName}
+                                    </Typography>
+                                  )}
+                                  {event.memberName && (
+                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                      <Avatar src={event.memberPhoto} sx={{ width: 20, height: 20, mr: 1, fontSize: '0.7rem', bgcolor: '#e0e0e0' }}>
+                                        {!event.memberPhoto && event.memberName.substring(0,1)}
+                                      </Avatar>
+                                      <Typography variant="body2" color="text.secondary">
+                                        {event.memberName}
+                                      </Typography>
+                                    </Box>
+                                  )}
+                                </Box>
+                              )}
+                            </Box>
+                          </Box>
+                        </ListItemButton>
+                      );
+                    })}
+                  </List>
+                ) : (
+                  <Paper elevation={0} sx={{ textAlign: 'center', py: 4, backgroundColor: 'transparent', borderRadius: '8px' }}>
+                    <Typography variant="subtitle1" color="text.secondary">선택된 날짜에 일정이 없습니다.</Typography>
+                  </Paper>
+                )}
               </div>
-              <div>
-                <label htmlFor="event-date" className="block text-sm font-medium text-gray-700">날짜</label>
-                <input type="date" id="event-date" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} required />
+               <div className="p-4 border-t border-gray-200 text-right">
+                <Button 
+                  variant="primary" 
+                  onClick={() => {
+                    if (selectedDay) {
+                      const dateQueryParam = selectedDay.format('YYYY-MM-DD');
+                      router.push(`/schedule/add?date=${dateQueryParam}`);
+                    }
+                  }}
+                  disabled={!selectedDay}
+                >
+                  새 일정 추가
+                </Button>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+            </Card>
+          </div>
+        )}
+
+        {/* 상세 정보 모달 (isModalOpen) */}
+        {isModalOpen ? selectedEventDetails && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+            <Card className="max-w-lg w-full" title={selectedEventDetails.title || '일정 상세'}>
+              <div className="space-y-4">
                 <div>
-                  <label htmlFor="event-startTime" className="block text-sm font-medium text-gray-700">시작 시간</label>
-                  <input type="time" id="event-startTime" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.startTime} onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })} required />
+                  <h4 className="text-sm font-medium text-gray-500">일시</h4>
+                  <p className="mt-1">
+                    {dayjs(selectedEventDetails.date).format('YYYY년 MM월 DD일')} {selectedEventDetails.startTime}
+                    {selectedEventDetails.endTime ? ` ~ ${selectedEventDetails.endTime}` : ''}
+                  </p>
                 </div>
-                <div>
-                  <label htmlFor="event-endTime" className="block text-sm font-medium text-gray-700">종료 시간</label>
-                  <input type="time" id="event-endTime" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.endTime} onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })} required />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="event-content" className="block text-sm font-medium text-gray-700">내용 (선택)</label>
-                <textarea id="event-content" rows={3} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.content || ''} onChange={(e) => setNewEvent({ ...newEvent, content: e.target.value })}></textarea>
-              </div>
-              {/* Group/Member fields - 필요시 아래 주석 해제하여 사용 */}
-              <div>
-                <label htmlFor="event-groupName" className="block text-sm font-medium text-gray-700">그룹명 (선택)</label>
-                <input type="text" id="event-groupName" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.groupName || ''} onChange={(e) => setNewEvent({ ...newEvent, groupName: e.target.value })} />
-              </div>
-              <div>
-                <label htmlFor="event-groupColor" className="block text-sm font-medium text-gray-700">그룹 색상 (선택, Tailwind 클래스 예: bg-blue-200)</label>
-                <input type="text" id="event-groupColor" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.groupColor || ''} onChange={(e) => setNewEvent({ ...newEvent, groupColor: e.target.value })} />
-              </div>
-              <div>
-                <label htmlFor="event-memberName" className="block text-sm font-medium text-gray-700">담당자명 (선택)</label>
-                <input type="text" id="event-memberName" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.memberName || ''} onChange={(e) => setNewEvent({ ...newEvent, memberName: e.target.value })} />
-              </div>
-               <div>
-                <label htmlFor="event-memberPhoto" className="block text-sm font-medium text-gray-700">담당자 사진 URL (선택)</label>
-                <input type="text" id="event-memberPhoto" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.memberPhoto || ''} onChange={(e) => setNewEvent({ ...newEvent, memberPhoto: e.target.value })} />
+                {selectedEventDetails.groupName && ( 
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500">그룹</h4>
+                    <Chip 
+                      label={selectedEventDetails.groupName} 
+                      size="small" 
+                      sx={{ 
+                        backgroundColor: selectedEventDetails.groupColor || 'default', 
+                        color: selectedEventDetails.groupColor ? 'black': 'inherit', 
+                        mt: 0.5 
+                      }} 
+                    />
+                  </div>
+                )}
+                {selectedEventDetails.memberName && ( 
+                   <div>
+                    <h4 className="text-sm font-medium text-gray-500">담당자</h4>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                      {selectedEventDetails.memberPhoto && (
+                        <Avatar 
+                          alt={selectedEventDetails.memberName} 
+                          src={selectedEventDetails.memberPhoto} 
+                          sx={{ width: 24, height: 24, mr: 1 }} 
+                        />
+                      )}
+                      <p>{selectedEventDetails.memberName}</p>
+                    </Box>
+                  </div>
+                )}
+                {selectedEventDetails.content && (
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500">내용</h4>
+                    <p className="mt-1 whitespace-pre-wrap">{selectedEventDetails.content}</p>
+                  </div>
+                )}
               </div>
               <div className="mt-6 flex justify-end space-x-3">
-                <button type="button" onClick={() => { setIsAddEventModalOpen(false); setNewEvent(initialNewEventState); setSelectedEventDetails(null);}} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">취소</button>
-                <button type="submit" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" disabled={!newEvent.title || !newEvent.date || !newEvent.startTime || !newEvent.endTime}>저장</button>
+                <Button variant="outline" onClick={() => setIsModalOpen(false)}>닫기</Button>
+                <Button variant="primary" onClick={handleOpenEditModal}>수정</Button>
+                <Button variant="danger" onClick={handleDeleteEvent}>삭제</Button>
               </div>
-            </form>
+            </Card>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+
+        {/* 추가/수정 모달 (isAddEventModalOpen) */}
+        {isAddEventModalOpen ? (
+           <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-start">
+                <h3 className="text-lg font-medium text-gray-900 font-suite">{newEvent.id ? '일정 수정' : '새 일정 추가'}</h3>
+                <button onClick={() => { setIsAddEventModalOpen(false); setNewEvent(initialNewEventState); setSelectedEventDetails(null); }} className="text-gray-400 hover:text-gray-500">
+                  <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <form className="mt-4 space-y-4" onSubmit={(e) => { e.preventDefault(); handleSaveEvent(); }}>
+                <div>
+                  <label htmlFor="event-title" className="block text-sm font-medium text-gray-700">제목</label>
+                  <input type="text" id="event-title" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} required />
+                </div>
+                <div>
+                  <label htmlFor="event-date" className="block text-sm font-medium text-gray-700">날짜</label>
+                  <input type="date" id="event-date" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} required />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="event-startTime" className="block text-sm font-medium text-gray-700">시작 시간</label>
+                    <input type="time" id="event-startTime" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.startTime} onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })} required />
+                  </div>
+                  <div>
+                    <label htmlFor="event-endTime" className="block text-sm font-medium text-gray-700">종료 시간</label>
+                    <input type="time" id="event-endTime" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.endTime} onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })} required />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="event-content" className="block text-sm font-medium text-gray-700">내용 (선택)</label>
+                  <textarea id="event-content" rows={3} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.content || ''} onChange={(e) => setNewEvent({ ...newEvent, content: e.target.value })}></textarea>
+                </div>
+                {/* Group/Member fields - 필요시 아래 주석 해제하여 사용 */}
+                <div>
+                  <label htmlFor="event-groupName" className="block text-sm font-medium text-gray-700">그룹명 (선택)</label>
+                  <input type="text" id="event-groupName" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.groupName || ''} onChange={(e) => setNewEvent({ ...newEvent, groupName: e.target.value })} />
+                </div>
+                <div>
+                  <label htmlFor="event-groupColor" className="block text-sm font-medium text-gray-700">그룹 색상 (선택, Tailwind 클래스 예: bg-blue-200)</label>
+                  <input type="text" id="event-groupColor" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.groupColor || ''} onChange={(e) => setNewEvent({ ...newEvent, groupColor: e.target.value })} />
+                </div>
+                <div>
+                  <label htmlFor="event-memberName" className="block text-sm font-medium text-gray-700">담당자명 (선택)</label>
+                  <input type="text" id="event-memberName" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.memberName || ''} onChange={(e) => setNewEvent({ ...newEvent, memberName: e.target.value })} />
+                </div>
+                 <div>
+                  <label htmlFor="event-memberPhoto" className="block text-sm font-medium text-gray-700">담당자 사진 URL (선택)</label>
+                  <input type="text" id="event-memberPhoto" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.memberPhoto || ''} onChange={(e) => setNewEvent({ ...newEvent, memberPhoto: e.target.value })} />
+                </div>
+                <div className="mt-6 flex justify-end space-x-3">
+                  <button type="button" onClick={() => { setIsAddEventModalOpen(false); setNewEvent(initialNewEventState); setSelectedEventDetails(null);}} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">취소</button>
+                  <button type="submit" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" disabled={!newEvent.title || !newEvent.date || !newEvent.startTime || !newEvent.endTime}>저장</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
+      </div>
     </PageContainer>
   );
 } 

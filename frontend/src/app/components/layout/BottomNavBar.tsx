@@ -15,7 +15,7 @@ export default function BottomNavBar() {
     { name: '내장소', path: '/location', icon: 'map-pin' },
     { name: '로그', path: '/logs', icon: 'list' },
   ];
-  
+
   return (
     <div 
       className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-[9999] !important"
@@ -32,7 +32,7 @@ export default function BottomNavBar() {
     >
       <div className="grid grid-cols-5 h-16 px-2">
         {navItems.map((item) => {
-          const isActive = pathname.startsWith(item.path);
+          const isActive = pathname ? pathname.startsWith(item.path) : false;
           return (
             <Link
               key={item.path}
@@ -68,7 +68,9 @@ export default function BottomNavBar() {
                   )}
                 </svg>
               </div>
-              <span className={`text-xs mt-0.5 font-medium ${isActive ? 'font-semibold' : ''}`}>{item.name}</span>
+              <div className="flex items-center justify-center mt-0.5">
+                <span className={`text-xs font-medium ${isActive ? 'font-semibold' : ''}`}>{item.name}</span>
+              </div>
             </Link>
           );
         })}

@@ -10,6 +10,8 @@ import { FiLink, FiChevronRight } from 'react-icons/fi';
 import { MdOutlineMessage } from 'react-icons/md';
 import { FaCheckCircle } from 'react-icons/fa';
 
+export const dynamic = 'force-dynamic';
+
 // CSS 애니메이션 키프레임 스타일 (최상단에 추가)
 const modalAnimation = `
 @keyframes slideUp {
@@ -47,7 +49,7 @@ const modalAnimation = `
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.2s ease-out forwards;
+  animation: fadeIn 1s ease-out forwards;
 }
 
 /* animate-scaleIn 클래스 추가 */
@@ -167,10 +169,10 @@ function GroupPageContent() {
   };
 
   return (
-    <PageContainer title="그룹 관리" description="그룹을 생성하고 관리하여 일정과 장소를 공유하세요" showHeader={false} showBackButton={false} className="h-full flex flex-col">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 flex-grow overflow-y-auto bg-gray-50">
+    <PageContainer title="그룹 관리" description="그룹을 생성하고 관리하여 일정과 장소를 공유하세요" showHeader={false} showBackButton={false} className="h-full flex flex-col bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 flex-grow p-6 overflow-auto">
         {/* 그룹 목록 - 파란색 계열 테마, 헤더 배경 제거 */}
-        <div className="md:col-span-2 h-full flex flex-col">
+        <div className="md:col-span-2 flex flex-col md:mb-0">
           <div className="bg-white rounded-xl shadow-lg overflow-hidden flex-grow flex flex-col border-r-4 border-blue-500">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">
               <div className="flex items-center">
@@ -223,7 +225,7 @@ function GroupPageContent() {
         </div>
 
         {/* 그룹 상세 정보 - 주황색 계열 테마, 헤더 배경 제거 */}
-        <div className="md:col-span-3 h-full flex flex-col">
+        <div className="md:col-span-3 flex flex-col pb-16">
           {selectedGroup ? (
             <div className="bg-white rounded-xl shadow-lg overflow-hidden flex-grow flex flex-col border-r-4 border-orange-500">
               <div className="p-4 border-b border-gray-200 flex justify-between items-center flex-shrink-0">

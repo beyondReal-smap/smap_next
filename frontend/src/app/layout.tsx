@@ -1,9 +1,9 @@
 import './globals.css'
 import type { Metadata } from 'next'
-import { Suspense } from 'react'
-// import { Inter } from 'next/font/google' // Inter 폰트 사용 제거
+// import { Suspense } from 'react' // Suspense는 ClientLayout 내부 또는 필요시 사용
 import { lineSeed } from './fonts'; // LINE SEED 폰트 임포트
-import { BottomNavBar } from './components/layout'
+// import { BottomNavBar } from './components/layout' // 직접 사용하지 않음
+import ClientLayout from './ClientLayout'; // ClientLayout import
 import config, { APP_INFO, getLocalizedAppInfo } from '../config'
 
 // const inter = Inter({ subsets: ['latin'] }) // Inter 폰트 인스턴스 제거
@@ -42,13 +42,11 @@ export default function RootLayout({
     <html lang="ko">
       {/* lineSeed.variable을 사용하여 폰트 변수 적용 및 기본 sans 클래스 추가 */}
       <body className={`${lineSeed.variable} font-sans`}>
-        <div className="min-h-screen bg-gray-50 pb-20">
-          <main className="max-w-lg mx-auto px-4 py-6">{children}</main>
-          {/* BottomNavBar를 Suspense로 감싸기 */}
-          <Suspense fallback={<div></div>}> 
-            <BottomNavBar />
-          </Suspense>
-        </div>
+        <ClientLayout> 
+          {/* ClientLayout이 children을 받아 내부에서 main 등의 구조를 관리하도록 위임 가능 */} 
+          {/* 또는 여기서 최소한의 구조만 남기고 ClientLayout에 더 많은 책임을 부여 */} 
+          {children} 
+        </ClientLayout>
         {/* DatePicker 캘린더 포털용 div 추가 */}
         <div id="root-portal"></div>
       </body>

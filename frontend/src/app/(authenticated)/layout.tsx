@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import AppLayout from '../components/layout/AppLayout';
 
@@ -24,8 +24,10 @@ export default function AuthenticatedLayout({
   */
   
   return (
-    <AppLayout>
-      {children}
-    </AppLayout>
+    <Suspense fallback={<div>Loading...</div>}>
+      <AppLayout>
+        {children}
+      </AppLayout>
+    </Suspense>
   );
 } 

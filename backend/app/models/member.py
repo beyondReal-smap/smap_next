@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, text
+from sqlalchemy import Column, Integer, String, DateTime, Numeric, Enum
 from app.models.base import BaseModel
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -8,13 +8,21 @@ class Member(BaseModel):
     __tablename__ = "member_t"
 
     mt_idx = Column(Integer, primary_key=True)
+    mt_type = Column(Integer, nullable=True)
     mt_level = Column(Integer, nullable=True)
     mt_status = Column(Integer, nullable=True)
     mt_id = Column(String(200), unique=True, nullable=False)
+    mt_pwd = Column(String(200), nullable=True)
     mt_token_id = Column(String(255), nullable=True)
     mt_name = Column(String(50), nullable=True)
     mt_nickname = Column(String(50), nullable=True)
+    mt_hp = Column(String(20), nullable=True)
+    mt_email = Column(String(200), nullable=True)
+    mt_show = Column(Enum('Y', 'N'), default='Y')
     mt_wdate = Column(DateTime, nullable=True)
+    mt_ldate = Column(DateTime, nullable=True)
+    mt_udate = Column(DateTime, nullable=True)
+    mt_lang = Column(String(2), nullable=True, default='ko')
     mt_lat = Column(Numeric(16, 14), nullable=True)
     mt_long = Column(Numeric(17, 14), nullable=True)
     mt_sido = Column(String(20), nullable=True)
@@ -25,9 +33,6 @@ class Member(BaseModel):
     mt_weather_tmx = Column(Integer, nullable=True)
     mt_weather_sky = Column(Integer, nullable=True)
     mt_weather_date = Column(DateTime, nullable=True)
-    mt_udate = Column(DateTime, nullable=True)
-    mt_lang = Column(String(2), nullable=True)
-    mt_email = Column(String(200), nullable=True)
 
     @classmethod
     def find_by_email(cls, db: Session, email: str) -> Optional['Member']:

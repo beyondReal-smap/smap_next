@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 interface PageContainerProps {
   title: string;
@@ -51,9 +52,19 @@ export default function PageContainer({
 
       {showHeader && (
         <div className="mb-2 flex items-start justify-between">
-          <div>
-            {showTitle && <h1 className="text-2xl font-bold text-gray-900">{title}</h1>}
-            {description && <p className="mt-2 text-gray-600">{description}</p>}
+          <div className="flex items-center">
+            <Image 
+              src="/images/smap_logo.webp" 
+              alt="SMAP 로고" 
+              width={40} 
+              height={40} 
+              className="mr-2"
+              priority
+            />
+            <div>
+              {showTitle && <h1 className="text-2xl font-bold text-gray-900">{title}</h1>}
+              {description && <p className="mt-2 text-gray-600">{description}</p>}
+            </div>
           </div>
           {actions && (
             <div className="flex space-x-2">
