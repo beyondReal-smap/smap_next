@@ -61,3 +61,5 @@ temp/
 **/com-dmonster-smap-firebase-adminsdk*.json
 
 ./frontend/src/app/smap_php/**/firebase-adminsdk-*.json
+
+docker_data/
