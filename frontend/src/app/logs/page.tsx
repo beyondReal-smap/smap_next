@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -169,11 +171,11 @@ const pageStyles = `
 }
 
 .animate-slideUp {
-  animation: slideUp 0.3s ease-out forwards;
+  animation: slideUp 1s ease-out forwards;
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.2s ease-out forwards;
+  animation: fadeIn 1s ease-out forwards;
 }
 
 .full-map-container {

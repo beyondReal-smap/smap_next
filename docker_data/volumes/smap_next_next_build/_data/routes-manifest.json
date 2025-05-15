@@ -1,0 +1,220 @@
+{
+  "version": 3,
+  "pages404": true,
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "dynamicRoutes": [
+    {
+      "page": "/api/push-logs/[...slug]",
+      "regex": "^/api/push\\-logs/(.+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPslug": "nxtPslug"
+      },
+      "namedRegex": "^/api/push\\-logs/(?<nxtPslug>.+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/group",
+      "regex": "^/group(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/group(?:/)?$"
+    },
+    {
+      "page": "/home",
+      "regex": "^/home(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/home(?:/)?$"
+    },
+    {
+      "page": "/location",
+      "regex": "^/location(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/location(?:/)?$"
+    },
+    {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/logs",
+      "regex": "^/logs(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/logs(?:/)?$"
+    },
+    {
+      "page": "/notice",
+      "regex": "^/notice(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/notice(?:/)?$"
+    },
+    {
+      "page": "/register",
+      "regex": "^/register(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/register(?:/)?$"
+    },
+    {
+      "page": "/schedule",
+      "regex": "^/schedule(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/schedule(?:/)?$"
+    },
+    {
+      "page": "/schedule/add",
+      "regex": "^/schedule/add(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/schedule/add(?:/)?$"
+    },
+    {
+      "page": "/setting",
+      "regex": "^/setting(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting(?:/)?$"
+    },
+    {
+      "page": "/setting/account",
+      "regex": "^/setting/account(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/account(?:/)?$"
+    },
+    {
+      "page": "/setting/account/password",
+      "regex": "^/setting/account/password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/account/password(?:/)?$"
+    },
+    {
+      "page": "/setting/account/withdraw",
+      "regex": "^/setting/account/withdraw(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/account/withdraw(?:/)?$"
+    },
+    {
+      "page": "/setting/coupon",
+      "regex": "^/setting/coupon(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/coupon(?:/)?$"
+    },
+    {
+      "page": "/setting/inquiry",
+      "regex": "^/setting/inquiry(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/inquiry(?:/)?$"
+    },
+    {
+      "page": "/setting/manual",
+      "regex": "^/setting/manual(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/manual(?:/)?$"
+    },
+    {
+      "page": "/setting/notice",
+      "regex": "^/setting/notice(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/notice(?:/)?$"
+    },
+    {
+      "page": "/setting/purchase",
+      "regex": "^/setting/purchase(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/purchase(?:/)?$"
+    },
+    {
+      "page": "/setting/referrer",
+      "regex": "^/setting/referrer(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/referrer(?:/)?$"
+    },
+    {
+      "page": "/setting/subscription",
+      "regex": "^/setting/subscription(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/subscription(?:/)?$"
+    },
+    {
+      "page": "/setting/terms",
+      "regex": "^/setting/terms(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/terms(?:/)?$"
+    },
+    {
+      "page": "/setting/terms/location",
+      "regex": "^/setting/terms/location(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/terms/location(?:/)?$"
+    },
+    {
+      "page": "/setting/terms/privacy",
+      "regex": "^/setting/terms/privacy(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/terms/privacy(?:/)?$"
+    },
+    {
+      "page": "/setting/terms/service",
+      "regex": "^/setting/terms/service(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/setting/terms/service(?:/)?$"
+    },
+    {
+      "page": "/signin",
+      "regex": "^/signin(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/signin(?:/)?$"
+    },
+    {
+      "page": "/social-login",
+      "regex": "^/social\\-login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/social\\-login(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "RSC",
+    "varyHeader": "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch",
+    "prefetchHeader": "Next-Router-Prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSuffix": ".prefetch.rsc",
+    "prefetchSegmentHeader": "Next-Router-Segment-Prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments"
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "http://backend:5000/api/v1/:path*",
+      "regex": "^/api(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))?(?:/)?$"
+    }
+  ]
+}

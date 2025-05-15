@@ -1,0 +1,7 @@
+alpine-baselayout
+alpine-keys
+alpine-release
+apk-tools
+busybox
+libc-utils
+libstdc++

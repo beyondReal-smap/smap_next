@@ -1,0 +1,30 @@
+FROM node:18-alpine
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# 필수 도구 설치
+RUN apk add --no-cache libc6-compat
+
+# 의존성 파일 복사
+COPY package.json package-lock.json* ./
+
+# 패키지 설치
+RUN npm install
+
+# 환경 변수 설정 (개발용)
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# CHOKIDAR와 WATCHPACK 설정으로 Docker 내에서 핫 리로딩 활성화
+ENV CHOKIDAR_USEPOLLING=true
+ENV WATCHPACK_POLLING=true
+
+# 소스 코드는 볼륨으로 마운트되므로 복사할 필요 없음
+
+# 내부 호스트 이름 설정
+ENV HOSTNAME "0.0.0.0"
+ENV PORT 3000
+
+# 개발 서버 실행
+CMD ["npm", "run", "dev"] 

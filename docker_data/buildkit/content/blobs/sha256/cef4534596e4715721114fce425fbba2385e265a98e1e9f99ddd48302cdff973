@@ -1,0 +1,903 @@
+{
+  "builder": {
+    "id": ""
+  },
+  "buildType": "https://mobyproject.org/buildkit@v1",
+  "materials": [
+    {
+      "uri": "pkg:docker/python@3.10-alpine?platform=linux%2Famd64",
+      "digest": {
+        "sha256": "db3ca4b1c75f8c27abe19e135ba49e70b3b834716eec65213272f144e1e55e17"
+      }
+    }
+  ],
+  "invocation": {
+    "configSource": {
+      "entryPoint": "Dockerfile.prod"
+    },
+    "parameters": {
+      "frontend": "dockerfile.v0",
+      "args": {
+        "label:com.docker.compose.project": "smap_next",
+        "label:com.docker.compose.service": "backend",
+        "label:com.docker.compose.version": "2.35.1"
+      },
+      "locals": [
+        {
+          "name": "context"
+        },
+        {
+          "name": "dockerfile"
+        }
+      ]
+    },
+    "environment": {
+      "platform": "linux/amd64"
+    }
+  },
+  "buildConfig": {
+    "llbDefinition": [
+      {
+        "id": "step0",
+        "op": {
+          "Op": {
+            "source": {
+              "identifier": "docker-image://docker.io/library/python:3.10-alpine@sha256:db3ca4b1c75f8c27abe19e135ba49e70b3b834716eec65213272f144e1e55e17",
+              "attrs": {
+                "image.resolvemode": "local"
+              }
+            }
+          },
+          "platform": {
+            "Architecture": "amd64",
+            "OS": "linux"
+          },
+          "constraints": {}
+        }
+      },
+      {
+        "id": "step1",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": -1,
+                  "output": 0,
+                  "Action": {
+                    "mkdir": {
+                      "path": "/app",
+                      "mode": 493,
+                      "makeParents": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "platform": {
+            "Architecture": "amd64",
+            "OS": "linux"
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step0:0"
+        ]
+      },
+      {
+        "id": "step2",
+        "op": {
+          "Op": {
+            "exec": {
+              "meta": {
+                "args": [
+                  "/bin/sh",
+                  "-c",
+                  "apk add --no-cache     gcc     musl-dev     python3-dev     libffi-dev     openssl-dev     mariadb-dev     mariadb-connector-c-dev     curl"
+                ],
+                "env": [
+                  "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                  "LANG=C.UTF-8",
+                  "GPG_KEY=A035C8C19219BA821ECEA86B64E628F8D684696D",
+                  "PYTHON_VERSION=3.10.17",
+                  "PYTHON_SHA256=4c68050f049d1b4ac5aadd0df5f27941c0350d2a9e7ab0907ee5eb5225d9d6b0"
+                ],
+                "cwd": "/app",
+                "removeMountStubsRecursive": true
+              },
+              "mounts": [
+                {
+                  "input": 0,
+                  "dest": "/",
+                  "output": 0
+                }
+              ]
+            }
+          },
+          "platform": {
+            "Architecture": "amd64",
+            "OS": "linux"
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step1:0"
+        ]
+      },
+      {
+        "id": "step3",
+        "op": {
+          "Op": {
+            "exec": {
+              "meta": {
+                "args": [
+                  "/bin/sh",
+                  "-c",
+                  "addgroup --system appgroup \u0026\u0026     adduser --system --ingroup appgroup appuser"
+                ],
+                "env": [
+                  "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                  "LANG=C.UTF-8",
+                  "GPG_KEY=A035C8C19219BA821ECEA86B64E628F8D684696D",
+                  "PYTHON_VERSION=3.10.17",
+                  "PYTHON_SHA256=4c68050f049d1b4ac5aadd0df5f27941c0350d2a9e7ab0907ee5eb5225d9d6b0"
+                ],
+                "cwd": "/app",
+                "removeMountStubsRecursive": true
+              },
+              "mounts": [
+                {
+                  "input": 0,
+                  "dest": "/",
+                  "output": 0
+                }
+              ]
+            }
+          },
+          "platform": {
+            "Architecture": "amd64",
+            "OS": "linux"
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step2:0"
+        ]
+      },
+      {
+        "id": "step4",
+        "op": {
+          "Op": {
+            "source": {
+              "identifier": "local://context",
+              "attrs": {
+                "local.sharedkeyhint": "context"
+              }
+            }
+          },
+          "constraints": {}
+        }
+      },
+      {
+        "id": "step5",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/requirements.txt",
+                      "dest": "/app/",
+                      "owner": {
+                        "user": {
+                          "User": {
+                            "byName": {
+                              "name": "appuser",
+                              "input": 0
+                            }
+                          }
+                        },
+                        "group": {
+                          "User": {
+                            "byName": {
+                              "name": "appgroup",
+                              "input": 0
+                            }
+                          }
+                        }
+                      },
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "platform": {
+            "Architecture": "amd64",
+            "OS": "linux"
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step3:0",
+          "step4:0"
+        ]
+      },
+      {
+        "id": "step6",
+        "op": {
+          "Op": {
+            "exec": {
+              "meta": {
+                "args": [
+                  "/bin/sh",
+                  "-c",
+                  "pip install --no-cache-dir -r requirements.txt"
+                ],
+                "env": [
+                  "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                  "LANG=C.UTF-8",
+                  "GPG_KEY=A035C8C19219BA821ECEA86B64E628F8D684696D",
+                  "PYTHON_VERSION=3.10.17",
+                  "PYTHON_SHA256=4c68050f049d1b4ac5aadd0df5f27941c0350d2a9e7ab0907ee5eb5225d9d6b0"
+                ],
+                "cwd": "/app",
+                "removeMountStubsRecursive": true
+              },
+              "mounts": [
+                {
+                  "input": 0,
+                  "dest": "/",
+                  "output": 0
+                }
+              ]
+            }
+          },
+          "platform": {
+            "Architecture": "amd64",
+            "OS": "linux"
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step5:0"
+        ]
+      },
+      {
+        "id": "step7",
+        "op": {
+          "Op": {
+            "file": {
+              "actions": [
+                {
+                  "input": 0,
+                  "secondaryInput": 1,
+                  "output": 0,
+                  "Action": {
+                    "copy": {
+                      "src": "/",
+                      "dest": "/app/",
+                      "owner": {
+                        "user": {
+                          "User": {
+                            "byName": {
+                              "name": "appuser",
+                              "input": 0
+                            }
+                          }
+                        },
+                        "group": {
+                          "User": {
+                            "byName": {
+                              "name": "appgroup",
+                              "input": 0
+                            }
+                          }
+                        }
+                      },
+                      "mode": -1,
+                      "followSymlink": true,
+                      "dirCopyContents": true,
+                      "createDestPath": true,
+                      "allowWildcard": true,
+                      "allowEmptyWildcard": true,
+                      "timestamp": -1
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "platform": {
+            "Architecture": "amd64",
+            "OS": "linux"
+          },
+          "constraints": {}
+        },
+        "inputs": [
+          "step6:0",
+          "step4:0"
+        ]
+      },
+      {
+        "id": "step8",
+        "op": {
+          "Op": null
+        },
+        "inputs": [
+          "step7:0"
+        ]
+      }
+    ],
+    "digestMapping": {
+      "sha256:100189ea931a862abc9cd35431a233c8e9c9d927b1a8666234dce3554d0d19ea": "step3",
+      "sha256:18139ecbd7f224745034822f4ba8bbe2edd12e60ed1adca0f058c110a8deef16": "step6",
+      "sha256:25a7087b78c13daf22e7e717cd55e346c0d95a50893cfd7dd1d9ec4699ef0ed5": "step8",
+      "sha256:4a153a3b00cceedcac06dddc5090e88491e610abd315839debd4d65994fec8ee": "step4",
+      "sha256:4fe892bc35ef04ab1ce72924ec89248c3f7f8cfb68635e600bf0c797b53a4493": "step2",
+      "sha256:a16725e071ca99f705962ef76ba7ad9ed9f13b3bf68ff089f9bceabfe2477615": "step0",
+      "sha256:c995637982cbe554a6cb185107e82fa3b9d115d3a1eb072d70a93fe737a69164": "step5",
+      "sha256:cda9dd6bc253dfa0af9ce6b1618f1f584fbfb9450e4c1da79563fd2222c882f7": "step1",
+      "sha256:e5fbbedd8c298c840cacf6c0fa360a0f8f901c699cdb9da1ade8f59ee524feea": "step7"
+    }
+  },
+  "metadata": {
+    "buildInvocationID": "w8rlfeg58we93cr5lgzymh949",
+    "buildStartedOn": "2025-05-15T00:39:57.841609085+09:00",
+    "buildFinishedOn": "2025-05-15T00:41:11.753196779+09:00",
+    "completeness": {
+      "parameters": true,
+      "environment": true,
+      "materials": false
+    },
+    "reproducible": false,
+    "https://mobyproject.org/buildkit@v1#metadata": {
+      "vcs": {
+        "localdir:context": "backend",
+        "localdir:dockerfile": "backend",
+        "revision": "342e47b7f8b27116e0f2ed4be816d8d1cdb8ed4d",
+        "source": "https://github.com/beyondReal-smap/smap_next.git"
+      },
+      "source": {
+        "locations": {
+          "step0": {
+            "locations": [
+              {
+                "ranges": [
+                  {
+                    "start": {
+                      "line": 2
+                    },
+                    "end": {
+                      "line": 2
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "step1": {
+            "locations": [
+              {
+                "ranges": [
+                  {
+                    "start": {
+                      "line": 5
+                    },
+                    "end": {
+                      "line": 5
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "step2": {
+            "locations": [
+              {
+                "ranges": [
+                  {
+                    "start": {
+                      "line": 8
+                    },
+                    "end": {
+                      "line": 8
+                    }
+                  },
+                  {
+                    "start": {
+                      "line": 9
+                    },
+                    "end": {
+                      "line": 9
+                    }
+                  },
+                  {
+                    "start": {
+                      "line": 10
+                    },
+                    "end": {
+                      "line": 10
+                    }
+                  },
+                  {
+                    "start": {
+                      "line": 11
+                    },
+                    "end": {
+                      "line": 11
+                    }
+                  },
+                  {
+                    "start": {
+                      "line": 12
+                    },
+                    "end": {
+                      "line": 12
+                    }
+                  },
+                  {
+                    "start": {
+                      "line": 13
+                    },
+                    "end": {
+                      "line": 13
+                    }
+                  },
+                  {
+                    "start": {
+                      "line": 14
+                    },
+                    "end": {
+                      "line": 14
+                    }
+                  },
+                  {
+                    "start": {
+                      "line": 15
+                    },
+                    "end": {
+                      "line": 15
+                    }
+                  },
+                  {
+                    "start": {
+                      "line": 16
+                    },
+                    "end": {
+                      "line": 16
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "step3": {
+            "locations": [
+              {
+                "ranges": [
+                  {
+                    "start": {
+                      "line": 19
+                    },
+                    "end": {
+                      "line": 19
+                    }
+                  },
+                  {
+                    "start": {
+                      "line": 20
+                    },
+                    "end": {
+                      "line": 20
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "step4": {},
+          "step5": {
+            "locations": [
+              {
+                "ranges": [
+                  {
+                    "start": {
+                      "line": 23
+                    },
+                    "end": {
+                      "line": 23
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "step6": {
+            "locations": [
+              {
+                "ranges": [
+                  {
+                    "start": {
+                      "line": 24
+                    },
+                    "end": {
+                      "line": 24
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "step7": {
+            "locations": [
+              {
+                "ranges": [
+                  {
+                    "start": {
+                      "line": 27
+                    },
+                    "end": {
+                      "line": 27
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "infos": [
+          {
+            "filename": "Dockerfile.prod",
+            "data": "IyBQeXRob24gMy4xMCBBbHBpbmUg7J2066+47KeAIOyCrOyaqQpGUk9NIHB5dGhvbjozLjEwLWFscGluZQoKIyDsnpHsl4Ug65SU66CJ7Yag66asIOyEpOyglQpXT1JLRElSIC9hcHAKCiMg7Iuc7Iqk7YWcIO2MqO2CpOyngCDshKTsuZgKUlVOIGFwayBhZGQgLS1uby1jYWNoZSBcCiAgICBnY2MgXAogICAgbXVzbC1kZXYgXAogICAgcHl0aG9uMy1kZXYgXAogICAgbGliZmZpLWRldiBcCiAgICBvcGVuc3NsLWRldiBcCiAgICBtYXJpYWRiLWRldiBcCiAgICBtYXJpYWRiLWNvbm5lY3Rvci1jLWRldiBcCiAgICBjdXJsCgojIOuztOyViOydhCDsnITtlZwg67mE7Yq56raMIOyCrOyaqeyekCDsg53shLEKUlVOIGFkZGdyb3VwIC0tc3lzdGVtIGFwcGdyb3VwICYmIFwKICAgIGFkZHVzZXIgLS1zeXN0ZW0gLS1pbmdyb3VwIGFwcGdyb3VwIGFwcHVzZXIKCiMgcmVxdWlyZW1lbnRzLnR4dCDrs7Xsgqwg67CPIOydmOyhtOyEsSDshKTsuZgKQ09QWSAtLWNob3duPWFwcHVzZXI6YXBwZ3JvdXAgcmVxdWlyZW1lbnRzLnR4dCAuClJVTiBwaXAgaW5zdGFsbCAtLW5vLWNhY2hlLWRpciAtciByZXF1aXJlbWVudHMudHh0CgojIOyGjOyKpCDsvZTrk5wg67O17IKsCkNPUFkgLS1jaG93bj1hcHB1c2VyOmFwcGdyb3VwIC4gLgoKIyDtmZjqsr0g67OA7IiYIOyEpOyglQpFTlYgUFlUSE9OVU5CVUZGRVJFRD0xIFwKICAgIFBZVEhPTkRPTlRXUklURUJZVEVDT0RFPTEKCiMg7IKs7Jqp7J6QIOyghO2ZmApVU0VSIHJvb3QKCiMg7Zes7Iqk7LK07YGsCkhFQUxUSENIRUNLIC0taW50ZXJ2YWw9MzBzIC0tdGltZW91dD0zMHMgLS1zdGFydC1wZXJpb2Q9NXMgLS1yZXRyaWVzPTMgXAogICAgQ01EIGN1cmwgLWYgaHR0cDovL2xvY2FsaG9zdDo1MDAwL2hlYWx0aCB8fCBleGl0IDEKCiMg7Y+s7Yq4IOuFuOy2nApFWFBPU0UgNTAwMAoKIyBGYXN0QVBJIOyEnOuyhCDsi6TtlokgKFV2aWNvcm4g7IKs7JqpKQpDTUQgWyJzaCIsICItYyIsICJ1dmljb3JuIGFwcC5tYWluOmFwcCAtLWhvc3QgMC4wLjAuMCAtLXBvcnQgNTAwMCJdIA==",
+            "llbDefinition": [
+              {
+                "id": "step0",
+                "op": {
+                  "Op": {
+                    "source": {
+                      "identifier": "local://dockerfile",
+                      "attrs": {
+                        "local.differ": "none",
+                        "local.followpaths": "[\"Dockerfile.prod\",\"Dockerfile.prod.dockerignore\"]",
+                        "local.sharedkeyhint": "dockerfile"
+                      }
+                    }
+                  },
+                  "constraints": {}
+                }
+              },
+              {
+                "id": "step1",
+                "op": {
+                  "Op": null
+                },
+                "inputs": [
+                  "step0:0"
+                ]
+              }
+            ],
+            "digestMapping": {
+              "sha256:58cc6f81b31912d27b269d136c1ddd3a43e25585ff031638b89c783ccf766ea5": "step1",
+              "sha256:a760f754db722af489e1ddba7de8e679d6a570b7993f896680a56ca8e1de5a61": "step0"
+            }
+          }
+        ]
+      },
+      "layers": {
+        "step0:0": [
+          [
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:08000c18d16dadf9553d747a58cf44023423a9ab010aab96cf263d2216b8b350",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:fee94043bf77556f1cc2d8fbe08f2bc48bfe2b640a45bb4f20934d4bf2c8a3b1",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:d13692de8d7b0fa700077fa872fc206530786dabac834ad9c2282f440f0223ec",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:1fec567e4311cfb1d8f181b3ad367ad31e29ef4bf9d32eaf747ee1e81ca099ad",
+              "size": -1
+            }
+          ],
+          [
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:08000c18d16dadf9553d747a58cf44023423a9ab010aab96cf263d2216b8b350",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:fee94043bf77556f1cc2d8fbe08f2bc48bfe2b640a45bb4f20934d4bf2c8a3b1",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:d13692de8d7b0fa700077fa872fc206530786dabac834ad9c2282f440f0223ec",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:1fec567e4311cfb1d8f181b3ad367ad31e29ef4bf9d32eaf747ee1e81ca099ad",
+              "size": -1
+            }
+          ]
+        ],
+        "step1:0": [
+          [
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:08000c18d16dadf9553d747a58cf44023423a9ab010aab96cf263d2216b8b350",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:fee94043bf77556f1cc2d8fbe08f2bc48bfe2b640a45bb4f20934d4bf2c8a3b1",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:d13692de8d7b0fa700077fa872fc206530786dabac834ad9c2282f440f0223ec",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:1fec567e4311cfb1d8f181b3ad367ad31e29ef4bf9d32eaf747ee1e81ca099ad",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:25bb656173d9a5ac81eb78676c9a4f1bde0eed10d8ce161eb40f1a395dc054a8",
+              "size": -1
+            }
+          ]
+        ],
+        "step2:0": [
+          [
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:08000c18d16dadf9553d747a58cf44023423a9ab010aab96cf263d2216b8b350",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:fee94043bf77556f1cc2d8fbe08f2bc48bfe2b640a45bb4f20934d4bf2c8a3b1",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:d13692de8d7b0fa700077fa872fc206530786dabac834ad9c2282f440f0223ec",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:1fec567e4311cfb1d8f181b3ad367ad31e29ef4bf9d32eaf747ee1e81ca099ad",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:25bb656173d9a5ac81eb78676c9a4f1bde0eed10d8ce161eb40f1a395dc054a8",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:cff2a9f04908c8045afc11d68e56f5180a87abadccfa9991c452283caf788493",
+              "size": -1
+            }
+          ]
+        ],
+        "step3:0": [
+          [
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:08000c18d16dadf9553d747a58cf44023423a9ab010aab96cf263d2216b8b350",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:fee94043bf77556f1cc2d8fbe08f2bc48bfe2b640a45bb4f20934d4bf2c8a3b1",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:d13692de8d7b0fa700077fa872fc206530786dabac834ad9c2282f440f0223ec",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:1fec567e4311cfb1d8f181b3ad367ad31e29ef4bf9d32eaf747ee1e81ca099ad",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:25bb656173d9a5ac81eb78676c9a4f1bde0eed10d8ce161eb40f1a395dc054a8",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:cff2a9f04908c8045afc11d68e56f5180a87abadccfa9991c452283caf788493",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:b61f7f6f054ca00b07973922702bbed13cefc4d5de63e442ec5a8cf0e89a4f00",
+              "size": -1
+            }
+          ]
+        ],
+        "step4:0": [
+          []
+        ],
+        "step5:0": [
+          [
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:08000c18d16dadf9553d747a58cf44023423a9ab010aab96cf263d2216b8b350",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:fee94043bf77556f1cc2d8fbe08f2bc48bfe2b640a45bb4f20934d4bf2c8a3b1",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:d13692de8d7b0fa700077fa872fc206530786dabac834ad9c2282f440f0223ec",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:1fec567e4311cfb1d8f181b3ad367ad31e29ef4bf9d32eaf747ee1e81ca099ad",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:25bb656173d9a5ac81eb78676c9a4f1bde0eed10d8ce161eb40f1a395dc054a8",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:cff2a9f04908c8045afc11d68e56f5180a87abadccfa9991c452283caf788493",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:b61f7f6f054ca00b07973922702bbed13cefc4d5de63e442ec5a8cf0e89a4f00",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:392e66b17370e308d86b69a23c93cd82068bb9cc5f3baf52d62e99d58c6e81d5",
+              "size": -1
+            }
+          ]
+        ],
+        "step6:0": [
+          [
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:08000c18d16dadf9553d747a58cf44023423a9ab010aab96cf263d2216b8b350",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:fee94043bf77556f1cc2d8fbe08f2bc48bfe2b640a45bb4f20934d4bf2c8a3b1",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:d13692de8d7b0fa700077fa872fc206530786dabac834ad9c2282f440f0223ec",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:1fec567e4311cfb1d8f181b3ad367ad31e29ef4bf9d32eaf747ee1e81ca099ad",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:25bb656173d9a5ac81eb78676c9a4f1bde0eed10d8ce161eb40f1a395dc054a8",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:cff2a9f04908c8045afc11d68e56f5180a87abadccfa9991c452283caf788493",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:b61f7f6f054ca00b07973922702bbed13cefc4d5de63e442ec5a8cf0e89a4f00",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:392e66b17370e308d86b69a23c93cd82068bb9cc5f3baf52d62e99d58c6e81d5",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:b185345421d4e56106f00c72d0422850ece32ba7712092e947b59a5bd3168eac",
+              "size": -1
+            }
+          ]
+        ],
+        "step7:0": [
+          [
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:08000c18d16dadf9553d747a58cf44023423a9ab010aab96cf263d2216b8b350",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:fee94043bf77556f1cc2d8fbe08f2bc48bfe2b640a45bb4f20934d4bf2c8a3b1",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:d13692de8d7b0fa700077fa872fc206530786dabac834ad9c2282f440f0223ec",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:1fec567e4311cfb1d8f181b3ad367ad31e29ef4bf9d32eaf747ee1e81ca099ad",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:25bb656173d9a5ac81eb78676c9a4f1bde0eed10d8ce161eb40f1a395dc054a8",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:cff2a9f04908c8045afc11d68e56f5180a87abadccfa9991c452283caf788493",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:b61f7f6f054ca00b07973922702bbed13cefc4d5de63e442ec5a8cf0e89a4f00",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:392e66b17370e308d86b69a23c93cd82068bb9cc5f3baf52d62e99d58c6e81d5",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:b185345421d4e56106f00c72d0422850ece32ba7712092e947b59a5bd3168eac",
+              "size": -1
+            },
+            {
+              "mediaType": "application/vnd.docker.image.rootfs.diff.tar",
+              "digest": "sha256:106940a3cf24b79ba6826e935a84b98de89961c6b1bfd6eef39612de02d47263",
+              "size": -1
+            }
+          ]
+        ]
+      }
+    }
+  }
+}

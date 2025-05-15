@@ -1393,5 +1393,9 @@ class BackgroundTasks:
             logger.info("Daily weather notifications executed successfully")
 
         except Exception as e:
-            logger.error(f"Error in daily weather notifications: {e}")
-            self.db.rollback() 
+            logger.error(f"Error sending daily weather notification: {e}")
+        finally:
+            db.close()
+
+# scheduler 인스턴스 생성
+scheduler = BackgroundTasks() 

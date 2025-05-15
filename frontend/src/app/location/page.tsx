@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+export const dynamic = 'force-dynamic'; // Add this line
+
+import { useState, useEffect, useRef, Suspense } from 'react';
 import axios from 'axios';
 // import mapboxgl from 'mapbox-gl'; // Mapbox 임포트 제거
 // import 'mapbox-gl/dist/mapbox-gl.css'; // Mapbox CSS 제거
@@ -189,11 +191,11 @@ const pageStyles = `
 }
 
 .animate-slideUp {
-  animation: slideUp 0.3s ease-out forwards;
+  animation: slideUp 1s ease-out forwards;
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.2s ease-out forwards;
+  animation: fadeIn 1s ease-out forwards;
 }
 
 .full-map-container {

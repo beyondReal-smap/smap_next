@@ -1,11 +1,16 @@
 'use client';
 
 import { AppLayout } from '../components/layout';
+import { Suspense } from 'react';
 
 export default function LocationLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AppLayout>{children}</AppLayout>
+    </Suspense>
+  );
 } 

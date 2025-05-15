@@ -1,0 +1,29 @@
+# Dependencies
+node_modules
+.yarn/cache
+.yarn/unplugged
+.yarn/install-state.gz
+
+# Next.js build output
+.next/
+
+# Development files
+.env*.local
+.env
+README.md
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Git
+.git
+.gitignore
+
+# Test files (optional, if not needed in production image)
+# __tests__
+# **/*.test.ts
+# **/*.spec.ts
+# **/*.test.tsx
+# **/*.spec.tsx
+# coverage/ 
