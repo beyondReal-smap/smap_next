@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
@@ -18,6 +18,11 @@ import mapService, {
   cleanupGoogleMap, 
   cleanupNaverMap 
 } from '../../services/mapService';
+import memberService from '@/services/memberService'; // 멤버 서비스 추가
+import scheduleService from '../../services/scheduleService'; // scheduleService 임포트
+import { 
+    AllDayCheckEnum, ShowEnum, ScheduleAlarmCheckEnum, InCheckEnum, ScheduleCheckEnum 
+} from '../../types/enums'; // 생성한 Enum 타입 임포트
 
 // window 전역 객체에 naver 및 google 프로퍼티 타입 선언
 declare global {
@@ -52,38 +57,35 @@ const RECOMMENDED_PLACES = [
 ];
 
 // 그룹멤버 더미 데이터 - 위치 정보 추가
-const MOCK_GROUP_MEMBERS = [
+const MOCK_GROUP_MEMBERS: GroupMember[] = [
   { 
-    id: '1', 
-    name: '김철수', 
-    photo: '/images/avatar3.png', 
-    isSelected: false,
+    id: '1', name: '김철수', photo: '/images/avatar3.png', isSelected: false,
     location: { lat: 37.5642 + 0.005, lng: 127.0016 + 0.002 },
     schedules: [
       { id: 'm1-1', title: '팀 회의', date: '오늘 14:00', location: '강남 사무실' },
       { id: 'm1-2', title: '저녁 약속', date: '오늘 19:00', location: '이탈리안 레스토랑' }
-    ]
+    ],
+    original_index: 0, mt_gender: 1, 
+    mt_weather_sky: '8', mt_weather_tmx: 25 // 예시 날씨 정보
   },
   { 
-    id: '2', 
-    name: '이영희', 
-    photo: '/images/avatar1.png', 
-    isSelected: false,
+    id: '2', name: '이영희', photo: '/images/avatar1.png', isSelected: false,
     location: { lat: 37.5642 - 0.003, lng: 127.0016 - 0.005 },
     schedules: [
       { id: 'm2-1', title: '프로젝트 발표', date: '내일 10:00', location: '회의실 A' }
-    ]
+    ],
+    original_index: 1, mt_gender: 2,
+    mt_weather_sky: '1', mt_weather_tmx: 22 // 예시 날씨 정보
   },
   { 
-    id: '3', 
-    name: '박민수', 
-    photo: '/images/avatar2.png', 
-    isSelected: false,
+    id: '3', name: '박민수', photo: '/images/avatar2.png', isSelected: false,
     location: { lat: 37.5642 + 0.002, lng: 127.0016 - 0.003 },
     schedules: [
       { id: 'm3-1', title: '주간 회의', date: '수요일 11:00', location: '본사 대회의실' },
       { id: 'm3-2', title: '고객 미팅', date: '목요일 15:00', location: '강남 오피스' }
-    ]
+    ],
+    original_index: 2, mt_gender: 1,
+    mt_weather_sky: '4', mt_weather_tmx: 18 // 예시 날씨 정보
   }
 ];
 
@@ -94,18 +96,63 @@ type MapType = MapTypeService;
 interface GroupMember {
   id: string;
   name: string;
-  photo: string;
+  photo: string | null;
   isSelected: boolean;
   location: Location;
-  schedules: Schedule[];
+  schedules: Schedule[]; // Schedule 타입은 이 파일 내의 것을 사용
+  mt_gender?: number | null;
+  original_index: number;
+  mt_weather_sky?: string | number | null;
+  mt_weather_tmx?: string | number | null;
 }
 
 // 일정 타입 정의
 interface Schedule {
-  id: string;
-  title: string;
-  date: string;
-  location: string;
+  id: string; // sst_idx (Primary Key)
+  sst_pidx?: number | null;
+  memberId?: string | null; // mt_idx (프론트엔드에서 편의상 memberId로 사용)
+  mt_schedule_idx?: number | null; // 새로 추가된 필드
+  title?: string | null;    // sst_title
+  date?: string | null;     // sst_sdate (datetime string)
+  sst_edate?: string | null;  // (datetime string)
+  sst_sedate?: string | null;
+  sst_all_day?: AllDayCheckEnum | null;
+  sst_repeat_json?: string | null;
+  sst_repeat_json_v?: string | null;
+  sgt_idx?: number | null;
+  sgdt_idx?: number | null;
+  sgdt_idx_t?: string | null;
+  sst_alram?: number | null; // 실제 값에 따라 Enum 또는 number 타입 지정 가능
+  sst_alram_t?: string | null;
+  sst_adate?: string | null;   // (datetime string)
+  slt_idx?: number | null;
+  slt_idx_t?: string | null;
+  location?: string | null; // sst_location_title (프론트엔드에서 편의상 location으로 사용)
+  sst_location_add?: string | null;
+  sst_location_lat?: number | null;  // Decimal이지만 프론트에서 number로 처리
+  sst_location_long?: number | null; // Decimal이지만 프론트에서 number로 처리
+  sst_supplies?: string | null;
+  sst_memo?: string | null;
+  sst_show?: ShowEnum | null;
+  sst_location_alarm?: number | null; // 실제 값에 따라 Enum 또는 number 타입 지정 가능
+  sst_schedule_alarm_chk?: ScheduleAlarmCheckEnum | null;
+  sst_pick_type?: string | null;
+  sst_pick_result?: number | null;
+  sst_schedule_alarm?: string | null; // (datetime string)
+  sst_update_chk?: string | null;
+  sst_wdate?: string | null; // (datetime string)
+  sst_udate?: string | null; // (datetime string)
+  sst_ddate?: string | null; // (datetime string)
+  sst_in_chk?: InCheckEnum | null;
+  sst_schedule_chk?: ScheduleCheckEnum | null;
+  sst_entry_cnt?: number | null;
+  sst_exit_cnt?: number | null;
+  statusDetail?: { // 스케줄 상태 상세 정보
+    name: 'completed' | 'ongoing' | 'upcoming' | 'default';
+    text: string;
+    color: string;
+    bgColor: string;
+  };
 }
 
 // 전역 로더 인스턴스 생성 (싱글톤 패턴)
@@ -215,13 +262,13 @@ const modalAnimation = `
 }
 
 .bottom-sheet-middle {
-  transform: translateY(65%);
+  transform: translateY(68%);
   min-height: 100vh;
 }
 
 .bottom-sheet-expanded {
   transform: translateY(0%);
-  min-height: 100vh;
+  min-height: 50vh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -238,7 +285,9 @@ const modalAnimation = `
   padding: 6px 8px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+              bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* opacity delay 제거, bottom과 동일 시간 */
   max-width: 60px;
 }
 
@@ -249,7 +298,9 @@ const modalAnimation = `
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+              bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0.2s; /* opacity는 0.2초 지연 후 0.2초 동안 변경 */
 }
 
 /* 바텀시트 상태에 따른 헤더 위치 */
@@ -378,28 +429,173 @@ const modalAnimation = `
 
 export const dynamic = 'force-dynamic';
 
+const BACKEND_STORAGE_BASE_URL = 'http://118.67.130.71:8000/storage/'; // 실제 백엔드 이미지 저장 경로의 기본 URL (★ 반드시 실제 경로로 수정 필요)
+
+const getDefaultImage = (gender: number | null | undefined, index: number): string => {
+  const imageNumber = (index % 4) + 1; // index 기반으로 1~4 숫자 결정 (랜덤 대신)
+  if (gender === 1) {
+    return `/images/male_${imageNumber}.png`;
+  } else if (gender === 2) {
+    return `/images/female_${imageNumber}.png`;
+  }
+  // mt_gender가 없거나 1, 2가 아닐 때, avatar 이미지도 index 기반으로 일관성 유지
+  return `/images/avatar${(index % 3) + 1}.png`; 
+};
+
+// 날씨 정보 타입 정의
+interface WeatherInfo {
+  temp: string; 
+  condition: string;
+  icon: string;
+  skyStatus?: string; // 백엔드 sky 코드 (선택적)
+}
+
+// PHP의 $arr_mt_weather_sky_icon, $arr_mt_weather_sky 와 유사한 매핑 객체
+const weatherIconMap: { [key: string]: string } = {
+  '1': '🌥️', // 구름 많음 (구름 뒤 해)
+  '2': '☁️', // 흐림 (구름)
+  '3': '🌦️', // 흐리고 비 (구름과 비)
+  '4': '🌧️', // 비
+  '5': '🌨️', // 비와 눈
+  '6': '❄️', // 눈
+  '7': '💨', // 눈날림 (바람으로 표현)
+  '8': '☀️', // 맑음
+  'default': '🌡️' // 기본값
+};
+
+const weatherConditionMap: { [key: string]: string } = {
+  '1': '구름많음',
+  '2': '흐림',
+  '3': '흐리고 비',
+  '4': '비',
+  '5': '비/눈',
+  '6': '눈',
+  '7': '눈날림',
+  '8': '맑음',
+  'default': '날씨 정보 없음'
+};
+
+const getWeatherDisplayData = (skyStatus: string | undefined | null, tempMax: number | string | undefined | null): WeatherInfo => {
+  const statusStr = String(skyStatus || 'default');
+  const icon = weatherIconMap[statusStr] || weatherIconMap['default'];
+  const condition = weatherConditionMap[statusStr] || weatherConditionMap['default'];
+  
+  let tempStr = '--°C';
+  if (typeof tempMax === 'number') {
+    tempStr = `${Math.round(tempMax)}°C`;
+  } else if (typeof tempMax === 'string' && !isNaN(parseFloat(tempMax))) {
+    tempStr = `${Math.round(parseFloat(tempMax))}°C`;
+  } else if (tempMax === null || tempMax === undefined) {
+    // 온도가 null 이나 undefined면 기본값 유지
+  } else {
+    tempStr = String(tempMax); // 숫자로 변환 불가능한 문자열이면 그대로 표시 (예: API가 가끔 문자열 온도를 줄 경우)
+  }
+
+  return {
+    temp: tempStr,
+    condition: condition,
+    icon: icon,
+    skyStatus: statusStr
+  };
+};
+
+// 일정 상태 관련 상수 및 함수 추가 (schedule/page.tsx 참고)
+const statusNameMap = {
+  completed: '완료',
+  ongoing: '진행 중',
+  upcoming: '예정',
+  default: '상태 없음'
+};
+
+const statusColorMap = {
+  completed: '#22c55e', // green-500
+  ongoing: '#f97316',   // orange-500
+  upcoming: '#3b82f6', // blue-500
+  default: '#6b7280'  // gray-500
+};
+
+const statusBgColorMap = {
+  completed: '#f0fdf4', // green-50
+  ongoing: '#fff7ed',   // orange-50
+  upcoming: '#eff6ff',    // blue-50
+  default: '#f9fafb'   // gray-50
+};
+
+// Schedule 타입의 sst_sdate, sst_edate를 사용하도록 수정
+const getScheduleStatus = (schedule: Schedule): { name: 'completed' | 'ongoing' | 'upcoming' | 'default'; text: string; color: string; bgColor: string } => {
+  const now = new Date();
+  
+  if (!schedule.date || !schedule.sst_edate) { // schedule.date는 sst_sdate의 날짜 부분, sst_edate는 종료일시
+    return { name: 'default', text: statusNameMap.default, color: statusColorMap.default, bgColor: statusBgColorMap.default };
+  }
+
+  // sst_sdate (시작일시) 와 sst_edate (종료일시)는 완전한 datetime 문자열로 가정
+  // 예: "2023-10-27 09:00:00"
+  const eventStartDate = new Date(schedule.date); // schedule.date는 YYYY-MM-DD 형식이어야 함
+  let eventStartDateTime: Date;
+  let eventEndDateTime: Date;
+
+  try {
+    // schedule.date (YYYY-MM-DD)와 시간정보가 포함된 sst_sdate, sst_edate를 조합하거나,
+    // sst_sdate와 sst_edate가 이미 완전한 datetime 문자열이라면 그대로 사용.
+    // scheduleService에서 date 필드는 sst_sdate의 날짜 부분만 사용하고 있으므로,
+    // 시간 정보를 얻기 위해 sst_sdate 원본을 사용하거나, schedule 객체에 sst_sdate 전체가 있다면 사용.
+    // 여기서는 schedule.date (날짜) 와 sst_sdate (시간 포함 시작) / sst_edate (시간 포함 종료)를 사용한다고 가정.
+    // schedule.date가 YYYY-MM-DD 형식이고, sst_sdate/sst_edate가 HH:mm:ss 형식이면 조합 필요.
+    // 여기서는 sst_sdate와 sst_edate가 완전한 ISO 날짜 문자열이라고 가정하고 진행 (예: '2024-07-30T10:00:00')
+    // 또는 scheduleService에서 매핑 시 date (sst_sdate에서 시간까지 포함), sst_edate를 ISO 형식으로 변환했다고 가정.
+    // 현재 Schedule 인터페이스의 date는 string | null (sst_sdate datetime string)으로 되어 있으므로, 이를 Date 객체로 변환.
+    
+    if (!schedule.date) { // sst_sdate가 없을 경우
+        throw new Error('Schedule start date is missing');
+    }
+    eventStartDateTime = new Date(schedule.date); // sst_sdate 전체를 사용
+
+    if (!schedule.sst_edate) { // 종료 시간이 없으면 시작 시간과 동일하게 처리하거나, 특정 기간(예: 1시간)을 더함
+        eventEndDateTime = new Date(eventStartDateTime.getTime() + 60 * 60 * 1000); // 예: 1시간 후로 설정
+        // console.warn(`Schedule ${schedule.id} has no end date. Defaulting to 1 hour duration.`);
+    } else {
+        eventEndDateTime = new Date(schedule.sst_edate);
+    }
+
+    if (isNaN(eventStartDateTime.getTime()) || isNaN(eventEndDateTime.getTime())) {
+      // console.error("Invalid date format for schedule status check:", schedule);
+      return { name: 'default', text: '시간오류', color: statusColorMap.default, bgColor: statusBgColorMap.default };
+    }
+  } catch (e) {
+    // console.error("Error parsing date for schedule status check:", e, schedule);
+    return { name: 'default', text: '시간오류', color: statusColorMap.default, bgColor: statusBgColorMap.default };
+  }
+
+  if (now > eventEndDateTime) {
+    return { name: 'completed', text: statusNameMap.completed, color: statusColorMap.completed, bgColor: statusBgColorMap.completed };
+  }
+  if (now >= eventStartDateTime && now <= eventEndDateTime) {
+    return { name: 'ongoing', text: statusNameMap.ongoing, color: statusColorMap.ongoing, bgColor: statusBgColorMap.ongoing };
+  }
+  if (now < eventStartDateTime) {
+    return { name: 'upcoming', text: statusNameMap.upcoming, color: statusColorMap.upcoming, bgColor: statusBgColorMap.upcoming };
+  }
+  return { name: 'default', text: statusNameMap.default, color: statusColorMap.default, bgColor: statusBgColorMap.default };
+};
+
 export default function HomePage() {
   const router = useRouter();
   const [userName, setUserName] = useState('사용자');
   const [userLocation, setUserLocation] = useState<Location>({ lat: 37.5642, lng: 127.0016 }); // 기본: 서울
   const [locationName, setLocationName] = useState('서울시');
   const [recommendedPlaces, setRecommendedPlaces] = useState(RECOMMENDED_PLACES);
-  const [recentSchedules, setRecentSchedules] = useState([
-    { id: '1', title: '팀 미팅', date: '오늘 14:00', location: '강남 사무실' },
-    { id: '2', title: '프로젝트 발표', date: '내일 10:00', location: '회의실 A' },
-    { id: '3', title: '주간 회의', date: '수요일 11:00', location: '본사 대회의실' },
-  ]);
   const [favoriteLocations, setFavoriteLocations] = useState([
     { id: '1', name: '회사', address: '서울시 강남구 테헤란로 123' },
     { id: '2', name: '자주 가는 카페', address: '서울시 강남구 역삼동 234' },
   ]);
-  const [groupMembers, setGroupMembers] = useState<GroupMember[]>(MOCK_GROUP_MEMBERS);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>(''); // 초기값을 빈 문자열로 변경
-  const [todayWeather, setTodayWeather] = useState({ temp: '22°C', condition: '맑음', icon: '☀️' });
+  const [selectedDate, setSelectedDate] = useState<string>(() => format(new Date(), 'yyyy-MM-dd')); // 오늘 날짜로 초기화
+  const [todayWeather, setTodayWeather] = useState<WeatherInfo>(getWeatherDisplayData(null, null));
   const [isMapLoading, setIsMapLoading] = useState(true);
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
-  const [mapType, setMapType] = useState<MapType>('naver'); // 기본값을 네이버 지도로 변경
+  const [mapType, setMapType] = useState<MapType>('google');
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
   const [daysForCalendar, setDaysForCalendar] = useState<{ value: string; display: string; }[]>([]); // 달력 날짜 상태 추가
@@ -412,6 +608,7 @@ export default function HomePage() {
   const naverMap = useRef<any>(null);
   const naverMarker = useRef<any>(null);
   const memberMarkers = useRef<any[]>([]);
+  const scheduleMarkersRef = useRef<any[]>([]); // 스케줄 마커를 위한 ref 추가
   
   // 스크립트 로드 및 지도 초기화 상태 추적
   const [mapsInitialized, setMapsInitialized] = useState({
@@ -427,6 +624,13 @@ export default function HomePage() {
   const dragStartTime = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
   const initialScrollTopRef = useRef<number>(0);
+
+  const dataFetchedRef = useRef({ members: false, schedules: false }); // dataFetchedRef를 객체로 변경
+
+  const [initialWeatherLoaded, setInitialWeatherLoaded] = useState(false);
+  const initialWeatherDataRef = useRef<WeatherInfo | null>(null); // 앱 초기/기본 날씨 저장용
+  const [groupSchedules, setGroupSchedules] = useState<Schedule[]>([]); // 그룹 전체 스케줄 (memberId 포함)
+  // const [dataFetched, setDataFetched] = useState({ members: false, schedules: false }); // 삭제
 
   // Bottom Sheet 상태를 클래스 이름으로 변환
   const getBottomSheetClassName = () => {
@@ -496,6 +700,9 @@ export default function HomePage() {
     
     const isDrag = Math.abs(deltaYOverall) > 10 || deltaTime > 200;
 
+    const mapHeader = document.querySelector('.map-header') as HTMLElement;
+    const mapControls = document.querySelector('.map-controls') as HTMLElement;
+
     if (isDrag) {
       bottomSheetRef.current.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
       const velocity = deltaTime > 0 ? deltaYOverall / deltaTime : 0;
@@ -530,14 +737,24 @@ export default function HomePage() {
           finalState = 'collapsed';
         }
       }
-      
       setBottomSheetState(finalState);
     }
 
-    bottomSheetRef.current.style.transform = '';
+    // 스타일 복원
+    if (bottomSheetRef.current) {
+      bottomSheetRef.current.style.transform = ''; // Bottom sheet의 transform은 CSS 클래스가 관리
+    }
+    if (mapHeader) {
+      mapHeader.style.transition = ''; // map-header의 transition 복원
+    }
+    if (mapControls) {
+      mapControls.style.transition = ''; // map-controls의 transition 복원
+    }
+
     startDragY.current = null;
     currentDragY.current = null;
     dragStartTime.current = null;
+    isDraggingRef.current = false; // isDraggingRef도 초기화
   };
 
   const toggleBottomSheet = () => {
@@ -567,6 +784,101 @@ export default function HomePage() {
       );
     }
   }, []);
+
+  // 그룹 멤버 및 스케줄 데이터 가져오기
+  useEffect(() => {
+    let isMounted = true;
+    const GROUP_ID_EXAMPLE = '641'; 
+    
+    const fetchAllGroupData = async () => {
+      if (!isMounted) return;
+
+      // 데이터 로딩이 실제로 필요한 경우에만 로딩 상태 true로 설정
+      if (!dataFetchedRef.current.members || !dataFetchedRef.current.schedules) {
+        // 이미 로딩 중이 아니라면 로딩 시작 (isMounted 체크 추가)
+        if (!isMapLoading && isMounted) setIsMapLoading(true); 
+      } else {
+        // 모든 데이터가 이미 로드되었다면 함수 종료 또는 로딩 상태 false로 확실히 설정
+        if (isMapLoading && isMounted) setIsMapLoading(false);
+        return;
+      }
+
+      try {
+        let currentMembers: GroupMember[] = groupMembers.length > 0 ? [...groupMembers] : [];
+
+        if (!dataFetchedRef.current.members) {
+          const memberData = await memberService.getGroupMembers(GROUP_ID_EXAMPLE);
+          if (isMounted) { 
+            if (memberData && memberData.length > 0) { 
+              currentMembers = memberData.map((member: any, index: number) => ({
+            id: member.mt_idx.toString(),
+            name: member.mt_name || `멤버 ${index + 1}`,
+                photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
+            isSelected: false,
+            location: { 
+              lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
+              lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
+            },
+                schedules: [], 
+                mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
+                original_index: index,
+                mt_weather_sky: member.mt_weather_sky,
+                mt_weather_tmx: member.mt_weather_tmx
+              }));
+            } else {
+              console.warn('No member data from API, or API call failed.');
+            }
+            setGroupMembers(currentMembers); 
+            dataFetchedRef.current.members = true;
+        }
+        }
+
+        if (dataFetchedRef.current.members && !dataFetchedRef.current.schedules) {
+          const rawSchedules: Schedule[] = await scheduleService.getGroupSchedules(GROUP_ID_EXAMPLE, 7); 
+          console.log('[HOME PAGE] Raw schedules from API:', rawSchedules); // 콘솔 로그 추가
+        if (isMounted) {
+            if (rawSchedules && rawSchedules.length > 0) {
+              setGroupSchedules(rawSchedules); 
+              setGroupMembers(prevMembers =>
+                prevMembers.map(member => ({
+                  ...member,
+                  schedules: rawSchedules
+                    .filter((schedule: Schedule) => 
+                      schedule.mt_schedule_idx !== null && 
+                      schedule.mt_schedule_idx !== undefined && 
+                      String(schedule.mt_schedule_idx) === member.id
+                    ) 
+                }))
+              );
+              const todayStr = format(new Date(), 'yyyy-MM-dd');
+              setFilteredSchedules(
+                rawSchedules.filter((s: Schedule) => s.date && s.date.startsWith(todayStr)) // null 체크 추가
+              );
+            } else {
+              console.warn('No schedule data from API for the group, or API call failed.');
+              setGroupSchedules([]);
+              setFilteredSchedules([]);
+            }
+            dataFetchedRef.current.schedules = true; 
+          }
+        }
+      } catch (error) {
+        console.error('[HOME PAGE] 그룹 데이터(멤버 또는 스케줄) 조회 오류:', error);
+        if (isMounted && !dataFetchedRef.current.members) dataFetchedRef.current.members = true;
+        if (isMounted && !dataFetchedRef.current.schedules) dataFetchedRef.current.schedules = true;
+      } finally {
+        if (isMounted && dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
+           if (isMapLoading) setIsMapLoading(false); 
+           console.log("All group data fetch attempts completed.");
+        }
+      }
+    };
+
+    fetchAllGroupData();
+
+    return () => { isMounted = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupMembers, dataFetchedRef.current.members, dataFetchedRef.current.schedules]);
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
@@ -878,7 +1190,7 @@ export default function HomePage() {
     // 지도가 초기화되면 첫 번째 멤버 선택
     if ((mapType === 'naver' && mapsInitialized.naver) || 
         (mapType === 'google' && mapsInitialized.google)) {
-      if (groupMembers.length > 0) {
+      if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected)) { // 아무도 선택되지 않았을 때만 첫 멤버 선택
         console.log('지도 초기화 감지 - 첫 번째 멤버 선택:', groupMembers[0].name);
         
         const timerId = setTimeout(() => {
@@ -889,34 +1201,138 @@ export default function HomePage() {
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapsInitialized.naver, mapsInitialized.google, mapType]);
+  }, [mapsInitialized.naver, mapsInitialized.google, mapType, groupMembers]); // groupMembers 추가
 
-  // 그룹 멤버 선택 핸들러 수정 - 한 번에 한 명만 선택 가능하도록 변경
+  // 스케줄 마커 업데이트 함수
+  const updateScheduleMarkers = (schedules: Schedule[]) => {
+    // 기존 스케줄 마커 삭제
+    if (scheduleMarkersRef.current.length > 0) {
+      scheduleMarkersRef.current.forEach(marker => {
+        if (marker.setMap) { // Naver, Google 마커 모두 setMap 메소드를 가짐
+          marker.setMap(null);
+        }
+      });
+      scheduleMarkersRef.current = [];
+    }
+
+    // 새 스케줄 마커 추가
+    schedules.forEach(schedule => {
+      if (schedule.sst_location_lat && schedule.sst_location_long) {
+        const position = { lat: schedule.sst_location_lat, lng: schedule.sst_location_long };
+        const scheduleTitle = schedule.title || '제목 없음';
+        const statusDetail = getScheduleStatus(schedule); // 스케줄 상태 가져오기
+
+        if (mapType === 'naver' && naverMap.current && window.naver?.maps && window.naver.maps.Marker) {
+          const naverPos = new window.naver.maps.LatLng(position.lat, position.lng);
+          const newMarker = new window.naver.maps.Marker({
+            position: naverPos,
+            map: naverMap.current,
+            title: scheduleTitle,
+            icon: {
+              content: [
+                '<div style="position: relative; text-align: center;">',
+                `  <div style="width: 12px; height: 12px; background-color: ${statusDetail.color}; border: 2px solid #FFFFFF; border-radius: 50%;"></div>`, // 'S' 제거 및 색상 적용, 크기 약간 줄임
+                `  <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color:rgba(0,0,0,0.6); color: white; padding: 1px 4px; border-radius: 3px; white-space: nowrap; font-size: 9px;">${scheduleTitle}</div>`,
+                '</div>'
+              ].join(''),
+              anchor: new window.naver.maps.Point(6, 24) // anchor 약간 조정 (마커 크기 변경에 따라)
+            }
+          });
+          if (window.naver.maps.InfoWindow) {
+            const infoWindow = new window.naver.maps.InfoWindow({
+              content: `<div style="padding:5px;font-size:12px;min-width:100px;text-align:center;"><strong>${scheduleTitle}</strong><br><span style="color:${statusDetail.color};">${statusDetail.text}</span></div>`,
+              disableAnchor: true
+            });
+            window.naver.maps.Event.addListener(newMarker, 'click', () => {
+              if (infoWindow.getMap()) {
+                infoWindow.close();
+              } else {
+                infoWindow.open(naverMap.current, newMarker);
+              }
+            });
+          }
+          scheduleMarkersRef.current.push(newMarker);
+        } else if (mapType === 'google' && map.current && window.google?.maps && window.google.maps.Marker) {
+          const newMarker = new window.google.maps.Marker({
+            position: position,
+            map: map.current,
+            title: `${scheduleTitle} (${statusDetail.text})`, // title에 상태 텍스트 추가
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              fillColor: statusDetail.color, // 상태에 따른 색상 적용
+              fillOpacity: 1,
+              strokeColor: '#FFFFFF',
+              strokeWeight: 2,
+              scale: 7 
+            },
+            // label 옵션 제거
+          });
+          if (window.google.maps.InfoWindow) {
+            const infoWindow = new window.google.maps.InfoWindow({
+              content: `<div style="font-size:12px;"><strong>${scheduleTitle}</strong><br><span style="color:${statusDetail.color};">${statusDetail.text}</span></div>`
+            });
+            newMarker.addListener('click', () => {
+              infoWindow.open({
+                anchor: newMarker,
+                map: map.current,
+                shouldFocus: false,
+              });
+            });
+          }
+          scheduleMarkersRef.current.push(newMarker);
+        }
+      }
+    });
+  };
+
+  // filteredSchedules 또는 mapType 변경 시 스케줄 마커 업데이트
+  useEffect(() => {
+    if ((mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) ||
+        (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)) {
+      updateScheduleMarkers(filteredSchedules);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredSchedules, mapType, mapsInitialized.google, mapsInitialized.naver]);
+
+  // 그룹 멤버 선택 핸들러 (filteredSchedules 업데이트)
   const handleMemberSelect = (id: string) => {
-    console.log('멤버 선택 실행:', id);
-    
-    // 멤버 선택 상태 업데이트 - 한 명만 선택되도록 수정
     const updatedMembers = groupMembers.map(member => 
-      member.id === id 
-        ? { ...member, isSelected: !member.isSelected } 
-        : { ...member, isSelected: false }  // 다른 멤버는 모두 선택 해제
+      member.id === id ? { ...member, isSelected: !member.isSelected } : { ...member, isSelected: false }
     );
     setGroupMembers(updatedMembers);
-    
-    // 선택된 멤버 찾기
     const selectedMember = updatedMembers.find(member => member.isSelected);
     
-    // 선택된 멤버의 일정 또는 기본 일정 표시
     if (selectedMember) {
-      setFilteredSchedules(selectedMember.schedules);
-      console.log('선택된 멤버:', selectedMember.name, selectedMember.location);
+      setTodayWeather(getWeatherDisplayData(String(selectedMember.mt_weather_sky ?? 'default'), selectedMember.mt_weather_tmx));
+      setFilteredSchedules(
+        selectedMember.schedules.filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(selectedDate))
+      );
     } else {
-      // 선택된 멤버가 없으면 기본 일정 표시
-      setFilteredSchedules(recentSchedules);
+      if (initialWeatherDataRef.current) setTodayWeather(initialWeatherDataRef.current);
+      setFilteredSchedules(
+        groupSchedules
+          .filter(s => typeof s.date === 'string' && s.date!.startsWith(selectedDate))
+          .map(({memberId, ...rest}) => rest)
+      );
     }
-    
-    // 지도에 선택된 멤버 마커 표시
     updateMemberMarkers(updatedMembers);
+  };
+
+  // 선택된 날짜 변경 핸들러 (filteredSchedules 업데이트)
+  const handleDateSelect = (dateValue: string) => {
+    setSelectedDate(dateValue);
+    const selectedMember = groupMembers.find(member => member.isSelected);
+    if (selectedMember) {
+      setFilteredSchedules(
+        selectedMember.schedules.filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(dateValue))
+      );
+    } else {
+      setFilteredSchedules(
+        groupSchedules
+          .filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(dateValue))
+          .map(({memberId, ...rest}) => rest)
+      );
+    }
   };
 
   // 멤버 마커 업데이트 함수
@@ -937,9 +1353,11 @@ export default function HomePage() {
     const selectedMembers = members.filter(member => member.isSelected);
     
     if (selectedMembers.length > 0) {
-      selectedMembers.forEach(member => {
+      selectedMembers.forEach((member, index) => { // 이 index는 selectedMembers 배열 내에서의 index임
+        const photoForMarker = member.photo ?? getDefaultImage(member.mt_gender, member.original_index); // original_index 사용
+
         if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
-          // 네이버 지도 마커
+          console.log(`[Naver Marker] Member: ${member.name}, Original Photo: ${member.photo}, Gender: ${member.mt_gender}, Final Photo URL: ${photoForMarker}`);
           const marker = new window.naver.maps.Marker({
             position: new window.naver.maps.LatLng(member.location.lat, member.location.lng),
             map: naverMap.current,
@@ -947,7 +1365,26 @@ export default function HomePage() {
               content: `
                 <div style="position: relative; text-align: center;">
                   <div style="width: 40px; height: 40px; background-color: white; border: 2px solid #4F46E5; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                    <img src="${member.photo}" alt="${member.name}" style="width: 100%; height: 100%; object-fit: cover;" />
+                    <img 
+                      src="${photoForMarker}" 
+                      alt="${member.name}" 
+                      style="width: 100%; height: 100%; object-fit: cover;" 
+                      data-gender="${member.mt_gender ?? ''}" 
+                      data-index="${member.original_index}" // original_index를 data-index로 전달
+                      onerror="
+                        const genderStr = this.getAttribute('data-gender');
+                        const indexStr = this.getAttribute('data-index');
+                        const gender = genderStr ? parseInt(genderStr, 10) : null;
+                        const idx = indexStr ? parseInt(indexStr, 10) : 0; // 여기서는 original_index를 사용하게 됨
+                        const imgNum = (idx % 4) + 1; /* index 기반 숫자 결정 */ 
+                        let fallbackSrc = '/images/avatar' + ((idx % 3) + 1) + '.png'; 
+                        if (gender === 1) { fallbackSrc = '/images/male_' + imgNum + '.png'; }
+                        else if (gender === 2) { fallbackSrc = '/images/female_' + imgNum + '.png'; }
+                        this.src = fallbackSrc;
+                        this.onerror = null; /* 무한 루프 방지 */
+                        console.error('Naver marker image ${photoForMarker} load failed for ${member.name}. Switched to fallback: ' + fallbackSrc);
+                      "
+                    />
                   </div>
                   <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background-color:rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px;">
                     ${member.name}
@@ -960,27 +1397,18 @@ export default function HomePage() {
           });
           memberMarkers.current.push(marker);
         } else if (mapType === 'google' && map.current && googleMapsLoaded) {
-          // 구글 지도 마커
+          console.log(`[Google Marker] Member: ${member.name}, Original Photo: ${member.photo}, Gender: ${member.mt_gender}, Final Photo URL: ${photoForMarker}`);
           const marker = new window.google.maps.Marker({
             position: member.location,
             map: map.current,
             title: member.name,
             icon: {
-              url: member.photo,
+              url: photoForMarker,
               scaledSize: new window.google.maps.Size(40, 40),
               origin: new window.google.maps.Point(0, 0),
               anchor: new window.google.maps.Point(20, 20),
               labelOrigin: new window.google.maps.Point(20, 50)
             },
-            label: {
-              text: member.name,
-              color: 'white',
-              fontSize: '10px',
-              fontWeight: 'bold',
-              background: '#4F46E5',
-              padding: '4px 8px',
-              borderRadius: '4px'
-            }
           });
           memberMarkers.current.push(marker);
         }
@@ -1020,26 +1448,17 @@ export default function HomePage() {
     }
   };
 
-  // 선택된 날짜 변경 핸들러
-  const handleDateSelect = (date: string) => {
-    setSelectedDate(date);
-    // 실제 구현 시에는 해당 날짜의 일정 및 위치 데이터를 불러옵니다
-  };
-
-  // 초기 실행 시 일정 필터링 설정
-  useEffect(() => {
-    setFilteredSchedules(recentSchedules);
-  }, [recentSchedules]);
-
   // 지도 타입 변경 시 멤버 마커 업데이트
   useEffect(() => {
     if (
-      (mapType === 'naver' && naverMapsLoaded && naverMap.current) || 
-      (mapType === 'google' && googleMapsLoaded && map.current)
+      (mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) || 
+      (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)
     ) {
       updateMemberMarkers(groupMembers);
+      updateScheduleMarkers(filteredSchedules); 
     }
-  }, [mapType, naverMapsLoaded, googleMapsLoaded]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapType, mapsInitialized.google, mapsInitialized.naver]);
 
   // 지도 타입 변경 핸들러
   const handleMapTypeChange = () => {
@@ -1123,6 +1542,61 @@ export default function HomePage() {
     }
   };
 
+  // 날씨 정보 가져오기 useEffect
+  useEffect(() => {
+    const fetchWeatherData = async () => {
+      try {
+        // 실제 API 호출로 변경 필요: 예시 memberService.getCurrentWeather()
+        // 이 API는 { sky: "8", temp_max: 25, ... } 형태의 객체를 반환한다고 가정합니다.
+        // 지금은 PHP 로직을 참고하여 임시 데이터를 사용합니다.
+        // 예시: const weatherDataFromApi = await memberService.getWeatherData();
+        
+        // 임시 데이터 (PHP 로직의 결과라고 가정)
+        // 실제로는 API 호출 후 그 결과를 사용해야 합니다.
+        const exampleSkyFromApi = '8'; // PHP의 $get_weather_status 값 예시
+        const exampleTempMaxFromApi = 28; // PHP의 $get_weather_max 값 예시
+
+        console.log('[HOME PAGE] Fetched Weather Data (Example): ', { sky: exampleSkyFromApi, temp_max: exampleTempMaxFromApi });
+        setTodayWeather(getWeatherDisplayData(exampleSkyFromApi, exampleTempMaxFromApi));
+
+      } catch (error) {
+        console.error('[HOME PAGE] 날씨 정보 조회 오류:', error);
+        setTodayWeather(getWeatherDisplayData('default', null)); // 오류 시 기본값
+      }
+    };
+
+    fetchWeatherData();
+    // 필요하다면 일정 간격으로 날씨 정보 업데이트 (setInterval, clearInterval)
+  }, []); // 마운트 시 1회 실행
+
+  // 앱 초기/기본 날씨 로드 useEffect
+  useEffect(() => {
+    // 이 useEffect는 마운트 시 한 번만 실행되어 초기 날씨를 가져옵니다.
+    // initialWeatherLoaded 상태는 다른 로직에서 이 초기 로드가 완료되었는지 확인하는 용도로 사용될 수 있습니다.
+    const fetchInitialWeatherDataOnce = async () => {
+      if (initialWeatherLoaded) return; // 이미 로드 시도했으면 중복 방지
+
+      try {
+        // TODO: 실제 API 호출 (예: 사용자 위치 기반 날씨)
+        const exampleSkyFromApi = '8'; 
+        const exampleTempMaxFromApi = 25; 
+        const initialWeather = getWeatherDisplayData(exampleSkyFromApi, exampleTempMaxFromApi);
+        setTodayWeather(initialWeather);
+        initialWeatherDataRef.current = initialWeather;
+      } catch (error) {
+        console.error('[HOME PAGE] 초기 날씨 정보 조회 오류:', error);
+        const defaultWeather = getWeatherDisplayData('default', null);
+        setTodayWeather(defaultWeather);
+        initialWeatherDataRef.current = defaultWeather;
+      } finally {
+        setInitialWeatherLoaded(true); // 성공/실패 여부와 관계없이 로드 시도 완료
+      }
+    };
+
+    fetchInitialWeatherDataOnce();
+  }, [initialWeatherLoaded]); // initialWeatherLoaded를 의존성에 넣어, true가 되면 더 이상 실행되지 않도록 함
+                                 // 또는 [] 로 하고 내부에서 initialWeatherLoaded 체크
+
   return (
     <>
       <style jsx global>{modalAnimation}</style>
@@ -1178,6 +1652,7 @@ export default function HomePage() {
         <div 
           ref={bottomSheetRef}
           className={`bottom-sheet ${getBottomSheetClassName()}`}
+          // style={{ background: 'linear-gradient(to bottom right, #e0e7ff, #faf5ff, #fdf2f8)' }}
           onTouchStart={handleDragStart}
           onTouchMove={handleDragMove}
           onTouchEnd={handleDragEnd}
@@ -1188,6 +1663,21 @@ export default function HomePage() {
         >
           <div className="bottom-sheet-handle"></div>
           <div className="px-4 pb-8" onClick={(e) => e.stopPropagation()}>
+            {/* API 테스트 링크 추가 - 이 부분을 삭제합니다. */}
+            {/* 
+            <div className="mb-3 text-right">
+              <Link 
+                href="/test-api" 
+                className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded text-purple-700 bg-purple-100 hover:bg-purple-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                </svg>
+                API 테스트
+              </Link>
+            </div>
+            */}
+            
             {/* 그룹 멤버 (최상단으로 이동) */}
             <div className="content-section members-section min-h-[180px] max-h-[180px] overflow-y-auto mb-3 sm:mb-0">
               <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
@@ -1204,7 +1694,7 @@ export default function HomePage() {
               </h2>
               {groupMembers.length > 0 ? (
                 <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
-                  {groupMembers.map((member) => (
+                  {groupMembers.map((member, index) => ( // 이 index는 groupMembers 배열 내에서의 index임
                     <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
                       <button
                         onClick={() => handleMemberSelect(member.id)}
@@ -1213,7 +1703,16 @@ export default function HomePage() {
                         <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
                           member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
                         }`}>
-                          <img src={member.photo} alt={member.name} className="w-full h-full object-cover" />
+                          <img 
+                            src={member.photo ?? getDefaultImage(member.mt_gender, member.original_index)} // original_index 사용
+                            alt={member.name} 
+                            className="w-full h-full object-cover" 
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = getDefaultImage(member.mt_gender, member.original_index); // original_index 사용
+                              target.onerror = null; // 무한 루프 방지
+                            }}
+                          />
                         </div>
                         <span className={`block text-xs font-medium mt-1 ${
                           member.isSelected ? 'text-indigo-700' : 'text-gray-900'
@@ -1283,32 +1782,53 @@ export default function HomePage() {
               
               {filteredSchedules.length > 0 ? (
                 <ul className="space-y-3">
-                  {filteredSchedules.map((schedule) => (
-                    <li key={schedule.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                      <Link href={`/schedule/${schedule.id}`} className="flex justify-between items-center">
-                        <div>
-                          <h3 className="font-medium text-gray-900">{schedule.title}</h3>
-                          <div className="text-sm text-gray-500 mt-1">
-                            <span className="inline-flex items-center mr-3">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  {filteredSchedules.map((schedule) => {
+                    // 시간 포맷팅 (12시간제, 오전/오후)
+                    let formattedTime = '시간 정보 없음';
+                    if (schedule.date) {
+                      try {
+                        const dateObj = new Date(schedule.date);
+                        if (!isNaN(dateObj.getTime())) {
+                          formattedTime = format(dateObj, 'a h:mm', { locale: ko });
+                        }
+                      } catch (e) {
+                        console.error("Error formatting schedule date:", e);
+                      }
+                    }
+
+                    const displayLocation = schedule.location || schedule.slt_idx_t;
+
+                    return (
+                      <li key={schedule.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors relative"> {/* relative 추가 */}
+                        <Link href={`/schedule/${schedule.id}`} className="block"> 
+                          <h3 className="font-medium text-gray-900 text-base mb-1">{schedule.title}</h3> 
+                          
+                          <div className="flex items-center text-sm text-gray-700 mb-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
-                              {schedule.date}
-                            </span>
-                            <span className="inline-flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <span className="text-gray-600">{formattedTime}</span> {/* 시간 텍스트 색상 변경 */}
+                          </div>
+
+                          {displayLocation && (
+                            <div className="text-sm flex items-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                               </svg>
-                              {schedule.location}
-                            </span>
+                              <span className="text-gray-500">{displayLocation}</span> {/* 장소 텍스트 색상 변경 */}
                           </div>
-                        </div>
+                          )}
+                          
+                          {/* 오른쪽 화살표 아이콘 */}
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
+                          </div>
                       </Link>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               ) : (
                 <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">

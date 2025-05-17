@@ -1,9 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false, // 개발 환경에서 두 번 렌더링 방지
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   images: {
     domains: ['localhost'],
+  },
+  // 서버가 0.0.0.0에 바인딩되도록 설정 (컨테이너 외부에서 접속 가능)
+  server: {
+    host: '0.0.0.0',
+    port: 3000,
   },
   async rewrites() {
     return [

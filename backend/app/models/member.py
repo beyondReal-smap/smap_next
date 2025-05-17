@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Numeric, Enum, text
 from app.models.base import BaseModel
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -28,6 +28,8 @@ class Member(BaseModel):
     mt_sido = Column(String(20), nullable=True)
     mt_gu = Column(String(20), nullable=True)
     mt_dong = Column(String(20), nullable=True)
+    mt_file1 = Column(String(50), nullable=True)
+    mt_gender = Column(String(10), nullable=True)
     mt_weather_pop = Column(Integer, nullable=True)
     mt_weather_tmn = Column(Integer, nullable=True)
     mt_weather_tmx = Column(Integer, nullable=True)
@@ -52,7 +54,7 @@ class Member(BaseModel):
 
     @classmethod
     def get_not_join_group_11(cls, db: Session) -> List['Member']:
-        before_11 = datetime.now() + datetime.timedelta(days=-11)
+        before_11 = datetime.now() - datetime.timedelta(days=11)
         before_11_sday = before_11.strftime("%Y-%m-%d 00:00:00")
         before_11_eday = before_11.strftime("%Y-%m-%d 23:59:59")
 
@@ -82,7 +84,7 @@ class Member(BaseModel):
 
     @classmethod
     def get_sign_in_3(cls, db: Session) -> List['Member']:
-        before3h_start = datetime.now() + datetime.timedelta(hours=-3)
+        before3h_start = datetime.now() - datetime.timedelta(hours=3)
         before3h_end = before3h_start + datetime.timedelta(hours=1)
         now_stime = before3h_start.strftime("%Y-%m-%d %H:%M:%S")
         now_etime = before3h_end.strftime("%Y-%m-%d %H:%M:%S")
@@ -95,7 +97,7 @@ class Member(BaseModel):
 
     @classmethod
     def get_sign_in_24(cls, db: Session) -> List['Member']:
-        before24h_start = datetime.now() + datetime.timedelta(hours=-24)
+        before24h_start = datetime.now() - datetime.timedelta(hours=24)
         before24h_end = before24h_start + datetime.timedelta(hours=1)
         now_stime = before24h_start.strftime("%Y-%m-%d %H:%M:%S")
         now_etime = before24h_end.strftime("%Y-%m-%d %H:%M:%S")

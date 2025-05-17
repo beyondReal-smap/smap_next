@@ -24,6 +24,7 @@
     "dayjs": "^1.11.10",
     "framer-motion": "^11.0.0",
     "heroicons": "^2.0.18",
+    "mysql2": "^3.14.1",
     "next": "15.3.2",
     "react": "19.0.0",
     "react-datepicker": "^8.3.0",
@@ -52,4 +53,4 @@
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
   }
-} 
+}

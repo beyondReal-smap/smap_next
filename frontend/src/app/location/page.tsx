@@ -1260,11 +1260,10 @@ export default function LocationPage() {
     <>
       <style jsx global>{pageStyles}</style>
       <PageContainer 
-        title="위치 관리"
-        description="위치 및 장소를 관리하고 공유하세요"
-        showHeader={false} // true에서 false로 변경
+        title="내 장소" 
+        showHeader={false} 
         showBackButton={false}
-        className="flex flex-col h-full overflow-hidden"
+        className="p-0 m-0 w-full h-screen overflow-hidden relative"
       >
         {isMapLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-50">

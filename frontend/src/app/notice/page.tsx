@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, Suspense, useMemo } from 'react';
+import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Label } from '@/components/ui/label';
 import { FcGoogle } from 'react-icons/fc';
 import { SiKakaotalk } from 'react-icons/si';
+import notificationService from '@/services/notificationService';
 
 // 날짜별 그룹핑 함수
 function groupByDate(list: PushLog[]): Record<string, PushLog[]> {
@@ -33,29 +34,49 @@ function NoticeContent() {
   const [notices, setNotices] = useState<PushLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const dataFetchedRef = React.useRef(false);
 
-  // 알림 목록 조회
+  // 알림 목록 조회 - 리렌더링 방지를 위해 ref 사용
   useEffect(() => {
-    const fetchNotices = async () => {
+    // const dataFetchedRef = React.useRef(false); // 기존 위치에서 제거
+    
+    // 이미 데이터를 가져왔으면 다시 가져오지 않음
+    if (dataFetchedRef.current) return;
+    
+    let isMounted = true;
+    
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/push-logs/member/1186');
+        const data = await notificationService.getMemberPushLogs('1186');
         
-        if (!response.ok) {
-          throw new Error(`Failed to fetch notices. Status: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        console.log('[NOTICE PAGE] Fetched data length:', data.length);
+        console.log('[NOTICE PAGE] Fetched data length:', Array.isArray(data) ? data.length : 'Data is not an array');
+        if (isMounted) {
+          if (Array.isArray(data)) {
         setNotices(data);
+          } else {
+            console.error('[NOTICE PAGE] Fetched data is not an array. Setting notices to empty array.', data);
+            setNotices([]); // 데이터가 배열이 아니면 빈 배열로 설정
+          }
+          dataFetchedRef.current = true;
+        }
       } catch (error) {
         console.error('Error fetching notices:', error);
+        if (isMounted) {
+          setNotices([]); // 에러 발생 시에도 빈 배열로 설정
+        }
       } finally {
+        if (isMounted) { // finally 블록에서도 isMounted 체크
         setLoading(false);
+        }
       }
     };
 
-    fetchNotices();
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // 날짜별 그룹핑 및 정렬
@@ -75,20 +96,8 @@ function NoticeContent() {
   const handleDeleteAll = async () => {
     if (window.confirm('정말 모든 알림을 삭제하시겠습니까?')) {
       try {
-        const response = await fetch('/api/push-logs/delete-all', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ mt_idx: 1186 }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to delete notices');
-        }
-
-        const data: DeleteAllResponse = await response.json();
-        console.log(data.message);
+        const response = await notificationService.deleteAllNotifications(1186);
+        console.log(response.message);
         setNotices([]);
       } catch (error) {
         console.error('Error deleting notices:', error);
@@ -102,14 +111,7 @@ function NoticeContent() {
 
     try {
       const formData = new FormData(e.currentTarget);
-      const response = await fetch('/api/notice', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('공지사항 등록에 실패했습니다.');
-      }
+      await notificationService.registerNotification(formData);
 
       toast({
         title: '성공',
@@ -171,7 +173,7 @@ function NoticeContent() {
 
       {/* 메인 컨텐츠 영역 */}
       <main className="pt-12 pb-8">
-        <div className="px-4 pb-2">
+        <div className="px-4 pb-2 pt-4">
           <p className="text-gray-600 text-sm">푸시 알림 내역을 확인하세요.</p>
         </div>
         <div className="px-2">
@@ -293,6 +295,9 @@ function NoticeContent() {
   );
 }
 
+// React.memo를 사용하여 불필요한 리렌더링 방지
+const MemoizedNoticeContent = React.memo(NoticeContent);
+
 export default function NoticePage() {
-  return <NoticeContent />;
+  return <MemoizedNoticeContent />;
 } 

@@ -268,10 +268,10 @@ const pageStyles = `
 }
 
 .content-section {
-  padding: 10px 16px; 
+  padding: 16px;
   background-color: #ffffff;
   border-radius: 12px;
-  margin-bottom: 10px; 
+  margin-bottom: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   position: relative;
   overflow: hidden;
@@ -690,6 +690,7 @@ export default function LogsPage() {
         <div 
           ref={bottomSheetRef}
           className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}
+          // style={{ background: 'linear-gradient(to bottom right, #e0e7ff, #faf5ff, #fdf2f8)' }}
           onTouchStart={handleDragStart}
           onTouchMove={handleDragMove}
           onTouchEnd={handleDragEnd}

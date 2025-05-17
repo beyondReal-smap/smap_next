@@ -139,7 +139,7 @@ export default function SettingsPage() {
     <div className="bg-[#fff] min-h-screen pb-10">
       <Header title="설정" />
       {/* 프로필 영역 */}
-      <div className="flex flex-col items-center pt-12 pb-4">
+      <div className="flex flex-col items-center pt-20 pb-4">
         <div className="relative">
           <button type="button" onClick={() => setShowSheet(true)}>
             <Image
@@ -194,7 +194,7 @@ export default function SettingsPage() {
       )}
 
       {/* 메뉴 리스트 */}
-      <div className="space-y-4 px-3">
+      <div className="space-y-4 px-3 pb-16">
         {menuSections.map((section, idx) => (
           <div key={idx} className="bg-[#f5f6f7] rounded-2xl shadow-sm p-1">
             {section.items.map((item, i) => (

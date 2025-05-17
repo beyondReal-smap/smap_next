@@ -63,4 +63,8 @@ class EnterAlarmEnum(str, Enum):
 
 class EnterCheckEnum(str, Enum):
     Y = 'Y'
+    N = 'N'
+
+class StatusEnum(str, Enum):
+    Y = 'Y'
     N = 'N' 
