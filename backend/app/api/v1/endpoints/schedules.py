@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.schedule import Schedule
 from app.schemas.schedule import ScheduleCreate, ScheduleUpdate, ScheduleResponse
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -46,12 +47,21 @@ def get_member_schedules(
 @router.get("/group/{group_id}", response_model=List[ScheduleResponse])
 def get_group_schedules(
     group_id: int,
+    days: Optional[int] = None,
     db: Session = Depends(deps.get_db)
 ):
     """
     특정 그룹의 일정 목록을 조회합니다.
+    'days' 파라미터가 주어지면 오늘부터 해당 일수까지의 일정을 반환합니다.
     """
-    schedules = Schedule.find_by_group(db, group_id)
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+    if days is not None and days > 0:
+        start_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        end_date = start_date + timedelta(days=days)
+    
+    schedules = Schedule.find_by_group(db, group_id, start_date=start_date, end_date=end_date)
     return schedules
 
 @router.get("/now/in-members", response_model=List[ScheduleResponse])

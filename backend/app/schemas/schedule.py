@@ -57,6 +57,7 @@ class ScheduleResponse(ScheduleBase):
     sst_wdate: Optional[datetime] = None
     sst_udate: Optional[datetime] = None
     sst_ddate: Optional[datetime] = None
+    mt_schedule_idx: Optional[int] = None
 
     class Config:
         orm_mode = True 

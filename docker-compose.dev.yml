@@ -11,7 +11,7 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_API_URL: http://118.67.130.71:8000/api/v1
       HOSTNAME: 0.0.0.0
       INTERNAL_BACKEND_URL: ${INTERNAL_BACKEND_URL:-http://backend:5000}
       CHOKIDAR_USEPOLLING: "true"

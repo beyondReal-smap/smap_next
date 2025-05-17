@@ -10,6 +10,7 @@ from app.models.enums import (
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict
 from datetime import datetime, timedelta
+from app.models.group_detail import GroupDetail
 
 class Schedule(BaseModel):
     __tablename__ = "smap_schedule_t"
@@ -62,7 +63,7 @@ class Schedule(BaseModel):
         try:
             from app.models.member import Member
             sql = text("""
-                SELECT sst.*, mt.mt_lang as mt_lang
+                SELECT sst.*, mt.mt_lat, mt.mt_lang, mt.mt_idx as mt_idx
                 FROM smap_schedule_t sst
                 LEFT JOIN member_t mt ON sst.mt_idx = mt.mt_idx
                 WHERE NOW() BETWEEN 
@@ -128,11 +129,30 @@ class Schedule(BaseModel):
         return db.query(cls).filter(
             cls.mt_idx == mt_idx,
             cls.sst_show == ShowEnum.Y
-        ).all()
+        ).order_by(cls.sst_sdate).all()
 
     @classmethod
-    def find_by_group(cls, db: Session, sgt_idx: int) -> List['Schedule']:
-        return db.query(cls).filter(
+    def find_by_group(cls, db: Session, sgt_idx: int, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> List['Schedule']:
+        query = db.query(
+            cls, 
+            GroupDetail.mt_idx.label('mt_schedule_idx')
+        ).outerjoin(
+            GroupDetail, cls.sgdt_idx == GroupDetail.sgdt_idx
+        ).filter(
             cls.sgt_idx == sgt_idx,
             cls.sst_show == ShowEnum.Y
-        ).all() 
+        )
+
+        if start_date:
+            query = query.filter(cls.sst_sdate >= start_date)
+        if end_date:
+            query = query.filter(cls.sst_sdate < end_date)
+        
+        results = query.order_by(cls.sst_sdate).all()
+
+        processed_schedules = []
+        for schedule_obj, mt_schedule_idx_val in results:
+            schedule_obj.mt_schedule_idx = mt_schedule_idx_val
+            processed_schedules.append(schedule_obj)
+        
+        return processed_schedules 
