@@ -237,9 +237,9 @@ const modalAnimation = `
   transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 40;
   max-height: 90vh;
-  overflow-y: auto;
-  touch-action: pan-y;
-  padding-bottom: 20px;
+  /* overflow-y: auto; */ /* 제거 - 내부 컨텐츠 래퍼가 담당 */
+  touch-action: pan-y; /* 시트 자체 드래그를 위함 */
+  /* padding-bottom: 20px; */ /* 제거 - 내부 컨텐츠 래퍼가 담당 */
   will-change: transform;
 }
 
@@ -268,9 +268,10 @@ const modalAnimation = `
 
 .bottom-sheet-expanded {
   transform: translateY(0%);
-  min-height: 50vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  height: 85vh; /* 고정 높이 추가 조정 (88vh -> 85vh) */
+  overflow-y: hidden !important; /* 중요: 시트 자체는 스크롤되지 않음 */
+  display: flex !important;
+  flex-direction: column !important;
 }
 
 /* 맵 헤더 스타일 - 바텀시트 위치에 따라 이동하도록 수정 */
@@ -1216,31 +1217,75 @@ export default function HomePage() {
     }
 
     // 새 스케줄 마커 추가
-    schedules.forEach(schedule => {
+    schedules.forEach((schedule, index) => { // index 추가
       if (schedule.sst_location_lat && schedule.sst_location_long) {
         const position = { lat: schedule.sst_location_lat, lng: schedule.sst_location_long };
         const scheduleTitle = schedule.title || '제목 없음';
         const statusDetail = getScheduleStatus(schedule); // 스케줄 상태 가져오기
 
+        // 시간 포맷팅
+        let startTime = '';
+        if (schedule.date) { // schedule.date는 sst_sdate (시작 일시)
+          try {
+            const startDateObj = new Date(schedule.date);
+            if (!isNaN(startDateObj.getTime())) {
+              startTime = format(startDateObj, 'HH:mm', { locale: ko });
+            }
+          } catch (e) { console.error("Error formatting start date:", e); }
+        }
+
+        let endTime = '';
+        if (schedule.sst_edate) { // 종료 일시
+          try {
+            const endDateObj = new Date(schedule.sst_edate);
+            if (!isNaN(endDateObj.getTime())) {
+              endTime = format(endDateObj, 'HH:mm', { locale: ko });
+            }
+          } catch (e) { console.error("Error formatting end date:", e); }
+        }
+
+        const timeRange = (startTime && endTime) ? `${startTime} - ${endTime}` : (startTime || '시간 정보 없음');
+        // Naver/Google 마커에서 가독성을 위해 흰색 또는 매우 밝은 배경색일 경우 어두운 텍스트 색상 사용
+        const titleTextColor = '#FFFFFF';
+        const timeTextColor = '#FFFFFF';
+        const titleBgColor = '#5046E5'; // 사용자가 지정한 색상으로 변경
+        const timeBgColor = '#EC4899'; // Pink-500
+        const orderCircleBgColor = '#22C55E'; // 초록색 (Tailwind Green-500)
+        const orderCircleTextColor = '#FFFFFF';
+
         if (mapType === 'naver' && naverMap.current && window.naver?.maps && window.naver.maps.Marker) {
           const naverPos = new window.naver.maps.LatLng(position.lat, position.lng);
+          const scheduleOrder = index + 1; // 1부터 시작하는 순번
+
           const newMarker = new window.naver.maps.Marker({
             position: naverPos,
             map: naverMap.current,
             title: scheduleTitle,
             icon: {
               content: [
-                '<div style="position: relative; text-align: center;">',
-                `  <div style="width: 12px; height: 12px; background-color: ${statusDetail.color}; border: 2px solid #FFFFFF; border-radius: 50%;"></div>`, // 'S' 제거 및 색상 적용, 크기 약간 줄임
-                `  <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color:rgba(0,0,0,0.6); color: white; padding: 1px 4px; border-radius: 3px; white-space: nowrap; font-size: 9px;">${scheduleTitle}</div>`,
+                '<div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">',
+                // 순서 표시 원
+                `  <div style="width: 16px; height: 16px; background-color: ${orderCircleBgColor}; color: ${orderCircleTextColor}; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.2); z-index: 1;">`,
+                `    ${scheduleOrder}`,
+                `  </div>`,
+                // 제목 박스
+                `  <div style="padding: 4px 8px; background-color: ${titleBgColor}; color: ${titleTextColor}; border-radius: 6px; font-size: 11px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.2); margin-bottom: 2px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">`, // margin-bottom: 2px 로 간격 줄임
+                `    ${scheduleTitle}`,
+                `  </div>`,
+                // 시간 박스
+                `  <div style="padding: 2px 6px; background-color: ${timeBgColor}; color: ${timeTextColor}; border-radius: 4px; font-size: 9px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.1); margin-bottom: 4px;">`,
+                `    ${timeRange}`,
+                `  </div>`,
+                // 하단 상태 원형 마커
+                `  <div style="width: 10px; height: 10px; background-color: ${statusDetail.color}; border: 1.5px solid #FFFFFF; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2);"></div>`,
                 '</div>'
               ].join(''),
-              anchor: new window.naver.maps.Point(6, 24) // anchor 약간 조정 (마커 크기 변경에 따라)
+              anchor: new window.naver.maps.Point(6, 52) // 아이콘 전체 높이 고려하여 anchor 조정 (순서원+제목+시간+상태원)
             }
           });
           if (window.naver.maps.InfoWindow) {
             const infoWindow = new window.naver.maps.InfoWindow({
-              content: `<div style="padding:5px;font-size:12px;min-width:100px;text-align:center;"><strong>${scheduleTitle}</strong><br><span style="color:${statusDetail.color};">${statusDetail.text}</span></div>`,
+              content: `<div style="padding:8px;font-size:13px;min-width:120px;text-align:left;line-height:1.5;"><strong>${scheduleTitle}</strong><br><span style="font-size:11px; color:#555;">시간: ${timeRange}</span><br><span style="font-size:11px; color:${statusDetail.color};">상태: ${statusDetail.text}</span></div>`,
               disableAnchor: true
             });
             window.naver.maps.Event.addListener(newMarker, 'click', () => {
@@ -1256,7 +1301,7 @@ export default function HomePage() {
           const newMarker = new window.google.maps.Marker({
             position: position,
             map: map.current,
-            title: `${scheduleTitle} (${statusDetail.text})`, // title에 상태 텍스트 추가
+            title: `${scheduleTitle} (${statusDetail.text}, ${timeRange})`, // title에 상태 텍스트 및 시간 추가
             icon: {
               path: window.google.maps.SymbolPath.CIRCLE,
               fillColor: statusDetail.color, // 상태에 따른 색상 적용
@@ -1269,7 +1314,7 @@ export default function HomePage() {
           });
           if (window.google.maps.InfoWindow) {
             const infoWindow = new window.google.maps.InfoWindow({
-              content: `<div style="font-size:12px;"><strong>${scheduleTitle}</strong><br><span style="color:${statusDetail.color};">${statusDetail.text}</span></div>`
+              content: `<div style="font-size:13px;line-height:1.5;"><strong>${scheduleTitle}</strong><br><span style="font-size:11px;color:#555;">시간: ${timeRange}</span><br><span style="font-size:11px;color:${statusDetail.color};">상태: ${statusDetail.text}</span></div>`
             });
             newMarker.addListener('click', () => {
               infoWindow.open({
@@ -1662,24 +1707,34 @@ export default function HomePage() {
           onMouseLeave={handleDragEnd}
         >
           <div className="bottom-sheet-handle"></div>
-          <div className="px-4 pb-8" onClick={(e) => e.stopPropagation()}>
-            {/* API 테스트 링크 추가 - 이 부분을 삭제합니다. */}
-            {/* 
-            <div className="mb-3 text-right">
-              <Link 
-                href="/test-api" 
-                className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded text-purple-700 bg-purple-100 hover:bg-purple-200"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-                </svg>
-                API 테스트
-              </Link>
-            </div>
-            */}
-            
+
+          {/* 메인 컨텐츠 래퍼: 상태에 따라 패딩 및 스크롤 동작 변경 */}
+          <div 
+            className={`
+              w-full
+              ${bottomSheetState === 'expanded' 
+                ? 'flex flex-col flex-grow min-h-0'  // expanded: flex 레이아웃, 내부 스크롤 준비
+                : 'px-4 pb-8 overflow-y-auto h-full' // non-expanded: 자체 스크롤, 기존 패딩
+              }
+            `}
+            style={bottomSheetState !== 'expanded' 
+              ? { WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } // non-expanded: 터치 스크롤 활성화
+              : {}
+            }
+          >
             {/* 그룹 멤버 (최상단으로 이동) */}
-            <div className="content-section members-section min-h-[180px] max-h-[180px] overflow-y-auto mb-3 sm:mb-0">
+            <div className={`
+              content-section members-section 
+              min-h-[180px] max-h-[180px] overflow-y-auto /* 자체 콘텐츠가 많을 경우 스크롤 */
+              ${bottomSheetState === 'expanded' 
+                ? 'flex-shrink-0 mx-4 mt-2 mb-3' // expanded: flex 아이템으로 동작, 위아래 마진
+                : 'mb-3 sm:mb-0' // non-expanded: 일반 블록 요소, 하단 마진 (좌우 패딩은 부모에서)
+              }
+            `}
+            // non-expanded 상태에서 멤버 섹션 내부 스크롤을 원활하게 하기 위함
+            style={bottomSheetState !== 'expanded' ? { touchAction: 'auto' } : {}} 
+            onClick={bottomSheetState !== 'expanded' ? (e) => e.stopPropagation() : undefined}
+            >
               <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
                 그룹 멤버
                 <Link 
@@ -1730,155 +1785,169 @@ export default function HomePage() {
               )}
             </div>
 
-            {/* 오늘의 일정 - 선택된 멤버의 일정을 표시 */}
-            <div className="content-section schedule-section">
-              <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
-                {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
-                {
-                  groupMembers.some(m => m.isSelected) ? (
-                    <button 
-                      onClick={() => {
-                        const selectedMember = groupMembers.find(m => m.isSelected);
-                        if (selectedMember) {
-                          router.push(`/schedule/add?memberId=${selectedMember.id}&memberName=${selectedMember.name}&from=home`);
+            {/* 스크롤 가능한 콘텐츠 영역 (오늘의 일정, 추천 장소) */}
+            <div className={`
+              ${bottomSheetState === 'expanded' 
+                ? 'flex-grow min-h-0 overflow-y-auto hide-scrollbar px-4 pb-16' // expanded: 남은 공간 채우고 내부 스크롤, pb-4 -> pb-16
+                : '' // non-expanded: 일반 플로우 (부모 div가 스크롤 담당)
+              }
+            `}
+            style={bottomSheetState === 'expanded' 
+              ? { WebkitOverflowScrolling: 'touch', touchAction: 'auto' } // expanded: 터치 스크롤 활성화
+              : {}
+            }
+            onClick={bottomSheetState === 'expanded' ? (e) => e.stopPropagation() : undefined}
+            >
+              {/* 오늘의 일정 - 선택된 멤버의 일정을 표시 */}
+              <div className={`content-section schedule-section ${bottomSheetState !== 'expanded' ? '' : 'mt-0'}`}>
+                <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
+                  {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
+                  {
+                    groupMembers.some(m => m.isSelected) ? (
+                      <button 
+                        onClick={() => {
+                          const selectedMember = groupMembers.find(m => m.isSelected);
+                          if (selectedMember) {
+                            router.push(`/schedule/add?memberId=${selectedMember.id}&memberName=${selectedMember.name}&from=home`);
+                          }
+                        }}
+                        className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                        </svg>
+                        일정 추가
+                      </button>
+                    ) : (
+                      <Link href="/schedule" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
+                        더보기
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </Link>
+                    )
+                  }
+                </h2>
+                <div className="mb-3 overflow-x-auto pb-2 hide-scrollbar">
+                  <div className="flex space-x-2">
+                    {daysForCalendar.map((day, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleDateSelect(day.value)}
+                        className={`px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors ${
+                          selectedDate === day.value
+                            ? 'bg-gray-900 text-white font-medium shadow-sm'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        <div className="text-center">
+                          <div className="text-xs">{day.display}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {filteredSchedules.length > 0 ? (
+                  <ul className="space-y-3">
+                    {filteredSchedules.map((schedule) => {
+                      // 시간 포맷팅 (12시간제, 오전/오후)
+                      let formattedTime = '시간 정보 없음';
+                      if (schedule.date) {
+                        try {
+                          const dateObj = new Date(schedule.date);
+                          if (!isNaN(dateObj.getTime())) {
+                            formattedTime = format(dateObj, 'a h:mm', { locale: ko });
+                          }
+                        } catch (e) {
+                          console.error("Error formatting schedule date:", e);
                         }
-                      }}
+                      }
+
+                      const displayLocation = schedule.location || schedule.slt_idx_t;
+
+                      return (
+                        <li key={schedule.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors relative"> {/* relative 추가 */}
+                          <Link href={`/schedule/${schedule.id}`} className="block"> 
+                            <h3 className="font-medium text-gray-900 text-base mb-1">{schedule.title}</h3> 
+                            
+                            <div className="flex items-center text-sm text-gray-700 mb-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              <span className="text-gray-600">{formattedTime}</span> {/* 시간 텍스트 색상 변경 */}
+                            </div>
+
+                            {displayLocation && (
+                              <div className="text-sm flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                </svg>
+                                <span className="text-gray-500">{displayLocation}</span> {/* 장소 텍스트 색상 변경 */}
+                            </div>
+                            )}
+                            
+                            {/* 오른쪽 화살표 아이콘 */}
+                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                            </div>
+                        </Link>
+                      </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                    <p>{groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* 확장됐을 때만 표시되는 나머지 내용 */}
+              <div className={`transition-all duration-300 ${bottomSheetState === 'expanded' ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                {/* 추천 장소 */}
+                <div className={`content-section places-section ${bottomSheetState === 'expanded' ? 'mt-3 mb-2' : 'mb-12'}`}>
+                  <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
+                    내 주변 장소
+                    <Link 
+                      href="/location/nearby" 
                       className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                      </svg>
-                      일정 추가
-                    </button>
-                  ) : (
-                    <Link href="/schedule" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
                       더보기
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                       </svg>
                     </Link>
-                  )
-                }
-              </h2>
-              <div className="mb-3 overflow-x-auto pb-2 hide-scrollbar">
-                <div className="flex space-x-2">
-                  {daysForCalendar.map((day, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleDateSelect(day.value)}
-                      className={`px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors ${
-                        selectedDate === day.value
-                          ? 'bg-gray-900 text-white font-medium shadow-sm'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      <div className="text-center">
-                        <div className="text-xs">{day.display}</div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              {filteredSchedules.length > 0 ? (
-                <ul className="space-y-3">
-                  {filteredSchedules.map((schedule) => {
-                    // 시간 포맷팅 (12시간제, 오전/오후)
-                    let formattedTime = '시간 정보 없음';
-                    if (schedule.date) {
-                      try {
-                        const dateObj = new Date(schedule.date);
-                        if (!isNaN(dateObj.getTime())) {
-                          formattedTime = format(dateObj, 'a h:mm', { locale: ko });
-                        }
-                      } catch (e) {
-                        console.error("Error formatting schedule date:", e);
-                      }
-                    }
-
-                    const displayLocation = schedule.location || schedule.slt_idx_t;
-
-                    return (
-                      <li key={schedule.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors relative"> {/* relative 추가 */}
-                        <Link href={`/schedule/${schedule.id}`} className="block"> 
-                          <h3 className="font-medium text-gray-900 text-base mb-1">{schedule.title}</h3> 
-                          
-                          <div className="flex items-center text-sm text-gray-700 mb-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            <span className="text-gray-600">{formattedTime}</span> {/* 시간 텍스트 색상 변경 */}
-                          </div>
-
-                          {displayLocation && (
-                            <div className="text-sm flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              </svg>
-                              <span className="text-gray-500">{displayLocation}</span> {/* 장소 텍스트 색상 변경 */}
-                          </div>
-                          )}
-                          
-                          {/* 오른쪽 화살표 아이콘 */}
-                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                          </div>
-                      </Link>
-                    </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-                  <p>{groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}</p>
-                </div>
-              )}
-            </div>
-
-            {/* 확장됐을 때만 표시되는 나머지 내용 */}
-            <div className={`transition-all duration-300 ${bottomSheetState === 'expanded' ? 'opacity-100' : 'opacity-0 hidden'}`}>
-              {/* 추천 장소 */}
-              <div className="content-section places-section mb-12">
-                <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
-                  내 주변 장소
-                  <Link 
-                    href="/location/nearby" 
-                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    더보기
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </Link>
-                </h2>
-                {recommendedPlaces.length > 0 ? (
-                  <ul className="space-y-3">
-                    {recommendedPlaces.map((place) => (
-                      <li key={place.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                        <Link href={`/location/place/${place.id}`} className="block">
-                          <div className="flex justify-between">
-                            <h3 className="font-medium text-gray-900">{place.title}</h3>
-                            <span className="text-sm text-indigo-600 font-medium">
-                              {formatDistance(place.distance)}
-                            </span>
-                          </div>
-                          <div className="text-sm text-gray-500 mt-1">
-                            <div className="inline-flex items-center">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              </svg>
-                              {place.address}
+                  </h2>
+                  {recommendedPlaces.length > 0 ? (
+                    <ul className="space-y-3">
+                      {recommendedPlaces.map((place) => (
+                        <li key={place.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                          <Link href={`/location/place/${place.id}`} className="block">
+                            <div className="flex justify-between">
+                              <h3 className="font-medium text-gray-900">{place.title}</h3>
+                              <span className="text-sm text-indigo-600 font-medium">
+                                {formatDistance(place.distance)}
+                              </span>
                             </div>
-                          </div>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="text-center py-3 text-gray-500">주변 장소가 없습니다</div>
-                )}
+                            <div className="text-sm text-gray-500 mt-1">
+                              <div className="inline-flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                </svg>
+                                {place.address}
+                              </div>
+                            </div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-center py-3 text-gray-500">주변 장소가 없습니다</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
