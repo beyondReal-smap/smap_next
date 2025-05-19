@@ -3,15 +3,20 @@ import axios, { AxiosInstance } from 'axios';
 // API 기본 URL 설정
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://118.67.130.71:8000/api/v1';
 
+// 커스텀 API 클라이언트 타입 정의
+interface CustomApiClient extends AxiosInstance {
+  upload: (url: string, formData: FormData) => Promise<any>;
+}
+
 // Axios 인스턴스 생성
-const apiClient: AxiosInstance & { upload?: (url: string, formData: FormData) => Promise<any> } = axios.create({
+const apiClient: CustomApiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true, // CORS 요청에 쿠키 포함
-});
+}) as CustomApiClient;
 
 // 요청 인터셉터
 apiClient.interceptors.request.use(
