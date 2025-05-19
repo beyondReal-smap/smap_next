@@ -5,11 +5,6 @@ const nextConfig = {
   images: {
     domains: ['localhost'],
   },
-  // 서버가 0.0.0.0에 바인딩되도록 설정 (컨테이너 외부에서 접속 가능)
-  server: {
-    host: '0.0.0.0',
-    port: 3000,
-  },
   async rewrites() {
     return [
       {
