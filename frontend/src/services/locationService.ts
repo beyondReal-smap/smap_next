@@ -34,6 +34,17 @@ export interface LocationPageData {
   notifications?: boolean;
 }
 
+// OtherMemberLocationRaw 인터페이스 정의 및 내보내기 추가
+export interface OtherMemberLocationRaw {
+  id: string;
+  name: string;
+  address: string;
+  coordinates: [number, number]; // [lng, lat]
+  category: string;
+  memo: string;
+  favorite: boolean;
+  notifications?: boolean;
+}
 
 const locationService = {
   getOtherMembersLocations: async (memberId: string): Promise<OtherMemberLocationRaw[]> => {
