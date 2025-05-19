@@ -28,8 +28,11 @@ const mockGroupMembers = [
   }
 ];
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  const memberId = params.id;
+export async function GET(
+  request: NextRequest,
+  context: { params: { id: string } }
+) {
+  const memberId = context.params.id;
   
   if (!memberId) {
     return NextResponse.json(
