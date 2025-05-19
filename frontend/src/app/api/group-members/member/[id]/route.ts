@@ -28,14 +28,16 @@ const mockGroupMembers = [
   }
 ];
 
-// 타입을 명확히 하기 위해 인터페이스 정의
-interface RouteContextParams {
-  id: string;
+// 인터페이스 이름 및 구조 변경
+interface RouteContext {
+  params: {
+    id: string;
+  };
 }
 
 export async function GET(
   request: NextRequest,
-  context: { params: RouteContextParams }
+  context: RouteContext
 ) {
   const memberId = context.params.id;
   
