@@ -44,6 +44,13 @@ export interface OtherMemberLocationRaw {
   memo: string;
   favorite: boolean;
   notifications?: boolean;
+  // 백엔드 필드와 매핑을 위한 추가 필드
+  slt_idx?: number | string;
+  slt_title?: string;
+  slt_add?: string;
+  slt_lat?: string;
+  slt_long?: string;
+  slt_enter_alarm?: string;
 }
 
 const locationService = {

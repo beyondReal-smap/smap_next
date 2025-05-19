@@ -715,7 +715,7 @@ export default function LocationPage() {
           if (activeView === 'selectedMemberPlaces') {
             addMarkersToMap(currentSelectedMember.savedLocations || []);
           } else {
-            addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+            addMarkersToMap(otherMembersSavedLocations);
           }
         } else {
           addMarkersToMap(locations); // 멤버 미선택 시 전체 장소 마커 표시 (또는 빈 배열)
@@ -1401,7 +1401,92 @@ export default function LocationPage() {
     } else { 
         addMarkersToMap(locations.filter(loc => loc.id !== idStr));
     }
-  }; 
+    };
+  
+  // 다른 멤버의 위치 데이터를 위한 함수 추가
+  const addMarkersToMapForOtherMembers = (locationsToDisplay: any[]) => {
+    if (!map.current || !window.naver?.maps || !naverMapsLoaded) return;
+    
+    Object.values(markers.current).forEach(marker => {
+      if (marker && typeof marker.setMap === 'function') marker.setMap(null);
+    });
+    markers.current = {};
+
+    if (!locationsToDisplay || locationsToDisplay.length === 0) {
+      return;
+    }
+
+    locationsToDisplay.forEach(location => {
+      if (!location.id) {
+        console.warn('Location ID is missing, cannot create marker:', location);
+        return;
+      }
+      try {
+        const lat = location.slt_lat ? parseFloat(location.slt_lat) : location.coordinates?.[1];
+        const lng = location.slt_long ? parseFloat(location.slt_long) : location.coordinates?.[0];
+        const position = new window.naver.maps.LatLng(lat, lng);
+        
+        const locationName = location.slt_title || location.name || '이름 없음';
+        const isSelectedByInfoPanel = isLocationInfoPanelOpen && newLocation.id === location.id && isEditingPanel;
+
+        const markerContent = `
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+            <div style="padding: 3px 7px; background-color: #4F46E5; color: white; border-radius: 5px; font-size: 11px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.3); margin-bottom: 3px;">
+              ${locationName}
+            </div>
+            <div style="width: 12px; height: 12px; background-color: ${isSelectedByInfoPanel ? '#FF0000' : '#1E90FF'}; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+            </div>
+          </div>
+        `;
+
+        const iconOptions = {
+            content: markerContent,
+            anchor: new window.naver.maps.Point(isSelectedByInfoPanel ? 6 : 6, 38)
+        };
+
+        const markerInstance = new window.naver.maps.Marker({
+            position: position,
+            map: map.current,
+            icon: iconOptions,
+        });
+
+        markerInstance.setZIndex(isSelectedByInfoPanel ? 200 : 100);
+
+        window.naver.maps.Event.addListener(markerInstance, 'click', (e: any) => {
+            const address = location.slt_add || location.address || '';
+            const lat = location.slt_lat ? parseFloat(location.slt_lat) : location.coordinates?.[1];
+            const lng = location.slt_long ? parseFloat(location.slt_long) : location.coordinates?.[0];
+            const coordinates: [number, number] = [lng, lat];
+            
+            setNewLocation({ 
+                id: location.id,
+                name: locationName,
+                address: address,
+                coordinates: coordinates,
+                category: location.category || '기타',
+                memo: location.memo || '',
+                favorite: location.favorite || false,
+                notifications: location.slt_enter_alarm === 'Y' || location.notifications || false,
+            });
+            setClickedCoordinates(new window.naver.maps.LatLng(lat, lng));
+            setIsEditingPanel(true); 
+            setIsLocationInfoPanelOpen(true); 
+            if (tempMarker.current) tempMarker.current.setMap(null); 
+            
+            if (bottomSheetState === 'collapsed') setBottomSheetState('expanded');
+        });
+        markers.current[location.id] = markerInstance;
+    } catch (error) {
+        console.error(`다른 멤버 장소 마커 추가 중 오류 (${location.slt_title || location.name}):`, error);
+    }
+  });
+  };
+
+  // 다른 멤버 위치 데이터 ID로 조회하는 함수 추가
+  const getOtherMemberLocationById = (id: string, otherLocations: any[]): any => {
+    if (!otherLocations || !id) return null;
+    return otherLocations.find(loc => loc.id === id || loc.slt_idx === id || String(loc.slt_idx) === id);
+  };
 
   return (
     <>
