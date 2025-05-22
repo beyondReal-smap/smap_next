@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ) {
   try {
+    const params = await context.params;
     const { id } = params;
     const backendUrl = `https://118.67.130.71:8000/api/v1/group-members/member/${id}`;
     

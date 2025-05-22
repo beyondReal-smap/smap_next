@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  context: any
 ) {
   try {
+    const params = await context.params;
     const { groupId } = params;
     const { searchParams } = new URL(request.url);
     const days = searchParams.get('days');
