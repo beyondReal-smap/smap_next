@@ -808,7 +808,7 @@ export default function HomePage() {
         let currentMembers: GroupMember[] = groupMembers.length > 0 ? [...groupMembers] : [];
 
         if (!dataFetchedRef.current.members) {
-          const memberData = await memberService.getGroupMembers(`/api/v1/group-members/member/${GROUP_ID_EXAMPLE}`);
+          const memberData = await memberService.getGroupMembers(GROUP_ID_EXAMPLE);
           if (isMounted) { 
             if (memberData && memberData.length > 0) { 
               currentMembers = memberData.map((member: any, index: number) => ({

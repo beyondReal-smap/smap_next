@@ -72,23 +72,23 @@ class MemberService {
   async getGroupMembers(groupId: number | string): Promise<Member[]> {
     const mockData: Member[] = [
       {
-        mt_idx: 1,
+        mt_idx: 1186,
         mt_name: '김철수',
-        mt_file1: '/images/avatar1.png',
+        mt_file1: '/images/avatar3.png',
         mt_lat: '37.5692',
         mt_long: '127.0036'
       },
       {
-        mt_idx: 2,
+        mt_idx: 1187,
         mt_name: '이영희',
-        mt_file1: '/images/avatar2.png',
+        mt_file1: '/images/avatar1.png',
         mt_lat: '37.5612',
         mt_long: '126.9966'
       },
       {
-        mt_idx: 3,
+        mt_idx: 1188,
         mt_name: '박민수',
-        mt_file1: '/images/avatar3.png',
+        mt_file1: '/images/avatar2.png',
         mt_lat: '37.5662',
         mt_long: '126.9986'
       }
@@ -96,7 +96,8 @@ class MemberService {
     
     try {
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 시작:', groupId);
-      const response = await apiClient.get<Member[]>(String(groupId));
+      // Next.js API 라우트를 통해 호출
+      const response = await apiClient.get<Member[]>(`/api/group-members/member/${groupId}`);
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 응답:', response.data);
       return response.data;
     } catch (error) {
