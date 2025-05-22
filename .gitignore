@@ -1,7 +1,5 @@
 # Dependencies
 /node_modules
-node_modules/
-**node_modules/**
 /.pnp
 .pnp.js
 
@@ -89,3 +87,4 @@ temp/
 ./frontend/src/app/smap_php/**/firebase-adminsdk-*.json
 
 docker_data/
+node_modules/

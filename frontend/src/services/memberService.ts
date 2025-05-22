@@ -96,7 +96,7 @@ class MemberService {
     
     try {
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 시작:', groupId);
-      const response = await apiClient.get<Member[]>(`/group-members/member/${groupId}`);
+      const response = await apiClient.get<Member[]>(String(groupId));
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 응답:', response.data);
       return response.data;
     } catch (error) {

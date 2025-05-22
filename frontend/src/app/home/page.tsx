@@ -430,7 +430,7 @@ const modalAnimation = `
 
 export const dynamic = 'force-dynamic';
 
-const BACKEND_STORAGE_BASE_URL = 'http://118.67.130.71:8000/storage/'; // 실제 백엔드 이미지 저장 경로의 기본 URL (★ 반드시 실제 경로로 수정 필요)
+const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/'; // 실제 백엔드 이미지 저장 경로의 기본 URL (★ 반드시 실제 경로로 수정 필요)
 
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
   const imageNumber = (index % 4) + 1; // index 기반으로 1~4 숫자 결정 (랜덤 대신)
@@ -808,7 +808,7 @@ export default function HomePage() {
         let currentMembers: GroupMember[] = groupMembers.length > 0 ? [...groupMembers] : [];
 
         if (!dataFetchedRef.current.members) {
-          const memberData = await memberService.getGroupMembers(GROUP_ID_EXAMPLE);
+          const memberData = await memberService.getGroupMembers(`/api/v1/group-members/member/${GROUP_ID_EXAMPLE}`);
           if (isMounted) { 
             if (memberData && memberData.length > 0) { 
               currentMembers = memberData.map((member: any, index: number) => ({

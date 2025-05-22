@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 
 // API 기본 URL 설정
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://118.67.130.71:8000/api/v1';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://118.67.130.71:8000/api/v1';
 
 // 커스텀 API 클라이언트 타입 정의
 interface CustomApiClient extends AxiosInstance {

@@ -28,7 +28,7 @@ const NAVER_MAPS_CLIENT_ID = API_KEYS.NAVER_MAPS_CLIENT_ID;
 // KAKAO_REST_API_KEY를 API_KEYS.KAKAO_REST_API_KEY에서 가져오도록 수정
 const KAKAO_REST_API_KEY = API_KEYS.KAKAO_REST_API_KEY; 
 // 백엔드 스토리지 URL 상수 추가
-const BACKEND_STORAGE_BASE_URL = 'http://118.67.130.71:8000/storage/';
+const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/';
 
 // 기본 이미지 가져오는 함수 추가
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {

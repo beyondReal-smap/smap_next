@@ -11,14 +11,13 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000",  # Next.js 개발 서버
         "http://localhost:8000",  # FastAPI 개발 서버
-        "http://118.67.130.71:3000",  # 프론트엔드 서버
-        "http://118.67.130.71:8000",  # 백엔드 서버
-        "http://frontend:3000",  # Docker 네트워크 내 프론트엔드 컨테이너
+        "https://118.67.130.71:3000",  # 프론트엔드 서버
+        "https://118.67.130.71:8000",  # 백엔드 서버
         "http://127.0.0.1:3000",  # 로컬 IP
     ]
     
     # MySQL 데이터베이스 설정
-    MYSQL_HOST: str = "host.docker.internal"
+    MYSQL_HOST: str = "https://118.67.130.71"
     MYSQL_USER: str = "smap2"
     MYSQL_PASSWORD: str = "dmonster"
     MYSQL_DB: str = "smap2_db"

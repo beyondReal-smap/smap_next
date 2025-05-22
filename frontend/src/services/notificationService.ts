@@ -38,6 +38,9 @@ class NotificationService {
    * 알림 등록 (관리자 기능)
    */
   async registerNotification(data: FormData): Promise<{ success: boolean; message: string }> {
+    if (!apiClient.upload) {
+      throw new Error('업로드 기능을 사용할 수 없습니다');
+    }
     return apiClient.upload('/notice', data);
   }
 }
