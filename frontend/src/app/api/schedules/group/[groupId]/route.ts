@@ -17,19 +17,27 @@ export async function GET(
     
     console.log('[API PROXY] 백엔드 호출:', backendUrl);
     
-    const response = await fetch(backendUrl, {
+    const fetchOptions: RequestInit = {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Next.js API Proxy',
       },
-    });
+    };
+    
+    const response = await fetch(backendUrl, fetchOptions);
+
+    console.log('[API PROXY] 백엔드 응답 상태:', response.status, response.statusText);
 
     if (!response.ok) {
-      throw new Error(`Backend API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('[API PROXY] 백엔드 에러 응답:', errorText);
+      throw new Error(`Backend API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('[API PROXY] 백엔드 응답:', data);
+    console.log('[API PROXY] 백엔드 응답 성공:', data);
 
     return NextResponse.json(data, {
       status: 200,
