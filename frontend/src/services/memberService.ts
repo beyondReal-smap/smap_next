@@ -96,8 +96,8 @@ class MemberService {
     
     try {
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 시작:', groupId);
-      // Next.js API 라우트를 통해 호출
-      const response = await apiClient.get<Member[]>(`/api/group-members/member/${groupId}`);
+      // Next.js API 라우트를 통한 프록시 호출
+      const response = await apiClient.get<Member[]>(`/group-members/member/${groupId}`);
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 응답:', response.data);
       return response.data;
     } catch (error) {

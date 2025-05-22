@@ -5,14 +5,7 @@ const nextConfig = {
   images: {
     domains: ['localhost'],
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://backend:5000/api/v1/:path*', // Docker 네트워크 환경에서 backend 컨테이너의 /api/v1 으로 프록시
-      },
-    ];
-  },
+  // API Routes가 서버사이드에서 프록시 처리하므로 rewrites와 headers 설정 불필요
   webpack: (config, { isServer }) => {
     // 모든 모듈에 대한 풀링 활성화 (Docker에서 변경 감지를 위해)
     config.watchOptions = {

@@ -50,7 +50,7 @@ const scheduleService = {
   // 특정 그룹의 스케줄 목록 가져오기 (기간 필터링 추가)
   async getGroupSchedules(groupId: string, days?: number): Promise<Schedule[]> {
     try {
-      let url = `/api/schedules/group/${groupId}`;
+      let url = `/schedules/group/${groupId}`;
       if (days !== undefined && days > 0) {
         url += `?days=${days}`;
       }

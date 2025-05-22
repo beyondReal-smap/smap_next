@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from 'axios';
 
-// API 기본 URL 설정 - Next.js API 라우트 사용
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+// API 기본 URL 설정 - Next.js API 라우트를 통한 프록시
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 // 커스텀 API 클라이언트 타입 정의
 interface CustomApiClient extends AxiosInstance {
