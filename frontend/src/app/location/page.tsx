@@ -301,7 +301,7 @@ const pageStyles = `
 }
 .location-info-panel {
   position: absolute;
-  top: 160px; /* 헤더 아래 여백을 더 늘림 */
+  top: 80px; /* 헤더 아래 여백을 줄여서 더 위쪽으로 이동 */
   left: 50%;
   transform: translateX(-50%);
   width: calc(100% - 30px);
@@ -309,7 +309,7 @@ const pageStyles = `
   background-color: white;
   border-radius: 12px;
   box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-  z-index: 45;
+  z-index: 55; /* z-index를 높여서 바텀시트 위에 확실히 표시 */
   padding: 20px;
   opacity: 0;
   visibility: hidden;
@@ -1794,11 +1794,13 @@ export default function LocationPage() {
                             onClick={() => {
                               if (map.current && window.naver?.maps) {
                                 const position = new window.naver.maps.LatLng(lat, lng);
-                                map.current.panTo(position); 
-                                if(map.current.getZoom() < 15) map.current.setZoom(15);
                                 
-                                // 바텀시트를 collapsed 상태로 변경하여 지도 이동을 명확하게 보이도록 함
-                                setBottomSheetState('collapsed');
+                                // 지도 중심 이동을 더 확실하게 하기 위해 panTo와 setCenter 모두 사용
+                                map.current.setCenter(position);
+                                map.current.panTo(position); 
+                                if(map.current.getZoom() < 16) map.current.setZoom(16); // 줌 레벨 증가
+                                
+                                // 바텀시트는 그대로 유지 (collapsed로 변경하지 않음)
                                 
                                 setNewLocation({ 
                                   id: String(location.slt_idx), 
@@ -1816,10 +1818,11 @@ export default function LocationPage() {
                                 if (tempMarker.current) tempMarker.current.setMap(null);
                                 addMarkersToMapForOtherMembers(otherMembersSavedLocations); 
                                 
-                                // 약간의 지연 후 정보 패널을 여는 효과 추가
+                                // 약간의 지연 후 로깅
                                 setTimeout(() => {
                                   console.log(`[LOCATION] 다른 멤버의 장소 선택됨: ${location.name || location.slt_title}, 좌표: [${lat}, ${lng}]`);
-                                }, 300);
+                                  console.log(`[LOCATION] 지도 중심 이동 완료, 현재 줌 레벨: ${map.current?.getZoom()}`);
+                                }, 500);
                               }
                             }}
                           >
