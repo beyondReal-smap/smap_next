@@ -657,9 +657,15 @@ export default function HomePage() {
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
+  const [firstMemberSelected, setFirstMemberSelected] = useState(false); // 첫번째 멤버 선택 완료 추적
 
   // Bottom Sheet 상태를 클래스 이름으로 변환
   const getBottomSheetClassName = () => {
+    // 로딩 중일 때는 강제로 collapsed 상태로 유지
+    if (isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) {
+      return 'bottom-sheet-collapsed';
+    }
+    
     switch (bottomSheetState) {
       case 'collapsed': return 'bottom-sheet-collapsed';
       case 'middle': return 'bottom-sheet-middle';
@@ -1897,16 +1903,20 @@ export default function HomePage() {
     }
   };
 
-  // 그룹 선택 핸들러
+  // 그룹 선택 핸들러 - location/page.tsx와 동일한 패턴으로 수정
   const handleGroupSelect = async (groupId: number) => {
     console.log('[handleGroupSelect] 그룹 선택:', groupId);
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
     
-    // 기존 데이터 초기화
+    // 바텀시트를 collapsed 상태로 변경
+    setBottomSheetState('collapsed');
+    
+    // 기존 데이터 초기화 - location/page.tsx와 동일한 패턴
     setGroupMembers([]);
     setGroupSchedules([]);
     setFilteredSchedules([]);
+    setFirstMemberSelected(false);
     setIsFirstMemberSelectionComplete(false);
     dataFetchedRef.current = { members: false, schedules: false };
     
@@ -1935,6 +1945,21 @@ export default function HomePage() {
     }
   }, [isGroupSelectorOpen]);
 
+  // 첫번째 멤버 자동 선택 - location/page.tsx와 동일한 패턴 추가
+  useEffect(() => {
+    if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && !firstMemberSelected && dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
+      console.log('[HOME] 첫번째 멤버 자동 선택 시작:', groupMembers[0].name);
+      
+      // 상태를 즉시 설정하여 중복 실행 방지
+      setFirstMemberSelected(true);
+      
+      setTimeout(() => {
+        console.log('[HOME] 첫번째 멤버 자동 선택 실행:', groupMembers[0].id);
+        handleMemberSelect(groupMembers[0].id);
+      }, 500);
+    }
+  }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members, dataFetchedRef.current.schedules]);
+
   return (
     <>
       <style jsx global>{modalAnimation}</style>
@@ -1954,7 +1979,7 @@ export default function HomePage() {
                       : "첫번째 멤버 위치로 이동 중입니다..."
               } 
               fullScreen={true}
-              type="dots"
+              type="ripple"
               size="md"
               color="indigo"
             />
@@ -1973,361 +1998,367 @@ export default function HomePage() {
         </div>
 
         {/* 지도 헤더 - 바텀시트 상태에 따라 위치 변경 */}
-        <div className={`map-header ${getHeaderClassName()}`}>
-          {isLocationEnabled && (
-            <span className="absolute top-1 right-1 inline-flex items-center justify-center w-2 h-2">
-              <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-pink-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
-            </span>
-          )}
-          <div className="flex flex-col items-center w-full">
-            <span className="text-lg">{todayWeather.icon}</span>
-            <span className="text-sm font-medium">{todayWeather.temp}</span>
-            <span className="text-xs text-white">{todayWeather.condition}</span>
+        {!(isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+          <div className={`map-header ${getHeaderClassName()}`}>
+            {isLocationEnabled && (
+              <span className="absolute top-1 right-1 inline-flex items-center justify-center w-2 h-2">
+                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-pink-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
+              </span>
+            )}
+            <div className="flex flex-col items-center w-full">
+              <span className="text-lg">{todayWeather.icon}</span>
+              <span className="text-sm font-medium">{todayWeather.temp}</span>
+              <span className="text-xs text-white">{todayWeather.condition}</span>
+            </div>
           </div>
-        </div>
+        )}
         
         {/* 지도 컨트롤 버튼들 - 바텀시트 상태에 따라 위치 변경 */}
-        <div className={`map-controls ${getControlsClassName()}`}>
-          <button 
-            onClick={() => updateMapPosition()}
-            className="map-control-button"
-            aria-label="내 위치로 이동"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-        </div>
+        {!(isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+          <div className={`map-controls ${getControlsClassName()}`}>
+            <button 
+              onClick={() => updateMapPosition()}
+              className="map-control-button"
+              aria-label="내 위치로 이동"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* Bottom Sheet - 끌어올리거나 내릴 수 있는 패널 */}
-        <div 
-          ref={bottomSheetRef}
-          className={`bottom-sheet ${getBottomSheetClassName()}`}
-          style={{ touchAction: 'pan-x' }} // 좌우 스와이프만 허용
-          onTouchStart={handleDragStart}
-          onTouchMove={handleDragMove}
-          onTouchEnd={handleDragEnd}
-          onMouseDown={handleDragStart}
-          onMouseMove={handleDragMove}
-          onMouseUp={handleDragEnd}
-          onMouseLeave={handleDragEnd}
-        >
-          <div className="bottom-sheet-handle"></div>
-
-          {/* 메인 컨텐츠 래퍼: 상태에 따라 패딩 및 스크롤 동작 변경 */}
+        {!(isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
           <div 
-            className={`
-              w-full
-              ${bottomSheetState === 'expanded' 
-                ? 'flex flex-col flex-grow min-h-0'  // expanded: flex 레이아웃, 내부 스크롤 준비
-                : 'px-4 pb-8 overflow-y-auto h-full' // non-expanded: 자체 스크롤, 기존 패딩
-              }
-            `}
-            style={bottomSheetState !== 'expanded' 
-              ? { WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } // non-expanded: 터치 스크롤 활성화
-              : {}
-            }
+            ref={bottomSheetRef}
+            className={`bottom-sheet ${getBottomSheetClassName()}`}
+            style={{ touchAction: 'pan-x' }} // 좌우 스와이프만 허용
+            onTouchStart={handleDragStart}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+            onMouseDown={handleDragStart}
+            onMouseMove={handleDragMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
           >
-            {/* 그룹 멤버 (최상단으로 이동) */}
-            <div className={`
-              content-section members-section 
-              min-h-[180px] max-h-[180px] overflow-y-auto /* 자체 콘텐츠가 많을 경우 스크롤 */
-              ${bottomSheetState === 'expanded' 
-                ? 'flex-shrink-0 mx-4 mt-2 mb-3' // expanded: flex 아이템으로 동작, 위아래 마진
-                : 'mb-3 sm:mb-0' // non-expanded: 일반 블록 요소, 하단 마진 (좌우 패딩은 부모에서)
+            <div className="bottom-sheet-handle"></div>
+
+            {/* 메인 컨텐츠 래퍼: 상태에 따라 패딩 및 스크롤 동작 변경 */}
+            <div 
+              className={`
+                w-full
+                ${bottomSheetState === 'expanded' 
+                  ? 'flex flex-col flex-grow min-h-0'  // expanded: flex 레이아웃, 내부 스크롤 준비
+                  : 'px-4 pb-8 overflow-y-auto h-full' // non-expanded: 자체 스크롤, 기존 패딩
+                }
+              `}
+              style={bottomSheetState !== 'expanded' 
+                ? { WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } // non-expanded: 터치 스크롤 활성화
+                : {}
               }
-            `}
-            // non-expanded 상태에서 멤버 섹션 내부 스크롤을 원활하게 하기 위함
-            style={bottomSheetState !== 'expanded' ? { touchAction: 'auto' } : {}} 
-            onClick={bottomSheetState !== 'expanded' ? (e) => e.stopPropagation() : undefined}
             >
-              <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
-                <div className="flex items-center space-x-3">
-                  <span>그룹 멤버</span>
-                </div>
-                
-                <div className="flex items-center space-x-2">
-                  {/* 그룹 선택 드롭다운 */}
-                  <div className="relative">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsGroupSelectorOpen(!isGroupSelectorOpen);
-                      }}
-                      className="flex items-center justify-between px-2.5 py-1.5 bg-white border border-gray-200 rounded text-xs hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
-                      disabled={isLoadingGroups}
-                      data-group-selector="true"
-                    >
-                      <span className="truncate text-gray-700">
-                        {isLoadingGroups 
-                          ? '로딩 중...' 
-                          : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
-                        }
-                      </span>
-                      <div className="ml-1 flex-shrink-0">
-                        {isLoadingGroups ? (
-                          <FiLoader className="animate-spin h-3 w-3 text-gray-400" />
-                        ) : (
-                          <FiChevronDown className={`text-gray-400 transition-transform duration-200 h-3 w-3 ${isGroupSelectorOpen ? 'rotate-180' : ''}`} />
-                        )}
-                      </div>
-                    </button>
-
-                    {isGroupSelectorOpen && userGroups.length > 0 && (
-                      <div className="absolute top-full right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto min-w-[160px]">
-                        {userGroups.map((group) => (
-                          <button
-                            key={group.sgt_idx}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleGroupSelect(group.sgt_idx);
-                            }}
-                            className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 focus:outline-none focus:bg-indigo-50 ${
-                              selectedGroupId === group.sgt_idx 
-                                ? 'bg-indigo-50 text-indigo-700 font-medium' 
-                                : 'text-gray-900'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</span>
-                              {selectedGroupId === group.sgt_idx && (
-                                <span className="text-indigo-500 ml-2">✓</span>
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+              {/* 그룹 멤버 (최상단으로 이동) */}
+              <div className={`
+                content-section members-section 
+                min-h-[180px] max-h-[180px] overflow-y-auto /* 자체 콘텐츠가 많을 경우 스크롤 */
+                ${bottomSheetState === 'expanded' 
+                  ? 'flex-shrink-0 mx-4 mt-2 mb-3' // expanded: flex 아이템으로 동작, 위아래 마진
+                  : 'mb-3 sm:mb-0' // non-expanded: 일반 블록 요소, 하단 마진 (좌우 패딩은 부모에서)
+                }
+              `}
+              // non-expanded 상태에서 멤버 섹션 내부 스크롤을 원활하게 하기 위함
+              style={bottomSheetState !== 'expanded' ? { touchAction: 'auto' } : {}} 
+              onClick={bottomSheetState !== 'expanded' ? (e) => e.stopPropagation() : undefined}
+              >
+                <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
+                  <div className="flex items-center space-x-3">
+                    <span>그룹 멤버</span>
                   </div>
-
-                  <Link 
-                    href="/group" 
-                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-                    </svg>
-                    그룹 관리
-                  </Link>
-                </div>
-              </h2>
-              {groupMembers.length > 0 ? (
-                <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
-                  {groupMembers.map((member, index) => ( // 이 index는 groupMembers 배열 내에서의 index임
-                    <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
+                  
+                  <div className="flex items-center space-x-2">
+                    {/* 그룹 선택 드롭다운 */}
+                    <div className="relative">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleMemberSelect(member.id);
+                          setIsGroupSelectorOpen(!isGroupSelectorOpen);
                         }}
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchMove={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
-                        className={`flex flex-col items-center`}
+                        className="flex items-center justify-between px-2.5 py-1.5 bg-white border border-gray-200 rounded text-xs hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
+                        disabled={isLoadingGroups}
+                        data-group-selector="true"
                       >
-                        <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
-                          member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
-                        }`}>
-                          <img 
-                            src={member.photo ?? getDefaultImage(member.mt_gender, member.original_index)} // original_index 사용
-                            alt={member.name} 
-                            className="w-full h-full object-cover" 
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = getDefaultImage(member.mt_gender, member.original_index); // original_index 사용
-                              target.onerror = null; // 무한 루프 방지
-                            }}
-                          />
-                        </div>
-                        <span className={`block text-xs font-medium mt-1 ${
-                          member.isSelected ? 'text-indigo-700' : 'text-gray-900'
-                        }`}>
-                          {member.name}
-                        </span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-3 text-gray-500">
-                  <p>그룹에 참여한 멤버가 없습니다</p>
-                </div>
-              )}
-            </div>
-
-            {/* 스크롤 가능한 콘텐츠 영역 (오늘의 일정, 추천 장소) */}
-            <div className={`
-              ${bottomSheetState === 'expanded' 
-                ? 'flex-grow min-h-0 overflow-y-auto hide-scrollbar px-4 pb-16' // expanded: 남은 공간 채우고 내부 스크롤, pb-4 -> pb-16
-                : '' // non-expanded: 일반 플로우 (부모 div가 스크롤 담당)
-              }
-            `}
-            style={bottomSheetState === 'expanded' 
-              ? { WebkitOverflowScrolling: 'touch', touchAction: 'auto' } // expanded: 터치 스크롤 활성화
-              : {}
-            }
-            onClick={bottomSheetState === 'expanded' ? (e) => e.stopPropagation() : undefined}
-            >
-              {/* 오늘의 일정 - 선택된 멤버의 일정을 표시 */}
-              <div className={`content-section schedule-section ${bottomSheetState !== 'expanded' ? '' : 'mt-0'}`}>
-                <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
-                  {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
-                  {
-                    groupMembers.some(m => m.isSelected) ? (
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const selectedMember = groupMembers.find(m => m.isSelected);
-                          if (selectedMember) {
-                            router.push(`/schedule/add?memberId=${selectedMember.id}&memberName=${selectedMember.name}&from=home`);
+                        <span className="truncate text-gray-700">
+                          {isLoadingGroups 
+                            ? '로딩 중...' 
+                            : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
                           }
-                        }}
+                        </span>
+                        <div className="ml-1 flex-shrink-0">
+                          {isLoadingGroups ? (
+                            <FiLoader className="animate-spin h-3 w-3 text-gray-400" />
+                          ) : (
+                            <FiChevronDown className={`text-gray-400 transition-transform duration-200 h-3 w-3 ${isGroupSelectorOpen ? 'rotate-180' : ''}`} />
+                          )}
+                        </div>
+                      </button>
+
+                      {isGroupSelectorOpen && userGroups.length > 0 && (
+                        <div className="absolute top-full right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto min-w-[160px]">
+                          {userGroups.map((group) => (
+                            <button
+                              key={group.sgt_idx}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleGroupSelect(group.sgt_idx);
+                              }}
+                              className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 focus:outline-none focus:bg-indigo-50 ${
+                                selectedGroupId === group.sgt_idx 
+                                  ? 'bg-indigo-50 text-indigo-700 font-medium' 
+                                  : 'text-gray-900'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</span>
+                                {selectedGroupId === group.sgt_idx && (
+                                  <span className="text-indigo-500 ml-2">✓</span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <Link 
+                      href="/group" 
+                      className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                      </svg>
+                      그룹 관리
+                    </Link>
+                  </div>
+                </h2>
+                {groupMembers.length > 0 ? (
+                  <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
+                    {groupMembers.map((member, index) => ( // 이 index는 groupMembers 배열 내에서의 index임
+                      <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMemberSelect(member.id);
+                          }}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
+                          onTouchEnd={(e) => e.stopPropagation()}
+                          className={`flex flex-col items-center`}
+                        >
+                          <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
+                            member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
+                          }`}>
+                            <img 
+                              src={member.photo ?? getDefaultImage(member.mt_gender, member.original_index)} // original_index 사용
+                              alt={member.name} 
+                              className="w-full h-full object-cover" 
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = getDefaultImage(member.mt_gender, member.original_index); // original_index 사용
+                                target.onerror = null; // 무한 루프 방지
+                              }}
+                            />
+                          </div>
+                          <span className={`block text-xs font-medium mt-1 ${
+                            member.isSelected ? 'text-indigo-700' : 'text-gray-900'
+                          }`}>
+                            {member.name}
+                          </span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-3 text-gray-500">
+                    <p>그룹에 참여한 멤버가 없습니다</p>
+                  </div>
+                )}
+              </div>
+
+              {/* 스크롤 가능한 콘텐츠 영역 (오늘의 일정, 추천 장소) */}
+              <div className={`
+                ${bottomSheetState === 'expanded' 
+                  ? 'flex-grow min-h-0 overflow-y-auto hide-scrollbar px-4 pb-16' // expanded: 남은 공간 채우고 내부 스크롤, pb-4 -> pb-16
+                  : '' // non-expanded: 일반 플로우 (부모 div가 스크롤 담당)
+                }
+              `}
+              style={bottomSheetState === 'expanded' 
+                ? { WebkitOverflowScrolling: 'touch', touchAction: 'auto' } // expanded: 터치 스크롤 활성화
+                : {}
+              }
+              onClick={bottomSheetState === 'expanded' ? (e) => e.stopPropagation() : undefined}
+              >
+                {/* 오늘의 일정 - 선택된 멤버의 일정을 표시 */}
+                <div className={`content-section schedule-section ${bottomSheetState !== 'expanded' ? '' : 'mt-0'}`}>
+                  <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
+                    {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
+                    {
+                      groupMembers.some(m => m.isSelected) ? (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const selectedMember = groupMembers.find(m => m.isSelected);
+                            if (selectedMember) {
+                              router.push(`/schedule/add?memberId=${selectedMember.id}&memberName=${selectedMember.name}&from=home`);
+                            }
+                          }}
+                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                          </svg>
+                          일정 추가
+                        </button>
+                      ) : (
+                        <Link href="/schedule" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
+                          더보기
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </Link>
+                      )
+                    }
+                  </h2>
+                  <div className="mb-3 overflow-x-auto pb-2 hide-scrollbar">
+                    <div className="flex space-x-2">
+                      {daysForCalendar.map((day, idx) => (
+                        <button
+                          key={idx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDateSelect(day.value);
+                          }}
+                          className={`px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors ${
+                            selectedDate === day.value
+                              ? 'bg-gray-900 text-white font-medium shadow-sm'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <div className="text-xs">{day.display}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {filteredSchedules.length > 0 ? (
+                    <ul className="space-y-3">
+                      {filteredSchedules.map((schedule) => {
+                        // 시간 포맷팅 (12시간제, 오전/오후)
+                        let formattedTime = '시간 정보 없음';
+                        if (schedule.date) {
+                          try {
+                            const dateObj = new Date(schedule.date);
+                            if (!isNaN(dateObj.getTime())) {
+                              formattedTime = format(dateObj, 'a h:mm', { locale: ko });
+                            }
+                          } catch (e) {
+                            console.error("Error formatting schedule date:", e);
+                          }
+                        }
+
+                        const displayLocation = schedule.location || schedule.slt_idx_t;
+
+                        return (
+                          <li key={schedule.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors relative"> {/* relative 추가 */}
+                            <Link href={`/schedule/${schedule.id}`} className="block"> 
+                              <h3 className="font-medium text-gray-900 text-base mb-1">{schedule.title}</h3> 
+                              
+                              <div className="flex items-center text-sm text-gray-700 mb-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                <span className="text-gray-600">{formattedTime}</span> {/* 시간 텍스트 색상 변경 */}
+                              </div>
+
+                              {displayLocation && (
+                                <div className="text-sm flex items-center">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  </svg>
+                                  <span className="text-gray-500">{displayLocation}</span> {/* 장소 텍스트 색상 변경 */}
+                              </div>
+                              )}
+                              
+                              {/* 오른쪽 화살표 아이콘 */}
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                              </div>
+                          </Link>
+                        </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                      <p>{groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 확장됐을 때만 표시되는 나머지 내용 */}
+                <div className={`transition-all duration-300 ${bottomSheetState === 'expanded' ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                  {/* 추천 장소 */}
+                  <div className={`content-section places-section ${bottomSheetState === 'expanded' ? 'mt-3 mb-2' : 'mb-12'}`}>
+                    <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
+                      내 주변 장소
+                      <Link 
+                        href="/location/nearby" 
                         className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                        </svg>
-                        일정 추가
-                      </button>
-                    ) : (
-                      <Link href="/schedule" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
                         더보기
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                         </svg>
                       </Link>
-                    )
-                  }
-                </h2>
-                <div className="mb-3 overflow-x-auto pb-2 hide-scrollbar">
-                  <div className="flex space-x-2">
-                    {daysForCalendar.map((day, idx) => (
-                      <button
-                        key={idx}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDateSelect(day.value);
-                        }}
-                        className={`px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors ${
-                          selectedDate === day.value
-                            ? 'bg-gray-900 text-white font-medium shadow-sm'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        <div className="text-center">
-                          <div className="text-xs">{day.display}</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {filteredSchedules.length > 0 ? (
-                  <ul className="space-y-3">
-                    {filteredSchedules.map((schedule) => {
-                      // 시간 포맷팅 (12시간제, 오전/오후)
-                      let formattedTime = '시간 정보 없음';
-                      if (schedule.date) {
-                        try {
-                          const dateObj = new Date(schedule.date);
-                          if (!isNaN(dateObj.getTime())) {
-                            formattedTime = format(dateObj, 'a h:mm', { locale: ko });
-                          }
-                        } catch (e) {
-                          console.error("Error formatting schedule date:", e);
-                        }
-                      }
-
-                      const displayLocation = schedule.location || schedule.slt_idx_t;
-
-                      return (
-                        <li key={schedule.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors relative"> {/* relative 추가 */}
-                          <Link href={`/schedule/${schedule.id}`} className="block"> 
-                            <h3 className="font-medium text-gray-900 text-base mb-1">{schedule.title}</h3> 
-                            
-                            <div className="flex items-center text-sm text-gray-700 mb-1">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                              <span className="text-gray-600">{formattedTime}</span> {/* 시간 텍스트 색상 변경 */}
-                            </div>
-
-                            {displayLocation && (
-                              <div className="text-sm flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                </svg>
-                                <span className="text-gray-500">{displayLocation}</span> {/* 장소 텍스트 색상 변경 */}
-                            </div>
-                            )}
-                            
-                            {/* 오른쪽 화살표 아이콘 */}
-                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                            </div>
-                        </Link>
-                      </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
-                    <p>{groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* 확장됐을 때만 표시되는 나머지 내용 */}
-              <div className={`transition-all duration-300 ${bottomSheetState === 'expanded' ? 'opacity-100' : 'opacity-0 hidden'}`}>
-                {/* 추천 장소 */}
-                <div className={`content-section places-section ${bottomSheetState === 'expanded' ? 'mt-3 mb-2' : 'mb-12'}`}>
-                  <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
-                    내 주변 장소
-                    <Link 
-                      href="/location/nearby" 
-                      className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      더보기
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </Link>
-                  </h2>
-                  {recommendedPlaces.length > 0 ? (
-                    <ul className="space-y-3">
-                      {recommendedPlaces.map((place) => (
-                        <li key={place.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-                          <Link href={`/location/place/${place.id}`} className="block">
-                            <div className="flex justify-between">
-                              <h3 className="font-medium text-gray-900">{place.title}</h3>
-                              <span className="text-sm text-indigo-600 font-medium">
-                                {formatDistance(place.distance)}
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              <div className="inline-flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                </svg>
-                                {place.address}
+                    </h2>
+                    {recommendedPlaces.length > 0 ? (
+                      <ul className="space-y-3">
+                        {recommendedPlaces.map((place) => (
+                          <li key={place.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <Link href={`/location/place/${place.id}`} className="block">
+                              <div className="flex justify-between">
+                                <h3 className="font-medium text-gray-900">{place.title}</h3>
+                                <span className="text-sm text-indigo-600 font-medium">
+                                  {formatDistance(place.distance)}
+                                </span>
                               </div>
-                            </div>
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="text-center py-3 text-gray-500">주변 장소가 없습니다</div>
-                  )}
+                              <div className="text-sm text-gray-500 mt-1">
+                                <div className="inline-flex items-center">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  </svg>
+                                  {place.address}
+                                </div>
+                              </div>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-center py-3 text-gray-500">주변 장소가 없습니다</div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </PageContainer>
     </>
   );
