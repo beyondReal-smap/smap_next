@@ -460,20 +460,53 @@ export default function LocationPage() {
       console.log('API에서 가져온 회원 데이터:', memberData);
       
       if (memberData && memberData.length > 0) {
-        const formattedMembers = memberData.map((member: any, index: number) => ({
-          id: member.mt_idx.toString(),
-          name: member.mt_name || `멤버 ${index + 1}`,
-          photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
-          isSelected: false,
-          location: { 
-            lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
-            lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
-          },
-          schedules: member.schedules || [], 
-          savedLocations: member.savedLocations || [],
-          mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
-          original_index: index
-        }));
+        // 각 멤버의 저장된 장소도 함께 조회
+        const formattedMembersPromises = memberData.map(async (member: any, index: number) => {
+          let memberSavedLocations: LocationData[] = [];
+          
+          try {
+            // 각 멤버의 저장된 장소 조회
+            const memberLocationsRaw = await locationService.getOtherMembersLocations(member.mt_idx.toString());
+            console.log(`멤버 ${member.mt_name}의 저장된 장소:`, memberLocationsRaw);
+            
+            // LocationData 형식으로 변환
+            memberSavedLocations = memberLocationsRaw.map(loc => ({
+              id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
+              name: loc.name || loc.slt_title || '제목 없음',
+              address: loc.address || loc.slt_add || '주소 정보 없음',
+              coordinates: [
+                parseFloat(String(loc.slt_long || '0')) || 0,
+                parseFloat(String(loc.slt_lat || '0')) || 0
+              ] as [number, number],
+              category: loc.category || '기타',
+              memo: loc.memo || '',
+              favorite: loc.favorite || false,
+              notifications: loc.notifications || loc.slt_enter_alarm === 'Y'
+            }));
+          } catch (locationError) {
+            console.warn(`멤버 ${member.mt_name}의 장소 조회 실패:`, locationError);
+            // 오류 시 빈 배열 유지
+          }
+          
+          return {
+            id: member.mt_idx.toString(),
+            name: member.mt_name || `멤버 ${index + 1}`,
+            photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
+            isSelected: false,
+            location: { 
+              lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
+              lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
+            },
+            schedules: member.schedules || [], 
+            savedLocations: memberSavedLocations, // 실제 조회된 장소 데이터 설정
+            mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
+            original_index: index
+          };
+        });
+        
+        // 모든 멤버의 데이터가 준비될 때까지 대기
+        const formattedMembers = await Promise.all(formattedMembersPromises);
+        console.log('모든 멤버의 장소 조회 완료:', formattedMembers);
         
         setGroupMembers(formattedMembers);
         dataFetchedRef.current = true;
@@ -646,18 +679,26 @@ export default function LocationPage() {
   }, [naverMapsLoaded]);
 
   useEffect(() => {
-     console.log("[AutoSelect Effect] Triggered. isMapInitialized:", isMapInitialized, "groupMembers.length:", groupMembers.length);
-      if (isMapInitialized && groupMembers.length > 0) {
-        const isAnyMemberSelected = groupMembers.some(m => m.isSelected);
-       console.log("[AutoSelect Effect] Conditions met. isAnyMemberSelected:", isAnyMemberSelected);
-       if (!isAnyMemberSelected && !isFetchingGroupMembers) { 
-          console.log("[LocationPage] Map initialized and group members ready. Auto-selecting first member.");
+    console.log("[AutoSelect Effect] Triggered. isMapInitialized:", isMapInitialized, "groupMembers.length:", groupMembers.length, "isFetchingGroupMembers:", isFetchingGroupMembers);
+    
+    // 지도가 초기화되고, 그룹멤버 데이터가 로드되었으며, 현재 로딩 중이 아닐 때 실행
+    if (isMapInitialized && groupMembers.length > 0 && !isFetchingGroupMembers) {
+      const isAnyMemberSelected = groupMembers.some(m => m.isSelected);
+      console.log("[AutoSelect Effect] Conditions met. isAnyMemberSelected:", isAnyMemberSelected);
+      
+      if (!isAnyMemberSelected) { 
+        console.log("[LocationPage] Map initialized and group members ready. Auto-selecting first member:", groupMembers[0].name);
+        console.log("[LocationPage] First member savedLocations count:", groupMembers[0].savedLocations?.length || 0);
+        
+        // 첫번째 멤버 선택 (약간의 지연을 두어 UI 업데이트가 완료된 후 실행)
+        setTimeout(() => {
           if (groupMembers[0] && groupMembers[0].id) {
-             handleMemberSelect(groupMembers[0].id, false); 
+            handleMemberSelect(groupMembers[0].id, false); 
           }
-        }
-      } 
-   }, [isMapInitialized, groupMembers, isFetchingGroupMembers]);
+        }, 500);
+      }
+    } 
+  }, [isMapInitialized, groupMembers, isFetchingGroupMembers, groupMembers.length]);
   
   const getBottomSheetClassName = () => {
     switch (bottomSheetState) {
@@ -1225,37 +1266,49 @@ export default function LocationPage() {
       map.current.setCenter(memberPosition);
       map.current.setZoom(16); // 적절한 줌 레벨로 설정
       
-      // 선택된 멤버의 저장된 장소를 API에서 가져오기
-      setIsLoadingOtherLocations(true);
-      try {
-        const memberLocationsRaw = await locationService.getOtherMembersLocations(newlySelectedMember.id);
-        console.log("[handleMemberSelect] 선택된 멤버의 장소 (raw):", memberLocationsRaw);
+      // 멤버의 저장된 장소 처리
+      if (newlySelectedMember.savedLocations && newlySelectedMember.savedLocations.length > 0) {
+        // 이미 로드된 장소가 있으면 바로 사용
+        console.log('[handleMemberSelect] 이미 로드된 장소 사용:', newlySelectedMember.savedLocations.length, '개');
+        setSelectedMemberSavedLocations(newlySelectedMember.savedLocations);
         
-        // 선택된 멤버의 장소로 설정
-        setSelectedMemberSavedLocations(memberLocationsRaw.map(loc => ({
-          id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
-          name: loc.name || loc.slt_title || '제목 없음',
-          address: loc.address || loc.slt_add || '주소 정보 없음',
-          coordinates: [
-            parseFloat(String(loc.slt_long || '0')) || 0,
-            parseFloat(String(loc.slt_lat || '0')) || 0
-          ] as [number, number],
-          category: loc.category || '기타',
-          memo: loc.memo || '',
-          favorite: loc.favorite || false,
-          notifications: loc.notifications || loc.slt_enter_alarm === 'Y'
-        })));
+        // 원본 데이터 형식으로 변환하여 otherMembersSavedLocations에도 설정
+        const rawLocationsForOtherMembers = newlySelectedMember.savedLocations.map(loc => ({
+          slt_idx: parseInt(loc.id),
+          name: loc.name,
+          slt_title: loc.name,
+          address: loc.address,
+          slt_add: loc.address,
+          slt_long: String(loc.coordinates[0]),
+          slt_lat: String(loc.coordinates[1]),
+          category: loc.category,
+          memo: loc.memo,
+          favorite: loc.favorite,
+          notifications: loc.notifications,
+          slt_enter_alarm: loc.notifications ? 'Y' : 'N'
+        }));
+        setOtherMembersSavedLocations(rawLocationsForOtherMembers);
         
-        // 다른 멤버들의 장소도 설정 (스와이프 시 사용)
-        setOtherMembersSavedLocations(memberLocationsRaw);
-        
-        // activeView를 선택된 멤버의 장소로 설정
+        // activeView 설정
         setActiveView('selectedMemberPlaces');
         
-        // 약간의 지연 후 마커 업데이트 (지도 이동이 완료된 후)
+        // 즉시 마커 생성
         setTimeout(() => {
-          // 선택된 멤버의 장소를 LocationData 형식으로 변환해서 마커 생성
-          const locationDataForMarkers: LocationData[] = memberLocationsRaw.map(loc => ({
+          addMarkersToMap(newlySelectedMember.savedLocations);
+          console.log('[handleMemberSelect] 기존 장소로 마커 생성:', newlySelectedMember.savedLocations.length, '개');
+        }, 300);
+        
+      } else {
+        // 저장된 장소가 없으면 API에서 조회
+        console.log('[handleMemberSelect] API에서 장소 조회 시작');
+        setIsLoadingOtherLocations(true);
+        
+        try {
+          const memberLocationsRaw = await locationService.getOtherMembersLocations(newlySelectedMember.id);
+          console.log("[handleMemberSelect] API에서 조회한 장소 (raw):", memberLocationsRaw);
+          
+          // LocationData 형식으로 변환
+          const convertedLocations = memberLocationsRaw.map(loc => ({
             id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
             name: loc.name || loc.slt_title || '제목 없음',
             address: loc.address || loc.slt_add || '주소 정보 없음',
@@ -1269,21 +1322,39 @@ export default function LocationPage() {
             notifications: loc.notifications || loc.slt_enter_alarm === 'Y'
           }));
           
-          addMarkersToMap(locationDataForMarkers);
-          console.log('[handleMemberSelect] 멤버의 저장된 장소 마커 생성:', locationDataForMarkers.length, '개');
-        }, 300);
-        
-      } catch (error) {
-        console.error("Failed to fetch selected member's locations in handleMemberSelect:", error);
-        setSelectedMemberSavedLocations([]);
-        setOtherMembersSavedLocations([]);
-        
-        // 오류 시 기본 장소 표시
-        setTimeout(() => {
-          addMarkersToMap(newlySelectedMember.savedLocations || []);
-        }, 300);
-      } finally {
-        setIsLoadingOtherLocations(false);
+          // 상태 업데이트
+          setSelectedMemberSavedLocations(convertedLocations);
+          setOtherMembersSavedLocations(memberLocationsRaw);
+          setActiveView('selectedMemberPlaces');
+          
+          // 그룹멤버 상태의 savedLocations도 업데이트 (다음에는 API 호출 없이 사용하기 위해)
+          setGroupMembers(prevMembers => 
+            prevMembers.map(member => 
+              member.id === memberId 
+                ? { ...member, savedLocations: convertedLocations }
+                : member
+            )
+          );
+          
+          // 마커 생성
+          setTimeout(() => {
+            addMarkersToMap(convertedLocations);
+            console.log('[handleMemberSelect] API 조회 장소로 마커 생성:', convertedLocations.length, '개');
+          }, 300);
+          
+        } catch (error) {
+          console.error("Failed to fetch selected member's locations in handleMemberSelect:", error);
+          setSelectedMemberSavedLocations([]);
+          setOtherMembersSavedLocations([]);
+          setActiveView('selectedMemberPlaces');
+          
+          // 오류 시 빈 마커
+          setTimeout(() => {
+            addMarkersToMap([]);
+          }, 300);
+        } finally {
+          setIsLoadingOtherLocations(false);
+        }
       }
 
       if (!openLocationPanel) {
@@ -1294,6 +1365,7 @@ export default function LocationPage() {
         }
       }
     } else {
+      // 아무도 선택되지 않은 경우
       setSelectedMemberSavedLocations(null); 
       setOtherMembersSavedLocations([]); 
       setActiveView('selectedMemberPlaces'); 
