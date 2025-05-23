@@ -1274,11 +1274,13 @@ export default function LocationPage() {
         
         // 원본 데이터 형식으로 변환하여 otherMembersSavedLocations에도 설정
         const rawLocationsForOtherMembers = newlySelectedMember.savedLocations.map(loc => ({
+          id: loc.id,
           slt_idx: parseInt(loc.id),
           name: loc.name,
           slt_title: loc.name,
           address: loc.address,
           slt_add: loc.address,
+          coordinates: [loc.coordinates[0], loc.coordinates[1]] as [number, number],
           slt_long: String(loc.coordinates[0]),
           slt_lat: String(loc.coordinates[1]),
           category: loc.category,
