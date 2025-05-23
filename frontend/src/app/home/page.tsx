@@ -244,7 +244,9 @@ const modalAnimation = `
   border-top-left-radius: 16px;
   border-top-right-radius: 16px;
   box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+              bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* 0.4s와 0.2s delay → 0.5s로 변경하여 바텀시트와 동일하게 */
   z-index: 40;
   max-height: 90vh;
   /* overflow-y: auto; */ /* 제거 - 내부 컨텐츠 래퍼가 담당 */
@@ -296,9 +298,9 @@ const modalAnimation = `
   padding: 6px 8px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-              bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1); /* opacity delay 제거, bottom과 동일 시간 */
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+              bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* opacity delay 제거, bottom과 동일 시간 */
   max-width: 60px;
 }
 
@@ -309,9 +311,9 @@ const modalAnimation = `
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
-              bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1) 0.2s; /* opacity는 0.2초 지연 후 0.2초 동안 변경 */
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+              bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* visibility 제외하여 즉시 처리 */
 }
 
 /* 바텀시트 상태에 따른 헤더 위치 */
@@ -319,12 +321,14 @@ const modalAnimation = `
   bottom: 120px; /* 바텀시트 높이(150px) + 간격(15px) */
   top: auto;
   opacity: 1;
+  visibility: visible;
 }
 
 .header-middle {
   bottom: calc(33vh + 10px); 
   top: auto;
   opacity: 1;
+  visibility: visible;
 }
 
 .header-expanded {
@@ -337,17 +341,21 @@ const modalAnimation = `
   bottom: 120px; /* 바텀시트 높이(150px) + 간격(15px) - 헤더와 동일한 위치 */
   top: auto;
   opacity: 1;
+  visibility: visible;
 }
 
 .controls-middle {
   bottom: calc(33vh + 10px); /* 바텀시트 중간 높이 + 간격(15px) - 헤더와 동일한 위치 */
   top: auto;
   opacity: 1;
+  visibility: visible;
 }
 
 .controls-expanded {
+  bottom: calc(33vh + 10px); /* middle 상태와 동일한 위치 유지 */
   opacity: 0;
   visibility: hidden;
+  transition: none; /* 즉시 사라지도록 transition 제거 */
 }
 
 .map-control-button {
@@ -631,10 +639,8 @@ export default function HomePage() {
   const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'middle' | 'expanded'>('collapsed');
   const bottomSheetRef = useRef<HTMLDivElement>(null);
   const startDragY = useRef<number | null>(null);
-  const currentDragY = useRef<number | null>(null);
   const dragStartTime = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
-  const initialScrollTopRef = useRef<number>(0);
 
   const dataFetchedRef = useRef({ members: false, schedules: false }); // dataFetchedRef를 객체로 변경
 
@@ -654,183 +660,115 @@ export default function HomePage() {
     }
   };
 
-  // Bottom Sheet 드래그 핸들러 수정
+  // Bottom Sheet 드래그 핸들러 수정 - 단순화된 로직
   const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
+    // 멤버 선택 버튼이나 기타 인터랙티브 요소에서 시작된 이벤트는 무시
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a')) {
+      return;
+    }
+    
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     startDragY.current = clientY;
-    currentDragY.current = clientY;
-    dragStartTime.current = Date.now();
     isDraggingRef.current = true;
-    initialScrollTopRef.current = bottomSheetRef.current?.scrollTop || 0;
+    dragStartTime.current = Date.now();
 
     if (bottomSheetRef.current) {
       bottomSheetRef.current.style.transition = 'none';
-      
-      const mapHeader = document.querySelector('.map-header') as HTMLElement;
-      const mapControls = document.querySelector('.map-controls') as HTMLElement;
-      
-      if (mapHeader) {
-        mapHeader.style.transition = 'none';
-      }
-      
-      if (mapControls) {
-        mapControls.style.transition = 'none';
-      }
     }
   };
 
   const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!isDraggingRef.current || startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
+    if (!isDraggingRef.current || startDragY.current === null) return;
     
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const deltaY = clientY - currentDragY.current;
+    const deltaY = clientY - startDragY.current;
     
-    // 수직 드래그만 처리하고 최소 움직임 임계값 적용
-    if (Math.abs(deltaY) > 5) {
-      currentDragY.current = clientY;
-      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
-      let currentTranslateY = 0;
-      
-      if (currentTransform !== 'none') {
-        const matrix = new DOMMatrixReadOnly(currentTransform);
-        currentTranslateY = matrix.m42;
+    // 최소 드래그 거리 체크 (30px 이상 움직여야 함)
+    const minDragDistance = 30;
+    if (Math.abs(deltaY) < minDragDistance) return;
+
+    // 드래그 방향에 따라 다음 상태 결정
+    let nextState: 'collapsed' | 'middle' | 'expanded' = bottomSheetState;
+    
+    if (deltaY < 0) { // 위로 드래그 (음수)
+      if (bottomSheetState === 'collapsed') {
+        nextState = 'middle';
+      } else if (bottomSheetState === 'middle') {
+        nextState = 'expanded';
       }
-
-      let newTranslateY = currentTranslateY + deltaY;
-      
-      const windowHeight = window.innerHeight;
-      // expanded 상태: translateY(0%) = 0px (화면 최상단)
-      const expandedY = windowHeight * BOTTOM_SHEET_POSITIONS.EXPANDED_PERCENTAGE; // 15%
-      // middle 상태: translateY(68%)
-      const middleY = windowHeight * BOTTOM_SHEET_POSITIONS.MIDDLE_PERCENTAGE; // 68%
-      // collapsed 상태: translateY(calc(100% - 100px))
-      const collapsedY = windowHeight - BOTTOM_SHEET_POSITIONS.COLLAPSED_HEIGHT; // ~900px
-
-      // 일반적인 드래그 범위 제한
-      newTranslateY = Math.max(expandedY, Math.min(newTranslateY, collapsedY));
-
-      // expanded 상태에서 아래로 내려가는 것을 제한 (저항 적용)
-      if (bottomSheetState === 'expanded' && deltaY > 0) {
-        const resistance = 0.3; // 30%만 움직이도록 저항 적용
-        newTranslateY = currentTranslateY + (deltaY * resistance);
-        newTranslateY = Math.max(expandedY, Math.min(newTranslateY, collapsedY));
+      // expanded에서 위로 드래그하면 그대로 유지
+    } else { // 아래로 드래그 (양수)
+      if (bottomSheetState === 'expanded') {
+        nextState = 'middle';
+      } else if (bottomSheetState === 'middle') {
+        nextState = 'collapsed';
       }
+      // collapsed에서 아래로 드래그하면 그대로 유지
+    }
 
-      bottomSheetRef.current.style.transform = `translateY(${newTranslateY}px)`;
-      bottomSheetRef.current.style.transition = 'none';
+    // 상태가 변경되면 즉시 적용하고 드래그 종료
+    if (nextState !== bottomSheetState) {
+      console.log('[BOTTOM_SHEET] 드래그로 상태 변경:', bottomSheetState, '→', nextState);
+      setBottomSheetState(nextState);
+      
+      // 드래그 종료 처리
+      if (bottomSheetRef.current) {
+        bottomSheetRef.current.style.transition = `transform ${BOTTOM_SHEET_POSITIONS.TRANSITION_DURATION} ${BOTTOM_SHEET_POSITIONS.TRANSITION_TIMING}`;
+      }
+      
+      startDragY.current = null;
+      isDraggingRef.current = false;
+      dragStartTime.current = null;
     }
   };
 
-  // 드래그 종료 핸들러 수정
   const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!isDraggingRef.current || startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
+    // 멤버 선택 버튼이나 기타 인터랙티브 요소에서 시작된 이벤트는 무시
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a')) {
+      return;
+    }
+    
+    if (!isDraggingRef.current || startDragY.current === null) return;
 
     const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
-    const deltaYOverall = clientY - startDragY.current;
+    const deltaY = clientY - startDragY.current;
     const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
     
-    const isDrag = Math.abs(deltaYOverall) > 10 || deltaTime > 200;
-
-    const mapHeader = document.querySelector('.map-header') as HTMLElement;
-    const mapControls = document.querySelector('.map-controls') as HTMLElement;
-
-    const windowHeight = window.innerHeight;
-    const expandedY = windowHeight * BOTTOM_SHEET_POSITIONS.EXPANDED_PERCENTAGE; // 15%
-    const middleY = windowHeight * BOTTOM_SHEET_POSITIONS.MIDDLE_PERCENTAGE; // 68%
-    const collapsedY = windowHeight - BOTTOM_SHEET_POSITIONS.COLLAPSED_HEIGHT; // ~900px
-
-    let finalState: 'expanded' | 'middle' | 'collapsed' = bottomSheetState;
-
-    if (isDrag) {
-      const velocity = deltaTime > 0 ? deltaYOverall / deltaTime : 0;
-      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
-      let currentSheetY = 0;
+    // 드래그가 아닌 탭 동작인 경우 (짧은 시간 + 작은 움직임)
+    const isTap = Math.abs(deltaY) < 10 && deltaTime < 200;
+    
+    if (isTap) {
+      // 탭 동작: 다음 단계로 이동
+      let nextState: 'collapsed' | 'middle' | 'expanded' = bottomSheetState;
       
-      if (currentTransform !== 'none') {
-        const matrix = new DOMMatrixReadOnly(currentTransform);
-        currentSheetY = matrix.m42;
-      }
-
-      // 임계점 정의
-      const expandedToMiddleThreshold = (expandedY + middleY) / 2; // ~40%
-      const middleToCollapsedThreshold = (middleY + collapsedY) / 2; // ~80%
-
-      if (Math.abs(velocity) > 0.5) {
-        // 빠른 스와이프: 방향에 따라 결정
-        if (velocity < 0) { // 위로 스와이프
-          if (bottomSheetState === 'collapsed') {
-            finalState = 'middle';
-          } else if (bottomSheetState === 'middle') {
-            finalState = 'expanded';
-          } else {
-            finalState = 'expanded'; // 이미 expanded
-          }
-        } else { // 아래로 스와이프
-          if (bottomSheetState === 'expanded') {
-            // expanded에서는 충분히 아래로 드래그해야만 middle로 전환
-            if (deltaYOverall >= BOTTOM_SHEET_POSITIONS.MIN_DRAG_DISTANCE) {
-              finalState = 'middle';
-            } else {
-              finalState = 'expanded';
-            }
-          } else if (bottomSheetState === 'middle') {
-            finalState = 'collapsed';
-          } else {
-            finalState = 'collapsed'; // 이미 collapsed
-          }
-        }
-      } else {
-        // 일반 드래그: 현재 위치에 따라 결정
-        if (currentSheetY < expandedToMiddleThreshold) {
-          finalState = 'expanded';
-        } else if (currentSheetY < middleToCollapsedThreshold) {
-          finalState = 'middle';
-        } else {
-          finalState = 'collapsed';
-        }
-
-        // expanded 상태에서는 특별 처리
-        if (bottomSheetState === 'expanded' && finalState !== 'expanded') {
-          if (deltaYOverall < BOTTOM_SHEET_POSITIONS.MIN_DRAG_DISTANCE) {
-            finalState = 'expanded'; // 충분히 드래그하지 않았으면 원래 상태 유지
-          }
-        }
-      }
-    } else {
-      // 탭 동작: 다음 단계로 전환
       if (bottomSheetState === 'collapsed') {
-        finalState = 'middle';
+        nextState = 'middle';
       } else if (bottomSheetState === 'middle') {
-        finalState = 'expanded';
+        nextState = 'expanded';
       }
       // expanded에서 탭하면 그대로 유지
+      
+      console.log('[BOTTOM_SHEET] 탭으로 상태 변경:', bottomSheetState, '→', nextState);
+      setBottomSheetState(nextState);
     }
-
-    setBottomSheetState(finalState);
 
     // 스타일 복원
     if (bottomSheetRef.current) {
       bottomSheetRef.current.style.transition = `transform ${BOTTOM_SHEET_POSITIONS.TRANSITION_DURATION} ${BOTTOM_SHEET_POSITIONS.TRANSITION_TIMING}`;
-      bottomSheetRef.current.style.transform = ''; // CSS 클래스가 위치를 결정하도록
-    }
-    if (mapHeader) {
-      mapHeader.style.transition = ''; // map-header의 transition 복원
-    }
-    if (mapControls) {
-      mapControls.style.transition = ''; // map-controls의 transition 복원
     }
 
     startDragY.current = null;
-    currentDragY.current = null;
+    isDraggingRef.current = false;
     dragStartTime.current = null;
-    isDraggingRef.current = false; // isDraggingRef도 초기화
   };
 
   const toggleBottomSheet = () => {
     setBottomSheetState(prev => {
-      if (prev === 'collapsed') return 'middle';
-      if (prev === 'middle') return 'expanded';
-      return 'collapsed';
+      const next = prev === 'collapsed' ? 'middle' : prev === 'middle' ? 'expanded' : 'collapsed';
+      console.log('[BOTTOM_SHEET] toggleBottomSheet 상태 변경:', prev, '→', next);
+      return next;
     });
   };
 
@@ -862,13 +800,8 @@ export default function HomePage() {
     const fetchAllGroupData = async () => {
       if (!isMounted) return;
 
-      // 데이터 로딩이 실제로 필요한 경우에만 로딩 상태 true로 설정
-      if (!dataFetchedRef.current.members || !dataFetchedRef.current.schedules) {
-        // 이미 로딩 중이 아니라면 로딩 시작 (isMounted 체크 추가)
-        if (!isMapLoading && isMounted) setIsMapLoading(true); 
-      } else {
-        // 모든 데이터가 이미 로드되었다면 함수 종료 또는 로딩 상태 false로 확실히 설정
-        if (isMapLoading && isMounted) setIsMapLoading(false);
+      // 이미 데이터가 로드되었거나 로딩 중이면 중복 실행 방지
+      if (dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
         return;
       }
 
@@ -880,14 +813,14 @@ export default function HomePage() {
           if (isMounted) { 
             if (memberData && memberData.length > 0) { 
               currentMembers = memberData.map((member: any, index: number) => ({
-            id: member.mt_idx.toString(),
-            name: member.mt_name || `멤버 ${index + 1}`,
+                id: member.mt_idx.toString(),
+                name: member.mt_name || `멤버 ${index + 1}`,
                 photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
-            isSelected: false,
-            location: { 
-              lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
-              lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
-            },
+                isSelected: false,
+                location: { 
+                  lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
+                  lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
+                },
                 schedules: [], 
                 mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
                 original_index: index,
@@ -896,18 +829,16 @@ export default function HomePage() {
               }));
             } else {
               console.warn('No member data from API, or API call failed.');
-              // 그룹멤버가 없으면 첫번째 멤버 선택 완료 상태를 true로 설정
               setIsFirstMemberSelectionComplete(true);
             }
             setGroupMembers(currentMembers); 
             dataFetchedRef.current.members = true;
-        }
+          }
         }
 
         if (dataFetchedRef.current.members && !dataFetchedRef.current.schedules) {
           const rawSchedules: Schedule[] = await scheduleService.getGroupSchedules(GROUP_ID_EXAMPLE, 7); 
-          console.log('[HOME PAGE] Raw schedules from API:', rawSchedules); // 콘솔 로그 추가
-        if (isMounted) {
+          if (isMounted) {
             if (rawSchedules && rawSchedules.length > 0) {
               setGroupSchedules(rawSchedules); 
               setGroupMembers(prevMembers =>
@@ -923,7 +854,7 @@ export default function HomePage() {
               );
               const todayStr = format(new Date(), 'yyyy-MM-dd');
               setFilteredSchedules(
-                rawSchedules.filter((s: Schedule) => s.date && s.date.startsWith(todayStr)) // null 체크 추가
+                rawSchedules.filter((s: Schedule) => s.date && s.date.startsWith(todayStr))
               );
             } else {
               console.warn('No schedule data from API for the group, or API call failed.');
@@ -937,14 +868,13 @@ export default function HomePage() {
         console.error('[HOME PAGE] 그룹 데이터(멤버 또는 스케줄) 조회 오류:', error);
         if (isMounted && !dataFetchedRef.current.members) {
           dataFetchedRef.current.members = true;
-          // 오류 시에도 첫번째 멤버 선택 완료 상태를 true로 설정
           setIsFirstMemberSelectionComplete(true);
         }
         if (isMounted && !dataFetchedRef.current.schedules) dataFetchedRef.current.schedules = true;
       } finally {
         if (isMounted && dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
-           if (isMapLoading) setIsMapLoading(false); 
-           console.log("All group data fetch attempts completed.");
+          if (isMapLoading) setIsMapLoading(false); 
+          console.log("All group data fetch attempts completed.");
         }
       }
     };
@@ -952,8 +882,7 @@ export default function HomePage() {
     fetchAllGroupData();
 
     return () => { isMounted = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupMembers, dataFetchedRef.current.members, dataFetchedRef.current.schedules]);
+  }, []); // 의존성 배열을 비워서 마운트 시 한 번만 실행
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
@@ -1262,10 +1191,10 @@ export default function HomePage() {
 
   // 지도 초기화 상태 변경 감지를 위한 별도 useEffect
   useEffect(() => {
-    // 지도가 초기화되면 첫 번째 멤버 선택
+    // 지도가 초기화되고 멤버가 있고 아직 선택된 멤버가 없을 때만 실행
     if ((mapType === 'naver' && mapsInitialized.naver) || 
         (mapType === 'google' && mapsInitialized.google)) {
-      if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected)) { // 아무도 선택되지 않았을 때만 첫 멤버 선택
+      if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && !isFirstMemberSelectionComplete) {
         console.log('지도 초기화 감지 - 첫 번째 멤버 선택:', groupMembers[0].name);
         
         const timerId = setTimeout(() => {
@@ -1275,8 +1204,7 @@ export default function HomePage() {
         return () => clearTimeout(timerId);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapsInitialized.naver, mapsInitialized.google, mapType, groupMembers]); // groupMembers 추가
+  }, [mapsInitialized.naver, mapsInitialized.google, mapType, groupMembers, isFirstMemberSelectionComplete]);
 
   // 공통 좌표 파싱 함수
   const parseCoordinate = (coord: any): number | null => {
@@ -1562,6 +1490,11 @@ export default function HomePage() {
 
   // 그룹 멤버 선택 핸들러 (filteredSchedules 업데이트)
   const handleMemberSelect = (id: string) => {
+    // 바텀시트 드래그 상태 리셋 (멤버 클릭으로 인한 의도치 않은 상태 변경 방지)
+    isDraggingRef.current = false;
+    startDragY.current = null;
+    dragStartTime.current = null;
+    
     const updatedMembers = groupMembers.map(member => 
       member.id === id ? { ...member, isSelected: !member.isSelected } : { ...member, isSelected: false }
     );
@@ -2047,7 +1980,13 @@ export default function HomePage() {
                   {groupMembers.map((member, index) => ( // 이 index는 groupMembers 배열 내에서의 index임
                     <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
                       <button
-                        onClick={() => handleMemberSelect(member.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMemberSelect(member.id);
+                        }}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => e.stopPropagation()}
                         className={`flex flex-col items-center`}
                       >
                         <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
@@ -2100,7 +2039,8 @@ export default function HomePage() {
                   {
                     groupMembers.some(m => m.isSelected) ? (
                       <button 
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           const selectedMember = groupMembers.find(m => m.isSelected);
                           if (selectedMember) {
                             router.push(`/schedule/add?memberId=${selectedMember.id}&memberName=${selectedMember.name}&from=home`);
@@ -2128,7 +2068,10 @@ export default function HomePage() {
                     {daysForCalendar.map((day, idx) => (
                       <button
                         key={idx}
-                        onClick={() => handleDateSelect(day.value)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDateSelect(day.value);
+                        }}
                         className={`px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors ${
                           selectedDate === day.value
                             ? 'bg-gray-900 text-white font-medium shadow-sm'

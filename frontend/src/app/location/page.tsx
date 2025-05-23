@@ -448,6 +448,11 @@ export default function LocationPage() {
   const isDraggingRef = useRef(false);
   const initialScrollTopRef = useRef(0);
   const [isFirstMemberSelectionComplete, setIsFirstMemberSelectionComplete] = useState(false); // 첫번째 멤버 선택 완료 상태 추가
+  // 첫번째 멤버 선택 완료 여부를 추적하는 상태 추가
+  const [firstMemberSelected, setFirstMemberSelected] = useState(false);
+  
+  // 현재 선택된 멤버 ID를 추적하는 ref 추가
+  const selectedMemberIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setPortalContainer(document.body);
@@ -682,16 +687,19 @@ export default function LocationPage() {
   }, [naverMapsLoaded]);
 
   useEffect(() => {
-    console.log("[AutoSelect Effect] Triggered. isMapInitialized:", isMapInitialized, "groupMembers.length:", groupMembers.length, "isFetchingGroupMembers:", isFetchingGroupMembers);
+    console.log("[AutoSelect Effect] Triggered. isMapInitialized:", isMapInitialized, "groupMembers.length:", groupMembers.length, "isFetchingGroupMembers:", isFetchingGroupMembers, "firstMemberSelected:", firstMemberSelected);
     
-    // 지도가 초기화되고, 그룹멤버 데이터가 로드되었으며, 현재 로딩 중이 아닐 때 실행
-    if (isMapInitialized && groupMembers.length > 0 && !isFetchingGroupMembers) {
+    // 지도가 초기화되고, 그룹멤버 데이터가 로드되었으며, 현재 로딩 중이 아니고, 아직 첫 멤버 선택이 완료되지 않았을 때만 실행
+    if (isMapInitialized && groupMembers.length > 0 && !isFetchingGroupMembers && !firstMemberSelected) {
       const isAnyMemberSelected = groupMembers.some(m => m.isSelected);
       console.log("[AutoSelect Effect] Conditions met. isAnyMemberSelected:", isAnyMemberSelected);
       
       if (!isAnyMemberSelected) { 
         console.log("[LocationPage] Map initialized and group members ready. Auto-selecting first member:", groupMembers[0].name);
         console.log("[LocationPage] First member savedLocations count:", groupMembers[0].savedLocations?.length || 0);
+        
+        // 첫번째 멤버 선택 상태를 즉시 true로 설정하여 중복 실행 방지
+        setFirstMemberSelected(true);
         
         // 첫번째 멤버 선택 (약간의 지연을 두어 UI 업데이트가 완료된 후 실행)
         setTimeout(() => {
@@ -701,7 +709,7 @@ export default function LocationPage() {
         }, 500);
       }
     } 
-  }, [isMapInitialized, groupMembers, isFetchingGroupMembers, groupMembers.length]);
+  }, [isMapInitialized, groupMembers.length, isFetchingGroupMembers, firstMemberSelected]); // groupMembers 전체 객체를 제거하고 length만 유지
   
   const getBottomSheetClassName = () => {
     switch (bottomSheetState) {
@@ -1349,6 +1357,23 @@ export default function LocationPage() {
 
   const handleMemberSelect = async (memberId: string, openLocationPanel = false) => { 
     console.log('[handleMemberSelect] 멤버 선택:', memberId, '패널 열기:', openLocationPanel);
+    
+    // 이미 선택된 멤버라면 중복 실행 방지 (ref 기반 체크 추가)
+    if (selectedMemberIdRef.current === memberId) {
+      console.log('[handleMemberSelect] 동일한 멤버 ID입니다. 중복 실행 방지 (ref)');
+      return;
+    }
+    
+    // selectedMemberIdRef 업데이트
+    selectedMemberIdRef.current = memberId;
+    
+    // 이미 선택된 멤버라면 중복 실행 방지 (상태 기반 체크)
+    const currentSelectedMember = groupMembers.find(m => m.isSelected);
+    if (currentSelectedMember && currentSelectedMember.id === memberId) {
+      console.log('[handleMemberSelect] 이미 선택된 멤버입니다. 중복 실행 방지 (상태)');
+      return;
+    }
+    
     const updatedMembers = groupMembers.map(member => {
       if (member.id === memberId) {
         return { ...member, isSelected: !member.isSelected };
@@ -1357,7 +1382,7 @@ export default function LocationPage() {
       }
     });
     setGroupMembers(updatedMembers);
-    updateMemberMarkers(updatedMembers); 
+    updateMemberMarkers(updatedMembers);
   
     const newlySelectedMember = updatedMembers.find(member => member.isSelected);
   
@@ -1523,7 +1548,7 @@ export default function LocationPage() {
     if (isMapInitialized) { 
         fetchOtherLocationsAndUpdateMarkers();
     }
-  }, [isMapInitialized, activeView, groupMembers]); // 의존성 단순화
+  }, [isMapInitialized, activeView]); // groupMembers 의존성 제거하여 중복 실행 방지
 
   useEffect(() => {
     console.log('[useEffect for handleClickOutside] Registering or unregistering. isLocationInfoPanelOpen:', isLocationInfoPanelOpen);
@@ -1787,12 +1812,13 @@ export default function LocationPage() {
       groupMembers.length > 0 &&
       map.current && 
       window.naver?.maps && 
-      naverMapsLoaded
+      naverMapsLoaded &&
+      firstMemberSelected // 첫 번째 멤버 선택이 완료된 후에만 실행
     ) {
       console.log('[LOCATION] 그룹멤버 데이터 변경 감지 - 마커 업데이트:', groupMembers.length, '명');
       updateMemberMarkers(groupMembers);
     }
-  }, [groupMembers, naverMapsLoaded]);
+  }, [groupMembers.length, naverMapsLoaded, firstMemberSelected]); // groupMembers 객체 전체 대신 length만 의존성으로 사용
 
   // 외부 클릭 이벤트 리스너 설정
   useEffect(() => {

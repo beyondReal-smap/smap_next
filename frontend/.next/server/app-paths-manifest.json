@@ -1,9 +1,12 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
   "/api/group-members/member/[id]/route": "app/api/group-members/member/[id]/route.js",
+  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
   "/api/locations/other-members/[memberId]/route": "app/api/locations/other-members/[memberId]/route.js",
   "/demo/spinner/page": "app/demo/spinner/page.js",
   "/group/page": "app/group/page.js",
-  "/location/page": "app/location/page.js",
   "/schedule/page": "app/schedule/page.js",
-  "/logs/page": "app/logs/page.js"
+  "/logs/page": "app/logs/page.js",
+  "/home/page": "app/home/page.js",
+  "/location/page": "app/location/page.js"
 }
