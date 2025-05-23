@@ -38,7 +38,7 @@ const BOTTOM_SHEET_POSITIONS = {
   EXPANDED_PERCENTAGE: 0.62, // 펼쳤을 때 CSS translateY(62%)와 일치
   TRANSITION_DURATION: '0.4s',
   TRANSITION_TIMING: 'cubic-bezier(0.4, 0, 0.2, 1)',
-  MIN_DRAG_DISTANCE: 100 // expanded에서 collapsed로 전환하기 위한 최소 드래그 거리
+  MIN_DRAG_DISTANCE: 30 // 상태 전환을 위한 최소 드래그 거리를 30px로 변경
 };
 
 // 기본 이미지 가져오는 함수 추가
@@ -778,51 +778,18 @@ export default function LocationPage() {
     const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
     
     // 드래그로 간주할 최소 거리 또는 시간 임계값
-    const isDrag = Math.abs(deltaYOverall) > 10 || deltaTime > 200;
-
-    const windowHeight = window.innerHeight;
-    const expandedY = windowHeight * BOTTOM_SHEET_POSITIONS.EXPANDED_PERCENTAGE; // 62%
-    const collapsedY = windowHeight - BOTTOM_SHEET_POSITIONS.COLLAPSED_HEIGHT; // ~900px
+    const isDrag = Math.abs(deltaYOverall) > BOTTOM_SHEET_POSITIONS.MIN_DRAG_DISTANCE || deltaTime > 200;
 
     let finalState: 'expanded' | 'collapsed' = bottomSheetState;
 
     if (isDrag) {
-      const velocity = deltaTime > 0 ? deltaYOverall / deltaTime : 0;
-      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
-      let currentSheetY = 0;
-      
-      if (currentTransform !== 'none') {
-        const matrix = new DOMMatrixReadOnly(currentTransform);
-        currentSheetY = matrix.m42;
-      }
-
-      // 중간 지점 계산
-      const midPoint = (expandedY + collapsedY) / 2;
-
-      if (Math.abs(velocity) > 0.5) {
-        // 빠른 스와이프: 방향에 따라 결정
-        if (velocity < 0) { // 위로 스와이프 (값이 작아짐)
-          finalState = 'expanded';
-        } else { // 아래로 스와이프 (값이 커짐)
-          // expanded 상태에서는 충분히 아래로 드래그해야만 collapsed로 전환
-          if (bottomSheetState === 'expanded' && deltaYOverall < BOTTOM_SHEET_POSITIONS.MIN_DRAG_DISTANCE) {
-            finalState = 'expanded';
-          } else {
-            finalState = 'collapsed';
-          }
-        }
+      // 단순한 로직: 위로 드래그하면 expanded, 아래로 드래그하면 collapsed
+      if (deltaYOverall < 0) {
+        // 위로 드래그 (값이 작아짐) -> expanded
+        finalState = 'expanded';
       } else {
-        // 일반 드래그: 현재 위치에 따라 결정
-        if (currentSheetY < midPoint) {
-          finalState = 'expanded';
-        } else {
-          // expanded 상태에서는 충분히 아래로 드래그해야만 collapsed로 전환
-          if (bottomSheetState === 'expanded' && deltaYOverall < BOTTOM_SHEET_POSITIONS.MIN_DRAG_DISTANCE) {
-            finalState = 'expanded';
-          } else {
-            finalState = 'collapsed';
-          }
-        }
+        // 아래로 드래그 (값이 커짐) -> collapsed
+        finalState = 'collapsed';
       }
     } else {
       // 탭 동작: collapsed에서만 expanded로 전환
