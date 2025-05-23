@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 // import mapboxgl from 'mapbox-gl'; // Mapbox 임포트 제거
 // import 'mapbox-gl/dist/mapbox-gl.css'; // Mapbox CSS 제거
@@ -644,7 +644,7 @@ export default function LocationPage() {
       default: return 'bottom-sheet-collapsed';
     }
   };
-  const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
+  const handleDragStart = (e: TouchEvent | MouseEvent) => {
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     startDragY.current = clientY;
     currentDragY.current = clientY;
@@ -1431,17 +1431,13 @@ export default function LocationPage() {
         
         // 우선순위: coordinates > slt_lat/slt_long > 기타 필드들
         if (location.coordinates && Array.isArray(location.coordinates) && location.coordinates.length >= 2) {
-          lat = parseFloat(location.coordinates[1]) || 0;
-          lng = parseFloat(location.coordinates[0]) || 0;
+          lat = typeof location.coordinates[1] === 'number' ? location.coordinates[1] : parseFloat(String(location.coordinates[1])) || 0;
+          lng = typeof location.coordinates[0] === 'number' ? location.coordinates[0] : parseFloat(String(location.coordinates[0])) || 0;
           console.log(`[LOCATION] coordinates 배열에서 좌표 추출: lat=${lat}, lng=${lng}`);
         } else if (location.slt_lat && location.slt_long) {
           lat = parseFloat(location.slt_lat) || 0;
           lng = parseFloat(location.slt_long) || 0;
           console.log(`[LOCATION] slt_lat/slt_long에서 좌표 추출: lat=${lat}, lng=${lng}`);
-        } else if (location.lat && location.lng) {
-          lat = parseFloat(location.lat) || 0;
-          lng = parseFloat(location.lng) || 0;
-          console.log(`[LOCATION] lat/lng에서 좌표 추출: lat=${lat}, lng=${lng}`);
         } else {
           console.error(`[LOCATION] 유효한 좌표를 찾을 수 없습니다:`, location);
         }
@@ -1507,7 +1503,7 @@ export default function LocationPage() {
                 console.log(`[LOCATION] 지도 중심 이동 완료`);
                 
                 setNewLocation({ 
-                  id: String(location.slt_idx), 
+                  id: location.slt_idx ? String(location.slt_idx) : String(Date.now()), 
                   name: location.name || location.slt_title || '',
                   address: location.address || location.slt_add || '',
                   coordinates: [lng, lat],
@@ -1550,7 +1546,7 @@ export default function LocationPage() {
   // 다른 멤버 위치 데이터 ID로 조회하는 함수 추가
   const getOtherMemberLocationById = (id: string, otherLocations: any[]): any => {
     if (!otherLocations || !id) return null;
-    return otherLocations.find(loc => loc.id === id || loc.slt_idx === id || String(loc.slt_idx) === id);
+    return otherLocations.find(loc => loc.id === id || loc.slt_idx === id || (loc.slt_idx && String(loc.slt_idx) === id));
   };
 
   return (
@@ -1859,17 +1855,13 @@ export default function LocationPage() {
                         
                         // 우선순위: coordinates > slt_lat/slt_long > 기타 필드들
                         if (location.coordinates && Array.isArray(location.coordinates) && location.coordinates.length >= 2) {
-                          lat = parseFloat(location.coordinates[1]) || 0;
-                          lng = parseFloat(location.coordinates[0]) || 0;
+                          lat = typeof location.coordinates[1] === 'number' ? location.coordinates[1] : parseFloat(String(location.coordinates[1])) || 0;
+                          lng = typeof location.coordinates[0] === 'number' ? location.coordinates[0] : parseFloat(String(location.coordinates[0])) || 0;
                           console.log(`[LOCATION] coordinates 배열에서 좌표 추출: lat=${lat}, lng=${lng}`);
                         } else if (location.slt_lat && location.slt_long) {
                           lat = parseFloat(location.slt_lat) || 0;
                           lng = parseFloat(location.slt_long) || 0;
                           console.log(`[LOCATION] slt_lat/slt_long에서 좌표 추출: lat=${lat}, lng=${lng}`);
-                        } else if (location.lat && location.lng) {
-                          lat = parseFloat(location.lat) || 0;
-                          lng = parseFloat(location.lng) || 0;
-                          console.log(`[LOCATION] lat/lng에서 좌표 추출: lat=${lat}, lng=${lng}`);
                         } else {
                           console.error(`[LOCATION] 유효한 좌표를 찾을 수 없습니다:`, location);
                         }
@@ -1935,7 +1927,7 @@ export default function LocationPage() {
                                 console.log(`[LOCATION] 지도 중심 이동 완료`);
                                 
                                 setNewLocation({ 
-                                  id: String(location.slt_idx), 
+                                  id: location.slt_idx ? String(location.slt_idx) : String(Date.now()), 
                                   name: location.name || location.slt_title || '',
                                   address: location.address || location.slt_add || '',
                                   coordinates: [lng, lat],
