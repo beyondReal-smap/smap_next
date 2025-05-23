@@ -431,6 +431,9 @@ export default function LocationPage() {
   const [isFetchingGroupMembers, setIsFetchingGroupMembers] = useState(false);
   const [isLoadingOtherLocations, setIsLoadingOtherLocations] = useState(false); // 로딩 상태 추가
 
+  const isDraggingRef = useRef(false);
+  const initialScrollTopRef = useRef(0);
+
   useEffect(() => {
     setPortalContainer(document.body);
     const body = document.body;
@@ -644,16 +647,19 @@ export default function LocationPage() {
       default: return 'bottom-sheet-collapsed';
     }
   };
-  const handleDragStart = (e: TouchEvent | MouseEvent) => {
+  const handleDragStart = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     startDragY.current = clientY;
     currentDragY.current = clientY;
     dragStartTime.current = Date.now();
+    isDraggingRef.current = true;
+    initialScrollTopRef.current = bottomSheetRef.current?.scrollTop || 0;
+
     if (bottomSheetRef.current) {
       bottomSheetRef.current.style.transition = 'none';
     }
   };
-  const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
+  const handleDragMove = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
     if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
     
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
@@ -669,13 +675,13 @@ export default function LocationPage() {
       }
       let newTranslateY = currentTranslateY + deltaY;
       const expandedY = 0;
-      const collapsedY = window.innerHeight * 0.6;
-      newTranslateY = Math.max(expandedY - (window.innerHeight * 0.1), Math.min(newTranslateY, collapsedY + 50));
+      const collapsedY = window.innerHeight * 0.3;
+      newTranslateY = Math.max(expandedY, Math.min(newTranslateY, collapsedY));
       bottomSheetRef.current.style.transform = `translateY(${newTranslateY}px)`;
       bottomSheetRef.current.style.transition = 'none';
     }
   };
-  const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
+  const handleDragEnd = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
     if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
 
     const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
@@ -685,7 +691,7 @@ export default function LocationPage() {
     const isDrag = Math.abs(deltaYOverall) > 10 || deltaTime > 200;
 
     if (isDrag) {
-      bottomSheetRef.current.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+      bottomSheetRef.current.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
       const velocity = deltaTime > 0 ? deltaYOverall / deltaTime : 0;
       const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
       let currentSheetY = 0;
@@ -694,39 +700,27 @@ export default function LocationPage() {
         currentSheetY = matrix.m42;
       }
       const windowHeight = window.innerHeight;
-      const threshold = windowHeight * 0.3;
+      const threshold = windowHeight * 0.2;
 
       let finalState: 'expanded' | 'collapsed';
-      if (Math.abs(velocity) > 0.3) {
+      
+      if (Math.abs(velocity) > 0.5) {
         finalState = velocity < 0 ? 'expanded' : 'collapsed';
       } else {
         finalState = currentSheetY < threshold ? 'expanded' : 'collapsed';
       }
-      
       setBottomSheetState(finalState);
-
-      if (finalState === 'collapsed') {
-        setIsLocationInfoPanelOpen(false);
-        if (tempMarker.current) {
-          tempMarker.current.setMap(null);
-        }
-        const currentSelectedMember = groupMembers.find(m => m.isSelected);
-        if (currentSelectedMember) {
-          if (activeView === 'selectedMemberPlaces') {
-            addMarkersToMap(currentSelectedMember.savedLocations || []);
-          } else {
-            addMarkersToMap(otherMembersSavedLocations);
-          }
-        } else {
-          addMarkersToMap(locations); // 멤버 미선택 시 전체 장소 마커 표시 (또는 빈 배열)
-        }
-      }
     }
 
-    bottomSheetRef.current.style.transform = '';
+    // 스타일 복원
+    if (bottomSheetRef.current) {
+      bottomSheetRef.current.style.transform = '';
+    }
+
     startDragY.current = null;
     currentDragY.current = null;
     dragStartTime.current = null;
+    isDraggingRef.current = false;
   };
   const toggleBottomSheet = () => {
     const newState = bottomSheetState === 'collapsed' ? 'expanded' : 'collapsed';
@@ -1503,7 +1497,7 @@ export default function LocationPage() {
                 console.log(`[LOCATION] 지도 중심 이동 완료`);
                 
                 setNewLocation({ 
-                  id: location.slt_idx ? String(location.slt_idx) : String(Date.now()), 
+                  id: location.slt_idx ? location.slt_idx.toString() : Date.now().toString(), 
                   name: location.name || location.slt_title || '',
                   address: location.address || location.slt_add || '',
                   coordinates: [lng, lat],
@@ -1927,7 +1921,7 @@ export default function LocationPage() {
                                 console.log(`[LOCATION] 지도 중심 이동 완료`);
                                 
                                 setNewLocation({ 
-                                  id: location.slt_idx ? String(location.slt_idx) : String(Date.now()), 
+                                  id: location.slt_idx ? location.slt_idx.toString() : Date.now().toString(), 
                                   name: location.name || location.slt_title || '',
                                   address: location.address || location.slt_add || '',
                                   coordinates: [lng, lat],
