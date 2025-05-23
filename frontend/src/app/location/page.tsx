@@ -1237,8 +1237,8 @@ export default function LocationPage() {
           name: loc.name || loc.slt_title || '제목 없음',
           address: loc.address || loc.slt_add || '주소 정보 없음',
           coordinates: [
-            parseFloat(loc.slt_long) || 0,
-            parseFloat(loc.slt_lat) || 0
+            parseFloat(String(loc.slt_long || '0')) || 0,
+            parseFloat(String(loc.slt_lat || '0')) || 0
           ] as [number, number],
           category: loc.category || '기타',
           memo: loc.memo || '',
@@ -1260,8 +1260,8 @@ export default function LocationPage() {
             name: loc.name || loc.slt_title || '제목 없음',
             address: loc.address || loc.slt_add || '주소 정보 없음',
             coordinates: [
-              parseFloat(loc.slt_long) || 0,
-              parseFloat(loc.slt_lat) || 0
+              parseFloat(String(loc.slt_long || '0')) || 0,
+              parseFloat(String(loc.slt_lat || '0')) || 0
             ] as [number, number],
             category: loc.category || '기타',
             memo: loc.memo || '',
@@ -1530,8 +1530,8 @@ export default function LocationPage() {
           lng = typeof location.coordinates[0] === 'number' ? location.coordinates[0] : parseFloat(String(location.coordinates[0])) || 0;
           console.log(`[MARKER] coordinates 배열에서 좌표 추출: lat=${lat}, lng=${lng}`);
         } else if (location.slt_lat && location.slt_long) {
-          lat = parseFloat(location.slt_lat) || 0;
-          lng = parseFloat(location.slt_long) || 0;
+          lat = parseFloat(String(location.slt_lat || '0')) || 0;
+          lng = parseFloat(String(location.slt_long || '0')) || 0;
           console.log(`[MARKER] slt_lat/slt_long에서 좌표 추출: lat=${lat}, lng=${lng}`);
         } else {
           console.error(`[MARKER] 유효한 좌표를 찾을 수 없습니다:`, location);
@@ -1924,8 +1924,8 @@ export default function LocationPage() {
                           lng = typeof location.coordinates[0] === 'number' ? location.coordinates[0] : parseFloat(String(location.coordinates[0])) || 0;
                           console.log(`[LOCATION] coordinates 배열에서 좌표 추출: lat=${lat}, lng=${lng}`);
                         } else if (location.slt_lat && location.slt_long) {
-                          lat = parseFloat(location.slt_lat) || 0;
-                          lng = parseFloat(location.slt_long) || 0;
+                          lat = parseFloat(String(location.slt_lat || '0')) || 0;
+                          lng = parseFloat(String(location.slt_long || '0')) || 0;
                           console.log(`[LOCATION] slt_lat/slt_long에서 좌표 추출: lat=${lat}, lng=${lng}`);
                         } else {
                           console.error(`[LOCATION] 유효한 좌표를 찾을 수 없습니다:`, location);
