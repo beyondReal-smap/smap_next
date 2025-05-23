@@ -44,32 +44,45 @@ export interface OtherMemberLocationRaw {
   memo: string;
   favorite: boolean;
   notifications?: boolean;
-  // 백엔드 필드와 매핑을 위한 추가 필드
+  // 백엔드 필드와 매핑을 위한 추가 필드 (null 허용)
   slt_idx?: number | string;
-  slt_title?: string;
-  slt_add?: string;
-  slt_lat?: string;
-  slt_long?: string;
-  slt_enter_alarm?: string;
+  slt_title?: string | null;
+  slt_add?: string | null;
+  slt_lat?: string | null;
+  slt_long?: string | null;
+  slt_enter_alarm?: string | null;
 }
 
 const locationService = {
   getOtherMembersLocations: async (memberId: string): Promise<OtherMemberLocationRaw[]> => {
     try {
       const response = await apiClient.get<LocationDataFromApi[]>(`/locations/other-members/${memberId}`);
-      return response.data.map((item) => ({
-        id: String(item.slt_idx),
-        name: item.slt_title || '제목 없음',
-        address: item.slt_add || '주소 없음',
-        coordinates: [
-          parseFloat(item.slt_long || '0'), 
-          parseFloat(item.slt_lat || '0')
-        ] as [number, number],
-        category: '기타', // 백엔드 응답에 category 필드가 있다면 사용 (예: item.slt_category)
-        memo: '', // 백엔드 응답에 memo 필드가 있다면 사용 (예: item.slt_memo)
-        favorite: false, // 백엔드 응답에 favorite(bookmark) 필드가 있다면 사용
-        notifications: item.slt_enter_alarm === 'Y', // slt_enter_alarm을 notifications로 매핑 예시
-      }));
+      console.log(`[locationService] 멤버 ${memberId}의 원본 데이터:`, response.data);
+      
+      return response.data.map((item) => {
+        const converted = {
+          id: String(item.slt_idx),
+          name: item.slt_title || '제목 없음',
+          address: item.slt_add || '주소 없음',
+          coordinates: [
+            parseFloat(item.slt_long || '0'), 
+            parseFloat(item.slt_lat || '0')
+          ] as [number, number],
+          category: '기타', // 백엔드 응답에 category 필드가 있다면 사용 (예: item.slt_category)
+          memo: '', // 백엔드 응답에 memo 필드가 있다면 사용 (예: item.slt_memo)
+          favorite: false, // 백엔드 응답에 favorite(bookmark) 필드가 있다면 사용
+          notifications: item.slt_enter_alarm === 'Y', // slt_enter_alarm을 notifications로 매핑
+          // 백엔드 원본 필드 유지
+          slt_idx: item.slt_idx,
+          slt_title: item.slt_title,
+          slt_add: item.slt_add,
+          slt_lat: item.slt_lat,
+          slt_long: item.slt_long,
+          slt_enter_alarm: item.slt_enter_alarm,
+        };
+        console.log(`[locationService] 변환된 데이터:`, { 원본: item, 변환후: converted });
+        return converted;
+      });
     } catch (error) {
       console.error('Error fetching other members locations:', error);
       return [];

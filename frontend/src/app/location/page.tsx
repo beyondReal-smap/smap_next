@@ -479,7 +479,7 @@ export default function LocationPage() {
                 category: loc.category || '기타',
                 memo: loc.memo || '',
                 favorite: loc.favorite || false,
-                notifications: loc.notifications || false // locationService에서 이미 slt_enter_alarm으로부터 변환됨
+                notifications: loc.notifications ?? false // locationService에서 이미 slt_enter_alarm으로부터 변환됨, ?? 사용하여 undefined/null만 false로 변환
               };
               console.log(`멤버 ${member.mt_name}의 ${locIndex + 1}번째 장소 변환:`, { 원본: loc, 변환후: converted });
               return converted;
@@ -1010,8 +1010,8 @@ export default function LocationPage() {
     const isSelectedByInfoPanel = isLocationInfoPanelOpen && newLocation.id === locationId && isEditingPanel;
     
     // 마커 타입에 따른 색상 설정
-    const bgColor = markerType === 'selected' ? '#4F46E5' : '#8B5CF6';
-    const dotColor = isSelectedByInfoPanel ? '#FF0000' : (markerType === 'selected' ? '#4F46E5' : '#A855F7');
+    const bgColor = isSelectedByInfoPanel ? '#FF0000' : '#4F46E5'; // 선택된 경우 빨간색, 아니면 인디고
+    const dotColor = isSelectedByInfoPanel ? '#FF0000' : '#4F46E5'; // 선택된 경우 빨간색, 아니면 인디고
     
     console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}`);
     
@@ -1067,6 +1067,17 @@ export default function LocationPage() {
       if (map.current.getZoom() < 16) {
         map.current.setZoom(16);
       }
+      
+      // 마커 선택 시 마커를 다시 그려서 빨간색으로 변경
+      setTimeout(() => {
+        const currentSelectedMember = groupMembers.find(m => m.isSelected);
+        if (markerType === 'selected') {
+          const locationsToShow = selectedMemberSavedLocations || currentSelectedMember?.savedLocations || locations;
+          addMarkersToMap(locationsToShow);
+        } else {
+          addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+        }
+      }, 100);
     });
     
     return { marker: markerInstance, id: `${locationId}_${index}` };
