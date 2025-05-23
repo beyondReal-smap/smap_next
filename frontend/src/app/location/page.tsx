@@ -1399,25 +1399,28 @@ export default function LocationPage() {
   
   // 다른 멤버의 위치 데이터를 위한 함수 추가
   const addMarkersToMapForOtherMembers = (locationsToDisplay: any[]) => {
-    if (!map.current || !window.naver?.maps || !naverMapsLoaded) return;
+    if (!map.current || !window.naver?.maps || !naverMapsLoaded) {
+      console.log('[MARKER] 지도 또는 네이버 API가 준비되지 않음');
+      return;
+    }
     
+    console.log('[MARKER] 기존 마커 제거 시작');
     Object.values(markers.current).forEach(marker => {
       if (marker && typeof marker.setMap === 'function') marker.setMap(null);
     });
     markers.current = {};
 
     if (!locationsToDisplay || locationsToDisplay.length === 0) {
+      console.log('[MARKER] 표시할 장소가 없음');
       return;
     }
 
-    locationsToDisplay.forEach(location => {
-      if (!location.id) {
-        console.warn('Location ID is missing, cannot create marker:', location);
-        return;
-      }
+    console.log(`[MARKER] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작`);
+
+    locationsToDisplay.forEach((location, index) => {
       try {
         // 좌표 파싱 전에 location 객체 전체를 로깅
-        console.log(`[LOCATION] 전체 location 객체:`, location);
+        console.log(`[MARKER] ${index + 1}번째 장소:`, location);
         
         // 다양한 좌표 필드 시도
         let lat = 0;
@@ -1427,114 +1430,84 @@ export default function LocationPage() {
         if (location.coordinates && Array.isArray(location.coordinates) && location.coordinates.length >= 2) {
           lat = typeof location.coordinates[1] === 'number' ? location.coordinates[1] : parseFloat(String(location.coordinates[1])) || 0;
           lng = typeof location.coordinates[0] === 'number' ? location.coordinates[0] : parseFloat(String(location.coordinates[0])) || 0;
-          console.log(`[LOCATION] coordinates 배열에서 좌표 추출: lat=${lat}, lng=${lng}`);
+          console.log(`[MARKER] coordinates 배열에서 좌표 추출: lat=${lat}, lng=${lng}`);
         } else if (location.slt_lat && location.slt_long) {
           lat = parseFloat(location.slt_lat) || 0;
           lng = parseFloat(location.slt_long) || 0;
-          console.log(`[LOCATION] slt_lat/slt_long에서 좌표 추출: lat=${lat}, lng=${lng}`);
+          console.log(`[MARKER] slt_lat/slt_long에서 좌표 추출: lat=${lat}, lng=${lng}`);
         } else {
-          console.error(`[LOCATION] 유효한 좌표를 찾을 수 없습니다:`, location);
+          console.error(`[MARKER] 유효한 좌표를 찾을 수 없습니다:`, location);
+          return; // 다음 장소로 넘어감
         }
         
-        console.log(`[LOCATION] 최종 파싱된 좌표: lat=${lat}, lng=${lng}`);
+        console.log(`[MARKER] 최종 파싱된 좌표: lat=${lat}, lng=${lng}`);
         
         // 좌표 유효성 검사
         if (lat === 0 && lng === 0) {
-          console.error('[LOCATION] 유효하지 않은 좌표입니다 (0, 0). 지도 중심 이동을 건너뜁니다.');
-          return null;
+          console.error('[MARKER] 유효하지 않은 좌표입니다 (0, 0). 마커 생성을 건너뜁니다.');
+          return; // 다음 장소로 넘어감
         }
-        
-        return (
-          <div 
-            key={location.slt_idx} 
-            className="flex-shrink-0 w-48 bg-white rounded-lg shadow p-3.5 cursor-pointer hover:shadow-lg transition-shadow duration-200 ease-in-out transform hover:-translate-y-0.5"
-            onClick={() => {
-              console.log(`[LOCATION] 장소 클릭됨: ${location.name || location.slt_title}, 좌표: [${lat}, ${lng}]`);
-              console.log(`[LOCATION] 지도 초기화 상태: ${isMapInitialized}, 지도 객체 존재: ${!!map.current}, 네이버 API: ${!!window.naver?.maps}`);
-              
-              // 좌표 유효성 검사
-              if (lat === 0 && lng === 0) {
-                console.error('[LOCATION] 유효하지 않은 좌표입니다 (0, 0). 지도 중심 이동을 건너뜁니다.');
-                return;
-              }
-              
-              if (!isMapInitialized) {
-                console.error('[LOCATION] 지도가 아직 초기화되지 않았습니다.');
-                return;
-              }
-              
-              if (!map.current) {
-                console.error('[LOCATION] 지도 객체가 없습니다.');
-                return;
-              }
-              
-              if (!window.naver?.maps) {
-                console.error('[LOCATION] 네이버 지도 API가 로드되지 않았습니다.');
-                return;
-              }
-              
-              try {
-                const position = new window.naver.maps.LatLng(lat, lng);
-                console.log(`[LOCATION] 생성된 LatLng 객체:`, position);
-                
-                // 지도 중심 이동
-                console.log(`[LOCATION] 지도 중심 이동 시작: lat=${lat}, lng=${lng}`);
-                map.current.setCenter(position);
-                
-                // 지도 중심이 실제로 변경되었는지 확인
-                setTimeout(() => {
-                  const currentCenter = map.current.getCenter();
-                  console.log(`[LOCATION] 현재 지도 중심: lat=${currentCenter.lat()}, lng=${currentCenter.lng()}`);
-                }, 100);
-                
-                // 줌 레벨 설정
-                const currentZoom = map.current.getZoom();
-                if (currentZoom < 16) {
-                  map.current.setZoom(16);
-                  console.log(`[LOCATION] 줌 레벨 변경: ${currentZoom} → 16`);
-                }
-                
-                console.log(`[LOCATION] 지도 중심 이동 완료`);
-                
-                setNewLocation({ 
-                  id: location.slt_idx ? location.slt_idx.toString() : Date.now().toString(), 
-                  name: location.name || location.slt_title || '',
-                  address: location.address || location.slt_add || '',
-                  coordinates: [lng, lat],
-                  category: location.category || '기타',
-                  memo: location.memo || '',
-                  favorite: location.favorite || false,
-                  notifications: location.notifications || location.slt_enter_alarm === 'Y', 
-                });
-                setClickedCoordinates(position);
-                setIsEditingPanel(true); 
-                setIsLocationInfoPanelOpen(true);
-                if (tempMarker.current) tempMarker.current.setMap(null);
-                addMarkersToMapForOtherMembers(otherMembersSavedLocations); 
-              } catch (error) {
-                console.error('[LOCATION] 지도 중심 이동 중 오류:', error);
-              }
-            }}
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center min-w-0">
-                <FiMapPin className="w-3.5 h-3.5 text-purple-600 mr-1.5 flex-shrink-0" />
-                <h4 className="text-sm font-semibold text-gray-800 truncate">{location.name || location.slt_title || '제목 없음'}</h4>
+
+        // 네이버 지도 마커 생성
+        const position = new window.naver.maps.LatLng(lat, lng);
+        const title = location.name || location.slt_title || '제목 없음';
+        const address = location.address || location.slt_add || '주소 정보 없음';
+
+        console.log(`[MARKER] 마커 생성 시작: ${title} at (${lat}, ${lng})`);
+
+        const marker = new window.naver.maps.Marker({
+          position: position,
+          map: map.current,
+          title: title,
+          icon: {
+            content: `
+              <div style="position: relative; background: white; border: 2px solid #8B5CF6; border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: bold; color: #8B5CF6; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                ${title}
+                <div style="position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid #8B5CF6;"></div>
               </div>
-              {/* 알림 아이콘: location.notifications 또는 location.slt_enter_alarm 사용 */}
-              {(location.notifications || location.slt_enter_alarm === 'Y') ? (
-                <FiBell size={12} className="text-yellow-500 flex-shrink-0 ml-1" />
-              ) : (
-                <FiBellOff size={12} className="text-red-500 flex-shrink-0 ml-1" />
-              )}
-            </div>
-            <p className="text-xs text-gray-500 truncate mt-1 pl-[1.125rem]">{location.address || location.slt_add || '주소 정보 없음'}</p>
-          </div>
-        );
+            `,
+            size: new window.naver.maps.Size(200, 40),
+            anchor: new window.naver.maps.Point(100, 40)
+          }
+        });
+
+        // 마커 클릭 이벤트 추가
+        window.naver.maps.Event.addListener(marker, 'click', () => {
+          console.log(`[MARKER] 마커 클릭됨: ${title}`);
+          
+          setNewLocation({ 
+            id: location.slt_idx ? location.slt_idx.toString() : Date.now().toString(), 
+            name: location.name || location.slt_title || '',
+            address: location.address || location.slt_add || '',
+            coordinates: [lng, lat],
+            category: location.category || '기타',
+            memo: location.memo || '',
+            favorite: location.favorite || false,
+            notifications: location.notifications || location.slt_enter_alarm === 'Y', 
+          });
+          setClickedCoordinates(position);
+          setIsEditingPanel(true); 
+          setIsLocationInfoPanelOpen(true);
+          
+          // 지도 중심을 클릭된 마커로 이동
+          map.current.setCenter(position);
+          if (map.current.getZoom() < 16) {
+            map.current.setZoom(16);
+          }
+        });
+
+        // 마커를 markers 객체에 저장
+        const markerId = location.slt_idx || location.id || `marker_${index}`;
+        markers.current[markerId] = marker;
+        
+        console.log(`[MARKER] 마커 생성 완료: ${title}, ID: ${markerId}`);
+
       } catch (error) {
-        console.error(`다른 멤버 장소 마커 추가 중 오류 (${location.slt_title || location.name}):`, error);
+        console.error(`[MARKER] 마커 생성 중 오류 (${location.slt_title || location.name}):`, error);
       }
     });
+
+    console.log(`[MARKER] 총 ${Object.keys(markers.current).length}개의 마커가 생성됨`);
   };
 
   // 다른 멤버 위치 데이터 ID로 조회하는 함수 추가
@@ -1905,12 +1878,6 @@ export default function LocationPage() {
                                 console.log(`[LOCATION] 지도 중심 이동 시작: lat=${lat}, lng=${lng}`);
                                 map.current.setCenter(position);
                                 
-                                // 지도 중심이 실제로 변경되었는지 확인
-                                setTimeout(() => {
-                                  const currentCenter = map.current.getCenter();
-                                  console.log(`[LOCATION] 현재 지도 중심: lat=${currentCenter.lat()}, lng=${currentCenter.lng()}`);
-                                }, 100);
-                                
                                 // 줌 레벨 설정
                                 const currentZoom = map.current.getZoom();
                                 if (currentZoom < 16) {
@@ -1933,8 +1900,19 @@ export default function LocationPage() {
                                 setClickedCoordinates(position);
                                 setIsEditingPanel(true); 
                                 setIsLocationInfoPanelOpen(true);
-                                if (tempMarker.current) tempMarker.current.setMap(null);
-                                addMarkersToMapForOtherMembers(otherMembersSavedLocations); 
+                                
+                                // 임시 마커 제거
+                                if (tempMarker.current) {
+                                  tempMarker.current.setMap(null);
+                                  tempMarker.current = null;
+                                }
+                                
+                                // 마커 재생성 (약간의 지연 후)
+                                setTimeout(() => {
+                                  console.log(`[LOCATION] 마커 재생성 시작, 장소 수: ${otherMembersSavedLocations.length}`);
+                                  addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+                                }, 100);
+                                
                               } catch (error) {
                                 console.error('[LOCATION] 지도 중심 이동 중 오류:', error);
                               }
