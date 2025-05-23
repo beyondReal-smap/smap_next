@@ -1935,12 +1935,15 @@ export default function HomePage() {
                 isMapLoading 
                   ? "지도를 불러오는 중입니다..." 
                   : !dataFetchedRef.current.members 
-                    ? "그룹 멤버 정보를 불러오는 중입니다..."
+                    ? "데이터를 불러오는 중입니다..."
                     : !dataFetchedRef.current.schedules
                       ? "그룹 일정을 불러오는 중입니다..."
                       : "첫번째 멤버 위치로 이동 중입니다..."
               } 
-              fullScreen={true} 
+              fullScreen={true}
+              type="dots"
+              size="md"
+              color="indigo"
             />
           )}
           

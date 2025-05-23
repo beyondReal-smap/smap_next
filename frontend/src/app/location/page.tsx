@@ -507,6 +507,7 @@ export default function LocationPage() {
       setIsFirstMemberSelectionComplete(true);
     } finally {
       setIsFetchingGroupMembers(false);
+      setIsLoading(false); // 그룹멤버 렌더링을 위해 isLoading도 false로 설정
       console.log('[fetchGroupMembersData] 완료');
     }
   };
@@ -516,6 +517,16 @@ export default function LocationPage() {
       fetchGroupMembersData();
     }
   }, [isMapInitialized]); 
+
+  // 첫번째 멤버 자동 선택
+  useEffect(() => {
+    if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && isMapInitialized) {
+      console.log('[LOCATION] 첫번째 멤버 자동 선택:', groupMembers[0].name);
+      setTimeout(() => {
+        handleMemberSelect(groupMembers[0].id);
+      }, 500);
+    }
+  }, [groupMembers, isMapInitialized]);
     
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
@@ -1383,7 +1394,7 @@ export default function LocationPage() {
           category: loc.category,
           memo: loc.memo,
           favorite: loc.favorite,
-          notifications: loc.notifications,
+          notifications: loc.notifications !== undefined ? loc.notifications : ((loc as any).slt_enter_alarm === 'Y' || (loc as any).slt_enter_alarm === undefined),
           slt_enter_alarm: loc.notifications ? 'Y' : 'N'
         }));
         setOtherMembersSavedLocations(rawLocationsForOtherMembers);
@@ -1418,7 +1429,8 @@ export default function LocationPage() {
             category: loc.category || '기타',
             memo: loc.memo || '',
             favorite: loc.favorite || false,
-            notifications: loc.notifications || loc.slt_enter_alarm === 'Y'
+            notifications: loc.notifications !== undefined ? loc.notifications : ((loc as any).slt_enter_alarm === 'Y' || (loc as any).slt_enter_alarm === undefined),
+            slt_enter_alarm: loc.notifications ? 'Y' : 'N'
           }));
           
           // 상태 업데이트
@@ -1852,10 +1864,13 @@ export default function LocationPage() {
               isMapLoading 
                 ? "지도를 불러오는 중입니다..." 
                 : isFetchingGroupMembers 
-                  ? "그룹 멤버 정보를 불러오는 중입니다..."
+                  ? "데이터를 불러오는 중입니다..."
                   : "첫번째 멤버 위치로 이동 중입니다..."
             } 
-            fullScreen={true} 
+            fullScreen={true}
+            type="dots"
+            size="md"
+            color="indigo"
           />
         )}
         
@@ -2216,7 +2231,7 @@ export default function LocationPage() {
                                   category: location.category || '기타',
                                   memo: location.memo || '',
                                   favorite: location.favorite || false,
-                                  notifications: location.notifications || location.slt_enter_alarm === 'Y', 
+                                  notifications: location.notifications !== undefined ? location.notifications : ((location as any).slt_enter_alarm === 'Y' || (location as any).slt_enter_alarm === undefined)
                                 });
                                 setClickedCoordinates(position);
                                 setIsEditingPanel(true); 
@@ -2244,7 +2259,7 @@ export default function LocationPage() {
                                 <h4 className="text-sm font-semibold text-gray-800 truncate">{location.name || location.slt_title || '제목 없음'}</h4>
                               </div>
                               {/* 알림 아이콘: location.notifications 또는 location.slt_enter_alarm 사용 */}
-                              {(location.notifications || location.slt_enter_alarm === 'Y') ? (
+                              {(location.notifications || (location as any).slt_enter_alarm === 'Y') ? (
                                 <FiBell size={12} className="text-yellow-500 flex-shrink-0 ml-1" />
                               ) : (
                                 <FiBellOff size={12} className="text-red-500 flex-shrink-0 ml-1" />

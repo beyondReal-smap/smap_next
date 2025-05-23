@@ -62,10 +62,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/group/page.js"
     ],
-    "/_not-found/page": [
+    "/demo/spinner/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/demo/spinner/page.js"
+    ],
+    "/logs/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/logs/layout.js"
+    ],
+    "/logs/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/logs/page.js"
     ]
   }
 }
