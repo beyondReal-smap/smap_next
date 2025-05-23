@@ -658,8 +658,10 @@ export default function LocationPage() {
     const handleClickOutside = (event: MouseEvent) => {
       if (isGroupSelectorOpen) {
         const target = event.target as HTMLElement;
-        const groupSelector = target.closest('.relative');
-        if (!groupSelector || !groupSelector.querySelector('button')) {
+        const groupDropdown = target.closest('.relative');
+        const isGroupDropdownClick = groupDropdown && groupDropdown.querySelector('button[data-group-selector]');
+        
+        if (!isGroupDropdownClick) {
           setIsGroupSelectorOpen(false);
         }
       }
@@ -2361,64 +2363,68 @@ export default function LocationPage() {
             >
               <div className="w-full flex-shrink-0 snap-start">
                  <div className="content-section members-section min-h-[180px] max-h-[180px] overflow-y-auto">
-                   {/* 그룹 선택 드롭다운 */}
-                   <div className="relative mb-2">
-                     <button
-                       onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
-                       className="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                       disabled={isLoadingGroups}
-                     >
-                       <div className="flex items-center min-w-0">
-                         <span className="text-sm font-medium text-gray-900 truncate">
-                           {isLoadingGroups 
-                             ? '그룹 로딩 중...' 
-                             : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹을 선택하세요'
-                           }
-                         </span>
-                       </div>
-                       <div className="flex items-center ml-2">
-                         {isLoadingGroups ? (
-                           <FiLoader className="animate-spin text-gray-400" size={16} />
-                         ) : (
-                           <FiChevronDown className={`text-gray-400 transition-transform duration-200 ${isGroupSelectorOpen ? 'rotate-180' : ''}`} size={16} />
+                   <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+                     <div className="flex items-center space-x-3">
+                       <span>그룹 멤버</span>
+                       {isFetchingGroupMembers && <FiLoader className="animate-spin text-indigo-500" size={18}/>}
+                     </div>
+                     
+                     <div className="flex items-center space-x-2">
+                       {/* 그룹 선택 드롭다운 */}
+                       <div className="relative">
+                         <button
+                           onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
+                           className="flex items-center justify-between px-2 py-1 bg-white border border-gray-200 rounded text-xs hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
+                           disabled={isLoadingGroups}
+                           data-group-selector="true"
+                         >
+                           <span className="truncate text-gray-700">
+                             {isLoadingGroups 
+                               ? '로딩 중...' 
+                               : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
+                             }
+                           </span>
+                           <div className="ml-1 flex-shrink-0">
+                             {isLoadingGroups ? (
+                               <FiLoader className="animate-spin text-gray-400" size={12} />
+                             ) : (
+                               <FiChevronDown className={`text-gray-400 transition-transform duration-200 ${isGroupSelectorOpen ? 'rotate-180' : ''}`} size={12} />
+                             )}
+                           </div>
+                         </button>
+
+                         {isGroupSelectorOpen && userGroups.length > 0 && (
+                           <div className="absolute top-full right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto min-w-[160px]">
+                             {userGroups.map((group) => (
+                               <button
+                                 key={group.sgt_idx}
+                                 onClick={() => handleGroupSelect(group.sgt_idx)}
+                                 className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 focus:outline-none focus:bg-indigo-50 ${
+                                   selectedGroupId === group.sgt_idx 
+                                     ? 'bg-indigo-50 text-indigo-700 font-medium' 
+                                     : 'text-gray-900'
+                                 }`}
+                               >
+                                 <div className="flex items-center justify-between">
+                                   <span className="truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</span>
+                                   {selectedGroupId === group.sgt_idx && (
+                                     <span className="text-indigo-500 ml-2">✓</span>
+                                   )}
+                                 </div>
+                               </button>
+                             ))}
+                           </div>
                          )}
                        </div>
-                     </button>
 
-                     {isGroupSelectorOpen && userGroups.length > 0 && (
-                       <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                         {userGroups.map((group) => (
-                           <button
-                             key={group.sgt_idx}
-                             onClick={() => handleGroupSelect(group.sgt_idx)}
-                             className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 focus:outline-none focus:bg-indigo-50 ${
-                               selectedGroupId === group.sgt_idx 
-                                 ? 'bg-indigo-50 text-indigo-700 font-medium' 
-                                 : 'text-gray-900'
-                             }`}
-                           >
-                             <div className="flex items-center justify-between">
-                               <span className="truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</span>
-                               {selectedGroupId === group.sgt_idx && (
-                                 <span className="text-indigo-500 ml-2">✓</span>
-                               )}
-                             </div>
-                           </button>
-                         ))}
-                       </div>
-                     )}
-                   </div>
-
-                   <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
-                     그룹 멤버
-                     {isFetchingGroupMembers && <FiLoader className="animate-spin ml-2 text-indigo-500" size={18}/>}
-                     <Link 
-                       href="/group" 
-                       className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                     >
-                       <FiPlus className="h-3 w-3 mr-1" />
-                       그룹 관리
-                     </Link>
+                       <Link 
+                         href="/group" 
+                         className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                       >
+                         <FiPlus className="h-3 w-3 mr-1" />
+                         그룹 관리
+                       </Link>
+                     </div>
                    </h2>
                    {isLoading ? (
                     <div className="text-center py-3 text-gray-500">

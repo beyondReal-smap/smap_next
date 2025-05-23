@@ -77,6 +77,11 @@
       "static/chunks/main-app.js",
       "static/chunks/app/logs/page.js"
     ],
+    "/api/v1/groups/member/[id]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/v1/groups/member/[id]/route.js"
+    ],
     "/_not-found/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",

@@ -26,12 +26,10 @@ export interface GroupUpdate {
 }
 
 class GroupService {
-  private baseUrl = '/api/v1/groups';
-
   // 모든 그룹 목록 조회
   async getAllGroups(skip: number = 0, limit: number = 100): Promise<Group[]> {
     try {
-      const response = await apiClient.get(`${this.baseUrl}?skip=${skip}&limit=${limit}`);
+      const response = await apiClient.get(`/groups?skip=${skip}&limit=${limit}`);
       return response.data;
     } catch (error) {
       console.error('Failed to fetch all groups:', error);
@@ -39,13 +37,13 @@ class GroupService {
     }
   }
 
-  // 특정 그룹 조회
+  // ID로 그룹 조회
   async getGroupById(groupId: number): Promise<Group> {
     try {
-      const response = await apiClient.get(`${this.baseUrl}/${groupId}`);
+      const response = await apiClient.get(`/groups/${groupId}`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to fetch group with id ${groupId}:`, error);
+      console.error(`Failed to fetch group ${groupId}:`, error);
       throw error;
     }
   }
@@ -53,10 +51,10 @@ class GroupService {
   // 특정 멤버의 그룹 목록 조회
   async getMemberGroups(memberId: number): Promise<Group[]> {
     try {
-      const response = await apiClient.get(`${this.baseUrl}/member/${memberId}`);
+      const response = await apiClient.get(`/v1/groups/member/${memberId}`);
       return response.data;
     } catch (error) {
-      console.error(`Failed to fetch groups for member ${memberId}:`, error);
+      console.error('Failed to fetch member groups:', error);
       throw error;
     }
   }
@@ -64,7 +62,7 @@ class GroupService {
   // 그룹 코드로 그룹 조회
   async getGroupByCode(code: string): Promise<Group> {
     try {
-      const response = await apiClient.get(`${this.baseUrl}/code/${code}`);
+      const response = await apiClient.get(`/groups/code/${code}`);
       return response.data;
     } catch (error) {
       console.error(`Failed to fetch group with code ${code}:`, error);
@@ -72,10 +70,10 @@ class GroupService {
     }
   }
 
-  // 새 그룹 생성
+  // 그룹 생성
   async createGroup(groupData: GroupCreate): Promise<Group> {
     try {
-      const response = await apiClient.post(this.baseUrl, groupData);
+      const response = await apiClient.post('/groups', groupData);
       return response.data;
     } catch (error) {
       console.error('Failed to create group:', error);
@@ -83,10 +81,10 @@ class GroupService {
     }
   }
 
-  // 그룹 정보 업데이트
+  // 그룹 업데이트
   async updateGroup(groupId: number, groupData: GroupUpdate): Promise<Group> {
     try {
-      const response = await apiClient.put(`${this.baseUrl}/${groupId}`, groupData);
+      const response = await apiClient.put(`/groups/${groupId}`, groupData);
       return response.data;
     } catch (error) {
       console.error(`Failed to update group ${groupId}:`, error);
@@ -97,7 +95,7 @@ class GroupService {
   // 그룹 삭제
   async deleteGroup(groupId: number): Promise<Group> {
     try {
-      const response = await apiClient.delete(`${this.baseUrl}/${groupId}`);
+      const response = await apiClient.delete(`/groups/${groupId}`);
       return response.data;
     } catch (error) {
       console.error(`Failed to delete group ${groupId}:`, error);
@@ -109,7 +107,7 @@ class GroupService {
   async getCurrentUserGroups(): Promise<Group[]> {
     try {
       // TODO: 실제 로그인한 사용자의 mt_idx를 가져와야 함
-      const CURRENT_USER_ID = 1; // 임시로 고정값 사용 (2에서 1로 변경)
+      const CURRENT_USER_ID = 1186; // 1에서 1186으로 변경
       return await this.getMemberGroups(CURRENT_USER_ID);
     } catch (error) {
       console.error('Failed to fetch current user groups:', error);
