@@ -814,6 +814,9 @@ select {
 .left-3 {
   left: 0.75rem;
 }
+.top-full {
+  top: 100%;
+}
 .z-10 {
   z-index: 10;
 }
@@ -1063,6 +1066,9 @@ select {
 .max-h-screen {
   max-height: 100vh;
 }
+.max-h-40 {
+  max-height: 10rem;
+}
 .min-h-0 {
   min-height: 0px;
 }
@@ -1220,6 +1226,10 @@ select {
 }
 .translate-y-\[calc\(100\%-60px\)\] {
   --tw-translate-y: calc(100% - 60px);
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+.rotate-180 {
+  --tw-rotate: 180deg;
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
 .scale-110 {
@@ -3098,6 +3108,11 @@ p {
 .focus\:border-indigo-500:focus {
   --tw-border-opacity: 1;
   border-color: rgb(99 102 241 / var(--tw-border-opacity, 1));
+}
+
+.focus\:bg-indigo-50:focus {
+  --tw-bg-opacity: 1;
+  background-color: rgb(238 242 255 / var(--tw-bg-opacity, 1));
 }
 
 .focus\:opacity-100:focus {

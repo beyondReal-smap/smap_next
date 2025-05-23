@@ -27,7 +27,7 @@ def get_group(
     """
     특정 그룹을 조회합니다.
     """
-    group = db.query(Group.__table__).filter(Group.gt_idx == group_id).first()
+    group = db.query(Group.__table__).filter(Group.sgt_idx == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     return group
@@ -79,7 +79,7 @@ def update_group(
     """
     그룹 정보를 업데이트합니다.
     """
-    group = db.query(Group.__table__).filter(Group.gt_idx == group_id).first()
+    group = db.query(Group.__table__).filter(Group.sgt_idx == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     
@@ -99,7 +99,7 @@ def delete_group(
     """
     그룹을 삭제합니다.
     """
-    group = db.query(Group.__table__).filter(Group.gt_idx == group_id).first()
+    group = db.query(Group.__table__).filter(Group.sgt_idx == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     

@@ -17,6 +17,7 @@ import { PageContainer, Button } from '../components/layout'; // Button 컴포�
 import ReactDOM from 'react-dom'; // Portal 사용 위해 추가
 import memberService from '@/services/memberService'; // 멤버 서비스 추가
 import locationService, { OtherMemberLocationRaw } from '@/services/locationService'; // locationService 임포트 추가
+import groupService, { Group } from '@/services/groupService'; // 그룹 서비스 추가
 
 // window 전역 객체에 naver 프로퍼티 타입 선언 (home/page.tsx 참고)
 declare global {
@@ -445,6 +446,12 @@ export default function LocationPage() {
   const [isFetchingGroupMembers, setIsFetchingGroupMembers] = useState(false);
   const [isLoadingOtherLocations, setIsLoadingOtherLocations] = useState(false); // 로딩 상태 추가
 
+  // 그룹 관련 상태 추가
+  const [userGroups, setUserGroups] = useState<Group[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
+
   const isDraggingRef = useRef(false);
   const [isFirstMemberSelectionComplete, setIsFirstMemberSelectionComplete] = useState(false); // 첫번째 멤버 선택 완료 상태 추가
   // 첫번째 멤버 선택 완료 여부를 추적하는 상태 추가
@@ -470,6 +477,99 @@ export default function LocationPage() {
     };
   }, [isAddModalOpen, isEditModalOpen, isLocationSearchModalOpen, isLocationInfoPanelOpen]);
   
+  // 사용자 그룹 목록 불러오기
+  const fetchUserGroups = async () => {
+    setIsLoadingGroups(true);
+    try {
+      const groups = await groupService.getCurrentUserGroups();
+      console.log('[fetchUserGroups] 그룹 목록 조회:', groups);
+      setUserGroups(groups);
+      
+      // 첫 번째 그룹을 기본 선택
+      if (groups.length > 0 && !selectedGroupId) {
+        setSelectedGroupId(groups[0].sgt_idx);
+        console.log('[fetchUserGroups] 첫 번째 그룹 자동 선택:', groups[0].sgt_title);
+      }
+    } catch (error) {
+      console.error('[fetchUserGroups] 그룹 목록 조회 실패:', error);
+      setUserGroups([]);
+    } finally {
+      setIsLoadingGroups(false);
+    }
+  };
+
+  // 그룹 선택 핸들러
+  const handleGroupSelect = async (groupId: number) => {
+    console.log('[handleGroupSelect] 그룹 선택:', groupId);
+    setSelectedGroupId(groupId);
+    setIsGroupSelectorOpen(false);
+    
+    // 기존 멤버 데이터 초기화
+    setGroupMembers([]);
+    setSelectedMemberSavedLocations(null);
+    setOtherMembersSavedLocations([]);
+    setFirstMemberSelected(false);
+    setIsFirstMemberSelectionComplete(false);
+    
+    // 새 그룹의 멤버 데이터 불러오기
+    await fetchGroupMembersDataForGroup(groupId.toString());
+  };
+
+  // 특정 그룹의 멤버 데이터 불러오기
+  const fetchGroupMembersDataForGroup = async (groupId: string) => {
+    if (isFetchingGroupMembers) {
+      console.log('[fetchGroupMembersDataForGroup] 이미 로딩 중입니다. 중복 실행 방지.');
+      return;
+    }
+
+    setIsFetchingGroupMembers(true);
+    console.log('[fetchGroupMembersDataForGroup] 시작, groupId:', groupId);
+    
+    try {
+      const memberData = await memberService.getGroupMembers(groupId);
+      console.log('[fetchGroupMembersDataForGroup] API 응답:', memberData);
+
+      if (memberData && memberData.length > 0) {
+        const convertedMembers: GroupMember[] = memberData.map((member: any, index: number) => ({
+          id: member.mt_idx.toString(),
+          name: member.mt_name || `멤버 ${index + 1}`,
+          photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
+          isSelected: false,
+          location: { 
+            lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
+            lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
+          },
+          schedules: [], 
+          savedLocations: [],
+          mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
+          original_index: index
+        }));
+
+        setGroupMembers(convertedMembers);
+        console.log('[fetchGroupMembersDataForGroup] 그룹멤버 설정 완료:', convertedMembers.length, '명');
+        
+        // 첫번째 멤버 자동 선택
+        if (convertedMembers.length > 0) {
+          setTimeout(() => {
+            handleMemberSelect(convertedMembers[0].id);
+          }, 500);
+        }
+      } else {
+        console.warn('[fetchGroupMembersDataForGroup] 그룹멤버 데이터가 없거나 비어있습니다.');
+        setGroupMembers([]); 
+        setIsFirstMemberSelectionComplete(true);
+      }
+    } catch (error) {
+      console.error('[fetchGroupMembersDataForGroup] 오류:', error);
+      setGroupMembers([]); 
+      setIsFirstMemberSelectionComplete(true);
+    } finally {
+      setIsFetchingGroupMembers(false);
+      setIsLoading(false);
+      console.log('[fetchGroupMembersDataForGroup] 완료');
+    }
+  };
+
   const fetchGroupMembersData = async () => {
     if (isFetchingGroupMembers) {
       console.log('[fetchGroupMembersData] 이미 로딩 중입니다. 중복 실행 방지.');
@@ -480,8 +580,11 @@ export default function LocationPage() {
     console.log('[fetchGroupMembersData] 시작');
     
     try {
-      const GROUP_ID_EXAMPLE = '641';
-      const memberData = await memberService.getGroupMembers(GROUP_ID_EXAMPLE);
+      // 선택된 그룹이 있으면 해당 그룹의 멤버를 불러오고, 없으면 기본 그룹 사용
+      const groupIdToUse = selectedGroupId ? selectedGroupId.toString() : '641';
+      console.log('[fetchGroupMembersData] 사용할 그룹 ID:', groupIdToUse);
+      
+      const memberData = await memberService.getGroupMembers(groupIdToUse);
       console.log('[fetchGroupMembersData] API 응답:', memberData);
 
       if (memberData && memberData.length > 0) {
@@ -526,6 +629,20 @@ export default function LocationPage() {
     }
   }, [isMapInitialized]); 
 
+  // 컴포넌트 마운트 시 그룹 목록 불러오기
+  useEffect(() => {
+    if (isMapInitialized) {
+      fetchUserGroups();
+    }
+  }, [isMapInitialized]);
+
+  // 선택된 그룹이 변경될 때 멤버 데이터 불러오기
+  useEffect(() => {
+    if (isMapInitialized && selectedGroupId) {
+      fetchGroupMembersData();
+    }
+  }, [isMapInitialized, selectedGroupId]);
+
   // 첫번째 멤버 자동 선택
   useEffect(() => {
     if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && isMapInitialized) {
@@ -536,6 +653,26 @@ export default function LocationPage() {
     }
   }, [groupMembers, isMapInitialized]);
     
+  // 그룹 선택 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isGroupSelectorOpen) {
+        const target = event.target as HTMLElement;
+        const groupSelector = target.closest('.relative');
+        if (!groupSelector || !groupSelector.querySelector('button')) {
+          setIsGroupSelectorOpen(false);
+        }
+      }
+    };
+
+    if (isGroupSelectorOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isGroupSelectorOpen]);
+
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
       setNaverMapsLoaded(true);
@@ -2224,6 +2361,54 @@ export default function LocationPage() {
             >
               <div className="w-full flex-shrink-0 snap-start">
                  <div className="content-section members-section min-h-[180px] max-h-[180px] overflow-y-auto">
+                   {/* 그룹 선택 드롭다운 */}
+                   <div className="relative mb-2">
+                     <button
+                       onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
+                       className="w-full flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                       disabled={isLoadingGroups}
+                     >
+                       <div className="flex items-center min-w-0">
+                         <span className="text-sm font-medium text-gray-900 truncate">
+                           {isLoadingGroups 
+                             ? '그룹 로딩 중...' 
+                             : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹을 선택하세요'
+                           }
+                         </span>
+                       </div>
+                       <div className="flex items-center ml-2">
+                         {isLoadingGroups ? (
+                           <FiLoader className="animate-spin text-gray-400" size={16} />
+                         ) : (
+                           <FiChevronDown className={`text-gray-400 transition-transform duration-200 ${isGroupSelectorOpen ? 'rotate-180' : ''}`} size={16} />
+                         )}
+                       </div>
+                     </button>
+
+                     {isGroupSelectorOpen && userGroups.length > 0 && (
+                       <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                         {userGroups.map((group) => (
+                           <button
+                             key={group.sgt_idx}
+                             onClick={() => handleGroupSelect(group.sgt_idx)}
+                             className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 focus:outline-none focus:bg-indigo-50 ${
+                               selectedGroupId === group.sgt_idx 
+                                 ? 'bg-indigo-50 text-indigo-700 font-medium' 
+                                 : 'text-gray-900'
+                             }`}
+                           >
+                             <div className="flex items-center justify-between">
+                               <span className="truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</span>
+                               {selectedGroupId === group.sgt_idx && (
+                                 <span className="text-indigo-500 ml-2">✓</span>
+                               )}
+                             </div>
+                           </button>
+                         ))}
+                       </div>
+                     )}
+                   </div>
+
                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
                      그룹 멤버
                      {isFetchingGroupMembers && <FiLoader className="animate-spin ml-2 text-indigo-500" size={18}/>}
