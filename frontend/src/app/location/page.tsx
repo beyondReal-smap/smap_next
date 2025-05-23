@@ -453,6 +453,10 @@ export default function LocationPage() {
   
   // 현재 선택된 멤버 ID를 추적하는 ref 추가
   const selectedMemberIdRef = useRef<string | null>(null);
+  
+  // 드래그 방향 감지용 ref 추가
+  const isHorizontalSwipeRef = useRef<boolean | null>(null);
+  const startDragX = useRef<number | null>(null);
 
   useEffect(() => {
     setPortalContainer(document.body);
@@ -720,10 +724,14 @@ export default function LocationPage() {
   };
   const handleDragStart = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    
     startDragY.current = clientY;
+    startDragX.current = clientX;
     currentDragY.current = clientY;
     dragStartTime.current = Date.now();
     isDraggingRef.current = true;
+    isHorizontalSwipeRef.current = null; // 방향 판단 초기화
     initialScrollTopRef.current = bottomSheetRef.current?.scrollTop || 0;
 
     if (bottomSheetRef.current) {
@@ -731,13 +739,43 @@ export default function LocationPage() {
     }
   };
   const handleDragMove = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current || startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
+    if (!isDraggingRef.current || startDragY.current === null || startDragX.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
     
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    
+    // 방향이 아직 결정되지 않았다면 방향을 판단 (더 빠르고 정확하게)
+    if (isHorizontalSwipeRef.current === null) {
+      const deltaX = Math.abs(clientX - startDragX.current);
+      const deltaY = Math.abs(clientY - startDragY.current);
+      
+      // 움직임이 5px 이상일 때 즉시 방향 판단 (기존 10px에서 5px로 감소)
+      if (deltaX >= 5 || deltaY >= 5) {
+        // 더 명확한 방향 판단: 1.5배 이상 차이날 때만 해당 방향으로 확정
+        if (deltaX > deltaY * 1.5) {
+          isHorizontalSwipeRef.current = true; // 좌우 스와이프
+        } else if (deltaY > deltaX * 1.5) {
+          isHorizontalSwipeRef.current = false; // 상하 드래그
+        }
+        // 애매한 경우 (비슷한 비율)는 조금 더 기다림
+      }
+    }
+    
+    // 방향이 아직 결정되지 않았다면 아무것도 하지 않음 (더 기다림)
+    if (isHorizontalSwipeRef.current === null) {
+      return;
+    }
+    
+    // 좌우 스와이프로 확정되었다면 세로 드래그 완전 차단
+    if (isHorizontalSwipeRef.current === true) {
+      return;
+    }
+    
+    // 상하 드래그로 확정되었다면 좌우 움직임 무시하고 세로만 처리
     const deltaY = clientY - currentDragY.current;
     
     // 수직 드래그만 처리하고 최소 움직임 임계값 적용
-    if (Math.abs(deltaY) > 5) {
+    if (Math.abs(deltaY) > 3) { // 기존 5px에서 3px로 더 민감하게
       currentDragY.current = clientY;
       const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
       let currentTranslateY = 0;
@@ -772,6 +810,23 @@ export default function LocationPage() {
   };
   const handleDragEnd = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
     if (!isDraggingRef.current || startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
+
+    // 좌우 스와이프 중이었다면 바텀시트 상태 변경 없이 종료
+    if (isHorizontalSwipeRef.current === true) {
+      // 상태 초기화
+      startDragY.current = null;
+      startDragX.current = null;
+      currentDragY.current = null;
+      dragStartTime.current = null;
+      isDraggingRef.current = false;
+      isHorizontalSwipeRef.current = null;
+      
+      if (bottomSheetRef.current) {
+        bottomSheetRef.current.style.transition = `transform ${BOTTOM_SHEET_POSITIONS.TRANSITION_DURATION} ${BOTTOM_SHEET_POSITIONS.TRANSITION_TIMING}`;
+        bottomSheetRef.current.style.transform = ''; // CSS 클래스가 위치를 결정하도록
+      }
+      return;
+    }
 
     const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
     const deltaYOverall = clientY - startDragY.current;
@@ -809,9 +864,11 @@ export default function LocationPage() {
 
     // 상태 초기화
     startDragY.current = null;
+    startDragX.current = null;
     currentDragY.current = null;
     dragStartTime.current = null;
     isDraggingRef.current = false;
+    isHorizontalSwipeRef.current = null;
   };
   const toggleBottomSheet = () => {
     const newState = bottomSheetState === 'collapsed' ? 'expanded' : 'collapsed';
