@@ -1792,15 +1792,46 @@ export default function LocationPage() {
                             key={location.slt_idx} 
                             className="flex-shrink-0 w-48 bg-white rounded-lg shadow p-3.5 cursor-pointer hover:shadow-lg transition-shadow duration-200 ease-in-out transform hover:-translate-y-0.5"
                             onClick={() => {
-                              if (map.current && window.naver?.maps) {
+                              console.log(`[LOCATION] 장소 클릭됨: ${location.name || location.slt_title}, 좌표: [${lat}, ${lng}]`);
+                              console.log(`[LOCATION] 지도 초기화 상태: ${isMapInitialized}, 지도 객체 존재: ${!!map.current}, 네이버 API: ${!!window.naver?.maps}`);
+                              
+                              if (!isMapInitialized) {
+                                console.error('[LOCATION] 지도가 아직 초기화되지 않았습니다.');
+                                return;
+                              }
+                              
+                              if (!map.current) {
+                                console.error('[LOCATION] 지도 객체가 없습니다.');
+                                return;
+                              }
+                              
+                              if (!window.naver?.maps) {
+                                console.error('[LOCATION] 네이버 지도 API가 로드되지 않았습니다.');
+                                return;
+                              }
+                              
+                              try {
                                 const position = new window.naver.maps.LatLng(lat, lng);
+                                console.log(`[LOCATION] 생성된 LatLng 객체:`, position);
                                 
-                                // 지도 중심 이동을 더 확실하게 하기 위해 panTo와 setCenter 모두 사용
+                                // 지도 중심 이동
+                                console.log(`[LOCATION] 지도 중심 이동 시작: lat=${lat}, lng=${lng}`);
                                 map.current.setCenter(position);
-                                map.current.panTo(position); 
-                                if(map.current.getZoom() < 16) map.current.setZoom(16); // 줌 레벨 증가
                                 
-                                // 바텀시트는 그대로 유지 (collapsed로 변경하지 않음)
+                                // 지도 중심이 실제로 변경되었는지 확인
+                                setTimeout(() => {
+                                  const currentCenter = map.current.getCenter();
+                                  console.log(`[LOCATION] 현재 지도 중심: lat=${currentCenter.lat()}, lng=${currentCenter.lng()}`);
+                                }, 100);
+                                
+                                // 줌 레벨 설정
+                                const currentZoom = map.current.getZoom();
+                                if (currentZoom < 16) {
+                                  map.current.setZoom(16);
+                                  console.log(`[LOCATION] 줌 레벨 변경: ${currentZoom} → 16`);
+                                }
+                                
+                                console.log(`[LOCATION] 지도 중심 이동 완료`);
                                 
                                 setNewLocation({ 
                                   id: String(location.slt_idx), 
@@ -1817,12 +1848,8 @@ export default function LocationPage() {
                                 setIsLocationInfoPanelOpen(true);
                                 if (tempMarker.current) tempMarker.current.setMap(null);
                                 addMarkersToMapForOtherMembers(otherMembersSavedLocations); 
-                                
-                                // 약간의 지연 후 로깅
-                                setTimeout(() => {
-                                  console.log(`[LOCATION] 다른 멤버의 장소 선택됨: ${location.name || location.slt_title}, 좌표: [${lat}, ${lng}]`);
-                                  console.log(`[LOCATION] 지도 중심 이동 완료, 현재 줌 레벨: ${map.current?.getZoom()}`);
-                                }, 500);
+                              } catch (error) {
+                                console.error('[LOCATION] 지도 중심 이동 중 오류:', error);
                               }
                             }}
                           >
