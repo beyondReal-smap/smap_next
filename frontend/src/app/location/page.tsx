@@ -1797,6 +1797,9 @@ export default function LocationPage() {
                                 map.current.panTo(position); 
                                 if(map.current.getZoom() < 15) map.current.setZoom(15);
                                 
+                                // 바텀시트를 collapsed 상태로 변경하여 지도 이동을 명확하게 보이도록 함
+                                setBottomSheetState('collapsed');
+                                
                                 setNewLocation({ 
                                   id: String(location.slt_idx), 
                                   name: location.name || location.slt_title || '',
@@ -1812,6 +1815,11 @@ export default function LocationPage() {
                                 setIsLocationInfoPanelOpen(true);
                                 if (tempMarker.current) tempMarker.current.setMap(null);
                                 addMarkersToMapForOtherMembers(otherMembersSavedLocations); 
+                                
+                                // 약간의 지연 후 정보 패널을 여는 효과 추가
+                                setTimeout(() => {
+                                  console.log(`[LOCATION] 다른 멤버의 장소 선택됨: ${location.name || location.slt_title}, 좌표: [${lat}, ${lng}]`);
+                                }, 300);
                               }
                             }}
                           >
