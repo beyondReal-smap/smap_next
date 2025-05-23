@@ -1307,7 +1307,7 @@ export default function LocationPage() {
         
         // 즉시 마커 생성
         setTimeout(() => {
-          addMarkersToMap(newlySelectedMember.savedLocations);
+          addMarkersToMap(newlySelectedMember.savedLocations, selectedLocationId || undefined);
           console.log('[handleMemberSelect] 기존 장소로 마커 생성:', newlySelectedMember.savedLocations.length, '개');
         }, 300);
         
@@ -1351,7 +1351,7 @@ export default function LocationPage() {
           
           // 마커 생성
           setTimeout(() => {
-            addMarkersToMap(convertedLocations);
+            addMarkersToMap(convertedLocations, selectedLocationId || undefined);
             console.log('[handleMemberSelect] API 조회 장소로 마커 생성:', convertedLocations.length, '개');
           }, 300);
           
@@ -1363,7 +1363,7 @@ export default function LocationPage() {
           
           // 오류 시 빈 마커
           setTimeout(() => {
-            addMarkersToMap([]);
+            addMarkersToMap([], selectedLocationId || undefined);
           }, 300);
         } finally {
           setIsLoadingOtherLocations(false);
@@ -1382,7 +1382,7 @@ export default function LocationPage() {
       setSelectedMemberSavedLocations(null); 
       setOtherMembersSavedLocations([]); 
       setActiveView('selectedMemberPlaces'); 
-      addMarkersToMap(locations); 
+      addMarkersToMap(locations, selectedLocationId || undefined); 
       setIsLocationInfoPanelOpen(false); 
       setIsEditingPanel(false);
     }
@@ -1399,13 +1399,13 @@ export default function LocationPage() {
           setOtherMembersSavedLocations(fetchedLocationsRaw);
           // 약간의 지연 후 마커 업데이트 - 깜빡임 최소화
           setTimeout(() => {
-            addMarkersToMapForOtherMembers(fetchedLocationsRaw);
+            addMarkersToMapForOtherMembers(fetchedLocationsRaw, selectedLocationId || undefined);
           }, 100);
         } catch (error) {
           console.error("Failed to fetch other members' locations on view change", error);
           setOtherMembersSavedLocations([]);
           setTimeout(() => {
-            addMarkersToMapForOtherMembers([]);
+            addMarkersToMapForOtherMembers([], selectedLocationId || undefined);
           }, 100);
         } finally {
           setIsLoadingOtherLocations(false);
@@ -1413,11 +1413,11 @@ export default function LocationPage() {
       } else if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
           // 약간의 지연 후 마커 업데이트 - 깜빡임 최소화
           setTimeout(() => {
-            addMarkersToMap(selectedMemberSavedLocations || currentSelectedMember.savedLocations || []);
+            addMarkersToMap(selectedMemberSavedLocations || currentSelectedMember.savedLocations || [], selectedLocationId || undefined);
           }, 100);
       } else if (!currentSelectedMember) {
           setTimeout(() => {
-            addMarkersToMap(locations);
+            addMarkersToMap(locations, selectedLocationId || undefined);
           }, 100);
       }
     };
@@ -1454,10 +1454,8 @@ export default function LocationPage() {
         }
         setIsEditingPanel(false);
         
-        // 모든 마커를 인디고색으로 변경
-        setTimeout(() => {
-          updateMarkerSelection(null);
-        }, 100);
+        // 선택 상태 유지 - updateMarkerSelection(null) 제거
+        // 마커는 핑크색 상태를 유지
       }
     };
 
@@ -1515,15 +1513,15 @@ export default function LocationPage() {
       if (newView === 'selectedMemberPlaces') {
         if (currentSelectedMember) {
           const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
-          addMarkersToMap(locationsToShow);
+          addMarkersToMap(locationsToShow, selectedLocationId || undefined);
         } else {
-          addMarkersToMap(locations);
+          addMarkersToMap(locations, selectedLocationId || undefined);
         }
       } else if (newView === 'otherMembersPlaces') {
         if (otherMembersSavedLocations.length > 0) {
-          addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+          addMarkersToMapForOtherMembers(otherMembersSavedLocations, selectedLocationId || undefined);
         } else {
-          addMarkersToMapForOtherMembers([]);
+          addMarkersToMapForOtherMembers([], selectedLocationId || undefined);
         }
       }
     }, 100);
@@ -1603,11 +1601,11 @@ export default function LocationPage() {
       const currentSelectedMember = groupMembers.find(m => m.isSelected);
       if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
           const updatedSavedLocations = (selectedMemberSavedLocations || currentSelectedMember.savedLocations || []).filter(loc => loc.id !== idStr);
-          addMarkersToMap(updatedSavedLocations);
+          addMarkersToMap(updatedSavedLocations, selectedLocationId || undefined);
       } else if (activeView === 'otherMembersPlaces' && !isNaN(idNum)){
-          addMarkersToMapForOtherMembers(otherMembersSavedLocations.filter(loc => loc.slt_idx !== idNum));
+          addMarkersToMapForOtherMembers(otherMembersSavedLocations.filter(loc => loc.slt_idx !== idNum), selectedLocationId || undefined);
       } else { 
-          addMarkersToMap(locations.filter(loc => loc.id !== idStr));
+          addMarkersToMap(locations.filter(loc => loc.id !== idStr), selectedLocationId || undefined);
       }
     }, 500);
   };
