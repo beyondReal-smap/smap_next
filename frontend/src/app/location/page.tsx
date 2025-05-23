@@ -790,18 +790,21 @@ export default function LocationPage() {
       if (tempMarker.current) {
         tempMarker.current.setMap(null);
       }
-      const currentSelectedMember = groupMembers.find(m => m.isSelected);
-      if (currentSelectedMember) {
-        if (activeView === 'selectedMemberPlaces') {
-          // selectedMemberSavedLocations를 우선적으로 사용하고, 없으면 멤버의 savedLocations 사용
-          const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
-          addMarkersToMap(locationsToShow);
+      // 마커 업데이트에 지연 추가 - 깜빡임 최소화
+      setTimeout(() => {
+        const currentSelectedMember = groupMembers.find(m => m.isSelected);
+        if (currentSelectedMember) {
+          if (activeView === 'selectedMemberPlaces') {
+            // selectedMemberSavedLocations를 우선적으로 사용하고, 없으면 멤버의 savedLocations 사용
+            const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
+            addMarkersToMap(locationsToShow);
+          } else {
+            addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+          }
         } else {
-          addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+          addMarkersToMap(locations); 
         }
-      } else {
-        addMarkersToMap(locations); 
-      }
+      }, 200);
     }
   };
 
@@ -1003,10 +1006,25 @@ export default function LocationPage() {
       try {
         console.log(`[addMarkersToMap] ${index + 1}번째 장소:`, location);
         
-        const position = new window.naver.maps.LatLng(location.coordinates[1], location.coordinates[0]);
+        // 좌표 안전하게 파싱
+        let lat = 0;
+        let lng = 0;
+        
+        if (location.coordinates && Array.isArray(location.coordinates) && location.coordinates.length >= 2) {
+          lng = typeof location.coordinates[0] === 'number' ? location.coordinates[0] : parseFloat(String(location.coordinates[0])) || 0;
+          lat = typeof location.coordinates[1] === 'number' ? location.coordinates[1] : parseFloat(String(location.coordinates[1])) || 0;
+        }
+        
+        // 좌표 유효성 검사
+        if (lat === 0 && lng === 0) {
+          console.error('[addMarkersToMap] 유효하지 않은 좌표입니다 (0, 0). 마커 생성을 건너뜁니다:', location);
+          return;
+        }
+        
+        console.log(`[addMarkersToMap] 마커 생성: ${location.name} at (${lat}, ${lng})`);
+        
+        const position = new window.naver.maps.LatLng(lat, lng);
         const isSelectedByInfoPanel = isLocationInfoPanelOpen && newLocation.id === location.id && isEditingPanel;
-
-        console.log(`[addMarkersToMap] 마커 생성: ${location.name} at (${location.coordinates[1]}, ${location.coordinates[0]})`);
 
         const markerContent = `
           <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
@@ -1020,7 +1038,7 @@ export default function LocationPage() {
 
         const iconOptions = {
             content: markerContent,
-            anchor: new window.naver.maps.Point(isSelectedByInfoPanel ? 6 : 6, 38)
+            anchor: new window.naver.maps.Point(6, 38)
         };
 
         const markerInstance = new window.naver.maps.Marker({
@@ -1041,39 +1059,26 @@ export default function LocationPage() {
                 id: location.id,
                 name: location.name,
                 address: location.address,
-                coordinates: location.coordinates,
+                coordinates: [lng, lat], // 올바른 순서로 설정
                 category: clickedExistingLocation?.category,
                 memo: clickedExistingLocation?.memo,
                 favorite: clickedExistingLocation?.favorite,
                 notifications: clickedExistingLocation?.notifications || false,
             });
-            setClickedCoordinates(new window.naver.maps.LatLng(location.coordinates[1], location.coordinates[0]));
+            setClickedCoordinates(new window.naver.maps.LatLng(lat, lng));
             setIsEditingPanel(true); 
             setIsLocationInfoPanelOpen(true); 
             if (tempMarker.current) tempMarker.current.setMap(null); 
             
             if (bottomSheetState === 'collapsed') setBottomSheetState('expanded');
             
-            // 클릭된 마커가 어떤 뷰에 속하는지에 따라 해당 뷰의 마커들을 다시 그림
-            if (activeView === 'selectedMemberPlaces' && selectedMemberSavedLocations?.find(l => l.id === location.id)) {
-                addMarkersToMap(selectedMemberSavedLocations);
-            } else if (activeView === 'otherMembersPlaces' && otherMembersSavedLocations?.find(l => l.id === location.id)) {
-                addMarkersToMapForOtherMembers(otherMembersSavedLocations);
-            } else {
-                // selectedMemberPlaces 뷰에서 멤버가 선택된 경우
-                const currentSelectedMember = groupMembers.find(m => m.isSelected);
-                if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
-                    const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
-                    addMarkersToMap(locationsToShow);
-                } else {
-                    // 기본적으로 전체 locations를 다시 그림
-                    addMarkersToMap(locations);
-                }
-            }
+            // 마커 클릭 시에는 마커를 다시 그리지 않음 - 깜빡임 방지
         });
         
-        markers.current[location.id] = markerInstance;
-        console.log(`[addMarkersToMap] 마커 생성 완료: ${location.name}, ID: ${location.id}`);
+        // 고유한 마커 ID 생성 (location.id가 중복될 수 있으므로)
+        const markerId = `${location.id}_${index}`;
+        markers.current[markerId] = markerInstance;
+        console.log(`[addMarkersToMap] 마커 생성 완료: ${location.name}, ID: ${markerId}`);
         
     } catch (error) {
         console.error(`[addMarkersToMap] 장소 마커 추가 중 오류 (${location.name}):`, error);
@@ -1395,18 +1400,28 @@ export default function LocationPage() {
           const fetchedLocationsRaw = await locationService.getOtherMembersLocations(currentSelectedMember.id);
           console.log("[useEffect/activeView] Other members' locations (raw):", fetchedLocationsRaw);
           setOtherMembersSavedLocations(fetchedLocationsRaw);
-          addMarkersToMapForOtherMembers(fetchedLocationsRaw);
+          // 약간의 지연 후 마커 업데이트 - 깜빡임 최소화
+          setTimeout(() => {
+            addMarkersToMapForOtherMembers(fetchedLocationsRaw);
+          }, 100);
         } catch (error) {
           console.error("Failed to fetch other members' locations on view change", error);
           setOtherMembersSavedLocations([]);
-          addMarkersToMapForOtherMembers([]);
+          setTimeout(() => {
+            addMarkersToMapForOtherMembers([]);
+          }, 100);
         } finally {
           setIsLoadingOtherLocations(false);
         }
       } else if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
-          addMarkersToMap(selectedMemberSavedLocations || currentSelectedMember.savedLocations || []);
+          // 약간의 지연 후 마커 업데이트 - 깜빡임 최소화
+          setTimeout(() => {
+            addMarkersToMap(selectedMemberSavedLocations || currentSelectedMember.savedLocations || []);
+          }, 100);
       } else if (!currentSelectedMember) {
-          addMarkersToMap(locations); 
+          setTimeout(() => {
+            addMarkersToMap(locations);
+          }, 100);
       }
     };
 
@@ -1414,7 +1429,7 @@ export default function LocationPage() {
         fetchOtherLocationsAndUpdateMarkers();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMapInitialized, activeView, groupMembers.find(m => m.isSelected)?.id, locations, selectedMemberSavedLocations]); 
+  }, [isMapInitialized, activeView, groupMembers.find(m => m.isSelected)?.id]);
 
   useEffect(() => {
     console.log('[useEffect for handleClickOutside] Registering or unregistering. isLocationInfoPanelOpen:', isLocationInfoPanelOpen);
@@ -1441,16 +1456,19 @@ export default function LocationPage() {
         if (tempMarker.current) {
           tempMarker.current.setMap(null);
         }
-        const currentSelectedMember = groupMembers.find(m => m.isSelected);
-        if (currentSelectedMember) {
-            if (activeView === 'selectedMemberPlaces') {
-                addMarkersToMap(selectedMemberSavedLocations || currentSelectedMember.savedLocations || []);
-            } else {
-                addMarkersToMapForOtherMembers(otherMembersSavedLocations);
-            }
-        } else {
-            addMarkersToMap(locations);
-        }
+        // 마커 업데이트에 지연 추가 - 깜빡임 최소화
+        setTimeout(() => {
+          const currentSelectedMember = groupMembers.find(m => m.isSelected);
+          if (currentSelectedMember) {
+              if (activeView === 'selectedMemberPlaces') {
+                  addMarkersToMap(selectedMemberSavedLocations || currentSelectedMember.savedLocations || []);
+              } else {
+                  addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+              }
+          } else {
+              addMarkersToMap(locations);
+          }
+        }, 200);
         setIsEditingPanel(false);
       }
     };
@@ -1496,26 +1514,31 @@ export default function LocationPage() {
     }
   }, [bottomSheetState, isMapInitialized]); 
 
-  // 뷰 변경 핸들러 함수 추가
+  // 뷰 변경 핸들러 함수 개선 - 마커 깜빡임 최소화
   const handleViewChange = (newView: 'selectedMemberPlaces' | 'otherMembersPlaces') => {
+    if (activeView === newView) return; // 같은 뷰면 아무것도 하지 않음
+    
     setActiveView(newView);
     
-    const currentSelectedMember = groupMembers.find(m => m.isSelected);
-    
-    if (newView === 'selectedMemberPlaces') {
-      if (currentSelectedMember) {
-        const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
-        addMarkersToMap(locationsToShow);
-      } else {
-        addMarkersToMap(locations);
+    // 약간의 지연을 두어 뷰 전환 후 마커 업데이트
+    setTimeout(() => {
+      const currentSelectedMember = groupMembers.find(m => m.isSelected);
+      
+      if (newView === 'selectedMemberPlaces') {
+        if (currentSelectedMember) {
+          const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
+          addMarkersToMap(locationsToShow);
+        } else {
+          addMarkersToMap(locations);
+        }
+      } else if (newView === 'otherMembersPlaces') {
+        if (otherMembersSavedLocations.length > 0) {
+          addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+        } else {
+          addMarkersToMapForOtherMembers([]);
+        }
       }
-    } else if (newView === 'otherMembersPlaces') {
-      if (otherMembersSavedLocations.length > 0) {
-        addMarkersToMapForOtherMembers(otherMembersSavedLocations);
-      } else {
-        addMarkersToMapForOtherMembers([]);
-      }
-    }
+    }, 100);
   };
 
   const handleSwipeScroll = () => {
@@ -1572,10 +1595,13 @@ export default function LocationPage() {
       return member;
     }));
 
-    if (markers.current[idStr]) {
-      markers.current[idStr].setMap(null);
-      delete markers.current[idStr];
-    }
+    // 해당 ID를 가진 모든 마커 제거 (새로운 마커 ID 체계 대응)
+    Object.keys(markers.current).forEach(markerId => {
+      if (markerId.startsWith(idStr + '_')) {
+        markers.current[markerId].setMap(null);
+        delete markers.current[markerId];
+      }
+    });
 
     if (newLocation.id === idStr) {
       setIsLocationInfoPanelOpen(false);
@@ -1584,16 +1610,19 @@ export default function LocationPage() {
       if(tempMarker.current) tempMarker.current.setMap(null);
     }
     
-    const currentSelectedMember = groupMembers.find(m => m.isSelected);
-    if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
-        const updatedSavedLocations = (selectedMemberSavedLocations || currentSelectedMember.savedLocations || []).filter(loc => loc.id !== idStr);
-        addMarkersToMap(updatedSavedLocations);
-    } else if (activeView === 'otherMembersPlaces' && !isNaN(idNum)){
-        addMarkersToMapForOtherMembers(otherMembersSavedLocations.filter(loc => loc.slt_idx !== idNum));
-    } else { 
-        addMarkersToMap(locations.filter(loc => loc.id !== idStr));
-    }
-    };
+    // 마커 재생성은 500ms 지연 후 실행 - 깜빡임 최소화
+    setTimeout(() => {
+      const currentSelectedMember = groupMembers.find(m => m.isSelected);
+      if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
+          const updatedSavedLocations = (selectedMemberSavedLocations || currentSelectedMember.savedLocations || []).filter(loc => loc.id !== idStr);
+          addMarkersToMap(updatedSavedLocations);
+      } else if (activeView === 'otherMembersPlaces' && !isNaN(idNum)){
+          addMarkersToMapForOtherMembers(otherMembersSavedLocations.filter(loc => loc.slt_idx !== idNum));
+      } else { 
+          addMarkersToMap(locations.filter(loc => loc.id !== idStr));
+      }
+    }, 500);
+  };
   
   // 다른 멤버의 위치 데이터를 위한 함수 추가
   const addMarkersToMapForOtherMembers = (locationsToDisplay: any[]) => {
@@ -1692,10 +1721,13 @@ export default function LocationPage() {
           if (map.current.getZoom() < 16) {
             map.current.setZoom(16);
           }
+          
+          // 마커 클릭 시에는 마커를 다시 그리지 않음 - 깜빡임 방지
         });
 
-        // 마커를 markers 객체에 저장
-        const markerId = location.slt_idx || location.id || `marker_${index}`;
+        // 고유한 마커 ID 생성 (기존 ID 체계와 통일)
+        const baseId = location.slt_idx || location.id || `other_${index}`;
+        const markerId = `${baseId}_${index}`;
         markers.current[markerId] = marker;
         
         console.log(`[MARKER] 마커 생성 완료: ${title}, ID: ${markerId}`);
