@@ -915,25 +915,36 @@ export default function LocationPage() {
   };
 
   const addMarkersToMap = (locationsToDisplay: LocationData[]) => {
-    if (!map.current || !window.naver?.maps || !naverMapsLoaded) return;
+    if (!map.current || !window.naver?.maps || !naverMapsLoaded) {
+      console.log('[addMarkersToMap] 지도 또는 네이버 API가 준비되지 않음');
+      return;
+    }
     
+    console.log('[addMarkersToMap] 기존 마커 제거 시작');
     Object.values(markers.current).forEach(marker => {
       if (marker && typeof marker.setMap === 'function') marker.setMap(null);
     });
     markers.current = {};
 
     if (!locationsToDisplay || locationsToDisplay.length === 0) {
+      console.log('[addMarkersToMap] 표시할 장소가 없음');
       return;
     }
 
-    locationsToDisplay.forEach(location => {
+    console.log(`[addMarkersToMap] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작`);
+
+    locationsToDisplay.forEach((location, index) => {
       if (!location.id) {
-        console.warn('Location ID is missing, cannot create marker:', location);
+        console.warn('[addMarkersToMap] Location ID가 없습니다. 마커를 생성할 수 없습니다:', location);
         return;
       }
       try {
+        console.log(`[addMarkersToMap] ${index + 1}번째 장소:`, location);
+        
         const position = new window.naver.maps.LatLng(location.coordinates[1], location.coordinates[0]);
         const isSelectedByInfoPanel = isLocationInfoPanelOpen && newLocation.id === location.id && isEditingPanel;
+
+        console.log(`[addMarkersToMap] 마커 생성: ${location.name} at (${location.coordinates[1]}, ${location.coordinates[0]})`);
 
         const markerContent = `
           <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
@@ -959,6 +970,8 @@ export default function LocationPage() {
         markerInstance.setZIndex(isSelectedByInfoPanel ? 200 : 100);
 
         window.naver.maps.Event.addListener(markerInstance, 'click', (e: any) => {
+            console.log(`[addMarkersToMap] 마커 클릭됨: ${location.name}`);
+            
             const clickedExistingLocation = locations.find(l => l.id === location.id) || 
                                           selectedMemberSavedLocations?.find(l => l.id === location.id) ||
                                           otherMembersSavedLocations?.find(l => l.id === location.id);
@@ -989,11 +1002,16 @@ export default function LocationPage() {
                 addMarkersToMap(locations);
             }
         });
+        
         markers.current[location.id] = markerInstance;
+        console.log(`[addMarkersToMap] 마커 생성 완료: ${location.name}, ID: ${location.id}`);
+        
     } catch (error) {
-        console.error(`장소 마커 추가 중 오류 (${location.name}):`, error);
+        console.error(`[addMarkersToMap] 장소 마커 추가 중 오류 (${location.name}):`, error);
     }
-  });
+    });
+
+    console.log(`[addMarkersToMap] 총 ${Object.keys(markers.current).length}개의 마커가 생성됨`);
   };
   
   const handleAddLocation = () => {
@@ -1182,9 +1200,20 @@ export default function LocationPage() {
     const newlySelectedMember = updatedMembers.find(member => member.isSelected);
   
     if (newlySelectedMember && map.current && window.naver?.maps) {
+      // 선택된 멤버의 위치로 지도 중심 이동
+      console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember.name, '위치:', newlySelectedMember.location);
+      const memberPosition = new window.naver.maps.LatLng(newlySelectedMember.location.lat, newlySelectedMember.location.lng);
+      map.current.setCenter(memberPosition);
+      map.current.setZoom(16); // 적절한 줌 레벨로 설정
+      
       setSelectedMemberSavedLocations(newlySelectedMember.savedLocations || []);
       setActiveView('selectedMemberPlaces'); 
-      addMarkersToMap(newlySelectedMember.savedLocations || []); 
+      
+      // 약간의 지연 후 마커 업데이트 (지도 이동이 완료된 후)
+      setTimeout(() => {
+        addMarkersToMap(newlySelectedMember.savedLocations || []); 
+        console.log('[handleMemberSelect] 멤버의 저장된 장소 마커 생성:', newlySelectedMember.savedLocations?.length || 0, '개');
+      }, 300);
       
       if (newlySelectedMember.id) { 
           setIsLoadingOtherLocations(true);
