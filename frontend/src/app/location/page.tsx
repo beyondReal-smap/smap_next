@@ -1037,10 +1037,22 @@ export default function LocationPage() {
       
       if (bottomSheetState === 'collapsed') setBottomSheetState('expanded');
       
-      // 지도 중심을 클릭된 마커로 이동
-      map.current.setCenter(position);
-      if (map.current.getZoom() < 16) {
-        map.current.setZoom(16);
+      // 지도 중심을 클릭된 마커로 부드럽게 애니메이션 이동
+      const currentZoom = map.current.getZoom();
+      const targetZoom = currentZoom < 16 ? 16 : currentZoom;
+      
+      if (currentZoom < 16) {
+        // 줌이 필요한 경우 morph()를 사용하여 이동과 줌을 동시에 애니메이션 처리
+        map.current.morph(position, targetZoom, {
+          duration: 800, // 800ms 애니메이션
+          easing: 'easeOutCubic'
+        });
+      } else {
+        // 줌이 필요하지 않은 경우 panTo()를 사용하여 부드럽게 이동
+        map.current.panTo(position, {
+          duration: 600, // 600ms 애니메이션
+          easing: 'easeOutQuart'
+        });
       }
       
       // 선택된 마커 색상 변경 - setTimeout 제거하고 즉시 실행
@@ -1237,10 +1249,14 @@ export default function LocationPage() {
       const member = selectedMembersToMark[0];
       if (map.current && member.location) {
         const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
-        map.current.panTo(position); 
-        if (map.current.getZoom() < 16) {
-           map.current.setZoom(16);
-        }
+        const currentZoom = map.current.getZoom();
+        const targetZoom = currentZoom < 16 ? 16 : currentZoom;
+        
+        // 부드러운 애니메이션 이동
+        map.current.morph(position, targetZoom, {
+          duration: 800, // 800ms 애니메이션
+          easing: 'easeOutCubic'
+        });
       }
     } else if (selectedMembersToMark.length > 1) {
       if (map.current) {
@@ -1251,7 +1267,10 @@ export default function LocationPage() {
           }
         });
         if (!bounds.isEmpty()) {
-            map.current.fitBounds(bounds);
+          // 경계에 맞춤 (부드러운 이동)
+          map.current.fitBounds(bounds, {
+            padding: { top: 50, right: 50, bottom: 50, left: 50 }
+          });
         }
       }
     }
@@ -1271,11 +1290,13 @@ export default function LocationPage() {
     const newlySelectedMember = updatedMembers.find(member => member.isSelected);
   
     if (newlySelectedMember && map.current && window.naver?.maps) {
-      // 선택된 멤버의 위치로 지도 중심 이동
+      // 선택된 멤버의 위치로 지도 중심을 부드럽게 애니메이션 이동
       console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember.name, '위치:', newlySelectedMember.location);
       const memberPosition = new window.naver.maps.LatLng(newlySelectedMember.location.lat, newlySelectedMember.location.lng);
-      map.current.setCenter(memberPosition);
-      map.current.setZoom(16); // 적절한 줌 레벨로 설정
+      map.current.morph(memberPosition, 16, {
+        duration: 1000, // 1초 애니메이션
+        easing: 'easeOutCubic'
+      });
       
       // 멤버의 저장된 장소 처리
       if (newlySelectedMember.savedLocations && newlySelectedMember.savedLocations.length > 0) {
