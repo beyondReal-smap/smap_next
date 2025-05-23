@@ -1,5 +1,6 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/location/page": "app/location/page.js",
+  "/api/group-members/member/[id]/route": "app/api/group-members/member/[id]/route.js",
+  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
   "/home/page": "app/home/page.js"
 }
