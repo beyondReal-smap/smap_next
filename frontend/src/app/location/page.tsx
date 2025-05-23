@@ -36,7 +36,7 @@ const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/';
 const BOTTOM_SHEET_POSITIONS = {
   COLLAPSED_HEIGHT: 100, // 접혔을 때 하단에서 올라온 높이
   EXPANDED_PERCENTAGE: 0.62, // 펼쳤을 때 CSS translateY(62%)와 일치
-  TRANSITION_DURATION: '0.4s',
+  TRANSITION_DURATION: '0.5s', // 0.4s에서 0.5s로 변경하여 home/page.tsx와 일치
   TRANSITION_TIMING: 'cubic-bezier(0.4, 0, 0.2, 1)',
   MIN_DRAG_DISTANCE: 30 // 상태 전환을 위한 최소 드래그 거리를 30px로 변경
 };
@@ -398,7 +398,6 @@ export default function LocationPage() {
   const bottomSheetRef = useRef<HTMLDivElement>(null);
   const previousOffsetYRef = useRef<number>(0);
   const startDragY = useRef<number | null>(null);
-  const currentDragY = useRef<number | null>(null);
   const dragStartTime = useRef<number | null>(null);
   const markers = useRef<{ [key: string]: NaverMarker }>({});
   const groupMemberMarkers = useRef<NaverMarker[]>([]); // 그룹 멤버 마커(네이버용)
@@ -436,6 +435,7 @@ export default function LocationPage() {
   const [clickedCoordinates, setClickedCoordinates] = useState<NaverCoord | null>(null); 
   const [isEditingPanel, setIsEditingPanel] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null); // 선택된 마커 ID 상태 추가
+  const selectedLocationIdRef = useRef<string | null>(null); // 선택 상태 보존용 ref 추가
 
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]); 
   const [selectedMemberSavedLocations, setSelectedMemberSavedLocations] = useState<LocationData[] | null>(null);
@@ -446,7 +446,6 @@ export default function LocationPage() {
   const [isLoadingOtherLocations, setIsLoadingOtherLocations] = useState(false); // 로딩 상태 추가
 
   const isDraggingRef = useRef(false);
-  const initialScrollTopRef = useRef(0);
   const [isFirstMemberSelectionComplete, setIsFirstMemberSelectionComplete] = useState(false); // 첫번째 멤버 선택 완료 상태 추가
   // 첫번째 멤버 선택 완료 여부를 추적하는 상태 추가
   const [firstMemberSelected, setFirstMemberSelected] = useState(false);
@@ -723,33 +722,38 @@ export default function LocationPage() {
     }
   };
   const handleDragStart = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
+    // 멤버 선택 버튼이나 기타 인터랙티브 요소에서 시작된 이벤트는 무시
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a')) {
+      return;
+    }
+    
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     
     startDragY.current = clientY;
     startDragX.current = clientX;
-    currentDragY.current = clientY;
-    dragStartTime.current = Date.now();
     isDraggingRef.current = true;
+    dragStartTime.current = Date.now();
     isHorizontalSwipeRef.current = null; // 방향 판단 초기화
-    initialScrollTopRef.current = bottomSheetRef.current?.scrollTop || 0;
 
     if (bottomSheetRef.current) {
       bottomSheetRef.current.style.transition = 'none';
     }
   };
+
   const handleDragMove = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current || startDragY.current === null || startDragX.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
+    if (!isDraggingRef.current || startDragY.current === null || startDragX.current === null) return;
     
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     
-    // 방향이 아직 결정되지 않았다면 방향을 판단 (더 빠르고 정확하게)
+    // 방향이 아직 결정되지 않았다면 방향을 판단
     if (isHorizontalSwipeRef.current === null) {
       const deltaX = Math.abs(clientX - startDragX.current);
       const deltaY = Math.abs(clientY - startDragY.current);
       
-      // 움직임이 5px 이상일 때 즉시 방향 판단 (기존 10px에서 5px로 감소)
+      // 움직임이 5px 이상일 때 즉시 방향 판단
       if (deltaX >= 5 || deltaY >= 5) {
         // 더 명확한 방향 판단: 1.5배 이상 차이날 때만 해당 방향으로 확정
         if (deltaX > deltaY * 1.5) {
@@ -757,117 +761,153 @@ export default function LocationPage() {
         } else if (deltaY > deltaX * 1.5) {
           isHorizontalSwipeRef.current = false; // 상하 드래그
         }
-        // 애매한 경우 (비슷한 비율)는 조금 더 기다림
       }
     }
     
-    // 방향이 아직 결정되지 않았다면 아무것도 하지 않음 (더 기다림)
+    // 방향이 아직 결정되지 않았다면 더 기다림
     if (isHorizontalSwipeRef.current === null) {
       return;
     }
     
-    // 좌우 스와이프로 확정되었다면 세로 드래그 완전 차단
+    // 좌우 스와이프: 상하 드래그와 동일한 패턴으로 즉시 전환
     if (isHorizontalSwipeRef.current === true) {
+      const deltaX = clientX - startDragX.current;
+      
+      // 최소 스와이프 거리 체크 (30px 이상 움직여야 함)
+      const minSwipeDistance = 30;
+      if (Math.abs(deltaX) < minSwipeDistance) return;
+
+      // 스와이프 방향에 따라 다음 뷰 결정
+      let nextView: 'selectedMemberPlaces' | 'otherMembersPlaces' = activeView;
+      
+      if (deltaX < 0) { // 왼쪽으로 스와이프 (음수) -> 다음 뷰
+        if (activeView === 'selectedMemberPlaces') {
+          nextView = 'otherMembersPlaces';
+        }
+        // otherMembersPlaces에서 왼쪽 스와이프하면 그대로 유지
+      } else { // 오른쪽으로 스와이프 (양수) -> 이전 뷰
+        if (activeView === 'otherMembersPlaces') {
+          nextView = 'selectedMemberPlaces';
+        }
+        // selectedMemberPlaces에서 오른쪽 스와이프하면 그대로 유지
+      }
+
+      // 뷰가 변경되면 즉시 적용하고 드래그 종료
+      if (nextView !== activeView) {
+        console.log('[SWIPE] 좌우 스와이프로 뷰 변경:', activeView, '→', nextView);
+        setActiveView(nextView);
+        
+        // 드래그 종료 처리
+        startDragY.current = null;
+        startDragX.current = null;
+        isDraggingRef.current = false;
+        dragStartTime.current = null;
+        isHorizontalSwipeRef.current = null;
+      }
       return;
     }
     
-    // 상하 드래그로 확정되었다면 좌우 움직임 무시하고 세로만 처리
-    const deltaY = clientY - currentDragY.current;
+    // 상하 드래그: home/page.tsx와 동일한 로직 적용
+    const deltaY = clientY - startDragY.current;
     
-    // 수직 드래그만 처리하고 최소 움직임 임계값 적용
-    if (Math.abs(deltaY) > 3) { // 기존 5px에서 3px로 더 민감하게
-      currentDragY.current = clientY;
-      const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
-      let currentTranslateY = 0;
-      
-      if (currentTransform !== 'none') {
-        const matrix = new DOMMatrixReadOnly(currentTransform);
-        currentTranslateY = matrix.m42;
+    // 최소 드래그 거리 체크 (30px 이상 움직여야 함)
+    const minDragDistance = 30;
+    if (Math.abs(deltaY) < minDragDistance) return;
+
+    // 드래그 방향에 따라 다음 상태 결정 (2개 상태만 사용)
+    let nextState: 'collapsed' | 'expanded' = bottomSheetState;
+    
+    if (deltaY < 0) { // 위로 드래그 (음수)
+      if (bottomSheetState === 'collapsed') {
+        nextState = 'expanded';
       }
-
-      let newTranslateY = currentTranslateY + deltaY;
-      
-      const windowHeight = window.innerHeight;
-      // expanded 상태: translateY(62%) = windowHeight의 62%
-      const expandedY = windowHeight * BOTTOM_SHEET_POSITIONS.EXPANDED_PERCENTAGE;
-      // collapsed 상태: translateY(calc(100% - 100px)) ≈ windowHeight - 100
-      const collapsedY = windowHeight - BOTTOM_SHEET_POSITIONS.COLLAPSED_HEIGHT;
-
-      // 일반적인 드래그 범위 제한 (expandedY가 더 작은 값, collapsedY가 더 큰 값)
-      newTranslateY = Math.max(expandedY, Math.min(newTranslateY, collapsedY));
-
-      // expanded 상태에서 아래로 내려가는 것을 제한 (특별한 경우에만)
-      if (bottomSheetState === 'expanded' && deltaY > 0) {
-        // expanded에서 아래로 드래그할 때는 저항을 주되, 완전히 막지는 않음
-        const resistance = 0.3; // 30%만 움직이도록 저항 적용
-        newTranslateY = currentTranslateY + (deltaY * resistance);
-        newTranslateY = Math.max(expandedY, Math.min(newTranslateY, collapsedY));
+      // expanded에서 위로 드래그하면 그대로 유지
+    } else { // 아래로 드래그 (양수)
+      if (bottomSheetState === 'expanded') {
+        nextState = 'collapsed';
       }
-
-      bottomSheetRef.current.style.transform = `translateY(${newTranslateY}px)`;
-      bottomSheetRef.current.style.transition = 'none';
+      // collapsed에서 아래로 드래그하면 그대로 유지
     }
-  };
-  const handleDragEnd = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
-    if (!isDraggingRef.current || startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
 
-    // 좌우 스와이프 중이었다면 바텀시트 상태 변경 없이 종료
-    if (isHorizontalSwipeRef.current === true) {
-      // 상태 초기화
-      startDragY.current = null;
-      startDragX.current = null;
-      currentDragY.current = null;
-      dragStartTime.current = null;
-      isDraggingRef.current = false;
-      isHorizontalSwipeRef.current = null;
+    // 상태가 변경되면 즉시 적용하고 드래그 종료
+    if (nextState !== bottomSheetState) {
+      console.log('[BOTTOM_SHEET] 드래그로 상태 변경:', bottomSheetState, '→', nextState);
+      setBottomSheetState(nextState);
       
+      // 드래그 종료 처리
       if (bottomSheetRef.current) {
         bottomSheetRef.current.style.transition = `transform ${BOTTOM_SHEET_POSITIONS.TRANSITION_DURATION} ${BOTTOM_SHEET_POSITIONS.TRANSITION_TIMING}`;
-        bottomSheetRef.current.style.transform = ''; // CSS 클래스가 위치를 결정하도록
       }
+      
+      startDragY.current = null;
+      startDragX.current = null;
+      isDraggingRef.current = false;
+      dragStartTime.current = null;
+      isHorizontalSwipeRef.current = null;
+    }
+  };
+
+  const handleDragEnd = (e: React.TouchEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
+    // 멤버 선택 버튼이나 기타 인터랙티브 요소에서 시작된 이벤트는 무시
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('a')) {
+      return;
+    }
+    
+    if (!isDraggingRef.current || startDragY.current === null) return;
+
+    const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
+    const clientX = 'changedTouches' in e ? e.changedTouches[0].clientX : e.clientX;
+    const deltaY = clientY - startDragY.current;
+    const deltaX = clientX - (startDragX.current || 0);
+    const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
+    
+    // 드래그가 아닌 탭 동작인 경우 (짧은 시간 + 작은 움직임)
+    const isTap = Math.abs(deltaY) < 10 && Math.abs(deltaX) < 10 && deltaTime < 200;
+    
+    // 좌우 스와이프였지만 거리가 부족한 경우 탭으로 처리
+    if (isHorizontalSwipeRef.current === true) {
+      if (isTap) {
+        // 탭 동작: 다음 뷰로 전환 (selectedMemberPlaces -> otherMembersPlaces만)
+        if (activeView === 'selectedMemberPlaces') {
+          console.log('[SWIPE] 탭으로 뷰 변경:', activeView, '→', 'otherMembersPlaces');
+          setActiveView('otherMembersPlaces');
+        }
+        // otherMembersPlaces에서 탭하면 그대로 유지 (뒤로 가지 않음)
+      }
+      
+      // 스타일 복원
+      if (bottomSheetRef.current) {
+        bottomSheetRef.current.style.transition = `transform ${BOTTOM_SHEET_POSITIONS.TRANSITION_DURATION} ${BOTTOM_SHEET_POSITIONS.TRANSITION_TIMING}`;
+      }
+      
+      startDragY.current = null;
+      startDragX.current = null;
+      isDraggingRef.current = false;
+      dragStartTime.current = null;
+      isHorizontalSwipeRef.current = null;
       return;
     }
 
-    const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
-    const deltaYOverall = clientY - startDragY.current;
-    const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
-    
-    // 드래그로 간주할 최소 거리 또는 시간 임계값
-    const isDrag = Math.abs(deltaYOverall) > BOTTOM_SHEET_POSITIONS.MIN_DRAG_DISTANCE || deltaTime > 200;
-
-    let finalState: 'expanded' | 'collapsed' = bottomSheetState;
-
-    if (isDrag) {
-      // 단순한 로직: 위로 드래그하면 expanded, 아래로 드래그하면 collapsed
-      if (deltaYOverall < 0) {
-        // 위로 드래그 (값이 작아짐) -> expanded
-        finalState = 'expanded';
-      } else {
-        // 아래로 드래그 (값이 커짐) -> collapsed
-        finalState = 'collapsed';
-      }
-    } else {
+    // 상하 드래그에 대한 탭 처리
+    if (isTap) {
       // 탭 동작: collapsed에서만 expanded로 전환
       if (bottomSheetState === 'collapsed') {
-        finalState = 'expanded';
+        console.log('[BOTTOM_SHEET] 탭으로 상태 변경:', bottomSheetState, '→', 'expanded');
+        setBottomSheetState('expanded');
       }
-      // expanded 상태에서 탭하면 그대로 유지
+      // expanded에서 탭하면 그대로 유지
     }
 
-    setBottomSheetState(finalState);
-
-    // 최종 상태에 따라 부드러운 전환 적용
+    // 스타일 복원
     if (bottomSheetRef.current) {
       bottomSheetRef.current.style.transition = `transform ${BOTTOM_SHEET_POSITIONS.TRANSITION_DURATION} ${BOTTOM_SHEET_POSITIONS.TRANSITION_TIMING}`;
-      bottomSheetRef.current.style.transform = ''; // CSS 클래스가 위치를 결정하도록
     }
 
-    // 상태 초기화
     startDragY.current = null;
     startDragX.current = null;
-    currentDragY.current = null;
-    dragStartTime.current = null;
     isDraggingRef.current = false;
+    dragStartTime.current = null;
     isHorizontalSwipeRef.current = null;
   };
   const toggleBottomSheet = () => {
@@ -1139,7 +1179,35 @@ export default function LocationPage() {
         category: clickedData?.category || location.category || '기타',
         memo: clickedData?.memo || location.memo || '',
         favorite: clickedData?.favorite || location.favorite || false,
-        notifications: clickedData?.notifications || location.notifications || location.slt_enter_alarm === 'Y' || false,
+        notifications: (() => {
+          // 현재 상태에서 해당 장소의 최신 알림 상태를 찾기
+          if (markerType === 'selected') {
+            // selectedMemberSavedLocations에서 먼저 찾기
+            const updatedSelectedLocation = selectedMemberSavedLocations?.find(l => l.id === locationId);
+            if (updatedSelectedLocation) {
+              return updatedSelectedLocation.notifications || false;
+            }
+            
+            // 기본 locations에서 찾기
+            const updatedLocation = locations.find(l => l.id === locationId);
+            if (updatedLocation) {
+              return updatedLocation.notifications || false;
+            }
+          } else {
+            // otherMembersSavedLocations에서 찾기
+            const updatedOtherLocation = otherMembersSavedLocations?.find(l => 
+              (l.id === locationId || (l.slt_idx && l.slt_idx.toString() === locationId))
+            );
+            if (updatedOtherLocation) {
+              return updatedOtherLocation.notifications !== undefined 
+                ? updatedOtherLocation.notifications 
+                : updatedOtherLocation.slt_enter_alarm === 'Y';
+            }
+          }
+          
+          // 기본값으로 clickedData에서 가져오거나 원본 데이터 사용
+          return clickedData?.notifications || location.notifications || location.slt_enter_alarm === 'Y' || false;
+        })(),
       });
       setClickedCoordinates(position);
       setIsEditingPanel(true); 
@@ -1156,6 +1224,7 @@ export default function LocationPage() {
       
       // 선택된 마커 색상 변경 - setTimeout 제거하고 즉시 실행
       setSelectedLocationId(locationId); // 선택된 마커 ID 업데이트
+      selectedLocationIdRef.current = locationId; // ref도 함께 업데이트
       updateMarkerSelection(locationId);
     });
     
@@ -1381,6 +1450,13 @@ export default function LocationPage() {
 
   const handleMemberSelect = async (memberId: string, openLocationPanel = false) => { 
     console.log('[handleMemberSelect] 멤버 선택:', memberId, '패널 열기:', openLocationPanel);
+    
+    // 드래그 상태 강제 리셋 (멤버 선택 시 바텀시트 상태 변경 방지)
+    isDraggingRef.current = false;
+    startDragY.current = null;
+    startDragX.current = null;
+    dragStartTime.current = null;
+    isHorizontalSwipeRef.current = null;
     
     // 이미 선택된 멤버라면 중복 실행 방지 (ref 기반 체크 추가)
     if (selectedMemberIdRef.current === memberId) {
@@ -1674,20 +1750,21 @@ export default function LocationPage() {
     }, 100);
   };
 
-  const handleSwipeScroll = () => {
-    if (swipeContainerRef.current) {
-      const { scrollLeft, clientWidth, scrollWidth } = swipeContainerRef.current;
-      // 현재 스크롤 위치가 전체 스크롤 가능 너비의 중간을 넘었는지 여부로 판단
-      // (자식 요소가 2개라고 가정)
-      if (scrollWidth > clientWidth) { // 스크롤 가능한 경우에만
-        if (scrollLeft >= (scrollWidth - clientWidth) / 2 && activeView !== 'otherMembersPlaces') {
-          handleViewChange('otherMembersPlaces');
-        } else if (scrollLeft < (scrollWidth - clientWidth) / 2 && activeView !== 'selectedMemberPlaces') {
-          handleViewChange('selectedMemberPlaces');
-        }
-      }
-    }
-  };
+  // handleSwipeScroll 함수 비활성화 - 드래그 기반 뷰 전환으로 대체됨
+  // const handleSwipeScroll = () => {
+  //   if (swipeContainerRef.current) {
+  //     const { scrollLeft, clientWidth, scrollWidth } = swipeContainerRef.current;
+  //     // 현재 스크롤 위치가 전체 스크롤 가능 너비의 중간을 넘었는지 여부로 판단
+  //     // (자식 요소가 2개라고 가정)
+  //     if (scrollWidth > clientWidth) { // 스크롤 가능한 경우에만
+  //       if (scrollLeft >= (scrollWidth - clientWidth) / 2 && activeView !== 'otherMembersPlaces') {
+  //         handleViewChange('otherMembersPlaces');
+  //       } else if (scrollLeft < (scrollWidth - clientWidth) / 2 && activeView !== 'selectedMemberPlaces') {
+  //         handleViewChange('selectedMemberPlaces');
+  //       }
+  //     }
+  //   }
+  // };
 
   useEffect(() => {
     if (swipeContainerRef.current) {
@@ -1946,33 +2023,48 @@ export default function LocationPage() {
               <div className="flex items-center space-x-1"> 
                 {isEditingPanel && (
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
                       const newNotificationStatus = !newLocation.notifications;
+                      const locationIdStr = newLocation.id;
+                      
+                      console.log('[알림 토글] 시작:', locationIdStr, '→', newNotificationStatus, 'selectedLocationId:', selectedLocationId);
+                      
+                      // 1. 즉시 UI만 업데이트 (패널의 알림 버튼)
                       setNewLocation(prev => ({ ...prev, notifications: newNotificationStatus }));
-                      if (newLocation.id) {
-                        const locationIdStr = newLocation.id;
-                        
-                        const otherMemberLoc = getOtherMemberLocationById(locationIdStr, otherMembersSavedLocations);
-                        if (otherMemberLoc) {
-                            setOtherMembersSavedLocations(prevOther => prevOther.map(loc => 
-                                loc.slt_idx === otherMemberLoc.slt_idx ? { ...loc, slt_enter_alarm: newNotificationStatus ? 'Y' : 'N' } : loc
+                      
+                      // 2. 나머지 상태 업데이트는 완전히 지연시켜서 현재 렌더링에 영향 없도록 함
+                      if (locationIdStr) {
+                        // 2초 후에 백그라운드 상태 업데이트 (UI에 영향 없음)
+                        setTimeout(() => {
+                          console.log('[알림 토글] 백그라운드 상태 업데이트 시작');
+                          
+                          // 다른 멤버 위치 데이터만 조건부 업데이트
+                          const otherMemberLoc = getOtherMemberLocationById(locationIdStr, otherMembersSavedLocations);
+                          if (otherMemberLoc) {
+                            setOtherMembersSavedLocations(prev => prev.map(loc => 
+                              loc.slt_idx === otherMemberLoc.slt_idx 
+                                ? { ...loc, slt_enter_alarm: newNotificationStatus ? 'Y' : 'N', notifications: newNotificationStatus } 
+                                : loc
                             ));
-                        } else {
-                            const updateNotifInLocationDataList = (list: LocationData[] | null) => 
-                                list ? list.map(loc => loc.id === locationIdStr ? { ...loc, notifications: newNotificationStatus } : loc) : null;
-                            
-                            setLocations(prevLocs => prevLocs.map(loc =>
-                              loc.id === locationIdStr ? { ...loc, notifications: newNotificationStatus } : loc
-                            ));
-                            setSelectedMemberSavedLocations(updateNotifInLocationDataList);
-                            setGroupMembers(prevMembers => prevMembers.map(member => ({
-                                ...member,
-                                savedLocations: member.savedLocations.map(sl => 
-                                    sl.id === locationIdStr ? {...sl, notifications: newNotificationStatus} : sl
-                                )
-                            })));
-                        }
+                          }
+                          
+                          // 현재 뷰에 따라서만 필요한 상태 업데이트
+                          if (activeView === 'selectedMemberPlaces') {
+                            setSelectedMemberSavedLocations(prev => 
+                              prev ? prev.map(loc => 
+                                loc.id === locationIdStr ? { ...loc, notifications: newNotificationStatus } : loc
+                              ) : null
+                            );
+                          }
+                          
+                          console.log('[알림 토글] 백그라운드 상태 업데이트 완료');
+                        }, 200); // 200ms로 단축하여 빠른 반영
                       }
+                      
+                      console.log('[알림 토글] 즉시 완료. selectedLocationId 절대 변경 안됨:', selectedLocationId);
                     }}
                     className={`p-1.5 rounded-md hover:bg-gray-100 transition-colors ${
                       newLocation.notifications ? 'text-yellow-500 hover:text-yellow-600' : 'text-red-500 hover:text-red-600'
@@ -2129,7 +2221,6 @@ export default function LocationPage() {
             <div
               ref={swipeContainerRef}
               className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar"
-              onScroll={handleSwipeScroll}
             >
               <div className="w-full flex-shrink-0 snap-start">
                  <div className="content-section members-section min-h-[180px] max-h-[180px] overflow-y-auto">
@@ -2154,7 +2245,13 @@ export default function LocationPage() {
                        {groupMembers.map((member) => (
                          <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
                            <button
-                             onClick={() => handleMemberSelect(member.id)}
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleMemberSelect(member.id);
+                             }}
+                             onTouchStart={(e) => e.stopPropagation()}
+                             onTouchMove={(e) => e.stopPropagation()}
+                             onTouchEnd={(e) => e.stopPropagation()}
                              className={`flex flex-col items-center focus:outline-none`}
                            >
                              <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'}`}>
@@ -2230,7 +2327,26 @@ export default function LocationPage() {
                         return (
                           <div 
                             key={location.slt_idx} 
-                            className="flex-shrink-0 w-48 bg-white rounded-lg shadow p-3.5 cursor-pointer hover:shadow-lg transition-shadow duration-200 ease-in-out transform hover:-translate-y-0.5"
+                            className={`flex-shrink-0 w-48 bg-white rounded-lg p-3.5 cursor-pointer transition-all duration-200 ease-in-out transform hover:-translate-y-0.5 ${
+                              (selectedLocationId === (location.slt_idx ? location.slt_idx.toString() : location.id) || 
+                               selectedLocationIdRef.current === (location.slt_idx ? location.slt_idx.toString() : location.id))
+                                ? 'shadow-xl ring-1 ring-gray-300 ring-opacity-80 bg-gray-50 scale-105 border border-gray-200' 
+                                : 'shadow hover:shadow-lg'
+                            }`}
+                            style={{
+                              // 인라인 스타일로도 선택 효과 강화
+                              ...((selectedLocationId === (location.slt_idx ? location.slt_idx.toString() : location.id) || 
+                                  selectedLocationIdRef.current === (location.slt_idx ? location.slt_idx.toString() : location.id))
+                                ? {
+                                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgb(209 213 219 / 0.8)',
+                                    backgroundColor: '#f9fafb',
+                                    transform: 'translateY(-3px) scale(1.02)',
+                                    borderColor: '#e5e7eb',
+                                    borderWidth: '1px',
+                                    borderStyle: 'solid'
+                                  }
+                                : {})
+                            }}
                             onClick={() => {
                               console.log(`[LOCATION] 장소 클릭됨: ${location.name || location.slt_title}, 좌표: [${lat}, ${lng}]`);
                               console.log(`[LOCATION] 지도 초기화 상태: ${isMapInitialized}, 지도 객체 존재: ${!!map.current}, 네이버 API: ${!!window.naver?.maps}`);
@@ -2273,15 +2389,49 @@ export default function LocationPage() {
                                 
                                 console.log(`[LOCATION] 지도 중심 이동 완료`);
                                 
-                                setNewLocation({ 
-                                  id: location.slt_idx ? location.slt_idx.toString() : Date.now().toString(), 
+                                const currentSelectedId = location.slt_idx ? location.slt_idx.toString() : (location.id || Date.now().toString());
+                                
+                                setNewLocation({
+                                  id: currentSelectedId,
                                   name: location.name || location.slt_title || '',
                                   address: location.address || location.slt_add || '',
                                   coordinates: [lng, lat],
                                   category: location.category || '기타',
                                   memo: location.memo || '',
                                   favorite: location.favorite || false,
-                                  notifications: location.notifications !== undefined ? location.notifications : ((location as any).slt_enter_alarm === 'Y' || (location as any).slt_enter_alarm === undefined)
+                                  notifications: (() => {
+                                    // 현재 상태에서 해당 장소의 최신 알림 상태를 찾기
+                                    const locationId = location.slt_idx ? location.slt_idx.toString() : (location.id || Date.now().toString());
+                                    
+                                    // otherMembersSavedLocations에서 찾기 (우선순위)
+                                    const updatedOtherLocation = otherMembersSavedLocations.find(loc => 
+                                      loc.slt_idx === location.slt_idx || loc.id === locationId
+                                    );
+                                    if (updatedOtherLocation) {
+                                      return updatedOtherLocation.notifications !== undefined 
+                                        ? updatedOtherLocation.notifications 
+                                        : updatedOtherLocation.slt_enter_alarm === 'Y';
+                                    }
+                                    
+                                    // selectedMemberSavedLocations에서 찾기
+                                    const updatedSelectedLocation = selectedMemberSavedLocations?.find(loc => 
+                                      loc.id === locationId
+                                    );
+                                    if (updatedSelectedLocation) {
+                                      return updatedSelectedLocation.notifications || false;
+                                    }
+                                    
+                                    // 기본 locations에서 찾기
+                                    const updatedLocation = locations.find(loc => loc.id === locationId);
+                                    if (updatedLocation) {
+                                      return updatedLocation.notifications || false;
+                                    }
+                                    
+                                    // 모든 곳에서 찾을 수 없으면 원본 데이터 사용
+                                    return location.notifications !== undefined 
+                                      ? location.notifications 
+                                      : ((location as any).slt_enter_alarm === 'Y' || (location as any).slt_enter_alarm === undefined);
+                                  })()
                                 });
                                 setClickedCoordinates(position);
                                 setIsEditingPanel(true); 
@@ -2293,10 +2443,14 @@ export default function LocationPage() {
                                   tempMarker.current = null;
                                 }
                                 
+                                // 선택된 장소 ID 설정 (바텀시트 스타일 업데이트용)
+                                setSelectedLocationId(currentSelectedId);
+                                selectedLocationIdRef.current = currentSelectedId; // ref도 함께 업데이트
+                                console.log(`[LOCATION] 바텀시트에서 선택된 장소 ID 설정: ${currentSelectedId}`);
+                                
                                 // 선택된 마커 색상 변경 - 지연 시간 제거하여 즉시 실행
-                                const selectedId = location.slt_idx ? location.slt_idx.toString() : (location.id || Date.now().toString());
-                                console.log(`[LOCATION] 바텀시트에서 선택된 장소의 마커 색상 변경: ${selectedId}`);
-                                updateMarkerSelection(selectedId);
+                                console.log(`[LOCATION] 바텀시트에서 선택된 장소의 마커 색상 변경: ${currentSelectedId}`);
+                                updateMarkerSelection(currentSelectedId);
                                 
                               } catch (error) {
                                 console.error('[LOCATION] 지도 중심 이동 중 오류:', error);
