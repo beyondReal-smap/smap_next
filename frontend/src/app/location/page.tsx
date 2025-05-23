@@ -1007,13 +1007,17 @@ export default function LocationPage() {
     const position = new window.naver.maps.LatLng(lat, lng);
     const title = location.name || location.slt_title || '제목 없음';
     const locationId = location.id || (location.slt_idx ? location.slt_idx.toString() : `${markerType}_${index}`);
-    const isSelectedByInfoPanel = isLocationInfoPanelOpen && newLocation.id === locationId && isEditingPanel;
+    
+    // 선택 상태 확인 - 현재 패널에서 선택된 장소와 일치하는지 확인
+    const isSelectedByInfoPanel = isLocationInfoPanelOpen && 
+                                  isEditingPanel && 
+                                  newLocation.id === locationId;
     
     // 마커 타입에 따른 색상 설정
-    const bgColor = isSelectedByInfoPanel ? '#FF0000' : '#4F46E5'; // 선택된 경우 빨간색, 아니면 인디고
-    const dotColor = isSelectedByInfoPanel ? '#FF0000' : '#4F46E5'; // 선택된 경우 빨간색, 아니면 인디고
+    const bgColor = isSelectedByInfoPanel ? '#EC4899' : '#4F46E5'; // 선택된 경우 핑크색, 아니면 인디고
+    const dotColor = isSelectedByInfoPanel ? '#EC4899' : '#4F46E5'; // 선택된 경우 핑크색, 아니면 인디고
     
-    console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}`);
+    console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}, selected: ${isSelectedByInfoPanel}`);
     
     const markerContent = `
       <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
@@ -1039,11 +1043,11 @@ export default function LocationPage() {
 
     // 마커 클릭 이벤트
     window.naver.maps.Event.addListener(markerInstance, 'click', () => {
-      console.log(`[createMarker] 마커 클릭됨: ${title}`);
+      console.log(`[createMarker] 마커 클릭됨: ${title}, ID: ${locationId}`);
       
       const clickedData = markerType === 'selected' 
         ? (locations.find(l => l.id === locationId) || selectedMemberSavedLocations?.find(l => l.id === locationId))
-        : otherMembersSavedLocations?.find(l => l.id === locationId);
+        : otherMembersSavedLocations?.find(l => (l.id === locationId || (l.slt_idx && l.slt_idx.toString() === locationId)));
       
       setNewLocation({ 
         id: locationId,
@@ -1068,16 +1072,20 @@ export default function LocationPage() {
         map.current.setZoom(16);
       }
       
-      // 마커 선택 시 마커를 다시 그려서 빨간색으로 변경
-      setTimeout(() => {
-        const currentSelectedMember = groupMembers.find(m => m.isSelected);
+      // 마커 선택 시 마커를 다시 그려서 핑크색으로 변경 - 더 빠른 반응을 위해 즉시 실행
+      requestAnimationFrame(() => {
         if (markerType === 'selected') {
+          const currentSelectedMember = groupMembers.find(m => m.isSelected);
           const locationsToShow = selectedMemberSavedLocations || currentSelectedMember?.savedLocations || locations;
-          addMarkersToMap(locationsToShow);
+          if (locationsToShow && locationsToShow.length > 0) {
+            addMarkersToMap(locationsToShow);
+          }
         } else {
-          addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+          if (otherMembersSavedLocations && otherMembersSavedLocations.length > 0) {
+            addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+          }
         }
-      }, 100);
+      });
     });
     
     return { marker: markerInstance, id: `${locationId}_${index}` };

@@ -56,10 +56,23 @@ export interface OtherMemberLocationRaw {
 const locationService = {
   getOtherMembersLocations: async (memberId: string): Promise<OtherMemberLocationRaw[]> => {
     try {
+      console.log(`[locationService] API 호출 시작 - 멤버 ID: ${memberId}, URL: /locations/other-members/${memberId}`);
       const response = await apiClient.get<LocationDataFromApi[]>(`/locations/other-members/${memberId}`);
-      console.log(`[locationService] 멤버 ${memberId}의 원본 데이터:`, response.data);
+      console.log(`[locationService] API 응답 상태:`, response.status);
+      console.log(`[locationService] 멤버 ${memberId}의 원본 응답 데이터:`, response.data);
       
-      return response.data.map((item) => {
+      // 각 아이템의 slt_enter_alarm 필드를 개별적으로 확인
+      response.data.forEach((item, index) => {
+        console.log(`[locationService] ${index + 1}번째 아이템 slt_enter_alarm:`, {
+          slt_idx: item.slt_idx,
+          slt_title: item.slt_title,
+          slt_enter_alarm: item.slt_enter_alarm,
+          hasEnterAlarmField: 'slt_enter_alarm' in item,
+          enterAlarmType: typeof item.slt_enter_alarm
+        });
+      });
+      
+      return response.data.map((item, index) => {
         const converted = {
           id: String(item.slt_idx),
           name: item.slt_title || '제목 없음',
@@ -80,7 +93,11 @@ const locationService = {
           slt_long: item.slt_long,
           slt_enter_alarm: item.slt_enter_alarm,
         };
-        console.log(`[locationService] 변환된 데이터:`, { 원본: item, 변환후: converted });
+        console.log(`[locationService] ${index + 1}번째 변환 결과:`, { 
+          원본_slt_enter_alarm: item.slt_enter_alarm, 
+          변환후_notifications: converted.notifications,
+          전체_변환후: converted 
+        });
         return converted;
       });
     } catch (error) {
