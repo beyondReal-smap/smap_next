@@ -1774,7 +1774,7 @@ export default function LocationPage() {
               <div className="w-full flex-shrink-0 snap-start">
                 <div className="content-section places-section min-h-[180px] max-h-[180px] overflow-y-auto">
                   <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
-                    다른 멤버들의 장소
+                    {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 장소` : '다른 멤버들의 장소'}
                     {isLoadingOtherLocations && <FiLoader className="animate-spin ml-2 text-indigo-500" size={18}/>}
                   </h2>
                   {isLoadingOtherLocations ? (
@@ -1799,13 +1799,13 @@ export default function LocationPage() {
                                 
                                 setNewLocation({ 
                                   id: String(location.slt_idx), 
-                                  name: location.slt_title || '',
-                                  address: location.slt_add || '',
+                                  name: location.name || location.slt_title || '',
+                                  address: location.address || location.slt_add || '',
                                   coordinates: [lng, lat],
-                                  category: '기타', // Populate from location.slt_category if available
-                                  memo: '', // Populate from location.slt_memo if available
-                                  favorite: false, // Populate from location.slt_bookmark if available
-                                  notifications: location.slt_enter_alarm === 'Y', 
+                                  category: location.category || '기타',
+                                  memo: location.memo || '',
+                                  favorite: location.favorite || false,
+                                  notifications: location.notifications || location.slt_enter_alarm === 'Y', 
                                 });
                                 setClickedCoordinates(position);
                                 setIsEditingPanel(true); 
@@ -1818,23 +1818,23 @@ export default function LocationPage() {
                             <div className="flex items-center justify-between mb-1.5">
                               <div className="flex items-center min-w-0">
                                 <FiMapPin className="w-3.5 h-3.5 text-purple-600 mr-1.5 flex-shrink-0" />
-                                <h4 className="text-sm font-semibold text-gray-800 truncate">{location.slt_title || '제목 없음'}</h4>
+                                <h4 className="text-sm font-semibold text-gray-800 truncate">{location.name || location.slt_title || '제목 없음'}</h4>
                               </div>
-                              {/* 알림 아이콘: location.slt_enter_alarm 사용 */}
-                              {location.slt_enter_alarm === 'Y' ? (
+                              {/* 알림 아이콘: location.notifications 또는 location.slt_enter_alarm 사용 */}
+                              {(location.notifications || location.slt_enter_alarm === 'Y') ? (
                                 <FiBell size={12} className="text-yellow-500 flex-shrink-0 ml-1" />
                               ) : (
                                 <FiBellOff size={12} className="text-red-500 flex-shrink-0 ml-1" />
                               )}
                             </div>
-                            <p className="text-xs text-gray-500 truncate mt-1 pl-[1.125rem]">{location.slt_add || '주소 정보 없음'}</p>
+                            <p className="text-xs text-gray-500 truncate mt-1 pl-[1.125rem]">{location.address || location.slt_add || '주소 정보 없음'}</p>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
                     <div className="text-center py-3 text-gray-500">
-                      <p>다른 멤버들이 등록한 장소가 없습니다.</p>
+                      <p>{groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}님이 등록한 장소가 없습니다.` : '다른 멤버들이 등록한 장소가 없습니다.'}</p>
                     </div>
                   )}
                 </div>
