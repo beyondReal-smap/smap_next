@@ -467,22 +467,23 @@ export default function LocationPage() {
           try {
             // 각 멤버의 저장된 장소 조회
             const memberLocationsRaw = await locationService.getOtherMembersLocations(member.mt_idx.toString());
-            console.log(`멤버 ${member.mt_name}의 저장된 장소:`, memberLocationsRaw);
+            console.log(`멤버 ${member.mt_name}의 저장된 장소 (Raw):`, memberLocationsRaw);
             
-            // LocationData 형식으로 변환
-            memberSavedLocations = memberLocationsRaw.map(loc => ({
-              id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
-              name: loc.name || loc.slt_title || '제목 없음',
-              address: loc.address || loc.slt_add || '주소 정보 없음',
-              coordinates: [
-                parseFloat(String(loc.slt_long || '0')) || 0,
-                parseFloat(String(loc.slt_lat || '0')) || 0
-              ] as [number, number],
-              category: loc.category || '기타',
-              memo: loc.memo || '',
-              favorite: loc.favorite || false,
-              notifications: loc.notifications || loc.slt_enter_alarm === 'Y'
-            }));
+            // LocationData 형식으로 변환 (locationService에서 이미 변환되었으므로 그대로 사용)
+            memberSavedLocations = memberLocationsRaw.map((loc, locIndex) => {
+              const converted = {
+                id: loc.id || (loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString()),
+                name: loc.name || '제목 없음',
+                address: loc.address || '주소 정보 없음',
+                coordinates: loc.coordinates || [0, 0], // locationService에서 이미 올바르게 변환됨
+                category: loc.category || '기타',
+                memo: loc.memo || '',
+                favorite: loc.favorite || false,
+                notifications: loc.notifications || false // locationService에서 이미 slt_enter_alarm으로부터 변환됨
+              };
+              console.log(`멤버 ${member.mt_name}의 ${locIndex + 1}번째 장소 변환:`, { 원본: loc, 변환후: converted });
+              return converted;
+            });
           } catch (locationError) {
             console.warn(`멤버 ${member.mt_name}의 장소 조회 실패:`, locationError);
             // 오류 시 빈 배열 유지
