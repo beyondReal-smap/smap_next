@@ -555,8 +555,15 @@ export default function LocationPage() {
 
         window.naver.maps.Event.addListener(map.current, 'click', async (e: { coord: NaverCoord, pointerEvent: MouseEvent }) => { 
           console.log("[Map Click] Event started. Current isLocationInfoPanelOpen:", isLocationInfoPanelOpen, "isMapClickedRecentlyRef:", isMapClickedRecentlyRef.current);
+          
+          // 클릭 플래그 설정 - handleClickOutside와의 충돌 방지
           isMapClickedRecentlyRef.current = true;
-          console.log("[Map Click] isMapClickedRecentlyRef set to true.");
+          
+          // 500ms 후 플래그 해제 (handleClickOutside가 실행되기 충분한 시간)
+          setTimeout(() => {
+            isMapClickedRecentlyRef.current = false;
+            console.log("[Map Click] isMapClickedRecentlyRef reset to false after timeout.");
+          }, 500);
 
           setClickedCoordinates(e.coord); 
           setIsEditingPanel(false); 
@@ -578,8 +585,11 @@ export default function LocationPage() {
             if (!window.naver?.maps?.Service) {
               console.warn('Naver Maps Service is not initialized yet');
               setNewLocation(prev => ({...prev, address: '주소 정보를 가져올 수 없습니다.'}));
-              setIsLocationInfoPanelOpen(true);
-              setBottomSheetState('collapsed');
+              // 약간의 지연 후 패널 열기 (handleClickOutside와의 충돌 방지)
+              setTimeout(() => {
+                setIsLocationInfoPanelOpen(true);
+                setBottomSheetState('collapsed');
+              }, 100);
               return;
             }
 
@@ -600,14 +610,23 @@ export default function LocationPage() {
                 const fullAddress = roadAddr?.addressElements?.length > 0 ? roadAddr.addressElements.map((el:any)=>el.longName).join(' ') : (roadAddr || '주소 정보 없음');
                 setNewLocation(prev => ({...prev, address: fullAddress}));
               }
-              setIsLocationInfoPanelOpen(true);
-              setBottomSheetState('collapsed');
+              
+              // 약간의 지연 후 패널 열기 (handleClickOutside와의 충돌 방지)
+              setTimeout(() => {
+                setIsLocationInfoPanelOpen(true);
+                setBottomSheetState('collapsed');
+                console.log("[Map Click] Location info panel opened after geocoding.");
+              }, 100);
             });
           } catch(geoError) { 
             console.error('Reverse geocode error:', geoError);
             setNewLocation(prev => ({...prev, address: '주소 변환 중 오류가 발생했습니다.'}));
-            setIsLocationInfoPanelOpen(true);
-            setBottomSheetState('collapsed');
+            
+            // 약간의 지연 후 패널 열기 (handleClickOutside와의 충돌 방지)
+            setTimeout(() => {
+              setIsLocationInfoPanelOpen(true);
+              setBottomSheetState('collapsed');
+            }, 100);
           } 
         });
 
@@ -1206,29 +1225,65 @@ export default function LocationPage() {
       map.current.setCenter(memberPosition);
       map.current.setZoom(16); // 적절한 줌 레벨로 설정
       
-      setSelectedMemberSavedLocations(newlySelectedMember.savedLocations || []);
-      setActiveView('selectedMemberPlaces'); 
-      
-      // 약간의 지연 후 마커 업데이트 (지도 이동이 완료된 후)
-      setTimeout(() => {
-        addMarkersToMap(newlySelectedMember.savedLocations || []); 
-        console.log('[handleMemberSelect] 멤버의 저장된 장소 마커 생성:', newlySelectedMember.savedLocations?.length || 0, '개');
-      }, 300);
-      
-      if (newlySelectedMember.id) { 
-          setIsLoadingOtherLocations(true);
-          try {
-              const otherLocationsRaw = await locationService.getOtherMembersLocations(newlySelectedMember.id);
-              console.log("[handleMemberSelect] Other members' locations (raw):", otherLocationsRaw);
-              setOtherMembersSavedLocations(otherLocationsRaw);
-          } catch (error) {
-              console.error("Failed to fetch other members' locations in handleMemberSelect:", error);
-              setOtherMembersSavedLocations([]); 
-          } finally {
-              setIsLoadingOtherLocations(false);
-          }
-      } else {
-          setOtherMembersSavedLocations([]); 
+      // 선택된 멤버의 저장된 장소를 API에서 가져오기
+      setIsLoadingOtherLocations(true);
+      try {
+        const memberLocationsRaw = await locationService.getOtherMembersLocations(newlySelectedMember.id);
+        console.log("[handleMemberSelect] 선택된 멤버의 장소 (raw):", memberLocationsRaw);
+        
+        // 선택된 멤버의 장소로 설정
+        setSelectedMemberSavedLocations(memberLocationsRaw.map(loc => ({
+          id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
+          name: loc.name || loc.slt_title || '제목 없음',
+          address: loc.address || loc.slt_add || '주소 정보 없음',
+          coordinates: [
+            parseFloat(loc.slt_long) || 0,
+            parseFloat(loc.slt_lat) || 0
+          ] as [number, number],
+          category: loc.category || '기타',
+          memo: loc.memo || '',
+          favorite: loc.favorite || false,
+          notifications: loc.notifications || loc.slt_enter_alarm === 'Y'
+        })));
+        
+        // 다른 멤버들의 장소도 설정 (스와이프 시 사용)
+        setOtherMembersSavedLocations(memberLocationsRaw);
+        
+        // activeView를 선택된 멤버의 장소로 설정
+        setActiveView('selectedMemberPlaces');
+        
+        // 약간의 지연 후 마커 업데이트 (지도 이동이 완료된 후)
+        setTimeout(() => {
+          // 선택된 멤버의 장소를 LocationData 형식으로 변환해서 마커 생성
+          const locationDataForMarkers: LocationData[] = memberLocationsRaw.map(loc => ({
+            id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
+            name: loc.name || loc.slt_title || '제목 없음',
+            address: loc.address || loc.slt_add || '주소 정보 없음',
+            coordinates: [
+              parseFloat(loc.slt_long) || 0,
+              parseFloat(loc.slt_lat) || 0
+            ] as [number, number],
+            category: loc.category || '기타',
+            memo: loc.memo || '',
+            favorite: loc.favorite || false,
+            notifications: loc.notifications || loc.slt_enter_alarm === 'Y'
+          }));
+          
+          addMarkersToMap(locationDataForMarkers);
+          console.log('[handleMemberSelect] 멤버의 저장된 장소 마커 생성:', locationDataForMarkers.length, '개');
+        }, 300);
+        
+      } catch (error) {
+        console.error("Failed to fetch selected member's locations in handleMemberSelect:", error);
+        setSelectedMemberSavedLocations([]);
+        setOtherMembersSavedLocations([]);
+        
+        // 오류 시 기본 장소 표시
+        setTimeout(() => {
+          addMarkersToMap(newlySelectedMember.savedLocations || []);
+        }, 300);
+      } finally {
+        setIsLoadingOtherLocations(false);
       }
 
       if (!openLocationPanel) {
@@ -1282,47 +1337,61 @@ export default function LocationPage() {
     console.log('[useEffect for handleClickOutside] Registering or unregistering. isLocationInfoPanelOpen:', isLocationInfoPanelOpen);
     const handleClickOutside = (event: MouseEvent) => {
       console.log('[handleClickOutside] Triggered. isMapClickedRecentlyRef:', isMapClickedRecentlyRef.current, 'isLocationInfoPanelOpen:', isLocationInfoPanelOpen);
+      
+      // 지도 클릭이 최근에 발생했다면 무시
       if (isMapClickedRecentlyRef.current) {
-        console.log('[handleClickOutside] Map was clicked recently. Clearing flag and returning.');
-        isMapClickedRecentlyRef.current = false;
+        console.log('[handleClickOutside] Map was clicked recently. Ignoring click outside event.');
         return;
       }
+      
+      // 패널이 열려있지 않다면 무시
+      if (!isLocationInfoPanelOpen) {
+        return;
+      }
+      
       console.log('[handleClickOutside] Checking if click is outside panel. Panel Ref:', infoPanelRef.current, 'Target:', event.target);
+      
+      // 패널 외부 클릭인지 확인
       if (infoPanelRef.current && !infoPanelRef.current.contains(event.target as Node)) {
-        if (isLocationInfoPanelOpen) { 
-          console.log('[handleClickOutside] Click is outside panel and panel is open. Closing panel.');
-          setIsLocationInfoPanelOpen(false);
-          if (tempMarker.current) {
-            tempMarker.current.setMap(null);
-          }
-          const currentSelectedMember = groupMembers.find(m => m.isSelected);
-            if (currentSelectedMember) {
-                if (activeView === 'selectedMemberPlaces') {
-                    addMarkersToMap(currentSelectedMember.savedLocations || []);
-                } else {
-                    addMarkersToMapForOtherMembers(otherMembersSavedLocations);
-                }
-            } else {
-                addMarkersToMap(locations);
-            }
-          setIsEditingPanel(false);
+        console.log('[handleClickOutside] Click is outside panel. Closing panel.');
+        setIsLocationInfoPanelOpen(false);
+        if (tempMarker.current) {
+          tempMarker.current.setMap(null);
         }
+        const currentSelectedMember = groupMembers.find(m => m.isSelected);
+        if (currentSelectedMember) {
+            if (activeView === 'selectedMemberPlaces') {
+                addMarkersToMap(selectedMemberSavedLocations || currentSelectedMember.savedLocations || []);
+            } else {
+                addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+            }
+        } else {
+            addMarkersToMap(locations);
+        }
+        setIsEditingPanel(false);
       }
     };
 
     if (isLocationInfoPanelOpen) {
       console.log('[useEffect for handleClickOutside] Adding mousedown listener.');
-      document.addEventListener('mousedown', handleClickOutside);
+      // 약간의 지연 후 이벤트 리스너 추가 (지도 클릭 이벤트가 완전히 처리된 후)
+      const timeoutId = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+      }, 150);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        console.log('[useEffect for handleClickOutside] Cleanup: Removing mousedown listener.');
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
     } else {
-      console.log('[useEffect for handleClickOutside] Removing mousedown listener (or not adding if initially false).');
+      console.log('[useEffect for handleClickOutside] Panel is closed, not adding listener.');
       document.removeEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
     }
-
-    return () => {
-      console.log('[useEffect for handleClickOutside] Cleanup: Removing mousedown listener.');
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isLocationInfoPanelOpen]);
+  }, [isLocationInfoPanelOpen, activeView, selectedMemberSavedLocations, otherMembersSavedLocations, locations]);
 
   useEffect(() => {
     if (map.current && isMapInitialized) {
