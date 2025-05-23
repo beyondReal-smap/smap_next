@@ -269,21 +269,23 @@ const pageStyles = `
   z-index: 61;
 }
 .location-info-panel {
-  position: absolute;
-  top: 60px; /* 80px에서 60px로 변경하여 더 위쪽으로 이동 */
+  position: fixed; /* absolute에서 fixed로 변경하여 더 안정적으로 고정 */
+  top: 70px; /* 헤더에서 10px 더 내려온 위치 (기존 60px에서 70px로 변경) */
   left: 50%;
   transform: translateX(-50%);
   width: calc(100% - 30px);
-  max-width: 480px;
+  max-width: 450px; /* max-width를 조금 줄여서 여백 확보 */
   background-color: white;
   border-radius: 12px;
-  box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-  z-index: 55; /* z-index를 높여서 바텀시트 위에 확실히 표시 */
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2); /* 그림자를 더 진하게 해서 고정된 느낌 강화 */
+  z-index: 60; /* z-index를 더 높여서 확실히 최상위에 표시 */
   padding: 20px;
   opacity: 0;
   visibility: hidden;
   transform: translateX(-50%) scale(0.95);
   transition: opacity 0.3s ease-out, visibility 0.3s ease-out, transform 0.3s ease-out;
+  margin: 0; /* 여백 제거 */
+  box-sizing: border-box; /* 박스 사이징 명시 */
 }
 .location-info-panel.open {
   opacity: 1;
@@ -1041,11 +1043,9 @@ export default function LocationPage() {
         map.current.setZoom(16);
       }
       
-      // 선택된 마커 색상 변경
-      setTimeout(() => {
-        setSelectedLocationId(locationId); // 선택된 마커 ID 업데이트
-        updateMarkerSelection(locationId);
-      }, 100);
+      // 선택된 마커 색상 변경 - setTimeout 제거하고 즉시 실행
+      setSelectedLocationId(locationId); // 선택된 마커 ID 업데이트
+      updateMarkerSelection(locationId);
     });
     
     return { marker: markerInstance, id: `${locationId}_${index}` };
@@ -1800,11 +1800,9 @@ export default function LocationPage() {
                           setIsLocationInfoPanelOpen(false);
                           if (tempMarker.current) tempMarker.current.setMap(null);
                           setIsEditingPanel(false);
-                          // 마커 색상 리셋
-                          setTimeout(() => {
-                            setSelectedLocationId(null); // 선택된 마커 ID 리셋
-                            updateMarkerSelection(null);
-                          }, 100);
+                          // 마커 색상 리셋 - setTimeout 제거하고 즉시 실행
+                          setSelectedLocationId(null); // 선택된 마커 ID 리셋
+                          updateMarkerSelection(null);
                       }} 
                       className="flex-1"
                   >
@@ -1877,11 +1875,9 @@ export default function LocationPage() {
                     setIsLocationInfoPanelOpen(false);
                     if (tempMarker.current) tempMarker.current.setMap(null);
                     setIsEditingPanel(false);
-                    // 마커 색상 리셋
-                    setTimeout(() => {
-                      setSelectedLocationId(null); // 선택된 마커 ID 리셋
-                      updateMarkerSelection(null);
-                    }, 100);
+                    // 마커 색상 리셋 - setTimeout 제거하고 즉시 실행
+                    setSelectedLocationId(null); // 선택된 마커 ID 리셋
+                    updateMarkerSelection(null);
                   }} className="flex-1">닫기</Button>
                   <Button variant="primary" onClick={handleConfirmPanelAction} className="flex-1" disabled={isSavingLocationPanel}>
                     {isSavingLocationPanel ? '저장 중...' : "내 장소 등록"}
