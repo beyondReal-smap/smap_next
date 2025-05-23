@@ -1204,30 +1204,101 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapsInitialized.naver, mapsInitialized.google, mapType, groupMembers]); // groupMembers 추가
 
-  // 스케줄 마커 업데이트 함수
-  const updateScheduleMarkers = (schedules: Schedule[]) => {
-    // 기존 스케줄 마커 삭제
-    if (scheduleMarkersRef.current.length > 0) {
-      scheduleMarkersRef.current.forEach(marker => {
-        if (marker.setMap) { // Naver, Google 마커 모두 setMap 메소드를 가짐
-          marker.setMap(null);
-        }
-      });
-      scheduleMarkersRef.current = [];
+  // 공통 좌표 파싱 함수
+  const parseCoordinate = (coord: any): number | null => {
+    if (typeof coord === 'number') return coord;
+    if (typeof coord === 'string' && !isNaN(parseFloat(coord))) return parseFloat(coord);
+    return null;
+  };
+
+  // 공통 마커 생성 함수 - 위치 페이지에서 가져온 개선된 로직
+  const createMarker = (
+    location: any,
+    index: number,
+    markerType: 'member' | 'schedule',
+    isSelected?: boolean,
+    memberData?: GroupMember,
+    scheduleData?: Schedule
+  ) => {
+    // 좌표 안전성 검사
+    let lat: number | null = null;
+    let lng: number | null = null;
+
+    if (markerType === 'member' && memberData) {
+      lat = parseCoordinate(memberData.location.lat);
+      lng = parseCoordinate(memberData.location.lng);
+    } else if (markerType === 'schedule' && scheduleData) {
+      lat = parseCoordinate(scheduleData.sst_location_lat);
+      lng = parseCoordinate(scheduleData.sst_location_long);
+    } else if (location) {
+      lat = parseCoordinate(location.lat);
+      lng = parseCoordinate(location.lng);
     }
 
-    // 새 스케줄 마커 추가
-    schedules.forEach((schedule, index) => { // index 추가
-      if (schedule.sst_location_lat && schedule.sst_location_long) {
-        const position = { lat: schedule.sst_location_lat, lng: schedule.sst_location_long };
-        const scheduleTitle = schedule.title || '제목 없음';
-        const statusDetail = getScheduleStatus(schedule); // 스케줄 상태 가져오기
+    if (lat === null || lng === null || lat === 0 || lng === 0) {
+      console.warn('유효하지 않은 좌표:', { lat, lng, location, markerType });
+      return null;
+    }
+
+    const validLat = lat;
+    const validLng = lng;
+
+    if (mapType === 'naver' && naverMap.current && window.naver?.maps) {
+      const naverPos = new window.naver.maps.LatLng(validLat, validLng);
+      
+      if (markerType === 'member' && memberData) {
+        const photoForMarker = memberData.photo ?? getDefaultImage(memberData.mt_gender, memberData.original_index);
+        const borderColor = isSelected ? '#DC2626' : '#4F46E5'; // 선택된 멤버는 빨간색, 기본은 인디고
+        
+        const newMarker = new window.naver.maps.Marker({
+          position: naverPos,
+          map: naverMap.current,
+          title: memberData.name,
+          icon: {
+            content: `
+              <div style="position: relative; text-align: center; cursor: pointer;">
+                <div style="width: 40px; height: 40px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+                  <img 
+                    src="${photoForMarker}" 
+                    alt="${memberData.name}" 
+                    style="width: 100%; height: 100%; object-fit: cover;" 
+                    data-gender="${memberData.mt_gender ?? ''}" 
+                    data-index="${memberData.original_index}"
+                    onerror="
+                      const genderStr = this.getAttribute('data-gender');
+                      const indexStr = this.getAttribute('data-index');
+                      const gender = genderStr ? parseInt(genderStr, 10) : null;
+                      const idx = indexStr ? parseInt(indexStr, 10) : 0;
+                      const imgNum = (idx % 4) + 1;
+                      let fallbackSrc = '/images/avatar' + ((idx % 3) + 1) + '.png';
+                      if (gender === 1) { fallbackSrc = '/images/male_' + imgNum + '.png'; }
+                      else if (gender === 2) { fallbackSrc = '/images/female_' + imgNum + '.png'; }
+                      this.src = fallbackSrc;
+                      this.onerror = null;
+                    "
+                  />
+                </div>
+                <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background-color: ${isSelected ? '#DC2626' : 'rgba(0,0,0,0.7)'}; color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px;">
+                  ${memberData.name}
+                </div>
+              </div>
+            `,
+            size: new window.naver.maps.Size(40, 40),
+            anchor: new window.naver.maps.Point(20, 20)
+          }
+        });
+
+        return newMarker;
+      } else if (markerType === 'schedule' && scheduleData) {
+        const scheduleTitle = scheduleData.title || '제목 없음';
+        const statusDetail = getScheduleStatus(scheduleData);
+        const scheduleOrder = index + 1;
 
         // 시간 포맷팅
         let startTime = '';
-        if (schedule.date) { // schedule.date는 sst_sdate (시작 일시)
+        if (scheduleData.date) {
           try {
-            const startDateObj = new Date(schedule.date);
+            const startDateObj = new Date(scheduleData.date);
             if (!isNaN(startDateObj.getTime())) {
               startTime = format(startDateObj, 'HH:mm', { locale: ko });
             }
@@ -1235,9 +1306,9 @@ export default function HomePage() {
         }
 
         let endTime = '';
-        if (schedule.sst_edate) { // 종료 일시
+        if (scheduleData.sst_edate) {
           try {
-            const endDateObj = new Date(schedule.sst_edate);
+            const endDateObj = new Date(scheduleData.sst_edate);
             if (!isNaN(endDateObj.getTime())) {
               endTime = format(endDateObj, 'HH:mm', { locale: ko });
             }
@@ -1245,85 +1316,160 @@ export default function HomePage() {
         }
 
         const timeRange = (startTime && endTime) ? `${startTime} - ${endTime}` : (startTime || '시간 정보 없음');
-        // Naver/Google 마커에서 가독성을 위해 흰색 또는 매우 밝은 배경색일 경우 어두운 텍스트 색상 사용
+        
+        // 통일된 색상 체계
         const titleTextColor = '#FFFFFF';
         const timeTextColor = '#FFFFFF';
-        const titleBgColor = '#5046E5'; // #5046E5에서 #4F46E5로 변경하여 location/page.tsx와 통일
-        const timeBgColor = '#EC4899'; // Pink-500
-        const orderCircleBgColor = '#22C55E'; // 초록색 (Tailwind Green-500)
+        const titleBgColor = '#4F46E5'; // 인디고 통일
+        const timeBgColor = '#EC4899'; // 핑크
+        const orderCircleBgColor = '#22C55E'; // 초록
         const orderCircleTextColor = '#FFFFFF';
 
-        if (mapType === 'naver' && naverMap.current && window.naver?.maps && window.naver.maps.Marker) {
-          const naverPos = new window.naver.maps.LatLng(position.lat, position.lng);
-          const scheduleOrder = index + 1; // 1부터 시작하는 순번
+        const newMarker = new window.naver.maps.Marker({
+          position: naverPos,
+          map: naverMap.current,
+          title: scheduleTitle,
+          icon: {
+            content: [
+              '<div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">',
+              `  <div style="width: 16px; height: 16px; background-color: ${orderCircleBgColor}; color: ${orderCircleTextColor}; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.2); z-index: 1;">`,
+              `    ${scheduleOrder}`,
+              `  </div>`,
+              `  <div style="padding: 4px 8px; background-color: ${titleBgColor}; color: ${titleTextColor}; border-radius: 6px; font-size: 11px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.2); margin-bottom: 2px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">`,
+              `    ${scheduleTitle}`,
+              `  </div>`,
+              `  <div style="padding: 2px 6px; background-color: ${timeBgColor}; color: ${timeTextColor}; border-radius: 4px; font-size: 9px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.1); margin-bottom: 4px;">`,
+              `    ${timeRange}`,
+              `  </div>`,
+              `  <div style="width: 10px; height: 10px; background-color: ${statusDetail.color}; border: 1.5px solid #FFFFFF; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2);"></div>`,
+              '</div>'
+            ].join(''),
+            anchor: new window.naver.maps.Point(6, 52)
+          }
+        });
 
-          const newMarker = new window.naver.maps.Marker({
-            position: naverPos,
-            map: naverMap.current,
-            title: scheduleTitle,
-            icon: {
-              content: [
-                '<div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">',
-                // 순서 표시 원
-                `  <div style="width: 16px; height: 16px; background-color: ${orderCircleBgColor}; color: ${orderCircleTextColor}; border-radius: 50%; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-bottom: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.2); z-index: 1;">`,
-                `    ${scheduleOrder}`,
-                `  </div>`,
-                // 제목 박스
-                `  <div style="padding: 4px 8px; background-color: ${titleBgColor}; color: ${titleTextColor}; border-radius: 6px; font-size: 11px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.2); margin-bottom: 2px; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">`, // margin-bottom: 2px 로 간격 줄임
-                `    ${scheduleTitle}`,
-                `  </div>`,
-                // 시간 박스
-                `  <div style="padding: 2px 6px; background-color: ${timeBgColor}; color: ${timeTextColor}; border-radius: 4px; font-size: 9px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.1); margin-bottom: 4px;">`,
-                `    ${timeRange}`,
-                `  </div>`,
-                // 하단 상태 원형 마커
-                `  <div style="width: 10px; height: 10px; background-color: ${statusDetail.color}; border: 1.5px solid #FFFFFF; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2);"></div>`,
-                '</div>'
-              ].join(''),
-              anchor: new window.naver.maps.Point(6, 52) // 아이콘 전체 높이 고려하여 anchor 조정 (순서원+제목+시간+상태원)
+        // InfoWindow 추가
+        if (window.naver.maps.InfoWindow) {
+          const infoWindow = new window.naver.maps.InfoWindow({
+            content: `<div style="padding:8px;font-size:13px;min-width:120px;text-align:left;line-height:1.5;"><strong>${scheduleTitle}</strong><br><span style="font-size:11px; color:#555;">시간: ${timeRange}</span><br><span style="font-size:11px; color:${statusDetail.color};">상태: ${statusDetail.text}</span></div>`,
+            disableAnchor: true
+          });
+          window.naver.maps.Event.addListener(newMarker, 'click', () => {
+            if (infoWindow.getMap()) {
+              infoWindow.close();
+            } else {
+              infoWindow.open(naverMap.current, newMarker);
             }
           });
-          if (window.naver.maps.InfoWindow) {
-            const infoWindow = new window.naver.maps.InfoWindow({
-              content: `<div style="padding:8px;font-size:13px;min-width:120px;text-align:left;line-height:1.5;"><strong>${scheduleTitle}</strong><br><span style="font-size:11px; color:#555;">시간: ${timeRange}</span><br><span style="font-size:11px; color:${statusDetail.color};">상태: ${statusDetail.text}</span></div>`,
-              disableAnchor: true
-            });
-            window.naver.maps.Event.addListener(newMarker, 'click', () => {
-              if (infoWindow.getMap()) {
-                infoWindow.close();
-              } else {
-                infoWindow.open(naverMap.current, newMarker);
-              }
-            });
+        }
+
+        return newMarker;
+      }
+    } else if (mapType === 'google' && map.current && window.google?.maps) {
+      if (markerType === 'member' && memberData) {
+        const photoForMarker = memberData.photo ?? getDefaultImage(memberData.mt_gender, memberData.original_index);
+        
+        const newMarker = new window.google.maps.Marker({
+          position: { lat: validLat, lng: validLng },
+          map: map.current,
+          title: memberData.name,
+          icon: {
+            url: photoForMarker,
+            scaledSize: new window.google.maps.Size(40, 40),
+            origin: new window.google.maps.Point(0, 0),
+            anchor: new window.google.maps.Point(20, 20),
+            labelOrigin: new window.google.maps.Point(20, 50)
           }
-          scheduleMarkersRef.current.push(newMarker);
-        } else if (mapType === 'google' && map.current && window.google?.maps && window.google.maps.Marker) {
-          const newMarker = new window.google.maps.Marker({
-            position: position,
-            map: map.current,
-            title: `${scheduleTitle} (${statusDetail.text}, ${timeRange})`, // title에 상태 텍스트 및 시간 추가
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              fillColor: statusDetail.color, // 상태에 따른 색상 적용
-              fillOpacity: 1,
-              strokeColor: '#FFFFFF',
-              strokeWeight: 2,
-              scale: 7 
-            },
-            // label 옵션 제거
+        });
+
+        return newMarker;
+      } else if (markerType === 'schedule' && scheduleData) {
+        const scheduleTitle = scheduleData.title || '제목 없음';
+        const statusDetail = getScheduleStatus(scheduleData);
+
+        // 시간 포맷팅
+        let startTime = '';
+        if (scheduleData.date) {
+          try {
+            const startDateObj = new Date(scheduleData.date);
+            if (!isNaN(startDateObj.getTime())) {
+              startTime = format(startDateObj, 'HH:mm', { locale: ko });
+            }
+          } catch (e) { console.error("Error formatting start date:", e); }
+        }
+
+        let endTime = '';
+        if (scheduleData.sst_edate) {
+          try {
+            const endDateObj = new Date(scheduleData.sst_edate);
+            if (!isNaN(endDateObj.getTime())) {
+              endTime = format(endDateObj, 'HH:mm', { locale: ko });
+            }
+          } catch (e) { console.error("Error formatting end date:", e); }
+        }
+
+        const timeRange = (startTime && endTime) ? `${startTime} - ${endTime}` : (startTime || '시간 정보 없음');
+
+        const newMarker = new window.google.maps.Marker({
+          position: { lat: validLat, lng: validLng },
+          map: map.current,
+          title: `${scheduleTitle} (${statusDetail.text}, ${timeRange})`,
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            fillColor: '#4F46E5', // 인디고 통일
+            fillOpacity: 1,
+            strokeColor: '#FFFFFF',
+            strokeWeight: 2,
+            scale: 7 
+          }
+        });
+
+        // InfoWindow 추가
+        if (window.google.maps.InfoWindow) {
+          const infoWindow = new window.google.maps.InfoWindow({
+            content: `<div style="font-size:13px;line-height:1.5;"><strong>${scheduleTitle}</strong><br><span style="font-size:11px;color:#555;">시간: ${timeRange}</span><br><span style="font-size:11px;color:${statusDetail.color};">상태: ${statusDetail.text}</span></div>`
           });
-          if (window.google.maps.InfoWindow) {
-            const infoWindow = new window.google.maps.InfoWindow({
-              content: `<div style="font-size:13px;line-height:1.5;"><strong>${scheduleTitle}</strong><br><span style="font-size:11px;color:#555;">시간: ${timeRange}</span><br><span style="font-size:11px;color:${statusDetail.color};">상태: ${statusDetail.text}</span></div>`
+          newMarker.addListener('click', () => {
+            infoWindow.open({
+              anchor: newMarker,
+              map: map.current,
+              shouldFocus: false,
             });
-            newMarker.addListener('click', () => {
-              infoWindow.open({
-                anchor: newMarker,
-                map: map.current,
-                shouldFocus: false,
-              });
-            });
-          }
+          });
+        }
+
+        return newMarker;
+      }
+    }
+
+    return null;
+  };
+
+  // 스케줄 마커 업데이트 함수 - createMarker 사용하도록 수정
+  const updateScheduleMarkers = (schedules: Schedule[]) => {
+    // 기존 스케줄 마커 삭제
+    if (scheduleMarkersRef.current.length > 0) {
+      scheduleMarkersRef.current.forEach(marker => {
+        if (marker && marker.setMap) { // Naver, Google 마커 모두 setMap 메소드를 가짐
+          marker.setMap(null);
+        }
+      });
+      scheduleMarkersRef.current = [];
+    }
+
+    // 새 스케줄 마커 추가 - createMarker 함수 사용
+    schedules.forEach((schedule, index) => {
+      if (schedule.sst_location_lat && schedule.sst_location_long) {
+        const newMarker = createMarker(
+          null, // location 객체는 사용하지 않음
+          index,
+          'schedule',
+          false,
+          undefined,
+          schedule
+        );
+        
+        if (newMarker) {
           scheduleMarkersRef.current.push(newMarker);
         }
       }
@@ -1380,82 +1526,34 @@ export default function HomePage() {
     }
   };
 
-  // 멤버 마커 업데이트 함수
+  // 멤버 마커 업데이트 함수 - createMarker 사용하도록 수정
   const updateMemberMarkers = (members: GroupMember[]) => {
     // 기존 마커 삭제
     if (memberMarkers.current.length > 0) {
       memberMarkers.current.forEach(marker => {
-        if (mapType === 'naver' && naverMap.current) {
-          marker.setMap(null);
-        } else if (mapType === 'google' && map.current) {
+        if (marker && marker.setMap) {
           marker.setMap(null);
         }
       });
       memberMarkers.current = [];
     }
     
-    // 선택된 멤버 마커 추가
+    // 선택된 멤버 마커 추가 - createMarker 함수 사용
     const selectedMembers = members.filter(member => member.isSelected);
     
     if (selectedMembers.length > 0) {
-      selectedMembers.forEach((member, index) => { // 이 index는 selectedMembers 배열 내에서의 index임
-        const photoForMarker = member.photo ?? getDefaultImage(member.mt_gender, member.original_index); // original_index 사용
-
-        if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
-          console.log(`[Naver Marker] Member: ${member.name}, Original Photo: ${member.photo}, Gender: ${member.mt_gender}, Final Photo URL: ${photoForMarker}`);
-          const marker = new window.naver.maps.Marker({
-            position: new window.naver.maps.LatLng(member.location.lat, member.location.lng),
-            map: naverMap.current,
-            icon: {
-              content: `
-                <div style="position: relative; text-align: center;">
-                  <div style="width: 40px; height: 40px; background-color: white; border: 2px solid #4F46E5; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                    <img 
-                      src="${photoForMarker}" 
-                      alt="${member.name}" 
-                      style="width: 100%; height: 100%; object-fit: cover;" 
-                      data-gender="${member.mt_gender ?? ''}" 
-                      data-index="${member.original_index}" // original_index를 data-index로 전달
-                      onerror="
-                        const genderStr = this.getAttribute('data-gender');
-                        const indexStr = this.getAttribute('data-index');
-                        const gender = genderStr ? parseInt(genderStr, 10) : null;
-                        const idx = indexStr ? parseInt(indexStr, 10) : 0; // 여기서는 original_index를 사용하게 됨
-                        const imgNum = (idx % 4) + 1; /* index 기반 숫자 결정 */ 
-                        let fallbackSrc = '/images/avatar' + ((idx % 3) + 1) + '.png'; 
-                        if (gender === 1) { fallbackSrc = '/images/male_' + imgNum + '.png'; }
-                        else if (gender === 2) { fallbackSrc = '/images/female_' + imgNum + '.png'; }
-                        this.src = fallbackSrc;
-                        this.onerror = null; /* 무한 루프 방지 */
-                        console.error('Naver marker image ${photoForMarker} load failed for ${member.name}. Switched to fallback: ' + fallbackSrc);
-                      "
-                    />
-                  </div>
-                  <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background-color:rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px;">
-                    ${member.name}
-                  </div>
-                </div>
-              `,
-              size: new window.naver.maps.Size(40, 40),
-              anchor: new window.naver.maps.Point(20, 20)
-            }
-          });
-          memberMarkers.current.push(marker);
-        } else if (mapType === 'google' && map.current && googleMapsLoaded) {
-          console.log(`[Google Marker] Member: ${member.name}, Original Photo: ${member.photo}, Gender: ${member.mt_gender}, Final Photo URL: ${photoForMarker}`);
-          const marker = new window.google.maps.Marker({
-            position: member.location,
-            map: map.current,
-            title: member.name,
-            icon: {
-              url: photoForMarker,
-              scaledSize: new window.google.maps.Size(40, 40),
-              origin: new window.google.maps.Point(0, 0),
-              anchor: new window.google.maps.Point(20, 20),
-              labelOrigin: new window.google.maps.Point(20, 50)
-            },
-          });
-          memberMarkers.current.push(marker);
+      selectedMembers.forEach((member, index) => {
+        const newMarker = createMarker(
+          null, // location 객체는 사용하지 않음
+          index,
+          'member',
+          member.isSelected, // 선택 상태 전달
+          member,
+          undefined
+        );
+        
+        if (newMarker) {
+          memberMarkers.current.push(newMarker);
         }
       });
       
@@ -1463,31 +1561,63 @@ export default function HomePage() {
       if (selectedMembers.length === 1) {
         const selectedMember = selectedMembers[0];
         
-        if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
-          // 네이버 지도 이동 및 줌 레벨 조정
-          naverMap.current.setCenter(new window.naver.maps.LatLng(selectedMember.location.lat, selectedMember.location.lng));
-          naverMap.current.setZoom(17); // 15에서 17로 수정
-          console.log('네이버 지도 중심 이동:', selectedMember.name, selectedMember.location);
-        } else if (mapType === 'google' && map.current && googleMapsLoaded) {
-          // 구글 지도 이동 및 줌 레벨 조정
-          map.current.panTo(selectedMember.location);
-          map.current.setZoom(17); // 15에서 17로 수정
-          console.log('구글 지도 중심 이동:', selectedMember.name, selectedMember.location);
+        // 좌표 안전성 검사
+        const lat = parseCoordinate(selectedMember.location.lat);
+        const lng = parseCoordinate(selectedMember.location.lng);
+
+        if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+          if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
+            // 네이버 지도 이동 및 줌 레벨 조정
+            setTimeout(() => {
+              naverMap.current.setCenter(new window.naver.maps.LatLng(lat, lng));
+              naverMap.current.setZoom(17);
+              console.log('네이버 지도 중심 이동:', selectedMember.name, { lat, lng });
+            }, 100);
+          } else if (mapType === 'google' && map.current && googleMapsLoaded) {
+            // 구글 지도 이동 및 줌 레벨 조정
+            setTimeout(() => {
+              map.current.panTo({ lat, lng });
+              map.current.setZoom(17);
+              console.log('구글 지도 중심 이동:', selectedMember.name, { lat, lng });
+            }, 100);
+          }
+        } else {
+          console.warn('유효하지 않은 멤버 좌표:', selectedMember.name, selectedMember.location);
         }
       } else if (selectedMembers.length > 1) {
         // 여러 멤버가 선택된 경우 모든 마커가 보이도록 지도 조정
-        if (mapType === 'naver' && naverMap.current) {
-          const bounds = new window.naver.maps.LatLngBounds();
-          selectedMembers.forEach(member => {
-            bounds.extend(new window.naver.maps.LatLng(member.location.lat, member.location.lng));
-          });
-          naverMap.current.fitBounds(bounds);
-        } else if (mapType === 'google' && map.current) {
-          const bounds = new window.google.maps.LatLngBounds();
-          selectedMembers.forEach(member => {
-            bounds.extend(member.location);
-          });
-          map.current.fitBounds(bounds);
+        const validMembers = selectedMembers.filter(member => {
+          const lat = parseCoordinate(member.location.lat);
+          const lng = parseCoordinate(member.location.lng);
+          return lat !== null && lng !== null && lat !== 0 && lng !== 0;
+        });
+
+        if (validMembers.length > 0) {
+          if (mapType === 'naver' && naverMap.current) {
+            const bounds = new window.naver.maps.LatLngBounds();
+            validMembers.forEach(member => {
+              const lat = parseCoordinate(member.location.lat);
+              const lng = parseCoordinate(member.location.lng);
+              if (lat !== null && lng !== null) {
+                bounds.extend(new window.naver.maps.LatLng(lat, lng));
+              }
+            });
+            setTimeout(() => {
+              naverMap.current.fitBounds(bounds);
+            }, 100);
+          } else if (mapType === 'google' && map.current) {
+            const bounds = new window.google.maps.LatLngBounds();
+            validMembers.forEach(member => {
+              const lat = parseCoordinate(member.location.lat);
+              const lng = parseCoordinate(member.location.lng);
+              if (lat !== null && lng !== null) {
+                bounds.extend({ lat, lng });
+              }
+            });
+            setTimeout(() => {
+              map.current.fitBounds(bounds);
+            }, 100);
+          }
         }
       }
     }

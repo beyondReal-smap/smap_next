@@ -976,14 +976,16 @@ export default function LocationPage() {
     const title = location.name || location.slt_title || '제목 없음';
     const locationId = location.id || (location.slt_idx ? location.slt_idx.toString() : `${markerType}_${index}`);
     
-    // 선택 상태 확인 - 정보 패널이 열려있고 편집 중이며 ID가 일치하는 경우만 선택 상태로 표시
+    // 선택 상태 확인 - selectedLocationId 상태를 우선 확인하고, 그 다음 정보 패널 상태 확인
+    const isSelectedByState = selectedLocationId === locationId;
     const isSelectedByInfoPanel = isLocationInfoPanelOpen && isEditingPanel && newLocation.id === locationId;
+    const isSelected = isSelectedByState || isSelectedByInfoPanel;
     
     // 마커 색상 설정 - 선택된 경우만 핑크색, 나머지는 모두 인디고
-    const bgColor = isSelectedByInfoPanel ? '#EC4899' : '#4F46E5'; 
-    const dotColor = isSelectedByInfoPanel ? '#EC4899' : '#4F46E5';
+    const bgColor = isSelected ? '#EC4899' : '#4F46E5'; 
+    const dotColor = isSelected ? '#EC4899' : '#4F46E5';
     
-    console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}, selected: ${isSelectedByInfoPanel}, locationId: ${locationId}`);
+    console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}, selected: ${isSelected} (state: ${isSelectedByState}, panel: ${isSelectedByInfoPanel}), locationId: ${locationId}`);
     
     const markerContent = `
       <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
@@ -1005,7 +1007,7 @@ export default function LocationPage() {
       }
     });
 
-    markerInstance.setZIndex(isSelectedByInfoPanel ? 200 : 100);
+    markerInstance.setZIndex(isSelected ? 200 : 100);
 
     // 마커 클릭 이벤트 - 마커 재생성 로직 제거
     window.naver.maps.Event.addListener(markerInstance, 'click', () => {
