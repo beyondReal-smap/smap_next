@@ -980,6 +980,98 @@ export default function LocationPage() {
     );
   };
 
+  // 공통 마커 생성 함수
+  const createMarker = (
+    location: any, 
+    index: number, 
+    markerType: 'selected' | 'other'
+  ) => {
+    // 좌표 안전하게 파싱
+    let lat = 0;
+    let lng = 0;
+    
+    if (location.coordinates && Array.isArray(location.coordinates) && location.coordinates.length >= 2) {
+      lng = typeof location.coordinates[0] === 'number' ? location.coordinates[0] : parseFloat(String(location.coordinates[0])) || 0;
+      lat = typeof location.coordinates[1] === 'number' ? location.coordinates[1] : parseFloat(String(location.coordinates[1])) || 0;
+    } else if (location.slt_lat && location.slt_long) {
+      lat = parseFloat(String(location.slt_lat || '0')) || 0;
+      lng = parseFloat(String(location.slt_long || '0')) || 0;
+    }
+    
+    // 좌표 유효성 검사
+    if (lat === 0 && lng === 0) {
+      console.error('[createMarker] 유효하지 않은 좌표입니다 (0, 0). 마커 생성을 건너뜁니다:', location);
+      return null;
+    }
+    
+    const position = new window.naver.maps.LatLng(lat, lng);
+    const title = location.name || location.slt_title || '제목 없음';
+    const locationId = location.id || (location.slt_idx ? location.slt_idx.toString() : `${markerType}_${index}`);
+    const isSelectedByInfoPanel = isLocationInfoPanelOpen && newLocation.id === locationId && isEditingPanel;
+    
+    // 마커 타입에 따른 색상 설정
+    const bgColor = markerType === 'selected' ? '#4F46E5' : '#8B5CF6';
+    const dotColor = isSelectedByInfoPanel ? '#FF0000' : (markerType === 'selected' ? '#4F46E5' : '#A855F7');
+    
+    console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}`);
+    
+    const markerContent = `
+      <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+        <div style="padding: 3px 7px; background-color: ${bgColor}; color: white; border-radius: 5px; font-size: 11px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.3); margin-bottom: 3px;">
+          ${title}
+        </div>
+        <div style="width: 12px; height: 12px; background-color: ${dotColor}; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+        </div>
+      </div>
+    `;
+
+    const markerInstance = new window.naver.maps.Marker({
+      position: position,
+      map: map.current,
+      title: title,
+      icon: {
+        content: markerContent,
+        anchor: new window.naver.maps.Point(6, 38)
+      }
+    });
+
+    markerInstance.setZIndex(isSelectedByInfoPanel ? 200 : 100);
+
+    // 마커 클릭 이벤트
+    window.naver.maps.Event.addListener(markerInstance, 'click', () => {
+      console.log(`[createMarker] 마커 클릭됨: ${title}`);
+      
+      const clickedData = markerType === 'selected' 
+        ? (locations.find(l => l.id === locationId) || selectedMemberSavedLocations?.find(l => l.id === locationId))
+        : otherMembersSavedLocations?.find(l => l.id === locationId);
+      
+      setNewLocation({ 
+        id: locationId,
+        name: title,
+        address: location.address || location.slt_add || '주소 정보 없음',
+        coordinates: [lng, lat],
+        category: clickedData?.category || location.category || '기타',
+        memo: clickedData?.memo || location.memo || '',
+        favorite: clickedData?.favorite || location.favorite || false,
+        notifications: clickedData?.notifications || location.notifications || location.slt_enter_alarm === 'Y' || false,
+      });
+      setClickedCoordinates(position);
+      setIsEditingPanel(true); 
+      setIsLocationInfoPanelOpen(true);
+      if (tempMarker.current) tempMarker.current.setMap(null); 
+      
+      if (bottomSheetState === 'collapsed') setBottomSheetState('expanded');
+      
+      // 지도 중심을 클릭된 마커로 이동
+      map.current.setCenter(position);
+      if (map.current.getZoom() < 16) {
+        map.current.setZoom(16);
+      }
+    });
+    
+    return { marker: markerInstance, id: `${locationId}_${index}` };
+  };
+
   const addMarkersToMap = (locationsToDisplay: LocationData[]) => {
     if (!map.current || !window.naver?.maps || !naverMapsLoaded) {
       console.log('[addMarkersToMap] 지도 또는 네이버 API가 준비되지 않음');
@@ -1004,86 +1096,12 @@ export default function LocationPage() {
         console.warn('[addMarkersToMap] Location ID가 없습니다. 마커를 생성할 수 없습니다:', location);
         return;
       }
-      try {
-        console.log(`[addMarkersToMap] ${index + 1}번째 장소:`, location);
-        
-        // 좌표 안전하게 파싱
-        let lat = 0;
-        let lng = 0;
-        
-        if (location.coordinates && Array.isArray(location.coordinates) && location.coordinates.length >= 2) {
-          lng = typeof location.coordinates[0] === 'number' ? location.coordinates[0] : parseFloat(String(location.coordinates[0])) || 0;
-          lat = typeof location.coordinates[1] === 'number' ? location.coordinates[1] : parseFloat(String(location.coordinates[1])) || 0;
-        }
-        
-        // 좌표 유효성 검사
-        if (lat === 0 && lng === 0) {
-          console.error('[addMarkersToMap] 유효하지 않은 좌표입니다 (0, 0). 마커 생성을 건너뜁니다:', location);
-          return;
-        }
-        
-        console.log(`[addMarkersToMap] 마커 생성: ${location.name} at (${lat}, ${lng})`);
-        
-        const position = new window.naver.maps.LatLng(lat, lng);
-        const isSelectedByInfoPanel = isLocationInfoPanelOpen && newLocation.id === location.id && isEditingPanel;
-
-        const markerContent = `
-          <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
-            <div style="padding: 3px 7px; background-color: #4F46E5; color: white; border-radius: 5px; font-size: 11px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.3); margin-bottom: 3px;">
-              ${location.name}
-            </div>
-            <div style="width: 12px; height: 12px; background-color: ${isSelectedByInfoPanel ? '#FF0000' : '#1E90FF'}; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-            </div>
-          </div>
-        `;
-
-        const iconOptions = {
-            content: markerContent,
-            anchor: new window.naver.maps.Point(6, 38)
-        };
-
-        const markerInstance = new window.naver.maps.Marker({
-            position: position,
-            map: map.current,
-            icon: iconOptions,
-        });
-
-        markerInstance.setZIndex(isSelectedByInfoPanel ? 200 : 100);
-
-        window.naver.maps.Event.addListener(markerInstance, 'click', (e: any) => {
-            console.log(`[addMarkersToMap] 마커 클릭됨: ${location.name}`);
-            
-            const clickedExistingLocation = locations.find(l => l.id === location.id) || 
-                                          selectedMemberSavedLocations?.find(l => l.id === location.id) ||
-                                          otherMembersSavedLocations?.find(l => l.id === location.id);
-            setNewLocation({ 
-                id: location.id,
-                name: location.name,
-                address: location.address,
-                coordinates: [lng, lat], // 올바른 순서로 설정
-                category: clickedExistingLocation?.category,
-                memo: clickedExistingLocation?.memo,
-                favorite: clickedExistingLocation?.favorite,
-                notifications: clickedExistingLocation?.notifications || false,
-            });
-            setClickedCoordinates(new window.naver.maps.LatLng(lat, lng));
-            setIsEditingPanel(true); 
-            setIsLocationInfoPanelOpen(true); 
-            if (tempMarker.current) tempMarker.current.setMap(null); 
-            
-            if (bottomSheetState === 'collapsed') setBottomSheetState('expanded');
-            
-            // 마커 클릭 시에는 마커를 다시 그리지 않음 - 깜빡임 방지
-        });
-        
-        // 고유한 마커 ID 생성 (location.id가 중복될 수 있으므로)
-        const markerId = `${location.id}_${index}`;
-        markers.current[markerId] = markerInstance;
-        console.log(`[addMarkersToMap] 마커 생성 완료: ${location.name}, ID: ${markerId}`);
-        
-    } catch (error) {
-        console.error(`[addMarkersToMap] 장소 마커 추가 중 오류 (${location.name}):`, error);
-    }
+      
+      const markerResult = createMarker(location, index, 'selected');
+      if (markerResult) {
+        markers.current[markerResult.id] = markerResult.marker;
+        console.log(`[addMarkersToMap] 마커 생성 완료: ${location.name}, ID: ${markerResult.id}`);
+      }
     });
 
     console.log(`[addMarkersToMap] 총 ${Object.keys(markers.current).length}개의 마커가 생성됨`);
@@ -1625,120 +1643,35 @@ export default function LocationPage() {
     }, 500);
   };
   
-  // 다른 멤버의 위치 데이터를 위한 함수 추가
+  // 다른 멤버의 위치 데이터를 위한 함수 개선
   const addMarkersToMapForOtherMembers = (locationsToDisplay: any[]) => {
     if (!map.current || !window.naver?.maps || !naverMapsLoaded) {
-      console.log('[MARKER] 지도 또는 네이버 API가 준비되지 않음');
+      console.log('[addMarkersToMapForOtherMembers] 지도 또는 네이버 API가 준비되지 않음');
       return;
     }
     
-    console.log('[MARKER] 기존 마커 제거 시작');
+    console.log('[addMarkersToMapForOtherMembers] 기존 마커 제거 시작');
     Object.values(markers.current).forEach(marker => {
       if (marker && typeof marker.setMap === 'function') marker.setMap(null);
     });
     markers.current = {};
 
     if (!locationsToDisplay || locationsToDisplay.length === 0) {
-      console.log('[MARKER] 표시할 장소가 없음');
+      console.log('[addMarkersToMapForOtherMembers] 표시할 장소가 없음');
       return;
     }
 
-    console.log(`[MARKER] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작`);
+    console.log(`[addMarkersToMapForOtherMembers] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작`);
 
     locationsToDisplay.forEach((location, index) => {
-      try {
-        // 좌표 파싱 전에 location 객체 전체를 로깅
-        console.log(`[MARKER] ${index + 1}번째 장소:`, location);
-        
-        // 다양한 좌표 필드 시도
-        let lat = 0;
-        let lng = 0;
-        
-        // 우선순위: coordinates > slt_lat/slt_long > 기타 필드들
-        if (location.coordinates && Array.isArray(location.coordinates) && location.coordinates.length >= 2) {
-          lat = typeof location.coordinates[1] === 'number' ? location.coordinates[1] : parseFloat(String(location.coordinates[1])) || 0;
-          lng = typeof location.coordinates[0] === 'number' ? location.coordinates[0] : parseFloat(String(location.coordinates[0])) || 0;
-          console.log(`[MARKER] coordinates 배열에서 좌표 추출: lat=${lat}, lng=${lng}`);
-        } else if (location.slt_lat && location.slt_long) {
-          lat = parseFloat(String(location.slt_lat || '0')) || 0;
-          lng = parseFloat(String(location.slt_long || '0')) || 0;
-          console.log(`[MARKER] slt_lat/slt_long에서 좌표 추출: lat=${lat}, lng=${lng}`);
-        } else {
-          console.error(`[MARKER] 유효한 좌표를 찾을 수 없습니다:`, location);
-          return; // 다음 장소로 넘어감
-        }
-        
-        console.log(`[MARKER] 최종 파싱된 좌표: lat=${lat}, lng=${lng}`);
-        
-        // 좌표 유효성 검사
-        if (lat === 0 && lng === 0) {
-          console.error('[MARKER] 유효하지 않은 좌표입니다 (0, 0). 마커 생성을 건너뜁니다.');
-          return; // 다음 장소로 넘어감
-        }
-
-        // 네이버 지도 마커 생성
-        const position = new window.naver.maps.LatLng(lat, lng);
-        const title = location.name || location.slt_title || '제목 없음';
-        const address = location.address || location.slt_add || '주소 정보 없음';
-
-        console.log(`[MARKER] 마커 생성 시작: ${title} at (${lat}, ${lng})`);
-
-        const marker = new window.naver.maps.Marker({
-          position: position,
-          map: map.current,
-          title: title,
-          icon: {
-            content: `
-              <div style="position: relative; background: white; border: 2px solid #8B5CF6; border-radius: 8px; padding: 4px 8px; font-size: 12px; font-weight: bold; color: #8B5CF6; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">
-                ${title}
-                <div style="position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid #8B5CF6;"></div>
-              </div>
-            `,
-            size: new window.naver.maps.Size(200, 40),
-            anchor: new window.naver.maps.Point(100, 40)
-          }
-        });
-
-        // 마커 클릭 이벤트 추가
-        window.naver.maps.Event.addListener(marker, 'click', () => {
-          console.log(`[MARKER] 마커 클릭됨: ${title}`);
-          
-          setNewLocation({ 
-            id: location.slt_idx ? location.slt_idx.toString() : Date.now().toString(), 
-            name: location.name || location.slt_title || '',
-            address: location.address || location.slt_add || '',
-            coordinates: [lng, lat],
-            category: location.category || '기타',
-            memo: location.memo || '',
-            favorite: location.favorite || false,
-            notifications: location.notifications || location.slt_enter_alarm === 'Y', 
-          });
-          setClickedCoordinates(position);
-          setIsEditingPanel(true); 
-          setIsLocationInfoPanelOpen(true);
-          
-          // 지도 중심을 클릭된 마커로 이동
-          map.current.setCenter(position);
-          if (map.current.getZoom() < 16) {
-            map.current.setZoom(16);
-          }
-          
-          // 마커 클릭 시에는 마커를 다시 그리지 않음 - 깜빡임 방지
-        });
-
-        // 고유한 마커 ID 생성 (기존 ID 체계와 통일)
-        const baseId = location.slt_idx || location.id || `other_${index}`;
-        const markerId = `${baseId}_${index}`;
-        markers.current[markerId] = marker;
-        
-        console.log(`[MARKER] 마커 생성 완료: ${title}, ID: ${markerId}`);
-
-      } catch (error) {
-        console.error(`[MARKER] 마커 생성 중 오류 (${location.slt_title || location.name}):`, error);
+      const markerResult = createMarker(location, index, 'other');
+      if (markerResult) {
+        markers.current[markerResult.id] = markerResult.marker;
+        console.log(`[addMarkersToMapForOtherMembers] 마커 생성 완료: ${location.name || location.slt_title}, ID: ${markerResult.id}`);
       }
     });
 
-    console.log(`[MARKER] 총 ${Object.keys(markers.current).length}개의 마커가 생성됨`);
+    console.log(`[addMarkersToMapForOtherMembers] 총 ${Object.keys(markers.current).length}개의 마커가 생성됨`);
   };
 
   // 다른 멤버 위치 데이터 ID로 조회하는 함수 추가
