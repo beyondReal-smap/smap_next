@@ -391,6 +391,7 @@ export default function LocationPage() {
   const [isLocationInfoPanelOpen, setIsLocationInfoPanelOpen] = useState(false);
   const [clickedCoordinates, setClickedCoordinates] = useState<NaverCoord | null>(null); 
   const [isEditingPanel, setIsEditingPanel] = useState(false);
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null); // 선택된 마커 ID 상태 추가
 
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]); 
   const [selectedMemberSavedLocations, setSelectedMemberSavedLocations] = useState<LocationData[] | null>(null);
@@ -1042,6 +1043,7 @@ export default function LocationPage() {
       
       // 선택된 마커 색상 변경
       setTimeout(() => {
+        setSelectedLocationId(locationId); // 선택된 마커 ID 업데이트
         updateMarkerSelection(locationId);
       }, 100);
     });
@@ -1659,8 +1661,8 @@ export default function LocationPage() {
       const locationId = markerId.split('_')[0]; // 마커 ID에서 실제 location ID 추출
       const isSelected = selectedLocationId === locationId;
       
-      const bgColor = isSelected ? '#EC4899' : '#5046E5';
-      const dotColor = isSelected ? '#EC4899' : '#5046E5';
+      const bgColor = isSelected ? '#EC4899' : '#4F46E5';
+      const dotColor = isSelected ? '#EC4899' : '#4F46E5';
       
       // 마커 제목 가져오기
       const title = marker.getTitle() || '제목 없음';
@@ -1760,6 +1762,7 @@ export default function LocationPage() {
                   setIsLocationInfoPanelOpen(false);
                   if (tempMarker.current) tempMarker.current.setMap(null);
                   setIsEditingPanel(false);
+                  setSelectedLocationId(null); // 선택된 마커 ID 리셋
                   const currentSelectedMember = groupMembers.find(m => m.isSelected);
                   if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
                       addMarkersToMap(currentSelectedMember.savedLocations || []);
@@ -1799,6 +1802,7 @@ export default function LocationPage() {
                           setIsEditingPanel(false);
                           // 마커 색상 리셋
                           setTimeout(() => {
+                            setSelectedLocationId(null); // 선택된 마커 ID 리셋
                             updateMarkerSelection(null);
                           }, 100);
                       }} 
@@ -1875,6 +1879,7 @@ export default function LocationPage() {
                     setIsEditingPanel(false);
                     // 마커 색상 리셋
                     setTimeout(() => {
+                      setSelectedLocationId(null); // 선택된 마커 ID 리셋
                       updateMarkerSelection(null);
                     }, 100);
                   }} className="flex-1">닫기</Button>
