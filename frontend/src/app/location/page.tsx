@@ -270,7 +270,7 @@ const pageStyles = `
 }
 .location-info-panel {
   position: absolute;
-  top: 80px; /* 헤더 아래 여백을 줄여서 더 위쪽으로 이동 */
+  top: 60px; /* 80px에서 60px로 변경하여 더 위쪽으로 이동 */
   left: 50%;
   transform: translateX(-50%);
   width: calc(100% - 30px);
@@ -2061,10 +2061,11 @@ export default function LocationPage() {
                                   tempMarker.current = null;
                                 }
                                 
-                                // 마커 재생성 (약간의 지연 후)
+                                // 선택된 마커 색상 변경
                                 setTimeout(() => {
-                                  console.log(`[LOCATION] 마커 재생성 시작, 장소 수: ${otherMembersSavedLocations.length}`);
-                                  addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+                                  const selectedId = location.slt_idx ? location.slt_idx.toString() : (location.id || Date.now().toString());
+                                  console.log(`[LOCATION] 바텀시트에서 선택된 장소의 마커 색상 변경: ${selectedId}`);
+                                  updateMarkerSelection(selectedId);
                                 }, 100);
                                 
                               } catch (error) {
