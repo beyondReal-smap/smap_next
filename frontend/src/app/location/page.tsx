@@ -67,38 +67,7 @@ interface NewLocationInput {
 }
 
 // MOCK_LOCATIONS 정의 복원 (기존 파일 내용 참고)
-const MOCK_LOCATIONS: LocationData[] = [
-  {
-    id: '1',
-    name: '본사 사무실',
-    address: '서울시 강남구 테헤란로 123',
-    category: '회사',
-    coordinates: [127.0381, 37.5012], 
-    memo: '본사 사무실 위치입니다.',
-    favorite: true,
-    notifications: false, // Added
-  },
-  {
-    id: '2',
-    name: '강남역 미팅룸',
-    address: '서울시 강남구 강남대로 456',
-    category: '미팅장소',
-    coordinates: [127.0281, 37.4982],
-    memo: '주요 미팅 장소',
-    favorite: false,
-    notifications: true, // Added
-  },
-  {
-    id: '3',
-    name: '을지로 지사',
-    address: '서울시 중구 을지로 789',
-    category: '회사',
-    coordinates: [126.9981, 37.5662],
-    memo: '을지로 지사 위치',
-    favorite: true,
-    notifications: false, // Added
-  }
-];
+const MOCK_LOCATIONS: LocationData[] = [];
 
 // --- home/page.tsx에서 가져온 인터페이스 및 데이터 ---
 interface HomeLocation { // 이름 충돌 방지를 위해 HomeLocation으로 변경
@@ -393,7 +362,7 @@ export default function LocationPage() {
   const [activeView, setActiveView] = useState<'selectedMemberPlaces' | 'otherMembersPlaces'>('selectedMemberPlaces'); // activeView 상태 확장
   const swipeContainerRef = useRef<HTMLDivElement>(null);
 
-  const [locations, setLocations] = useState<LocationData[]>(MOCK_LOCATIONS.map(m => ({...m, category: m.category || '기타', memo: m.memo || '', favorite: m.favorite || false })));
+  const [locations, setLocations] = useState<LocationData[]>([]); // 목업 데이터 제거하고 빈 배열로 초기화
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [newLocation, setNewLocation] = useState<NewLocationInput>({
@@ -791,21 +760,11 @@ export default function LocationPage() {
       if (tempMarker.current) {
         tempMarker.current.setMap(null);
       }
-      // 마커 업데이트에 지연 추가 - 깜빡임 최소화
+      setIsEditingPanel(false);
+      // 마커 색상 리셋
       setTimeout(() => {
-        const currentSelectedMember = groupMembers.find(m => m.isSelected);
-        if (currentSelectedMember) {
-          if (activeView === 'selectedMemberPlaces') {
-            // selectedMemberSavedLocations를 우선적으로 사용하고, 없으면 멤버의 savedLocations 사용
-            const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
-            addMarkersToMap(locationsToShow);
-          } else {
-            addMarkersToMapForOtherMembers(otherMembersSavedLocations);
-          }
-        } else {
-          addMarkersToMap(locations); 
-        }
-      }, 200);
+        updateMarkerSelection(null);
+      }, 100);
     }
   };
 
@@ -957,6 +916,10 @@ export default function LocationPage() {
       }
       setIsLocationInfoPanelOpen(false);
       setIsEditingPanel(false);
+      // 마커 색상 리셋
+      setTimeout(() => {
+        updateMarkerSelection(null);
+      }, 100);
       setNewLocation({ 
         name: '', 
         address: '', 
@@ -980,7 +943,7 @@ export default function LocationPage() {
     );
   };
 
-  // 공통 마커 생성 함수
+  // 공통 마커 생성 함수 - 선택 상태 관리 개선
   const createMarker = (
     location: any, 
     index: number, 
@@ -1009,16 +972,14 @@ export default function LocationPage() {
     const title = location.name || location.slt_title || '제목 없음';
     const locationId = location.id || (location.slt_idx ? location.slt_idx.toString() : `${markerType}_${index}`);
     
-    // 선택 상태 확인 - selectedMarkerId가 전달되면 우선 사용, 없으면 기존 로직 사용
-    const isSelectedByInfoPanel = selectedMarkerId 
-      ? selectedMarkerId === locationId
-      : (isLocationInfoPanelOpen && isEditingPanel && newLocation.id === locationId);
+    // 선택 상태 확인 - 정보 패널이 열려있고 편집 중이며 ID가 일치하는 경우만 선택 상태로 표시
+    const isSelectedByInfoPanel = isLocationInfoPanelOpen && isEditingPanel && newLocation.id === locationId;
     
-    // 마커 타입에 따른 색상 설정
-    const bgColor = isSelectedByInfoPanel ? '#EC4899' : '#4F46E5'; // 선택된 경우 핑크색, 아니면 인디고
-    const dotColor = isSelectedByInfoPanel ? '#EC4899' : '#4F46E5'; // 선택된 경우 핑크색, 아니면 인디고
+    // 마커 색상 설정 - 선택된 경우만 빨간색, 나머지는 모두 인디고
+    const bgColor = isSelectedByInfoPanel ? '#FF0000' : '#4F46E5'; 
+    const dotColor = isSelectedByInfoPanel ? '#FF0000' : '#4F46E5'; 
     
-    console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}, selected: ${isSelectedByInfoPanel}, selectedMarkerId: ${selectedMarkerId}, locationId: ${locationId}`);
+    console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}, selected: ${isSelectedByInfoPanel}, locationId: ${locationId}`);
     
     const markerContent = `
       <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
@@ -1042,7 +1003,7 @@ export default function LocationPage() {
 
     markerInstance.setZIndex(isSelectedByInfoPanel ? 200 : 100);
 
-    // 마커 클릭 이벤트
+    // 마커 클릭 이벤트 - 마커 재생성 로직 제거
     window.naver.maps.Event.addListener(markerInstance, 'click', () => {
       console.log(`[createMarker] 마커 클릭됨: ${title}, ID: ${locationId}`);
       
@@ -1073,20 +1034,10 @@ export default function LocationPage() {
         map.current.setZoom(16);
       }
       
-      // 마커 선택 시 마커를 다시 그려서 핑크색으로 변경 - 선택된 ID를 직접 전달
-      requestAnimationFrame(() => {
-        if (markerType === 'selected') {
-          const currentSelectedMember = groupMembers.find(m => m.isSelected);
-          const locationsToShow = selectedMemberSavedLocations || currentSelectedMember?.savedLocations || locations;
-          if (locationsToShow && locationsToShow.length > 0) {
-            addMarkersToMap(locationsToShow, locationId); // 선택된 ID 전달
-          }
-        } else {
-          if (otherMembersSavedLocations && otherMembersSavedLocations.length > 0) {
-            addMarkersToMapForOtherMembers(otherMembersSavedLocations, locationId); // 선택된 ID 전달
-          }
-        }
-      });
+      // 선택된 마커 색상 변경
+      setTimeout(() => {
+        updateMarkerSelection(locationId);
+      }, 100);
     });
     
     return { marker: markerInstance, id: `${locationId}_${index}` };
@@ -1109,7 +1060,7 @@ export default function LocationPage() {
       return;
     }
 
-    console.log(`[addMarkersToMap] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작, 선택된 ID: ${selectedMarkerId}`);
+    console.log(`[addMarkersToMap] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작`);
 
     locationsToDisplay.forEach((location, index) => {
       if (!location.id) {
@@ -1117,7 +1068,7 @@ export default function LocationPage() {
         return;
       }
       
-      const markerResult = createMarker(location, index, 'selected', selectedMarkerId);
+      const markerResult = createMarker(location, index, 'selected');
       if (markerResult) {
         markers.current[markerResult.id] = markerResult.marker;
         console.log(`[addMarkersToMap] 마커 생성 완료: ${location.name}, ID: ${markerResult.id}`);
@@ -1467,8 +1418,7 @@ export default function LocationPage() {
     if (isMapInitialized) { 
         fetchOtherLocationsAndUpdateMarkers();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isMapInitialized, activeView, groupMembers.find(m => m.isSelected)?.id]);
+  }, [isMapInitialized, activeView, groupMembers]); // 의존성 단순화
 
   useEffect(() => {
     console.log('[useEffect for handleClickOutside] Registering or unregistering. isLocationInfoPanelOpen:', isLocationInfoPanelOpen);
@@ -1495,20 +1445,12 @@ export default function LocationPage() {
         if (tempMarker.current) {
           tempMarker.current.setMap(null);
         }
-        // 마커 업데이트에 지연 추가 - 깜빡임 최소화
-        setTimeout(() => {
-          const currentSelectedMember = groupMembers.find(m => m.isSelected);
-          if (currentSelectedMember) {
-              if (activeView === 'selectedMemberPlaces') {
-                  addMarkersToMap(selectedMemberSavedLocations || currentSelectedMember.savedLocations || []);
-              } else {
-                  addMarkersToMapForOtherMembers(otherMembersSavedLocations);
-              }
-          } else {
-              addMarkersToMap(locations);
-          }
-        }, 200);
         setIsEditingPanel(false);
+        
+        // 모든 마커를 인디고색으로 변경
+        setTimeout(() => {
+          updateMarkerSelection(null);
+        }, 100);
       }
     };
 
@@ -1531,7 +1473,7 @@ export default function LocationPage() {
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [isLocationInfoPanelOpen, activeView, selectedMemberSavedLocations, otherMembersSavedLocations, locations]);
+  }, [isLocationInfoPanelOpen]); // 의존성 단순화
 
   useEffect(() => {
     if (map.current && isMapInitialized) {
@@ -1681,10 +1623,10 @@ export default function LocationPage() {
       return;
     }
 
-    console.log(`[addMarkersToMapForOtherMembers] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작, 선택된 ID: ${selectedMarkerId}`);
+    console.log(`[addMarkersToMapForOtherMembers] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작`);
 
     locationsToDisplay.forEach((location, index) => {
-      const markerResult = createMarker(location, index, 'other', selectedMarkerId);
+      const markerResult = createMarker(location, index, 'other');
       if (markerResult) {
         markers.current[markerResult.id] = markerResult.marker;
         console.log(`[addMarkersToMapForOtherMembers] 마커 생성 완료: ${location.name || location.slt_title}, ID: ${markerResult.id}`);
@@ -1698,6 +1640,42 @@ export default function LocationPage() {
   const getOtherMemberLocationById = (id: string, otherLocations: any[]): any => {
     if (!otherLocations || !id) return null;
     return otherLocations.find(loc => loc.id === id || loc.slt_idx === id || (loc.slt_idx && String(loc.slt_idx) === id));
+  };
+
+  // 선택된 마커만 업데이트하는 함수 추가
+  const updateMarkerSelection = (selectedLocationId: string | null) => {
+    if (!map.current || !window.naver?.maps || !naverMapsLoaded) return;
+    
+    console.log(`[updateMarkerSelection] 선택된 마커 업데이트: ${selectedLocationId}`);
+    
+    // 모든 마커의 색상을 인디고로 변경
+    Object.entries(markers.current).forEach(([markerId, marker]) => {
+      const locationId = markerId.split('_')[0]; // 마커 ID에서 실제 location ID 추출
+      const isSelected = selectedLocationId === locationId;
+      
+      const bgColor = isSelected ? '#FF0000' : '#4F46E5';
+      const dotColor = isSelected ? '#FF0000' : '#4F46E5';
+      
+      // 마커 제목 가져오기
+      const title = marker.getTitle() || '제목 없음';
+      
+      const markerContent = `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+          <div style="padding: 3px 7px; background-color: ${bgColor}; color: white; border-radius: 5px; font-size: 11px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.3); margin-bottom: 3px;">
+            ${title}
+          </div>
+          <div style="width: 12px; height: 12px; background-color: ${dotColor}; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
+          </div>
+        </div>
+      `;
+      
+      marker.setIcon({
+        content: markerContent,
+        anchor: new window.naver.maps.Point(6, 38)
+      });
+      
+      marker.setZIndex(isSelected ? 200 : 100);
+    });
   };
 
   return (
@@ -1813,14 +1791,10 @@ export default function LocationPage() {
                           setIsLocationInfoPanelOpen(false);
                           if (tempMarker.current) tempMarker.current.setMap(null);
                           setIsEditingPanel(false);
-                          const currentSelectedMember = groupMembers.find(m => m.isSelected);
-                          if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
-                              addMarkersToMap(currentSelectedMember.savedLocations || []);
-                          } else if (activeView === 'otherMembersPlaces'){
-                              addMarkersToMapForOtherMembers(otherMembersSavedLocations);
-                          } else if (!currentSelectedMember){
-                               addMarkersToMap(locations);
-                          }
+                          // 마커 색상 리셋
+                          setTimeout(() => {
+                            updateMarkerSelection(null);
+                          }, 100);
                       }} 
                       className="flex-1"
                   >
@@ -1893,14 +1867,10 @@ export default function LocationPage() {
                     setIsLocationInfoPanelOpen(false);
                     if (tempMarker.current) tempMarker.current.setMap(null);
                     setIsEditingPanel(false);
-                    const currentSelectedMember = groupMembers.find(m => m.isSelected);
-                    if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
-                        addMarkersToMap(currentSelectedMember.savedLocations || []);
-                    } else if (activeView === 'otherMembersPlaces'){
-                        addMarkersToMapForOtherMembers(otherMembersSavedLocations);
-                    } else if (!currentSelectedMember){
-                         addMarkersToMap(locations);
-                    }
+                    // 마커 색상 리셋
+                    setTimeout(() => {
+                      updateMarkerSelection(null);
+                    }, 100);
                   }} className="flex-1">닫기</Button>
                   <Button variant="primary" onClick={handleConfirmPanelAction} className="flex-1" disabled={isSavingLocationPanel}>
                     {isSavingLocationPanel ? '저장 중...' : "내 장소 등록"}
