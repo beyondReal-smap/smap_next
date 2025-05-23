@@ -511,64 +511,14 @@ export default function LocationPage() {
     setFirstMemberSelected(false);
     setIsFirstMemberSelectionComplete(false);
     
-    // 새 그룹의 멤버 데이터 불러오기
-    await fetchGroupMembersDataForGroup(groupId.toString());
-  };
-
-  // 특정 그룹의 멤버 데이터 불러오기
-  const fetchGroupMembersDataForGroup = async (groupId: string) => {
-    if (isFetchingGroupMembers) {
-      console.log('[fetchGroupMembersDataForGroup] 이미 로딩 중입니다. 중복 실행 방지.');
-      return;
-    }
-
-    setIsFetchingGroupMembers(true);
-    console.log('[fetchGroupMembersDataForGroup] 시작, groupId:', groupId);
+    // selectedMemberIdRef도 초기화
+    selectedMemberIdRef.current = null;
     
-    try {
-      const memberData = await memberService.getGroupMembers(groupId);
-      console.log('[fetchGroupMembersDataForGroup] API 응답:', memberData);
-
-      if (memberData && memberData.length > 0) {
-        const convertedMembers: GroupMember[] = memberData.map((member: any, index: number) => ({
-          id: member.mt_idx.toString(),
-          name: member.mt_name || `멤버 ${index + 1}`,
-          photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
-          isSelected: false,
-          location: { 
-            lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
-            lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
-          },
-          schedules: [], 
-          savedLocations: [],
-          mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
-          original_index: index
-        }));
-
-        setGroupMembers(convertedMembers);
-        console.log('[fetchGroupMembersDataForGroup] 그룹멤버 설정 완료:', convertedMembers.length, '명');
-        
-        // 첫번째 멤버 자동 선택
-        if (convertedMembers.length > 0) {
-          setTimeout(() => {
-            handleMemberSelect(convertedMembers[0].id);
-          }, 500);
-        }
-      } else {
-        console.warn('[fetchGroupMembersDataForGroup] 그룹멤버 데이터가 없거나 비어있습니다.');
-        setGroupMembers([]); 
-        setIsFirstMemberSelectionComplete(true);
-      }
-    } catch (error) {
-      console.error('[fetchGroupMembersDataForGroup] 오류:', error);
-      setGroupMembers([]); 
-      setIsFirstMemberSelectionComplete(true);
-    } finally {
-      setIsFetchingGroupMembers(false);
-      setIsLoading(false);
-      console.log('[fetchGroupMembersDataForGroup] 완료');
-    }
+    console.log('[handleGroupSelect] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작');
   };
+
+  // 특정 그룹의 멤버 데이터 불러오기 함수 제거
+  // 기본 fetchGroupMembersData 함수만 사용
 
   const fetchGroupMembersData = async () => {
     if (isFetchingGroupMembers) {
@@ -645,13 +595,19 @@ export default function LocationPage() {
 
   // 첫번째 멤버 자동 선택
   useEffect(() => {
-    if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && isMapInitialized) {
-      console.log('[LOCATION] 첫번째 멤버 자동 선택:', groupMembers[0].name);
+    if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && isMapInitialized && !isFirstMemberSelectionComplete) {
+      console.log('[LOCATION] 첫번째 멤버 자동 선택 시작:', groupMembers[0].name);
+      console.log('[LOCATION] isFirstMemberSelectionComplete:', isFirstMemberSelectionComplete);
+      
+      // 상태를 즉시 설정하여 중복 실행 방지
+      setFirstMemberSelected(true);
+      
       setTimeout(() => {
+        console.log('[LOCATION] 첫번째 멤버 자동 선택 실행:', groupMembers[0].id);
         handleMemberSelect(groupMembers[0].id);
       }, 500);
     }
-  }, [groupMembers, isMapInitialized]);
+  }, [groupMembers.length, isMapInitialized, isFirstMemberSelectionComplete]); // 의존성 배열 개선
     
   // 그룹 선택 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
@@ -1597,31 +1553,30 @@ export default function LocationPage() {
     dragStartTime.current = null;
     isHorizontalSwipeRef.current = null;
     
-    // 이미 선택된 멤버라면 중복 실행 방지 (ref 기반 체크 추가)
-    if (selectedMemberIdRef.current === memberId) {
-      console.log('[handleMemberSelect] 동일한 멤버 ID입니다. 중복 실행 방지 (ref)');
+    // 이미 선택된 멤버라면 중복 실행 방지 (상태 기반 체크만 사용)
+    const currentSelectedMember = groupMembers.find(m => m.isSelected);
+    if (currentSelectedMember && currentSelectedMember.id === memberId) {
+      console.log('[handleMemberSelect] 이미 선택된 멤버입니다. 중복 실행 방지');
+      // 이미 선택된 멤버이지만 첫번째 선택 완료 상태는 설정
+      if (!isFirstMemberSelectionComplete) {
+        setIsFirstMemberSelectionComplete(true);
+        console.log('[handleMemberSelect] 첫번째 멤버 선택 완료 (중복 체크)');
+      }
       return;
     }
     
     // selectedMemberIdRef 업데이트
     selectedMemberIdRef.current = memberId;
     
-    // 이미 선택된 멤버라면 중복 실행 방지 (상태 기반 체크)
-    const currentSelectedMember = groupMembers.find(m => m.isSelected);
-    if (currentSelectedMember && currentSelectedMember.id === memberId) {
-      console.log('[handleMemberSelect] 이미 선택된 멤버입니다. 중복 실행 방지 (상태)');
-      return;
-    }
-    
     const updatedMembers = groupMembers.map(member => {
       if (member.id === memberId) {
-        return { ...member, isSelected: !member.isSelected };
+        return { ...member, isSelected: true };
       } else {
         return { ...member, isSelected: false }; 
       }
     });
     setGroupMembers(updatedMembers);
-    updateMemberMarkers(updatedMembers);
+    updateMemberMarkers(updatedMembers); 
   
     const newlySelectedMember = updatedMembers.find(member => member.isSelected);
   
@@ -1747,6 +1702,12 @@ export default function LocationPage() {
       addMarkersToMap(locations, selectedLocationId || undefined); 
       setIsLocationInfoPanelOpen(false); 
       setIsEditingPanel(false);
+      
+      // 첫번째 멤버 선택 완료 상태 설정 (실패한 경우에도)
+      if (!isFirstMemberSelectionComplete) {
+        setIsFirstMemberSelectionComplete(true);
+        console.log('[handleMemberSelect] 첫번째 멤버 선택 완료 (실패)');
+      }
     }
   };
 
@@ -2374,7 +2335,7 @@ export default function LocationPage() {
                        <div className="relative">
                          <button
                            onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
-                           className="flex items-center justify-between px-2 py-1 bg-white border border-gray-200 rounded text-xs hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
+                           className="flex items-center justify-between px-2.5 py-1.5 bg-white border border-gray-200 rounded text-xs hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
                            disabled={isLoadingGroups}
                            data-group-selector="true"
                          >
@@ -2421,7 +2382,9 @@ export default function LocationPage() {
                          href="/group" 
                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                        >
-                         <FiPlus className="h-3 w-3 mr-1" />
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                        </svg>
                          그룹 관리
                        </Link>
                      </div>

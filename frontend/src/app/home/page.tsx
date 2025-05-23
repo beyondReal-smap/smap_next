@@ -9,6 +9,7 @@ import { ko } from 'date-fns/locale';
 import { PageContainer, Card, Button } from '../components/layout';
 import { Loader } from '@googlemaps/js-api-loader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { FiLoader, FiChevronDown } from 'react-icons/fi'; // 필요한 아이콘들 추가
 // 공통 설정 및 서비스 임포트
 import config, { API_KEYS, detectLanguage, MAP_CONFIG } from '../../config';
 import mapService, { 
@@ -20,6 +21,7 @@ import mapService, {
 } from '../../services/mapService';
 import memberService from '@/services/memberService'; // 멤버 서비스 추가
 import scheduleService from '../../services/scheduleService'; // scheduleService 임포트
+import groupService, { Group } from '@/services/groupService'; // 그룹 서비스 추가
 import { 
     AllDayCheckEnum, ShowEnum, ScheduleAlarmCheckEnum, InCheckEnum, ScheduleCheckEnum 
 } from '../../types/enums'; // 생성한 Enum 타입 임포트
@@ -650,6 +652,12 @@ export default function HomePage() {
   // const [dataFetched, setDataFetched] = useState({ members: false, schedules: false }); // 삭제
   const [isFirstMemberSelectionComplete, setIsFirstMemberSelectionComplete] = useState(false); // 첫번째 멤버 선택 완료 상태 추가
 
+  // 그룹 관련 상태 추가
+  const [userGroups, setUserGroups] = useState<Group[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
+  const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
+
   // Bottom Sheet 상태를 클래스 이름으로 변환
   const getBottomSheetClassName = () => {
     switch (bottomSheetState) {
@@ -795,10 +803,15 @@ export default function HomePage() {
   // 그룹 멤버 및 스케줄 데이터 가져오기
   useEffect(() => {
     let isMounted = true;
-    const GROUP_ID_EXAMPLE = '641'; 
     
     const fetchAllGroupData = async () => {
       if (!isMounted) return;
+
+      // selectedGroupId가 없으면 실행하지 않음
+      if (!selectedGroupId) {
+        console.log('[fetchAllGroupData] selectedGroupId가 없어서 실행하지 않음');
+        return;
+      }
 
       // 이미 데이터가 로드되었거나 로딩 중이면 중복 실행 방지
       if (dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
@@ -806,10 +819,13 @@ export default function HomePage() {
       }
 
       try {
+        const groupIdToUse = selectedGroupId.toString();
+        console.log('[fetchAllGroupData] 사용할 그룹 ID:', groupIdToUse);
+
         let currentMembers: GroupMember[] = groupMembers.length > 0 ? [...groupMembers] : [];
 
         if (!dataFetchedRef.current.members) {
-          const memberData = await memberService.getGroupMembers(GROUP_ID_EXAMPLE);
+          const memberData = await memberService.getGroupMembers(groupIdToUse);
           if (isMounted) { 
             if (memberData && memberData.length > 0) { 
               currentMembers = memberData.map((member: any, index: number) => ({
@@ -837,7 +853,7 @@ export default function HomePage() {
         }
 
         if (dataFetchedRef.current.members && !dataFetchedRef.current.schedules) {
-          const rawSchedules: Schedule[] = await scheduleService.getGroupSchedules(GROUP_ID_EXAMPLE, 7); 
+          const rawSchedules: Schedule[] = await scheduleService.getGroupSchedules(groupIdToUse, 7); 
           if (isMounted) {
             if (rawSchedules && rawSchedules.length > 0) {
               setGroupSchedules(rawSchedules); 
@@ -882,12 +898,17 @@ export default function HomePage() {
     fetchAllGroupData();
 
     return () => { isMounted = false; };
-  }, []); // 의존성 배열을 비워서 마운트 시 한 번만 실행
+  }, [selectedGroupId]); // selectedGroupId를 의존성에 추가
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
     // 네이버 지도를 기본으로 사용 (개발 환경에서도 네이버 지도 사용)
     setMapType('naver');
+  }, []);
+
+  // 컴포넌트 마운트 시 그룹 목록 불러오기
+  useEffect(() => {
+    fetchUserGroups();
   }, []);
 
   // Google Maps API 로드 함수
@@ -1855,6 +1876,65 @@ export default function HomePage() {
   }, [initialWeatherLoaded]); // initialWeatherLoaded를 의존성에 넣어, true가 되면 더 이상 실행되지 않도록 함
                                  // 또는 [] 로 하고 내부에서 initialWeatherLoaded 체크
 
+  // 사용자 그룹 목록 불러오기
+  const fetchUserGroups = async () => {
+    setIsLoadingGroups(true);
+    try {
+      const groups = await groupService.getCurrentUserGroups();
+      console.log('[fetchUserGroups] 그룹 목록 조회:', groups);
+      setUserGroups(groups);
+      
+      // 첫 번째 그룹을 기본 선택
+      if (groups.length > 0 && !selectedGroupId) {
+        setSelectedGroupId(groups[0].sgt_idx);
+        console.log('[fetchUserGroups] 첫 번째 그룹 자동 선택:', groups[0].sgt_title);
+      }
+    } catch (error) {
+      console.error('[fetchUserGroups] 그룹 목록 조회 실패:', error);
+      setUserGroups([]);
+    } finally {
+      setIsLoadingGroups(false);
+    }
+  };
+
+  // 그룹 선택 핸들러
+  const handleGroupSelect = async (groupId: number) => {
+    console.log('[handleGroupSelect] 그룹 선택:', groupId);
+    setSelectedGroupId(groupId);
+    setIsGroupSelectorOpen(false);
+    
+    // 기존 데이터 초기화
+    setGroupMembers([]);
+    setGroupSchedules([]);
+    setFilteredSchedules([]);
+    setIsFirstMemberSelectionComplete(false);
+    dataFetchedRef.current = { members: false, schedules: false };
+    
+    console.log('[handleGroupSelect] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작');
+  };
+
+  // 그룹 선택 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isGroupSelectorOpen) {
+        const target = event.target as HTMLElement;
+        const groupDropdown = target.closest('.relative');
+        const isGroupDropdownClick = groupDropdown && groupDropdown.querySelector('button[data-group-selector]');
+        
+        if (!isGroupDropdownClick) {
+          setIsGroupSelectorOpen(false);
+        }
+      }
+    };
+
+    if (isGroupSelectorOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isGroupSelectorOpen]);
+
   return (
     <>
       <style jsx global>{modalAnimation}</style>
@@ -1964,16 +2044,74 @@ export default function HomePage() {
             onClick={bottomSheetState !== 'expanded' ? (e) => e.stopPropagation() : undefined}
             >
               <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
-                그룹 멤버
-                <Link 
-                  href="/group" 
-                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-                  </svg>
-                  그룹 관리
-                </Link>
+                <div className="flex items-center space-x-3">
+                  <span>그룹 멤버</span>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  {/* 그룹 선택 드롭다운 */}
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsGroupSelectorOpen(!isGroupSelectorOpen);
+                      }}
+                      className="flex items-center justify-between px-2.5 py-1.5 bg-white border border-gray-200 rounded text-xs hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
+                      disabled={isLoadingGroups}
+                      data-group-selector="true"
+                    >
+                      <span className="truncate text-gray-700">
+                        {isLoadingGroups 
+                          ? '로딩 중...' 
+                          : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
+                        }
+                      </span>
+                      <div className="ml-1 flex-shrink-0">
+                        {isLoadingGroups ? (
+                          <FiLoader className="animate-spin h-3 w-3 text-gray-400" />
+                        ) : (
+                          <FiChevronDown className={`text-gray-400 transition-transform duration-200 h-3 w-3 ${isGroupSelectorOpen ? 'rotate-180' : ''}`} />
+                        )}
+                      </div>
+                    </button>
+
+                    {isGroupSelectorOpen && userGroups.length > 0 && (
+                      <div className="absolute top-full right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto min-w-[160px]">
+                        {userGroups.map((group) => (
+                          <button
+                            key={group.sgt_idx}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleGroupSelect(group.sgt_idx);
+                            }}
+                            className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 focus:outline-none focus:bg-indigo-50 ${
+                              selectedGroupId === group.sgt_idx 
+                                ? 'bg-indigo-50 text-indigo-700 font-medium' 
+                                : 'text-gray-900'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</span>
+                              {selectedGroupId === group.sgt_idx && (
+                                <span className="text-indigo-500 ml-2">✓</span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <Link 
+                    href="/group" 
+                    className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                    </svg>
+                    그룹 관리
+                  </Link>
+                </div>
               </h2>
               {groupMembers.length > 0 ? (
                 <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
