@@ -793,7 +793,9 @@ export default function LocationPage() {
       const currentSelectedMember = groupMembers.find(m => m.isSelected);
       if (currentSelectedMember) {
         if (activeView === 'selectedMemberPlaces') {
-          addMarkersToMap(currentSelectedMember.savedLocations || []);
+          // selectedMemberSavedLocations를 우선적으로 사용하고, 없으면 멤버의 savedLocations 사용
+          const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
+          addMarkersToMap(locationsToShow);
         } else {
           addMarkersToMapForOtherMembers(otherMembersSavedLocations);
         }
@@ -1058,8 +1060,15 @@ export default function LocationPage() {
             } else if (activeView === 'otherMembersPlaces' && otherMembersSavedLocations?.find(l => l.id === location.id)) {
                 addMarkersToMapForOtherMembers(otherMembersSavedLocations);
             } else {
-                // 기본적으로 전체 locations를 다시 그림 (혹은 현재 뷰에 맞는 데이터)
-                addMarkersToMap(locations);
+                // selectedMemberPlaces 뷰에서 멤버가 선택된 경우
+                const currentSelectedMember = groupMembers.find(m => m.isSelected);
+                if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
+                    const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
+                    addMarkersToMap(locationsToShow);
+                } else {
+                    // 기본적으로 전체 locations를 다시 그림
+                    addMarkersToMap(locations);
+                }
             }
         });
         
@@ -1487,6 +1496,28 @@ export default function LocationPage() {
     }
   }, [bottomSheetState, isMapInitialized]); 
 
+  // 뷰 변경 핸들러 함수 추가
+  const handleViewChange = (newView: 'selectedMemberPlaces' | 'otherMembersPlaces') => {
+    setActiveView(newView);
+    
+    const currentSelectedMember = groupMembers.find(m => m.isSelected);
+    
+    if (newView === 'selectedMemberPlaces') {
+      if (currentSelectedMember) {
+        const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
+        addMarkersToMap(locationsToShow);
+      } else {
+        addMarkersToMap(locations);
+      }
+    } else if (newView === 'otherMembersPlaces') {
+      if (otherMembersSavedLocations.length > 0) {
+        addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+      } else {
+        addMarkersToMapForOtherMembers([]);
+      }
+    }
+  };
+
   const handleSwipeScroll = () => {
     if (swipeContainerRef.current) {
       const { scrollLeft, clientWidth, scrollWidth } = swipeContainerRef.current;
@@ -1494,14 +1525,9 @@ export default function LocationPage() {
       // (자식 요소가 2개라고 가정)
       if (scrollWidth > clientWidth) { // 스크롤 가능한 경우에만
         if (scrollLeft >= (scrollWidth - clientWidth) / 2 && activeView !== 'otherMembersPlaces') {
-          setActiveView('otherMembersPlaces');
-          if (otherMembersSavedLocations.length > 0) addMarkersToMapForOtherMembers(otherMembersSavedLocations);
-          else addMarkersToMapForOtherMembers([]); // 다른 멤버 장소 없으면 마커 클리어
+          handleViewChange('otherMembersPlaces');
         } else if (scrollLeft < (scrollWidth - clientWidth) / 2 && activeView !== 'selectedMemberPlaces') {
-          setActiveView('selectedMemberPlaces');
-          const currentSelectedMember = groupMembers.find(m => m.isSelected);
-          if (currentSelectedMember) addMarkersToMap(currentSelectedMember.savedLocations || []);
-          else addMarkersToMap(locations); // 선택된 멤버 없으면 전체 장소 (또는 빈 배열)
+          handleViewChange('selectedMemberPlaces');
         }
       }
     }
@@ -2118,14 +2144,14 @@ export default function LocationPage() {
             {/* 스와이프 인디케이터 (점) */}
             <div className="flex justify-center items-center my-2">
                 <button
-                  onClick={() => setActiveView('selectedMemberPlaces')}
+                  onClick={() => handleViewChange('selectedMemberPlaces')}
                   className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
                     activeView === 'selectedMemberPlaces' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
                   } transition-all duration-300`}
                   aria-label="선택된 멤버 장소 뷰로 전환"
                 />
                 <button
-                  onClick={() => setActiveView('otherMembersPlaces')}
+                  onClick={() => handleViewChange('otherMembersPlaces')}
                   className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
                     activeView === 'otherMembersPlaces' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
                   } transition-all duration-300`}
