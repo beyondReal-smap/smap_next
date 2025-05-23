@@ -568,6 +568,10 @@ export default function LocationPage() {
             console.log("[Map Click] isMapClickedRecentlyRef reset to false after timeout.");
           }, 500);
 
+          // 클릭한 지점으로 지도 중심 이동
+          map.current.panTo(e.coord);
+          console.log("[Map Click] 지도 중심을 클릭한 지점으로 이동:", e.coord.x, e.coord.y);
+
           setClickedCoordinates(e.coord); 
           setIsEditingPanel(false); 
           setNewLocation({
@@ -975,9 +979,9 @@ export default function LocationPage() {
     // 선택 상태 확인 - 정보 패널이 열려있고 편집 중이며 ID가 일치하는 경우만 선택 상태로 표시
     const isSelectedByInfoPanel = isLocationInfoPanelOpen && isEditingPanel && newLocation.id === locationId;
     
-    // 마커 색상 설정 - 선택된 경우만 빨간색, 나머지는 모두 인디고
-    const bgColor = isSelectedByInfoPanel ? '#FF0000' : '#4F46E5'; 
-    const dotColor = isSelectedByInfoPanel ? '#FF0000' : '#4F46E5'; 
+    // 마커 색상 설정 - 선택된 경우만 핑크색, 나머지는 모두 인디고
+    const bgColor = isSelectedByInfoPanel ? '#EC4899' : '#4F46E5'; 
+    const dotColor = isSelectedByInfoPanel ? '#EC4899' : '#4F46E5';
     
     console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}, selected: ${isSelectedByInfoPanel}, locationId: ${locationId}`);
     
@@ -1653,8 +1657,8 @@ export default function LocationPage() {
       const locationId = markerId.split('_')[0]; // 마커 ID에서 실제 location ID 추출
       const isSelected = selectedLocationId === locationId;
       
-      const bgColor = isSelected ? '#FF0000' : '#4F46E5';
-      const dotColor = isSelected ? '#FF0000' : '#4F46E5';
+      const bgColor = isSelected ? '#EC4899' : '#5046E5';
+      const dotColor = isSelected ? '#EC4899' : '#5046E5';
       
       // 마커 제목 가져오기
       const title = marker.getTitle() || '제목 없음';
@@ -2061,12 +2065,10 @@ export default function LocationPage() {
                                   tempMarker.current = null;
                                 }
                                 
-                                // 선택된 마커 색상 변경
-                                setTimeout(() => {
-                                  const selectedId = location.slt_idx ? location.slt_idx.toString() : (location.id || Date.now().toString());
-                                  console.log(`[LOCATION] 바텀시트에서 선택된 장소의 마커 색상 변경: ${selectedId}`);
-                                  updateMarkerSelection(selectedId);
-                                }, 100);
+                                // 선택된 마커 색상 변경 - 지연 시간 제거하여 즉시 실행
+                                const selectedId = location.slt_idx ? location.slt_idx.toString() : (location.id || Date.now().toString());
+                                console.log(`[LOCATION] 바텀시트에서 선택된 장소의 마커 색상 변경: ${selectedId}`);
+                                updateMarkerSelection(selectedId);
                                 
                               } catch (error) {
                                 console.error('[LOCATION] 지도 중심 이동 중 오류:', error);

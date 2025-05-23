@@ -1248,7 +1248,7 @@ export default function HomePage() {
         // Naver/Google 마커에서 가독성을 위해 흰색 또는 매우 밝은 배경색일 경우 어두운 텍스트 색상 사용
         const titleTextColor = '#FFFFFF';
         const timeTextColor = '#FFFFFF';
-        const titleBgColor = '#5046E5'; // 사용자가 지정한 색상으로 변경
+        const titleBgColor = '#5046E5'; // #5046E5에서 #4F46E5로 변경하여 location/page.tsx와 통일
         const timeBgColor = '#EC4899'; // Pink-500
         const orderCircleBgColor = '#22C55E'; // 초록색 (Tailwind Green-500)
         const orderCircleTextColor = '#FFFFFF';

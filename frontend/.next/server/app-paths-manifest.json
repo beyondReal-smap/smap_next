@@ -1,4 +1,7 @@
 {
-  "/location/page": "app/location/page.js",
-  "/home/page": "app/home/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/group-members/member/[id]/route": "app/api/group-members/member/[id]/route.js",
+  "/api/locations/other-members/[memberId]/route": "app/api/locations/other-members/[memberId]/route.js",
+  "/home/page": "app/home/page.js",
+  "/location/page": "app/location/page.js"
 }
