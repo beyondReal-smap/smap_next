@@ -122,4 +122,15 @@ def delete_location(
     
     db.delete(location)
     db.commit()
-    return location 
+    return location
+
+@router.get("/other-members/{member_id}", response_model=List[LocationResponse])
+def get_other_members_locations(
+    member_id: int,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    다른 멤버의 위치 목록을 조회합니다.
+    """
+    locations = Location.find_by_member(db, member_id)
+    return locations 
