@@ -984,7 +984,8 @@ export default function LocationPage() {
   const createMarker = (
     location: any, 
     index: number, 
-    markerType: 'selected' | 'other'
+    markerType: 'selected' | 'other',
+    selectedMarkerId?: string
   ) => {
     // 좌표 안전하게 파싱
     let lat = 0;
@@ -1008,16 +1009,16 @@ export default function LocationPage() {
     const title = location.name || location.slt_title || '제목 없음';
     const locationId = location.id || (location.slt_idx ? location.slt_idx.toString() : `${markerType}_${index}`);
     
-    // 선택 상태 확인 - 현재 패널에서 선택된 장소와 일치하는지 확인
-    const isSelectedByInfoPanel = isLocationInfoPanelOpen && 
-                                  isEditingPanel && 
-                                  newLocation.id === locationId;
+    // 선택 상태 확인 - selectedMarkerId가 전달되면 우선 사용, 없으면 기존 로직 사용
+    const isSelectedByInfoPanel = selectedMarkerId 
+      ? selectedMarkerId === locationId
+      : (isLocationInfoPanelOpen && isEditingPanel && newLocation.id === locationId);
     
     // 마커 타입에 따른 색상 설정
     const bgColor = isSelectedByInfoPanel ? '#EC4899' : '#4F46E5'; // 선택된 경우 핑크색, 아니면 인디고
     const dotColor = isSelectedByInfoPanel ? '#EC4899' : '#4F46E5'; // 선택된 경우 핑크색, 아니면 인디고
     
-    console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}, selected: ${isSelectedByInfoPanel}`);
+    console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}, selected: ${isSelectedByInfoPanel}, selectedMarkerId: ${selectedMarkerId}, locationId: ${locationId}`);
     
     const markerContent = `
       <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
@@ -1072,17 +1073,17 @@ export default function LocationPage() {
         map.current.setZoom(16);
       }
       
-      // 마커 선택 시 마커를 다시 그려서 핑크색으로 변경 - 더 빠른 반응을 위해 즉시 실행
+      // 마커 선택 시 마커를 다시 그려서 핑크색으로 변경 - 선택된 ID를 직접 전달
       requestAnimationFrame(() => {
         if (markerType === 'selected') {
           const currentSelectedMember = groupMembers.find(m => m.isSelected);
           const locationsToShow = selectedMemberSavedLocations || currentSelectedMember?.savedLocations || locations;
           if (locationsToShow && locationsToShow.length > 0) {
-            addMarkersToMap(locationsToShow);
+            addMarkersToMap(locationsToShow, locationId); // 선택된 ID 전달
           }
         } else {
           if (otherMembersSavedLocations && otherMembersSavedLocations.length > 0) {
-            addMarkersToMapForOtherMembers(otherMembersSavedLocations);
+            addMarkersToMapForOtherMembers(otherMembersSavedLocations, locationId); // 선택된 ID 전달
           }
         }
       });
@@ -1091,7 +1092,7 @@ export default function LocationPage() {
     return { marker: markerInstance, id: `${locationId}_${index}` };
   };
 
-  const addMarkersToMap = (locationsToDisplay: LocationData[]) => {
+  const addMarkersToMap = (locationsToDisplay: LocationData[], selectedMarkerId?: string) => {
     if (!map.current || !window.naver?.maps || !naverMapsLoaded) {
       console.log('[addMarkersToMap] 지도 또는 네이버 API가 준비되지 않음');
       return;
@@ -1108,7 +1109,7 @@ export default function LocationPage() {
       return;
     }
 
-    console.log(`[addMarkersToMap] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작`);
+    console.log(`[addMarkersToMap] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작, 선택된 ID: ${selectedMarkerId}`);
 
     locationsToDisplay.forEach((location, index) => {
       if (!location.id) {
@@ -1116,7 +1117,7 @@ export default function LocationPage() {
         return;
       }
       
-      const markerResult = createMarker(location, index, 'selected');
+      const markerResult = createMarker(location, index, 'selected', selectedMarkerId);
       if (markerResult) {
         markers.current[markerResult.id] = markerResult.marker;
         console.log(`[addMarkersToMap] 마커 생성 완료: ${location.name}, ID: ${markerResult.id}`);
@@ -1663,7 +1664,7 @@ export default function LocationPage() {
   };
   
   // 다른 멤버의 위치 데이터를 위한 함수 개선
-  const addMarkersToMapForOtherMembers = (locationsToDisplay: any[]) => {
+  const addMarkersToMapForOtherMembers = (locationsToDisplay: any[], selectedMarkerId?: string) => {
     if (!map.current || !window.naver?.maps || !naverMapsLoaded) {
       console.log('[addMarkersToMapForOtherMembers] 지도 또는 네이버 API가 준비되지 않음');
       return;
@@ -1680,10 +1681,10 @@ export default function LocationPage() {
       return;
     }
 
-    console.log(`[addMarkersToMapForOtherMembers] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작`);
+    console.log(`[addMarkersToMapForOtherMembers] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작, 선택된 ID: ${selectedMarkerId}`);
 
     locationsToDisplay.forEach((location, index) => {
-      const markerResult = createMarker(location, index, 'other');
+      const markerResult = createMarker(location, index, 'other', selectedMarkerId);
       if (markerResult) {
         markers.current[markerResult.id] = markerResult.marker;
         console.log(`[addMarkersToMapForOtherMembers] 마커 생성 완료: ${location.name || location.slt_title}, ID: ${markerResult.id}`);
