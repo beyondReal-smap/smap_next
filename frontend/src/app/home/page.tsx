@@ -36,6 +36,16 @@ declare global {
 const GOOGLE_MAPS_API_KEY = MAP_API_KEYS.GOOGLE;
 const NAVER_MAPS_CLIENT_ID = MAP_API_KEYS.NAVER_CLIENT_ID;
 
+// 바텀시트 위치 상수 정의 (3단계)
+const BOTTOM_SHEET_POSITIONS = {
+  COLLAPSED_HEIGHT: 100, // 접혔을 때 하단에서 올라온 높이
+  MIDDLE_PERCENTAGE: 0.68, // 중간 상태: translateY(68%)
+  EXPANDED_PERCENTAGE: 0.15, // 펼쳤을 때: translateY(15%) = 85% 화면 높이
+  TRANSITION_DURATION: '0.5s',
+  TRANSITION_TIMING: 'cubic-bezier(0.4, 0, 0.2, 1)',
+  MIN_DRAG_DISTANCE: 80 // 상태 전환을 위한 최소 드래그 거리
+};
+
 // 추천 장소 더미 데이터
 const RECOMMENDED_PLACES = [
   { 
@@ -632,6 +642,7 @@ export default function HomePage() {
   const initialWeatherDataRef = useRef<WeatherInfo | null>(null); // 앱 초기/기본 날씨 저장용
   const [groupSchedules, setGroupSchedules] = useState<Schedule[]>([]); // 그룹 전체 스케줄 (memberId 포함)
   // const [dataFetched, setDataFetched] = useState({ members: false, schedules: false }); // 삭제
+  const [isFirstMemberSelectionComplete, setIsFirstMemberSelectionComplete] = useState(false); // 첫번째 멤버 선택 완료 상태 추가
 
   // Bottom Sheet 상태를 클래스 이름으로 변환
   const getBottomSheetClassName = () => {
@@ -669,23 +680,42 @@ export default function HomePage() {
   };
 
   const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
+    if (!isDraggingRef.current || startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
     
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const deltaY = clientY - currentDragY.current;
     
+    // 수직 드래그만 처리하고 최소 움직임 임계값 적용
     if (Math.abs(deltaY) > 5) {
       currentDragY.current = clientY;
       const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
       let currentTranslateY = 0;
+      
       if (currentTransform !== 'none') {
         const matrix = new DOMMatrixReadOnly(currentTransform);
         currentTranslateY = matrix.m42;
       }
+
       let newTranslateY = currentTranslateY + deltaY;
-      const expandedY = 0;
-      const collapsedY = window.innerHeight * 0.6;
-      newTranslateY = Math.max(expandedY - (window.innerHeight * 0.1), Math.min(newTranslateY, collapsedY + 50));
+      
+      const windowHeight = window.innerHeight;
+      // expanded 상태: translateY(0%) = 0px (화면 최상단)
+      const expandedY = windowHeight * BOTTOM_SHEET_POSITIONS.EXPANDED_PERCENTAGE; // 15%
+      // middle 상태: translateY(68%)
+      const middleY = windowHeight * BOTTOM_SHEET_POSITIONS.MIDDLE_PERCENTAGE; // 68%
+      // collapsed 상태: translateY(calc(100% - 100px))
+      const collapsedY = windowHeight - BOTTOM_SHEET_POSITIONS.COLLAPSED_HEIGHT; // ~900px
+
+      // 일반적인 드래그 범위 제한
+      newTranslateY = Math.max(expandedY, Math.min(newTranslateY, collapsedY));
+
+      // expanded 상태에서 아래로 내려가는 것을 제한 (저항 적용)
+      if (bottomSheetState === 'expanded' && deltaY > 0) {
+        const resistance = 0.3; // 30%만 움직이도록 저항 적용
+        newTranslateY = currentTranslateY + (deltaY * resistance);
+        newTranslateY = Math.max(expandedY, Math.min(newTranslateY, collapsedY));
+      }
+
       bottomSheetRef.current.style.transform = `translateY(${newTranslateY}px)`;
       bottomSheetRef.current.style.transition = 'none';
     }
@@ -693,7 +723,7 @@ export default function HomePage() {
 
   // 드래그 종료 핸들러 수정
   const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
-    if (startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
+    if (!isDraggingRef.current || startDragY.current === null || !bottomSheetRef.current || currentDragY.current === null) return;
 
     const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
     const deltaYOverall = clientY - startDragY.current;
@@ -704,46 +734,84 @@ export default function HomePage() {
     const mapHeader = document.querySelector('.map-header') as HTMLElement;
     const mapControls = document.querySelector('.map-controls') as HTMLElement;
 
+    const windowHeight = window.innerHeight;
+    const expandedY = windowHeight * BOTTOM_SHEET_POSITIONS.EXPANDED_PERCENTAGE; // 15%
+    const middleY = windowHeight * BOTTOM_SHEET_POSITIONS.MIDDLE_PERCENTAGE; // 68%
+    const collapsedY = windowHeight - BOTTOM_SHEET_POSITIONS.COLLAPSED_HEIGHT; // ~900px
+
+    let finalState: 'expanded' | 'middle' | 'collapsed' = bottomSheetState;
+
     if (isDrag) {
-      bottomSheetRef.current.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
       const velocity = deltaTime > 0 ? deltaYOverall / deltaTime : 0;
       const currentTransform = getComputedStyle(bottomSheetRef.current).transform;
       let currentSheetY = 0;
+      
       if (currentTransform !== 'none') {
         const matrix = new DOMMatrixReadOnly(currentTransform);
         currentSheetY = matrix.m42;
       }
-      const windowHeight = window.innerHeight;
-      const upperThreshold = windowHeight * 0.2;  // 상단 20%
-      const middleThreshold = windowHeight * 0.5;  // 중간 50%
 
-      let finalState: 'expanded' | 'middle' | 'collapsed';
-      
+      // 임계점 정의
+      const expandedToMiddleThreshold = (expandedY + middleY) / 2; // ~40%
+      const middleToCollapsedThreshold = (middleY + collapsedY) / 2; // ~80%
+
       if (Math.abs(velocity) > 0.5) {
-        // 빠른 스와이프 동작 처리
-        if (velocity < 0) {
-          // 위로 스와이프
-          finalState = currentSheetY < middleThreshold ? 'expanded' : 'middle';
-        } else {
-          // 아래로 스와이프
-          finalState = currentSheetY > middleThreshold ? 'collapsed' : 'middle';
+        // 빠른 스와이프: 방향에 따라 결정
+        if (velocity < 0) { // 위로 스와이프
+          if (bottomSheetState === 'collapsed') {
+            finalState = 'middle';
+          } else if (bottomSheetState === 'middle') {
+            finalState = 'expanded';
+          } else {
+            finalState = 'expanded'; // 이미 expanded
+          }
+        } else { // 아래로 스와이프
+          if (bottomSheetState === 'expanded') {
+            // expanded에서는 충분히 아래로 드래그해야만 middle로 전환
+            if (deltaYOverall >= BOTTOM_SHEET_POSITIONS.MIN_DRAG_DISTANCE) {
+              finalState = 'middle';
+            } else {
+              finalState = 'expanded';
+            }
+          } else if (bottomSheetState === 'middle') {
+            finalState = 'collapsed';
+          } else {
+            finalState = 'collapsed'; // 이미 collapsed
+          }
         }
       } else {
-        // 일반적인 드래그 동작 처리
-        if (currentSheetY < upperThreshold) {
+        // 일반 드래그: 현재 위치에 따라 결정
+        if (currentSheetY < expandedToMiddleThreshold) {
           finalState = 'expanded';
-        } else if (currentSheetY < middleThreshold) {
+        } else if (currentSheetY < middleToCollapsedThreshold) {
           finalState = 'middle';
         } else {
           finalState = 'collapsed';
         }
+
+        // expanded 상태에서는 특별 처리
+        if (bottomSheetState === 'expanded' && finalState !== 'expanded') {
+          if (deltaYOverall < BOTTOM_SHEET_POSITIONS.MIN_DRAG_DISTANCE) {
+            finalState = 'expanded'; // 충분히 드래그하지 않았으면 원래 상태 유지
+          }
+        }
       }
-      setBottomSheetState(finalState);
+    } else {
+      // 탭 동작: 다음 단계로 전환
+      if (bottomSheetState === 'collapsed') {
+        finalState = 'middle';
+      } else if (bottomSheetState === 'middle') {
+        finalState = 'expanded';
+      }
+      // expanded에서 탭하면 그대로 유지
     }
+
+    setBottomSheetState(finalState);
 
     // 스타일 복원
     if (bottomSheetRef.current) {
-      bottomSheetRef.current.style.transform = ''; // Bottom sheet의 transform은 CSS 클래스가 관리
+      bottomSheetRef.current.style.transition = `transform ${BOTTOM_SHEET_POSITIONS.TRANSITION_DURATION} ${BOTTOM_SHEET_POSITIONS.TRANSITION_TIMING}`;
+      bottomSheetRef.current.style.transform = ''; // CSS 클래스가 위치를 결정하도록
     }
     if (mapHeader) {
       mapHeader.style.transition = ''; // map-header의 transition 복원
@@ -828,6 +896,8 @@ export default function HomePage() {
               }));
             } else {
               console.warn('No member data from API, or API call failed.');
+              // 그룹멤버가 없으면 첫번째 멤버 선택 완료 상태를 true로 설정
+              setIsFirstMemberSelectionComplete(true);
             }
             setGroupMembers(currentMembers); 
             dataFetchedRef.current.members = true;
@@ -865,7 +935,11 @@ export default function HomePage() {
         }
       } catch (error) {
         console.error('[HOME PAGE] 그룹 데이터(멤버 또는 스케줄) 조회 오류:', error);
-        if (isMounted && !dataFetchedRef.current.members) dataFetchedRef.current.members = true;
+        if (isMounted && !dataFetchedRef.current.members) {
+          dataFetchedRef.current.members = true;
+          // 오류 시에도 첫번째 멤버 선택 완료 상태를 true로 설정
+          setIsFirstMemberSelectionComplete(true);
+        }
         if (isMounted && !dataFetchedRef.current.schedules) dataFetchedRef.current.schedules = true;
       } finally {
         if (isMounted && dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
@@ -1248,7 +1322,8 @@ export default function HomePage() {
       
       if (markerType === 'member' && memberData) {
         const photoForMarker = memberData.photo ?? getDefaultImage(memberData.mt_gender, memberData.original_index);
-        const borderColor = isSelected ? '#DC2626' : '#4F46E5'; // 선택된 멤버는 빨간색, 기본은 인디고
+        // location/page.tsx와 동일한 인디고 색상 사용
+        const borderColor = '#4F46E5';
         
         const newMarker = new window.naver.maps.Marker({
           position: naverPos,
@@ -1256,8 +1331,8 @@ export default function HomePage() {
           title: memberData.name,
           icon: {
             content: `
-              <div style="position: relative; text-align: center; cursor: pointer;">
-                <div style="width: 40px; height: 40px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+              <div style="position: relative; text-align: center;">
+                <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
                   <img 
                     src="${photoForMarker}" 
                     alt="${memberData.name}" 
@@ -1278,13 +1353,13 @@ export default function HomePage() {
                     "
                   />
                 </div>
-                <div style="position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); background-color: ${isSelected ? '#DC2626' : 'rgba(0,0,0,0.7)'}; color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px;">
+                <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
                   ${memberData.name}
                 </div>
               </div>
             `,
-            size: new window.naver.maps.Size(40, 40),
-            anchor: new window.naver.maps.Point(20, 20)
+            size: new window.naver.maps.Size(36, 48),
+            anchor: new window.naver.maps.Point(18, 42)
           }
         });
 
@@ -1375,10 +1450,10 @@ export default function HomePage() {
           title: memberData.name,
           icon: {
             url: photoForMarker,
-            scaledSize: new window.google.maps.Size(40, 40),
+            scaledSize: new window.google.maps.Size(32, 32),
             origin: new window.google.maps.Point(0, 0),
-            anchor: new window.google.maps.Point(20, 20),
-            labelOrigin: new window.google.maps.Point(20, 50)
+            anchor: new window.google.maps.Point(16, 16),
+            labelOrigin: new window.google.maps.Point(16, 40)
           }
         });
 
@@ -1493,6 +1568,12 @@ export default function HomePage() {
     setGroupMembers(updatedMembers);
     const selectedMember = updatedMembers.find(member => member.isSelected);
     
+    // 첫번째 멤버 선택 완료 상태 설정
+    if (!isFirstMemberSelectionComplete && selectedMember) {
+      setIsFirstMemberSelectionComplete(true);
+      console.log('[HOME] 첫번째 멤버 선택 완료:', selectedMember.name);
+    }
+    
     if (selectedMember) {
       setTodayWeather(getWeatherDisplayData(String(selectedMember.mt_weather_sky ?? 'default'), selectedMember.mt_weather_tmx));
       setFilteredSchedules(
@@ -1526,7 +1607,7 @@ export default function HomePage() {
     }
   };
 
-  // 멤버 마커 업데이트 함수 - createMarker 사용하도록 수정
+  // 멤버 마커 업데이트 함수 - 모든 그룹멤버 표시
   const updateMemberMarkers = (members: GroupMember[]) => {
     // 기존 마커 삭제
     if (memberMarkers.current.length > 0) {
@@ -1538,30 +1619,85 @@ export default function HomePage() {
       memberMarkers.current = [];
     }
     
-    // 선택된 멤버 마커 추가 - createMarker 함수 사용
-    const selectedMembers = members.filter(member => member.isSelected);
-    
-    if (selectedMembers.length > 0) {
-      selectedMembers.forEach((member, index) => {
-        const newMarker = createMarker(
-          null, // location 객체는 사용하지 않음
-          index,
-          'member',
-          member.isSelected, // 선택 상태 전달
-          member,
-          undefined
-        );
-        
-        if (newMarker) {
-          memberMarkers.current.push(newMarker);
+    // 모든 그룹멤버에 대해 마커 생성
+    if (members.length > 0) {
+      members.forEach((member, index) => {
+        // 좌표 안전성 검사
+        const lat = parseCoordinate(member.location.lat);
+        const lng = parseCoordinate(member.location.lng);
+
+        if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+          if (mapType === 'naver' && naverMap.current && window.naver?.maps) {
+            const photoForMarker = member.photo ?? getDefaultImage(member.mt_gender, member.original_index);
+            const position = new window.naver.maps.LatLng(lat, lng);
+            // 선택된 멤버는 핑크색 외곽선, 일반 멤버는 인디고 외곽선
+            const borderColor = member.isSelected ? '#EC4899' : '#4F46E5';
+            
+            const markerInstance = new window.naver.maps.Marker({
+              position: position,
+              map: naverMap.current,
+              icon: {
+                content: `
+                  <div style="position: relative; text-align: center;">
+                    <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
+                      <img 
+                        src="${photoForMarker}" 
+                        alt="${member.name}" 
+                        style="width: 100%; height: 100%; object-fit: cover;" 
+                        data-gender="${member.mt_gender ?? ''}" 
+                        data-index="${member.original_index}"
+                        onerror="
+                          const genderStr = this.getAttribute('data-gender');
+                          const indexStr = this.getAttribute('data-index');
+                          const gender = genderStr ? parseInt(genderStr, 10) : null;
+                          const idx = indexStr ? parseInt(indexStr, 10) : 0;
+                          const imgNum = (idx % 4) + 1;
+                          let fallbackSrc = '/images/avatar' + ((idx % 3) + 1) + '.png';
+                          if (gender === 1) { fallbackSrc = '/images/male_' + imgNum + '.png'; }
+                          else if (gender === 2) { fallbackSrc = '/images/female_' + imgNum + '.png'; }
+                          this.src = fallbackSrc;
+                          this.onerror = null;
+                        "
+                      />
+                    </div>
+                    <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
+                      ${member.name}
+                    </div>
+                  </div>
+                `,
+                size: new window.naver.maps.Size(36, 48), 
+                anchor: new window.naver.maps.Point(18, 42) 
+              },
+              zIndex: member.isSelected ? 200 : 150 // 선택된 멤버가 위에 표시되도록
+            });
+            
+            memberMarkers.current.push(markerInstance);
+          } else if (mapType === 'google' && map.current && window.google?.maps) {
+            const photoForMarker = member.photo ?? getDefaultImage(member.mt_gender, member.original_index);
+            
+            const markerInstance = new window.google.maps.Marker({
+              position: { lat, lng },
+              map: map.current,
+              title: member.name,
+              icon: {
+                url: photoForMarker,
+                scaledSize: new window.google.maps.Size(32, 32),
+                origin: new window.google.maps.Point(0, 0),
+                anchor: new window.google.maps.Point(16, 16)
+              },
+              zIndex: member.isSelected ? 200 : 150
+            });
+            
+            memberMarkers.current.push(markerInstance);
+          }
+        } else {
+          console.warn('유효하지 않은 멤버 좌표:', member.name, member.location);
         }
       });
       
-      // 선택된 멤버 위치로 지도 이동 (항상 수행되도록 수정)
-      if (selectedMembers.length === 1) {
-        const selectedMember = selectedMembers[0];
-        
-        // 좌표 안전성 검사
+      // 선택된 멤버가 있으면 해당 위치로 지도 이동
+      const selectedMember = members.find(member => member.isSelected);
+      if (selectedMember) {
         const lat = parseCoordinate(selectedMember.location.lat);
         const lng = parseCoordinate(selectedMember.location.lng);
 
@@ -1584,9 +1720,9 @@ export default function HomePage() {
         } else {
           console.warn('유효하지 않은 멤버 좌표:', selectedMember.name, selectedMember.location);
         }
-      } else if (selectedMembers.length > 1) {
-        // 여러 멤버가 선택된 경우 모든 마커가 보이도록 지도 조정
-        const validMembers = selectedMembers.filter(member => {
+      } else if (members.length > 0) {
+        // 선택된 멤버가 없으면 모든 멤버가 보이도록 지도 조정
+        const validMembers = members.filter(member => {
           const lat = parseCoordinate(member.location.lat);
           const lng = parseCoordinate(member.location.lng);
           return lat !== null && lng !== null && lat !== 0 && lng !== 0;
@@ -1603,7 +1739,9 @@ export default function HomePage() {
               }
             });
             setTimeout(() => {
-              naverMap.current.fitBounds(bounds);
+              naverMap.current.fitBounds(bounds, {
+                padding: { top: 50, right: 50, bottom: 50, left: 50 }
+              });
             }, 100);
           } else if (mapType === 'google' && map.current) {
             const bounds = new window.google.maps.LatLngBounds();
@@ -1634,6 +1772,18 @@ export default function HomePage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapType, mapsInitialized.google, mapsInitialized.naver]);
+
+  // 그룹멤버 데이터 변경 시 마커 업데이트
+  useEffect(() => {
+    if (
+      groupMembers.length > 0 &&
+      ((mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) || 
+       (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps))
+    ) {
+      console.log('[HOME] 그룹멤버 데이터 변경 감지 - 마커 업데이트:', groupMembers.length, '명');
+      updateMemberMarkers(groupMembers);
+    }
+  }, [groupMembers, mapType, mapsInitialized.naver, mapsInitialized.google]);
 
   // 지도 타입 변경 핸들러
   const handleMapTypeChange = () => {
@@ -1778,10 +1928,22 @@ export default function HomePage() {
       <PageContainer title="홈" showTitle={false} showBackButton={false} showHeader={false} className="p-0 m-0 w-full h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
         {/* 지도 영역 (화면 100% 차지, fixed 포지션으로 고정) */}
         <div className="full-map-container">
-          {/* 지도 컨테이너 */}
-          {isMapLoading && (
-            <LoadingSpinner message="지도를 불러오는 중입니다..." />
+          {/* 전체화면 로딩 - 지도 로딩, 그룹멤버 로딩, 첫번째 멤버 선택 완료까지 */}
+          {(isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+            <LoadingSpinner 
+              message={
+                isMapLoading 
+                  ? "지도를 불러오는 중입니다..." 
+                  : !dataFetchedRef.current.members 
+                    ? "그룹 멤버 정보를 불러오는 중입니다..."
+                    : !dataFetchedRef.current.schedules
+                      ? "그룹 일정을 불러오는 중입니다..."
+                      : "첫번째 멤버 위치로 이동 중입니다..."
+              } 
+              fullScreen={true} 
+            />
           )}
+          
           <div 
             ref={googleMapContainer} 
             className="w-full h-full absolute top-0 left-0" 
@@ -1827,7 +1989,7 @@ export default function HomePage() {
         <div 
           ref={bottomSheetRef}
           className={`bottom-sheet ${getBottomSheetClassName()}`}
-          // style={{ background: 'linear-gradient(to bottom right, #e0e7ff, #faf5ff, #fdf2f8)' }}
+          style={{ touchAction: 'pan-x' }} // 좌우 스와이프만 허용
           onTouchStart={handleDragStart}
           onTouchMove={handleDragMove}
           onTouchEnd={handleDragEnd}

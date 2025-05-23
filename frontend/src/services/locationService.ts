@@ -74,16 +74,16 @@ const locationService = {
       
       return response.data.map((item, index) => {
         const converted = {
-          id: String(item.slt_idx),
-          name: item.slt_title || '제목 없음',
-          address: item.slt_add || '주소 없음',
-          coordinates: [
-            parseFloat(item.slt_long || '0'), 
-            parseFloat(item.slt_lat || '0')
-          ] as [number, number],
-          category: '기타', // 백엔드 응답에 category 필드가 있다면 사용 (예: item.slt_category)
-          memo: '', // 백엔드 응답에 memo 필드가 있다면 사용 (예: item.slt_memo)
-          favorite: false, // 백엔드 응답에 favorite(bookmark) 필드가 있다면 사용
+        id: String(item.slt_idx),
+        name: item.slt_title || '제목 없음',
+        address: item.slt_add || '주소 없음',
+        coordinates: [
+          parseFloat(item.slt_long || '0'), 
+          parseFloat(item.slt_lat || '0')
+        ] as [number, number],
+        category: '기타', // 백엔드 응답에 category 필드가 있다면 사용 (예: item.slt_category)
+        memo: '', // 백엔드 응답에 memo 필드가 있다면 사용 (예: item.slt_memo)
+        favorite: false, // 백엔드 응답에 favorite(bookmark) 필드가 있다면 사용
           notifications: item.slt_enter_alarm === 'Y', // slt_enter_alarm을 notifications로 매핑
           // 백엔드 원본 필드 유지
           slt_idx: item.slt_idx,
