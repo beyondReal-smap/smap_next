@@ -103,4 +103,47 @@ export interface ApiResponse<T = any> {
   message: string;
   data?: T;
   error?: string;
-} 
+}
+
+// 사용자 프로필 타입 (Member를 확장)
+export interface UserProfile extends Member {
+  groups?: GroupWithMembers[];
+  ownedGroups?: GroupWithMembers[];
+  joinedGroups?: GroupWithMembers[];
+}
+
+// 그룹 역할 타입
+export interface GroupRole {
+  isOwner: boolean;
+  isLeader: boolean;
+  canInvite: boolean;
+  canEdit: boolean;
+}
+
+// 멤버가 있는 그룹 타입
+export interface GroupWithMembers extends Group {
+  members?: Member[];
+  memberCount?: number;
+  myRole: GroupRole;
+}
+
+// Auth 상태 타입
+export interface AuthState {
+  isLoggedIn: boolean;
+  user: UserProfile | null;
+  selectedGroup: GroupWithMembers | null;
+  loading: boolean;
+  error: string | null;
+}
+
+// Auth 액션 타입
+export type AuthAction =
+  | { type: 'LOGIN_START' }
+  | { type: 'LOGIN_SUCCESS'; payload: UserProfile }
+  | { type: 'LOGIN_FAILURE'; payload: string }
+  | { type: 'LOGOUT' }
+  | { type: 'UPDATE_USER'; payload: Partial<UserProfile> }
+  | { type: 'SELECT_GROUP'; payload: GroupWithMembers | null }
+  | { type: 'UPDATE_GROUPS'; payload: GroupWithMembers[] }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_ERROR'; payload: string | null }; 

@@ -140,7 +140,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await authService.login(credentials);
       
       if (response.success && response.data) {
-        const userProfile = await authService.getUserProfile(response.data.user.mt_idx);
+        const userProfile = await authService.getUserProfile(response.data.member.mt_idx);
         dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
       } else {
         throw new Error(response.message || '로그인에 실패했습니다.');
