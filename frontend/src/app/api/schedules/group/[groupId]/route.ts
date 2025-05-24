@@ -26,8 +26,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
 ) {
+  const { groupId } = await params;
   try {
-    const { groupId } = await params;
     const { searchParams } = new URL(request.url);
     const days = searchParams.get('days') || '7'; // 기본 7일
 

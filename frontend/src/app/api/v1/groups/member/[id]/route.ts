@@ -12,8 +12,8 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
-    const { id } = await params;
     const backendUrl = `https://118.67.130.71:8000/api/v1/groups/member/${id}`;
     
     console.log('[API PROXY] 백엔드 호출:', backendUrl);

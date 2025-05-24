@@ -442,7 +442,8 @@ function GroupPageContent() {
               <div className="p-6 overflow-y-auto flex-grow bg-white">
                 <p className="text-gray-700">{selectedGroup.sgt_content}</p>
                 <div>
-                  <h3 className="text-base font-medium text-gray-900 mb-3">그룹멤버 ({groupMembers.length}명)</h3>
+                  {/* <h3 className="text-base font-medium text-gray-900 mb-3">그룹멤버 ({groupMembers.length}명)</h3> */}
+                  <h3 className="text-base font-medium text-gray-900 mb-3">그룹멤버</h3>
                   {membersLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <LoadingSpinner 

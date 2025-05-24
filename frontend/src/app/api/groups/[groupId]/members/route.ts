@@ -70,9 +70,9 @@ async function fetchWithFallback(url: string): Promise<any> {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
-  const { groupId } = params;
+  const { groupId } = await params;
   
   try {
     console.log('[Group Members API] 그룹 멤버 조회 요청:', { groupId });
