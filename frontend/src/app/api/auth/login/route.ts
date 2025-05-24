@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
         message: '로그인 성공',
         data: {
           token: 'mock-jwt-token-' + Date.now(),
-          user: mockUser
+          member: mockUser
         }
       };
 
