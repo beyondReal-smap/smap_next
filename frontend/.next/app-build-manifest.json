@@ -77,6 +77,16 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/push-logs/[...slug]/route.js"
     ],
+    "/group/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/group/layout.js"
+    ],
+    "/group/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/group/page.js"
+    ],
     "/_not-found/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
