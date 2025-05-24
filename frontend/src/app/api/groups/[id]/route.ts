@@ -4,7 +4,7 @@ import { Group } from '@/types/auth';
 // 그룹 상세 조회
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;

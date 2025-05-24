@@ -4,7 +4,7 @@ import { Member, GroupDetail } from '@/types/auth';
 // 그룹의 멤버 목록 조회
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
