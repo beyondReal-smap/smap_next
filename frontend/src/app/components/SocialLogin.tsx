@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SocialLoginButtonProps {
   provider: string;
@@ -40,23 +41,51 @@ export default function SocialLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleSocialLogin = async (provider: string) => {
     setIsLoading(true);
     setError('');
 
     try {
-      // 실제 구현 시에는 여기에 각 소셜 로그인 API 연동 코드가 들어갑니다
       console.log(`${provider} 로그인 시도 중...`);
       
-      // 임시: 2초 후 홈으로 리다이렉트 (데모용)
-      setTimeout(() => {
-        localStorage.setItem('socialToken', `demo-token-${provider}`);
-        router.push('/');
-      }, 2000);
+      // 소셜 로그인 API 호출 (데모용으로 가상의 토큰 사용)
+      const response = await fetch('/api/auth/social-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: provider.toLowerCase(),
+          token: `demo-${provider}-token-${Date.now()}`
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || `${provider} 로그인에 실패했습니다.`);
+      }
+
+      if (data.success && data.data) {
+        // AuthService를 통해 토큰과 사용자 정보 저장
+        const authService = await import('@/services/authService');
+        if (data.data.token) {
+          authService.default.setToken(data.data.token);
+        }
+        authService.default.setUserData(data.data.member);
+        
+        console.log(`${provider} 로그인 성공:`, data.data.member);
+        router.push('/home');
+      } else {
+        throw new Error(data.message || `${provider} 로그인에 실패했습니다.`);
+      }
       
     } catch (err: any) {
+      console.error(`${provider} 로그인 오류:`, err);
       setError(`${provider} 로그인 중 오류가 발생했습니다: ${err.message}`);
+    } finally {
       setIsLoading(false);
     }
   };

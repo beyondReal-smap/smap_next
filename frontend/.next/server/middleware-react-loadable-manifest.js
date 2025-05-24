@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}"
+self.__REACT_LOADABLE_MANIFEST="{\"app/login/page.tsx -> @/services/authService\":{\"id\":\"app/login/page.tsx -> @/services/authService\",\"files\":[]}}"

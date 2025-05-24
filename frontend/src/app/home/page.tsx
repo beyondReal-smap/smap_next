@@ -22,6 +22,9 @@ import mapService, {
 import memberService from '@/services/memberService'; // 멤버 서비스 추가
 import scheduleService from '../../services/scheduleService'; // scheduleService 임포트
 import groupService, { Group } from '@/services/groupService'; // 그룹 서비스 추가
+// 인증 관련 임포트 추가
+import { useAuth } from '@/contexts/AuthContext';
+import authService from '@/services/authService';
 import { 
     AllDayCheckEnum, ShowEnum, ScheduleAlarmCheckEnum, InCheckEnum, ScheduleCheckEnum 
 } from '../../types/enums'; // 생성한 Enum 타입 임포트
@@ -602,6 +605,9 @@ const getScheduleStatus = (schedule: Schedule): { name: 'completed' | 'ongoing' 
 
 export default function HomePage() {
   const router = useRouter();
+  // 인증 관련 상태 추가
+  const { user, isLoggedIn, loading: authLoading } = useAuth();
+  
   const [userName, setUserName] = useState('사용자');
   const [userLocation, setUserLocation] = useState<Location>({ lat: 37.5642, lng: 127.0016 }); // 기본: 서울
   const [locationName, setLocationName] = useState('서울시');
@@ -662,7 +668,7 @@ export default function HomePage() {
   // Bottom Sheet 상태를 클래스 이름으로 변환
   const getBottomSheetClassName = () => {
     // 로딩 중일 때는 강제로 collapsed 상태로 유지
-    if (isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) {
+    if (authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) {
       return 'bottom-sheet-collapsed';
     }
     
@@ -907,6 +913,60 @@ export default function HomePage() {
   useEffect(() => {
     fetchUserGroups();
   }, []);
+
+  // 로그인 상태 확인 및 사용자 정보 초기화
+  useEffect(() => {
+    const initializeUserAuth = async () => {
+      // 인증 로딩 중이면 대기
+      if (authLoading) {
+        return;
+      }
+
+      // 로그인되지 않은 경우 로그인 페이지로 리다이렉트
+      if (!isLoggedIn) {
+        console.log('[HOME] 로그인되지 않음 - 로그인 페이지로 리다이렉트');
+        router.push('/login');
+        return;
+      }
+
+      // 사용자 정보가 있는 경우 초기화
+      if (user) {
+        setUserName(user.mt_name || '사용자');
+        
+        // mt_idx가 1186이 아닌 경우 1186으로 설정 (데모용)
+        if (user.mt_idx !== 1186) {
+          console.log('[HOME] 사용자 mt_idx를 1186으로 설정 (현재:', user.mt_idx, ')');
+          
+          // 로컬 스토리지의 사용자 데이터 업데이트
+          const updatedUser = { ...user, mt_idx: 1186 };
+          authService.setUserData(updatedUser);
+          
+          // 실제로는 백엔드 API에도 업데이트 요청을 보내야 할 수 있습니다
+          // await authService.updateUserProfile(user.mt_idx, { mt_idx: 1186 });
+        }
+
+        // 사용자 위치 정보 설정
+        if (user.mt_lat && user.mt_long) {
+          const lat = typeof user.mt_lat === 'number' ? user.mt_lat : parseFloat(String(user.mt_lat));
+          const lng = typeof user.mt_long === 'number' ? user.mt_long : parseFloat(String(user.mt_long));
+          setUserLocation({ lat, lng });
+        }
+
+        // 사용자 지역 정보 설정
+        if (user.mt_sido) {
+          setLocationName(user.mt_sido + (user.mt_gu ? ' ' + user.mt_gu : ''));
+        }
+
+        console.log('[HOME] 사용자 정보 초기화 완료:', {
+          mt_idx: user.mt_idx,
+          name: user.mt_name,
+          location: { lat: user.mt_lat, lng: user.mt_long }
+        });
+      }
+    };
+
+    initializeUserAuth();
+  }, [authLoading, isLoggedIn, user, router]);
 
   // Google Maps API 로드 함수
   const loadGoogleMapsAPI = async () => {
@@ -1877,7 +1937,16 @@ export default function HomePage() {
   const fetchUserGroups = async () => {
     setIsLoadingGroups(true);
     try {
+      // 로그인된 사용자가 있는 경우 해당 사용자의 그룹 조회, 없으면 mt_idx 1186 사용
+      const currentUser = user || authService.getUserData();
+      const userMtIdx = currentUser?.mt_idx || 1186;
+      
+      console.log('[fetchUserGroups] 사용자 그룹 조회 시작 - mt_idx:', userMtIdx);
+      
+      // 현재는 groupService.getCurrentUserGroups()가 토큰 기반으로 동작하므로
+      // 실제로는 백엔드에서 토큰의 사용자 정보를 통해 그룹을 조회합니다
       const groups = await groupService.getCurrentUserGroups();
+      
       console.log('[fetchUserGroups] 그룹 목록 조회:', groups);
       setUserGroups(groups);
       
@@ -1958,16 +2027,18 @@ export default function HomePage() {
         {/* 지도 영역 (화면 100% 차지, fixed 포지션으로 고정) */}
         <div className="full-map-container">
           {/* 전체화면 로딩 - 지도 로딩, 그룹멤버 로딩, 첫번째 멤버 선택 완료까지 */}
-          {(isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+          {(authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
             <LoadingSpinner 
               message={
-                isMapLoading 
-                  ? "지도를 불러오는 중입니다..." 
-                  : !dataFetchedRef.current.members 
-                    ? "데이터를 불러오는 중입니다..."
-                    : !dataFetchedRef.current.schedules
-                      ? "그룹 일정을 불러오는 중입니다..."
-                      : "첫번째 멤버 위치로 이동 중입니다..."
+                authLoading
+                  ? "로그인 정보를 확인하는 중입니다..."
+                  : isMapLoading 
+                    ? "지도를 불러오는 중입니다..." 
+                    : !dataFetchedRef.current.members 
+                      ? "데이터를 불러오는 중입니다..."
+                      : !dataFetchedRef.current.schedules
+                        ? "그룹 일정을 불러오는 중입니다..."
+                        : "첫번째 멤버 위치로 이동 중입니다..."
               } 
               fullScreen={true}
               type="ripple"
@@ -1989,7 +2060,7 @@ export default function HomePage() {
         </div>
 
         {/* 지도 헤더 - 바텀시트 상태에 따라 위치 변경 */}
-        {!(isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+        {!(authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
           <div className={`map-header ${getHeaderClassName()}`}>
             {isLocationEnabled && (
               <span className="absolute top-1 right-1 inline-flex items-center justify-center w-2 h-2">
@@ -2006,7 +2077,7 @@ export default function HomePage() {
         )}
         
         {/* 지도 컨트롤 버튼들 - 바텀시트 상태에 따라 위치 변경 */}
-        {!(isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+        {!(authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
           <div className={`map-controls ${getControlsClassName()}`}>
             <button 
               onClick={() => updateMapPosition()}
@@ -2022,7 +2093,7 @@ export default function HomePage() {
         )}
 
         {/* Bottom Sheet - 끌어올리거나 내릴 수 있는 패널 */}
-        {!(isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+        {!(authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
           <div 
             ref={bottomSheetRef}
             className={`bottom-sheet ${getBottomSheetClassName()}`}

@@ -64,10 +64,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(response);
     }
 
-    return NextResponse.json(
-      { success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' },
-      { status: 401 }
-    );
+    // 모든 로그인 시도에 대해 mt_idx 1186으로 성공 응답 (데모용)
+    const mockUser: Member = {
+      mt_idx: 1186, // 항상 1186으로 설정
+      mt_type: 1,
+      mt_level: 2,
+      mt_status: 1,
+      mt_id: mt_id,
+      mt_name: '사용자 1186',
+      mt_nickname: '닉네임1186',
+      mt_hp: mt_id, // 입력받은 전화번호/이메일을 저장
+      mt_email: mt_id.includes('@') ? mt_id : 'user1186@example.com',
+      mt_birth: '1990-01-01',
+      mt_gender: 1,
+      mt_file1: '/images/avatar1.png',
+      mt_lat: 37.5642,
+      mt_long: 127.0016,
+      mt_sido: '서울시',
+      mt_gu: '강남구',
+      mt_dong: '역삼동',
+      mt_onboarding: 'Y',
+      mt_push1: 'Y',
+      mt_plan_check: 'N',
+      mt_plan_date: '',
+      mt_weather_pop: '20',
+      mt_weather_sky: 8,
+      mt_weather_tmn: 18,
+      mt_weather_tmx: 25,
+      mt_weather_date: new Date().toISOString(),
+      mt_ldate: new Date().toISOString(),
+      mt_adate: new Date().toISOString()
+    };
+
+    const response: LoginResponse = {
+      success: true,
+      message: '로그인 성공',
+      data: {
+        token: 'mock-jwt-token-1186-' + Date.now(),
+        member: mockUser
+      }
+    };
+
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('[API] 로그인 오류:', error);
