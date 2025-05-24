@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     console.log('[Groups API] 그룹 목록 조회 요청:', { mt_idx });
 
-    // 실제 백엔드 API 호출
+    // 기존 작동하던 백엔드 API 호출
     const backendUrl = `https://118.67.130.71:8000/api/v1/groups/member/${mt_idx}`;
     console.log('[Groups API] 백엔드 호출:', backendUrl);
     

@@ -9,6 +9,7 @@ export interface Group {
   sgt_show: string;
   sgt_wdate: string;
   memberCount?: number;
+  member_count?: number;  // 백엔드에서 제공하는 멤버 수
 }
 
 export interface GroupMember {

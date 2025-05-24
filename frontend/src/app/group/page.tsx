@@ -120,6 +120,7 @@ function GroupPageContent() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+  const [groupMemberCounts, setGroupMemberCounts] = useState<{[key: number]: number}>({});
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [newGroup, setNewGroup] = useState<GroupForm>({ name: '', description: '' });
@@ -141,6 +142,21 @@ function GroupPageContent() {
         if (data.length > 0) {
           setSelectedGroup(data[0]);
         }
+
+        // 각 그룹의 멤버 수 조회
+        const memberCounts: {[key: number]: number} = {};
+        for (const group of data) {
+          try {
+            const members = await memberService.getGroupMembers(group.sgt_idx.toString());
+            memberCounts[group.sgt_idx] = members.length;
+            console.log(`[Group Page] 그룹 ${group.sgt_title} 멤버 수:`, members.length);
+          } catch (error) {
+            console.error(`[Group Page] 그룹 ${group.sgt_idx} 멤버 수 조회 오류:`, error);
+            memberCounts[group.sgt_idx] = 0;
+          }
+        }
+        setGroupMemberCounts(memberCounts);
+        
       } catch (error) {
         console.error('[Group Page] 그룹 목록 조회 오류:', error);
         setGroups([]);
@@ -339,8 +355,10 @@ function GroupPageContent() {
               {filteredGroups.length > 0 ? (
                 filteredGroups.map(group => {
                   const isSelected = selectedGroup?.sgt_idx === group.sgt_idx;
-                  const baseClasses = 'cursor-pointer transition-colors duration-150 ease-in-out px-4 py-2';
-                  const selectedClasses = isSelected ? 'bg-blue-100' : 'hover:bg-gray-100';
+                  const baseClasses = 'cursor-pointer transition-all duration-200 ease-in-out px-4 py-3 border-l-4';
+                  const selectedClasses = isSelected 
+                    ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-l-blue-500 shadow-lg transform scale-[1.02]' 
+                    : 'border-l-transparent hover:bg-gray-50 hover:border-l-blue-200';
 
                   return (
                     <div
@@ -348,16 +366,32 @@ function GroupPageContent() {
                       className={`${baseClasses} ${selectedClasses}`}
                       onClick={() => handleGroupSelect(group)}
                     >
-                      <div className="flex items-center">
-                        {isSelected ? (
-                          <FaCheckCircle className="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" />
-                        ) : (
-                          <div className="w-4 h-4 mr-2 flex-shrink-0"></div>
-                        )}
-                        <div>
-                          <h3 className="text-base font-medium text-gray-900">{group.sgt_title}</h3>
-                          <p className="mt-1 text-sm text-gray-500">{group.sgt_content}</p>
-                          <p className="mt-2 text-xs text-gray-400">멤버: {group.memberCount}명</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center flex-1">
+                          {isSelected ? (
+                            <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center mr-3 flex-shrink-0">
+                              <FaCheckCircle className="w-3 h-3 text-white" />
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 rounded-full border-2 border-gray-300 mr-3 flex-shrink-0"></div>
+                          )}
+                          <div className="flex-1">
+                            <h3 className={`text-base font-medium ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
+                              {group.sgt_title}
+                            </h3>
+                            <p className={`mt-1 text-sm ${isSelected ? 'text-blue-700' : 'text-gray-500'}`}>
+                              {group.sgt_content}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="ml-3 flex items-center">
+                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            isSelected 
+                              ? 'bg-blue-200 text-blue-800' 
+                              : 'bg-gray-200 text-gray-600'
+                          }`}>
+                            {groupMemberCounts[group.sgt_idx] || 0}명
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -408,7 +442,7 @@ function GroupPageContent() {
               <div className="p-6 overflow-y-auto flex-grow bg-white">
                 <p className="text-gray-700">{selectedGroup.sgt_content}</p>
                 <div>
-                  <h3 className="text-base font-medium text-gray-900 mb-3">그룹원 ({groupMembers.length}명)</h3>
+                  <h3 className="text-base font-medium text-gray-900 mb-3">그룹멤버 ({groupMembers.length}명)</h3>
                   {membersLoading ? (
                     <div className="flex items-center justify-center py-8">
                       <LoadingSpinner 
