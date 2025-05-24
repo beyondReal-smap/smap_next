@@ -6,57 +6,6 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/home/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/home/layout.js"
-    ],
-    "/home/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/home/page.js"
-    ],
-    "/api/v1/groups/member/[id]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/v1/groups/member/[id]/route.js"
-    ],
-    "/api/group-members/member/[id]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/group-members/member/[id]/route.js"
-    ],
-    "/api/schedules/group/[groupId]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/schedules/group/[groupId]/route.js"
-    ],
-    "/notice/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/notice/page.js"
-    ],
-    "/api/push-logs/[...slug]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/push-logs/[...slug]/route.js"
-    ],
-    "/location/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/location/layout.js"
-    ],
-    "/location/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/location/page.css",
-      "static/chunks/app/location/page.js"
-    ],
-    "/api/locations/other-members/[memberId]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/locations/other-members/[memberId]/route.js"
-    ],
     "/group/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -67,50 +16,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/group/page.js"
     ],
-    "/login/page": [
+    "/api/groups/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/login/page.js"
+      "static/chunks/app/api/groups/route.js"
     ],
-    "/signin/page": [
+    "/api/groups/[groupId]/members/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/signin/page.js"
-    ],
-    "/api/auth/login/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/login/route.js"
-    ],
-    "/api/members/[id]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/members/[id]/route.js"
-    ],
-    "/api/group-details/member/[id]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/group-details/member/[id]/route.js"
-    ],
-    "/api/groups/[id]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/groups/[id]/route.js"
-    ],
-    "/api/groups/[id]/members/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/groups/[id]/members/route.js"
-    ],
-    "/logs/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/logs/layout.js"
-    ],
-    "/logs/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/logs/page.js"
+      "static/chunks/app/api/groups/[groupId]/members/route.js"
     ],
     "/_not-found/page": [
       "static/chunks/webpack.js",

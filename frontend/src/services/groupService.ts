@@ -3,12 +3,58 @@ import apiClient from './apiClient';
 // 그룹 타입 정의
 export interface Group {
   sgt_idx: number;
-  mt_idx?: number | null;
-  sgt_title?: string | null;
-  sgt_code?: string | null;
-  sgt_show?: 'Y' | 'N' | null;
-  sgt_wdate?: string | null;
-  sgt_udate?: string | null;
+  sgt_title: string;
+  sgt_content?: string;
+  mt_idx: number;
+  sgt_show: string;
+  sgt_wdate: string;
+  memberCount?: number;
+}
+
+export interface GroupMember {
+  mt_idx: number;
+  mt_type: number;
+  mt_level: number;
+  mt_status: number;
+  mt_id: string;
+  mt_name: string;
+  mt_nickname: string;
+  mt_hp: string;
+  mt_email: string;
+  mt_birth?: string;
+  mt_gender: number;
+  mt_file1: string;
+  mt_lat: number;
+  mt_long: number;
+  mt_sido: string;
+  mt_gu: string;
+  mt_dong: string;
+  mt_onboarding?: string;
+  mt_push1?: string;
+  mt_plan_check?: string;
+  mt_plan_date?: string;
+  mt_weather_pop?: string;
+  mt_weather_sky: number;
+  mt_weather_tmn: number;
+  mt_weather_tmx: number;
+  mt_weather_date: string;
+  mt_ldate: string;
+  mt_adate: string;
+  // 그룹 상세 정보
+  sgdt_idx: number;
+  sgt_idx: number;
+  sgdt_owner_chk: string;
+  sgdt_leader_chk: string;
+  sgdt_discharge?: string;
+  sgdt_group_chk?: string;
+  sgdt_exit?: string;
+  sgdt_show?: string;
+  sgdt_push_chk?: string;
+  sgdt_wdate?: string;
+  sgdt_udate?: string;
+  sgdt_ddate?: string;
+  sgdt_xdate?: string;
+  sgdt_adate?: string;
 }
 
 export interface GroupCreate {
@@ -114,7 +160,46 @@ class GroupService {
       throw error;
     }
   }
+
+  /**
+   * 사용자의 그룹 목록 조회
+   */
+  async getMyGroups(mt_idx: number | string = 1186): Promise<Group[]> {
+    try {
+      const response = await fetch(`/api/groups?mt_idx=${mt_idx}`);
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || '그룹 목록 조회에 실패했습니다.');
+      }
+      
+      return result.data || [];
+    } catch (error) {
+      console.error('그룹 목록 조회 오류:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 특정 그룹의 멤버 목록 조회
+   */
+  async getGroupMembers(sgt_idx: number | string): Promise<GroupMember[]> {
+    try {
+      const response = await fetch(`/api/groups/${sgt_idx}/members`);
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || '그룹 멤버 조회에 실패했습니다.');
+      }
+      
+      return result.data || [];
+    } catch (error) {
+      console.error('그룹 멤버 조회 오류:', error);
+      throw error;
+    }
+  }
 }
 
+// 싱글톤 인스턴스 생성
 const groupService = new GroupService();
 export default groupService; 

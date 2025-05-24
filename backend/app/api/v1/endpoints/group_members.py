@@ -9,13 +9,13 @@ from app.models.enums import StatusEnum, ShowEnum
 
 router = APIRouter()
 
-@router.get("/member/{group_id}", response_model=List[MemberResponse])
+@router.get("/member/{group_id}", response_model=List[dict])
 def get_group_members(
     group_id: int,
     db: Session = Depends(deps.get_db)
 ):
     """
-    그룹에 속한 멤버 목록을 조회합니다.
+    그룹에 속한 멤버 목록과 그룹 상세 정보를 조회합니다.
     """
     # 그룹 상세 테이블에서 그룹 ID로 멤버 ID 목록 조회
     group_details = db.query(GroupDetail).filter(
@@ -32,34 +32,39 @@ def get_group_members(
     # 멤버 ID 목록으로 멤버 정보 조회
     db_members = db.query(Member).filter(
         Member.mt_idx.in_(member_ids),
-        Member.mt_status == 1  # StatusEnum은 문자열 enum이지만 mt_status는 정수 필드로 보임
+        Member.mt_status == 1
     ).all()
     
-    # mt_weather_pop 전처리 로직 추가
-    processed_members = []
-    for member_model in db_members:
-        # MemberResponse 스키마에 맞게 데이터를 변환할 준비
-        # SQLAlchemy 모델 객체의 속성을 직접 수정하거나, 새로운 딕셔너리를 만듭니다.
-        # 여기서는 FastAPI가 response_model을 사용하여 자동으로 변환할 때
-        # SQLAlchemy 모델 객체를 직접 사용하므로, 모델 객체의 속성을 직접 수정합니다.
-        # (주의: 이 방식은 모델 객체 자체를 변경하므로, 상황에 따라 부작용이 있을 수 있습니다.
-        #  더 안전한 방법은 MemberResponse 객체를 직접 생성하여 리스트에 담는 것입니다.)
-
-        current_pop = getattr(member_model, "mt_weather_pop", None)
-        if current_pop is not None and isinstance(current_pop, str):
-            try:
-                # '%' 제거 후 정수 변환 시도
-                setattr(member_model, "mt_weather_pop", int(current_pop.replace('%', '')))
-            except ValueError:
-                # 변환 실패 시 None 또는 기본값 처리 (예: 0)
-                setattr(member_model, "mt_weather_pop", None) # 또는 0, 또는 오류 로깅
-        elif current_pop is not None and not isinstance(current_pop, int):
-            # 이미 정수가 아니거나 문자열도 아닌 경우 (예: float 등) None 처리
-            setattr(member_model, "mt_weather_pop", None)
+    # mt_idx를 키로 사용하여 그룹 상세 정보를 딕셔너리로 변환
+    group_details_dict = {gd.mt_idx: gd for gd in group_details}
+    
+    # 결과 리스트 생성
+    result = []
+    for member in db_members:
+        # 멤버 데이터를 딕셔너리로 변환
+        member_dict = {c.name: getattr(member, c.name) for c in member.__table__.columns}
+        
+        # mt_weather_pop 처리
+        if "mt_weather_pop" in member_dict and member_dict["mt_weather_pop"] is not None:
+            if isinstance(member_dict["mt_weather_pop"], str):
+                try:
+                    member_dict["mt_weather_pop"] = int(member_dict["mt_weather_pop"].replace('%', ''))
+                except ValueError:
+                    member_dict["mt_weather_pop"] = None
+            elif not isinstance(member_dict["mt_weather_pop"], int):
+                member_dict["mt_weather_pop"] = None
+        
+        # 해당 멤버의 그룹 상세 정보 가져오기
+        group_detail = group_details_dict.get(member.mt_idx)
+        if group_detail:
+            # 그룹 상세 정보를 딕셔너리로 변환하여 추가
+            group_detail_dict = {c.name: getattr(group_detail, c.name) for c in group_detail.__table__.columns}
             
-        processed_members.append(member_model) # 수정된 모델 객체를 리스트에 추가
-
-    return processed_members
+            # 멤버 정보와 그룹 상세 정보를 합쳐서 결과에 추가
+            combined_dict = {**member_dict, **group_detail_dict}
+            result.append(combined_dict)
+    
+    return result
 
 @router.post("/add")
 def add_member_to_group(

@@ -12,6 +12,42 @@ export interface Member {
   mt_regdate?: string;
   mt_wdate?: string;
   mt_status?: string;
+  // 추가 멤버 정보
+  mt_nickname?: string;
+  mt_id?: string;
+  mt_birth?: string;
+  mt_gender?: number;
+  mt_sido?: string;
+  mt_gu?: string;
+  mt_dong?: string;
+  mt_type?: string;
+  mt_onboarding?: string;
+  mt_plan_check?: number;
+  mt_plan_date?: string;
+  mt_push1?: number;
+  mt_adate?: string;
+  mt_ldate?: string;
+  mt_weather_date?: string;
+  mt_weather_pop?: number;
+  mt_weather_sky?: string;
+  mt_weather_tmn?: number;
+  mt_weather_tmx?: number;
+  
+  // smap_group_detail_t 필드들
+  sgdt_idx?: number;
+  sgt_idx?: number;
+  sgdt_owner_chk?: number;
+  sgdt_leader_chk?: number;
+  sgdt_group_chk?: number;
+  sgdt_push_chk?: number;
+  sgdt_show?: number;
+  sgdt_discharge?: number;
+  sgdt_exit?: number;
+  sgdt_adate?: string;
+  sgdt_udate?: string;
+  sgdt_wdate?: string;
+  sgdt_ddate?: string;
+  sgdt_xdate?: string;
 }
 
 class MemberService {
@@ -96,8 +132,8 @@ class MemberService {
     
     try {
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 시작:', groupId);
-      // Next.js API 라우트를 통한 프록시 호출
-      const response = await apiClient.get<Member[]>(`/group-members/member/${groupId}`);
+      // smap_group_detail_t 데이터가 포함된 완전한 멤버 정보 조회
+      const response = await apiClient.get<Member[]>(`/groups/${groupId}/members`);
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 응답:', response.data);
       return response.data;
     } catch (error) {

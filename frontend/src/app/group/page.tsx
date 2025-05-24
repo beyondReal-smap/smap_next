@@ -10,6 +10,9 @@ import { RiKakaoTalkFill } from 'react-icons/ri';
 import { FiLink, FiChevronRight } from 'react-icons/fi';
 import { MdOutlineMessage } from 'react-icons/md';
 import { FaCheckCircle } from 'react-icons/fa';
+import groupService, { Group } from '@/services/groupService';
+import memberService from '@/services/memberService';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,56 +62,180 @@ const modalAnimation = `
 }
 `;
 
-// 모의 그룹 데이터
-const MOCK_GROUPS = [
-  {
-    id: '1',
-    name: '개발팀',
-    description: '프로젝트 개발 및 일정 관리',
-    members: [
-      { id: '1', name: '김개발', position: '팀장', avatar: '/images/avatar1.png' },
-      { id: '2', name: '이코딩', position: '프론트엔드', avatar: '/images/avatar2.png' },
-      { id: '3', name: '박서버', position: '백엔드', avatar: '/images/avatar3.png' },
-      { id: '4', name: '최디비', position: 'DBA', avatar: '/images/avatar4.png' },
-    ]
-  },
-  {
-    id: '2',
-    name: '마케팅팀',
-    description: '마케팅 전략 및 일정 공유',
-    members: [
-      { id: '5', name: '정마케팅', position: '팀장', avatar: '/images/avatar5.png' },
-      { id: '6', name: '한기획', position: '기획자', avatar: '/images/avatar6.png' },
-      { id: '7', name: '윤디자인', position: '디자이너', avatar: '/images/avatar7.png' },
-    ]
-  }
-];
-
 // 새 그룹 폼 타입 정의
 interface GroupForm {
   name: string;
   description: string;
 }
 
+// GroupMember 타입 정의 (홈 페이지와 동일)
+interface GroupMember {
+  mt_idx: number;
+  mt_type: number;
+  mt_level: number;
+  mt_status: number;
+  mt_id: string;
+  mt_name: string;
+  mt_nickname: string;
+  mt_hp: string;
+  mt_email: string;
+  mt_birth?: string;
+  mt_gender: number;
+  mt_file1: string;
+  mt_lat: number;
+  mt_long: number;
+  mt_sido: string;
+  mt_gu: string;
+  mt_dong: string;
+  mt_onboarding?: string;
+  mt_push1?: string;
+  mt_plan_check?: string;
+  mt_plan_date?: string;
+  mt_weather_pop?: string;
+  mt_weather_sky: number;
+  mt_weather_tmn: number;
+  mt_weather_tmx: number;
+  mt_weather_date: string;
+  mt_ldate: string;
+  mt_adate: string;
+  // 그룹 상세 정보
+  sgdt_idx: number;
+  sgt_idx: number;
+  sgdt_owner_chk: string;
+  sgdt_leader_chk: string;
+  sgdt_discharge?: string;
+  sgdt_group_chk?: string;
+  sgdt_exit?: string;
+  sgdt_show?: string;
+  sgdt_push_chk?: string;
+  sgdt_wdate?: string;
+  sgdt_udate?: string;
+  sgdt_ddate?: string;
+  sgdt_xdate?: string;
+  sgdt_adate?: string;
+}
+
 // 기존 페이지 로직을 포함하는 내부 컴포넌트
 function GroupPageContent() {
-  const [groups, setGroups] = useState(MOCK_GROUPS);
-  const [selectedGroup, setSelectedGroup] = useState<any>(MOCK_GROUPS[0]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [newGroup, setNewGroup] = useState<GroupForm>({ name: '', description: '' });
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [membersLoading, setMembersLoading] = useState(false);
   const router = useRouter();
 
+  // 사용자 그룹 목록 조회
+  useEffect(() => {
+    const fetchGroups = async () => {
+      try {
+        setLoading(true);
+        const data = await groupService.getMyGroups(1186);
+        console.log('[Group Page] 그룹 목록 조회 결과:', data);
+        setGroups(data);
+        
+        // 첫 번째 그룹을 기본 선택
+        if (data.length > 0) {
+          setSelectedGroup(data[0]);
+        }
+      } catch (error) {
+        console.error('[Group Page] 그룹 목록 조회 오류:', error);
+        setGroups([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGroups();
+  }, []);
+
+  // 선택된 그룹의 멤버 목록 조회
+  useEffect(() => {
+    const fetchGroupMembers = async () => {
+      if (!selectedGroup) {
+        setGroupMembers([]);
+        return;
+      }
+
+      try {
+        setMembersLoading(true);
+        console.log('[Group Page] 그룹 멤버 조회 시작:', selectedGroup.sgt_idx);
+        
+        // memberService 사용 (홈 페이지와 동일)
+        const memberData = await memberService.getGroupMembers(selectedGroup.sgt_idx.toString());
+        console.log('[Group Page] 그룹 멤버 조회 결과:', memberData);
+        
+        // 홈 페이지와 동일한 방식으로 데이터 변환
+        const transformedMembers: GroupMember[] = memberData.map((member: any, index: number) => ({
+          mt_idx: member.mt_idx,
+          mt_type: member.mt_type || 1,
+          mt_level: member.mt_level || 2,
+          mt_status: member.mt_status || 1,
+          mt_id: member.mt_id || '',
+          mt_name: member.mt_name || `멤버 ${index + 1}`,
+          mt_nickname: member.mt_nickname || member.mt_name || `멤버 ${index + 1}`,
+          mt_hp: member.mt_hp || '',
+          mt_email: member.mt_email || '',
+          mt_birth: member.mt_birth,
+          mt_gender: member.mt_gender || 1,
+          mt_file1: member.mt_file1 || '',
+          mt_lat: parseFloat(member.mt_lat || '37.5642'),
+          mt_long: parseFloat(member.mt_long || '127.0016'),
+          mt_sido: member.mt_sido || '',
+          mt_gu: member.mt_gu || '',
+          mt_dong: member.mt_dong || '',
+          mt_onboarding: member.mt_onboarding,
+          mt_push1: member.mt_push1,
+          mt_plan_check: member.mt_plan_check,
+          mt_plan_date: member.mt_plan_date,
+          mt_weather_pop: member.mt_weather_pop,
+          mt_weather_sky: member.mt_weather_sky || 1,
+          mt_weather_tmn: member.mt_weather_tmn || 15,
+          mt_weather_tmx: member.mt_weather_tmx || 25,
+          mt_weather_date: member.mt_weather_date || new Date().toISOString(),
+          mt_ldate: member.mt_ldate || new Date().toISOString(),
+          mt_adate: member.mt_adate || new Date().toISOString(),
+          // 그룹 상세 정보 (기본값 설정)
+          sgdt_idx: member.sgdt_idx || index + 1,
+          sgt_idx: selectedGroup.sgt_idx,
+          sgdt_owner_chk: member.sgdt_owner_chk || (index === 0 ? 'Y' : 'N'), // 첫 번째는 그룹장
+          sgdt_leader_chk: member.sgdt_leader_chk || 'N',
+          sgdt_discharge: member.sgdt_discharge || 'N',
+          sgdt_group_chk: member.sgdt_group_chk || 'Y',
+          sgdt_exit: member.sgdt_exit || 'N',
+          sgdt_show: member.sgdt_show || 'Y',
+          sgdt_push_chk: member.sgdt_push_chk || 'Y',
+          sgdt_wdate: member.sgdt_wdate,
+          sgdt_udate: member.sgdt_udate,
+          sgdt_ddate: member.sgdt_ddate,
+          sgdt_xdate: member.sgdt_xdate,
+          sgdt_adate: member.sgdt_adate,
+        }));
+        
+        setGroupMembers(transformedMembers);
+      } catch (error) {
+        console.error('[Group Page] 그룹 멤버 조회 오류:', error);
+        setGroupMembers([]);
+      } finally {
+        setMembersLoading(false);
+      }
+    };
+
+    fetchGroupMembers();
+  }, [selectedGroup]);
+
   // 그룹 선택
-  const handleGroupSelect = (group: any) => {
+  const handleGroupSelect = (group: Group) => {
     setSelectedGroup(group);
   };
 
   // 검색 필터링
   const filteredGroups = groups.filter(group => 
-    group.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    group.description.toLowerCase().includes(searchQuery.toLowerCase())
+    group.sgt_title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (group.sgt_content && group.sgt_content.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // 새 그룹 추가 모달
@@ -128,15 +255,19 @@ function GroupPageContent() {
     setNewGroup(prev => ({ ...prev, [name]: value }));
   };
 
-  // 새 그룹 저장
+  // 새 그룹 저장 (추후 API 연동 필요)
   const handleSaveGroup = () => {
     if (newGroup.name.trim() === '') return;
     
-    const newGroupItem = {
-      id: `${groups.length + 1}`,
-      name: newGroup.name,
-      description: newGroup.description,
-      members: []
+    // TODO: 실제 그룹 생성 API 호출
+    const newGroupItem: Group = {
+      sgt_idx: groups.length + 1,
+      sgt_title: newGroup.name,
+      sgt_content: newGroup.description,
+      mt_idx: 1186,
+      sgt_show: 'Y',
+      sgt_wdate: new Date().toISOString(),
+      memberCount: 0
     };
     
     setGroups([...groups, newGroupItem]);
@@ -146,13 +277,13 @@ function GroupPageContent() {
 
   // 공유 기능 함수들
   const handleShareKakao: () => void = () => {
-    console.log("Share via Kakao: Not yet implemented. Group ID: ", selectedGroup?.id);
+    console.log("Share via Kakao: Not yet implemented. Group ID: ", selectedGroup?.sgt_idx);
     alert('카카오톡 공유 기능은 준비 중입니다.');
   };
 
   const handleCopyLink = () => {
     // 실제 초대 링크 생성 로직 필요 (예: /group/[groupId]/invite)
-    const inviteLink = `${window.location.origin}/group/${selectedGroup?.id}/join`; 
+    const inviteLink = `${window.location.origin}/group/${selectedGroup?.sgt_idx}/join`; 
     navigator.clipboard.writeText(inviteLink)
       .then(() => {
         alert('초대 링크가 복사되었습니다! (임시 링크)');
@@ -165,9 +296,24 @@ function GroupPageContent() {
   };
 
   const handleShareSms = () => {
-    console.log("Share via SMS: Not yet implemented. Group ID: ", selectedGroup?.id);
+    console.log("Share via SMS: Not yet implemented. Group ID: ", selectedGroup?.sgt_idx);
     alert('문자 공유 기능은 준비 중입니다.');
   };
+
+  // 로딩 중일 때
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+        <LoadingSpinner 
+          message="그룹 목록을 불러오는 중입니다..." 
+          fullScreen={true}
+          type="ripple"
+          size="md"
+          color="indigo"
+        />
+      </div>
+    );
+  }
 
   return (
     <PageContainer title="그룹 관리" description="그룹을 생성하고 관리하여 일정과 장소를 공유하세요" showHeader={false} showBackButton={false} className="h-full flex flex-col bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
@@ -192,13 +338,13 @@ function GroupPageContent() {
             <div className="divide-y divide-gray-200 overflow-y-auto flex-grow">
               {filteredGroups.length > 0 ? (
                 filteredGroups.map(group => {
-                  const isSelected = selectedGroup?.id === group.id;
+                  const isSelected = selectedGroup?.sgt_idx === group.sgt_idx;
                   const baseClasses = 'cursor-pointer transition-colors duration-150 ease-in-out px-4 py-2';
                   const selectedClasses = isSelected ? 'bg-blue-100' : 'hover:bg-gray-100';
 
                   return (
                     <div
-                      key={group.id}
+                      key={group.sgt_idx}
                       className={`${baseClasses} ${selectedClasses}`}
                       onClick={() => handleGroupSelect(group)}
                     >
@@ -209,9 +355,9 @@ function GroupPageContent() {
                           <div className="w-4 h-4 mr-2 flex-shrink-0"></div>
                         )}
                         <div>
-                          <h3 className="text-base font-medium text-gray-900">{group.name}</h3>
-                          <p className="mt-1 text-sm text-gray-500">{group.description}</p>
-                          <p className="mt-2 text-xs text-gray-400">멤버: {group.members.length}명</p>
+                          <h3 className="text-base font-medium text-gray-900">{group.sgt_title}</h3>
+                          <p className="mt-1 text-sm text-gray-500">{group.sgt_content}</p>
+                          <p className="mt-2 text-xs text-gray-400">멤버: {group.memberCount}명</p>
                         </div>
                       </div>
                     </div>
@@ -234,7 +380,7 @@ function GroupPageContent() {
                 <div className="flex items-center">
                   {/* 로고 제거: <Image src="/images/smap_logo.webp" alt="SMAP Logo" width={24} height={24} className="mr-2" /> */}
                   <FaLayerGroup className="w-5 h-5 text-orange-600 mr-2 flex-shrink-0" />
-                  <h2 className="text-lg text-gray-900 font-normal">{selectedGroup.name}</h2>
+                  <h2 className="text-lg text-gray-900 font-normal">{selectedGroup.sgt_title}</h2>
                 </div>
                 {/* 액션 버튼 그룹: 수정, 삭제, 그룹원 추가 순서로 변경 */}
                 <div className="flex items-center space-x-2">
@@ -260,28 +406,46 @@ function GroupPageContent() {
                 </div>
               </div>
               <div className="p-6 overflow-y-auto flex-grow bg-white">
-                <p className="text-gray-700">{selectedGroup.description}</p>
-                <div className="mt-6">
-                  <h3 className="text-base font-medium text-gray-900 mb-3">그룹원 ({selectedGroup.members.length}명)</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {selectedGroup.members.map((member: any) => (
-                      <div key={member.id} className="flex items-center p-3 border border-gray-300 rounded-lg bg-gray-100 hover:shadow-md hover:border-indigo-400 transition-all duration-150 ease-in-out">
-                        <div className="h-10 w-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center">
-                          {member.avatar ? (
-                            <img src={member.avatar} alt={member.name} className="h-10 w-10 rounded-full" />
-                          ) : (
-                            <svg className="h-6 w-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                            </svg>
-                          )}
+                <p className="text-gray-700">{selectedGroup.sgt_content}</p>
+                <div>
+                  <h3 className="text-base font-medium text-gray-900 mb-3">그룹원 ({groupMembers.length}명)</h3>
+                  {membersLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <LoadingSpinner 
+                        message="그룹원을 불러오는 중..." 
+                        fullScreen={false}
+                        type="ripple"
+                        size="sm"
+                        color="indigo"
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {groupMembers.length > 0 ? (
+                        groupMembers.map((member: GroupMember) => (
+                          <div key={member.mt_idx} className="flex items-center p-3 border border-gray-300 rounded-lg bg-gray-100 hover:shadow-md hover:border-indigo-400 transition-all duration-150 ease-in-out">
+                            <div className="h-10 w-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center">
+                              <svg className="h-6 w-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <div className="ml-3">
+                              <p className="text-sm font-medium text-gray-900">
+                                {member.mt_nickname || member.mt_name || '이름 없음'}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {member.sgdt_owner_chk === 'Y' ? '그룹장' : member.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="col-span-2 text-center text-gray-500 py-8">
+                          그룹원이 없습니다.
                         </div>
-                        <div className="ml-3">
-                          <p className="text-sm font-medium text-gray-900">{member.name}</p>
-                          <p className="text-xs text-gray-500">{member.position}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
