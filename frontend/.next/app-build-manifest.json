@@ -31,10 +31,35 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/schedules/group/[groupId]/route.js"
     ],
-    "/_not-found/page": [
+    "/api/members/[id]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/api/members/[id]/route.js"
+    ],
+    "/api/groups/[id]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/groups/[id]/route.js"
+    ],
+    "/notice/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/notice/page.js"
+    ],
+    "/api/push-logs/[...slug]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/push-logs/[...slug]/route.js"
+    ],
+    "/api/group-details/member/[id]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/group-details/member/[id]/route.js"
+    ],
+    "/api/groups/[id]/members/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/groups/[id]/members/route.js"
     ]
   }
 }

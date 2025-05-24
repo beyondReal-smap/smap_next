@@ -10,11 +10,10 @@ try {
 
 export async function GET(
   request: NextRequest,
-  context: any
+  { params }: { params: { memberId: string } }
 ) {
   try {
-    const params = await context.params;
-    const { memberId } = params;
+    const { memberId } = await params;
     const backendUrl = `https://118.67.130.71:8000/api/v1/locations/member/${memberId}`;
     
     console.log('[API PROXY] 다른 멤버 위치 백엔드 호출:', backendUrl);

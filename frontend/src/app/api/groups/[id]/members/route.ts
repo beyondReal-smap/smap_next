@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // TODO: 실제 백엔드 API 호출
     // const response = await axios.get(`http://your-backend-api/groups/${id}/members`);
