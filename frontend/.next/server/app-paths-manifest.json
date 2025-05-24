@@ -1,12 +1,7 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/push-logs/[...slug]/route": "app/api/push-logs/[...slug]/route.js",
   "/api/v1/groups/member/[id]/route": "app/api/v1/groups/member/[id]/route.js",
-  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
   "/api/group-members/member/[id]/route": "app/api/group-members/member/[id]/route.js",
-  "/notice/page": "app/notice/page.js",
-  "/location/page": "app/location/page.js",
-  "/home/page": "app/home/page.js",
-  "/logs/page": "app/logs/page.js",
-  "/group/page": "app/group/page.js"
+  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
+  "/home/page": "app/home/page.js"
 }

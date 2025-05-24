@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+interface Schedule {
+  id: string;
+  sst_pidx?: number | null;
+  mt_schedule_idx?: number | null;
+  title?: string | null;
+  date?: string | null;
+  sst_edate?: string | null;
+  sst_location_title?: string | null;
+  sst_location_lat?: number | null;
+  sst_location_long?: number | null;
+  sst_memo?: string | null;
+  sst_wdate?: string | null;
+}
+
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;
 try {
@@ -10,156 +24,81 @@ try {
 
 export async function GET(
   request: NextRequest,
-  context: any
+  { params }: { params: { groupId: string } }
 ) {
   try {
-    const params = await context.params;
-    const { groupId } = params;
+    const { groupId } = await params;
     const { searchParams } = new URL(request.url);
-    const days = searchParams.get('days');
-    
-    let backendUrl = `https://118.67.130.71:8000/api/v1/schedules/group/${groupId}`;
-    if (days) {
-      backendUrl += `?days=${days}`;
-    }
-    
-    console.log('[API PROXY] 백엔드 호출:', backendUrl);
-    
-    const fetchOptions: RequestInit = {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'Next.js API Proxy',
-      },
-      // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
-      rejectUnauthorized: false,
-    };
-    
-    // Node.js 환경 변수로 SSL 검증 비활성화 (Vercel에서)
-    const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    
-    let response: any;
-    let usedMethod = 'default-fetch';
+    const days = searchParams.get('days') || '7'; // 기본 7일
 
-    try {
-      // 기본 fetch 시도
-      response = await fetch(backendUrl, fetchOptions);
-      console.log('[API PROXY] 기본 fetch 성공');
-    } catch (fetchError) {
-      console.log('[API PROXY] 기본 fetch 실패, node-fetch 시도:', fetchError instanceof Error ? fetchError.message : String(fetchError));
-      
-      if (nodeFetch) {
-        // node-fetch 시도
-        try {
-          response = await nodeFetch(backendUrl, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'User-Agent': 'Next.js API Proxy (node-fetch)',
-            },
-            // node-fetch의 SSL 우회 옵션
-            agent: function(_parsedURL: any) {
-              const https = require('https');
-              return new https.Agent({
-                rejectUnauthorized: false
-              });
-            }
-          });
-          usedMethod = 'node-fetch';
-          console.log('[API PROXY] node-fetch 성공');
-        } catch (nodeFetchError) {
-          console.error('[API PROXY] node-fetch도 실패:', nodeFetchError);
-          throw fetchError; // 원래 에러를 던짐
-        }
-      } else {
-        throw fetchError; // node-fetch가 없으면 원래 에러를 던짐
-      }
-    } finally {
-      // 환경 변수 복원
-      if (originalTlsReject !== undefined) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
-      } else {
-        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-      }
-    }
+    // TODO: 실제 백엔드 API 호출
+    // const response = await axios.get(`http://your-backend-api/schedules/group/${groupId}?days=${days}`);
 
-    console.log('[API PROXY] 백엔드 응답 상태:', response.status, response.statusText, '(사용된 방법:', usedMethod + ')');
-    console.log('[API PROXY] 응답 헤더:', Object.fromEntries(response.headers.entries()));
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[API PROXY] 백엔드 에러 응답:', errorText);
-      console.error('[API PROXY] 응답 헤더:', Object.fromEntries(response.headers.entries()));
-      throw new Error(`Backend API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log('[API PROXY] 백엔드 응답 성공, 데이터 길이:', Array.isArray(data) ? data.length : 'object', '(사용된 방법:', usedMethod + ')');
-
-    return NextResponse.json(data, {
-      status: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'X-Fetch-Method': usedMethod, // 사용된 방법을 헤더에 포함
-      },
-    });
-  } catch (error) {
-    console.error('[API PROXY] 상세 오류:', {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : String(error),
-      code: (error as any)?.code || 'UNKNOWN',
-      cause: (error as any)?.cause || null,
-      stack: error instanceof Error ? error.stack : null
-    });
-    
-    // 목업 데이터 반환
-    const mockData = [
+    // 임시 Mock 데이터
+    const today = new Date();
+    const mockSchedules: Schedule[] = [
       {
-        sst_idx: 1,
-        mt_idx: 1186,
-        mt_schedule_idx: 1186,
-        sst_title: '팀 회의',
-        sst_sdate: '2024-12-27 14:00:00',
-        sst_edate: '2024-12-27 15:00:00',
+        id: '1',
+        sst_pidx: 1,
+        mt_schedule_idx: 1186, // 김철수
+        title: '팀 회의',
+        date: new Date(today.getTime() + 2 * 60 * 60 * 1000).toISOString(), // 2시간 후
+        sst_edate: new Date(today.getTime() + 3 * 60 * 60 * 1000).toISOString(), // 3시간 후
         sst_location_title: '강남 사무실',
-        sst_location_lat: 37.5665,
-        sst_location_long: 126.9780,
-        sst_memo: '프로젝트 진행상황 논의',
-        sst_show: 1,
-        sst_all_day: 0
+        sst_location_lat: 37.5642,
+        sst_location_long: 127.0016,
+        sst_memo: '주간 팀 미팅',
+        sst_wdate: new Date().toISOString()
       },
       {
-        sst_idx: 2,
-        mt_idx: 1186,
-        mt_schedule_idx: 1186,
-        sst_title: '저녁 약속',
-        sst_sdate: '2024-12-27 19:00:00',
-        sst_edate: '2024-12-27 21:00:00',
+        id: '2',
+        sst_pidx: 2,
+        mt_schedule_idx: 1187, // 이영희
+        title: '프로젝트 발표',
+        date: new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString(), // 내일
+        sst_edate: new Date(today.getTime() + 25 * 60 * 60 * 1000).toISOString(),
+        sst_location_title: '회의실 A',
+        sst_location_lat: 37.5652,
+        sst_location_long: 127.0026,
+        sst_memo: 'Q3 프로젝트 결과 발표',
+        sst_wdate: new Date().toISOString()
+      },
+      {
+        id: '3',
+        sst_pidx: 3,
+        mt_schedule_idx: 1188, // 박민수
+        title: '고객 미팅',
+        date: new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 모레
+        sst_edate: new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString(),
+        sst_location_title: '강남 오피스',
+        sst_location_lat: 37.5632,
+        sst_location_long: 127.0006,
+        sst_memo: '신규 프로젝트 논의',
+        sst_wdate: new Date().toISOString()
+      },
+      {
+        id: '4',
+        sst_pidx: 4,
+        mt_schedule_idx: 1186, // 김철수
+        title: '저녁 약속',
+        date: new Date(today.getTime() + 8 * 60 * 60 * 1000).toISOString(), // 8시간 후 (저녁)
+        sst_edate: new Date(today.getTime() + 10 * 60 * 60 * 1000).toISOString(),
         sst_location_title: '이탈리안 레스토랑',
-        sst_location_lat: 37.5612,
-        sst_location_long: 126.9966,
-        sst_memo: '친구들과 저녁식사',
-        sst_show: 1,
-        sst_all_day: 0
+        sst_location_lat: 37.5662,
+        sst_location_long: 127.0036,
+        sst_memo: '동료들과 저녁 식사',
+        sst_wdate: new Date().toISOString()
       }
     ];
 
-    console.log('[API PROXY] 목업 데이터 반환:', mockData.length, '개 항목');
+    return NextResponse.json(mockSchedules);
 
-    return NextResponse.json(mockData, {
-      status: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'X-Data-Source': 'mock', // 목업 데이터임을 표시
-      },
-    });
+  } catch (error) {
+    console.error('[API] 그룹 스케줄 조회 오류:', error);
+    return NextResponse.json(
+      { error: '그룹 스케줄을 불러올 수 없습니다.' },
+      { status: 500 }
+    );
   }
 }
 

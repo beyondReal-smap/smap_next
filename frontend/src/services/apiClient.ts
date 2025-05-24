@@ -15,19 +15,45 @@ const apiClient: CustomApiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // CORS 요청에 쿠키 포함
+  withCredentials: false, // API 라우트는 쿠키 불필요
 }) as CustomApiClient;
+
+// 토큰 관리 유틸리티
+const getToken = (): string | null => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('smap_auth_token');
+  }
+  return null;
+};
+
+const removeToken = (): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('smap_auth_token');
+    localStorage.removeItem('smap_user_data');
+  }
+};
 
 // 요청 인터셉터
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    // 인증이 필요한 요청에 토큰 추가
+    const token = getToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // 요청 로깅 (개발 환경에서만)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[API REQUEST] ${config.method?.toUpperCase()} ${config.url}`, {
+        headers: config.headers,
+        data: config.data
+      });
+    }
+    
     return config;
   },
   (error) => {
+    console.error('[API REQUEST ERROR]', error);
     return Promise.reject(error);
   }
 );
@@ -35,24 +61,55 @@ apiClient.interceptors.request.use(
 // 응답 인터셉터
 apiClient.interceptors.response.use(
   (response) => {
+    // 응답 로깅 (개발 환경에서만)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[API RESPONSE] ${response.config.method?.toUpperCase()} ${response.config.url}`, {
+        status: response.status,
+        data: response.data
+      });
+    }
+    
     return response;
   },
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+    
+    // 응답 오류 로깅
     if (error.response) {
-      // 서버가 응답을 반환한 경우
-      console.error('API 응답 오류:', error.response.data);
+      console.error(`[API RESPONSE ERROR] ${error.response.status}:`, error.response.data);
     } else if (error.request) {
-      // 요청이 전송되었지만 응답을 받지 못한 경우
-      console.error('API 요청 오류:', error.request);
+      console.error('[API REQUEST ERROR]:', error.request);
     } else {
-      // 요청 설정 중 오류가 발생한 경우
-      console.error('API 오류:', error.message);
+      console.error('[API ERROR]:', error.message);
     }
-    if (error.response?.status === 401) {
-      // 인증 오류 처리
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+    
+    // 401 오류 처리 (토큰 만료 또는 인증 실패)
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        // 토큰 갱신 시도
+        const refreshResponse = await apiClient.post('/auth/refresh');
+        const newToken = refreshResponse.data.token;
+        
+        if (newToken) {
+          localStorage.setItem('smap_auth_token', newToken);
+          originalRequest.headers.Authorization = `Bearer ${newToken}`;
+          return apiClient(originalRequest);
+        }
+      } catch (refreshError) {
+        console.error('[TOKEN REFRESH ERROR]:', refreshError);
+      }
+      
+      // 토큰 갱신 실패 시 로그아웃 처리
+      removeToken();
+      
+      // 로그인 페이지로 리다이렉트 (클라이언트 사이드에서만)
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
     }
+    
     return Promise.reject(error);
   }
 );

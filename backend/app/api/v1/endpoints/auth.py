@@ -13,6 +13,17 @@ from app.crud import crud_auth
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+# home/page.tsx의 AuthContext에서 사용하는 로그인 요청 모델
+class LoginRequestHome(BaseModel):
+    mt_id: str  # 아이디 (전화번호 또는 이메일)
+    mt_pwd: str  # 비밀번호
+
+# home/page.tsx의 AuthContext에서 사용하는 로그인 응답 모델
+class LoginResponseHome(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     if expires_delta:
@@ -23,7 +34,148 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=LoginResponseHome)
+async def login_for_home_page(
+    login_request: LoginRequestHome,
+    db: Session = Depends(get_db)
+):
+    """
+    home/page.tsx의 AuthContext에서 사용하는 로그인 API
+    """
+    try:
+        # 이메일 또는 전화번호로 사용자 조회
+        user = None
+        if "@" in login_request.mt_id:
+            # 이메일로 조회
+            user = crud_auth.get_user_by_email(db, login_request.mt_id)
+        else:
+            # 전화번호로 조회 (하이픈 제거)
+            user = crud_auth.get_user_by_phone(db, login_request.mt_id.replace("-", ""))
+        
+        if not user:
+            return LoginResponseHome(
+                success=False,
+                message="아이디 또는 비밀번호가 올바르지 않습니다."
+            )
+        
+        # 비밀번호 검증
+        if not user.mt_pwd or not crud_auth.verify_password(login_request.mt_pwd, user.mt_pwd):
+            return LoginResponseHome(
+                success=False,
+                message="아이디 또는 비밀번호가 올바르지 않습니다."
+            )
+
+        # 토큰 생성
+        access_token = create_access_token(
+            data={
+                "mt_idx": user.mt_idx,
+                "mt_id": user.mt_id,
+                "mt_name": user.mt_name
+            }
+        )
+        
+        # 로그인 시간 업데이트
+        user.mt_ldate = datetime.utcnow()
+        db.commit()
+
+        # home/page.tsx의 Member 타입에 맞는 사용자 정보 구성
+        user_data = {
+            "mt_idx": user.mt_idx,
+            "mt_type": user.mt_type or 1,
+            "mt_level": user.mt_level or 2,
+            "mt_status": user.mt_status or 1,
+            "mt_id": user.mt_id or "",
+            "mt_name": user.mt_name or "",
+            "mt_nickname": user.mt_nickname or "",
+            "mt_hp": user.mt_hp or "",
+            "mt_email": user.mt_email or "",
+            "mt_birth": user.mt_birth.isoformat() if user.mt_birth else "",
+            "mt_gender": user.mt_gender or 1,
+            "mt_file1": user.mt_file1 or "",
+            "mt_lat": float(user.mt_lat) if user.mt_lat else 37.5642,
+            "mt_long": float(user.mt_long) if user.mt_long else 127.0016,
+            "mt_sido": user.mt_sido or "",
+            "mt_gu": user.mt_gu or "",
+            "mt_dong": user.mt_dong or "",
+            "mt_onboarding": user.mt_onboarding or 'Y',
+            "mt_push1": user.mt_push1 or 'Y',
+            "mt_plan_check": user.mt_plan_check or 'N',
+            "mt_plan_date": user.mt_plan_date.isoformat() if user.mt_plan_date else "",
+            "mt_weather_pop": user.mt_weather_pop or "",
+            "mt_weather_sky": user.mt_weather_sky or 8,
+            "mt_weather_tmn": user.mt_weather_tmn or 18,
+            "mt_weather_tmx": user.mt_weather_tmx or 25,
+            "mt_weather_date": user.mt_weather_date.isoformat() if user.mt_weather_date else datetime.utcnow().isoformat(),
+            "mt_ldate": user.mt_ldate.isoformat() if user.mt_ldate else datetime.utcnow().isoformat(),
+            "mt_adate": user.mt_adate.isoformat() if user.mt_adate else datetime.utcnow().isoformat()
+        }
+
+        return LoginResponseHome(
+            success=True,
+            message="로그인 성공",
+            data={
+                "token": access_token,
+                "user": user_data
+            }
+        )
+
+    except Exception as e:
+        return LoginResponseHome(
+            success=False,
+            message="서버 오류가 발생했습니다."
+        )
+
+@router.post("/logout")
+async def logout():
+    """
+    로그아웃 (클라이언트에서 토큰 제거)
+    """
+    return {
+        "success": True,
+        "message": "로그아웃되었습니다."
+    }
+
+@router.post("/refresh")
+async def refresh_token(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+):
+    """
+    토큰 갱신
+    """
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        mt_idx: Optional[int] = payload.get("mt_idx")
+        
+        if mt_idx is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="토큰이 유효하지 않습니다."
+            )
+        
+        # 새로운 토큰 생성
+        new_token = create_access_token(
+            data={
+                "mt_idx": mt_idx,
+                "mt_id": payload.get("mt_id"),
+                "mt_name": payload.get("mt_name")
+            }
+        )
+        
+        return {
+            "success": True,
+            "token": new_token,
+            "message": "토큰이 갱신되었습니다."
+        }
+        
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="토큰 갱신에 실패했습니다."
+        )
+
+# 기존 로그인 API (하위 호환성을 위해 유지)
+@router.post("/login-original", response_model=LoginResponse)
 async def login_for_access_token_custom(
     db: Session = Depends(get_db),
     login_request: LoginRequest = Body(...)

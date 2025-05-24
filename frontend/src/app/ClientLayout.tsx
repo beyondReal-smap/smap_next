@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { BottomNavBar } from './components/layout';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 export default function ClientLayout({
   children,
@@ -15,10 +16,14 @@ export default function ClientLayout({
     setIsMounted(true);
   }, []);
 
+  if (!isMounted) {
+    return null; // 서버 사이드 렌더링 중에는 아무것도 렌더링하지 않음
+  }
+
   return (
-    <>
+    <AuthProvider>
       {children}
-      {isMounted && <BottomNavBar />}
-    </>
+      <BottomNavBar />
+    </AuthProvider>
   );
 } 
