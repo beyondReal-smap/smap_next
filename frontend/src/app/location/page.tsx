@@ -542,18 +542,18 @@ export default function LocationPage() {
 
       if (memberData && memberData.length > 0) {
         const convertedMembers: GroupMember[] = memberData.map((member: any, index: number) => ({
-          id: member.mt_idx.toString(),
-          name: member.mt_name || `멤버 ${index + 1}`,
-          photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
-          isSelected: false,
-          location: { 
-            lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
-            lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
-          },
+            id: member.mt_idx.toString(),
+            name: member.mt_name || `멤버 ${index + 1}`,
+            photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
+            isSelected: false,
+            location: { 
+              lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
+              lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
+            },
           schedules: [], 
           savedLocations: [],
-          mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
-          original_index: index
+            mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
+            original_index: index
         }));
 
         setGroupMembers(convertedMembers);
@@ -633,7 +633,7 @@ export default function LocationPage() {
       };
     }
   }, [isGroupSelectorOpen]);
-
+    
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
       setNaverMapsLoaded(true);
@@ -1243,20 +1243,20 @@ export default function LocationPage() {
     const dotColor = isSelected ? '#EC4899' : '#4F46E5';
     
     console.log(`[createMarker] 마커 생성: ${title} at (${lat}, ${lng}), type: ${markerType}, selected: ${isSelected} (state: ${isSelectedByState}, panel: ${isSelectedByInfoPanel}), locationId: ${locationId}`);
-    
-    const markerContent = `
-      <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
+
+        const markerContent = `
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
         <div style="padding: 3px 7px; background-color: ${bgColor}; color: white; border-radius: 5px; font-size: 11px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.3); margin-bottom: 3px;">
           ${title}
-        </div>
+            </div>
         <div style="width: 12px; height: 12px; background-color: ${dotColor}; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
-        </div>
-      </div>
-    `;
+            </div>
+          </div>
+        `;
 
-    const markerInstance = new window.naver.maps.Marker({
-      position: position,
-      map: map.current,
+        const markerInstance = new window.naver.maps.Marker({
+            position: position,
+            map: map.current,
       title: title,
       icon: {
         content: markerContent,
@@ -1274,7 +1274,7 @@ export default function LocationPage() {
         ? (locations.find(l => l.id === locationId) || selectedMemberSavedLocations?.find(l => l.id === locationId))
         : otherMembersSavedLocations?.find(l => (l.id === locationId || (l.slt_idx && l.slt_idx.toString() === locationId)));
       
-      setNewLocation({ 
+            setNewLocation({ 
         id: locationId,
         name: title,
         address: location.address || location.slt_add || '주소 정보 없음',
@@ -1313,12 +1313,12 @@ export default function LocationPage() {
         })(),
       });
       setClickedCoordinates(position);
-      setIsEditingPanel(true); 
-      setIsLocationInfoPanelOpen(true);
-      if (tempMarker.current) tempMarker.current.setMap(null); 
-      
-      if (bottomSheetState === 'collapsed') setBottomSheetState('expanded');
-      
+            setIsEditingPanel(true); 
+            setIsLocationInfoPanelOpen(true); 
+            if (tempMarker.current) tempMarker.current.setMap(null); 
+            
+            if (bottomSheetState === 'collapsed') setBottomSheetState('expanded');
+            
       // 지도 중심을 클릭된 마커로 이동
       map.current.setCenter(position);
       if (map.current.getZoom() < 16) {
@@ -1342,6 +1342,7 @@ export default function LocationPage() {
     
     console.log(`[addMarkersToMap] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작, selectedMarkerId: ${selectedMarkerId}`);
 
+    // 기존 마커 즉시 제거
     Object.values(markers.current).forEach(marker => {
       if (marker && typeof marker.setMap === 'function') marker.setMap(null);
     });
@@ -1352,6 +1353,7 @@ export default function LocationPage() {
       return;
     }
 
+    // 새 마커 즉시 생성
     locationsToDisplay.forEach((location, index) => {
       if (!location.id) {
         console.warn('[addMarkersToMap] Location ID가 없습니다. 마커를 생성할 수 없습니다:', location);
@@ -1540,7 +1542,7 @@ export default function LocationPage() {
       if (validMembers.length > 0 && map.current) {
         const bounds = new window.naver.maps.LatLngBounds();
         validMembers.forEach(member => {
-          bounds.extend(new window.naver.maps.LatLng(member.location.lat, member.location.lng));
+            bounds.extend(new window.naver.maps.LatLng(member.location.lat, member.location.lng));
         });
         
         // 유효한 멤버가 있으면 bounds 적용 (isEmpty 체크 제거)
@@ -1629,11 +1631,9 @@ export default function LocationPage() {
         // activeView 설정
         setActiveView('selectedMemberPlaces');
         
-        // 즉시 마커 생성
-        setTimeout(() => {
-          addMarkersToMap(newlySelectedMember.savedLocations, selectedLocationId || undefined);
-          console.log('[handleMemberSelect] 기존 장소로 마커 생성:', newlySelectedMember.savedLocations.length, '개');
-        }, 300);
+        // 즉시 마커 생성 - setTimeout 제거
+        addMarkersToMap(newlySelectedMember.savedLocations, selectedLocationId || undefined);
+        console.log('[handleMemberSelect] 기존 장소로 마커 즉시 생성:', newlySelectedMember.savedLocations.length, '개');
         
       } else {
         // 저장된 장소가 없으면 API에서 조회
@@ -1674,11 +1674,9 @@ export default function LocationPage() {
             )
           );
           
-          // 마커 생성
-          setTimeout(() => {
-            addMarkersToMap(convertedLocations, selectedLocationId || undefined);
-            console.log('[handleMemberSelect] API 조회 장소로 마커 생성:', convertedLocations.length, '개');
-          }, 300);
+          // 즉시 마커 생성 - setTimeout 제거
+          addMarkersToMap(convertedLocations, selectedLocationId || undefined);
+          console.log('[handleMemberSelect] API 조회 장소로 마커 즉시 생성:', convertedLocations.length, '개');
           
         } catch (error) {
           console.error("Failed to fetch selected member's locations in handleMemberSelect:", error);
@@ -1686,10 +1684,8 @@ export default function LocationPage() {
           setOtherMembersSavedLocations([]);
           setActiveView('selectedMemberPlaces');
           
-          // 오류 시 빈 마커
-          setTimeout(() => {
-            addMarkersToMap([], selectedLocationId || undefined);
-          }, 300);
+          // 오류 시 빈 마커 즉시 생성
+          addMarkersToMap([], selectedLocationId || undefined);
         } finally {
           setIsLoadingOtherLocations(false);
         }
@@ -1728,28 +1724,20 @@ export default function LocationPage() {
           const fetchedLocationsRaw = await locationService.getOtherMembersLocations(currentSelectedMember.id);
           console.log("[useEffect/activeView] Other members' locations (raw):", fetchedLocationsRaw);
           setOtherMembersSavedLocations(fetchedLocationsRaw);
-          // 약간의 지연 후 마커 업데이트 - 깜빡임 최소화
-          setTimeout(() => {
-            addMarkersToMapForOtherMembers(fetchedLocationsRaw, selectedLocationId || undefined);
-          }, 100);
+          // 즉시 마커 업데이트 - setTimeout 제거
+          addMarkersToMapForOtherMembers(fetchedLocationsRaw, selectedLocationId || undefined);
         } catch (error) {
           console.error("Failed to fetch other members' locations on view change", error);
           setOtherMembersSavedLocations([]);
-          setTimeout(() => {
-            addMarkersToMapForOtherMembers([], selectedLocationId || undefined);
-          }, 100);
+          addMarkersToMapForOtherMembers([], selectedLocationId || undefined);
         } finally {
           setIsLoadingOtherLocations(false);
         }
       } else if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
-          // 약간의 지연 후 마커 업데이트 - 깜빡임 최소화
-          setTimeout(() => {
-            addMarkersToMap(selectedMemberSavedLocations || currentSelectedMember.savedLocations || [], selectedLocationId || undefined);
-          }, 100);
+          // 즉시 마커 업데이트 - setTimeout 제거
+          addMarkersToMap(selectedMemberSavedLocations || currentSelectedMember.savedLocations || [], selectedLocationId || undefined);
       } else if (!currentSelectedMember) {
-          setTimeout(() => {
-            addMarkersToMap(locations, selectedLocationId || undefined);
-          }, 100);
+          addMarkersToMap(locations, selectedLocationId || undefined);
       }
     };
 
@@ -1837,25 +1825,23 @@ export default function LocationPage() {
     
     setActiveView(newView);
     
-    // 약간의 지연을 두어 뷰 전환 후 마커 업데이트
-    setTimeout(() => {
-      const currentSelectedMember = groupMembers.find(m => m.isSelected);
-      
-      if (newView === 'selectedMemberPlaces') {
-        if (currentSelectedMember) {
-          const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
-          addMarkersToMap(locationsToShow, selectedLocationId || undefined);
-        } else {
-          addMarkersToMap(locations, selectedLocationId || undefined);
-        }
-      } else if (newView === 'otherMembersPlaces') {
-        if (otherMembersSavedLocations.length > 0) {
-          addMarkersToMapForOtherMembers(otherMembersSavedLocations, selectedLocationId || undefined);
-        } else {
-          addMarkersToMapForOtherMembers([], selectedLocationId || undefined);
-        }
+    // 즉시 마커 업데이트 - setTimeout 제거
+    const currentSelectedMember = groupMembers.find(m => m.isSelected);
+
+    if (newView === 'selectedMemberPlaces') {
+      if (currentSelectedMember) {
+        const locationsToShow = selectedMemberSavedLocations || currentSelectedMember.savedLocations || [];
+        addMarkersToMap(locationsToShow, selectedLocationId || undefined);
+      } else {
+        addMarkersToMap(locations, selectedLocationId || undefined);
       }
-    }, 100);
+    } else if (newView === 'otherMembersPlaces') {
+      if (otherMembersSavedLocations.length > 0) {
+        addMarkersToMapForOtherMembers(otherMembersSavedLocations, selectedLocationId || undefined);
+      } else {
+        addMarkersToMapForOtherMembers([], selectedLocationId || undefined);
+      }
+    }
   };
 
   // handleSwipeScroll 함수 비활성화 - 드래그 기반 뷰 전환으로 대체됨
@@ -1928,18 +1914,16 @@ export default function LocationPage() {
       if(tempMarker.current) tempMarker.current.setMap(null);
     }
     
-    // 마커 재생성은 500ms 지연 후 실행 - 깜빡임 최소화
-    setTimeout(() => {
-      const currentSelectedMember = groupMembers.find(m => m.isSelected);
-      if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
-          const updatedSavedLocations = (selectedMemberSavedLocations || currentSelectedMember.savedLocations || []).filter(loc => loc.id !== idStr);
+    // 마커 재생성은 즉시 실행 - setTimeout 제거
+    const currentSelectedMember = groupMembers.find(m => m.isSelected);
+    if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
+        const updatedSavedLocations = (selectedMemberSavedLocations || currentSelectedMember.savedLocations || []).filter(loc => loc.id !== idStr);
           addMarkersToMap(updatedSavedLocations, selectedLocationId || undefined);
-      } else if (activeView === 'otherMembersPlaces' && !isNaN(idNum)){
+    } else if (activeView === 'otherMembersPlaces' && !isNaN(idNum)){
           addMarkersToMapForOtherMembers(otherMembersSavedLocations.filter(loc => loc.slt_idx !== idNum), selectedLocationId || undefined);
-      } else { 
+    } else { 
           addMarkersToMap(locations.filter(loc => loc.id !== idStr), selectedLocationId || undefined);
-      }
-    }, 500);
+    }
   };
   
   // 다른 멤버의 위치 데이터를 위한 함수 개선
@@ -1950,6 +1934,7 @@ export default function LocationPage() {
     }
     
     console.log('[addMarkersToMapForOtherMembers] 기존 마커 제거 시작');
+    // 기존 마커 즉시 제거
     Object.values(markers.current).forEach(marker => {
       if (marker && typeof marker.setMap === 'function') marker.setMap(null);
     });
@@ -1962,6 +1947,7 @@ export default function LocationPage() {
 
     console.log(`[addMarkersToMapForOtherMembers] ${locationsToDisplay.length}개의 장소에 대한 마커 생성 시작, selectedMarkerId: ${selectedMarkerId}`);
 
+    // 새 마커 즉시 생성
     locationsToDisplay.forEach((location, index) => {
       const markerResult = createMarker(location, index, 'other', selectedMarkerId);
       if (markerResult) {
@@ -1999,8 +1985,8 @@ export default function LocationPage() {
       const markerContent = `
         <div style="position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer;">
           <div style="padding: 3px 7px; background-color: ${bgColor}; color: white; border-radius: 5px; font-size: 11px; font-weight: normal; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.3); margin-bottom: 3px;">
-            ${title}
-          </div>
+                ${title}
+              </div>
           <div style="width: 12px; height: 12px; background-color: ${dotColor}; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2);">
           </div>
         </div>
@@ -2136,8 +2122,8 @@ export default function LocationPage() {
                       e.stopPropagation();
                       
                       const newNotificationStatus = !newLocation.notifications;
-                      const locationIdStr = newLocation.id;
-                      
+                        const locationIdStr = newLocation.id;
+                        
                       console.log('[알림 토글] 시작:', locationIdStr, '→', newNotificationStatus, 'selectedLocationId:', selectedLocationId);
                       
                       // 1. 즉시 UI만 업데이트 (패널의 알림 버튼)
@@ -2150,8 +2136,8 @@ export default function LocationPage() {
                           console.log('[알림 토글] 백그라운드 상태 업데이트 시작');
                           
                           // 다른 멤버 위치 데이터만 조건부 업데이트
-                          const otherMemberLoc = getOtherMemberLocationById(locationIdStr, otherMembersSavedLocations);
-                          if (otherMemberLoc) {
+                        const otherMemberLoc = getOtherMemberLocationById(locationIdStr, otherMembersSavedLocations);
+                        if (otherMemberLoc) {
                             setOtherMembersSavedLocations(prev => prev.map(loc => 
                               loc.slt_idx === otherMemberLoc.slt_idx 
                                 ? { ...loc, slt_enter_alarm: newNotificationStatus ? 'Y' : 'N', notifications: newNotificationStatus } 
@@ -2163,7 +2149,7 @@ export default function LocationPage() {
                           if (activeView === 'selectedMemberPlaces') {
                             setSelectedMemberSavedLocations(prev => 
                               prev ? prev.map(loc => 
-                                loc.id === locationIdStr ? { ...loc, notifications: newNotificationStatus } : loc
+                              loc.id === locationIdStr ? { ...loc, notifications: newNotificationStatus } : loc
                               ) : null
                             );
                           }
@@ -2313,27 +2299,27 @@ export default function LocationPage() {
 
         {/* Bottom Sheet - 로딩 중이 아닐 때만 렌더링 */}
         {!(isMapLoading || isFetchingGroupMembers || !isFirstMemberSelectionComplete) && (
-          <div 
-            ref={bottomSheetRef}
-            className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}
+        <div
+          ref={bottomSheetRef}
+          className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}
             style={{ touchAction: 'pan-x' }} // 좌우 스와이프만 허용
-            onTouchStart={handleDragStart}
-            onTouchMove={handleDragMove}
-            onTouchEnd={handleDragEnd}
-            onMouseDown={handleDragStart}
-            onMouseMove={handleDragMove}
-            onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
-          >
-            <div className="bottom-sheet-handle"></div>
-            <div className="px-4 pb-4">
-              <div
-                ref={swipeContainerRef}
-                className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar"
-              >
-                <div className="w-full flex-shrink-0 snap-start">
-                   <div className="content-section members-section min-h-[180px] max-h-[180px] overflow-y-auto">
-                     <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+          onTouchStart={handleDragStart}
+          onTouchMove={handleDragMove}
+          onTouchEnd={handleDragEnd}
+          onMouseDown={handleDragStart}
+          onMouseMove={handleDragMove}
+          onMouseUp={handleDragEnd}
+          onMouseLeave={handleDragEnd}
+        >
+          <div className="bottom-sheet-handle"></div>
+          <div className="px-4 pb-4">
+            <div
+              ref={swipeContainerRef}
+              className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar"
+            >
+              <div className="w-full flex-shrink-0 snap-start">
+                 <div className="content-section members-section min-h-[180px] max-h-[180px] overflow-y-auto">
+                   <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
                        <div className="flex items-center space-x-3">
                          <span>그룹 멤버</span>
                          {isFetchingGroupMembers && <FiLoader className="animate-spin text-indigo-500" size={18}/>}
@@ -2387,27 +2373,27 @@ export default function LocationPage() {
                            )}
                          </div>
 
-                         <Link 
-                           href="/group" 
-                           className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                         >
+                     <Link 
+                       href="/group" 
+                       className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                     >
                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
                           </svg>
-                           그룹 관리
-                         </Link>
+                       그룹 관리
+                     </Link>
                        </div>
-                     </h2>
-                     {isLoading ? (
-                      <div className="text-center py-3 text-gray-500">
-                        <FiLoader className="animate-spin mx-auto mb-1" />
-                        <p>멤버 정보를 불러오는 중...</p>
-                      </div>
-                     ) : groupMembers.length > 0 ? (
-                       <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
-                         {groupMembers.map((member) => (
-                           <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
-                             <button
+                   </h2>
+                   {isLoading ? (
+                    <div className="text-center py-3 text-gray-500">
+                      <FiLoader className="animate-spin mx-auto mb-1" />
+                      <p>멤버 정보를 불러오는 중...</p>
+                    </div>
+                   ) : groupMembers.length > 0 ? (
+                     <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
+                       {groupMembers.map((member) => (
+                         <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
+                           <button
                                onClick={(e) => {
                                  e.stopPropagation();
                                  handleMemberSelect(member.id);
@@ -2415,81 +2401,81 @@ export default function LocationPage() {
                                onTouchStart={(e) => e.stopPropagation()}
                                onTouchMove={(e) => e.stopPropagation()}
                                onTouchEnd={(e) => e.stopPropagation()}
-                               className={`flex flex-col items-center focus:outline-none`}
-                             >
-                               <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'}`}>
-                                 <img 
-                                  src={member.photo ?? getDefaultImage(member.mt_gender, member.original_index)} 
-                                  alt={member.name} 
-                                  className="w-full h-full object-cover" 
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    target.src = getDefaultImage(member.mt_gender, member.original_index);
-                                    target.onerror = null; 
-                                  }}
-                                 />
-                               </div>
-                               <span className={`block text-xs font-medium mt-1.5 ${member.isSelected ? 'text-indigo-700' : 'text-gray-700'}`}>
-                                 {member.name}
-                               </span>
-                             </button>
-                           </div>
-                         ))}
-                       </div>
-                     ) : (
-                       <div className="text-center py-3 text-gray-500">
-                         <p>그룹에 참여한 멤버가 없습니다</p>
-                       </div>
-                     )}
-                   </div>
-                </div>
+                             className={`flex flex-col items-center focus:outline-none`}
+                           >
+                             <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'}`}>
+                               <img 
+                                src={member.photo ?? getDefaultImage(member.mt_gender, member.original_index)} 
+                                alt={member.name} 
+                                className="w-full h-full object-cover" 
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = getDefaultImage(member.mt_gender, member.original_index);
+                                  target.onerror = null; 
+                                }}
+                               />
+                             </div>
+                             <span className={`block text-xs font-medium mt-1.5 ${member.isSelected ? 'text-indigo-700' : 'text-gray-700'}`}>
+                               {member.name}
+                             </span>
+                           </button>
+                         </div>
+                       ))}
+                     </div>
+                   ) : (
+                     <div className="text-center py-3 text-gray-500">
+                       <p>그룹에 참여한 멤버가 없습니다</p>
+                     </div>
+                   )}
+                 </div>
+              </div>
 
-                {/* 다른 멤버들의 장소 뷰 (스와이프 대상) */}
-                <div className="w-full flex-shrink-0 snap-start">
-                  <div className="content-section places-section min-h-[180px] max-h-[180px] overflow-y-auto">
-                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
-                      {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 장소` : '다른 멤버들의 장소'}
-                      {isLoadingOtherLocations && <FiLoader className="animate-spin ml-2 text-indigo-500" size={18}/>}
-                    </h2>
-                    {isLoadingOtherLocations ? (
-                      <div className="text-center py-3 text-gray-500">
-                        <FiLoader className="animate-spin mx-auto mb-1" />
-                        <p>다른 멤버 장소 로딩 중...</p>
-                      </div>
-                    ) : otherMembersSavedLocations.length > 0 ? (
-                      <div className="flex overflow-x-auto space-x-3 pb-2 hide-scrollbar -mx-1 px-1">
-                        {otherMembersSavedLocations.map(location => {
-                          // 좌표 파싱 전에 location 객체 전체를 로깅
-                          console.log(`[LOCATION] 전체 location 객체:`, location);
-                          
-                          // 다양한 좌표 필드 시도
-                          let lat = 0;
-                          let lng = 0;
-                          
-                          // 우선순위: coordinates > slt_lat/slt_long > 기타 필드들
-                          if (location.coordinates && Array.isArray(location.coordinates) && location.coordinates.length >= 2) {
-                            lat = typeof location.coordinates[1] === 'number' ? location.coordinates[1] : parseFloat(String(location.coordinates[1])) || 0;
-                            lng = typeof location.coordinates[0] === 'number' ? location.coordinates[0] : parseFloat(String(location.coordinates[0])) || 0;
-                            console.log(`[LOCATION] coordinates 배열에서 좌표 추출: lat=${lat}, lng=${lng}`);
-                          } else if (location.slt_lat && location.slt_long) {
-                            lat = parseFloat(String(location.slt_lat || '0')) || 0;
-                            lng = parseFloat(String(location.slt_long || '0')) || 0;
-                            console.log(`[LOCATION] slt_lat/slt_long에서 좌표 추출: lat=${lat}, lng=${lng}`);
-                          } else {
-                            console.error(`[LOCATION] 유효한 좌표를 찾을 수 없습니다:`, location);
-                          }
-                          
-                          console.log(`[LOCATION] 최종 파싱된 좌표: lat=${lat}, lng=${lng}`);
-                          
-                          // 좌표 유효성 검사
-                          if (lat === 0 && lng === 0) {
-                            console.error('[LOCATION] 유효하지 않은 좌표입니다 (0, 0). 지도 중심 이동을 건너뜁니다.');
-                            return null;
-                          }
-                          
-                          return (
-                            <div 
-                              key={location.slt_idx} 
+              {/* 다른 멤버들의 장소 뷰 (스와이프 대상) */}
+              <div className="w-full flex-shrink-0 snap-start">
+                <div className="content-section places-section min-h-[180px] max-h-[180px] overflow-y-auto">
+                  <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+                    {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 장소` : '다른 멤버들의 장소'}
+                    {isLoadingOtherLocations && <FiLoader className="animate-spin ml-2 text-indigo-500" size={18}/>}
+                  </h2>
+                  {isLoadingOtherLocations ? (
+                    <div className="text-center py-3 text-gray-500">
+                      <FiLoader className="animate-spin mx-auto mb-1" />
+                      <p>다른 멤버 장소 로딩 중...</p>
+                    </div>
+                  ) : otherMembersSavedLocations.length > 0 ? (
+                    <div className="flex overflow-x-auto space-x-3 pb-2 hide-scrollbar -mx-1 px-1">
+                      {otherMembersSavedLocations.map(location => {
+                        // 좌표 파싱 전에 location 객체 전체를 로깅
+                        console.log(`[LOCATION] 전체 location 객체:`, location);
+                        
+                        // 다양한 좌표 필드 시도
+                        let lat = 0;
+                        let lng = 0;
+                        
+                        // 우선순위: coordinates > slt_lat/slt_long > 기타 필드들
+                        if (location.coordinates && Array.isArray(location.coordinates) && location.coordinates.length >= 2) {
+                          lat = typeof location.coordinates[1] === 'number' ? location.coordinates[1] : parseFloat(String(location.coordinates[1])) || 0;
+                          lng = typeof location.coordinates[0] === 'number' ? location.coordinates[0] : parseFloat(String(location.coordinates[0])) || 0;
+                          console.log(`[LOCATION] coordinates 배열에서 좌표 추출: lat=${lat}, lng=${lng}`);
+                        } else if (location.slt_lat && location.slt_long) {
+                          lat = parseFloat(String(location.slt_lat || '0')) || 0;
+                          lng = parseFloat(String(location.slt_long || '0')) || 0;
+                          console.log(`[LOCATION] slt_lat/slt_long에서 좌표 추출: lat=${lat}, lng=${lng}`);
+                        } else {
+                          console.error(`[LOCATION] 유효한 좌표를 찾을 수 없습니다:`, location);
+                        }
+                        
+                        console.log(`[LOCATION] 최종 파싱된 좌표: lat=${lat}, lng=${lng}`);
+                        
+                        // 좌표 유효성 검사
+                        if (lat === 0 && lng === 0) {
+                          console.error('[LOCATION] 유효하지 않은 좌표입니다 (0, 0). 지도 중심 이동을 건너뜁니다.');
+                          return null;
+                        }
+                        
+                        return (
+                          <div 
+                            key={location.slt_idx} 
                               className={`flex-shrink-0 w-48 bg-white rounded-lg p-3.5 cursor-pointer transition-all duration-200 ease-in-out transform hover:-translate-y-0.5 ${
                                 (selectedLocationId === (location.slt_idx ? location.slt_idx.toString() : location.id) || 
                                  selectedLocationIdRef.current === (location.slt_idx ? location.slt_idx.toString() : location.id))
@@ -2506,58 +2492,58 @@ export default function LocationPage() {
                                     }
                                   : {})
                               }}
-                              onClick={() => {
-                                console.log(`[LOCATION] 장소 클릭됨: ${location.name || location.slt_title}, 좌표: [${lat}, ${lng}]`);
-                                console.log(`[LOCATION] 지도 초기화 상태: ${isMapInitialized}, 지도 객체 존재: ${!!map.current}, 네이버 API: ${!!window.naver?.maps}`);
+                            onClick={() => {
+                              console.log(`[LOCATION] 장소 클릭됨: ${location.name || location.slt_title}, 좌표: [${lat}, ${lng}]`);
+                              console.log(`[LOCATION] 지도 초기화 상태: ${isMapInitialized}, 지도 객체 존재: ${!!map.current}, 네이버 API: ${!!window.naver?.maps}`);
+                              
+                              // 좌표 유효성 검사
+                              if (lat === 0 && lng === 0) {
+                                console.error('[LOCATION] 유효하지 않은 좌표입니다 (0, 0). 지도 중심 이동을 건너뜁니다.');
+                                return;
+                              }
+                              
+                              if (!isMapInitialized) {
+                                console.error('[LOCATION] 지도가 아직 초기화되지 않았습니다.');
+                                return;
+                              }
+                              
+                              if (!map.current) {
+                                console.error('[LOCATION] 지도 객체가 없습니다.');
+                                return;
+                              }
+                              
+                              if (!window.naver?.maps) {
+                                console.error('[LOCATION] 네이버 지도 API가 로드되지 않았습니다.');
+                                return;
+                              }
+                              
+                              try {
+                                const position = new window.naver.maps.LatLng(lat, lng);
+                                console.log(`[LOCATION] 생성된 LatLng 객체:`, position);
                                 
-                                // 좌표 유효성 검사
-                                if (lat === 0 && lng === 0) {
-                                  console.error('[LOCATION] 유효하지 않은 좌표입니다 (0, 0). 지도 중심 이동을 건너뜁니다.');
-                                  return;
+                                // 지도 중심 이동
+                                console.log(`[LOCATION] 지도 중심 이동 시작: lat=${lat}, lng=${lng}`);
+                                map.current.setCenter(position);
+                                
+                                // 줌 레벨 설정
+                                const currentZoom = map.current.getZoom();
+                                if (currentZoom < 16) {
+                                  map.current.setZoom(16);
+                                  console.log(`[LOCATION] 줌 레벨 변경: ${currentZoom} → 16`);
                                 }
                                 
-                                if (!isMapInitialized) {
-                                  console.error('[LOCATION] 지도가 아직 초기화되지 않았습니다.');
-                                  return;
-                                }
-                                
-                                if (!map.current) {
-                                  console.error('[LOCATION] 지도 객체가 없습니다.');
-                                  return;
-                                }
-                                
-                                if (!window.naver?.maps) {
-                                  console.error('[LOCATION] 네이버 지도 API가 로드되지 않았습니다.');
-                                  return;
-                                }
-                                
-                                try {
-                                  const position = new window.naver.maps.LatLng(lat, lng);
-                                  console.log(`[LOCATION] 생성된 LatLng 객체:`, position);
-                                  
-                                  // 지도 중심 이동
-                                  console.log(`[LOCATION] 지도 중심 이동 시작: lat=${lat}, lng=${lng}`);
-                                  map.current.setCenter(position);
-                                  
-                                  // 줌 레벨 설정
-                                  const currentZoom = map.current.getZoom();
-                                  if (currentZoom < 16) {
-                                    map.current.setZoom(16);
-                                    console.log(`[LOCATION] 줌 레벨 변경: ${currentZoom} → 16`);
-                                  }
-                                  
-                                  console.log(`[LOCATION] 지도 중심 이동 완료`);
+                                console.log(`[LOCATION] 지도 중심 이동 완료`);
                                   
                                   const currentSelectedId = location.slt_idx ? location.slt_idx.toString() : (location.id || Date.now().toString());
-                                  
-                                  setNewLocation({
+                                
+                                setNewLocation({ 
                                     id: currentSelectedId,
-                                    name: location.name || location.slt_title || '',
-                                    address: location.address || location.slt_add || '',
-                                    coordinates: [lng, lat],
-                                    category: location.category || '기타',
-                                    memo: location.memo || '',
-                                    favorite: location.favorite || false,
+                                  name: location.name || location.slt_title || '',
+                                  address: location.address || location.slt_add || '',
+                                  coordinates: [lng, lat],
+                                  category: location.category || '기타',
+                                  memo: location.memo || '',
+                                  favorite: location.favorite || false,
                                     notifications: (() => {
                                       // 현재 상태에서 해당 장소의 최신 알림 상태를 찾기
                                       const locationId = location.slt_idx ? location.slt_idx.toString() : (location.id || Date.now().toString());
@@ -2591,17 +2577,17 @@ export default function LocationPage() {
                                         ? location.notifications 
                                         : ((location as any).slt_enter_alarm === 'Y' || (location as any).slt_enter_alarm === undefined);
                                     })()
-                                  });
-                                  setClickedCoordinates(position);
-                                  setIsEditingPanel(true); 
-                                  setIsLocationInfoPanelOpen(true);
-                                  
-                                  // 임시 마커 제거
-                                  if (tempMarker.current) {
-                                    tempMarker.current.setMap(null);
-                                    tempMarker.current = null;
-                                  }
-                                  
+                                });
+                                setClickedCoordinates(position);
+                                setIsEditingPanel(true); 
+                                setIsLocationInfoPanelOpen(true);
+                                
+                                // 임시 마커 제거
+                                if (tempMarker.current) {
+                                  tempMarker.current.setMap(null);
+                                  tempMarker.current = null;
+                                }
+                                
                                   // 선택된 장소 ID 설정 (바텀시트 스타일 업데이트용)
                                   setSelectedLocationId(currentSelectedId);
                                   selectedLocationIdRef.current = currentSelectedId; // ref도 함께 업데이트
@@ -2610,56 +2596,56 @@ export default function LocationPage() {
                                   // 선택된 마커 색상 변경 - 지연 시간 제거하여 즉시 실행
                                   console.log(`[LOCATION] 바텀시트에서 선택된 장소의 마커 색상 변경: ${currentSelectedId}`);
                                   updateMarkerSelection(currentSelectedId);
-                                  
-                                } catch (error) {
-                                  console.error('[LOCATION] 지도 중심 이동 중 오류:', error);
-                                }
-                              }}
-                            >
-                              <div className="flex items-center justify-between mb-1.5">
-                                <div className="flex items-center min-w-0">
-                                  <FiMapPin className="w-3.5 h-3.5 text-purple-600 mr-1.5 flex-shrink-0" />
-                                  <h4 className="text-sm font-semibold text-gray-800 truncate">{location.name || location.slt_title || '제목 없음'}</h4>
-                                </div>
-                                {/* 알림 아이콘: location.notifications 또는 location.slt_enter_alarm 사용 */}
-                                {(location.notifications || (location as any).slt_enter_alarm === 'Y') ? (
-                                  <FiBell size={12} className="text-yellow-500 flex-shrink-0 ml-1" />
-                                ) : (
-                                  <FiBellOff size={12} className="text-red-500 flex-shrink-0 ml-1" />
-                                )}
+                                
+                              } catch (error) {
+                                console.error('[LOCATION] 지도 중심 이동 중 오류:', error);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center min-w-0">
+                                <FiMapPin className="w-3.5 h-3.5 text-purple-600 mr-1.5 flex-shrink-0" />
+                                <h4 className="text-sm font-semibold text-gray-800 truncate">{location.name || location.slt_title || '제목 없음'}</h4>
                               </div>
-                              <p className="text-xs text-gray-500 truncate mt-1 pl-[1.125rem]">{location.address || location.slt_add || '주소 정보 없음'}</p>
+                              {/* 알림 아이콘: location.notifications 또는 location.slt_enter_alarm 사용 */}
+                                {(location.notifications || (location as any).slt_enter_alarm === 'Y') ? (
+                                <FiBell size={12} className="text-yellow-500 flex-shrink-0 ml-1" />
+                              ) : (
+                                <FiBellOff size={12} className="text-red-500 flex-shrink-0 ml-1" />
+                              )}
                             </div>
-                          );
-                        }).filter(Boolean)}
-                      </div>
-                    ) : (
-                      <div className="text-center py-3 text-gray-500">
-                        <p>{groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}님이 등록한 장소가 없습니다.` : '다른 멤버들이 등록한 장소가 없습니다.'}</p>
-                      </div>
-                    )}
-                  </div>
+                            <p className="text-xs text-gray-500 truncate mt-1 pl-[1.125rem]">{location.address || location.slt_add || '주소 정보 없음'}</p>
+                          </div>
+                        );
+                      }).filter(Boolean)}
+                    </div>
+                  ) : (
+                    <div className="text-center py-3 text-gray-500">
+                      <p>{groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}님이 등록한 장소가 없습니다.` : '다른 멤버들이 등록한 장소가 없습니다.'}</p>
+                    </div>
+                  )}
                 </div>
               </div>
-              {/* 스와이프 인디케이터 (점) */}
-              <div className="flex justify-center items-center my-2">
-                  <button
+            </div>
+            {/* 스와이프 인디케이터 (점) */}
+            <div className="flex justify-center items-center my-2">
+                <button
                     onClick={() => handleViewChange('selectedMemberPlaces')}
-                    className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
-                      activeView === 'selectedMemberPlaces' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
-                    } transition-all duration-300`}
-                    aria-label="선택된 멤버 장소 뷰로 전환"
-                  />
-                  <button
+                  className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
+                    activeView === 'selectedMemberPlaces' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
+                  } transition-all duration-300`}
+                  aria-label="선택된 멤버 장소 뷰로 전환"
+                />
+                <button
                     onClick={() => handleViewChange('otherMembersPlaces')}
-                    className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
-                      activeView === 'otherMembersPlaces' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
-                    } transition-all duration-300`}
-                    aria-label="다른 멤버 장소 뷰로 전환"
-                  />
-              </div>
+                  className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
+                    activeView === 'otherMembersPlaces' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
+                  } transition-all duration-300`}
+                  aria-label="다른 멤버 장소 뷰로 전환"
+                />
             </div>
           </div>
+        </div>
         )}
 
         {isAddModalOpen && renderModal(
