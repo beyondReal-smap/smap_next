@@ -13,10 +13,12 @@ class AuthService {
       const response = await apiClient.post<LoginResponse>('/auth/login', credentials);
       
       if (response.data.success && response.data.data) {
-        // 토큰 저장
-        this.setToken(response.data.data.token);
+        // 토큰 저장 (token이 있는 경우에만)
+        if (response.data.data.token) {
+          this.setToken(response.data.data.token);
+        }
         // 사용자 전체 정보 조회 및 저장
-        const userProfile = await this.getUserProfile(response.data.data.user.mt_idx);
+        const userProfile = await this.getUserProfile(response.data.data.member.mt_idx);
         this.setUserData(userProfile);
       }
       
@@ -97,7 +99,8 @@ class AuthService {
             myRole: {
               isOwner: detail.sgdt_owner_chk === 'Y',
               isLeader: detail.sgdt_leader_chk === 'Y',
-              canReceivePush: detail.sgdt_push_chk === 'Y'
+              canInvite: detail.sgdt_leader_chk === 'Y' || detail.sgdt_owner_chk === 'Y',
+              canEdit: detail.sgdt_owner_chk === 'Y'
             }
           } as GroupWithMembers;
         })
@@ -132,7 +135,8 @@ class AuthService {
         myRole: {
           isOwner: myDetail.sgdt_owner_chk === 'Y',
           isLeader: myDetail.sgdt_leader_chk === 'Y',
-          canReceivePush: myDetail.sgdt_push_chk === 'Y'
+          canInvite: myDetail.sgdt_leader_chk === 'Y' || myDetail.sgdt_owner_chk === 'Y',
+          canEdit: myDetail.sgdt_owner_chk === 'Y'
         }
       };
     } catch (error) {

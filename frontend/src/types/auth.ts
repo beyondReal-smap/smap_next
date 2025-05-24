@@ -94,7 +94,7 @@ export interface LoginResponse {
 // 로그인 요청 타입
 export interface LoginRequest {
   mt_id: string;
-  mt_password: string;
+  mt_pwd: string;
 }
 
 // API 응답의 공통 타입
