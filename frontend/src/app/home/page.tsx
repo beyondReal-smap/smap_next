@@ -690,6 +690,12 @@ export default function HomePage() {
     if (bottomSheetRef.current) {
       bottomSheetRef.current.style.transition = 'none';
     }
+
+    // 핸들 영역에서 시작된 드래그인지 확인하여 로그 출력
+    const isHandleDrag = target.classList.contains('bottom-sheet-handle');
+    if (isHandleDrag) {
+      console.log('[BOTTOM_SHEET] 핸들에서 드래그 시작');
+    }
   };
 
   const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
@@ -750,23 +756,8 @@ export default function HomePage() {
     const deltaY = clientY - startDragY.current;
     const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
     
-    // 드래그가 아닌 탭 동작인 경우 (짧은 시간 + 작은 움직임)
-    const isTap = Math.abs(deltaY) < 10 && deltaTime < 200;
-    
-    if (isTap) {
-      // 탭 동작: 다음 단계로 이동
-      let nextState: 'collapsed' | 'middle' | 'expanded' = bottomSheetState;
-      
-      if (bottomSheetState === 'collapsed') {
-        nextState = 'middle';
-      } else if (bottomSheetState === 'middle') {
-        nextState = 'expanded';
-      }
-      // expanded에서 탭하면 그대로 유지
-      
-      console.log('[BOTTOM_SHEET] 탭으로 상태 변경:', bottomSheetState, '→', nextState);
-      setBottomSheetState(nextState);
-    }
+    // 탭 동작 완전 비활성화 - 드래그만 허용
+    console.log('[BOTTOM_SHEET] 드래그 종료 - 탭 동작 비활성화됨 (deltaY:', deltaY, ', deltaTime:', deltaTime, ')');
 
     // 스타일 복원
     if (bottomSheetRef.current) {
@@ -2275,13 +2266,13 @@ export default function HomePage() {
                         return (
                           <li key={schedule.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors relative"> {/* relative 추가 */}
                             <Link href={`/schedule/${schedule.id}`} className="block"> 
-                              <h3 className="font-medium text-gray-900 text-base mb-1">{schedule.title}</h3> 
+                              <h3 className="font-medium text-pink-700 text-base mb-1">{schedule.title}</h3> 
                               
-                              <div className="flex items-center text-sm text-gray-700 mb-1">
+                              <div className="flex items-center text-sm text-gray-800 mb-1">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                   </svg>
-                                <span className="text-gray-600">{formattedTime}</span> {/* 시간 텍스트 색상 변경 */}
+                                <span className="text-gray-700">{formattedTime}</span> {/* 시간 텍스트 색상 변경 */}
                               </div>
 
                               {displayLocation && (
@@ -2295,7 +2286,7 @@ export default function HomePage() {
                               
                               {/* 오른쪽 화살표 아이콘 */}
                               <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
                               </div>
@@ -2333,7 +2324,7 @@ export default function HomePage() {
                           <li key={place.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
                             <Link href={`/location/place/${place.id}`} className="block">
                               <div className="flex justify-between">
-                                <h3 className="font-medium text-gray-900">{place.title}</h3>
+                                <h3 className="font-medium text-yellow-700">{place.title}</h3>
                                 <span className="text-sm text-indigo-600 font-medium">
                                   {formatDistance(place.distance)}
                                 </span>
