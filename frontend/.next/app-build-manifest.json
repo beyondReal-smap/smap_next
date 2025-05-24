@@ -46,6 +46,22 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/groups/route.js"
     ],
+    "/location/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/location/layout.js"
+    ],
+    "/location/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/css/app/location/page.css",
+      "static/chunks/app/location/page.js"
+    ],
+    "/api/locations/other-members/[memberId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/locations/other-members/[memberId]/route.js"
+    ],
     "/_not-found/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",

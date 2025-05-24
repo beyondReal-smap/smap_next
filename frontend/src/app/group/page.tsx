@@ -4,10 +4,10 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 // import Image from 'next/image'; // 더 이상 사용하지 않으므로 주석 처리 또는 삭제
-import { PageContainer } from '../components/layout';
+import { PageContainer, Button } from '../components/layout';
 import { FaUsers, FaLayerGroup, FaXmark, FaUserPlus, FaPlus } from 'react-icons/fa6';
 import { RiKakaoTalkFill } from 'react-icons/ri';
-import { FiLink, FiChevronRight } from 'react-icons/fi';
+import { FiLink, FiChevronRight, FiX } from 'react-icons/fi';
 import { MdOutlineMessage } from 'react-icons/md';
 import { FaCheckCircle } from 'react-icons/fa';
 import groupService, { Group } from '@/services/groupService';
@@ -127,6 +127,7 @@ function GroupPageContent() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const router = useRouter();
 
   // 사용자 그룹 목록 조회
@@ -271,24 +272,60 @@ function GroupPageContent() {
     setNewGroup(prev => ({ ...prev, [name]: value }));
   };
 
-  // 새 그룹 저장 (추후 API 연동 필요)
-  const handleSaveGroup = () => {
+  // 새 그룹 저장 - 실제 API 호출로 변경
+  const handleSaveGroup = async () => {
     if (newGroup.name.trim() === '') return;
     
-    // TODO: 실제 그룹 생성 API 호출
-    const newGroupItem: Group = {
-      sgt_idx: groups.length + 1,
-      sgt_title: newGroup.name,
-      sgt_content: newGroup.description,
-      mt_idx: 1186,
-      sgt_show: 'Y',
-      sgt_wdate: new Date().toISOString(),
-      memberCount: 0
-    };
+    setIsCreatingGroup(true); // 로딩 시작
     
-    setGroups([...groups, newGroupItem]);
-    setSelectedGroup(newGroupItem);
-    handleCloseModal();
+    try {
+      // 실제 그룹 생성 API 호출
+      const groupData = {
+        mt_idx: 1186, // 현재 로그인한 사용자 ID (추후 실제 로그인 시스템과 연동 필요)
+        sgt_title: newGroup.name.trim(),
+        sgt_code: null, // 그룹 코드는 서버에서 자동 생성
+        sgt_show: 'Y' as const
+      };
+      
+      console.log('[Group Page] 그룹 생성 시도:', groupData);
+      const createdGroup = await groupService.createGroup(groupData);
+      console.log('[Group Page] 그룹 생성 성공:', createdGroup);
+      
+      // 생성된 그룹을 목록에 추가
+      const newGroupItem: Group = {
+        sgt_idx: createdGroup.sgt_idx,
+        sgt_title: createdGroup.sgt_title,
+        sgt_content: createdGroup.sgt_content || '',
+        mt_idx: createdGroup.mt_idx,
+        sgt_show: createdGroup.sgt_show,
+        sgt_wdate: createdGroup.sgt_wdate,
+        memberCount: 1 // 생성자가 첫 번째 멤버
+      };
+      
+      setGroups(prevGroups => [newGroupItem, ...prevGroups]);
+      
+      // 그룹 멤버 수 업데이트
+      setGroupMemberCounts(prev => ({
+        ...prev,
+        [createdGroup.sgt_idx]: 1
+      }));
+      
+      // 새로 생성된 그룹을 선택
+      setSelectedGroup(newGroupItem);
+      
+      // 모달 닫기
+      handleCloseModal();
+      
+      // 성공 알림 (선택사항)
+      console.log(`[Group Page] 그룹 "${newGroup.name}" 생성 완료`);
+      
+    } catch (error) {
+      console.error('[Group Page] 그룹 생성 오류:', error);
+      // 에러 처리 - 사용자에게 알림
+      alert('그룹 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsCreatingGroup(false); // 로딩 종료
+    }
   };
 
   // 공유 기능 함수들
@@ -504,62 +541,39 @@ function GroupPageContent() {
             onClick={handleCloseModal}
           >
             <div 
-              className="bg-white rounded-lg shadow-xl max-w-lg w-full animate-scaleIn text-left overflow-hidden"
+              className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 modal-content animate-scaleIn"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* 모달 헤더 수정 */}
-              <div className="flex justify-between items-center p-4 sm:p-5 border-b border-gray-200">
-                <h3 className="text-xl leading-6 font-semibold text-gray-900 font-light">새 그룹 만들기</h3>
+              <div className="flex justify-between items-center mb-3 pb-3 border-b border-gray-200">
+                <h3 className="text-lg font-semibold text-gray-800">새 그룹 만들기</h3>
                 <button 
                   onClick={handleCloseModal}
-                  className="p-1 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-                  aria-label="닫기"
+                  className="text-gray-400 hover:text-gray-500 p-1 -m-1"
                 >
-                  <FaXmark className="h-5 w-5" />
+                  <FiX size={20} />
                 </button>
               </div>
-
-              {/* 모달 본문 수정 */}
-              <div className="px-5 pt-8 pb-4 flex flex-col">
-                <label htmlFor="name" className="mb-2 font-semibold text-gray-700">그룹명</label>
-                <input
-                  type="text"
-                  name="name"
-                  id="name"
-                  value={newGroup.name}
-                  onChange={handleInputChange}
-                  className="w-full bg-gray-100 rounded-2xl px-4 py-4 text-base placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 border-none"
-                  placeholder="그룹 이름을 입력하세요"
-                />
-                <label htmlFor="description" className="mb-2 font-semibold text-gray-700">그룹 설명</label>
-                <textarea
-                  name="description"
-                  id="description"
-                  rows={4}
-                  value={newGroup.description}
-                  onChange={handleInputChange}
-                  className="w-full bg-gray-100 rounded-2xl px-4 py-4 text-base placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4 border-none resize-none"
-                  placeholder="그룹에 대한 설명을 입력하세요 (선택 사항)"
-                />
-              </div>
-              {/* 모달 푸터 수정 */}
-              <div className="flex flex-col gap-2 mt-2">
-                <button
-                  type="button"
-                  onClick={handleSaveGroup}
-                  className="w-full max-w-xs mx-auto py-4 rounded-2xl bg-indigo-600 text-white text-lg font-bold shadow-md active:bg-indigo-700 transition disabled:opacity-50"
-                  disabled={newGroup.name.trim() === ''}
-                >
-                  그룹 만들기
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="w-full max-w-xs mx-auto py-4 rounded-2xl bg-gray-100 text-gray-700 text-lg font-bold shadow-md active:bg-gray-200 transition mb-6"
-                >
-                  취소
-                </button>
-              </div>
+              <form className="mt-4 space-y-4">
+                <div>
+                  <label htmlFor="group-name" className="block text-sm font-medium text-gray-700">그룹명</label>
+                  <input
+                    type="text"
+                    id="group-name"
+                    name="name"
+                    className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    value={newGroup.name}
+                    onChange={handleInputChange}
+                    placeholder="그룹 이름을 입력하세요"
+                    required
+                  />
+                </div>
+                <div className="mt-6 flex space-x-3">
+                  <Button type="button" variant="secondary" onClick={handleCloseModal} className="flex-1" disabled={isCreatingGroup}>취소</Button>
+                  <Button type="button" onClick={handleSaveGroup} disabled={newGroup.name.trim() === '' || isCreatingGroup} className="flex-1">
+                    {isCreatingGroup ? '생성 중...' : '그룹 만들기'}
+                  </Button>
+                </div>
+              </form>
             </div>
           </div>
         </>

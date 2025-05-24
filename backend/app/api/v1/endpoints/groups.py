@@ -3,6 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from jose import jwt, JWTError
+import hashlib
+import random
+import string
 from app.api import deps
 from app.models.group import Group
 from app.models.group_detail import GroupDetail
@@ -125,6 +128,27 @@ def get_group_by_code(
         raise HTTPException(status_code=404, detail="Group not found")
     return group
 
+def generate_sgt_code(db: Session) -> str:
+    """
+    고유한 sgt_code를 생성합니다.
+    PHP의 get_sgt_code() 함수와 동일한 로직: G + MD5(랜덤)의 첫 5자리
+    """
+    unique = False
+    while not unique:
+        # 랜덤 값 생성 후 MD5 해시
+        random_value = str(random.randint(1, 999999999))
+        md5_hash = hashlib.md5(random_value.encode()).hexdigest().upper()
+        # G + 첫 5자리
+        uid = "G" + md5_hash[:5]
+        
+        # 중복 확인
+        existing_group = db.query(Group).filter(Group.sgt_code == uid).first()
+        if not existing_group:
+            unique = True
+            return uid
+    
+    return uid
+
 @router.post("/", response_model=GroupResponse)
 def create_group(
     group_in: GroupCreate,
@@ -133,10 +157,42 @@ def create_group(
     """
     새로운 그룹을 생성합니다.
     """
-    group = Group(**group_in.dict())
+    # 그룹 데이터 생성
+    group_data = group_in.dict()
+    
+    # sgt_code 자동 생성 (고유값)
+    group_data['sgt_code'] = generate_sgt_code(db)
+    
+    # sgt_wdate 현재 시간 설정
+    group_data['sgt_wdate'] = datetime.utcnow()
+    
+    # sgt_show 기본값 설정
+    if not group_data.get('sgt_show'):
+        group_data['sgt_show'] = 'Y'
+    
+    # 그룹 생성
+    group = Group(**group_data)
     db.add(group)
     db.commit()
     db.refresh(group)
+    
+    # 그룹 생성자를 GroupDetail 테이블에 그룹장으로 추가
+    if group_data.get('mt_idx'):
+        group_detail = GroupDetail(
+            sgt_idx=group.sgt_idx,
+            mt_idx=group_data['mt_idx'],
+            sgdt_owner_chk='Y',  # 그룹장
+            sgdt_leader_chk='N',
+            sgdt_discharge='N',
+            sgdt_group_chk='Y',
+            sgdt_exit='N',
+            sgdt_show='Y',
+            sgdt_push_chk='Y',
+            sgdt_wdate=datetime.utcnow()
+        )
+        db.add(group_detail)
+        db.commit()
+    
     return group
 
 @router.put("/{group_id}", response_model=GroupResponse)
