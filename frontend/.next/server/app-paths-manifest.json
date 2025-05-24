@@ -1,7 +1,8 @@
 {
-  "/api/locations/other-members/[memberId]/route": "app/api/locations/other-members/[memberId]/route.js",
   "/_not-found/page": "app/_not-found/page.js",
+  "/api/push-logs/[...slug]/route": "app/api/push-logs/[...slug]/route.js",
   "/notice/page": "app/notice/page.js",
+  "/logs/page": "app/logs/page.js",
   "/home/page": "app/home/page.js",
   "/location/page": "app/location/page.js"
 }

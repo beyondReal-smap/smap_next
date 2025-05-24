@@ -133,7 +133,13 @@ function NoticeContent() {
   if (loading) {
     return (
       <div className="flex-grow flex items-center justify-center">
-        <LoadingSpinner message="알림을 불러오는 중입니다..." />
+        <LoadingSpinner 
+          message="알림을 불러오는 중입니다..." 
+          fullScreen={true}
+          type="ripple"
+          size="md"
+          color="indigo"
+        />
       </div>
     );
   }
