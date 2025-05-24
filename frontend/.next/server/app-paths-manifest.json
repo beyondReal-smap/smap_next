@@ -1,16 +1,13 @@
 {
-  "/api/auth/login/route": "app/api/auth/login/route.js",
-  "/api/members/[id]/route": "app/api/members/[id]/route.js",
-  "/api/group-details/member/[id]/route": "app/api/group-details/member/[id]/route.js",
-  "/api/groups/[id]/members/route": "app/api/groups/[id]/members/route.js",
-  "/api/groups/[id]/route": "app/api/groups/[id]/route.js",
-  "/api/group-members/member/[id]/route": "app/api/group-members/member/[id]/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/push-logs/[...slug]/route": "app/api/push-logs/[...slug]/route.js",
   "/api/v1/groups/member/[id]/route": "app/api/v1/groups/member/[id]/route.js",
+  "/api/group-members/member/[id]/route": "app/api/group-members/member/[id]/route.js",
   "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
-  "/notice/page": "app/notice/page.js",
   "/login/page": "app/login/page.js",
   "/signin/page": "app/signin/page.js",
+  "/notice/page": "app/notice/page.js",
   "/home/page": "app/home/page.js",
-  "/group/page": "app/group/page.js",
-  "/location/page": "app/location/page.js"
+  "/logs/page": "app/logs/page.js",
+  "/group/page": "app/group/page.js"
 }

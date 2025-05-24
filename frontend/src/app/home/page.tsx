@@ -1941,6 +1941,7 @@ export default function HomePage() {
       const currentUser = user || authService.getUserData();
       const userMtIdx = currentUser?.mt_idx || 1186;
       
+      console.log('[fetchUserGroups] 사용자 정보:', currentUser);
       console.log('[fetchUserGroups] 사용자 그룹 조회 시작 - mt_idx:', userMtIdx);
       
       // 현재는 groupService.getCurrentUserGroups()가 토큰 기반으로 동작하므로

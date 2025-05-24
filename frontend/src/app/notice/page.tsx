@@ -179,7 +179,7 @@ function NoticeContent() {
 
       {/* 메인 컨텐츠 영역 */}
       <main className="pt-12 pb-8">
-        <div className="px-4 pb-2 pt-4">
+        <div className="px-4 pt-4">
           <p className="text-gray-600 text-sm">푸시 알림 내역을 확인하세요.</p>
         </div>
         <div className="px-2">
@@ -189,16 +189,21 @@ function NoticeContent() {
             <div className="space-y-8">
               {Object.entries(grouped).map(([date, items]) => (
                  <section key={date} className="mb-8">
-                   <div className="text-base font-bold text-indigo-600 mb-2 px-2">
+                   <div className="text-base font-bold text-gray-600 mb-2 px-2">
                      {format(new Date(date), 'yyyy.MM.dd (E)', { locale: ko })}
                      {date === format(new Date(), 'yyyy-MM-dd') && (
                        <span className="text-primary ml-2">오늘의 알림</span>
                      )}
                    </div>
-                   <div className="bg-white rounded-xl shadow px-3 py-4">
-                     <div className="space-y-3">
-                       {items.map(item => (
-                         <div key={item.plt_idx} className="flex items-start border-b last:border-b-0 border-gray-100 pb-3 last:pb-0">
+                   <div className="bg-white rounded-xl shadow px-4 py-4">
+                     <div className="">
+                       {items.map((item, index) => (
+                         <div 
+                           key={item.plt_idx} 
+                           className={`flex items-start border-b last:border-b-0 border-gray-100 py-3 px-3 transition-colors ${
+                             index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
+                           }`}
+                         >
                            <div className="text-2xl ml-2 mr-3 mt-1 select-none">
                              {item.plt_title.match(/\p{Extended_Pictographic}/u)?.[0] || '📢'}
                            </div>
