@@ -12,6 +12,12 @@ from app.models.group_detail import GroupDetail
 from app.schemas.group import GroupCreate, GroupUpdate, GroupResponse
 from app.core.config import settings
 from datetime import datetime
+from app.models.enums import ShowEnum
+import traceback
+import logging
+
+# 로거 설정
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -39,7 +45,7 @@ def get_groups(
     """
     그룹 목록을 조회합니다.
     """
-    groups = db.query(Group.__table__).offset(skip).limit(limit).all()
+    groups = db.query(Group).offset(skip).limit(limit).all()
     return groups
 
 @router.get("/current-user", response_model=List[dict])
@@ -100,7 +106,7 @@ def get_group(
     """
     특정 그룹을 조회합니다.
     """
-    group = db.query(Group.__table__).filter(Group.sgt_idx == group_id).first()
+    group = db.query(Group).filter(Group.sgt_idx == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     return group
@@ -205,17 +211,52 @@ def update_group(
     """
     그룹 정보를 업데이트합니다.
     """
-    group = db.query(Group.__table__).filter(Group.sgt_idx == group_id).first()
-    if not group:
-        raise HTTPException(status_code=404, detail="Group not found")
-    
-    for field, value in group_in.dict(exclude_unset=True).items():
-        setattr(group, field, value)
-    
-    db.add(group)
-    db.commit()
-    db.refresh(group)
-    return group
+    try:
+        # 먼저 그룹이 존재하는지 확인
+        group = db.query(Group).filter(Group.sgt_idx == group_id).first()
+        if not group:
+            raise HTTPException(status_code=404, detail="Group not found")
+        
+        # 업데이트할 필드들을 개별적으로 처리
+        updated = False
+        
+        if group_in.sgt_title is not None:
+            group.sgt_title = group_in.sgt_title
+            updated = True
+            
+        if group_in.sgt_memo is not None:
+            group.sgt_memo = group_in.sgt_memo
+            updated = True
+            
+        if group_in.sgt_code is not None:
+            group.sgt_code = group_in.sgt_code
+            updated = True
+            
+        if group_in.mt_idx is not None:
+            group.mt_idx = group_in.mt_idx
+            updated = True
+            
+        if group_in.sgt_show is not None:
+            group.sgt_show = group_in.sgt_show
+            updated = True
+        
+        # 업데이트된 필드가 있으면 업데이트 시간 설정
+        if updated:
+            group.sgt_udate = datetime.utcnow()
+            db.commit()
+            db.refresh(group)
+        
+        return group
+        
+    except HTTPException:
+        # HTTPException은 그대로 재발생
+        raise
+    except Exception as e:
+        # 다른 모든 예외는 500 에러로 처리
+        db.rollback()
+        logger.error(f"그룹 업데이트 오류 (group_id: {group_id}): {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"그룹 업데이트 중 오류가 발생했습니다: {str(e)}")
 
 @router.delete("/{group_id}", response_model=GroupResponse)
 def delete_group(
@@ -225,7 +266,7 @@ def delete_group(
     """
     그룹을 삭제합니다.
     """
-    group = db.query(Group.__table__).filter(Group.sgt_idx == group_id).first()
+    group = db.query(Group).filter(Group.sgt_idx == group_id).first()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
     

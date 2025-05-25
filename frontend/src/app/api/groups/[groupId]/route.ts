@@ -81,9 +81,21 @@ export async function PUT(
     const data = await fetchWithFallback(backendUrl, fetchOptions);
     console.log('[Group Update API] 백엔드 응답 성공:', data);
     
+    // 백엔드에서 받은 데이터를 Group 형태로 변환
+    const groupData = {
+      sgt_idx: data.sgt_idx,
+      sgt_title: data.sgt_title,
+      sgt_content: data.sgt_content || data.sgt_memo,
+      sgt_memo: data.sgt_memo,
+      mt_idx: data.mt_idx,
+      sgt_show: data.sgt_show,
+      sgt_wdate: data.sgt_wdate,
+      memberCount: 0 // 기본값
+    };
+    
     return NextResponse.json({
       success: true,
-      data: data,
+      data: groupData,
       message: '그룹이 성공적으로 업데이트되었습니다.'
     });
 

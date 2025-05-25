@@ -148,7 +148,9 @@ class GroupService {
   // 그룹 업데이트
   async updateGroup(groupId: number, groupData: GroupUpdate): Promise<Group> {
     try {
-      // Next.js API 라우트를 통해 백엔드 호출
+      console.log('[GroupService] 그룹 업데이트 요청:', { groupId, groupData });
+      
+      // Next.js API 라우트를 통해 백엔드 호출 (CORS 문제 해결)
       const response = await fetch(`/api/groups/${groupId}`, {
         method: 'PUT',
         headers: {
@@ -157,7 +159,14 @@ class GroupService {
         body: JSON.stringify(groupData),
       });
       
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[GroupService] API 오류:', response.status, errorText);
+        throw new Error(`API 오류: ${response.status} - ${errorText}`);
+      }
+      
       const result = await response.json();
+      console.log('[GroupService] 응답 성공:', result);
       
       if (!result.success) {
         throw new Error(result.message || '그룹 업데이트에 실패했습니다.');
