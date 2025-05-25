@@ -43,9 +43,9 @@ def get_groups(
     limit: int = 100
 ):
     """
-    그룹 목록을 조회합니다.
+    그룹 목록을 조회합니다. (sgt_show = 'Y'인 그룹만)
     """
-    groups = db.query(Group).offset(skip).limit(limit).all()
+    groups = db.query(Group).filter(Group.sgt_show == 'Y').offset(skip).limit(limit).all()
     return groups
 
 @router.get("/current-user", response_model=List[dict])
@@ -62,17 +62,13 @@ def get_current_user_groups(
     if not user_id:
         raise HTTPException(status_code=401, detail="인증이 필요합니다.")
     
-    # 사용자가 속한 그룹들을 GroupDetail과 Group을 조인하여 조회
+    # 사용자가 속한 그룹 조회 (sgt_show = 'Y'인 그룹만)
     user_groups = db.query(Group, GroupDetail).join(
         GroupDetail, Group.sgt_idx == GroupDetail.sgt_idx
     ).filter(
-        and_(
-            GroupDetail.mt_idx == user_id,
-            GroupDetail.sgdt_show == 'Y',
-            GroupDetail.sgdt_exit == 'N',
-            GroupDetail.sgdt_discharge == 'N',
-            Group.sgt_show == 'Y'
-        )
+        GroupDetail.mt_idx == user_id,
+        GroupDetail.sgdt_exit == 'N',  # 탈퇴하지 않은 그룹
+        Group.sgt_show == 'Y'  # 표시되는 그룹만
     ).all()
     
     result = []
@@ -119,7 +115,14 @@ def get_member_groups(
     """
     특정 회원의 그룹 목록을 조회합니다.
     """
+    logger.info(f"[GET_MEMBER_GROUPS] 멤버 그룹 목록 조회 시작 - member_id: {member_id}")
+    
     groups = Group.find_by_member(db, member_id)
+    
+    logger.info(f"[GET_MEMBER_GROUPS] 조회된 그룹 수: {len(groups)}")
+    for group in groups:
+        logger.info(f"[GET_MEMBER_GROUPS] 그룹 정보 - sgt_idx: {group.sgt_idx}, sgt_title: {group.sgt_title}, sgt_show: {group.sgt_show}")
+    
     return groups
 
 @router.get("/code/{code}", response_model=GroupResponse)
@@ -264,12 +267,27 @@ def delete_group(
     db: Session = Depends(deps.get_db)
 ):
     """
-    그룹을 삭제합니다.
+    그룹을 삭제합니다. (실제로는 sgt_show를 'N'으로 변경하여 숨김 처리)
     """
+    logger.info(f"[DELETE_GROUP] 그룹 삭제 요청 시작 - group_id: {group_id}")
+    
     group = db.query(Group).filter(Group.sgt_idx == group_id).first()
     if not group:
+        logger.error(f"[DELETE_GROUP] 그룹을 찾을 수 없음 - group_id: {group_id}")
         raise HTTPException(status_code=404, detail="Group not found")
     
-    db.delete(group)
+    logger.info(f"[DELETE_GROUP] 삭제 전 그룹 상태 - sgt_show: {group.sgt_show}, sgt_title: {group.sgt_title}")
+    
+    # 실제 삭제 대신 sgt_show를 'N'으로 변경
+    group.sgt_show = 'N'
+    group.sgt_udate = datetime.utcnow()  # 업데이트 시간 설정
+    
+    logger.info(f"[DELETE_GROUP] 소프트 삭제 실행 - sgt_show를 'N'으로 변경")
+    
     db.commit()
+    db.refresh(group)
+    
+    logger.info(f"[DELETE_GROUP] 삭제 후 그룹 상태 - sgt_show: {group.sgt_show}, sgt_title: {group.sgt_title}")
+    logger.info(f"[DELETE_GROUP] 그룹 소프트 삭제 완료 - group_id: {group_id}")
+    
     return group 

@@ -110,4 +110,62 @@ export async function PUT(
       status: 500 
     });
   }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ groupId: string }> }
+) {
+  const { groupId } = await params;
+  
+  try {
+    console.log('[Group Delete API] 그룹 삭제 요청:', { groupId });
+
+    // 백엔드 그룹 삭제 API 호출
+    const backendUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}`;
+    console.log('[Group Delete API] 백엔드 API 호출:', backendUrl);
+    
+    const fetchOptions: RequestInit = {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Next.js API Proxy',
+      },
+      // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
+      rejectUnauthorized: false,
+    };
+    
+    const data = await fetchWithFallback(backendUrl, fetchOptions);
+    console.log('[Group Delete API] 백엔드 응답 성공:', data);
+    
+    // 백엔드에서 받은 데이터를 Group 형태로 변환
+    const groupData = {
+      sgt_idx: data.sgt_idx,
+      sgt_title: data.sgt_title,
+      sgt_content: data.sgt_content || data.sgt_memo,
+      sgt_memo: data.sgt_memo,
+      mt_idx: data.mt_idx,
+      sgt_show: data.sgt_show,
+      sgt_wdate: data.sgt_wdate,
+      memberCount: 0 // 기본값
+    };
+    
+    return NextResponse.json({
+      success: true,
+      data: groupData,
+      message: '그룹이 성공적으로 삭제되었습니다.'
+    });
+
+  } catch (error) {
+    console.error('[Group Delete API] 오류:', error);
+    
+    return NextResponse.json({
+      success: false,
+      message: error instanceof Error ? error.message : '그룹 삭제 중 오류가 발생했습니다.',
+      error: error instanceof Error ? error.message : String(error)
+    }, { 
+      status: 500 
+    });
+  }
 } 

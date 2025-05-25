@@ -19,7 +19,8 @@ import {
   FaMapMarkerAlt,
   FaShare,
   FaArrowLeft,
-  FaBars
+  FaBars,
+  FaCheckCircle
 } from 'react-icons/fa';
 import { 
   HiSparkles, 
@@ -54,28 +55,6 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
 
 // 모바일 최적화된 CSS 애니메이션
 const mobileAnimations = `
-@keyframes slideInFromRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideInFromLeft {
-  from {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
 @keyframes slideInFromBottom {
   from {
     transform: translateY(100%);
@@ -98,44 +77,31 @@ const mobileAnimations = `
   }
 }
 
-@keyframes fadeInUp {
+@keyframes slideInFromLeft {
   from {
-    transform: translateY(20px);
+    transform: translateX(-100%);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: translateX(0);
     opacity: 1;
   }
 }
 
-@keyframes fadeOut {
+@keyframes slideInFromRight {
   from {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(-10px);
+    transform: translateX(100%);
     opacity: 0;
   }
-}
-
-@keyframes staggerFadeIn {
-  from {
-    transform: translateY(10px);
-    opacity: 0;
-    scale: 0.98;
-  }
   to {
-    transform: translateY(0);
+    transform: translateX(0);
     opacity: 1;
-    scale: 1;
   }
 }
 
 @keyframes scaleIn {
   from {
-    transform: scale(0.95);
+    transform: scale(0.9);
     opacity: 0;
   }
   to {
@@ -144,97 +110,56 @@ const mobileAnimations = `
   }
 }
 
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
+@keyframes progress-bar {
+  from {
+    width: 0%;
   }
-  50% {
-    opacity: 0.5;
+  to {
+    width: 100%;
   }
-}
-
-@keyframes bounce {
-  0%, 20%, 53%, 80%, 100% {
-    transform: translate3d(0,0,0);
-  }
-  40%, 43% {
-    transform: translate3d(0, -5px, 0);
-  }
-  70% {
-    transform: translate3d(0, -2px, 0);
-  }
-  90% {
-    transform: translate3d(0, -1px, 0);
-  }
-}
-
-.animate-slideInFromRight {
-  animation: slideInFromRight 0.3s ease-out forwards;
-}
-
-.animate-slideInFromLeft {
-  animation: slideInFromLeft 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
 .animate-slideInFromBottom {
-  animation: slideInFromBottom 0.4s ease-out forwards;
+  animation: slideInFromBottom 0.3s ease-out forwards;
 }
 
 .animate-slideOutToBottom {
   animation: slideOutToBottom 0.3s ease-in forwards;
 }
 
-.animate-fadeInUp {
-  animation: staggerFadeIn 0.4s ease-out forwards;
+.animate-slideInFromLeft {
+  animation: slideInFromLeft 0.3s ease-out forwards;
 }
 
-.animate-fadeOut {
-  animation: fadeOut 0.2s ease-in forwards;
+.animate-slideInFromRight {
+  animation: slideInFromRight 0.3s ease-out forwards;
 }
 
 .animate-scaleIn {
   animation: scaleIn 0.2s ease-out forwards;
 }
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-.animate-bounce {
-  animation: bounce 2s infinite;
-}
-
-.mobile-card {
-  transition: all 0.2s ease-in-out;
-}
-
-.mobile-card:active {
-  transform: scale(0.98);
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-.mobile-button {
-  min-height: 44px;
-  transition: all 0.2s ease-in-out;
-}
-
-.mobile-button:active {
-  transform: scale(0.95);
-}
-
-.safe-area {
-  padding-bottom: max(env(safe-area-inset-bottom), 40px);
+.animate-progress-bar {
+  animation: progress-bar 3s linear forwards;
 }
 
 .modal-safe-area {
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 40px);
-  margin-bottom: 20px;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-.glass-mobile {
-  backdrop-filter: blur(20px);
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+.mobile-card {
+  transition: all 0.2s ease;
+  animation: slideInFromBottom 0.3s ease-out forwards;
+}
+
+.mobile-button {
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.mobile-button:active {
+  transform: scale(0.98);
 }
 `;
 
@@ -319,6 +244,14 @@ function GroupPageContent() {
   const [editGroup, setEditGroup] = useState<GroupForm>({ name: '', description: '' });
   const [isUpdatingGroup, setIsUpdatingGroup] = useState(false);
   
+  // 그룹 삭제 확인 모달 상태 추가
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // 성공 알림 모달 상태 추가
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  
   // 모바일 전용 상태
   const [currentView, setCurrentView] = useState<'list' | 'detail'>('list');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -332,39 +265,41 @@ function GroupPageContent() {
   
   const router = useRouter();
 
-  // 사용자 그룹 목록 조회
-  useEffect(() => {
-    const fetchGroups = async () => {
-      try {
-        setLoading(true);
-        const data = await groupService.getMyGroups(1186);
-        console.log('[Group Page] 그룹 목록 조회 결과:', data);
-        setGroups(data);
-        
-        if (data.length > 0) {
-          setSelectedGroup(data[0]);
-        }
-
-        const memberCounts: {[key: number]: number} = {};
-        for (const group of data) {
-          try {
-            const members = await memberService.getGroupMembers(group.sgt_idx.toString());
-            memberCounts[group.sgt_idx] = members.length;
-          } catch (error) {
-            console.error(`[Group Page] 그룹 ${group.sgt_idx} 멤버 수 조회 오류:`, error);
-            memberCounts[group.sgt_idx] = 0;
-          }
-        }
-        setGroupMemberCounts(memberCounts);
-        
-      } catch (error) {
-        console.error('[Group Page] 그룹 목록 조회 오류:', error);
-        setGroups([]);
-      } finally {
-        setLoading(false);
+  // 그룹 목록 조회 함수
+  const fetchGroups = async () => {
+    try {
+      setLoading(true);
+      const data = await groupService.getMyGroups(1186);
+      console.log('[Group Page] 그룹 목록 조회 결과:', data);
+      setGroups(data);
+      
+      // 선택된 그룹이 없거나 삭제된 경우에만 첫 번째 그룹 선택
+      if (data.length > 0 && (!selectedGroup || !data.find(g => g.sgt_idx === selectedGroup.sgt_idx))) {
+        setSelectedGroup(data[0]);
       }
-    };
 
+      const memberCounts: {[key: number]: number} = {};
+      for (const group of data) {
+        try {
+          const members = await memberService.getGroupMembers(group.sgt_idx.toString());
+          memberCounts[group.sgt_idx] = members.length;
+        } catch (error) {
+          console.error(`[Group Page] 그룹 ${group.sgt_idx} 멤버 수 조회 오류:`, error);
+          memberCounts[group.sgt_idx] = 0;
+        }
+      }
+      setGroupMemberCounts(memberCounts);
+      
+    } catch (error) {
+      console.error('[Group Page] 그룹 목록 조회 오류:', error);
+      setGroups([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 그룹 목록 초기 로드
+  useEffect(() => {
     fetchGroups();
   }, []);
 
@@ -534,6 +469,16 @@ function GroupPageContent() {
     setEditGroup(prev => ({ ...prev, [name]: value }));
   };
 
+  // 삭제 확인 모달 닫기 함수 추가
+  const handleCloseDeleteModal = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsDeleteModalOpen(false);
+      setIsDeleting(false);
+      setIsClosing(false);
+    }, 300);
+  };
+
   // 그룹 업데이트
   const handleUpdateGroup = async () => {
     if (!selectedGroup || editGroup.name.trim() === '') return;
@@ -567,11 +512,54 @@ function GroupPageContent() {
       
       handleCloseEditModal();
       
+      // 성공 메시지
+      setSuccessMessage('그룹이 성공적으로 수정되었습니다.');
+      setIsSuccessModalOpen(true);
+      
     } catch (error) {
       console.error('[Group Page] 그룹 수정 오류:', error);
       alert('그룹 수정 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setIsUpdatingGroup(false);
+    }
+  };
+
+  // 그룹 삭제 핸들러 추가 (실제로는 sgt_show를 'N'으로 변경)
+  const handleDeleteGroup = async () => {
+    if (!selectedGroup) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      console.log('[Group Page] 그룹 삭제 시작:', selectedGroup.sgt_idx);
+      
+      // 그룹 삭제 API 호출 (백엔드에서 소프트 삭제 처리)
+      await groupService.deleteGroup(selectedGroup.sgt_idx);
+      
+      // 로컬 상태 조작 대신 그룹 목록을 다시 불러오기
+      // 백엔드에서 sgt_show = 'N'으로 변경된 그룹은 자동으로 목록에서 제외됨
+      await fetchGroups();
+      
+      // 선택된 그룹 초기화
+      setSelectedGroup(null);
+      setGroupMembers([]);
+      setShowGroupActions(false);
+      
+      // 모달 닫기
+      setIsDeleteModalOpen(false);
+      
+      // 목록 뷰로 돌아가기
+      setCurrentView('list');
+      
+      // 성공 메시지
+      setSuccessMessage('그룹이 목록에서 숨겨졌습니다.');
+      setIsSuccessModalOpen(true);
+      
+    } catch (error) {
+      console.error('[Group Page] 그룹 삭제 오류:', error);
+      alert('그룹 삭제 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -612,6 +600,10 @@ function GroupPageContent() {
       setSelectedGroup(newGroupItem);
       handleCloseModal();
       
+      // 성공 메시지
+      setSuccessMessage('새 그룹이 성공적으로 생성되었습니다.');
+      setIsSuccessModalOpen(true);
+      
     } catch (error) {
       console.error('[Group Page] 그룹 생성 오류:', error);
       alert('그룹 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -630,8 +622,9 @@ function GroupPageContent() {
     const inviteLink = `${window.location.origin}/group/${selectedGroup?.sgt_idx}/join`;
     navigator.clipboard.writeText(inviteLink)
       .then(() => {
-        alert('초대 링크가 복사되었습니다!');
         setIsShareModalOpen(false);
+        setSuccessMessage('초대 링크가 복사되었습니다!');
+        setIsSuccessModalOpen(true);
       })
       .catch(err => {
         console.error('Failed to copy link: ', err);
@@ -694,6 +687,18 @@ function GroupPageContent() {
     setDragStartY(0);
     setDragCurrentY(0);
   };
+
+  // 성공 모달 자동 닫기
+  useEffect(() => {
+    if (isSuccessModalOpen) {
+      const timer = setTimeout(() => {
+        setIsSuccessModalOpen(false);
+        setSuccessMessage('');
+      }, 3000); // 3초 후 자동 닫기
+
+      return () => clearTimeout(timer);
+    }
+  }, [isSuccessModalOpen]);
 
   // 로딩 중일 때
   if (loading) {
@@ -887,7 +892,13 @@ function GroupPageContent() {
                             그룹 수정
                           </button>
                           <hr className="my-1" />
-                          <button className="w-full px-4 py-3 text-left hover:bg-red-50 flex items-center text-red-600">
+                          <button 
+                            onClick={() => {
+                              setIsDeleteModalOpen(true);
+                              setShowGroupActions(false);
+                            }}
+                            className="w-full px-4 py-3 text-left hover:bg-red-50 flex items-center text-red-600"
+                          >
                             <FaTrash className="w-4 h-4 mr-3" />
                             그룹 삭제
                           </button>
@@ -911,7 +922,7 @@ function GroupPageContent() {
                   </div>
                   <div className="flex items-center justify-between text-sm text-indigo-200">
                     <span>코드: {selectedGroup.sgt_code || 'N/A'}</span>
-                    <span>{new Date(selectedGroup.sgt_wdate).toLocaleDateString()}</span>
+                    <span>생성일: {new Date(selectedGroup.sgt_wdate).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>
@@ -919,20 +930,20 @@ function GroupPageContent() {
               {/* 통계 카드들 */}
               <div className="px-4 mb-6">
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-xl p-3 text-white text-center shadow-md">
-                    <FaUsers className="w-6 h-6 text-indigo-200 mx-auto mb-1" />
+                  <div className="bg-gradient-to-r from-red-400 to-red-500 rounded-xl p-3 text-white text-center shadow-md">
+                    <FaUsers className="w-6 h-6 text-red-200 mx-auto mb-1" />
                     <p className="text-lg font-bold">{groupMembers.length}</p>
-                    <p className="text-indigo-100 text-xs">멤버</p>
+                    <p className="text-red-100 text-xs">멤버</p>
                   </div>
-                  <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-3 text-white text-center shadow-md">
-                    <FaCalendarAlt className="w-6 h-6 text-blue-200 mx-auto mb-1" />
+                  <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-xl p-3 text-white text-center shadow-md">
+                    <FaCalendarAlt className="w-6 h-6 text-yellow-200 mx-auto mb-1" />
                     <p className="text-lg font-bold">3</p>
-                    <p className="text-blue-100 text-xs">일정</p>
+                    <p className="text-yellow-100 text-xs">일정</p>
                   </div>
-                  <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-xl p-3 text-white text-center shadow-md">
-                    <FaMapMarkerAlt className="w-6 h-6 text-red-200 mx-auto mb-1" />
+                  <div className="bg-gradient-to-r from-blue-400 to-blue-500 rounded-xl p-3 text-white text-center shadow-md">
+                    <FaMapMarkerAlt className="w-6 h-6 text-blue-200 mx-auto mb-1" />
                     <p className="text-lg font-bold">7</p>
-                    <p className="text-red-100 text-xs">장소</p>
+                    <p className="text-blue-100 text-xs">장소</p>
                   </div>
                 </div>
               </div>
@@ -1050,11 +1061,11 @@ function GroupPageContent() {
         {/* 새 그룹 추가 모달 */}
         {isAddModalOpen && (
           <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end justify-center z-50"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={handleCloseModal}
           >
             <div 
-              className={`bg-white rounded-t-3xl w-full max-w-md mx-auto modal-safe-area ${
+              className={`bg-white rounded-3xl w-full max-w-md mx-auto modal-safe-area ${
                 isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
               }`}
               style={{
@@ -1069,8 +1080,7 @@ function GroupPageContent() {
               onTouchEnd={handleTouchEnd}
             >
               <div className="p-6 pb-8">
-                {/* 모달 핸들 */}
-                <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6 cursor-pointer"></div>
+                {/* 모달 핸들 제거 */}
                 
                 <div className="text-center mb-6">
                   <HiUserGroup className="w-12 h-12 text-gray-700 mx-auto mb-3" />
@@ -1144,11 +1154,11 @@ function GroupPageContent() {
         {/* 공유 모달 */}
         {isShareModalOpen && selectedGroup && (
           <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end justify-center z-50"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={handleCloseShareModal}
           >
             <div 
-              className={`bg-white rounded-t-3xl w-full max-w-md mx-auto modal-safe-area ${
+              className={`bg-white rounded-3xl w-full max-w-md mx-auto modal-safe-area ${
                 isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
               }`}
               style={{
@@ -1163,8 +1173,7 @@ function GroupPageContent() {
               onTouchEnd={handleTouchEnd}
             >
               <div className="p-6 pb-8">
-                {/* 모달 핸들 */}
-                <div className="w-12 h-1 bg-indigo-300 rounded-full mx-auto mb-6 cursor-pointer"></div>
+                {/* 모달 핸들 제거 */}
                 
                 <div className="text-center mb-6">
                   <FaShare className="w-12 h-12 text-indigo-600 mx-auto mb-3" />
@@ -1212,11 +1221,11 @@ function GroupPageContent() {
         {/* 그룹 수정 모달 */}
         {isEditModalOpen && selectedGroup && (
           <div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end justify-center z-50"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={handleCloseEditModal}
           >
             <div 
-              className={`bg-white rounded-t-3xl w-full max-w-md mx-auto modal-safe-area ${
+              className={`bg-white rounded-3xl w-full max-w-md mx-auto modal-safe-area ${
                 isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
               }`}
               style={{
@@ -1231,8 +1240,7 @@ function GroupPageContent() {
               onTouchEnd={handleTouchEnd}
             >
               <div className="p-6 pb-8">
-                {/* 모달 핸들 */}
-                <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6 cursor-pointer"></div>
+                {/* 모달 핸들 제거 */}
                 
                 <div className="text-center mb-6">
                   <FaEdit className="w-12 h-12 text-gray-700 mx-auto mb-3" />
@@ -1303,6 +1311,113 @@ function GroupPageContent() {
             </div>
           </div>
         )}
+
+        {/* 그룹 삭제 확인 모달 */}
+        {isDeleteModalOpen && selectedGroup && (
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={handleCloseDeleteModal}
+          >
+            <div 
+              className={`bg-white rounded-3xl w-full max-w-md mx-auto modal-safe-area ${
+                isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
+              }`}
+              style={{
+                transform: isDragging 
+                  ? `translateY(${Math.max(0, dragCurrentY - dragStartY)}px)` 
+                  : 'translateY(0)',
+                transition: isDragging ? 'none' : 'transform 0.2s ease-out'
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              <div className="p-6 pb-8">
+                {/* 모달 핸들 제거 */}
+                
+                <div className="text-center mb-6">
+                  <FaTrash className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                  <h3 className="text-xl font-bold text-gray-900">그룹 삭제</h3>
+                  <p className="text-gray-600 mt-2 mb-4">
+                    <span className="font-medium text-red-600">"{selectedGroup.sgt_title}"</span> 그룹을 정말 삭제하시겠습니까?
+                  </p>
+                </div>
+                
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={handleDeleteGroup}
+                    disabled={isDeleting}
+                    className="w-full mobile-button py-4 bg-red-500 text-white rounded-2xl font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        삭제 중...
+                      </>
+                    ) : (
+                      '그룹 삭제'
+                    )}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={handleCloseDeleteModal}
+                    disabled={isDeleting}
+                    className="w-full mobile-button py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 성공 알림 모달 */}
+        {isSuccessModalOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          >
+            <div 
+              className={`bg-white rounded-3xl w-full max-w-md mx-auto modal-safe-area animate-slideInFromBottom`}
+            >
+              <div className="p-6 pb-8">
+                {/* 모달 핸들 제거 */}
+                
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FaCheckCircle className="w-8 h-8 text-green-500" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">완료</h3>
+                  <p className="text-gray-600 mb-4">{successMessage}</p>
+                  
+                  {/* 자동 닫기 진행 바 */}
+                  <div className="w-full bg-gray-200 rounded-full h-1 mb-2">
+                    <div 
+                      className="bg-green-500 h-1 rounded-full animate-progress-bar"
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-400">3초 후 자동으로 닫힙니다</p>
+                </div>
+                
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSuccessModalOpen(false);
+                      setSuccessMessage('');
+                    }}
+                    className="w-full mobile-button py-4 bg-green-500 text-white rounded-2xl font-medium hover:bg-green-600 flex items-center justify-center"
+                  >
+                    확인
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
@@ -1322,4 +1437,4 @@ export default function GroupPageWithSuspense() {
       <GroupPageContent />
     </Suspense>
   );
-} 
+}

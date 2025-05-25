@@ -179,11 +179,38 @@ class GroupService {
     }
   }
 
-  // 그룹 삭제
+  // 그룹 삭제 (실제로는 sgt_show를 'N'으로 업데이트)
   async deleteGroup(groupId: number): Promise<Group> {
     try {
-      const response = await apiClient.delete(`/groups/${groupId}`);
-      return response.data;
+      console.log('[GroupService] 그룹 삭제 요청:', { groupId });
+      
+      // DELETE 대신 PUT을 사용하여 sgt_show를 'N'으로 업데이트
+      const updateData = {
+        sgt_show: 'N'
+      };
+      
+      const response = await fetch(`/api/groups/${groupId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[GroupService] 삭제 API 오류:', response.status, errorText);
+        throw new Error(`API 오류: ${response.status} - ${errorText}`);
+      }
+      
+      const result = await response.json();
+      console.log('[GroupService] 삭제 응답 성공:', result);
+      
+      if (!result.success) {
+        throw new Error(result.message || '그룹 삭제에 실패했습니다.');
+      }
+      
+      return result.data;
     } catch (error) {
       console.error(`Failed to delete group ${groupId}:`, error);
       throw error;

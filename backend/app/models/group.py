@@ -29,9 +29,15 @@ class Group(BaseModel):
 
     @classmethod
     def find_by_member(cls, db: Session, mt_idx: int) -> List['Group']:
-        return db.query(cls).filter(
-            cls.mt_idx == mt_idx,
-            cls.sgt_show == ShowEnum.Y
+        # GroupDetail 테이블과 조인하여 사용자가 멤버로 속한 모든 그룹 조회
+        from app.models.group_detail import GroupDetail
+        
+        return db.query(cls).join(
+            GroupDetail, cls.sgt_idx == GroupDetail.sgt_idx
+        ).filter(
+            GroupDetail.mt_idx == mt_idx,
+            GroupDetail.sgdt_exit == 'N',  # 탈퇴하지 않은 그룹
+            cls.sgt_show == ShowEnum.Y  # 표시되는 그룹만
         ).all()
 
     @classmethod
