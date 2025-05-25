@@ -165,6 +165,7 @@ function NoticeContent() {
               </svg>
             </button>
             <span className="ml-1 text-lg font-normal text-gray-900">알림</span>
+            <span className="ml-2 text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">최근 7일</span>
           </div>
           <button
             onClick={handleDeleteAll}
@@ -182,7 +183,7 @@ function NoticeContent() {
 
       {/* 메인 컨텐츠 영역 */}
       <main className="pb-8">
-        <div className="px-4 pt-4">
+        <div className="px-4 pt-4 pb-16">
           {notices.length > 0 && (
             <div className="px-2">
               <p className="text-indigo-600 text-sm">푸시 알림 내역을 확인하세요.</p>

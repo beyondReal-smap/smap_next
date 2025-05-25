@@ -97,8 +97,34 @@ export async function GET(
 
     const data = await response.json();
     console.log('[API PROXY /push-logs] 백엔드 응답 성공, 데이터 길이:', Array.isArray(data) ? data.length : 'object', '(사용된 방법:', usedMethod + ')');
+    console.log('[API PROXY /push-logs] 요청 경로:', path);
+    console.log('[API PROXY /push-logs] member 경로 체크:', path.startsWith('member/'));
 
-    return NextResponse.json(data, {
+    // member 경로일 때 최근 7일 필터링 적용
+    let filteredData = data;
+    if (path.startsWith('member/') && Array.isArray(data)) {
+      console.log('[API PROXY /push-logs] 7일 필터링 시작...');
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0); // 7일 전 자정으로 설정
+      
+      console.log('[API PROXY /push-logs] 7일 전 기준 날짜:', sevenDaysAgo.toISOString());
+      
+      filteredData = data.filter((log: any) => {
+        const logDate = new Date(log.plt_sdate);
+        const isRecent = logDate >= sevenDaysAgo;
+        if (!isRecent) {
+          console.log('[API PROXY /push-logs] 필터링됨:', log.plt_sdate, '→', logDate.toISOString());
+        }
+        return isRecent;
+      });
+      
+      console.log(`[API PROXY /push-logs] 7일 필터링 적용: 전체 ${data.length}개 → 필터링 후 ${filteredData.length}개`);
+    } else {
+      console.log('[API PROXY /push-logs] 7일 필터링 건너뜀 - 조건 불충족');
+    }
+
+    return NextResponse.json(filteredData, {
       status: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
@@ -159,8 +185,96 @@ export async function POST(
     const path = Array.isArray(slug) ? slug.join('/') : slug || '';
     const backendUrl = `https://118.67.130.71:8000/api/v1/push-logs/${path}`;
     
+    // delete-all의 경우 쿼리 파라미터에서 mt_idx 추출
+    if (path === 'delete-all') {
+      const url = new URL(request.url);
+      const mt_idx = url.searchParams.get('mt_idx');
+      if (!mt_idx) {
+        return NextResponse.json({ error: 'mt_idx is required' }, { status: 400 });
+      }
+      
+      console.log('[API PROXY /push-logs] DELETE-ALL 요청:', `${backendUrl}?mt_idx=${mt_idx}`);
+      
+      // SSL 인증서 우회 설정
+      const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+      
+      let response: any;
+      let usedMethod = 'default-fetch';
+      
+      try {
+        // 기본 fetch 시도
+        response = await fetch(`${backendUrl}?mt_idx=${mt_idx}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Next.js API Proxy',
+          },
+          // @ts-ignore
+          rejectUnauthorized: false,
+        });
+        console.log('[API PROXY /push-logs] DELETE-ALL 기본 fetch 성공');
+      } catch (fetchError) {
+        console.log('[API PROXY /push-logs] DELETE-ALL 기본 fetch 실패, node-fetch 시도:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+        
+        if (nodeFetch) {
+          try {
+            response = await nodeFetch(`${backendUrl}?mt_idx=${mt_idx}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'User-Agent': 'Next.js API Proxy (node-fetch)',
+              },
+              agent: function(_parsedURL: any) {
+                const https = require('https');
+                return new https.Agent({
+                  rejectUnauthorized: false
+                });
+              }
+            });
+            usedMethod = 'node-fetch';
+            console.log('[API PROXY /push-logs] DELETE-ALL node-fetch 성공');
+          } catch (nodeFetchError) {
+            console.error('[API PROXY /push-logs] DELETE-ALL node-fetch도 실패:', nodeFetchError);
+            throw fetchError;
+          }
+        } else {
+          throw fetchError;
+        }
+      } finally {
+        // 환경 변수 복원
+        if (originalTlsReject !== undefined) {
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
+        } else {
+          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+        }
+      }
+
+      console.log('[API PROXY /push-logs] DELETE-ALL 백엔드 응답 상태:', response.status, response.statusText, '(사용된 방법:', usedMethod + ')');
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[API PROXY /push-logs] DELETE-ALL 백엔드 에러:', errorText);
+        throw new Error(`Backend API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('[API PROXY /push-logs] DELETE-ALL 성공:', data);
+      return NextResponse.json(data, {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'X-Fetch-Method': usedMethod,
+        },
+      });
+    }
+
+    // 다른 POST 요청들은 기존 로직 유지
     const body = await request.json();
-    console.log('[API PROXY /push-logs] POST 요청:', backendUrl, body);
     
     const fetchOptions: RequestInit = {
       method: 'POST',

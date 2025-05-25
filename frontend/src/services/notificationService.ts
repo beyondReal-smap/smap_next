@@ -3,7 +3,7 @@ import { PushLog, DeleteAllResponse } from '@/types/push';
 
 class NotificationService {
   /**
-   * 멤버의 푸시 알림 내역 조회
+   * 멤버의 푸시 알림 내역 조회 (최근 7일 - 백엔드에서 필터링됨)
    */
   async getMemberPushLogs(memberId: number | string): Promise<PushLog[]> {
     const response = await apiClient.get<PushLog[]>(`/push-logs/member/${memberId}`);
@@ -14,7 +14,7 @@ class NotificationService {
    * 알림 전체 삭제
    */
   async deleteAllNotifications(memberId: number | string): Promise<DeleteAllResponse> {
-    const response = await apiClient.post<DeleteAllResponse>('/push-logs/delete-all', { mt_idx: memberId });
+    const response = await apiClient.post<DeleteAllResponse>(`/push-logs/delete-all?mt_idx=${memberId}`);
     return response.data;
   }
 

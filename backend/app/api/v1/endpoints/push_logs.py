@@ -5,7 +5,7 @@ from app.api import deps
 from app.models.push_log import PushLog
 from app.schemas.push_log import PushLogCreate, PushLogUpdate, PushLogResponse
 from app.models.enums import ShowEnum, ReadCheckEnum
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -40,12 +40,16 @@ def get_member_push_logs(
     db: Session = Depends(deps.get_db)
 ):
     """
-    특정 회원의 푸시 로그 목록을 조회합니다.
+    특정 회원의 푸시 로그 목록을 조회합니다. (최근 7일)
     """
+    # 7일 전 날짜 계산
+    seven_days_ago = datetime.now() - timedelta(days=7)
+    
     push_logs = db.query(PushLog).filter(
         PushLog.mt_idx == member_id,
         PushLog.plt_show == ShowEnum.Y,
-        PushLog.plt_status == 2
+        PushLog.plt_status == 2,
+        PushLog.plt_sdate >= seven_days_ago  # 7일 필터링 추가
     ).order_by(PushLog.plt_sdate.desc()).all()
     return push_logs
 

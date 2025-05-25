@@ -1109,8 +1109,8 @@ function GroupPageContent() {
       <style jsx global>{mobileAnimations}</style>
       <div key={componentKey} className="min-h-screen bg-indigo-50">
         
-        {/* 앱 헤더 - 홈 페이지 스타일 */}
-        <div className="px-4 bg-indigo-50">
+        {/* 앱 헤더 - 홈 페이지 스타일 (고정) */}
+        <div className="sticky top-0 z-10 px-4 bg-indigo-50 border-b border-indigo-100">
           <div className="flex items-center justify-between h-12">
             {currentView === 'list' ? (
               <div className="flex items-center">
