@@ -1122,19 +1122,20 @@ function GroupPageContent() {
                   alt="SMAP 로고" 
                   className="h-10"
                 />
-                <span className="ml-1 text-lg font-normal text-gray-900">장소</span>
+                <span className="ml-1 text-lg font-normal text-gray-900">그룹</span>
               </div>
             ) : (
               <div></div>
             )}
             {currentView === 'list' && (
-              <button
-                onClick={handleAddGroup}
-                className="px-2.5 py-1.5 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-md shadow-sm flex items-center space-x-1.5 hover:from-indigo-700 hover:to-indigo-700 transition-all duration-200"
-              >
-                <FaPlus className="w-3 h-3" />
-                <span className="text-sm font-normal">새 그룹</span>
-              </button>
+              <div className="fixed bottom-20 right-6 z-10">
+                <button
+                  onClick={handleAddGroup}
+                  className="p-4 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center hover:from-indigo-700 hover:to-indigo-700 transition-all duration-200"
+                >
+                  <FaPlus className="w-5 h-5" />
+                </button>
+              </div>
             )}
             {currentView === 'detail' && selectedGroup && (
               <div className="flex items-center space-x-2 ml-auto">
@@ -1146,6 +1147,7 @@ function GroupPageContent() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
+                <span className="text-lg font-normal text-gray-900 absolute left-12">그룹 상세</span>
               </div>
             )}
           </div>
@@ -1167,7 +1169,7 @@ function GroupPageContent() {
                     onChange={handleSearchChange}
                     onFocus={() => setIsSearchFocused(true)}
                     onBlur={() => setIsSearchFocused(false)}
-                    className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
+                    className="w-full pl-12 pr-4 py-4 bg-white border border-indigo-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
                   />
                 </div>
               </div>
@@ -1212,47 +1214,66 @@ function GroupPageContent() {
                   </div>
                 )}
                 {filteredGroups.length > 0 ? (
-                  filteredGroups.map((group, index) => {
-                    const memberCount = groupMemberCounts[group.sgt_idx] || 0;
-                    
-                    return (
-                      <div
-                        key={`${group.sgt_idx}-${searchQuery}`}
-                        onClick={() => handleGroupSelect(group as ExtendedGroup)}
-                        className="mobile-card bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center flex-1 mr-3">
-                            <div className="p-3 bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl mr-4">
-                              <HiUserGroup className="w-6 h-6 text-gray-700" />
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="font-normal text-lg text-gray-900 mb-1">
-                                {group.sgt_title}
-                              </h3>
-                              <p className="text-gray-500 text-sm line-clamp-2 mb-2">
-                                {group.sgt_memo || group.sgt_content || '그룹 설명이 없습니다'}
-                              </p>
-                              <div className="flex items-center space-x-4 text-xs text-gray-400">
-                                <span className="flex items-center">
-                                  <FaUsers className="w-3 h-3 mr-1" />
-                                  {memberCount}명
-                                </span>
-                                <span>
-                                  {new Date(group.sgt_wdate).toLocaleDateString()}
-                                </span>
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                          <FaLayerGroup className="w-5 h-5 mr-2 text-yellow-600" />
+                          내 그룹 목록
+                          {/* <span className="ml-2 px-2 py-1 bg-indigo-100 text-indigo-800 text-xs rounded-full">
+                            {filteredGroups.length}개
+                          </span> */}
+                        </h3>
+                      </div>
+                    </div>
+                    <div className="p-4 space-y-3">
+                      {filteredGroups.map((group, index) => {
+                        const memberCount = groupMemberCounts[group.sgt_idx] || 0;
+                        
+                        return (
+                          <div
+                            key={`${group.sgt_idx}-${searchQuery}`}
+                            onClick={() => handleGroupSelect(group as ExtendedGroup)}
+                            className="mobile-card bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-4 hover:bg-gradient-to-r hover:from-indigo-100 hover:to-blue-100 transition-all duration-200 cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center flex-1 mr-3">
+                                <div className="p-2 bg-gradient-to-r from-white to-white rounded-xl mr-4">
+                                  <img 
+                                    src={`/images/group${(index % 2) + 1}.webp`}
+                                    alt="그룹 아이콘"
+                                    className="w-12 h-12 object-cover"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-normal text-lg text-gray-800 mb-1">
+                                    {group.sgt_title}
+                                  </h4>
+                                  <p className="text-gray-600 text-sm line-clamp-2 mb-2">
+                                    {group.sgt_memo || group.sgt_content || '그룹 설명이 없습니다'}
+                                  </p>
+                                  <div className="flex items-center space-x-4 text-xs text-indigo-500">
+                                    <span className="flex items-center">
+                                      <FaUsers className="w-3 h-3 mr-1" />
+                                      {memberCount}명
+                                    </span>
+                                    <span className="text-blue-500">
+                                      {new Date(group.sgt_wdate).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-center space-y-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
                               </div>
                             </div>
                           </div>
-                          <div className="flex flex-col items-center space-y-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
+                        );
+                      })}
+                    </div>
+                  </div>
                 ) : (
                   <div className="text-center py-12">
                     <div className="p-6 bg-indigo-100 rounded-full w-fit mx-auto mb-4">
@@ -1268,8 +1289,8 @@ function GroupPageContent() {
             /* 그룹 상세 화면 */
             <div className="animate-slideInFromRight">
               {/* 그룹 헤더 카드 */}
-              <div className="mx-4 mt-4 mb-6">
-                <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg relative">
+              <div className="mx-4 mt-4 mb-4">
+                <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg relative">
                   {/* 그룹 액션 메뉴 버튼 - 오른쪽 위 */}
                   <div className="absolute top-4 right-4">
                     <button
@@ -1311,8 +1332,12 @@ function GroupPageContent() {
                   
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center flex-1 pr-12">
-                      <div className="p-3 bg-white/20 rounded-xl mr-4">
-                        <HiUserGroup className="w-8 h-8 text-white" />
+                      <div className="p-2 bg-gradient-to-r from-white to-white rounded-xl mr-4">
+                        <img 
+                          src={`/images/group${((groups.findIndex(g => g.sgt_idx === selectedGroup.sgt_idx) % 2) + 1)}.webp`}
+                          alt="그룹 아이콘"
+                          className="w-12 h-12 object-cover"
+                        />
                       </div>
                       <div className="flex-1">
                         <h2 className="text-xl font-bold mb-1">{selectedGroup.sgt_title}</h2>
@@ -1330,7 +1355,7 @@ function GroupPageContent() {
               </div>
 
               {/* 통계 카드들 */}
-              <div className="px-4 mb-6">
+              <div className="px-4 mb-4">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-gradient-to-r from-red-300 to-red-300 rounded-xl p-3 text-white text-center shadow-md">
                     <FaUsers className="w-6 h-6 text-red-800 mx-auto mb-1" />
@@ -1606,9 +1631,9 @@ function GroupPageContent() {
                 {/* 모달 핸들 제거 */}
                 
                 <div className="text-center mb-6">
-                  <FaShare className="w-12 h-12 text-indigo-600 mx-auto mb-3" />
-                  <h3 className="text-xl font-bold text-indigo-900">그룹 초대하기</h3>
-                  <p className="text-indigo-600 mt-1">{selectedGroup.sgt_title}</p>
+                  <FaShare className="w-12 h-12 text-gray-700 mx-auto mb-3" />
+                  <h3 className="text-xl font-bold text-gray-900">그룹 초대하기</h3>
+                  <p className="text-gray-600 mt-1">{selectedGroup.sgt_title}</p>
                 </div>
                 
                 <div className="space-y-3">
@@ -1622,7 +1647,7 @@ function GroupPageContent() {
                   
                   <button 
                     onClick={handleCopyLink} 
-                    className="w-full mobile-button flex items-center p-4 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white"
+                    className="w-full mobile-button flex items-center p-4 rounded-2xl bg-blue-400 hover:bg-blue-600 text-white"
                   >
                     <FiCopy className="w-6 h-6 mr-4" />
                     <span className="font-medium">초대 링크 복사</span>
@@ -1630,7 +1655,7 @@ function GroupPageContent() {
                   
                   <button 
                     onClick={handleShareSms} 
-                    className="w-full mobile-button flex items-center p-4 rounded-2xl bg-green-600 hover:bg-green-700 text-white"
+                    className="w-full mobile-button flex items-center p-4 rounded-2xl bg-red-400 hover:bg-red-500 text-white"
                   >
                     <MdOutlineMessage className="w-6 h-6 mr-4" />
                     <span className="font-medium">문자로 공유</span>
@@ -1638,7 +1663,7 @@ function GroupPageContent() {
                   
                   <button
                     onClick={handleCloseShareModal}
-                    className="w-full mobile-button py-4 mt-6 text-indigo-600 font-medium hover:text-indigo-800"
+                    className="w-full mobile-button py-4 mt-6 text-gray-600 font-medium hover:text-gray-800"
                   >
                     닫기
                   </button>

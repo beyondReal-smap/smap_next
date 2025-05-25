@@ -1,12 +1,12 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/v1/groups/member/[id]/route": "app/api/v1/groups/member/[id]/route.js",
+  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
   "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
   "/api/locations/other-members/[memberId]/route": "app/api/locations/other-members/[memberId]/route.js",
-  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
-  "/api/groups/[groupId]/members/[memberId]/role/route": "app/api/groups/[groupId]/members/[memberId]/role/route.js",
-  "/api/v1/groups/member/[id]/route": "app/api/v1/groups/member/[id]/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/schedule/page": "app/schedule/page.js",
+  "/notice/page": "app/notice/page.js",
   "/group/page": "app/group/page.js",
   "/home/page": "app/home/page.js",
+  "/schedule/page": "app/schedule/page.js",
   "/location/page": "app/location/page.js"
 }

@@ -5,9 +5,20 @@ from sqlalchemy import and_
 from app.api import deps
 from app.models.group_detail import GroupDetail
 from app.schemas.group_detail import GroupDetailCreate, GroupDetailUpdate, GroupDetailResponse
+from app.models.enums import LeaderCheckEnum, ShowEnum, ExitEnum
 from datetime import datetime
+from pydantic import BaseModel
 
 router = APIRouter()
+
+# 멤버 역할 변경을 위한 스키마
+class MemberRoleUpdate(BaseModel):
+    sgdt_leader_chk: str
+
+# 멤버 탈퇴를 위한 스키마  
+class MemberRemove(BaseModel):
+    sgdt_show: str = 'N'
+    sgdt_exit: str = 'Y'
 
 @router.get("/", response_model=List[GroupDetailResponse])
 def get_group_details(
@@ -128,6 +139,70 @@ def update_group_detail(
     db.commit()
     db.refresh(group_detail)
     return group_detail
+
+@router.put("/{group_detail_id}/role")
+def update_member_role(
+    group_detail_id: int,
+    role_update: MemberRoleUpdate,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    멤버의 역할을 변경합니다 (리더 ↔ 일반멤버).
+    """
+    group_detail = db.query(GroupDetail).filter(GroupDetail.sgdt_idx == group_detail_id).first()
+    if not group_detail:
+        raise HTTPException(status_code=404, detail="GroupDetail not found")
+    
+    # 역할 변경
+    group_detail.sgdt_leader_chk = LeaderCheckEnum.Y if role_update.sgdt_leader_chk == 'Y' else LeaderCheckEnum.N
+    group_detail.sgdt_udate = datetime.utcnow()
+    
+    db.add(group_detail)
+    db.commit()
+    db.refresh(group_detail)
+    
+    return {
+        "success": True,
+        "message": "멤버 역할이 성공적으로 변경되었습니다.",
+        "data": {
+            "sgdt_idx": group_detail.sgdt_idx,
+            "sgdt_leader_chk": group_detail.sgdt_leader_chk,
+            "sgdt_udate": group_detail.sgdt_udate.isoformat()
+        }
+    }
+
+@router.put("/{group_detail_id}/remove")
+def remove_member_from_group(
+    group_detail_id: int,
+    remove_data: MemberRemove,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    그룹에서 멤버를 탈퇴시킵니다 (소프트 삭제).
+    """
+    group_detail = db.query(GroupDetail).filter(GroupDetail.sgdt_idx == group_detail_id).first()
+    if not group_detail:
+        raise HTTPException(status_code=404, detail="GroupDetail not found")
+    
+    # 소프트 삭제 처리
+    group_detail.sgdt_show = ShowEnum.N
+    group_detail.sgdt_exit = ExitEnum.Y
+    group_detail.sgdt_udate = datetime.utcnow()
+    
+    db.add(group_detail)
+    db.commit()
+    db.refresh(group_detail)
+    
+    return {
+        "success": True,
+        "message": "멤버가 그룹에서 탈퇴되었습니다.",
+        "data": {
+            "sgdt_idx": group_detail.sgdt_idx,
+            "sgdt_show": group_detail.sgdt_show,
+            "sgdt_exit": group_detail.sgdt_exit,
+            "sgdt_udate": group_detail.sgdt_udate.isoformat()
+        }
+    }
 
 @router.delete("/{group_detail_id}")
 def delete_group_detail(
