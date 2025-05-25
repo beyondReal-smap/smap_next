@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  { params }: { params: Promise<{ groupId: string }> }
 ) {
   try {
-    const groupId = params.groupId;
+    const { groupId } = await params;
     console.log(`[API] 그룹 통계 조회 요청 - groupId: ${groupId}`);
 
     // 백엔드 API 호출
@@ -94,7 +94,7 @@ export async function GET(
     
     // 오류 발생 시에도 목업 데이터 반환
     const mockStats = {
-      group_id: parseInt(params.groupId),
+      group_id: 1,
       group_title: "테스트 그룹",
       member_count: 3,
       weekly_schedules: 12,
