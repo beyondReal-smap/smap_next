@@ -8,15 +8,26 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { PushLog, DeleteAllResponse } from '@/types/push';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
-import { Label } from '@/components/ui/label';
-import { FcGoogle } from 'react-icons/fc';
-import { SiKakaotalk } from 'react-icons/si';
 import notificationService from '@/services/notificationService';
+
+// 모바일 최적화된 CSS 애니메이션
+const mobileAnimations = `
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slideInFromBottom {
+  animation: slideInFromBottom 0.3s ease-out forwards;
+}
+`;
 
 // 날짜별 그룹핑 함수
 function groupByDate(list: PushLog[]): Record<string, PushLog[]> {
@@ -33,7 +44,8 @@ function NoticeContent() {
   const { toast } = useToast();
   const [notices, setNotices] = useState<PushLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const dataFetchedRef = React.useRef(false);
 
   // 알림 목록 조회 - 리렌더링 방지를 위해 ref 사용
@@ -94,101 +106,104 @@ function NoticeContent() {
 
   // 전체 삭제 핸들러
   const handleDeleteAll = async () => {
-    if (window.confirm('정말 모든 알림을 삭제하시겠습니까?')) {
-      try {
-        const response = await notificationService.deleteAllNotifications(1186);
-        console.log(response.message);
-        setNotices([]);
-      } catch (error) {
-        console.error('Error deleting notices:', error);
-      }
-    }
+    setIsDeleteModalOpen(true);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
+  // 실제 삭제 실행
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true);
     try {
-      const formData = new FormData(e.currentTarget);
-      await notificationService.registerNotification(formData);
-
+      const response = await notificationService.deleteAllNotifications(1186);
+      console.log(response.message);
+      setNotices([]);
+      setIsDeleteModalOpen(false);
       toast({
         title: '성공',
-        description: '공지사항이 등록되었습니다.',
+        description: '모든 알림이 삭제되었습니다.',
       });
-
-      router.push('/notice/list');
     } catch (error) {
+      console.error('Error deleting notices:', error);
       toast({
         title: '오류',
-        description: error instanceof Error ? error.message : '알 수 없는 오류가 발생했습니다.',
+        description: '알림 삭제 중 오류가 발생했습니다.',
         variant: 'destructive',
       });
     } finally {
-      setIsSubmitting(false);
+      setIsDeleting(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="flex-grow flex items-center justify-center">
-        <LoadingSpinner 
-          message="알림을 불러오는 중입니다..." 
-          fullScreen={true}
-          type="ripple"
-          size="md"
-          color="indigo"
-        />
+      <div className="min-h-screen flex items-center justify-center bg-indigo-50">
+        <div className="text-center px-6">
+          <LoadingSpinner 
+            message="알림을 불러오는 중입니다..." 
+            fullScreen={true}
+            type="ripple"
+            size="md"
+            color="blue"
+          />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
-      {/* 상단 고정 헤더 + 전체 삭제 버튼 */}
-      <header className="bg-white shadow-sm fixed top-0 left-0 right-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center h-12 justify-between">
-            <div className="flex items-center">
-              <button
-                onClick={() => router.back()}
-                aria-label="뒤로 가기"
-                className="p-2 mr-2 -ml-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
-              <h1 className="text-lg font-medium text-gray-900 truncate">앱 푸시 알림</h1>
-            </div>
-            <button
-              onClick={handleDeleteAll}
-              className="flex items-center text-xs text-gray-500 hover:text-red-600 hover:bg-red-50 px-2 py-1 rounded transition-colors"
-              aria-label="전체 삭제"
-              disabled={notices.length === 0}
+    <div className="min-h-screen bg-indigo-50">
+      <style jsx global>{mobileAnimations}</style>
+      {/* 앱 헤더 - 그룹 페이지 스타일 (고정) */}
+      <div className="sticky top-0 z-10 px-4 bg-indigo-50 border-b border-indigo-100">
+        <div className="flex items-center justify-between h-12">
+          <div className="flex items-center">
+            <button 
+              onClick={() => router.back()}
+              className="px-2 py-2 hover:bg-indigo-200 transition-all duration-200 mr-2"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              전체삭제
             </button>
+            <span className="ml-1 text-lg font-normal text-gray-900">알림</span>
           </div>
+          <button
+            onClick={handleDeleteAll}
+            className="flex items-center text-xs text-red-500 hover:text-red-600 px-2 py-1 rounded transition-colors"
+            aria-label="전체 삭제"
+            disabled={notices.length === 0}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            전체삭제
+          </button>
         </div>
-      </header>
+      </div>
 
       {/* 메인 컨텐츠 영역 */}
-      <main className="pt-12 pb-8">
+      <main className="pb-8">
         <div className="px-4 pt-4">
-          <p className="text-gray-600 text-sm">푸시 알림 내역을 확인하세요.</p>
-        </div>
-        <div className="px-2">
+          {notices.length > 0 && (
+            <div className="px-2">
+              <p className="text-indigo-600 text-sm">푸시 알림 내역을 확인하세요.</p>
+            </div>
+          )}
           {notices.length === 0 ? (
-             <div className="text-center text-gray-400 py-16">알림이 없습니다.</div>
+            <div className="bg-white rounded-xl shadow px-4 py-16">
+              <div className="text-center text-gray-400">
+                <div className="mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 mx-auto text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-5 5-5-5h5v-6h5v6zM9 7H4l5-5 5 5H9v6H4V7z" />
+                  </svg>
+                </div>
+                <p className="text-lg font-medium text-gray-500">알림이 없습니다</p>
+                <p className="text-sm text-gray-400 mt-2">새로운 알림이 도착하면 여기에 표시됩니다</p>
+              </div>
+            </div>
            ) : (
             <div className="space-y-8">
               {Object.entries(grouped).map(([date, items]) => (
-                 <section key={date} className="mb-8">
+                 <section key={date} className="mb-4">
                    <div className="text-base font-bold text-gray-600 mb-2 px-2">
                      {format(new Date(date), 'yyyy.MM.dd (E)', { locale: ko })}
                      {date === format(new Date(), 'yyyy-MM-dd') && (
@@ -231,77 +246,62 @@ function NoticeContent() {
          </div>
       </main>
 
-      <div className="container mx-auto py-8">
-        <Card>
-          <CardHeader>
-            <CardTitle>공지사항 작성</CardTitle>
-            <CardDescription>새로운 공지사항을 작성합니다.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">제목</Label>
-                <Input id="title" name="title" required />
+      {/* 전체 삭제 확인 모달 */}
+      {isDeleteModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setIsDeleteModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-3xl w-full max-w-md mx-auto animate-slideInFromBottom"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 pb-8">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">전체 삭제</h3>
+                <p className="text-gray-600 mb-4">
+                  정말 <span className="font-medium text-red-600">모든 알림</span>을 삭제하시겠습니까?
+                </p>
+                <p className="text-sm text-gray-500">
+                  삭제된 알림은 복구할 수 없습니다.
+                </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="content">내용</Label>
-                <Textarea id="content" name="content" required className="min-h-[200px]" />
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button
+              
+              <div className="space-y-3">
+                <button
                   type="button"
-                  variant="outline"
-                  onClick={() => router.back()}
-                  disabled={isSubmitting}
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                  className="w-full py-4 bg-red-500 text-white rounded-2xl font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      삭제 중...
+                    </>
+                  ) : (
+                    '모든 알림 삭제'
+                  )}
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  disabled={isDeleting}
+                  className="w-full py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors"
                 >
                   취소
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? '등록 중...' : '등록'}
-                </Button>
-              </div>
-            </form>
-
-            <div className="mt-8">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">
-                    또는
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6 grid grid-cols-2 gap-4">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    // 구글 로그인 처리
-                    console.log('Google login clicked');
-                  }}
-                >
-                  <FcGoogle className="mr-2 h-5 w-5" />
-                  구글로 가입
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    // 카카오 로그인 처리
-                    console.log('Kakao login clicked');
-                  }}
-                >
-                  <SiKakaotalk className="mr-2 h-5 w-5 text-yellow-400" />
-                  카카오로 가입
-                </Button>
+                </button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

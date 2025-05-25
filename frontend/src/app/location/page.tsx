@@ -2091,7 +2091,7 @@ export default function LocationPage() {
             fullScreen={true}
             type="ripple"
             size="md"
-            color="indigo"
+            color="blue"
           />
         )}
         

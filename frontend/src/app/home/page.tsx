@@ -2044,7 +2044,7 @@ export default function HomePage() {
               fullScreen={true}
               type="ripple"
               size="md"
-              color="indigo"
+              color="blue"
             />
           )}
           

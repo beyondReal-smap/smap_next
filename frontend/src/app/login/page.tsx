@@ -197,7 +197,7 @@ export default function LoginPage() {
         fullScreen={true}
         type="ripple"
         size="md"
-        color="indigo"
+        color="blue"
       />
     );
   }

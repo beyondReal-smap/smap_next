@@ -1090,17 +1090,14 @@ function GroupPageContent() {
   // 로딩 중일 때
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+      <div className="min-h-screen flex items-center justify-center bg-indigo-50">
         <div className="text-center px-6">
-          <div className="animate-bounce mb-6">
-            <HiUserGroup className="w-16 h-16 text-gray-500 mx-auto" />
-          </div>
           <LoadingSpinner 
             message="그룹 목록을 불러오는 중입니다..." 
-            fullScreen={false}
+            fullScreen={true}
             type="ripple"
             size="md"
-            color="indigo"
+            color="blue"
           />
         </div>
       </div>
@@ -1423,7 +1420,7 @@ function GroupPageContent() {
                           fullScreen={false}
                           type="ripple"
                           size="sm"
-                          color="indigo"
+                          color="blue"
                         />
                       </div>
                     ) : (
@@ -1637,9 +1634,9 @@ function GroupPageContent() {
                 </div>
                 
                 <div className="space-y-3">
-                  <button 
+                   <button 
                     onClick={handleShareKakao} 
-                    className="w-full mobile-button flex items-center p-4 rounded-2xl bg-[#FEE500] hover:bg-[#FEDD00] text-[#3C1E1E]"
+                    className="w-full mobile-button flex items-center justify-center p-4 rounded-2xl bg-[#FEE500] hover:bg-[#FEDD00] text-[#3C1E1E]"
                   >
                     <RiKakaoTalkFill className="w-6 h-6 mr-4" />
                     <span className="font-medium">카카오톡으로 공유</span>
@@ -1647,7 +1644,7 @@ function GroupPageContent() {
                   
                   <button 
                     onClick={handleCopyLink} 
-                    className="w-full mobile-button flex items-center p-4 rounded-2xl bg-blue-400 hover:bg-blue-600 text-white"
+                    className="w-full mobile-button flex items-center justify-center p-4 rounded-2xl bg-blue-400 hover:bg-blue-600 text-white"
                   >
                     <FiCopy className="w-6 h-6 mr-4" />
                     <span className="font-medium">초대 링크 복사</span>
@@ -1655,7 +1652,7 @@ function GroupPageContent() {
                   
                   <button 
                     onClick={handleShareSms} 
-                    className="w-full mobile-button flex items-center p-4 rounded-2xl bg-red-400 hover:bg-red-500 text-white"
+                    className="w-full mobile-button flex items-center justify-center p-4 rounded-2xl bg-red-400 hover:bg-red-500 text-white"
                   >
                     <MdOutlineMessage className="w-6 h-6 mr-4" />
                     <span className="font-medium">문자로 공유</span>
