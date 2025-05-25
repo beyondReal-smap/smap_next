@@ -266,17 +266,29 @@ class GroupService {
   async getGroupStats(sgt_idx: number | string): Promise<GroupStats> {
     try {
       console.log(`[GroupService] 그룹 통계 조회 요청 - sgt_idx: ${sgt_idx}`);
+      console.log(`[GroupService] API 요청 URL: /api/groups/${sgt_idx}/stats`);
       
       const response = await apiClient.get(`/groups/${sgt_idx}/stats`);
       
+      console.log(`[GroupService] API 응답 상태:`, response.status);
+      console.log(`[GroupService] API 응답 데이터:`, response.data);
+      
       if (!response.data.success) {
+        console.error(`[GroupService] API 응답 실패:`, response.data.message);
         throw new Error(response.data.message || '그룹 통계 조회에 실패했습니다.');
       }
       
       console.log('[GroupService] 그룹 통계 조회 성공:', response.data.data);
       return response.data.data;
     } catch (error) {
-      console.error('그룹 통계 조회 오류:', error);
+      console.error('[GroupService] 그룹 통계 조회 오류:', error);
+      console.error('[GroupService] 오류 타입:', typeof error);
+      console.error('[GroupService] 오류 상세:', error instanceof Error ? error.message : String(error));
+      
+      if (error instanceof Error && error.message.includes('fetch')) {
+        console.error('[GroupService] 네트워크 오류로 추정됩니다.');
+      }
+      
       throw new Error('그룹 통계를 가져오는데 실패했습니다.');
     }
   }

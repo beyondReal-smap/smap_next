@@ -218,8 +218,63 @@ class MemberService {
    * 멤버 위치 정보 업데이트
    */
   async updateMemberLocation(id: number | string, lat: number, lng: number): Promise<Member> {
-    const response = await apiClient.patch<Member>(`/members/${id}/location`, { mt_lat: lat, mt_long: lng });
+    const response = await apiClient.put<Member>(`/members/${id}/location`, {
+      mt_lat: lat.toString(),
+      mt_long: lng.toString()
+    });
     return response.data;
+  }
+
+  /**
+   * 그룹 멤버 역할 변경 (리더 권한)
+   */
+  async updateMemberRole(groupId: number | string, memberId: number | string, isLeader: boolean): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('[MEMBER SERVICE] 멤버 역할 변경 시작:', {
+        groupId,
+        memberId,
+        isLeader,
+        newRole: isLeader ? 'leader' : 'member'
+      });
+
+      const response = await apiClient.put(`/groups/${groupId}/members/${memberId}/role`, {
+        sgdt_leader_chk: isLeader ? 'Y' : 'N'
+      });
+
+      console.log('[MEMBER SERVICE] 멤버 역할 변경 성공:', response.data);
+      return {
+        success: true,
+        message: `멤버 역할이 ${isLeader ? '리더' : '멤버'}로 변경되었습니다.`
+      };
+    } catch (error) {
+      console.error('[MEMBER SERVICE] 멤버 역할 변경 실패:', error);
+      throw new Error('멤버 역할 변경 중 오류가 발생했습니다.');
+    }
+  }
+
+  /**
+   * 그룹 멤버 탈퇴 처리 (소프트 삭제)
+   */
+  async removeMemberFromGroup(groupId: number | string, memberId: number | string): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('[MEMBER SERVICE] 그룹 멤버 탈퇴 처리 시작:', {
+        groupId,
+        memberId
+      });
+
+      const response = await apiClient.put(`/groups/${groupId}/members/${memberId}/remove`, {
+        sgdt_show: 'N' // 소프트 삭제
+      });
+
+      console.log('[MEMBER SERVICE] 그룹 멤버 탈퇴 처리 성공:', response.data);
+      return {
+        success: true,
+        message: '멤버가 그룹에서 탈퇴되었습니다.'
+      };
+    } catch (error) {
+      console.error('[MEMBER SERVICE] 그룹 멤버 탈퇴 처리 실패:', error);
+      throw new Error('멤버 탈퇴 처리 중 오류가 발생했습니다.');
+    }
   }
 }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { flushSync } from 'react-dom';
 import { PageContainer, Button } from '../components/layout';
 import { 
   FaUsers, 
@@ -34,6 +35,8 @@ import { MdOutlineMessage, MdGroupAdd } from 'react-icons/md';
 import { BsThreeDots } from 'react-icons/bs';
 import groupService, { Group, GroupStats } from '@/services/groupService';
 import memberService from '@/services/memberService';
+import scheduleService from '@/services/scheduleService';
+import locationService from '@/services/locationService';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 export const dynamic = 'force-dynamic';
@@ -267,7 +270,47 @@ function GroupPageContent() {
   const [groupStats, setGroupStats] = useState<GroupStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   
+  // 강제 리렌더링을 위한 상태 추가
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
+  // 컴포넌트 마운트 상태 추가
+  const [isMounted, setIsMounted] = useState(false);
+  
+  // 컴포넌트 키 상태 추가 (강제 리마운트용)
+  const [componentKey, setComponentKey] = useState(0);
+  
+  // 첫 번째 그룹 자동 선택 완료 플래그
+  const [initialGroupSelected, setInitialGroupSelected] = useState(false);
+  
+  // 멤버 관리 모달 상태 추가
+  const [isMemberManageModalOpen, setIsMemberManageModalOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
+  const [isUpdatingMember, setIsUpdatingMember] = useState(false);
+  
   const router = useRouter();
+
+  // 컴포넌트 마운트 완료 추적
+  useEffect(() => {
+    setIsMounted(true);
+    console.log('[Group Page] 컴포넌트 마운트 완료');
+  }, []);
+
+  // 렌더링 상태 추적
+  useEffect(() => {
+    console.log('[Group Page] 렌더링 상태 변화:', {
+      selectedGroup: selectedGroup?.sgt_idx,
+      groupStats: groupStats ? {
+        group_id: groupStats.group_id,
+        member_count: groupStats.member_count,
+        weekly_schedules: groupStats.weekly_schedules,
+        total_locations: groupStats.total_locations
+      } : null,
+      groupMembers: groupMembers.length,
+      membersLoading,
+      statsLoading,
+      forceUpdate
+    });
+  }, [selectedGroup, groupStats, groupMembers.length, membersLoading, statsLoading, forceUpdate]);
 
   // 그룹 목록 조회 함수
   const fetchGroups = async () => {
@@ -276,11 +319,6 @@ function GroupPageContent() {
       const data = await groupService.getCurrentUserGroups();
       console.log('[Group Page] 그룹 목록 조회 결과:', data);
       setGroups(data);
-      
-      // 선택된 그룹이 없거나 삭제된 경우에만 첫 번째 그룹 선택
-      if (data.length > 0 && (!selectedGroup || !data.find(g => g.sgt_idx === selectedGroup.sgt_idx))) {
-        setSelectedGroup(data[0]);
-      }
 
       const memberCounts: {[key: number]: number} = {};
       for (const group of data) {
@@ -307,19 +345,64 @@ function GroupPageContent() {
     fetchGroups();
   }, []);
 
+  // 그룹 목록이 로드된 후 첫 번째 그룹 자동 선택
+  useEffect(() => {
+    console.log('[Group Page] 그룹 자동 선택 useEffect 실행:', {
+      그룹수: groups.length,
+      현재선택된그룹: selectedGroup?.sgt_idx,
+      첫번째그룹: groups[0]?.sgt_idx,
+      컴포넌트마운트: isMounted
+    });
+    
+    // 초기 자동 선택 비활성화 - 사용자가 직접 선택하도록 함
+    /*
+    if (isMounted && groups.length > 0 && !initialGroupSelected && (!selectedGroup || !groups.find(g => g.sgt_idx === selectedGroup.sgt_idx))) {
+      console.log('[Group Page] 첫 번째 그룹 자동 선택:', groups[0].sgt_idx, groups[0].sgt_title);
+      // handleInitialGroupSelect 함수를 사용하여 일관된 처리
+      setTimeout(() => {
+        handleInitialGroupSelect(groups[0] as ExtendedGroup);
+        setInitialGroupSelected(true); // 플래그 설정
+      }, 50); // 더 긴 지연시간으로 변경
+    } else {
+      console.log('[Group Page] 그룹 자동 선택 조건 불만족:', {
+        컴포넌트마운트: isMounted,
+        그룹있음: groups.length > 0,
+        선택된그룹없음: !selectedGroup,
+        그룹목록에서찾을수없음: selectedGroup ? !groups.find(g => g.sgt_idx === selectedGroup.sgt_idx) : 'N/A'
+      });
+    }
+    */
+  }, [groups, isMounted]);
+
+  // selectedGroup 상태 변화 추적
+  useEffect(() => {
+    console.log('[Group Page] selectedGroup 상태 변화:', {
+      이전: '추적불가',
+      현재: selectedGroup?.sgt_idx,
+      현재그룹명: selectedGroup?.sgt_title
+    });
+  }, [selectedGroup]);
+
   // 선택된 그룹의 멤버 목록 조회
   useEffect(() => {
     const fetchGroupMembers = async () => {
       if (!selectedGroup) {
+        console.log('[Group Page] 선택된 그룹이 없음 - 멤버 데이터 초기화');
         setGroupMembers([]);
+        setGroupStats(null); // 그룹 통계도 초기화
         return;
       }
 
       try {
+        console.log('[Group Page] 멤버 조회 시작 - 그룹 ID:', selectedGroup.sgt_idx, '그룹명:', selectedGroup.sgt_title);
         setMembersLoading(true);
+        // 그룹 변경 시 이전 데이터 초기화
+        setGroupMembers([]);
+        setGroupStats(null);
+        
         const memberData = await memberService.getGroupMembers(selectedGroup.sgt_idx.toString());
         
-        console.log('[Group Page] 원본 멤버 데이터:', memberData);
+        console.log('[Group Page] 그룹', selectedGroup.sgt_idx, '원본 멤버 데이터:', memberData, '멤버 수:', memberData.length);
         
         // 각 멤버의 sgdt_owner_chk, sgdt_leader_chk 값 확인
         memberData.forEach((member: any, index: number) => {
@@ -389,11 +472,13 @@ function GroupPageContent() {
           });
         });
         
+        console.log('[Group Page] 그룹', selectedGroup.sgt_idx, '멤버 상태 업데이트 시작 - 멤버 수:', transformedMembers.length);
         setGroupMembers(transformedMembers);
         setGroupMemberCounts(prev => ({
           ...prev,
           [selectedGroup.sgt_idx]: transformedMembers.length
         }));
+        console.log('[Group Page] 그룹', selectedGroup.sgt_idx, '멤버 상태 업데이트 완료');
       } catch (error) {
         console.error('[Group Page] 그룹 멤버 조회 오류:', error);
         setGroupMembers([]);
@@ -405,84 +490,174 @@ function GroupPageContent() {
     fetchGroupMembers();
   }, [selectedGroup]);
 
-  // 선택된 그룹의 통계 데이터 조회
+  // 그룹 멤버 로딩 완료 후 통계 조회
   useEffect(() => {
-    const fetchGroupStats = async () => {
-      if (!selectedGroup) {
-        setGroupStats(null);
-        return;
-      }
+    if (selectedGroup && groupMembers.length > 0 && !membersLoading) {
+      console.log('[Group Page] 멤버 로딩 완료, 통계 조회 시작');
+      const fetchGroupStats = async () => {
+        try {
+          setStatsLoading(true);
+          console.log('[Group Page] 그룹 통계 조회 시작 - 그룹 ID:', selectedGroup.sgt_idx, '그룹명:', selectedGroup.sgt_title);
+          
+          // 실제 API들을 활용해서 통계 계산
+          const memberCount = groupMembers.length;
+          console.log('[Group Page] 그룹 멤버 수:', memberCount);
+          
+          // 1. 선택된 그룹의 7일간 스케줄 데이터 조회 (한 번만 조회)
+          let weeklySchedules = 0;
+          let allGroupSchedules: any[] = [];
+          try {
+            allGroupSchedules = await scheduleService.getGroupSchedules(selectedGroup.sgt_idx.toString(), 7);
+            weeklySchedules = allGroupSchedules.length;
+            console.log('[Group Page] 그룹', selectedGroup.sgt_idx, '의 7일간 스케줄 조회 결과:', weeklySchedules, '개');
+            
+            // 스케줄 데이터 구조 확인
+            if (allGroupSchedules.length > 0) {
+              console.log('[Group Page] 첫 번째 스케줄 데이터 구조:', allGroupSchedules[0]);
+              console.log('[Group Page] 스케줄 데이터 필드들:', Object.keys(allGroupSchedules[0]));
+            }
+          } catch (error) {
+            console.error('[Group Page] 그룹', selectedGroup.sgt_idx, '스케줄 조회 오류:', error);
+          }
+          
+          // 2. 그룹 멤버들의 위치 데이터 조회
+          let totalLocations = 0;
+          const memberStats = [];
+          
+          for (const member of groupMembers) {
+            try {
+              console.log(`[Group Page] 멤버 ${member.mt_name}(ID: ${member.mt_idx}) 통계 조회 시작`);
+              
+              // 각 멤버의 저장된 위치 조회 (그룹과 관련된 위치)
+              const memberLocations = await locationService.getOtherMembersLocations(member.mt_idx.toString());
+              const memberLocationCount = memberLocations.length;
+              totalLocations += memberLocationCount;
+              
+              // 해당 멤버의 7일간 스케줄 필터링 (mt_idx로 필터링)
+              const memberWeeklySchedules = allGroupSchedules.filter(schedule => 
+                schedule.mt_idx === member.mt_idx
+              ).length;
+              
+              console.log(`[Group Page] ${member.mt_name} 스케줄 필터링:`, {
+                멤버ID: member.mt_idx,
+                전체스케줄수: allGroupSchedules.length,
+                필터링된스케줄수: memberWeeklySchedules,
+                스케줄샘플: allGroupSchedules.slice(0, 3).map(s => ({
+                  mt_schedule_idx: s.mt_schedule_idx,
+                  mt_idx: s.mt_idx,
+                  기타필드들: Object.keys(s).filter(k => k.includes('mt_') || k.includes('idx'))
+                }))
+              });
+              
+              memberStats.push({
+                mt_idx: member.mt_idx,
+                mt_name: member.mt_name,
+                mt_nickname: member.mt_nickname,
+                weekly_schedules: memberWeeklySchedules,
+                total_locations: memberLocationCount,
+                weekly_locations: Math.min(memberLocationCount, memberWeeklySchedules), // 주간 위치는 스케줄 수와 비슷하게
+                is_owner: member.sgdt_owner_chk === 'Y',
+                is_leader: member.sgdt_leader_chk === 'Y'
+              });
+              
+              console.log(`[Group Page] ${member.mt_name} 통계 완료:`, {
+                그룹ID: selectedGroup.sgt_idx,
+                멤버ID: member.mt_idx,
+                위치수: memberLocationCount,
+                주간일정수: memberWeeklySchedules
+              });
+            } catch (error) {
+              console.error(`[Group Page] 그룹 ${selectedGroup.sgt_idx} 멤버 ${member.mt_name} 데이터 조회 오류:`, error);
+              // 오류 시 기본값 설정
+              memberStats.push({
+                mt_idx: member.mt_idx,
+                mt_name: member.mt_name,
+                mt_nickname: member.mt_nickname,
+                weekly_schedules: 0,
+                total_locations: 0,
+                weekly_locations: 0,
+                is_owner: member.sgdt_owner_chk === 'Y',
+                is_leader: member.sgdt_leader_chk === 'Y'
+              });
+            }
+          }
+          
+          const statsData = {
+            group_id: selectedGroup.sgt_idx,
+            group_title: selectedGroup.sgt_title,
+            member_count: memberCount,
+            weekly_schedules: weeklySchedules,
+            total_locations: totalLocations,
+            stats_period: {
+              start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+              end_date: new Date().toISOString(),
+              days: 7
+            },
+            member_stats: memberStats
+          };
+          
+          console.log('[Group Page] 그룹', selectedGroup.sgt_idx, '통계 조회 완료:', {
+            그룹명: statsData.group_title,
+            멤버수: statsData.member_count,
+            주간일정: statsData.weekly_schedules,
+            총위치: statsData.total_locations,
+            멤버별통계: memberStats.map(m => ({ 이름: m.mt_name, 일정: m.weekly_schedules, 위치: m.total_locations }))
+          });
+          
+          // 상태 업데이트를 강제로 다음 틱에서 실행
+          setTimeout(() => {
+            flushSync(() => {
+              setGroupStats(prevStats => {
+                console.log('[Group Page] 통계 상태 업데이트 완료:', statsData.group_id, statsData.group_title);
+                console.log('[Group Page] 이전 상태:', prevStats?.group_id, '새 상태:', statsData.group_id);
+                return statsData;
+              });
+              // 강제 리렌더링
+              setForceUpdate(prev => prev + 1);
+            });
+          }, 100); // 지연시간 증가
+          
+        } catch (error) {
+          console.error('[Group Page] 그룹', selectedGroup?.sgt_idx, '통계 조회 오류:', error);
+          console.error('[Group Page] 오류 상세:', error instanceof Error ? error.message : String(error));
+          setGroupStats(null);
+        } finally {
+          setStatsLoading(false);
+        }
+      };
 
-      try {
-        setStatsLoading(true);
-        console.log('[Group Page] 그룹 통계 조회 시작:', selectedGroup.sgt_idx);
-        
-        const statsData = await groupService.getGroupStats(selectedGroup.sgt_idx);
-        setGroupStats(statsData);
-        
-        console.log('[Group Page] 그룹 통계 조회 완료:', statsData);
-      } catch (error) {
-        console.error('[Group Page] 그룹 통계 조회 오류:', error);
-        setGroupStats(null);
-      } finally {
-        setStatsLoading(false);
-      }
-    };
+      fetchGroupStats();
+    }
+  }, [selectedGroup, groupMembers.length, membersLoading]);
 
-    fetchGroupStats();
-  }, [selectedGroup]);
-
-  // 그룹 선택 (모바일에서는 상세 화면으로 이동)
-  const handleGroupSelect = (group: ExtendedGroup) => {
-    setSelectedGroup(group);
-    setCurrentView('detail');
-    setShowGroupActions(false);
-  };
-
-  // 검색 필터링
-  const filteredGroups = groups.filter(group => 
-    group.sgt_title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (group.sgt_content && group.sgt_content.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (group.sgt_memo && group.sgt_memo.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-
-  // 검색어 변경 핸들러
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setIsSearching(true);
-    setSearchQuery(value);
-    
-    // 짧은 딜레이 후 검색 상태 해제 (애니메이션을 위해)
-    setTimeout(() => {
-      setIsSearching(false);
-    }, 100);
-  };
-
-  // 모달 관련 함수들
-  const handleAddGroup = () => setIsAddModalOpen(true);
-  const handleCloseModal = () => {
-    setIsClosing(true);
-    setTimeout(() => {
-      setIsAddModalOpen(false);
-      setNewGroup({ name: '', description: '' });
-      setIsClosing(false);
-    }, 300);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setNewGroup(prev => ({ ...prev, [name]: value }));
-  };
-
-  // 그룹 수정 관련 함수들 추가
-  const handleEditGroup = () => {
-    if (!selectedGroup) return;
-    
-    setEditGroup({
-      name: selectedGroup.sgt_title,
-      description: selectedGroup.sgt_memo || selectedGroup.sgt_content || ''
+  // 초기 로드용 그룹 선택 (화면 전환 없음)
+  const handleInitialGroupSelect = (group: ExtendedGroup) => {
+    console.log('[Group Page] 초기 그룹 선택:', {
+      이전그룹: selectedGroup?.sgt_idx,
+      새그룹: group.sgt_idx,
+      새그룹명: group.sgt_title
     });
-    setIsEditModalOpen(true);
+    
+    // 그룹 변경 시 이전 데이터 초기화
+    setGroupMembers([]);
+    setGroupStats(null);
+    setStatsLoading(false);
+    setMembersLoading(false);
+    
+    // flushSync로 강제 동기 업데이트
+    flushSync(() => {
+      setSelectedGroup(group);
+    });
+    
+    // 컴포넌트 강제 리마운트
+    setTimeout(() => {
+      setComponentKey(prev => prev + 1);
+      // 무한 새로고침 방지를 위해 주석 처리
+      // console.log('[Group Page] 첫 번째 그룹 선택 - 페이지 새로고침 실행');
+      // window.location.reload();
+    }, 10);
+    
+    // 화면 전환은 하지 않음 (목록 화면 유지)
     setShowGroupActions(false);
   };
 
@@ -731,6 +906,187 @@ function GroupPageContent() {
     }
   }, [isSuccessModalOpen]);
 
+  // 그룹 선택 (모바일에서는 상세 화면으로 이동)
+  const handleGroupSelect = (group: ExtendedGroup) => {
+    console.log('[Group Page] 그룹 선택:', {
+      이전그룹: selectedGroup?.sgt_idx,
+      새그룹: group.sgt_idx,
+      새그룹명: group.sgt_title,
+      같은그룹재선택: selectedGroup?.sgt_idx === group.sgt_idx
+    });
+    
+    // 그룹 변경 시 이전 데이터 초기화
+    setGroupMembers([]);
+    setGroupStats(null);
+    setStatsLoading(false);
+    setMembersLoading(false);
+    
+    // 같은 그룹을 다시 선택하는 경우에도 강제로 상태 업데이트
+    if (selectedGroup?.sgt_idx === group.sgt_idx) {
+      console.log('[Group Page] 같은 그룹 재선택 - 강제 업데이트');
+      // 잠시 null로 설정했다가 다시 설정하여 useEffect 트리거
+      setSelectedGroup(null);
+      setTimeout(() => {
+        setSelectedGroup(group);
+        setCurrentView('detail');
+      }, 10);
+    } else {
+      setSelectedGroup(group);
+      setCurrentView('detail');
+    }
+    
+    setShowGroupActions(false);
+  };
+
+  // 검색 필터링
+  const filteredGroups = groups.filter(group => 
+    group.sgt_title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (group.sgt_content && group.sgt_content.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (group.sgt_memo && group.sgt_memo.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  // 검색어 변경 핸들러
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setIsSearching(true);
+    setSearchQuery(value);
+    
+    // 짧은 딜레이 후 검색 상태 해제 (애니메이션을 위해)
+    setTimeout(() => {
+      setIsSearching(false);
+    }, 100);
+  };
+
+  // 모달 관련 함수들
+  const handleAddGroup = () => setIsAddModalOpen(true);
+  const handleCloseModal = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsAddModalOpen(false);
+      setNewGroup({ name: '', description: '' });
+      setIsClosing(false);
+    }, 300);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setNewGroup(prev => ({ ...prev, [name]: value }));
+  };
+
+  // 그룹 수정 관련 함수들 추가
+  const handleEditGroup = () => {
+    if (!selectedGroup) return;
+    
+    setEditGroup({
+      name: selectedGroup.sgt_title,
+      description: selectedGroup.sgt_memo || selectedGroup.sgt_content || ''
+    });
+    setIsEditModalOpen(true);
+    setShowGroupActions(false);
+  };
+
+  // 현재 로그인한 사용자가 그룹 관리자인지 확인
+  const isCurrentUserGroupOwner = () => {
+    if (!selectedGroup || !groupMembers.length) return false;
+    const currentUserId = 1186; // 현재 로그인한 사용자 ID (실제로는 context나 props에서 가져와야 함)
+    const currentUserMember = groupMembers.find(member => member.mt_idx === currentUserId);
+    return currentUserMember?.sgdt_owner_chk === 'Y';
+  };
+
+  // 멤버 클릭 핸들러
+  const handleMemberClick = (member: GroupMember) => {
+    if (!isCurrentUserGroupOwner()) return; // 관리자가 아니면 아무것도 하지 않음
+    if (member.sgdt_owner_chk === 'Y') return; // 관리자 자신은 관리할 수 없음
+    
+    setSelectedMember(member);
+    setIsMemberManageModalOpen(true);
+  };
+
+  // 멤버 역할 변경
+  const handleChangeMemberRole = async (newRole: 'member' | 'leader') => {
+    if (!selectedMember || !selectedGroup) return;
+    
+    setIsUpdatingMember(true);
+    try {
+      console.log(`[Group Page] 멤버 ${selectedMember.mt_name}의 역할을 ${newRole}로 변경 시작`);
+      
+      // 실제 API 호출로 멤버 역할 변경
+      const result = await memberService.updateMemberRole(
+        selectedGroup.sgt_idx,
+        selectedMember.mt_idx,
+        newRole === 'leader'
+      );
+      
+      console.log('[Group Page] 멤버 역할 변경 API 응답:', result);
+      
+      // 로컬 상태 업데이트
+      setGroupMembers(prevMembers => 
+        prevMembers.map(member => 
+          member.mt_idx === selectedMember.mt_idx 
+            ? { ...member, sgdt_leader_chk: newRole === 'leader' ? 'Y' : 'N' }
+            : member
+        )
+      );
+      
+      setIsMemberManageModalOpen(false);
+      setSelectedMember(null);
+      setSuccessMessage(result.message);
+      setIsSuccessModalOpen(true);
+      
+    } catch (error) {
+      console.error('[Group Page] 멤버 역할 변경 오류:', error);
+      const errorMessage = error instanceof Error ? error.message : '역할 변경 중 오류가 발생했습니다.';
+      alert(errorMessage);
+    } finally {
+      setIsUpdatingMember(false);
+    }
+  };
+
+  // 멤버 그룹 탈퇴
+  const handleRemoveMember = async () => {
+    if (!selectedMember || !selectedGroup) return;
+    
+    setIsUpdatingMember(true);
+    try {
+      console.log(`[Group Page] 멤버 ${selectedMember.mt_name}을 그룹에서 탈퇴 처리 시작`);
+      
+      // 실제 API 호출로 멤버 탈퇴 처리 (소프트 삭제)
+      const result = await memberService.removeMemberFromGroup(
+        selectedGroup.sgt_idx,
+        selectedMember.mt_idx
+      );
+      
+      console.log('[Group Page] 멤버 탈퇴 처리 API 응답:', result);
+      
+      // 로컬 상태 업데이트 (UI에서 제거)
+      setGroupMembers(prevMembers => 
+        prevMembers.filter(member => member.mt_idx !== selectedMember.mt_idx)
+      );
+      
+      setIsMemberManageModalOpen(false);
+      setSelectedMember(null);
+      setSuccessMessage(result.message);
+      setIsSuccessModalOpen(true);
+      
+    } catch (error) {
+      console.error('[Group Page] 멤버 탈퇴 처리 오류:', error);
+      const errorMessage = error instanceof Error ? error.message : '멤버 탈퇴 처리 중 오류가 발생했습니다.';
+      alert(errorMessage);
+    } finally {
+      setIsUpdatingMember(false);
+    }
+  };
+
+  // 멤버 관리 모달 닫기
+  const handleCloseMemberManageModal = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsMemberManageModalOpen(false);
+      setSelectedMember(null);
+      setIsClosing(false);
+    }, 300);
+  };
+
   // 로딩 중일 때
   if (loading) {
     return (
@@ -754,10 +1110,10 @@ function GroupPageContent() {
   return (
     <>
       <style jsx global>{mobileAnimations}</style>
-      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+      <div key={componentKey} className="min-h-screen bg-indigo-50">
         
         {/* 앱 헤더 - 홈 페이지 스타일 */}
-        <div className="px-4 bg-white/95 backdrop-blur-lg">
+        <div className="px-4 bg-indigo-50">
           <div className="flex items-center justify-between h-12">
             {currentView === 'list' ? (
               <div className="flex items-center">
@@ -784,9 +1140,11 @@ function GroupPageContent() {
               <div className="flex items-center space-x-2 ml-auto">
                 <button 
                   onClick={() => setCurrentView('list')}
-                  className="px-2 py-2 rounded-full bg-indigo-100 hover:bg-indigo-200 transition-all duration-200 absolute left-4"
+                  className="px-2 py-2 hover:bg-indigo-200 transition-all duration-200 absolute left-4"
                 >
-                  <FaArrowLeft className="w-4 h-4 text-indigo-700" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
                 </button>
               </div>
             )}
@@ -817,7 +1175,7 @@ function GroupPageContent() {
               {/* 통계 카드 */}
               <div className="px-4 mb-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-2xl p-4 text-white shadow-lg">
+                  <div className="bg-gradient-to-r from-indigo-400 to-indigo-400 rounded-2xl p-4 text-white shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-indigo-100 text-sm">총 그룹</p>
@@ -826,7 +1184,7 @@ function GroupPageContent() {
                       <FaLayerGroup className="w-8 h-8 text-indigo-200" />
                     </div>
                   </div>
-                  <div className="bg-gradient-to-r from-pink-500 to-pink-600 rounded-2xl p-4 text-white shadow-lg">
+                  <div className="bg-gradient-to-r from-pink-400 to-pink-400 rounded-2xl p-4 text-white shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-pink-100 text-sm">총 멤버</p>
@@ -840,6 +1198,19 @@ function GroupPageContent() {
 
               {/* 그룹 목록 */}
               <div className={`px-4 space-y-3 transition-all duration-300 ${isSearching ? 'opacity-70' : 'opacity-100'}`}>
+                {!selectedGroup && groups.length > 0 && (
+                  <div className="bg-green-50 border rounded-2xl p-4 mb-4">
+                    <div className="flex items-center">
+                      <div className="p-2 bg-green-100 rounded-lg mr-3">
+                        <FaCheckCircle className="w-5 h-5 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-gray-800 font-medium">그룹을 선택해주세요</p>
+                        <p className="text-green-600 text-sm">아래 그룹 중 하나를 선택하여 상세 정보를 확인하세요</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {filteredGroups.length > 0 ? (
                   filteredGroups.map((group, index) => {
                     const memberCount = groupMemberCounts[group.sgt_idx] || 0;
@@ -961,38 +1332,38 @@ function GroupPageContent() {
               {/* 통계 카드들 */}
               <div className="px-4 mb-6">
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-gradient-to-r from-red-400 to-red-500 rounded-xl p-3 text-white text-center shadow-md">
-                    <FaUsers className="w-6 h-6 text-red-200 mx-auto mb-1" />
+                  <div className="bg-gradient-to-r from-red-300 to-red-300 rounded-xl p-3 text-white text-center shadow-md">
+                    <FaUsers className="w-6 h-6 text-red-800 mx-auto mb-1" />
                     <p className="text-lg font-bold">
-                      {statsLoading ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      {membersLoading ? (
+                        <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></span>
                       ) : (
-                        groupStats?.member_count || groupMembers.length
+                        groupStats?.member_count ?? groupMembers.length ?? 0
                       )}
                     </p>
-                    <p className="text-red-100 text-xs">멤버</p>
+                    <p className="text-red-800 text-xs">멤버</p>
                   </div>
-                  <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-xl p-3 text-white text-center shadow-md">
-                    <FaCalendarAlt className="w-6 h-6 text-yellow-200 mx-auto mb-1" />
+                  <div className="bg-gradient-to-r from-yellow-300 to-yellow-300 rounded-xl p-3 text-white text-center shadow-md">
+                    <FaCalendarAlt className="w-6 h-6 text-yellow-800 mx-auto mb-1" />
                     <p className="text-lg font-bold">
                       {statsLoading ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                        <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></span>
                       ) : (
-                        groupStats?.weekly_schedules || 0
+                        groupStats?.weekly_schedules ?? 0
                       )}
                     </p>
-                    <p className="text-yellow-100 text-xs">주간 일정</p>
+                    <p className="text-yellow-800 text-xs">주간 일정</p>
                   </div>
-                  <div className="bg-gradient-to-r from-blue-400 to-blue-500 rounded-xl p-3 text-white text-center shadow-md">
-                    <FaMapMarkerAlt className="w-6 h-6 text-blue-200 mx-auto mb-1" />
+                  <div className="bg-gradient-to-r from-blue-300 to-blue-300 rounded-xl p-3 text-white text-center shadow-md">
+                    <FaMapMarkerAlt className="w-6 h-6 text-blue-600 mx-auto mb-1" />
                     <p className="text-lg font-bold">
                       {statsLoading ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                        <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></span>
                       ) : (
-                        groupStats?.total_locations || 0
+                        groupStats?.total_locations ?? 0
                       )}
                     </p>
-                    <p className="text-blue-100 text-xs">총 위치</p>
+                    <p className="text-blue-800 text-xs">총 위치</p>
                   </div>
                 </div>
               </div>
@@ -1000,14 +1371,14 @@ function GroupPageContent() {
               {/* 그룹 멤버 섹션 */}
               <div className="px-4">
                 <div className="bg-white rounded-2xl shadow-sm border border-indigo-100 overflow-hidden">
-                  <div className="p-4 border-b border-indigo-100 bg-indigo-50">
+                  <div className="p-4 border-b border-indigo-100">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-normal text-gray-900 flex items-center">
                         <FaUsers className="w-5 h-5 mr-2 text-indigo-700" />
                         그룹 멤버
-                        <span className="ml-2 px-2 py-1 bg-indigo-200 text-gray-800 text-xs rounded-full">
+                        {/* <span className="ml-2 px-2 py-1 bg-indigo-200 text-gray-800 text-xs rounded-full">
                           {groupMembers.length}명
-                        </span>
+                        </span> */}
                       </h3>
                       <button
                         onClick={() => setIsShareModalOpen(true)}
@@ -1036,7 +1407,12 @@ function GroupPageContent() {
                           groupMembers.map((member, index) => (
                             <div 
                               key={member.mt_idx} 
-                              className="flex items-center p-3 bg-indigo-50 rounded-xl mobile-card hover:bg-indigo-100"
+                              onClick={() => handleMemberClick(member)}
+                              className={`flex items-center p-3 bg-indigo-50 rounded-xl mobile-card hover:bg-indigo-100 ${
+                                isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' 
+                                  ? 'cursor-pointer hover:shadow-md transition-all duration-200' 
+                                  : ''
+                              }`}
                               style={{ animationDelay: `${index * 0.05}s` }}
                             >
                               <div className="relative mr-3">
@@ -1061,11 +1437,16 @@ function GroupPageContent() {
                                   <h4 className="font-normal text-gray-900">
                                     {member.mt_nickname || member.mt_name || '이름 없음'}
                                   </h4>
-                                  {member.sgdt_owner_chk === 'Y' && (
-                                    <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
-                                      그룹장
-                                    </span>
-                                  )}
+                                  <div className="flex items-center space-x-2">
+                                    {member.sgdt_owner_chk === 'Y' && (
+                                      <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
+                                        그룹장
+                                      </span>
+                                    )}
+                                    {isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' && (
+                                      <FaCog className="w-4 h-4 text-gray-400" />
+                                    )}
+                                  </div>
                                 </div>
                                 <p className="text-sm text-indigo-600 mt-1">
                                   {member.sgdt_owner_chk === 'Y' ? '그룹 관리자' : 
@@ -1079,8 +1460,8 @@ function GroupPageContent() {
                             <div className="p-4 bg-indigo-100 rounded-full w-fit mx-auto mb-3">
                               <FaUsers className="w-6 h-6 text-indigo-400" />
                             </div>
-                            <p className="text-indigo-500 font-medium">그룹원이 없습니다</p>
-                            <p className="text-indigo-400 text-sm mt-1">새로운 멤버를 초대해보세요</p>
+                            <p className="text-gray-500 font-medium">그룹원이 없습니다</p>
+                            <p className="text-gray-400 text-sm mt-1">새로운 멤버를 초대해보세요</p>
                           </div>
                         )}
                       </div>
@@ -1336,7 +1717,7 @@ function GroupPageContent() {
                     type="button"
                     onClick={handleCloseEditModal}
                     disabled={isUpdatingGroup}
-                    className="flex-1 mobile-button py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium disabled:opacity-50 hover:bg-indigo-50"
+                    className="flex-1 mobile-button py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50"
                   >
                     취소
                   </button>
@@ -1461,6 +1842,96 @@ function GroupPageContent() {
                     className="w-full mobile-button py-4 bg-green-500 text-white rounded-2xl font-medium hover:bg-green-600 flex items-center justify-center"
                   >
                     확인
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 멤버 관리 모달 */}
+        {isMemberManageModalOpen && selectedMember && (
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={handleCloseMemberManageModal}
+          >
+            <div 
+              className={`bg-white rounded-3xl w-full max-w-md mx-auto modal-safe-area ${
+                isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
+              }`}
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              <div className="p-6 pb-8">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <img
+                      src={selectedMember.photo || getDefaultImage(selectedMember.mt_gender, selectedMember.original_index)}
+                      alt={selectedMember.mt_name}
+                      className="w-full h-full object-cover rounded-full"
+                      onError={(e) => {
+                        e.currentTarget.src = getDefaultImage(selectedMember.mt_gender, selectedMember.original_index);
+                      }}
+                    />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-1">{selectedMember.mt_nickname || selectedMember.mt_name}</h3>
+                  <p className="text-gray-600">
+                    현재: {selectedMember.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
+                  </p>
+                </div>
+                
+                <div className="space-y-3">
+                  {selectedMember.sgdt_leader_chk === 'Y' ? (
+                    // 현재 리더인 경우
+                    <button 
+                      onClick={() => handleChangeMemberRole('member')}
+                      disabled={isUpdatingMember}
+                      className="w-full mobile-button flex items-center justify-center p-4 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
+                    >
+                      {isUpdatingMember ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      ) : (
+                        <FaUsers className="w-5 h-5 mr-2" />
+                      )}
+                      <span>멤버로 변경</span>
+                    </button>
+                  ) : (
+                    // 현재 멤버인 경우
+                    <button 
+                      onClick={() => handleChangeMemberRole('leader')}
+                      disabled={isUpdatingMember}
+                      className="w-full mobile-button flex items-center justify-center p-4 rounded-2xl bg-yellow-500 hover:bg-yellow-600 text-white disabled:opacity-50"
+                    >
+                      {isUpdatingMember ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      ) : (
+                        <FaCrown className="w-5 h-5 mr-2" />
+                      )}
+                      <span>리더로 승격</span>
+                    </button>
+                  )}
+                  
+                  <button 
+                    onClick={handleRemoveMember}
+                    disabled={isUpdatingMember}
+                    className="w-full mobile-button flex items-center justify-center p-4 rounded-2xl bg-red-500 hover:bg-red-600 text-white disabled:opacity-50"
+                  >
+                    {isUpdatingMember ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    ) : (
+                      <FaTrash className="w-5 h-5 mr-2" />
+                    )}
+                    <span>그룹에서 탈퇴</span>
+                  </button>
+                  
+                  <button
+                    onClick={handleCloseMemberManageModal}
+                    disabled={isUpdatingMember}
+                    className="w-full mobile-button py-4 text-gray-600 font-medium hover:text-gray-800 disabled:opacity-50"
+                  >
+                    취소
                   </button>
                 </div>
               </div>
