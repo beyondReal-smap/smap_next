@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Enum, Text
 from app.models.base import BaseModel
 from app.models.enums import ShowEnum
 from sqlalchemy.orm import Session
@@ -11,6 +11,7 @@ class Group(BaseModel):
     mt_idx = Column(Integer, nullable=True)
     sgt_title = Column(String(50), nullable=True)
     sgt_code = Column(String(10), nullable=True)
+    sgt_memo = Column(Text, nullable=True)
     sgt_show = Column(Enum(ShowEnum), nullable=True)
     sgt_wdate = Column(DateTime, nullable=True)
     sgt_udate = Column(DateTime, nullable=True)

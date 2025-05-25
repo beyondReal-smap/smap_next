@@ -5,6 +5,7 @@ export interface Group {
   sgt_idx: number;
   sgt_title: string;
   sgt_content?: string;
+  sgt_memo?: string;
   mt_idx: number;
   sgt_show: string;
   sgt_wdate: string;
@@ -62,6 +63,7 @@ export interface GroupCreate {
   mt_idx?: number | null;
   sgt_title?: string | null;
   sgt_code?: string | null;
+  sgt_memo?: string | null;
   sgt_show?: 'Y' | 'N' | null;
 }
 
@@ -69,6 +71,7 @@ export interface GroupUpdate {
   mt_idx?: number | null;
   sgt_title?: string | null;
   sgt_code?: string | null;
+  sgt_memo?: string | null;
   sgt_show?: 'Y' | 'N' | null;
 }
 

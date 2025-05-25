@@ -7,6 +7,7 @@ class GroupBase(BaseModel):
     mt_idx: Optional[int] = None
     sgt_title: Optional[str] = None
     sgt_code: Optional[str] = None
+    sgt_memo: Optional[str] = None
     sgt_show: Optional[ShowEnum] = None
 
 class GroupCreate(GroupBase):

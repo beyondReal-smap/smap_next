@@ -76,6 +76,7 @@ def get_current_user_groups(
             "mt_idx": group.mt_idx,  # 그룹 오너 ID
             "sgt_title": group.sgt_title or f"그룹 {group.sgt_idx}",
             "sgt_code": group.sgt_code or "",
+            "sgt_memo": group.sgt_memo or "",
             "sgt_show": group.sgt_show or 'Y',
             "sgt_wdate": group.sgt_wdate.isoformat() if group.sgt_wdate else datetime.utcnow().isoformat(),
             "sgt_udate": group.sgt_udate.isoformat() if group.sgt_udate else datetime.utcnow().isoformat(),
