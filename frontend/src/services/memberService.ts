@@ -36,8 +36,8 @@ export interface Member {
   // smap_group_detail_t 필드들
   sgdt_idx?: number;
   sgt_idx?: number;
-  sgdt_owner_chk?: number;
-  sgdt_leader_chk?: number;
+  sgdt_owner_chk?: string;
+  sgdt_leader_chk?: string;
   sgdt_group_chk?: number;
   sgdt_push_chk?: number;
   sgdt_show?: number;
@@ -112,21 +112,42 @@ class MemberService {
         mt_name: '김철수',
         mt_file1: '/images/avatar3.png',
         mt_lat: '37.5692',
-        mt_long: '127.0036'
+        mt_long: '127.0036',
+        mt_gender: 1,
+        sgdt_idx: 1,
+        sgt_idx: Number(groupId),
+        sgdt_owner_chk: 'Y', // 첫 번째 멤버는 그룹장
+        sgdt_leader_chk: 'N',
+        sgdt_group_chk: 1,
+        sgdt_show: 1
       },
       {
         mt_idx: 1187,
         mt_name: '이영희',
         mt_file1: '/images/avatar1.png',
         mt_lat: '37.5612',
-        mt_long: '126.9966'
+        mt_long: '126.9966',
+        mt_gender: 2,
+        sgdt_idx: 2,
+        sgt_idx: Number(groupId),
+        sgdt_owner_chk: 'N',
+        sgdt_leader_chk: 'Y', // 두 번째 멤버는 리더
+        sgdt_group_chk: 1,
+        sgdt_show: 1
       },
       {
         mt_idx: 1188,
         mt_name: '박민수',
         mt_file1: '/images/avatar2.png',
         mt_lat: '37.5662',
-        mt_long: '126.9986'
+        mt_long: '126.9986',
+        mt_gender: 1,
+        sgdt_idx: 3,
+        sgt_idx: Number(groupId),
+        sgdt_owner_chk: 'N',
+        sgdt_leader_chk: 'N', // 일반 멤버
+        sgdt_group_chk: 1,
+        sgdt_show: 1
       }
     ];
     
@@ -134,10 +155,37 @@ class MemberService {
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 시작:', groupId);
       // smap_group_detail_t 데이터가 포함된 완전한 멤버 정보 조회
       const response = await apiClient.get<Member[]>(`/groups/${groupId}/members`);
-      console.log('[MEMBER SERVICE] 그룹 멤버 조회 응답:', response.data);
-      return response.data;
+      console.log('[MEMBER SERVICE] 그룹 멤버 조회 응답:', {
+        status: response.status,
+        dataLength: response.data?.length || 0,
+        firstMember: response.data?.[0] ? {
+          name: response.data[0].mt_name,
+          mt_idx: response.data[0].mt_idx,
+          owner: response.data[0].sgdt_owner_chk,
+          leader: response.data[0].sgdt_leader_chk
+        } : null
+      });
+      
+      // 응답 데이터가 배열이고 길이가 0보다 큰 경우에만 반환
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        console.log('[MEMBER SERVICE] ✅ 실제 백엔드 데이터 사용:', response.data.length, '명');
+        return response.data;
+      } else {
+        console.warn('[MEMBER SERVICE] ⚠️ 백엔드에서 빈 배열 반환, mock 데이터 사용');
+        return mockData;
+      }
     } catch (error) {
-      console.error('[MEMBER SERVICE] 서버 API 호출 실패, 목 데이터 반환:', error);
+      console.error('[MEMBER SERVICE] ❌ 백엔드 API 호출 실패, mock 데이터 반환:', error);
+      
+      // 네트워크 오류나 서버 오류인 경우 상세 로그
+      if (error instanceof Error) {
+        console.error('[MEMBER SERVICE] 오류 상세:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+      }
+      
       return mockData;
     }
   }

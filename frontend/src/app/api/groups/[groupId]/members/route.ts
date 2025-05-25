@@ -77,135 +77,40 @@ export async function GET(
   try {
     console.log('[Group Members API] 그룹 멤버 조회 요청:', { groupId });
 
-    // 새로운 통합 엔드포인트 호출 (member_t + smap_group_detail_t 조인된 데이터)
-    const membersWithDetailsUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}/members-with-details`;
-    console.log('[Group Members API] 통합 멤버 정보 조회:', membersWithDetailsUrl);
+    // 기존 백엔드 엔드포인트 직접 호출 (이미 조인된 데이터 반환)
+    const membersUrl = `https://118.67.130.71:8000/api/v1/group-members/member/${groupId}`;
+    console.log('[Group Members API] 백엔드 API 호출:', membersUrl);
     
-    let combinedData;
-    try {
-      combinedData = await fetchWithFallback(membersWithDetailsUrl);
-      console.log('[Group Members API] 통합 멤버 정보 조회 성공:', { 
-        count: combinedData.length, 
-        sampleMember: combinedData[0] ? {
-          name: combinedData[0].mt_name,
-          owner: combinedData[0].sgdt_owner_chk,
-          leader: combinedData[0].sgdt_leader_chk
-        } : null
-      });
-      
-      // null 값을 기본값으로 변환
-      const processedData = combinedData.map((member: any) => ({
-        ...member,
-        sgdt_discharge_chk: member.sgdt_discharge_chk || "N",
-        sgdt_exit_chk: member.sgdt_exit_chk || "N",
-        sgdt_in_chk: member.sgdt_in_chk || "Y",
-        sgdt_schedule_chk: member.sgdt_schedule_chk || "Y", 
-        sgdt_read_chk: member.sgdt_read_chk || "Y",
-        sgdt_enter_alarm: member.sgdt_enter_alarm || "Y",
-        sgdt_enter_chk: member.sgdt_enter_chk || "Y",
-        sgdt_wdate: member.sgdt_wdate || new Date().toISOString(),
-        sgdt_udate: member.sgdt_udate || new Date().toISOString()
-      }));
-      
-      return NextResponse.json(processedData, {
-        headers: {
-          'X-Data-Source': 'backend-unified',
-          'X-Members-Count': processedData.length.toString()
-        }
-      });
-      
-    } catch (unifiedError) {
-      console.error('[Group Members API] 통합 엔드포인트 호출 실패, 기존 방식으로 fallback:', unifiedError);
-      
-      // 기존 방식으로 fallback
-      // 1. 멤버 기본 정보 조회
-      const membersUrl = `https://118.67.130.71:8000/api/v1/group-members/member/${groupId}`;
-      console.log('[Group Members API] 멤버 기본 정보 조회 (fallback):', membersUrl);
-      
-      let membersData;
-      try {
-        membersData = await fetchWithFallback(membersUrl);
-        console.log('[Group Members API] 멤버 기본 정보 조회 성공:', { count: membersData.length, first: membersData[0]?.mt_name });
-      } catch (membersError) {
-        console.error('[Group Members API] 멤버 기본 정보 조회 실패:', membersError);
-        throw membersError;
+    const membersData = await fetchWithFallback(membersUrl);
+    console.log('[Group Members API] 백엔드 응답 성공:', { 
+      count: membersData.length, 
+      sampleMember: membersData[0] ? {
+        name: membersData[0].mt_name,
+        owner: membersData[0].sgdt_owner_chk,
+        leader: membersData[0].sgdt_leader_chk
+      } : null
+    });
+    
+    // null 값을 기본값으로 변환
+    const processedData = membersData.map((member: any) => ({
+      ...member,
+      sgdt_discharge_chk: member.sgdt_discharge || "N",
+      sgdt_exit_chk: member.sgdt_exit || "N",
+      sgdt_in_chk: member.sgdt_in_chk || "Y",
+      sgdt_schedule_chk: member.sgdt_schedule_chk || "Y", 
+      sgdt_read_chk: member.sgdt_read_chk || "Y",
+      sgdt_enter_alarm: member.sgdt_enter_alarm || "Y",
+      sgdt_enter_chk: member.sgdt_enter_chk || "Y",
+      sgdt_wdate: member.sgdt_wdate || new Date().toISOString(),
+      sgdt_udate: member.sgdt_udate || new Date().toISOString()
+    }));
+    
+    return NextResponse.json(processedData, {
+      headers: {
+        'X-Data-Source': 'backend-direct',
+        'X-Members-Count': processedData.length.toString()
       }
-
-      // 2. 그룹 상세 정보 조회
-      const groupDetailsUrl = `https://118.67.130.71:8000/api/v1/group-details/group/${groupId}/members`;
-      console.log('[Group Members API] 그룹 상세 정보 조회:', groupDetailsUrl);
-      
-      let groupDetailsData;
-      try {
-        groupDetailsData = await fetchWithFallback(groupDetailsUrl);
-        console.log('[Group Members API] 그룹 상세 정보 조회 성공:', { count: groupDetailsData.length, details: groupDetailsData });
-      } catch (groupDetailsError) {
-        console.error('[Group Members API] 그룹 상세 정보 조회 실패:', groupDetailsError);
-        throw groupDetailsError;
-      }
-
-      // 3. 데이터 조합 (mt_idx 기준으로 조인)
-      const combinedDataFallback = membersData.map((member: any) => {
-        const groupDetail = groupDetailsData.find((detail: any) => detail.mt_idx === member.mt_idx);
-        
-        // 그룹 상세 정보가 없는 경우 기본값 설정
-        const defaultGroupDetail = {
-          sgt_idx: parseInt(groupId),
-          sgdt_idx: null,
-          sgdt_owner_chk: "N",
-          sgdt_leader_chk: "N", 
-          sgdt_discharge_chk: "N",
-          sgdt_group_chk: "Y",
-          sgdt_exit_chk: "N",
-          sgdt_push_chk: "Y",
-          sgdt_in_chk: "Y",
-          sgdt_schedule_chk: "Y",
-          sgdt_read_chk: "Y",
-          sgdt_enter_alarm: "Y",
-          sgdt_enter_chk: "Y",
-          sgdt_wdate: new Date().toISOString(),
-          sgdt_udate: new Date().toISOString()
-        };
-        
-        // null 값을 기본값으로 변환하는 함수
-        const processGroupDetail = (detail: any) => {
-          if (!detail) return defaultGroupDetail;
-          
-          return {
-            ...detail,
-            sgdt_discharge_chk: detail.sgdt_discharge_chk || "N",
-            sgdt_exit_chk: detail.sgdt_exit_chk || "N",
-            sgdt_in_chk: detail.sgdt_in_chk || "Y", 
-            sgdt_schedule_chk: detail.sgdt_schedule_chk || "Y",
-            sgdt_read_chk: detail.sgdt_read_chk || "Y",
-            sgdt_enter_alarm: detail.sgdt_enter_alarm || "Y",
-            sgdt_enter_chk: detail.sgdt_enter_chk || "Y",
-            sgdt_wdate: detail.sgdt_wdate || new Date().toISOString(),
-            sgdt_udate: detail.sgdt_udate || new Date().toISOString()
-          };
-        };
-        
-        return {
-          ...member,
-          ...processGroupDetail(groupDetail)
-        };
-      });
-
-      console.log('[Group Members API] 조합된 데이터:', {
-        membersCount: membersData.length,
-        groupDetailsCount: groupDetailsData.length,
-        combinedCount: combinedDataFallback.length,
-        sampleMember: combinedDataFallback[0] ? Object.keys(combinedDataFallback[0]) : []
-      });
-
-      return NextResponse.json(combinedDataFallback, {
-        headers: {
-          'X-Data-Source': 'backend-fallback',
-          'X-Members-Count': membersData.length.toString(),
-          'X-Group-Details-Count': groupDetailsData.length.toString()
-        }
-      });
-    }
+    });
 
   } catch (error) {
     console.error('[Group Members API] 오류:', error);

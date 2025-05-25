@@ -37,6 +37,21 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 
 export const dynamic = 'force-dynamic';
 
+// 백엔드 이미지 저장 경로의 기본 URL
+const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/';
+
+// 기본 이미지 생성 함수 (home/page.tsx와 동일)
+const getDefaultImage = (gender: number | null | undefined, index: number): string => {
+  const imageNumber = (index % 4) + 1; // index 기반으로 1~4 숫자 결정
+  if (gender === 1) {
+    return `/images/male_${imageNumber}.png`;
+  } else if (gender === 2) {
+    return `/images/female_${imageNumber}.png`;
+  }
+  // mt_gender가 없거나 1, 2가 아닐 때, avatar 이미지도 index 기반으로 일관성 유지
+  return `/images/avatar${(index % 3) + 1}.png`; 
+};
+
 // 모바일 최적화된 CSS 애니메이션
 const mobileAnimations = `
 @keyframes slideInFromRight {
@@ -72,6 +87,17 @@ const mobileAnimations = `
   }
 }
 
+@keyframes slideOutToBottom {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
 @keyframes fadeInUp {
   from {
     transform: translateY(20px);
@@ -80,6 +106,30 @@ const mobileAnimations = `
   to {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+}
+
+@keyframes staggerFadeIn {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+    scale: 0.98;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+    scale: 1;
   }
 }
 
@@ -123,15 +173,23 @@ const mobileAnimations = `
 }
 
 .animate-slideInFromLeft {
-  animation: slideInFromLeft 0.3s ease-out forwards;
+  animation: slideInFromLeft 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
 .animate-slideInFromBottom {
   animation: slideInFromBottom 0.4s ease-out forwards;
 }
 
+.animate-slideOutToBottom {
+  animation: slideOutToBottom 0.3s ease-in forwards;
+}
+
 .animate-fadeInUp {
-  animation: fadeInUp 0.3s ease-out forwards;
+  animation: staggerFadeIn 0.4s ease-out forwards;
+}
+
+.animate-fadeOut {
+  animation: fadeOut 0.2s ease-in forwards;
 }
 
 .animate-scaleIn {
@@ -165,7 +223,12 @@ const mobileAnimations = `
 }
 
 .safe-area {
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: max(env(safe-area-inset-bottom), 40px);
+}
+
+.modal-safe-area {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 40px);
+  margin-bottom: 20px;
 }
 
 .glass-mobile {
@@ -225,6 +288,9 @@ interface GroupMember {
   sgdt_ddate?: string;
   sgdt_xdate?: string;
   sgdt_adate?: string;
+  // 추가 필드들
+  photo?: string | null; // 프로필 이미지 URL
+  original_index: number; // 기본 이미지 선택을 위한 인덱스
 }
 
 // 새 그룹 폼 타입 정의
@@ -248,9 +314,21 @@ function GroupPageContent() {
   const [isCreatingGroup, setIsCreatingGroup] = useState(false);
   const [showGroupActions, setShowGroupActions] = useState(false);
   
+  // 그룹 수정 관련 상태 추가
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editGroup, setEditGroup] = useState<GroupForm>({ name: '', description: '' });
+  const [isUpdatingGroup, setIsUpdatingGroup] = useState(false);
+  
   // 모바일 전용 상태
   const [currentView, setCurrentView] = useState<'list' | 'detail'>('list');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  
+  // 드래그 관련 상태
+  const [dragStartY, setDragStartY] = useState(0);
+  const [dragCurrentY, setDragCurrentY] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   
   const router = useRouter();
 
@@ -302,6 +380,18 @@ function GroupPageContent() {
         setMembersLoading(true);
         const memberData = await memberService.getGroupMembers(selectedGroup.sgt_idx.toString());
         
+        console.log('[Group Page] 원본 멤버 데이터:', memberData);
+        
+        // 각 멤버의 sgdt_owner_chk, sgdt_leader_chk 값 확인
+        memberData.forEach((member: any, index: number) => {
+          console.log(`[멤버 ${index}] ${member.mt_name}:`, {
+            sgdt_owner_chk: member.sgdt_owner_chk,
+            sgdt_leader_chk: member.sgdt_leader_chk,
+            sgdt_idx: member.sgdt_idx,
+            mt_idx: member.mt_idx
+          });
+        });
+        
         const transformedMembers: GroupMember[] = memberData.map((member: any, index: number) => ({
           mt_idx: member.mt_idx,
           mt_type: member.mt_type || 1,
@@ -345,9 +435,26 @@ function GroupPageContent() {
           sgdt_ddate: member.sgdt_ddate,
           sgdt_xdate: member.sgdt_xdate,
           sgdt_adate: member.sgdt_adate,
+          photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
+          original_index: index,
         }));
         
+        console.log('[Group Page] 변환된 멤버 데이터:', transformedMembers);
+        
+        // 변환 후 sgdt_owner_chk, sgdt_leader_chk 값 재확인
+        transformedMembers.forEach((member, index) => {
+          console.log(`[변환된 멤버 ${index}] ${member.mt_name}:`, {
+            sgdt_owner_chk: member.sgdt_owner_chk,
+            sgdt_leader_chk: member.sgdt_leader_chk,
+            '그룹장 여부': member.sgdt_owner_chk === 'Y'
+          });
+        });
+        
         setGroupMembers(transformedMembers);
+        setGroupMemberCounts(prev => ({
+          ...prev,
+          [selectedGroup.sgt_idx]: transformedMembers.length
+        }));
       } catch (error) {
         console.error('[Group Page] 그룹 멤버 조회 오류:', error);
         setGroupMembers([]);
@@ -373,16 +480,99 @@ function GroupPageContent() {
     (group.sgt_memo && group.sgt_memo.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  // 검색어 변경 핸들러
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setIsSearching(true);
+    setSearchQuery(value);
+    
+    // 짧은 딜레이 후 검색 상태 해제 (애니메이션을 위해)
+    setTimeout(() => {
+      setIsSearching(false);
+    }, 100);
+  };
+
   // 모달 관련 함수들
   const handleAddGroup = () => setIsAddModalOpen(true);
   const handleCloseModal = () => {
-    setIsAddModalOpen(false);
-    setNewGroup({ name: '', description: '' });
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsAddModalOpen(false);
+      setNewGroup({ name: '', description: '' });
+      setIsClosing(false);
+    }, 300);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setNewGroup(prev => ({ ...prev, [name]: value }));
+  };
+
+  // 그룹 수정 관련 함수들 추가
+  const handleEditGroup = () => {
+    if (!selectedGroup) return;
+    
+    setEditGroup({
+      name: selectedGroup.sgt_title,
+      description: selectedGroup.sgt_memo || selectedGroup.sgt_content || ''
+    });
+    setIsEditModalOpen(true);
+    setShowGroupActions(false);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsEditModalOpen(false);
+      setEditGroup({ name: '', description: '' });
+      setIsClosing(false);
+    }, 300);
+  };
+
+  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setEditGroup(prev => ({ ...prev, [name]: value }));
+  };
+
+  // 그룹 업데이트
+  const handleUpdateGroup = async () => {
+    if (!selectedGroup || editGroup.name.trim() === '') return;
+    
+    setIsUpdatingGroup(true);
+    
+    try {
+      const updateData = {
+        sgt_title: editGroup.name.trim(),
+        sgt_memo: editGroup.description.trim() || null
+      };
+      
+      const updatedGroup = await groupService.updateGroup(selectedGroup.sgt_idx, updateData);
+      
+      // 로컬 상태 업데이트
+      const updatedGroupExtended: ExtendedGroup = {
+        ...selectedGroup,
+        sgt_title: updatedGroup.sgt_title,
+        sgt_memo: updatedGroup.sgt_memo,
+        sgt_content: updatedGroup.sgt_memo || updatedGroup.sgt_content || ''
+      };
+      
+      setSelectedGroup(updatedGroupExtended);
+      setGroups(prevGroups => 
+        prevGroups.map(group => 
+          group.sgt_idx === selectedGroup.sgt_idx 
+            ? updatedGroupExtended 
+            : group
+        )
+      );
+      
+      handleCloseEditModal();
+      
+    } catch (error) {
+      console.error('[Group Page] 그룹 수정 오류:', error);
+      alert('그룹 수정 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsUpdatingGroup(false);
+    }
   };
 
   // 새 그룹 저장
@@ -454,13 +644,64 @@ function GroupPageContent() {
     alert('문자 공유 기능은 준비 중입니다.');
   };
 
+  const handleCloseShareModal = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsShareModalOpen(false);
+      setIsClosing(false);
+    }, 300);
+  };
+
+  // 드래그 핸들러 함수들
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setDragStartY(e.touches[0].clientY);
+    setDragCurrentY(e.touches[0].clientY);
+    setIsDragging(true);
+    setIsClosing(false);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    setDragCurrentY(e.touches[0].clientY);
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDragging) return;
+    const deltaY = dragCurrentY - dragStartY;
+    
+    // 30px 이상 위아래로 움직이면 무조건 실행
+    if (Math.abs(deltaY) > 30) {
+      if (deltaY > 0) {
+        // 아래로 드래그 - 모달 닫기
+        if (isAddModalOpen) {
+          handleCloseModal();
+        }
+        if (isShareModalOpen) {
+          handleCloseShareModal();
+        }
+        if (isEditModalOpen) {
+          handleCloseEditModal();
+        }
+      } else {
+        // 위로 드래그 - 모달 유지 (원위치로 복귀)
+        setIsDragging(false);
+      }
+    } else {
+      // 움직임이 적으면 원위치로 복귀
+      setIsDragging(false);
+    }
+    
+    setDragStartY(0);
+    setDragCurrentY(0);
+  };
+
   // 로딩 중일 때
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
         <div className="text-center px-6">
           <div className="animate-bounce mb-6">
-            <HiUserGroup className="w-16 h-16 text-orange-500 mx-auto" />
+            <HiUserGroup className="w-16 h-16 text-gray-500 mx-auto" />
           </div>
           <LoadingSpinner 
             message="그룹 목록을 불러오는 중입니다..." 
@@ -477,7 +718,7 @@ function GroupPageContent() {
   return (
     <>
       <style jsx global>{mobileAnimations}</style>
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
         
         {/* 앱 헤더 - 홈 페이지 스타일 */}
         <div className="px-4 bg-white/95 backdrop-blur-lg">
@@ -497,7 +738,7 @@ function GroupPageContent() {
             {currentView === 'list' && (
               <button
                 onClick={handleAddGroup}
-                className="px-2.5 py-1.5 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-md shadow-sm flex items-center space-x-1.5 hover:from-orange-600 hover:to-orange-700 transition-all duration-200"
+                className="px-2.5 py-1.5 bg-gradient-to-r from-indigo-500 to-indigo-600 text-white rounded-md shadow-sm flex items-center space-x-1.5 hover:from-indigo-700 hover:to-indigo-700 transition-all duration-200"
               >
                 <FaPlus className="w-3 h-3" />
                 <span className="text-sm font-normal">새 그룹</span>
@@ -507,41 +748,10 @@ function GroupPageContent() {
               <div className="flex items-center space-x-2 ml-auto">
                 <button 
                   onClick={() => setCurrentView('list')}
-                  className="px-2 py-2 rounded-full bg-orange-100 hover:bg-orange-200 transition-all duration-200 absolute left-4"
+                  className="px-2 py-2 rounded-full bg-indigo-100 hover:bg-indigo-200 transition-all duration-200 absolute left-4"
                 >
-                  <FaArrowLeft className="w-4 h-4 text-orange-700" />
+                  <FaArrowLeft className="w-4 h-4 text-indigo-700" />
                 </button>
-                <button
-                  onClick={() => setIsShareModalOpen(true)}
-                  className="px-2 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-all duration-200"
-                >
-                  <FaUserPlus className="w-3.5 h-3.5" />
-                </button>
-                <div className="relative">
-                  <button
-                    onClick={() => setShowGroupActions(!showGroupActions)}
-                    className="px-2 py-2 bg-orange-100 rounded-md hover:bg-orange-200 transition-all duration-200"
-                  >
-                    <HiEllipsisVertical className="w-3.5 h-3.5 text-orange-700" />
-                  </button>
-                  {showGroupActions && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-orange-200 py-2 z-50 animate-scaleIn">
-                      <button className="w-full px-4 py-3 text-left hover:bg-orange-50 flex items-center text-orange-700">
-                        <FaEdit className="w-4 h-4 mr-3" />
-                        그룹 수정
-                      </button>
-                      <button className="w-full px-4 py-3 text-left hover:bg-orange-50 flex items-center text-orange-700">
-                        <FaEye className="w-4 h-4 mr-3" />
-                        그룹 정보
-                      </button>
-                      <hr className="my-1" />
-                      <button className="w-full px-4 py-3 text-left hover:bg-red-50 flex items-center text-red-600">
-                        <FaTrash className="w-4 h-4 mr-3" />
-                        그룹 삭제
-                      </button>
-                    </div>
-                  )}
-                </div>
               </div>
             )}
           </div>
@@ -551,19 +761,19 @@ function GroupPageContent() {
         <div className="pb-safe">
           {currentView === 'list' ? (
             /* 그룹 목록 화면 */
-            <div className="animate-slideInFromLeft">
+            <div className="animate-slideInFromLeft" style={{ transform: 'translateY(0)' }}>
               {/* 검색 섹션 */}
               <div className="px-4 py-4">
                 <div className={`relative transition-all duration-300 ${isSearchFocused ? 'transform scale-105' : ''}`}>
-                  <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-orange-400 w-4 h-4" />
+                  <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
                     type="text"
                     placeholder="그룹 검색..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={handleSearchChange}
                     onFocus={() => setIsSearchFocused(true)}
                     onBlur={() => setIsSearchFocused(false)}
-                    className="w-full pl-12 pr-4 py-4 bg-white border border-orange-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 placeholder-orange-400 text-base shadow-sm"
+                    className="w-full pl-12 pr-4 py-4 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
                   />
                 </div>
               </div>
@@ -571,53 +781,52 @@ function GroupPageContent() {
               {/* 통계 카드 */}
               <div className="px-4 mb-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-2xl p-4 text-white shadow-lg">
+                  <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-2xl p-4 text-white shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-orange-100 text-sm">총 그룹</p>
+                        <p className="text-indigo-100 text-sm">총 그룹</p>
                         <p className="text-2xl font-bold">{groups.length}개</p>
                       </div>
-                      <FaLayerGroup className="w-8 h-8 text-orange-200" />
+                      <FaLayerGroup className="w-8 h-8 text-indigo-200" />
                     </div>
                   </div>
-                  <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-2xl p-4 text-white shadow-lg">
+                  <div className="bg-gradient-to-r from-pink-500 to-pink-600 rounded-2xl p-4 text-white shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-green-100 text-sm">총 멤버</p>
+                        <p className="text-pink-100 text-sm">총 멤버</p>
                         <p className="text-2xl font-bold">{Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}명</p>
                       </div>
-                      <FaUsers className="w-8 h-8 text-green-200" />
+                      <FaUsers className="w-8 h-8 text-pink-200" />
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* 그룹 목록 */}
-              <div className="px-4 space-y-3">
+              <div className={`px-4 space-y-3 transition-all duration-300 ${isSearching ? 'opacity-70' : 'opacity-100'}`}>
                 {filteredGroups.length > 0 ? (
                   filteredGroups.map((group, index) => {
                     const memberCount = groupMemberCounts[group.sgt_idx] || 0;
                     
                     return (
                       <div
-                        key={group.sgt_idx}
+                        key={`${group.sgt_idx}-${searchQuery}`}
                         onClick={() => handleGroupSelect(group as ExtendedGroup)}
-                        className="mobile-card bg-white rounded-2xl p-4 shadow-sm border border-orange-100 animate-fadeInUp hover:shadow-md transition-shadow"
-                        style={{ animationDelay: `${index * 0.1}s` }}
+                        className="mobile-card bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center flex-1 mr-3">
-                            <div className="p-3 bg-gradient-to-r from-orange-100 to-orange-200 rounded-xl mr-4">
-                              <HiUserGroup className="w-6 h-6 text-orange-700" />
+                            <div className="p-3 bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl mr-4">
+                              <HiUserGroup className="w-6 h-6 text-gray-700" />
                             </div>
                             <div className="flex-1">
-                              <h3 className="font-bold text-lg text-orange-900 mb-1">
+                              <h3 className="font-normal text-lg text-gray-900 mb-1">
                                 {group.sgt_title}
                               </h3>
-                              <p className="text-orange-600 text-sm line-clamp-2 mb-2">
+                              <p className="text-gray-500 text-sm line-clamp-2 mb-2">
                                 {group.sgt_memo || group.sgt_content || '그룹 설명이 없습니다'}
                               </p>
-                              <div className="flex items-center space-x-4 text-xs text-orange-500">
+                              <div className="flex items-center space-x-4 text-xs text-gray-400">
                                 <span className="flex items-center">
                                   <FaUsers className="w-3 h-3 mr-1" />
                                   {memberCount}명
@@ -629,8 +838,9 @@ function GroupPageContent() {
                             </div>
                           </div>
                           <div className="flex flex-col items-center space-y-2">
-                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                            <FaArrowLeft className="w-4 h-4 text-orange-400 transform rotate-180" />
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
                           </div>
                         </div>
                       </div>
@@ -638,11 +848,11 @@ function GroupPageContent() {
                   })
                 ) : (
                   <div className="text-center py-12">
-                    <div className="p-6 bg-orange-100 rounded-full w-fit mx-auto mb-4">
-                      <FaSearch className="w-8 h-8 text-orange-400" />
+                    <div className="p-6 bg-indigo-100 rounded-full w-fit mx-auto mb-4">
+                      <FaSearch className="w-8 h-8 text-indigo-400" />
                     </div>
-                    <p className="text-orange-500 text-lg font-medium">검색 결과가 없습니다</p>
-                    <p className="text-orange-400 text-sm mt-1">다른 키워드로 검색해보세요</p>
+                    <p className="text-indigo-500 text-lg font-medium">검색 결과가 없습니다</p>
+                    <p className="text-indigo-400 text-sm mt-1">다른 키워드로 검색해보세요</p>
                   </div>
                 )}
               </div>
@@ -652,21 +862,54 @@ function GroupPageContent() {
             <div className="animate-slideInFromRight">
               {/* 그룹 헤더 카드 */}
               <div className="mx-4 mt-4 mb-6">
-                <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl p-6 text-white shadow-lg">
+                <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-2xl p-6 text-white shadow-lg relative">
+                  {/* 그룹 액션 메뉴 버튼 - 오른쪽 위 */}
+                  <div className="absolute top-4 right-4">
+                    <button
+                      onClick={() => setShowGroupActions(!showGroupActions)}
+                      className="p-2 bg-white/20 rounded-full hover:bg-white/30 transition-all duration-200"
+                    >
+                      <HiEllipsisVertical className="w-4 h-4 text-white" />
+                    </button>
+                    {showGroupActions && (
+                      <>
+                        {/* 배경 오버레이 - 메뉴 외부 클릭 시 닫기 */}
+                        <div 
+                          className="fixed inset-0 z-[55]" 
+                          onClick={() => setShowGroupActions(false)}
+                        ></div>
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-[60] animate-scaleIn">
+                          <button 
+                            onClick={handleEditGroup}
+                            className="w-full px-4 py-3 text-left hover:bg-indigo-50 flex items-center text-gray-700"
+                          >
+                            <FaEdit className="w-4 h-4 mr-3" />
+                            그룹 수정
+                          </button>
+                          <hr className="my-1" />
+                          <button className="w-full px-4 py-3 text-left hover:bg-red-50 flex items-center text-red-600">
+                            <FaTrash className="w-4 h-4 mr-3" />
+                            그룹 삭제
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
                   <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center flex-1">
+                    <div className="flex items-center flex-1 pr-12">
                       <div className="p-3 bg-white/20 rounded-xl mr-4">
                         <HiUserGroup className="w-8 h-8 text-white" />
                       </div>
                       <div className="flex-1">
                         <h2 className="text-xl font-bold mb-1">{selectedGroup.sgt_title}</h2>
-                        <p className="text-orange-100 text-sm">
+                        <p className="text-indigo-100 text-sm">
                           {selectedGroup.sgt_memo || selectedGroup.sgt_content || '그룹 설명이 없습니다'}
                         </p>
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-sm text-orange-200">
+                  <div className="flex items-center justify-between text-sm text-indigo-200">
                     <span>코드: {selectedGroup.sgt_code || 'N/A'}</span>
                     <span>{new Date(selectedGroup.sgt_wdate).toLocaleDateString()}</span>
                   </div>
@@ -676,10 +919,10 @@ function GroupPageContent() {
               {/* 통계 카드들 */}
               <div className="px-4 mb-6">
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl p-3 text-white text-center shadow-md">
-                    <FaUsers className="w-6 h-6 text-orange-200 mx-auto mb-1" />
+                  <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-xl p-3 text-white text-center shadow-md">
+                    <FaUsers className="w-6 h-6 text-indigo-200 mx-auto mb-1" />
                     <p className="text-lg font-bold">{groupMembers.length}</p>
-                    <p className="text-orange-100 text-xs">멤버</p>
+                    <p className="text-indigo-100 text-xs">멤버</p>
                   </div>
                   <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-3 text-white text-center shadow-md">
                     <FaCalendarAlt className="w-6 h-6 text-blue-200 mx-auto mb-1" />
@@ -696,19 +939,19 @@ function GroupPageContent() {
 
               {/* 그룹 멤버 섹션 */}
               <div className="px-4">
-                <div className="bg-white rounded-2xl shadow-sm border border-orange-100 overflow-hidden">
-                  <div className="p-4 border-b border-orange-100 bg-orange-50">
+                <div className="bg-white rounded-2xl shadow-sm border border-indigo-100 overflow-hidden">
+                  <div className="p-4 border-b border-indigo-100 bg-indigo-50">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-bold text-orange-900 flex items-center">
-                        <FaUsers className="w-5 h-5 mr-2 text-orange-700" />
+                      <h3 className="text-lg font-normal text-gray-900 flex items-center">
+                        <FaUsers className="w-5 h-5 mr-2 text-indigo-700" />
                         그룹 멤버
-                        <span className="ml-2 px-2 py-1 bg-orange-200 text-orange-800 text-xs rounded-full">
+                        <span className="ml-2 px-2 py-1 bg-indigo-200 text-gray-800 text-xs rounded-full">
                           {groupMembers.length}명
                         </span>
                       </h3>
                       <button
                         onClick={() => setIsShareModalOpen(true)}
-                        className="px-3 py-2 bg-green-500 text-white rounded-lg text-sm flex items-center space-x-1 hover:bg-green-600"
+                        className="px-3 py-2 bg-pink-500 text-white rounded-lg text-sm flex items-center space-x-1 hover:bg-pink-600"
                       >
                         <MdGroupAdd className="w-4 h-4" />
                         <span>초대</span>
@@ -733,12 +976,19 @@ function GroupPageContent() {
                           groupMembers.map((member, index) => (
                             <div 
                               key={member.mt_idx} 
-                              className="flex items-center p-3 bg-orange-50 rounded-xl mobile-card hover:bg-orange-100"
+                              className="flex items-center p-3 bg-indigo-50 rounded-xl mobile-card hover:bg-indigo-100"
                               style={{ animationDelay: `${index * 0.05}s` }}
                             >
                               <div className="relative mr-3">
-                                <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-full flex items-center justify-center">
-                                  <FaUsers className="w-6 h-6 text-white" />
+                                <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center border-3 border-indigo-200">
+                                  <img
+                                    src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}
+                                    alt={member.mt_name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.src = getDefaultImage(member.mt_gender, member.original_index);
+                                    }}
+                                  />
                                 </div>
                                 {member.sgdt_owner_chk === 'Y' && (
                                   <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center">
@@ -748,7 +998,7 @@ function GroupPageContent() {
                               </div>
                               <div className="flex-1">
                                 <div className="flex items-center justify-between">
-                                  <h4 className="font-semibold text-orange-900">
+                                  <h4 className="font-normal text-gray-900">
                                     {member.mt_nickname || member.mt_name || '이름 없음'}
                                   </h4>
                                   {member.sgdt_owner_chk === 'Y' && (
@@ -757,7 +1007,7 @@ function GroupPageContent() {
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-sm text-orange-600 mt-1">
+                                <p className="text-sm text-indigo-600 mt-1">
                                   {member.sgdt_owner_chk === 'Y' ? '그룹 관리자' : 
                                    member.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
                                 </p>
@@ -766,11 +1016,11 @@ function GroupPageContent() {
                           ))
                         ) : (
                           <div className="text-center py-8">
-                            <div className="p-4 bg-orange-100 rounded-full w-fit mx-auto mb-3">
-                              <FaUsers className="w-6 h-6 text-orange-400" />
+                            <div className="p-4 bg-indigo-100 rounded-full w-fit mx-auto mb-3">
+                              <FaUsers className="w-6 h-6 text-indigo-400" />
                             </div>
-                            <p className="text-orange-500 font-medium">그룹원이 없습니다</p>
-                            <p className="text-orange-400 text-sm mt-1">새로운 멤버를 초대해보세요</p>
+                            <p className="text-indigo-500 font-medium">그룹원이 없습니다</p>
+                            <p className="text-indigo-400 text-sm mt-1">새로운 멤버를 초대해보세요</p>
                           </div>
                         )}
                       </div>
@@ -782,14 +1032,14 @@ function GroupPageContent() {
           ) : (
             /* 그룹 미선택 상태 */
             <div className="flex flex-col items-center justify-center h-96 px-6 text-center">
-              <div className="p-8 bg-gradient-to-r from-orange-100 to-orange-200 rounded-full mb-6 animate-bounce">
-                <HiUserGroup className="w-16 h-16 text-orange-500" />
+              <div className="p-8 bg-gradient-to-r from-indigo-100 to-indigo-200 rounded-full mb-6 animate-bounce">
+                <HiUserGroup className="w-16 h-16 text-indigo-500" />
               </div>
-              <h3 className="text-xl font-bold text-orange-900 mb-2">그룹을 선택해주세요</h3>
-              <p className="text-orange-600 mb-6">관리하고 싶은 그룹을 선택하세요</p>
+              <h3 className="text-xl font-bold text-indigo-900 mb-2">그룹을 선택해주세요</h3>
+              <p className="text-indigo-600 mb-6">관리하고 싶은 그룹을 선택하세요</p>
               <button
                 onClick={() => setCurrentView('list')}
-                className="mobile-button px-6 py-3 bg-gradient-to-r from-orange-700 to-orange-800 text-white rounded-xl hover:from-orange-800 hover:to-orange-900"
+                className="mobile-button px-6 py-3 bg-gradient-to-r from-indigo-700 to-indigo-800 text-white rounded-xl hover:from-indigo-800 hover:to-indigo-900"
               >
                 그룹 목록 보기
               </button>
@@ -799,23 +1049,37 @@ function GroupPageContent() {
 
         {/* 새 그룹 추가 모달 */}
         {isAddModalOpen && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end justify-center z-50">
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end justify-center z-50"
+            onClick={handleCloseModal}
+          >
             <div 
-              className="bg-white rounded-t-3xl w-full max-w-md mx-auto animate-slideInFromBottom safe-area"
+              className={`bg-white rounded-t-3xl w-full max-w-md mx-auto modal-safe-area ${
+                isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
+              }`}
+              style={{
+                transform: isDragging 
+                  ? `translateY(${Math.max(0, dragCurrentY - dragStartY)}px)` 
+                  : 'translateY(0)',
+                transition: isDragging ? 'none' : 'transform 0.2s ease-out'
+              }}
               onClick={(e) => e.stopPropagation()}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
             >
-              <div className="p-6">
+              <div className="p-6 pb-8">
                 {/* 모달 핸들 */}
-                <div className="w-12 h-1 bg-orange-300 rounded-full mx-auto mb-6"></div>
+                <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6 cursor-pointer"></div>
                 
                 <div className="text-center mb-6">
-                  <HiUserGroup className="w-12 h-12 text-orange-700 mx-auto mb-3" />
-                  <h3 className="text-xl font-bold text-orange-900">새 그룹 만들기</h3>
+                  <HiUserGroup className="w-12 h-12 text-gray-700 mx-auto mb-3" />
+                  <h3 className="text-xl font-normal text-gray-900">새 그룹 만들기</h3>
                 </div>
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-orange-700 mb-2">
+                    <label className="block text-sm font-normal text-indigo-700 mb-2">
                       그룹명 <span className="text-rose-500">*</span>
                     </label>
                     <input
@@ -823,15 +1087,15 @@ function GroupPageContent() {
                       name="name"
                       value={newGroup.name}
                       onChange={handleInputChange}
-                      placeholder="예: 친구들과 함께하는 여행"
-                      className="w-full px-4 py-4 border border-orange-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-base"
+                      placeholder="예: 가족, 친구, 직장"
+                      className="w-full px-4 py-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
                       maxLength={50}
                     />
-                    <p className="text-xs text-orange-500 mt-1">{newGroup.name.length}/50</p>
+                    <p className="text-xs text-gray-500 mt-1">{newGroup.name.length}/50</p>
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-semibold text-orange-700 mb-2">
+                    <label className="block text-sm font-normal text-indigo-700 mb-2">
                       그룹 설명
                     </label>
                     <textarea
@@ -840,10 +1104,10 @@ function GroupPageContent() {
                       onChange={handleInputChange}
                       placeholder="그룹에 대한 간단한 설명을 입력해주세요"
                       rows={3}
-                      className="w-full px-4 py-4 border border-orange-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none text-base"
-                      maxLength={200}
+                      className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base"
+                      maxLength={100}
                     />
-                    <p className="text-xs text-orange-500 mt-1">{newGroup.description.length}/200</p>
+                    <p className="text-xs text-gray-500 mt-1">{newGroup.description.length}/100</p>
                   </div>
                 </div>
                 
@@ -852,7 +1116,7 @@ function GroupPageContent() {
                     type="button"
                     onClick={handleCloseModal}
                     disabled={isCreatingGroup}
-                    className="flex-1 mobile-button py-4 border border-orange-300 rounded-2xl text-orange-700 font-medium disabled:opacity-50 hover:bg-orange-50"
+                    className="flex-1 mobile-button py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium disabled:opacity-50 hover:bg-indigo-50"
                   >
                     취소
                   </button>
@@ -860,7 +1124,7 @@ function GroupPageContent() {
                     type="button"
                     onClick={handleSaveGroup}
                     disabled={newGroup.name.trim() === '' || isCreatingGroup}
-                    className="flex-1 mobile-button py-4 bg-gradient-to-r from-orange-700 to-orange-800 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center hover:from-orange-800 hover:to-orange-900"
+                    className="flex-1 mobile-button py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center hover:from-indigo-800 hover:to-indigo-900"
                   >
                     {isCreatingGroup ? (
                       <>
@@ -879,19 +1143,33 @@ function GroupPageContent() {
 
         {/* 공유 모달 */}
         {isShareModalOpen && selectedGroup && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end justify-center z-50">
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end justify-center z-50"
+            onClick={handleCloseShareModal}
+          >
             <div 
-              className="bg-white rounded-t-3xl w-full max-w-md mx-auto animate-slideInFromBottom safe-area"
+              className={`bg-white rounded-t-3xl w-full max-w-md mx-auto modal-safe-area ${
+                isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
+              }`}
+              style={{
+                transform: isDragging 
+                  ? `translateY(${Math.max(0, dragCurrentY - dragStartY)}px)` 
+                  : 'translateY(0)',
+                transition: isDragging ? 'none' : 'transform 0.2s ease-out'
+              }}
               onClick={(e) => e.stopPropagation()}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
             >
-              <div className="p-6">
+              <div className="p-6 pb-8">
                 {/* 모달 핸들 */}
-                <div className="w-12 h-1 bg-orange-300 rounded-full mx-auto mb-6"></div>
+                <div className="w-12 h-1 bg-indigo-300 rounded-full mx-auto mb-6 cursor-pointer"></div>
                 
                 <div className="text-center mb-6">
-                  <FaShare className="w-12 h-12 text-orange-600 mx-auto mb-3" />
-                  <h3 className="text-xl font-bold text-orange-900">그룹 초대하기</h3>
-                  <p className="text-orange-600 mt-1">{selectedGroup.sgt_title}</p>
+                  <FaShare className="w-12 h-12 text-indigo-600 mx-auto mb-3" />
+                  <h3 className="text-xl font-bold text-indigo-900">그룹 초대하기</h3>
+                  <p className="text-indigo-600 mt-1">{selectedGroup.sgt_title}</p>
                 </div>
                 
                 <div className="space-y-3">
@@ -920,10 +1198,105 @@ function GroupPageContent() {
                   </button>
                   
                   <button
-                    onClick={() => setIsShareModalOpen(false)}
-                    className="w-full mobile-button py-4 mt-6 text-orange-600 font-medium hover:text-orange-800"
+                    onClick={handleCloseShareModal}
+                    className="w-full mobile-button py-4 mt-6 text-indigo-600 font-medium hover:text-indigo-800"
                   >
                     닫기
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 그룹 수정 모달 */}
+        {isEditModalOpen && selectedGroup && (
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end justify-center z-50"
+            onClick={handleCloseEditModal}
+          >
+            <div 
+              className={`bg-white rounded-t-3xl w-full max-w-md mx-auto modal-safe-area ${
+                isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
+              }`}
+              style={{
+                transform: isDragging 
+                  ? `translateY(${Math.max(0, dragCurrentY - dragStartY)}px)` 
+                  : 'translateY(0)',
+                transition: isDragging ? 'none' : 'transform 0.2s ease-out'
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              <div className="p-6 pb-8">
+                {/* 모달 핸들 */}
+                <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6 cursor-pointer"></div>
+                
+                <div className="text-center mb-6">
+                  <FaEdit className="w-12 h-12 text-gray-700 mx-auto mb-3" />
+                  <h3 className="text-xl font-normal text-gray-900">그룹 수정하기</h3>
+                  <p className="text-gray-600 mt-1">{selectedGroup.sgt_title}</p>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-normal text-indigo-700 mb-2">
+                      그룹명 <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={editGroup.name}
+                      onChange={handleEditInputChange}
+                      placeholder="예: 가족, 친구, 직장"
+                      className="w-full px-4 py-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
+                      maxLength={50}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">{editGroup.name.length}/50</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-normal text-indigo-700 mb-2">
+                      그룹 설명
+                    </label>
+                    <textarea
+                      name="description"
+                      value={editGroup.description}
+                      onChange={handleEditInputChange}
+                      placeholder="그룹에 대한 간단한 설명을 입력해주세요"
+                      rows={3}
+                      className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base"
+                      maxLength={100}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">{editGroup.description.length}/100</p>
+                  </div>
+                </div>
+                
+                <div className="flex space-x-3 mt-8">
+                  <button
+                    type="button"
+                    onClick={handleCloseEditModal}
+                    disabled={isUpdatingGroup}
+                    className="flex-1 mobile-button py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium disabled:opacity-50 hover:bg-indigo-50"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUpdateGroup}
+                    disabled={editGroup.name.trim() === '' || isUpdatingGroup}
+                    className="flex-1 mobile-button py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center hover:from-indigo-800 hover:to-indigo-900"
+                  >
+                    {isUpdatingGroup ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        수정 중...
+                      </>
+                    ) : (
+                      '수정 완료'
+                    )}
                   </button>
                 </div>
               </div>
@@ -939,10 +1312,10 @@ function GroupPageContent() {
 export default function GroupPageWithSuspense() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
         <div className="text-center px-6">
-          <HiUserGroup className="w-16 h-16 text-orange-500 mx-auto mb-4 animate-pulse" />
-          <p className="text-orange-600 font-medium">로딩 중...</p>
+          <HiUserGroup className="w-16 h-16 text-indigo-500 mx-auto mb-4 animate-pulse" />
+          <p className="text-indigo-600 font-medium">로딩 중...</p>
         </div>
       </div>
     }> 

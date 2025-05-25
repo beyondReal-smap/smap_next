@@ -148,8 +148,22 @@ class GroupService {
   // 그룹 업데이트
   async updateGroup(groupId: number, groupData: GroupUpdate): Promise<Group> {
     try {
-      const response = await apiClient.put(`/groups/${groupId}`, groupData);
-      return response.data;
+      // Next.js API 라우트를 통해 백엔드 호출
+      const response = await fetch(`/api/groups/${groupId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(groupData),
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        throw new Error(result.message || '그룹 업데이트에 실패했습니다.');
+      }
+      
+      return result.data;
     } catch (error) {
       console.error(`Failed to update group ${groupId}:`, error);
       throw error;

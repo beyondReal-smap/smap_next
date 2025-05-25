@@ -1,1 +1,1 @@
-self.__NEXT_FONT_MANIFEST="{\"pages\":{},\"app\":{\"/Users/genie/SmapSource/smap_next/frontend/src/app/layout\":[\"static/media/3a7d91abd51422c6-s.p.woff2\",\"static/media/624b068509136a48-s.p.woff2\",\"static/media/6c36986711e50b72-s.p.woff2\"]},\"appUsingSizeAdjust\":true,\"pagesUsingSizeAdjust\":false}"
+self.__NEXT_FONT_MANIFEST="{\"pages\":{},\"app\":{},\"appUsingSizeAdjust\":false,\"pagesUsingSizeAdjust\":false}"
