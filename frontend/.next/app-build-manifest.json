@@ -16,10 +16,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/group/page.js"
     ],
-    "/api/groups/route": [
+    "/api/v1/groups/member/[id]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/groups/route.js"
+      "static/chunks/app/api/v1/groups/member/[id]/route.js"
     ],
     "/api/groups/[groupId]/members/route": [
       "static/chunks/webpack.js",
@@ -30,11 +30,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/groups/[groupId]/route.js"
-    ],
-    "/_not-found/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
     ]
   }
 }

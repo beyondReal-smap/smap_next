@@ -59,6 +59,31 @@ export interface GroupMember {
   sgdt_adate?: string;
 }
 
+export interface GroupMemberStats {
+  mt_idx: number;
+  mt_name: string;
+  mt_nickname: string;
+  weekly_schedules: number;
+  total_locations: number;
+  weekly_locations: number;
+  is_owner: boolean;
+  is_leader: boolean;
+}
+
+export interface GroupStats {
+  group_id: number;
+  group_title: string;
+  member_count: number;
+  weekly_schedules: number;
+  total_locations: number;
+  stats_period: {
+    start_date: string;
+    end_date: string;
+    days: number;
+  };
+  member_stats: GroupMemberStats[];
+}
+
 export interface GroupCreate {
   mt_idx?: number | null;
   sgt_title?: string | null;
@@ -123,22 +148,13 @@ class GroupService {
   // 그룹 생성
   async createGroup(groupData: GroupCreate): Promise<Group> {
     try {
-      // Next.js API 라우트를 통해 백엔드 호출
-      const response = await fetch('/api/groups', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(groupData),
-      });
+      const response = await apiClient.post('/groups', groupData);
       
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.message || '그룹 생성에 실패했습니다.');
+      if (!response.data.success) {
+        throw new Error(response.data.message || '그룹 생성에 실패했습니다.');
       }
       
-      return result.data;
+      return response.data.data;
     } catch (error) {
       console.error('Failed to create group:', error);
       throw error;
@@ -150,29 +166,14 @@ class GroupService {
     try {
       console.log('[GroupService] 그룹 업데이트 요청:', { groupId, groupData });
       
-      // Next.js API 라우트를 통해 백엔드 호출 (CORS 문제 해결)
-      const response = await fetch(`/api/groups/${groupId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(groupData),
-      });
+      const response = await apiClient.put(`/groups/${groupId}`, groupData);
+      console.log('[GroupService] 응답 성공:', response.data);
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[GroupService] API 오류:', response.status, errorText);
-        throw new Error(`API 오류: ${response.status} - ${errorText}`);
+      if (!response.data.success) {
+        throw new Error(response.data.message || '그룹 업데이트에 실패했습니다.');
       }
       
-      const result = await response.json();
-      console.log('[GroupService] 응답 성공:', result);
-      
-      if (!result.success) {
-        throw new Error(result.message || '그룹 업데이트에 실패했습니다.');
-      }
-      
-      return result.data;
+      return response.data.data;
     } catch (error) {
       console.error(`Failed to update group ${groupId}:`, error);
       throw error;
@@ -183,36 +184,28 @@ class GroupService {
   async deleteGroup(groupId: number): Promise<Group> {
     try {
       console.log('[GroupService] 그룹 삭제 요청:', { groupId });
+      console.log('[GroupService] ⚠️ 중요: PUT 메서드로 sgt_show=N 업데이트 실행');
       
       // DELETE 대신 PUT을 사용하여 sgt_show를 'N'으로 업데이트
       const updateData = {
         sgt_show: 'N'
       };
       
-      const response = await fetch(`/api/groups/${groupId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updateData),
-      });
+      console.log('[GroupService] 전송할 데이터:', updateData);
+      console.log('[GroupService] 요청 URL:', `/api/groups/${groupId}`);
+      console.log('[GroupService] 요청 메서드: PUT');
+      console.log('[GroupService] 🚨 주의: DELETE 메서드가 아닌 PUT 메서드 사용 중');
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[GroupService] 삭제 API 오류:', response.status, errorText);
-        throw new Error(`API 오류: ${response.status} - ${errorText}`);
-      }
+      const response = await apiClient.put(`/groups/${groupId}`, updateData);
       
-      const result = await response.json();
-      console.log('[GroupService] 삭제 응답 성공:', result);
+      console.log('[GroupService] 삭제 응답 성공:', response.data);
+      console.log('[GroupService] ✅ 소프트 삭제 완료 - 실제 DB 삭제 아님');
+      console.log('[GroupService] 응답 데이터 sgt_show 값:', response.data?.data?.sgt_show);
       
-      if (!result.success) {
-        throw new Error(result.message || '그룹 삭제에 실패했습니다.');
-      }
-      
-      return result.data;
+      return response.data.data || response.data;
     } catch (error) {
-      console.error(`Failed to delete group ${groupId}:`, error);
+      console.error('[GroupService] 그룹 삭제 오류:', error);
+      console.error('[GroupService] 🚨 오류 발생 - 소프트 삭제 실패');
       throw error;
     }
   }
@@ -234,17 +227,16 @@ class GroupService {
    */
   async getMyGroups(mt_idx: number | string = 1186): Promise<Group[]> {
     try {
-      const response = await fetch(`/api/groups?mt_idx=${mt_idx}`);
-      const result = await response.json();
+      const response = await apiClient.get(`/groups?mt_idx=${mt_idx}`);
       
-      if (!result.success) {
-        throw new Error(result.message || '그룹 목록 조회에 실패했습니다.');
+      if (!response.data.success) {
+        throw new Error(response.data.message || '그룹 목록 조회에 실패했습니다.');
       }
       
-      return result.data || [];
+      return response.data.data || [];
     } catch (error) {
       console.error('그룹 목록 조회 오류:', error);
-      throw error;
+      throw new Error('그룹 목록을 가져오는데 실패했습니다.');
     }
   }
 
@@ -253,17 +245,39 @@ class GroupService {
    */
   async getGroupMembers(sgt_idx: number | string): Promise<GroupMember[]> {
     try {
-      const response = await fetch(`/api/groups/${sgt_idx}/members`);
-      const result = await response.json();
+      const response = await apiClient.get(`/groups/${sgt_idx}/members`);
       
-      if (!result.success) {
-        throw new Error(result.message || '그룹 멤버 조회에 실패했습니다.');
+      if (!response.data.success) {
+        throw new Error(response.data.message || '그룹 멤버 조회에 실패했습니다.');
       }
       
-      return result.data || [];
+      return response.data.data || [];
     } catch (error) {
       console.error('그룹 멤버 조회 오류:', error);
-      throw error;
+      throw new Error('그룹 멤버를 가져오는데 실패했습니다.');
+    }
+  }
+
+  /**
+   * 그룹 통계 데이터 조회
+   * - 1주일간 일정 개수
+   * - 위치 데이터 통계
+   */
+  async getGroupStats(sgt_idx: number | string): Promise<GroupStats> {
+    try {
+      console.log(`[GroupService] 그룹 통계 조회 요청 - sgt_idx: ${sgt_idx}`);
+      
+      const response = await apiClient.get(`/groups/${sgt_idx}/stats`);
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || '그룹 통계 조회에 실패했습니다.');
+      }
+      
+      console.log('[GroupService] 그룹 통계 조회 성공:', response.data.data);
+      return response.data.data;
+    } catch (error) {
+      console.error('그룹 통계 조회 오류:', error);
+      throw new Error('그룹 통계를 가져오는데 실패했습니다.');
     }
   }
 }

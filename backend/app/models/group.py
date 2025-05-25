@@ -16,6 +16,26 @@ class Group(BaseModel):
     sgt_wdate = Column(DateTime, nullable=True)
     sgt_udate = Column(DateTime, nullable=True)
 
+    def soft_delete(self, db: Session):
+        """
+        소프트 삭제: sgt_show를 'N'으로 변경
+        """
+        from datetime import datetime
+        self.sgt_show = 'N'
+        self.sgt_udate = datetime.utcnow()
+        db.commit()
+        return self
+
+    def restore(self, db: Session):
+        """
+        복구: sgt_show를 'Y'로 변경
+        """
+        from datetime import datetime
+        self.sgt_show = 'Y'
+        self.sgt_udate = datetime.utcnow()
+        db.commit()
+        return self
+
     @classmethod
     def get_group_count(cls, db: Session, mt_idx: int) -> int:
         return db.query(cls).filter(
@@ -42,4 +62,7 @@ class Group(BaseModel):
 
     @classmethod
     def find_by_code(cls, db: Session, code: str) -> Optional['Group']:
-        return db.query(cls).filter(cls.sgt_code == code).first() 
+        return db.query(cls).filter(
+            cls.sgt_code == code,
+            cls.sgt_show == ShowEnum.Y
+        ).first() 

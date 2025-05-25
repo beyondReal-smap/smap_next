@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     ]
     
     # MySQL 데이터베이스 설정
-    MYSQL_HOST: str = "https://118.67.130.71"
+    MYSQL_HOST: str = "118.67.130.71"
     MYSQL_USER: str = "smap2"
     MYSQL_PASSWORD: str = "dmonster"
     MYSQL_DB: str = "smap2_db"

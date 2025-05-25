@@ -32,7 +32,7 @@ import { RiKakaoTalkFill } from 'react-icons/ri';
 import { FiLink, FiX, FiCopy, FiSettings } from 'react-icons/fi';
 import { MdOutlineMessage, MdGroupAdd } from 'react-icons/md';
 import { BsThreeDots } from 'react-icons/bs';
-import groupService, { Group } from '@/services/groupService';
+import groupService, { Group, GroupStats } from '@/services/groupService';
 import memberService from '@/services/memberService';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
@@ -263,13 +263,17 @@ function GroupPageContent() {
   const [isDragging, setIsDragging] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   
+  // 그룹 통계 관련 상태 추가
+  const [groupStats, setGroupStats] = useState<GroupStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  
   const router = useRouter();
 
   // 그룹 목록 조회 함수
   const fetchGroups = async () => {
     try {
       setLoading(true);
-      const data = await groupService.getMyGroups(1186);
+      const data = await groupService.getCurrentUserGroups();
       console.log('[Group Page] 그룹 목록 조회 결과:', data);
       setGroups(data);
       
@@ -399,6 +403,33 @@ function GroupPageContent() {
     };
 
     fetchGroupMembers();
+  }, [selectedGroup]);
+
+  // 선택된 그룹의 통계 데이터 조회
+  useEffect(() => {
+    const fetchGroupStats = async () => {
+      if (!selectedGroup) {
+        setGroupStats(null);
+        return;
+      }
+
+      try {
+        setStatsLoading(true);
+        console.log('[Group Page] 그룹 통계 조회 시작:', selectedGroup.sgt_idx);
+        
+        const statsData = await groupService.getGroupStats(selectedGroup.sgt_idx);
+        setGroupStats(statsData);
+        
+        console.log('[Group Page] 그룹 통계 조회 완료:', statsData);
+      } catch (error) {
+        console.error('[Group Page] 그룹 통계 조회 오류:', error);
+        setGroupStats(null);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchGroupStats();
   }, [selectedGroup]);
 
   // 그룹 선택 (모바일에서는 상세 화면으로 이동)
@@ -932,18 +963,36 @@ function GroupPageContent() {
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-gradient-to-r from-red-400 to-red-500 rounded-xl p-3 text-white text-center shadow-md">
                     <FaUsers className="w-6 h-6 text-red-200 mx-auto mb-1" />
-                    <p className="text-lg font-bold">{groupMembers.length}</p>
+                    <p className="text-lg font-bold">
+                      {statsLoading ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      ) : (
+                        groupStats?.member_count || groupMembers.length
+                      )}
+                    </p>
                     <p className="text-red-100 text-xs">멤버</p>
                   </div>
                   <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-xl p-3 text-white text-center shadow-md">
                     <FaCalendarAlt className="w-6 h-6 text-yellow-200 mx-auto mb-1" />
-                    <p className="text-lg font-bold">3</p>
-                    <p className="text-yellow-100 text-xs">일정</p>
+                    <p className="text-lg font-bold">
+                      {statsLoading ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      ) : (
+                        groupStats?.weekly_schedules || 0
+                      )}
+                    </p>
+                    <p className="text-yellow-100 text-xs">주간 일정</p>
                   </div>
                   <div className="bg-gradient-to-r from-blue-400 to-blue-500 rounded-xl p-3 text-white text-center shadow-md">
                     <FaMapMarkerAlt className="w-6 h-6 text-blue-200 mx-auto mb-1" />
-                    <p className="text-lg font-bold">7</p>
-                    <p className="text-blue-100 text-xs">장소</p>
+                    <p className="text-lg font-bold">
+                      {statsLoading ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+                      ) : (
+                        groupStats?.total_locations || 0
+                      )}
+                    </p>
+                    <p className="text-blue-100 text-xs">총 위치</p>
                   </div>
                 </div>
               </div>

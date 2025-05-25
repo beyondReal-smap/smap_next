@@ -119,25 +119,33 @@ export async function DELETE(
   const { groupId } = await params;
   
   try {
-    console.log('[Group Delete API] 그룹 삭제 요청:', { groupId });
+    console.log('[Group Delete API] 그룹 소프트 삭제 요청:', { groupId });
+    console.log('[Group Delete API] ⚠️ 중요: 실제 삭제가 아닌 sgt_show=N 업데이트 실행');
 
-    // 백엔드 그룹 삭제 API 호출
+    // 소프트 삭제를 위한 PUT 요청으로 sgt_show를 'N'으로 업데이트
+    const updateData = {
+      sgt_show: 'N'
+    };
+
     const backendUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}`;
-    console.log('[Group Delete API] 백엔드 API 호출:', backendUrl);
+    console.log('[Group Delete API] 백엔드 PUT API 호출 (소프트 삭제):', backendUrl);
+    console.log('[Group Delete API] 전송할 데이터:', updateData);
     
     const fetchOptions: RequestInit = {
-      method: 'DELETE',
+      method: 'PUT', // DELETE 대신 PUT 사용
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'User-Agent': 'Next.js API Proxy',
       },
+      body: JSON.stringify(updateData), // sgt_show: 'N' 전송
       // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
       rejectUnauthorized: false,
     };
     
     const data = await fetchWithFallback(backendUrl, fetchOptions);
-    console.log('[Group Delete API] 백엔드 응답 성공:', data);
+    console.log('[Group Delete API] 백엔드 응답 성공 (소프트 삭제):', data);
+    console.log('[Group Delete API] ✅ 소프트 삭제 완료 - 실제 DB 삭제 아님');
     
     // 백엔드에서 받은 데이터를 Group 형태로 변환
     const groupData = {
@@ -146,7 +154,7 @@ export async function DELETE(
       sgt_content: data.sgt_content || data.sgt_memo,
       sgt_memo: data.sgt_memo,
       mt_idx: data.mt_idx,
-      sgt_show: data.sgt_show,
+      sgt_show: data.sgt_show, // 'N'이 되어야 함
       sgt_wdate: data.sgt_wdate,
       memberCount: 0 // 기본값
     };
@@ -154,11 +162,11 @@ export async function DELETE(
     return NextResponse.json({
       success: true,
       data: groupData,
-      message: '그룹이 성공적으로 삭제되었습니다.'
+      message: '그룹이 목록에서 숨겨졌습니다. (소프트 삭제)'
     });
 
   } catch (error) {
-    console.error('[Group Delete API] 오류:', error);
+    console.error('[Group Delete API] 소프트 삭제 오류:', error);
     
     return NextResponse.json({
       success: false,
