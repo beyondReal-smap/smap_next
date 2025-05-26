@@ -2,32 +2,202 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ko';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
-import { PickersCalendarHeader, PickersCalendarHeaderProps } from '@mui/x-date-pickers/PickersCalendarHeader';
-import { PickersDay, PickersDayProps } from '@mui/x-date-pickers/PickersDay';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { PageContainer, Card, Button } from '../components/layout';
-import { IconButton, Box, Typography, Button as MuiButton, ListItemText, List, ListItemButton, Paper, Chip, Avatar, Badge } from '@mui/material';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import isBetween from 'dayjs/plugin/isBetween';
 import { v4 as uuidv4 } from 'uuid';
+import { 
+  FiCalendar, 
+  FiPlus, 
+  FiClock, 
+  FiUsers, 
+  FiUser, 
+  FiEdit3, 
+  FiTrash2, 
+  FiX,
+  FiChevronLeft,
+  FiChevronRight,
+  FiMoreVertical
+} from 'react-icons/fi';
+import { HiSparkles } from 'react-icons/hi2';
+import Image from 'next/image';
 
 dayjs.extend(isBetween);
 dayjs.locale('ko');
+
+// 모바일 최적화된 CSS 스타일
+const pageStyles = `
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+  position: relative;
+}
+
+.mobile-button {
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.mobile-button:active {
+  transform: scale(0.98);
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.glass-effect {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.calendar-day {
+  transition: all 0.2s ease;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.calendar-day:hover {
+  transform: scale(1.1);
+}
+
+.calendar-day.selected {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: white;
+  transform: scale(1.1);
+}
+
+.calendar-day.has-event::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  background: #ef4444;
+  border-radius: 50%;
+}
+
+.event-card {
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.event-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.floating-button {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  z-index: 40;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
+}
+
+.floating-button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 12px 35px rgba(79, 70, 229, 0.4);
+}
+`;
 
 const TODAY = dayjs().format('YYYY-MM-DD');
 const YESTERDAY = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
 const TOMORROW = dayjs().add(1, 'day').format('YYYY-MM-DD');
 
-// ScheduleEvent 인터페이스 정의 (컴포넌트 외부)
+// Framer Motion 애니메이션 variants
+const pageVariants = {
+  initial: { 
+    opacity: 0, 
+    y: 20 
+  },
+  in: { 
+    opacity: 1, 
+    y: 0,
+    transition: {
+      duration: 0.6,
+      ease: [0.25, 0.46, 0.45, 0.94]
+    }
+  },
+  out: { 
+    opacity: 0, 
+    y: -20,
+    transition: {
+      duration: 0.4,
+      ease: [0.55, 0.06, 0.68, 0.19]
+    }
+  }
+};
+
+const modalVariants = {
+  hidden: { 
+    opacity: 0, 
+    y: 100,
+    scale: 0.95
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.3,
+      ease: [0.25, 0.46, 0.45, 0.94]
+    }
+  },
+  exit: { 
+    opacity: 0, 
+    y: 100,
+    scale: 0.95,
+    transition: {
+      duration: 0.2,
+      ease: [0.55, 0.06, 0.68, 0.19]
+    }
+  }
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: i * 0.1,
+      duration: 0.5,
+      ease: [0.25, 0.46, 0.45, 0.94]
+    }
+  })
+};
+
+const floatingButtonVariants = {
+  initial: { scale: 0, rotate: -180 },
+  animate: { 
+    scale: 1, 
+    rotate: 0,
+    transition: {
+      delay: 0.5,
+      type: "spring",
+      stiffness: 260,
+      damping: 20
+    }
+  },
+  hover: { 
+    scale: 1.1,
+    transition: { duration: 0.2 }
+  },
+  tap: { scale: 0.9 }
+};
+
+// ScheduleEvent 인터페이스 정의
 interface ScheduleEvent {
   id: string;
   date: string; // YYYY-MM-DD
@@ -41,7 +211,7 @@ interface ScheduleEvent {
   memberPhoto?: string;
 }
 
-// 모의 일정 데이터 (컴포넌트 외부)
+// 모의 일정 데이터
 const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
   {
     id: '1',
@@ -51,7 +221,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     title: '아침 스크럼',
     content: '데일리 스크럼 진행 및 이슈 공유',
     groupName: '프론트엔드팀',
-    groupColor: 'bg-sky-200', // Changed color and name
+    groupColor: 'bg-sky-500',
     memberName: '김민지',
     memberPhoto: '/images/avatar1.png',
   },
@@ -63,7 +233,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     title: '백엔드 API 설계 회의',
     content: '신규 기능 관련 API 엔드포인트 및 데이터 구조 설계 논의',
     groupName: '백엔드팀',
-    groupColor: 'bg-teal-200', // Changed color and name
+    groupColor: 'bg-teal-500',
     memberName: '이준호',
     memberPhoto: '/images/avatar2.png',
   },
@@ -74,7 +244,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     endTime: '15:00',
     title: 'UX/UI 디자인 검토',
     groupName: '디자인팀',
-    groupColor: 'bg-amber-200', // Changed color and name
+    groupColor: 'bg-amber-500',
     memberName: '박서연',
     memberPhoto: '/images/avatar3.png',
   },
@@ -86,7 +256,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     title: '주간 전체 회의',
     content: '각 팀별 진행 상황 공유 및 주요 안건 논의',
     groupName: '전체팀',
-    groupColor: 'bg-indigo-200', // Changed color and name
+    groupColor: 'bg-indigo-500',
     memberName: '최현우',
     memberPhoto: '/images/avatar4.png',
   },
@@ -98,7 +268,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     title: '데이터베이스 마이그레이션 계획',
     content: '기존 DB에서 신규 DB로의 마이그레이션 절차 및 일정 계획 수립',
     groupName: '인프라팀',
-    groupColor: 'bg-rose-200', // Changed color and name
+    groupColor: 'bg-rose-500',
     memberName: '정다은',
     memberPhoto: '/images/avatar5.png',
   },
@@ -109,9 +279,9 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     endTime: '17:00',
     title: '신규 입사자 OT',
     groupName: 'HR팀',
-    groupColor: 'bg-lime-200', // Changed color and name
+    groupColor: 'bg-lime-500',
     memberName: '홍길동',
-    memberPhoto: '/images/avar1.png',
+    memberPhoto: '/images/avatar1.png',
   },
   {
     id: '7',
@@ -120,19 +290,18 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     endTime: '10:30',
     title: '마케팅 캠페인 아이디어 회의',
     groupName: '마케팅팀',
-    groupColor: 'bg-fuchsia-200', // Changed color and name
-    memberName: '고은별',
-    memberPhoto: '/images/avar2.png',
-  },
+    groupColor: 'bg-purple-500',
+    memberName: '김영희',
+    memberPhoto: '/images/avatar2.png',
+  }
 ];
 
-// NewEvent 폼 데이터용 인터페이스 (컴포넌트 외부)
 interface NewEvent {
-  id?: string; // 수정 시 사용
+  id?: string;
   title: string;
-  date: string; // YYYY-MM-DD
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
+  date: string;
+  startTime: string;
+  endTime: string;
   content?: string;
   groupName?: string;
   groupColor?: string;
@@ -140,108 +309,224 @@ interface NewEvent {
   memberPhoto?: string;
 }
 
-// 이벤트 상태에 따른 MUI 색상 이름 반환
-function getEventStatus(event: ScheduleEvent): { text: string; color: 'success' | 'warning' | 'error' | 'info' | 'default' } {
+// 일정 상태 판단 함수
+function getEventStatus(event: ScheduleEvent): { text: string; color: string; bgColor: string } {
   const now = dayjs();
-  // Ensure event.date and event.startTime are valid before parsing
-  if (!event.date || !event.startTime || !event.endTime) {
-    // Handle cases where date or time might be missing, though ideally they shouldn't be
-    return { text: '시간 정보 부족', color: 'error' };
-  }
-  const eventStartDateTime = dayjs(`${event.date}T${event.startTime}`);
-  const eventEndDateTime = dayjs(`${event.date}T${event.endTime}`);
+  const eventDate = dayjs(event.date);
+  const eventStart = dayjs(`${event.date} ${event.startTime}`);
+  const eventEnd = dayjs(`${event.date} ${event.endTime}`);
 
-  if (!eventStartDateTime.isValid() || !eventEndDateTime.isValid()) {
-    return { text: '잘못된 시간 형식', color: 'error' };
+  if (now.isBefore(eventStart)) {
+    return { text: '예정', color: 'text-blue-600', bgColor: 'bg-blue-50' };
+  } else if (now.isBetween(eventStart, eventEnd)) {
+    return { text: '진행중', color: 'text-green-600', bgColor: 'bg-green-50' };
+  } else {
+    return { text: '완료', color: 'text-gray-600', bgColor: 'bg-gray-50' };
   }
-
-  if (now.isAfter(eventEndDateTime)) { return { text: '완료', color: 'success' }; }
-  if (now.isBetween(eventStartDateTime, eventEndDateTime, null, '[]')) { return { text: '진행 중', color: 'warning' }; }
-  if (now.isBefore(eventStartDateTime)) { return { text: '예정', color: 'default' }; }
-  return { text: '확인 필요', color: 'default' };
 }
 
-// 상태 보더 색상 매핑
-const statusColorMap = { success: '#22c55e', warning: '#f97316', error: '#ef4444', info: '#3b82f6', default: '#6b7280' };
+// 커스텀 캘린더 컴포넌트
+function MobileCalendar({ 
+  selectedDay, 
+  onDayClick, 
+  events 
+}: { 
+  selectedDay: Dayjs | null; 
+  onDayClick: (day: Dayjs) => void;
+  events: ScheduleEvent[];
+}) {
+  const [currentMonth, setCurrentMonth] = useState(dayjs());
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [animationDirection, setAnimationDirection] = useState<'left' | 'right'>('right');
+  
+  const daysInMonth = currentMonth.daysInMonth();
+  const firstDayOfMonth = currentMonth.startOf('month').day();
+  const today = dayjs();
+  
+  const eventDates = useMemo(() => {
+    return events.reduce((acc, event) => {
+      acc[event.date] = true;
+      return acc;
+    }, {} as Record<string, boolean>);
+  }, [events]);
 
-// 상태 배경 색상 매핑 (연한 버전)
-const statusBgColorMap = {
-  success: '#f0fdf4', // green-50
-  warning: '#fff7ed', // orange-50
-  error: '#fef2f2',   // red-50
-  info: '#eff6ff',    // blue-50
-  default: '#f9fafb' // gray-50 (예정)
-};
+  const handlePrevMonth = () => {
+    setAnimationDirection('left');
+    setIsAnimating(true);
+    setTimeout(() => {
+      setCurrentMonth(prev => prev.subtract(1, 'month'));
+      setIsAnimating(false);
+    }, 150);
+  };
 
-// CustomCalendarHeaderProps 및 CustomCalendarHeader 함수 (컴포넌트 외부 또는 SchedulePage 내부 상단)
-interface CustomCalendarHeaderProps extends PickersCalendarHeaderProps<Dayjs> { onGoToToday: () => void; }
-function CustomCalendarHeader(props: CustomCalendarHeaderProps) {
-  const { currentMonth, onMonthChange, onGoToToday } = props;
-  const handlePrevMonth = () => { onMonthChange(dayjs(currentMonth).subtract(1, 'month'), 'left'); };
-  const handleNextMonth = () => { onMonthChange(dayjs(currentMonth).add(1, 'month'), 'right'); };
-  const monthName = dayjs(currentMonth).format('YYYY년 MMMM');
+  const handleNextMonth = () => {
+    setAnimationDirection('right');
+    setIsAnimating(true);
+    setTimeout(() => {
+      setCurrentMonth(prev => prev.add(1, 'month'));
+      setIsAnimating(false);
+    }, 150);
+  };
+
+  const handleToday = () => {
+    setAnimationDirection('right');
+    setIsAnimating(true);
+    setTimeout(() => {
+      setCurrentMonth(today);
+      onDayClick(today);
+      setIsAnimating(false);
+    }, 150);
+  };
+
+  const renderCalendarDays = () => {
+    const days = [];
+    
+    // 빈 칸 추가 (이전 달 마지막 날들)
+    for (let i = 0; i < firstDayOfMonth; i++) {
+      days.push(<div key={`empty-${i}`} className="h-10"></div>);
+    }
+    
+    // 현재 달의 날짜들
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = currentMonth.date(day);
+      const dateString = currentDate.format('YYYY-MM-DD');
+      const isSelected = selectedDay?.isSame(currentDate, 'day');
+      const isToday = today.isSame(currentDate, 'day');
+      const hasEvent = eventDates[dateString];
+      
+      days.push(
+        <button
+          key={day}
+          onClick={() => onDayClick(currentDate)}
+          className={`
+            h-10 w-full rounded-lg flex items-center justify-center text-sm font-medium calendar-day mobile-button
+            ${isSelected ? 'calendar-day selected' : ''}
+            ${isToday && !isSelected ? 'bg-indigo-100 text-indigo-600' : ''}
+            ${!isSelected && !isToday ? 'hover:bg-gray-100' : ''}
+            ${hasEvent ? 'calendar-day has-event' : ''}
+          `}
+        >
+          {day}
+        </button>
+      );
+    }
+    
+    return days;
+  };
 
   return (
-    <Box display="flex" justifyContent="space-between" alignItems="center" p={1} sx={{ borderBottom: '1px solid #e0e0e0' }}>
-      <IconButton onClick={handlePrevMonth} size="small" aria-label="Previous month"><ChevronLeftIcon /></IconButton>
-      <Typography variant="subtitle1" component="div" sx={{ fontSize: '1.25rem', color: 'black' }}>{monthName}</Typography>
-      <Box>
-        <MuiButton onClick={onGoToToday} variant="text" size="small" sx={{ marginRight: '8px', fontSize: '0.875rem' }}>오늘</MuiButton>
-        <IconButton onClick={handleNextMonth} size="small" aria-label="Next month"><ChevronRightIcon /></IconButton>
-      </Box>
-    </Box>
-  );
-}
+    <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+      {/* 캘린더 헤더 */}
+      <div className="flex items-center justify-between mb-4">
+        <motion.button
+          onClick={handlePrevMonth}
+          className="p-2 hover:bg-gray-100 rounded-full mobile-button"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          disabled={isAnimating}
+        >
+          <FiChevronLeft className="w-5 h-5 text-gray-600" />
+        </motion.button>
+        
+        <div className="text-center">
+          <motion.h2 
+            key={currentMonth.format('YYYY-MM')}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="text-lg font-bold text-gray-900"
+          >
+            {currentMonth.format('YYYY년 MM월')}
+          </motion.h2>
+          <motion.button
+            onClick={handleToday}
+            className="text-sm text-indigo-600 hover:text-indigo-700 mobile-button"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            disabled={isAnimating}
+          >
+            오늘로 이동
+          </motion.button>
+        </div>
+        
+        <motion.button
+          onClick={handleNextMonth}
+          className="p-2 hover:bg-gray-100 rounded-full mobile-button"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          disabled={isAnimating}
+        >
+          <FiChevronRight className="w-5 h-5 text-gray-600" />
+        </motion.button>
+      </div>
 
-// CustomDay Props 정의에 hasEvent 추가
-interface CustomDayProps extends PickersDayProps<Dayjs> {
-  hasEvent?: boolean;
-}
+      {/* 요일 헤더 */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
+          <div key={day} className={`h-6 flex items-center justify-center text-xs font-medium ${
+            index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-500'
+          }`}>
+            {day}
+          </div>
+        ))}
+      </div>
 
-// CustomDay 컴포넌트 정의 (Badge 추가)
-function CustomDay(props: CustomDayProps) {
-  const { day, outsideCurrentMonth, hasEvent, ...other } = props;
-
-  const isSaturday = day.day() === 6;
-  const isSunday = day.day() === 0;
-  const sxProps: any = { fontSize: '1.1rem' }; // 날짜 숫자 크기
-
-  if (!outsideCurrentMonth) {
-    if (isSaturday) sxProps.color = 'blue';
-    else if (isSunday) sxProps.color = 'red';
-  }
-
-  return (
-    <Badge
-      key={day.toString()}
-      overlap="circular"
-      variant="dot"
-      invisible={!hasEvent || outsideCurrentMonth}
-      sx={{
-        '& .MuiBadge-dot': {
-          backgroundColor: '#FF3333', // 형광 느낌의 밝은 빨강 (예: 네온 레드 계열)
-          width: '6px',  // 점 크기 (정원으로 보이도록 width/height 동일하게 유지)
-          height: '6px', // 점 크기
-          borderRadius: '50%', // 원형 유지
-          minWidth: '6px', // 최소 크기 보장
-          position: 'absolute', 
-          bottom: '10%', 
-          right: '48%',  // 오른쪽으로 이동 (값 감소)
-        }
-      }}
-    >
-      <PickersDay {...other} day={day} outsideCurrentMonth={outsideCurrentMonth} sx={sxProps} />
-    </Badge>
+      {/* 캘린더 그리드 */}
+      <AnimatePresence mode="wait">
+        <motion.div 
+          key={currentMonth.format('YYYY-MM')}
+          initial={{ 
+            opacity: 0, 
+            x: animationDirection === 'right' ? 50 : -50 
+          }}
+          animate={{ 
+            opacity: 1, 
+            x: 0 
+          }}
+          exit={{ 
+            opacity: 0, 
+            x: animationDirection === 'right' ? -50 : 50 
+          }}
+          transition={{ 
+            duration: 0.3,
+            ease: [0.25, 0.46, 0.45, 0.94]
+          }}
+          className="grid grid-cols-7 gap-1"
+        >
+          {renderCalendarDays()}
+        </motion.div>
+      </AnimatePresence>
+    </div>
   );
 }
 
 export default function SchedulePage() {
-  const [eventDates, setEventDates] = useState<ScheduleEvent[]>(MOCK_SCHEDULE_EVENTS);
+  const router = useRouter();
   const [selectedDay, setSelectedDay] = useState<Dayjs | null>(dayjs());
-  const [eventsForSelectedDay, setEventsForSelectedDay] = useState<ScheduleEvent[]>([]);
+  const [events, setEvents] = useState<ScheduleEvent[]>(MOCK_SCHEDULE_EVENTS);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEventDetails, setSelectedEventDetails] = useState<ScheduleEvent | null>(null);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
+
+  // 컴포넌트 마운트 감지
+  useEffect(() => {
+    document.body.style.overflowX = 'hidden';
+    document.documentElement.style.overflowX = 'hidden';
+    
+    return () => {
+      document.body.style.overflowX = '';
+      document.documentElement.style.overflowX = '';
+    };
+  }, []);
+
+  // 선택된 날짜의 일정들
+  const eventsForSelectedDay = useMemo(() => {
+    if (!selectedDay) return [];
+    const dateString = selectedDay.format('YYYY-MM-DD');
+    return events
+      .filter(event => event.date === dateString)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }, [selectedDay, events]);
 
   const initialNewEventState: NewEvent = useMemo(() => ({
     title: '',
@@ -258,358 +543,575 @@ export default function SchedulePage() {
   const [newEvent, setNewEvent] = useState<NewEvent>(initialNewEventState);
   
   useEffect(() => {
-    // selectedDay가 변경될 때 newEvent의 date 필드를 업데이트
     setNewEvent(prev => ({
       ...prev,
       date: selectedDay ? selectedDay.format('YYYY-MM-DD') : TODAY,
     }));
   }, [selectedDay]);
 
-  const router = useRouter();
-
-  // 이벤트가 있는 날짜 Set 생성 (YYYY-MM-DD 형식)
-  const eventDays = useMemo(() => {
-    const daysWithEvents = new Set<string>();
-    eventDates.forEach(event => {
-      daysWithEvents.add(event.date); // event.date는 이미 YYYY-MM-DD 형식
-    });
-    return daysWithEvents;
-  }, [eventDates]);
-
-  useEffect(() => { /* Filter and sort events for selectedDay */
-    if (selectedDay) {
-      const filteredEvents = eventDates
-        .filter(event => event.date === selectedDay.format('YYYY-MM-DD'))
-        .sort((a, b) => {
-          // startTime을 비교하여 정렬 (HH:mm 형식)
-          return a.startTime.localeCompare(b.startTime);
-        });
-      setEventsForSelectedDay(filteredEvents);
-    } else { setEventsForSelectedDay([]); }
-  }, [selectedDay, eventDates]);
-
-  const handleDayClick = (newValue: Dayjs | null) => { if (newValue) setSelectedDay(newValue.startOf('day')); };
-
+  // 일정 저장
   const handleSaveEvent = () => {
     if (!newEvent.title || !newEvent.date || !newEvent.startTime || !newEvent.endTime) return;
-    
+
     const eventToSave: ScheduleEvent = {
       id: newEvent.id || uuidv4(),
       title: newEvent.title,
       date: newEvent.date,
       startTime: newEvent.startTime,
       endTime: newEvent.endTime,
-      content: newEvent.content || undefined,
-      groupName: newEvent.groupName || undefined,
-      groupColor: newEvent.groupColor || undefined,
-      memberName: newEvent.memberName || undefined,
-      memberPhoto: newEvent.memberPhoto || undefined,
+      content: newEvent.content,
+      groupName: newEvent.groupName,
+      groupColor: newEvent.groupColor,
+      memberName: newEvent.memberName,
+      memberPhoto: newEvent.memberPhoto,
     };
 
     if (newEvent.id) {
-      setEventDates(eventDates.map(event => event.id === newEvent.id ? eventToSave : event));
+      // 수정
+      setEvents(prev => prev.map(event => 
+        event.id === newEvent.id ? eventToSave : event
+      ));
     } else {
-      setEventDates([...eventDates, eventToSave]);
+      // 추가
+      setEvents(prev => [...prev, eventToSave]);
     }
+
     setIsAddEventModalOpen(false);
-    setNewEvent(initialNewEventState); // Reset form to initial state for the current selectedDay
+    setNewEvent(initialNewEventState);
     setSelectedEventDetails(null);
   };
 
+  // 일정 삭제
   const handleDeleteEvent = () => {
-    if (!selectedEventDetails || !selectedEventDetails.id) return;
-    setEventDates(eventDates.filter(event => event.id !== selectedEventDetails.id));
+    if (selectedEventDetails) {
+      setEvents(prev => prev.filter(event => event.id !== selectedEventDetails.id));
+      setIsModalOpen(false);
+      setSelectedEventDetails(null);
+    }
+  };
+
+  // 일정 수정 모달 열기
+  const handleOpenEditModal = () => {
+    if (selectedEventDetails) {
+      setNewEvent({
+        id: selectedEventDetails.id,
+        title: selectedEventDetails.title,
+        date: selectedEventDetails.date,
+        startTime: selectedEventDetails.startTime,
+        endTime: selectedEventDetails.endTime,
+        content: selectedEventDetails.content || '',
+        groupName: selectedEventDetails.groupName || '',
+        groupColor: selectedEventDetails.groupColor || '',
+        memberName: selectedEventDetails.memberName || '',
+        memberPhoto: selectedEventDetails.memberPhoto || '',
+      });
+      setIsModalOpen(false);
+      setIsAddEventModalOpen(true);
+    }
+  };
+
+  // 일정 클릭 핸들러
+  const handleEventItemClick = (event: ScheduleEvent) => {
+    setSelectedEventDetails(event);
+    setIsModalOpen(true);
+  };
+
+  // 뒤로가기 핸들러
+  const handleBack = () => {
+    router.back();
+  };
+
+  // 모달 닫기 핸들러
+  const closeModal = () => {
     setIsModalOpen(false);
     setSelectedEventDetails(null);
   };
 
-  const handleOpenEditModal = () => {
-    if (!selectedEventDetails) return;
-    setNewEvent({
-      id: selectedEventDetails.id,
-      title: selectedEventDetails.title,
-      date: selectedEventDetails.date,
-      startTime: selectedEventDetails.startTime,
-      endTime: selectedEventDetails.endTime,
-      content: selectedEventDetails.content || '',
-      groupName: selectedEventDetails.groupName || '',
-      groupColor: selectedEventDetails.groupColor || '',
-      memberName: selectedEventDetails.memberName || '',
-      memberPhoto: selectedEventDetails.memberPhoto || '',
-    });
-    setIsAddEventModalOpen(true);
-    setIsModalOpen(false);
+  const closeAddModal = () => {
+    setIsAddEventModalOpen(false);
+    setNewEvent(initialNewEventState);
+    setSelectedEventDetails(null);
   };
-  
-  const handleGoToToday = () => { if (dayjs()) setSelectedDay(dayjs().startOf('day')); };
-
-  const handleEventItemClick = (event: ScheduleEvent) => { setSelectedEventDetails(event); setIsModalOpen(true); };
 
   return (
-    <PageContainer title="일정 관리" description="일정을 생성하고 관리하세요" showHeader={false} showBackButton={false} className="h-full flex flex-col bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 flex-grow p-6 overflow-auto">
-        {/* Calendar Card - 오른쪽 보더 굵기 수정 */}
-        <div className="md:col-span-2 flex flex-col md:mb-0">
-          <Card className="w-full mx-auto flex flex-col items-center justify-center font-['Line_Seed'] border-r-4 border-blue-500">
-            <div className="w-full p-2">
-              <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="ko">
-                <DateCalendar 
-                  value={selectedDay} 
-                  onChange={handleDayClick}
-                  slots={{ 
-                    // day 슬롯 수정: hasEvent prop 전달
-                    day: (props) => {
-                      const dayStr = props.day.format('YYYY-MM-DD');
-                      const hasEvent = eventDays.has(dayStr);
-                      return <CustomDay {...props} hasEvent={hasEvent} />;
-                    },
-                    calendarHeader: (headerProps) => <CustomCalendarHeader {...headerProps} onGoToToday={handleGoToToday} /> 
-                  }}
-                  sx={{
-                    '& .MuiDayCalendar-weekDayLabel': { fontSize: '0.9rem', textTransform: 'none', margin: '0 0.5rem' },
-                    '& .MuiDayCalendar-monthContainer': { display: 'flex', flexDirection: 'column', gap: '0.4rem' },
-                    '& .MuiDayCalendar-weekContainer': { display: 'flex', gap: '0.4rem' },
-                  }}
-                />
-              </LocalizationProvider>
+    <>
+      <style jsx global>{pageStyles}</style>
+      <div className="bg-indigo-50 min-h-screen pb-20">
+        {/* 앱 헤더 - 완전 고정 */}
+        <div className="fixed top-0 left-0 right-0 z-50 px-4 bg-white/95 backdrop-blur-md border-b border-gray-200/50">
+          <div className="flex items-center justify-between h-14">
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
+                <FiCalendar className="w-5 h-5 text-indigo-600" />
+                <span className="text-lg font-semibold text-gray-900">일정</span>
+              </div>
             </div>
-          </Card>
+          </div>
         </div>
 
-        {/* Selected Day Events Card - 오른쪽 보더로 변경 */}
-        {selectedDay && (
-          <div className="md:col-span-3 flex flex-col pb-16">
-            <Card 
-              className="w-full mx-auto font-['Line_Seed'] border-r-4 border-orange-500"
-              title={
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <Typography variant="h6" component="span" sx={{ fontWeight: 'normal', color: 'black' }}>
-                    {selectedDay.format('M월 D일')} 일정
-                  </Typography>
-                  <Chip label={`${eventsForSelectedDay.length}개 일정`} size="small" color="primary" variant="outlined" />
-                </Box>
-              }
-            >
-              <div className="p-2 pt-2">
-                {eventsForSelectedDay.length > 0 ? (
-                  <List sx={{paddingTop: 0}}>
-                    {eventsForSelectedDay.map((event) => {
-                      const status = getEventStatus(event);
-                      const borderColor = statusColorMap[status.color] || statusColorMap.default;
-                      const bgColor = statusBgColorMap[status.color] || statusBgColorMap.default;
-                      return (
-                        <ListItemButton 
-                          key={event.id} 
-                          onClick={() => handleEventItemClick(event)}
-                          sx={{
-                            mb: 1.5, p: 2, 
-                            border: '1px solid #eee',
-                            borderRadius: '16px',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-                            alignItems: 'flex-start', 
-                            backgroundColor: bgColor,
-                            transition: 'box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out, background-color 0.2s ease-in-out',
-                            '&:hover': { 
-                              boxShadow: '0 4px 12px rgba(0,0,0,0.08)', 
-                            }
-                          }}
-                        >
-                          <Box sx={{ display: 'flex', width: '100%', gap: 0 }}>
-                            <Box sx={{ 
-                              mr: 2,
-                              pr: 2,
-                              display: 'flex', 
-                              flexDirection: 'column', 
-                              alignItems: 'center', 
-                              flexShrink: 0, 
-                              minWidth: '75px',
-                              borderRight: '1px solid #e0e0e0'
-                            }}>
-                              <Typography variant="subtitle1" component="div" sx={{ fontWeight: 'bold', color: '#374151' }}>
-                                {event.startTime}
-                              </Typography>
-                              {event.endTime && (
-                                <Typography variant="caption" component="div" color="text.secondary" sx={{lineHeight: 1.2}}>
-                                  {`~ ${event.endTime}`}
-                                </Typography>
-                              )}
-                              <Chip label={status.text} color={status.color} size="small" sx={{ mt: 0.75, fontWeight: 500 }} />
-                            </Box>
-                            <Box sx={{ 
-                              display: 'flex', 
-                              flexDirection: 'column', 
-                              flexGrow: 1, 
-                              pl: 2
-                            }}>
-                              <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.3, mb: 0.5, color: '#111827' }}>
-                                {event.title}
-                              </Typography>
-                              {(event.groupName || event.memberName || event.content) && (
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 0.5 }}>
-                                  {event.groupName && (
-                                    <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                                      {event.groupName}
-                                    </Typography>
-                                  )}
-                                  {event.memberName && (
-                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                      <Avatar src={event.memberPhoto} sx={{ width: 20, height: 20, mr: 1, fontSize: '0.7rem', bgcolor: '#e0e0e0' }}>
-                                        {!event.memberPhoto && event.memberName.substring(0,1)}
-                                      </Avatar>
-                                      <Typography variant="body2" color="text.secondary">
-                                        {event.memberName}
-                                      </Typography>
-                                    </Box>
-                                  )}
-                                </Box>
-                              )}
-                            </Box>
-                          </Box>
-                        </ListItemButton>
-                      );
-                    })}
-                  </List>
-                ) : (
-                  <Paper elevation={0} sx={{ textAlign: 'center', py: 4, backgroundColor: 'transparent', borderRadius: '8px' }}>
-                    <Typography variant="subtitle1" color="text.secondary">선택된 날짜에 일정이 없습니다.</Typography>
-                  </Paper>
-                )}
-              </div>
-               <div className="p-4 border-t border-gray-200 text-right">
-                <Button 
-                  variant="primary" 
-                  onClick={() => {
-                    if (selectedDay) {
-                      const dateQueryParam = selectedDay.format('YYYY-MM-DD');
-                      router.push(`/schedule/add?date=${dateQueryParam}`);
-                    }
-                  }}
-                  disabled={!selectedDay}
-                >
-                  새 일정 추가
-                </Button>
-              </div>
-            </Card>
-          </div>
-        )}
+        {/* 메인 컨텐츠 - 애니메이션 적용 */}
+        <motion.div
+          initial="initial"
+          animate="in"
+          exit="out"
+          variants={pageVariants}
+          className="px-4 pt-8 space-y-6"
+        >
+          {/* 캘린더 섹션 */}
+          <motion.div
+            variants={cardVariants}
+            initial="hidden"
+            animate="visible"
+            custom={0}
+          >
+            <MobileCalendar 
+              selectedDay={selectedDay}
+              onDayClick={setSelectedDay}
+              events={events}
+            />
+          </motion.div>
 
-        {/* 상세 정보 모달 (isModalOpen) */}
-        {isModalOpen ? selectedEventDetails && (
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-            <Card className="max-w-lg w-full" title={selectedEventDetails.title || '일정 상세'}>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-500">일시</h4>
-                  <p className="mt-1">
-                    {dayjs(selectedEventDetails.date).format('YYYY년 MM월 DD일')} {selectedEventDetails.startTime}
-                    {selectedEventDetails.endTime ? ` ~ ${selectedEventDetails.endTime}` : ''}
-                  </p>
+          {/* 선택된 날짜의 일정 목록 */}
+          {selectedDay && (
+            <motion.div
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+              custom={1}
+            >
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                {/* 헤더 */}
+                <div className="px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold">
+                        {format(selectedDay.toDate(), 'MM월 dd일 (E)', { locale: ko })}
+                      </h3>
+                      <p className="text-indigo-100 text-sm">
+                        {eventsForSelectedDay.length}개의 일정
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-1 bg-white/20 px-3 py-1 rounded-full">
+                      <HiSparkles className="w-4 h-4" />
+                      <span className="text-sm font-medium">일정</span>
+                    </div>
+                  </div>
                 </div>
-                {selectedEventDetails.groupName && ( 
+
+                {/* 일정 목록 */}
+                <div className="p-4">
+                  {eventsForSelectedDay.length > 0 ? (
+                    <motion.div 
+                      className="space-y-3"
+                      initial="hidden"
+                      animate="visible"
+                      variants={{
+                        hidden: {},
+                        visible: {
+                          transition: {
+                            staggerChildren: 0.1
+                          }
+                        }
+                      }}
+                    >
+                      {eventsForSelectedDay.map((event, index) => {
+                        const status = getEventStatus(event);
+                        return (
+                          <motion.div
+                            key={event.id}
+                            onClick={() => handleEventItemClick(event)}
+                            className="event-card bg-white border border-gray-200 rounded-2xl p-4 mobile-button"
+                            variants={{
+                              hidden: { opacity: 0, y: 20 },
+                              visible: { 
+                                opacity: 1, 
+                                y: 0,
+                                transition: {
+                                  duration: 0.4,
+                                  ease: [0.25, 0.46, 0.45, 0.94]
+                                }
+                              }
+                            }}
+                            whileHover={{ 
+                              y: -4,
+                              transition: { duration: 0.2 }
+                            }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <div className="flex items-start space-x-3">
+                              {/* 시간 표시 */}
+                              <div className="flex-shrink-0 text-center">
+                                <div className="text-sm font-bold text-gray-900">
+                                  {event.startTime}
+                                </div>
+                                {event.endTime && (
+                                  <div className="text-xs text-gray-500">
+                                    ~ {event.endTime}
+                                  </div>
+                                )}
+                                <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${status.color} ${status.bgColor}`}>
+                                  {status.text}
+                                </div>
+                              </div>
+
+                              {/* 일정 내용 */}
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-gray-900 mb-1 truncate">
+                                  {event.title}
+                                </h4>
+                                
+                                {event.content && (
+                                  <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                                    {event.content}
+                                  </p>
+                                )}
+
+                                <div className="flex items-center space-x-3">
+                                  {event.groupName && (
+                                    <div className="flex items-center space-x-1">
+                                      <div className={`w-3 h-3 rounded-full ${event.groupColor || 'bg-gray-400'}`}></div>
+                                      <span className="text-xs text-gray-600">{event.groupName}</span>
+                                    </div>
+                                  )}
+                                  
+                                  {event.memberName && (
+                                    <div className="flex items-center space-x-1">
+                                      {event.memberPhoto ? (
+                                        <Image
+                                          src={event.memberPhoto}
+                                          alt={event.memberName}
+                                          width={16}
+                                          height={16}
+                                          className="rounded-full"
+                                        />
+                                      ) : (
+                                        <div className="w-4 h-4 bg-gray-300 rounded-full flex items-center justify-center">
+                                          <FiUser className="w-2 h-2 text-gray-600" />
+                                        </div>
+                                      )}
+                                      <span className="text-xs text-gray-600">{event.memberName}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 더보기 버튼 */}
+                              <button className="flex-shrink-0 p-1 hover:bg-gray-100 rounded-full mobile-button">
+                                <FiMoreVertical className="w-4 h-4 text-gray-400" />
+                              </button>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </motion.div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FiCalendar className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-1">일정이 없습니다</h3>
+                      <p className="text-gray-500 text-sm">새로운 일정을 추가해보세요</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </motion.div>
+
+        {/* 플로팅 추가 버튼 */}
+        <motion.button
+          onClick={() => setIsAddEventModalOpen(true)}
+          className="floating-button w-14 h-14 rounded-full flex items-center justify-center text-white shadow-lg mobile-button disabled:opacity-50"
+          variants={floatingButtonVariants}
+          initial="initial"
+          animate="animate"
+          whileHover="hover"
+          whileTap="tap"
+        >
+          <FiPlus className="w-6 h-6 stroke-2" />
+        </motion.button>
+
+        {/* 일정 상세 모달 */}
+        <AnimatePresence>
+          {isModalOpen && selectedEventDetails && (
+            <motion.div 
+              className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
+              onClick={closeModal}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div 
+                className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl"
+                onClick={e => e.stopPropagation()}
+                variants={modalVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                {/* 모달 핸들 */}
+                <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-6"></div>
+                
+                {/* 모달 헤더 */}
+                <div className="px-6 pb-4 border-b border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-gray-900">일정 상세</h3>
+                    <button
+                      onClick={closeModal}
+                      className="p-2 hover:bg-gray-100 rounded-full mobile-button"
+                    >
+                      <FiX className="w-5 h-5 text-gray-500" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 모달 내용 */}
+                <div className="px-6 py-6 space-y-6">
                   <div>
-                    <h4 className="text-sm font-medium text-gray-500">그룹</h4>
-                    <Chip 
-                      label={selectedEventDetails.groupName} 
-                      size="small" 
-                      sx={{ 
-                        backgroundColor: selectedEventDetails.groupColor || 'default', 
-                        color: selectedEventDetails.groupColor ? 'black': 'inherit', 
-                        mt: 0.5 
-                      }} 
+                    <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                      {selectedEventDetails.title}
+                    </h4>
+                    {selectedEventDetails.content && (
+                      <p className="text-gray-600">{selectedEventDetails.content}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <FiClock className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {dayjs(selectedEventDetails.date).format('YYYY년 MM월 DD일')}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {selectedEventDetails.startTime} ~ {selectedEventDetails.endTime}
+                        </p>
+                      </div>
+                    </div>
+
+                    {selectedEventDetails.groupName && (
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                          <FiUsers className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">그룹</p>
+                          <div className="flex items-center space-x-2">
+                            <div className={`w-3 h-3 rounded-full ${selectedEventDetails.groupColor || 'bg-gray-400'}`}></div>
+                            <span className="text-sm text-gray-600">{selectedEventDetails.groupName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedEventDetails.memberName && (
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                          <FiUser className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">담당자</p>
+                          <div className="flex items-center space-x-2">
+                            {selectedEventDetails.memberPhoto ? (
+                              <Image
+                                src={selectedEventDetails.memberPhoto}
+                                alt={selectedEventDetails.memberName}
+                                width={20}
+                                height={20}
+                                className="rounded-full"
+                              />
+                            ) : (
+                              <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
+                            )}
+                            <span className="text-sm text-gray-600">{selectedEventDetails.memberName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 모달 액션 버튼 */}
+                <div className="px-6 py-4 bg-gray-50 rounded-t-3xl space-y-3">
+                  <button
+                    onClick={handleOpenEditModal}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-2xl font-medium mobile-button flex items-center justify-center space-x-2"
+                  >
+                    <FiEdit3 className="w-4 h-4" />
+                    <span>수정하기</span>
+                  </button>
+                  
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={handleDeleteEvent}
+                      className="flex-1 py-3 bg-red-500 text-white rounded-2xl font-medium mobile-button flex items-center justify-center space-x-2"
+                    >
+                      <FiTrash2 className="w-4 h-4" />
+                      <span>삭제</span>
+                    </button>
+                    
+                    <button
+                      onClick={closeModal}
+                      className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-2xl font-medium mobile-button"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 일정 추가/수정 모달 */}
+        <AnimatePresence>
+          {isAddEventModalOpen && (
+            <motion.div 
+              className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
+              onClick={closeAddModal}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div 
+                className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
+                onClick={e => e.stopPropagation()}
+                variants={modalVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                {/* 모달 핸들 */}
+                <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-6"></div>
+                
+                {/* 모달 헤더 */}
+                <div className="px-6 pb-4 border-b border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-gray-900">
+                      {newEvent.id ? '일정 수정' : '새 일정 추가'}
+                    </h3>
+                    <button
+                      onClick={closeAddModal}
+                      className="p-2 hover:bg-gray-100 rounded-full mobile-button"
+                    >
+                      <FiX className="w-5 h-5 text-gray-500" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 폼 */}
+                <form 
+                  className="px-6 py-6 space-y-6" 
+                  onSubmit={(e) => { e.preventDefault(); handleSaveEvent(); }}
+                >
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">제목</label>
+                    <input
+                      type="text"
+                      value={newEvent.title}
+                      onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder="일정 제목을 입력하세요"
+                      required
                     />
                   </div>
-                )}
-                {selectedEventDetails.memberName && ( 
-                   <div>
-                    <h4 className="text-sm font-medium text-gray-500">담당자</h4>
-                    <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                      {selectedEventDetails.memberPhoto && (
-                        <Avatar 
-                          alt={selectedEventDetails.memberName} 
-                          src={selectedEventDetails.memberPhoto} 
-                          sx={{ width: 24, height: 24, mr: 1 }} 
-                        />
-                      )}
-                      <p>{selectedEventDetails.memberName}</p>
-                    </Box>
-                  </div>
-                )}
-                {selectedEventDetails.content && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-500">내용</h4>
-                    <p className="mt-1 whitespace-pre-wrap">{selectedEventDetails.content}</p>
-                  </div>
-                )}
-              </div>
-              <div className="mt-6 flex justify-end space-x-3">
-                <Button variant="outline" onClick={() => setIsModalOpen(false)}>닫기</Button>
-                <Button variant="primary" onClick={handleOpenEditModal}>수정</Button>
-                <Button variant="danger" onClick={handleDeleteEvent}>삭제</Button>
-              </div>
-            </Card>
-          </div>
-        ) : null}
 
-        {/* 추가/수정 모달 (isAddEventModalOpen) */}
-        {isAddEventModalOpen ? (
-           <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <div className="flex justify-between items-start">
-                <h3 className="text-lg font-medium text-gray-900 font-suite">{newEvent.id ? '일정 수정' : '새 일정 추가'}</h3>
-                <button onClick={() => { setIsAddEventModalOpen(false); setNewEvent(initialNewEventState); setSelectedEventDetails(null); }} className="text-gray-400 hover:text-gray-500">
-                  <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </div>
-              <form className="mt-4 space-y-4" onSubmit={(e) => { e.preventDefault(); handleSaveEvent(); }}>
-                <div>
-                  <label htmlFor="event-title" className="block text-sm font-medium text-gray-700">제목</label>
-                  <input type="text" id="event-title" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} required />
-                </div>
-                <div>
-                  <label htmlFor="event-date" className="block text-sm font-medium text-gray-700">날짜</label>
-                  <input type="date" id="event-date" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.date} onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })} required />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="event-startTime" className="block text-sm font-medium text-gray-700">시작 시간</label>
-                    <input type="time" id="event-startTime" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.startTime} onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })} required />
+                    <label className="block text-sm font-medium text-gray-700 mb-2">날짜</label>
+                    <input
+                      type="date"
+                      value={newEvent.date}
+                      onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      required
+                    />
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">시작 시간</label>
+                      <input
+                        type="time"
+                        value={newEvent.startTime}
+                        onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">종료 시간</label>
+                      <input
+                        type="time"
+                        value={newEvent.endTime}
+                        onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label htmlFor="event-endTime" className="block text-sm font-medium text-gray-700">종료 시간</label>
-                    <input type="time" id="event-endTime" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.endTime} onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })} required />
+                    <label className="block text-sm font-medium text-gray-700 mb-2">내용 (선택)</label>
+                    <textarea
+                      value={newEvent.content || ''}
+                      onChange={(e) => setNewEvent({ ...newEvent, content: e.target.value })}
+                      rows={3}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder="일정에 대한 상세 내용을 입력하세요"
+                    />
                   </div>
-                </div>
-                <div>
-                  <label htmlFor="event-content" className="block text-sm font-medium text-gray-700">내용 (선택)</label>
-                  <textarea id="event-content" rows={3} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.content || ''} onChange={(e) => setNewEvent({ ...newEvent, content: e.target.value })}></textarea>
-                </div>
-                {/* Group/Member fields - 필요시 아래 주석 해제하여 사용 */}
-                <div>
-                  <label htmlFor="event-groupName" className="block text-sm font-medium text-gray-700">그룹명 (선택)</label>
-                  <input type="text" id="event-groupName" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.groupName || ''} onChange={(e) => setNewEvent({ ...newEvent, groupName: e.target.value })} />
-                </div>
-                <div>
-                  <label htmlFor="event-groupColor" className="block text-sm font-medium text-gray-700">그룹 색상 (선택, Tailwind 클래스 예: bg-blue-200)</label>
-                  <input type="text" id="event-groupColor" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.groupColor || ''} onChange={(e) => setNewEvent({ ...newEvent, groupColor: e.target.value })} />
-                </div>
-                <div>
-                  <label htmlFor="event-memberName" className="block text-sm font-medium text-gray-700">담당자명 (선택)</label>
-                  <input type="text" id="event-memberName" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.memberName || ''} onChange={(e) => setNewEvent({ ...newEvent, memberName: e.target.value })} />
-                </div>
-                 <div>
-                  <label htmlFor="event-memberPhoto" className="block text-sm font-medium text-gray-700">담당자 사진 URL (선택)</label>
-                  <input type="text" id="event-memberPhoto" className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" value={newEvent.memberPhoto || ''} onChange={(e) => setNewEvent({ ...newEvent, memberPhoto: e.target.value })} />
-                </div>
-                <div className="mt-6 flex justify-end space-x-3">
-                  <button type="button" onClick={() => { setIsAddEventModalOpen(false); setNewEvent(initialNewEventState); setSelectedEventDetails(null);}} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">취소</button>
-                  <button type="submit" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" disabled={!newEvent.title || !newEvent.date || !newEvent.startTime || !newEvent.endTime}>저장</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        ) : null}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">그룹명 (선택)</label>
+                    <input
+                      type="text"
+                      value={newEvent.groupName || ''}
+                      onChange={(e) => setNewEvent({ ...newEvent, groupName: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder="그룹명을 입력하세요"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">담당자명 (선택)</label>
+                    <input
+                      type="text"
+                      value={newEvent.memberName || ''}
+                      onChange={(e) => setNewEvent({ ...newEvent, memberName: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      placeholder="담당자명을 입력하세요"
+                    />
+                  </div>
+
+                  {/* 액션 버튼 */}
+                  <div className="pt-4 space-y-3">
+                    <button
+                      type="submit"
+                      disabled={!newEvent.title || !newEvent.date || !newEvent.startTime || !newEvent.endTime}
+                      className="w-full py-3 bg-indigo-600 text-white rounded-2xl font-medium mobile-button disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {newEvent.id ? '수정하기' : '저장하기'}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={closeAddModal}
+                      className="w-full py-3 bg-gray-200 text-gray-700 rounded-2xl font-medium mobile-button"
+                    >
+                      취소
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-    </PageContainer>
+    </>
   );
 } 
