@@ -2,12 +2,11 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect, Suspense, useMemo, useRef } from 'react';
+import React, { useState, useEffect, Suspense, useMemo, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { PushLog, DeleteAllResponse } from '@/types/push';
-import LoadingSpinner from '../components/common/LoadingSpinner';
 import { useToast } from '@/components/ui/use-toast';
 import notificationService from '@/services/notificationService';
 
@@ -24,8 +23,38 @@ const mobileAnimations = `
   }
 }
 
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutToRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
 .animate-slideInFromBottom {
   animation: slideInFromBottom 0.3s ease-out forwards;
+}
+
+.animate-slideInFromRight {
+  animation: slideInFromRight 0.3s ease-out forwards;
+}
+
+.animate-slideOutToRight {
+  animation: slideOutToRight 0.3s ease-in forwards;
 }
 `;
 
@@ -46,7 +75,199 @@ function NoticeContent() {
   const [loading, setLoading] = useState(true);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [currentStickyDate, setCurrentStickyDate] = useState<string>('');
+  const [showStickyDate, setShowStickyDate] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+  const [isEntering, setIsEntering] = useState(true);
   const dataFetchedRef = React.useRef(false);
+  const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
+  const lastScrollY = useRef(0);
+  const updateTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // 디바운싱된 날짜 업데이트 함수
+  const updateStickyDate = useCallback((newDate: string) => {
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
+    
+    updateTimeoutRef.current = setTimeout(() => {
+      if (newDate !== currentStickyDate) {
+        setCurrentStickyDate(newDate);
+        setShowStickyDate(true);
+      }
+    }, 150); // 150ms 디바운싱
+  }, [currentStickyDate]);
+
+  // 스크롤 이벤트로 현재 보이는 섹션 감지
+  const handleScroll = useCallback(() => {
+    if (sectionRefs.current.size === 0) return;
+
+    const headerHeight = 60; // 메인 헤더 높이
+    const stickyPosition = 80; // sticky header 위치 (top-20)
+    const triggerPoint = stickyPosition; // 80px
+
+    const sections = Array.from(sectionRefs.current.entries()).map(([date, element]) => {
+      const rect = element.getBoundingClientRect();
+      // 각 섹션의 날짜 헤더 위치 (섹션 내부의 첫 번째 div)
+      const dateHeaderElement = element.querySelector('div:first-child');
+      const dateHeaderRect = dateHeaderElement ? dateHeaderElement.getBoundingClientRect() : rect;
+      
+      return {
+        date,
+        element,
+        sectionTop: rect.top,
+        sectionBottom: rect.bottom,
+        dateHeaderTop: dateHeaderRect.top,
+        dateHeaderBottom: dateHeaderRect.bottom,
+        // 날짜 헤더가 trigger point를 통과했는지 확인
+        hasPassedTrigger: dateHeaderRect.top <= triggerPoint,
+        // 섹션이 아직 화면에 있는지 확인
+        isStillVisible: rect.bottom > triggerPoint,
+        // trigger point가 현재 섹션 영역 내부에 있는지 확인
+        isCurrentlyActive: rect.top <= triggerPoint && rect.bottom > triggerPoint
+      };
+    }).sort((a, b) => a.sectionTop - b.sectionTop);
+
+    // 1. 먼저 trigger point가 현재 어떤 섹션 내부에 있는지 확인
+    const activeSection = sections.find(section => section.isCurrentlyActive);
+    
+    if (activeSection) {
+      // trigger point가 특정 섹션 내부에 있으면 그 섹션의 날짜 사용
+      if (activeSection.date !== currentStickyDate) {
+        console.log('[SCROLL] 활성 섹션:', activeSection.date, 'at scrollY:', window.scrollY);
+        setCurrentStickyDate(activeSection.date);
+        setShowStickyDate(true);
+      }
+    } else {
+      // 2. trigger point가 섹션 사이의 빈 공간에 있는 경우
+      // 가장 마지막에 통과한 섹션을 유지 (변경하지 않음)
+      const passedSections = sections.filter(section => 
+        section.hasPassedTrigger && section.isStillVisible
+      );
+
+      if (passedSections.length > 0) {
+        const lastPassedSection = passedSections[passedSections.length - 1];
+        
+        // 현재 날짜가 설정되지 않았거나, 명확히 다른 섹션으로 이동한 경우에만 변경
+        if (!currentStickyDate) {
+          console.log('[SCROLL] 마지막 통과 섹션 유지:', lastPassedSection.date);
+          setCurrentStickyDate(lastPassedSection.date);
+          setShowStickyDate(true);
+        }
+      } else {
+        // 3. 아무 섹션도 통과하지 않았다면 첫 번째 섹션
+        const firstSection = sections[0];
+        if (firstSection && !currentStickyDate) {
+          console.log('[SCROLL] 첫 번째 섹션 기본 선택:', firstSection.date);
+          setCurrentStickyDate(firstSection.date);
+          setShowStickyDate(true);
+        }
+      }
+    }
+  }, [currentStickyDate]);
+
+  // 초기 날짜 설정을 위한 별도 useEffect
+  useEffect(() => {
+    if (notices.length > 0 && !currentStickyDate) {
+      // 가장 최근 날짜 찾기
+      const sortedNotices = [...notices].sort((a, b) => new Date(b.plt_sdate).getTime() - new Date(a.plt_sdate).getTime());
+      if (sortedNotices.length > 0) {
+        const latestDate = sortedNotices[0].plt_sdate.slice(0, 10);
+        console.log('[STICKY DATE] 초기 설정 - 가장 최근 날짜:', latestDate);
+        console.log('[STICKY DATE] 모든 알림 날짜들:', sortedNotices.map(n => n.plt_sdate.slice(0, 10)));
+        setCurrentStickyDate(latestDate);
+        setShowStickyDate(true);
+      }
+    }
+  }, [notices]);
+
+  // 날짜별 그룹핑 및 정렬
+  const sorted = useMemo(() => {
+    console.log('[NOTICE PAGE] Sorting notices, length:', notices.length);
+    return [...notices].sort((a, b) => new Date(b.plt_sdate).getTime() - new Date(a.plt_sdate).getTime());
+  }, [notices]);
+
+  const grouped = useMemo(() => {
+    console.log('[NOTICE PAGE] Grouping notices, length:', sorted.length);
+    return groupByDate(sorted);
+  }, [sorted]);
+
+  // grouped 데이터가 준비된 후 날짜 확인 및 설정
+  useEffect(() => {
+    if (Object.keys(grouped).length > 0) {
+      const sortedDates = Object.keys(grouped).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+      
+      // 현재 sticky date가 설정되지 않았거나 잘못되어 있다면 수정
+      if (sortedDates.length > 0 && (!currentStickyDate || currentStickyDate !== sortedDates[0])) {
+        console.log('[STICKY DATE] 최종 날짜 설정:', sortedDates[0]);
+        setCurrentStickyDate(sortedDates[0]);
+        setShowStickyDate(true);
+      }
+    }
+  }, [grouped]); // currentStickyDate 의존성 제거하여 무한 루프 방지
+
+  // 스크롤 이벤트 리스너 등록 (초기 날짜 설정 후에만)
+  useEffect(() => {
+    if (notices.length === 0 || !currentStickyDate) return; // currentStickyDate가 설정된 후에만 실행
+
+    let scrollTimeout: NodeJS.Timeout;
+    let lastScrollTime = 0;
+
+    const smartHandleScroll = () => {
+      const now = Date.now();
+      
+      // 빠른 스크롤 감지 (100ms 이내 연속 스크롤)
+      if (now - lastScrollTime < 100) {
+        // 즉시 실행 (빠른 반응)
+        handleScroll();
+      } else {
+        // 일반 스크롤은 디바운싱
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(handleScroll, 20);
+      }
+      
+      lastScrollTime = now;
+    };
+
+    window.addEventListener('scroll', smartHandleScroll, { passive: true });
+    
+    // 초기 실행을 빠르게 하여 즉시 반응
+    const initialTimer = setTimeout(handleScroll, 200);
+
+    return () => {
+      window.removeEventListener('scroll', smartHandleScroll);
+      clearTimeout(scrollTimeout);
+      clearTimeout(initialTimer);
+    };
+  }, [handleScroll, notices, currentStickyDate]);
+
+  // 섹션 ref 설정 함수
+  const setSectionRef = useCallback((date: string) => (el: HTMLElement | null) => {
+    if (el) {
+      sectionRefs.current.set(date, el);
+    } else {
+      sectionRefs.current.delete(date);
+    }
+  }, []);
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // 페이지 진입 애니메이션
+  useEffect(() => {
+    // 컴포넌트 마운트 후 진입 애니메이션 시작
+    const timer = setTimeout(() => {
+      setIsEntering(false);
+    }, 300); // 애니메이션 시간과 일치
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // 알림 목록 조회 - 리렌더링 방지를 위해 ref 사용
   useEffect(() => {
@@ -91,17 +312,6 @@ function NoticeContent() {
     };
   }, []);
 
-  // 날짜별 그룹핑 및 정렬
-  const sorted = useMemo(() => {
-    console.log('[NOTICE PAGE] Sorting notices, length:', notices.length);
-    return [...notices].sort((a, b) => new Date(b.plt_sdate).getTime() - new Date(a.plt_sdate).getTime());
-  }, [notices]);
-
-  const grouped = useMemo(() => {
-    console.log('[NOTICE PAGE] Grouping notices, length:', sorted.length);
-    return groupByDate(sorted);
-  }, [sorted]);
-
   console.log('[NOTICE PAGE] Render - loading:', loading, 'notices length:', notices.length, 'grouped keys:', Object.keys(grouped));
 
   // 전체 삭제 핸들러
@@ -133,39 +343,70 @@ function NoticeContent() {
     }
   };
 
+  // 뒤로가기 애니메이션 핸들러
+  const handleBackNavigation = () => {
+    setIsExiting(true);
+    // 애니메이션 완료 후 페이지 이동
+    setTimeout(() => {
+      router.back();
+    }, 300); // 애니메이션 시간과 일치
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-indigo-50">
-        <div className="text-center px-6">
-          <LoadingSpinner 
-            message="알림을 불러오는 중입니다..." 
-            fullScreen={true}
-            type="ripple"
-            size="md"
-            color="blue"
-          />
+      <div className={`min-h-screen bg-indigo-50 ${
+        isExiting ? 'animate-slideOutToRight' : 
+        isEntering ? 'animate-slideInFromRight' : ''
+      }`}>
+        <style jsx global>{mobileAnimations}</style>
+        {/* 앱 헤더 - 그룹 페이지 스타일 (고정) */}
+        <div className="sticky top-0 z-10 px-4 bg-white border-b border-gray-200">
+          <div className="flex items-center justify-between h-12">
+            <div className="flex items-center">
+              <button 
+                onClick={handleBackNavigation}
+                className="px-2 py-2 hover:bg-gray-100 transition-all duration-200 mr-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="ml-1 text-lg font-normal text-gray-900">알림</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* 간단한 로딩 상태 */}
+        <div className="flex items-center justify-center min-h-[calc(100vh-3rem)]">
+          <div className="flex items-center space-x-2 text-gray-500">
+            <div className="w-4 h-4 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>
+            <span className="text-sm">알림을 불러오는 중...</span>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-indigo-50">
+    <div className={`min-h-screen bg-indigo-50 ${
+      isExiting ? 'animate-slideOutToRight' : 
+      isEntering ? 'animate-slideInFromRight' : ''
+    }`}>
       <style jsx global>{mobileAnimations}</style>
       {/* 앱 헤더 - 그룹 페이지 스타일 (고정) */}
-      <div className="sticky top-0 z-10 px-4 bg-indigo-50 border-b border-indigo-100">
+      <div className="sticky top-0 z-10 px-4 bg-white border-b border-gray-200">
         <div className="flex items-center justify-between h-12">
           <div className="flex items-center">
             <button 
-              onClick={() => router.back()}
-              className="px-2 py-2 hover:bg-indigo-200 transition-all duration-200 mr-2"
+              onClick={handleBackNavigation}
+              className="px-2 py-2 hover:bg-gray-100 transition-all duration-200 mr-2"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <span className="ml-1 text-lg font-normal text-gray-900">알림</span>
-            <span className="ml-2 text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">최근 7일</span>
+            {/* <span className="ml-2 text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">최근 7일</span> */}
           </div>
           <button
             onClick={handleDeleteAll}
@@ -182,63 +423,81 @@ function NoticeContent() {
       </div>
 
       {/* 메인 컨텐츠 영역 */}
-      <main className="pb-8">
-        <div className="px-4 pt-4 pb-16">
-          {notices.length > 0 && (
-            <div className="px-2">
-              <p className="text-indigo-600 text-sm">푸시 알림 내역을 확인하세요.</p>
-            </div>
-          )}
+      <main className="pb-8 bg-gradient-to-b from-indigo-50/30 to-white">
+        <div className="px-4 pt-6 pb-16">
           {notices.length === 0 ? (
-            <div className="bg-white rounded-xl shadow px-4 py-16">
-              <div className="text-center text-gray-400">
-                <div className="mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-12 h-12 mx-auto text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-5 5-5-5h5v-6h5v6zM9 7H4l5-5 5 5H9v6H4V7z" />
-                  </svg>
+            <div className="fixed inset-0 bg-indigo-50 flex items-center justify-center z-[5]">
+              <div className="text-center px-6 py-12">
+                <div className="mb-8">
+                  <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-5 5-5-5h5v-6h5v6zM9 7H4l5-5 5 5H9v6H4V7z" />
+                    </svg>
+                  </div>
+                  <div className="flex items-center justify-center space-x-1 mb-2">
+                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-pulse"></div>
+                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                  </div>
                 </div>
-                <p className="text-lg font-medium text-gray-500">알림이 없습니다</p>
-                <p className="text-sm text-gray-400 mt-2">새로운 알림이 도착하면 여기에 표시됩니다</p>
+                <h3 className="text-xl font-semibold text-gray-700 mb-3">알림이 없습니다</h3>
+                <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto">
+                  새로운 알림이 도착하면<br />
+                  여기에 표시됩니다
+                </p>
               </div>
             </div>
            ) : (
-            <div className="space-y-8">
+            <div className="space-y-6">
               {Object.entries(grouped).map(([date, items]) => (
-                 <section key={date} className="mb-4">
-                   <div className="text-base font-bold text-gray-600 mb-2 px-2">
-                     {format(new Date(date), 'yyyy.MM.dd (E)', { locale: ko })}
-                     {date === format(new Date(), 'yyyy-MM-dd') && (
-                       <span className="text-primary ml-2">오늘의 알림</span>
-                     )}
-                   </div>
-                   <div className="bg-white rounded-xl shadow px-4 py-4">
-                     <div className="">
-                       {items.map((item, index) => (
-                         <div 
-                           key={item.plt_idx} 
-                           className={`flex items-start border-b last:border-b-0 border-gray-100 py-3 px-3 transition-colors ${
-                             index % 2 === 0 ? 'bg-gray-50' : 'bg-white'
-                           }`}
-                         >
-                           <div className="text-2xl ml-2 mr-3 mt-1 select-none">
-                             {item.plt_title.match(/\p{Extended_Pictographic}/u)?.[0] || '📢'}
-                           </div>
-                           <div className="flex-1 min-w-0">
-                             <div className="flex items-center gap-2">
-                               <span className="font-bold text-gray-900 text-sm leading-tight">
-                                 {item.plt_title.replace(/\p{Extended_Pictographic}/u, '').trim()}
-                               </span>
-                             </div>
-                             <div className="text-gray-700 text-sm whitespace-pre-line mt-0.5 leading-snug">
-                               {item.plt_content}
-                             </div>
-                             <div className="text-xs text-gray-400 mt-1">
-                               {format(new Date(item.plt_sdate), 'a h:mm', { locale: ko })}
-                             </div>
-                           </div>
-                         </div>
-                       ))}
+                 <section 
+                   key={date}  
+                   data-date={date}
+                   ref={setSectionRef(date)}
+                   className="relative"
+                 >
+                   {/* 날짜 헤더 - 모바일 최적화 */}
+                   <div className="sticky top-16 z-[8] mb-3">
+                     <div className="bg-gray-900 backdrop-blur-md rounded-lg px-4 py-2 mx-2 shadow-sm border border-gray-800 text-white">
+                       <div className="flex items-center justify-center space-x-2">
+                         <div className="w-1.5 h-1.5 bg-pink-400 rounded-full"></div>
+                         <span className="text-sm font-semibold text-white">
+                           {format(new Date(date), 'MM월 dd일 (E)', { locale: ko })}
+                         </span>
+                         <div className="w-1.5 h-1.5 bg-pink-400 rounded-full"></div>
+                       </div>
                      </div>
+                   </div>
+
+                   {/* 알림 카드들 */}
+                   <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 mx-2 overflow-hidden">
+                     {items.map((item, index) => (
+                       <div 
+                         key={item.plt_idx} 
+                         className={`flex items-start p-4 transition-colors ${
+                           index !== items.length - 1 ? 'border-b border-gray-200' : ''
+                         } hover:bg-gray-50/50 active:bg-gray-100/50`}
+                       >
+                         <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center mr-3 mt-0.5">
+                           <span className="text-lg">
+                             {item.plt_title.match(/\p{Extended_Pictographic}/u)?.[0] || '📢'}
+                           </span>
+                         </div>
+                         <div className="flex-1 min-w-0">
+                           <div className="flex items-start justify-between mb-1">
+                             <h3 className="font-semibold text-gray-900 text-sm leading-tight pr-2">
+                               {item.plt_title.replace(/\p{Extended_Pictographic}/u, '').trim()}
+                             </h3>
+                             <time className="text-xs text-indigo-400 font-medium flex-shrink-0">
+                               {format(new Date(item.plt_sdate), 'a h:mm', { locale: ko })}
+                             </time>
+                           </div>
+                           <p className="text-gray-500 text-sm leading-relaxed whitespace-pre-line">
+                             {item.plt_content}
+                           </p>
+                         </div>
+                       </div>
+                     ))}
                    </div>
                  </section>
                ))}

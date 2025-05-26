@@ -164,6 +164,21 @@ const mobileAnimations = `
 .mobile-button:active {
   transform: scale(0.98);
 }
+
+@keyframes slideOutToRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.animate-slideOutToRight {
+  animation: slideOutToRight 0.3s ease-in forwards;
+}
 `;
 
 // Group 인터페이스에 sgt_code 추가
@@ -287,12 +302,35 @@ function GroupPageContent() {
   const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
   const [isUpdatingMember, setIsUpdatingMember] = useState(false);
   
+  // 페이지 애니메이션 상태 추가
+  const [isEntering, setIsEntering] = useState(true);
+  const [isExiting, setIsExiting] = useState(false);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
+  
   const router = useRouter();
 
   // 컴포넌트 마운트 완료 추적
   useEffect(() => {
     setIsMounted(true);
     console.log('[Group Page] 컴포넌트 마운트 완료');
+  }, []);
+
+  // 페이지 진입 애니메이션
+  useEffect(() => {
+    // 뒤로가기가 아닌 경우에만 애니메이션 활성화
+    const skipAnimation = sessionStorage.getItem('skipEnterAnimation') === 'true';
+    
+    if (skipAnimation) {
+      sessionStorage.removeItem('skipEnterAnimation');
+      setIsEntering(false);
+      setShouldAnimate(false);
+    } else {
+      setShouldAnimate(true);
+      const timer = setTimeout(() => {
+        setIsEntering(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
   }, []);
 
   // 렌더링 상태 추적
@@ -1079,12 +1117,23 @@ function GroupPageContent() {
 
   // 멤버 관리 모달 닫기
   const handleCloseMemberManageModal = () => {
-    setIsClosing(true);
+    setIsMemberManageModalOpen(false);
+    setSelectedMember(null);
+  };
+
+  // 뒤로가기 애니메이션 핸들러
+  const handleBackNavigation = () => {
+    setIsExiting(true);
+    // 뒤로가기임을 표시
+    sessionStorage.setItem('skipEnterAnimation', 'true');
     setTimeout(() => {
-      setIsMemberManageModalOpen(false);
-      setSelectedMember(null);
-      setIsClosing(false);
+      router.back();
     }, 300);
+  };
+
+  // 그룹 상세에서 목록으로 돌아가기
+  const handleBackToList = () => {
+    setCurrentView('list');
   };
 
   // 로딩 중일 때
@@ -1107,10 +1156,13 @@ function GroupPageContent() {
   return (
     <>
       <style jsx global>{mobileAnimations}</style>
-      <div key={componentKey} className="min-h-screen bg-indigo-50">
+      <div key={componentKey} className={`min-h-screen bg-indigo-50 ${
+        isExiting ? 'animate-slideOutToRight' : 
+        (shouldAnimate && isEntering) ? 'animate-slideInFromRight' : ''
+      }`}>
         
         {/* 앱 헤더 - 홈 페이지 스타일 (고정) */}
-        <div className="sticky top-0 z-10 px-4 bg-indigo-50 border-b border-indigo-100">
+        <div className="sticky top-0 z-10 px-4 bg-white border-b border-gray-200">
           <div className="flex items-center justify-between h-12">
             {currentView === 'list' ? (
               <div className="flex items-center">
@@ -1137,8 +1189,8 @@ function GroupPageContent() {
             {currentView === 'detail' && selectedGroup && (
               <div className="flex items-center space-x-2 ml-auto">
                 <button 
-                  onClick={() => setCurrentView('list')}
-                  className="px-2 py-2 hover:bg-indigo-200 transition-all duration-200 absolute left-4"
+                  onClick={handleBackToList}
+                  className="px-2 py-2 hover:bg-gray-100 transition-all duration-200 absolute left-4"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -1215,7 +1267,7 @@ function GroupPageContent() {
                     <div className="px-4 py-3 border-b border-gray-100">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-medium text-gray-900 flex items-center">
-                          <FaLayerGroup className="w-5 h-5 mr-2 text-yellow-600" />
+                          {/* <FaLayerGroup className="w-5 h-5 mr-2 text-yellow-600" /> */}
                           내 그룹 목록
                           {/* <span className="ml-2 px-2 py-1 bg-indigo-100 text-indigo-800 text-xs rounded-full">
                             {filteredGroups.length}개
@@ -1396,7 +1448,7 @@ function GroupPageContent() {
                   <div className="p-4 border-b border-indigo-100">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-normal text-gray-900 flex items-center">
-                        <FaUsers className="w-5 h-5 mr-2 text-indigo-700" />
+                        {/* <FaUsers className="w-5 h-5 mr-2 text-indigo-700" /> */}
                         그룹 멤버
                         {/* <span className="ml-2 px-2 py-1 bg-indigo-200 text-gray-800 text-xs rounded-full">
                           {groupMembers.length}명

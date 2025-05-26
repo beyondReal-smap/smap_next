@@ -6,6 +6,16 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
+    "/setting/account/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/setting/account/page.js"
+    ],
+    "/setting/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/setting/page.js"
+    ],
     "/home/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -15,26 +25,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/home/page.js"
-    ],
-    "/schedule/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/schedule/layout.js"
-    ],
-    "/schedule/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/schedule/page.js"
-    ],
-    "/group/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/group/layout.js"
-    ],
-    "/group/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/group/page.js"
     ],
     "/api/v1/groups/member/[id]/route": [
       "static/chunks/webpack.js",
@@ -61,20 +51,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/push-logs/[...slug]/route.js"
     ],
-    "/api/locations/other-members/[memberId]/route": [
+    "/setting/account/password/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/locations/other-members/[memberId]/route.js"
+      "static/chunks/app/setting/account/password/page.js"
     ],
-    "/setting/page": [
+    "/setting/account/withdraw/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/setting/page.js"
+      "static/chunks/app/setting/account/withdraw/page.js"
     ],
-    "/_not-found/page": [
+    "/setting/manual/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/setting/manual/page.js"
     ]
   }
 }

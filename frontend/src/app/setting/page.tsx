@@ -2,13 +2,61 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import Header from '@/components/Header';
 import Image from 'next/image';
 // AppLayout은 App Router에서 불필요합니다. (authenticated) 라우트 그룹이 이미 레이아웃을 사용함
 // import { AppLayout } from '../components/layout';
+
+// 모바일 최적화된 CSS 애니메이션
+const pageAnimations = `
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutToRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+.animate-slideInFromRight {
+  animation: slideInFromRight 0.3s ease-out forwards;
+}
+
+.animate-slideOutToRight {
+  animation: slideOutToRight 0.3s ease-in forwards;
+}
+
+.initial-hidden {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+.mobile-button {
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.mobile-button:active {
+  transform: scale(0.98);
+}
+`;
 
 // 설정 스키마 정의
 const settingsSchema = z.object({
@@ -38,13 +86,35 @@ const GENDER_OPTIONS = [
 ];
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isPageLoaded, setIsPageLoaded] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+  const [shouldAnimate, setShouldAnimate] = useState(false);
   
   const { control, handleSubmit, reset, formState: { errors, isDirty } } = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
     defaultValues: MOCK_USER_SETTINGS
   });
+
+  // 페이지 로드 애니메이션 트리거
+  useEffect(() => {
+    // 뒤로가기가 아닌 경우에만 애니메이션 활성화
+    const skipAnimation = sessionStorage.getItem('skipEnterAnimation') === 'true';
+    
+    if (skipAnimation) {
+      sessionStorage.removeItem('skipEnterAnimation');
+      setIsPageLoaded(true);
+      setShouldAnimate(false);
+    } else {
+      setShouldAnimate(true);
+      const timer = setTimeout(() => {
+        setIsPageLoaded(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   // 사용자 설정 가져오기
   useEffect(() => {
@@ -135,81 +205,118 @@ export default function SettingsPage() {
     }
   };
 
+  // 뒤로가기 핸들러 (애니메이션 포함)
+  const handleBack = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      router.back();
+    }, 300); // 애니메이션 시간과 동일
+  };
+
   return (
-    <div className="bg-[#fff] min-h-screen pb-10">
-      <Header title="설정" />
-      {/* 프로필 영역 */}
-      <div className="flex flex-col items-center pt-20 pb-4">
-        <div className="relative">
-          <button type="button" onClick={() => setShowSheet(true)}>
-            <Image
-              src={profileImg}
-              alt="프로필 이미지"
-              width={80}
-              height={80}
-              className="rounded-full border border-gray-200 bg-gray-100"
-            />
-            <div className="absolute bottom-0 right-0 bg-white rounded-full p-1 border border-gray-200">
-              <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path d="M4 13V16H7L16.29 6.71C16.68 6.32 16.68 5.69 16.29 5.3L14.7 3.71C14.31 3.32 13.68 3.32 13.29 3.71L4 13ZM17.71 4.29C18.1 4.68 18.1 5.31 17.71 5.7L16.3 7.11L12.89 3.7L14.3 2.29C14.69 1.9 15.32 1.9 15.71 2.29L17.71 4.29Z"></path></svg>
-            </div>
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-        </div>
-        <div className="mt-3 text-lg font-bold text-gray-900">{profile.name}</div>
-        <div className="text-xs text-gray-500 mt-1">{profile.plan}</div>
-        <div className="text-sm text-indigo-600 font-medium mt-1">{profile.phone}</div>
-      </div>
-
-      {/* 액션시트 모달 */}
-      {showSheet && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30" onClick={() => setShowSheet(false)}>
-          <div className="w-full max-w-xs bg-white rounded-2xl p-6 pb-4 shadow-lg flex flex-col items-center" onClick={e => e.stopPropagation()}>
-            <div className="text-lg font-semibold text-center mb-6">프로필 사진 변경</div>
-            <button
-              className="w-full py-4 mb-2 rounded-2xl bg-pink-600 text-white text-base font-normal shadow-sm border border-pink-600 hover:bg-indigo-700 active:bg-indigo-800 transition"
-              onClick={() => handleSelect('camera')}
-            >
-              카메라로 촬영
-            </button>
-            <button
-              className="w-full py-4 mb-2 rounded-2xl bg-indigo-600 text-white text-base font-normal shadow-sm border border-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 transition"
-              onClick={() => handleSelect('album')}
-            >
-              앨범에서 선택
-            </button>
-            <button
-              className="w-full py-4 mt-2 rounded-2xl bg-gray-100 text-gray-700 text-base font-normal shadow-sm active:bg-gray-200 transition"
-              onClick={() => setShowSheet(false)}
-            >
-              취소
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 메뉴 리스트 */}
-      <div className="space-y-4 px-3 pb-16">
-        {menuSections.map((section, idx) => (
-          <div key={idx} className="bg-[#f5f6f7] rounded-2xl shadow-sm p-1">
-            {section.items.map((item, i) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`flex items-center justify-between px-4 py-4 ${i !== section.items.length - 1 ? 'border-b border-gray-100' : ''}`}
+    <>
+      <style jsx global>{pageAnimations}</style>
+      <div className={`bg-indigo-50 min-h-screen pb-10 ${
+        isExiting ? 'animate-slideOutToRight' : 
+        (shouldAnimate && isPageLoaded) ? 'animate-slideInFromRight' : 
+        shouldAnimate ? 'initial-hidden' : ''
+      }`}>
+        {/* 앱 헤더 - group 페이지와 동일한 스타일 (고정) */}
+        <div className="sticky top-0 z-10 px-4 bg-white border-b border-gray-200">
+          <div className="flex items-center justify-between h-12">
+            <div className="flex items-center space-x-2">
+              <button 
+                onClick={handleBack}
+                disabled={isExiting}
+                className="px-2 py-2 hover:bg-gray-100 transition-all duration-200 mobile-button disabled:opacity-50"
               >
-                <span className="text-[16px] text-black font-medium">{item.label}</span>
-                <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-              </Link>
-            ))}
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <span className="text-lg font-normal text-gray-900">설정</span>
+            </div>
           </div>
-        ))}
+        </div>
+
+        {/* 프로필 영역 */}
+        <div className="flex flex-col items-center pt-6 pb-4">
+          <div className="relative">
+            <button type="button" onClick={() => setShowSheet(true)} className="mobile-button" disabled={isExiting}>
+              <Image
+                src={profileImg}
+                alt="프로필 이미지"
+                width={80}
+                height={80}
+                className="rounded-full border border-gray-200 bg-gray-100"
+              />
+              <div className="absolute bottom-0 right-0 bg-white rounded-full p-1 border border-gray-200">
+                <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path d="M4 13V16H7L16.29 6.71C16.68 6.32 16.68 5.69 16.29 5.3L14.7 3.71C14.31 3.32 13.68 3.32 13.29 3.71L4 13ZM17.71 4.29C18.1 4.68 18.1 5.31 17.71 5.7L16.3 7.11L12.89 3.7L14.3 2.29C14.69 1.9 15.32 1.9 15.71 2.29L17.71 4.29Z"></path></svg>
+              </div>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </div>
+          <div className="mt-3 text-lg font-bold text-gray-900">{profile.name}</div>
+          <div className="text-xs text-gray-500 mt-1">{profile.plan}</div>
+          <div className="text-sm text-indigo-600 font-medium mt-1">{profile.phone}</div>
+        </div>
+
+        {/* 액션시트 모달 */}
+        {showSheet && !isExiting && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30" onClick={() => setShowSheet(false)}>
+            <div className="w-full max-w-xs bg-white rounded-2xl p-6 pb-4 shadow-lg flex flex-col items-center animate-slideInFromRight" onClick={e => e.stopPropagation()}>
+              <div className="text-lg font-semibold text-center mb-6">프로필 사진 변경</div>
+              <button
+                className="w-full py-4 mb-2 rounded-2xl bg-pink-600 text-white text-base font-normal shadow-sm border border-pink-600 hover:bg-pink-700 active:bg-pink-800 transition mobile-button"
+                onClick={() => handleSelect('camera')}
+              >
+                카메라로 촬영
+              </button>
+              <button
+                className="w-full py-4 mb-2 rounded-2xl bg-indigo-600 text-white text-base font-normal shadow-sm border border-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 transition mobile-button"
+                onClick={() => handleSelect('album')}
+              >
+                앨범에서 선택
+              </button>
+              <button
+                className="w-full py-4 mt-2 rounded-2xl bg-gray-100 text-gray-700 text-base font-normal shadow-sm active:bg-gray-200 transition mobile-button"
+                onClick={() => setShowSheet(false)}
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 메뉴 리스트 */}
+        <div className="space-y-4 px-4 pb-16">
+          {menuSections.map((section, idx) => (
+            <div 
+              key={idx} 
+              className="bg-white rounded-2xl shadow-sm p-1"
+            >
+              {section.items.map((item, i) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`flex items-center justify-between px-4 py-4 mobile-button hover:bg-gray-50 transition-colors ${
+                    isExiting ? 'pointer-events-none' : ''
+                  } ${i !== section.items.length - 1 ? 'border-b border-gray-100' : ''}`}
+                >
+                  <span className="text-[16px] text-black font-medium">{item.label}</span>
+                  <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                </Link>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   );
 } 
