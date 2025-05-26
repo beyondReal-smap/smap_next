@@ -1162,7 +1162,23 @@ export default function LocationPage() {
     }
   };
 
-  // 지도에 그룹멤버 마커 표시
+  // 좌표 안전성 검사 헬퍼 함수
+  const parseCoordinate = (coord: any): number | null => {
+    if (typeof coord === 'number') return coord;
+    if (typeof coord === 'string' && !isNaN(parseFloat(coord))) return parseFloat(coord);
+    return null;
+  };
+
+  // 안전한 이미지 URL 가져오기 헬퍼 함수
+  const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
+    // URL이 안전하지 않거나 null인 경우 기본 이미지 사용
+    if (!photoUrl || photoUrl.includes('https://118.67.130.71:8000')) {
+      return getDefaultImage(gender, index);
+    }
+    return photoUrl;
+  };
+
+  // 지도에 그룹멤버 마커 표시 (home/page.tsx 방식 참고)
   const updateMemberMarkers = (members: GroupMember[]) => {
     if (!map || !window.naver) {
       console.log('[updateMemberMarkers] 지도 또는 네이버 API가 준비되지 않음');
@@ -1172,202 +1188,164 @@ export default function LocationPage() {
     console.log('[updateMemberMarkers] 시작 - 기존 마커:', memberMarkers.length, '개, 새 멤버:', members.length, '명');
 
     // 기존 멤버 마커들 제거
-    memberMarkers.forEach(marker => marker.setMap(null));
+    memberMarkers.forEach(marker => {
+      if (marker && marker.setMap) {
+        marker.setMap(null);
+      }
+    });
     setMemberMarkers([]);
 
     // 새 멤버 마커들 생성
     const newMemberMarkers: NaverMarker[] = [];
     
-    members.forEach((member, index) => {
-      const { lat, lng } = member.location;
-      
-      // 유효한 좌표인지 확인
-      if (lat === 0 && lng === 0) return;
-      
-      const position = new window.naver.maps.LatLng(lat, lng);
-      
-      const marker = new window.naver.maps.Marker({
-        position,
-        map,
-        title: member.name,
-        icon: {
-          content: `
-            <div class="member-marker" style="
-              position: relative;
-              width: 50px;
-              height: 50px;
-              cursor: pointer;
-              animation: memberMarkerDrop 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${index * 0.15}s both;
-            ">
-              <div class="member-marker-pulse" style="
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 50px;
-                height: 50px;
-                background: ${member.isSelected ? 'rgba(34, 197, 94, 0.4)' : 'rgba(59, 130, 246, 0.3)'};
-                border-radius: 50%;
-                animation: memberPulse 3s infinite;
-              "></div>
-              <div class="member-marker-avatar" style="
-                position: relative;
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                border: 3px solid ${member.isSelected ? '#22c55e' : '#3b82f6'};
-                background: white;
-                overflow: hidden;
-                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-                transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-                z-index: ${member.isSelected ? '20' : '10'};
-                transform: ${member.isSelected ? 'scale(1.1)' : 'scale(1)'};
-              " 
-              onmouseover="
-                this.style.transform='scale(1.2) translateY(-3px)';
-                this.style.boxShadow='0 8px 25px rgba(0, 0, 0, 0.3)';
-                this.parentElement.querySelector('.member-marker-pulse').style.animationDuration='1.5s';
-              " 
-              onmouseout="
-                this.style.transform='${member.isSelected ? 'scale(1.1)' : 'scale(1)'} translateY(0)';
-                this.style.boxShadow='0 4px 15px rgba(0, 0, 0, 0.2)';
-                this.parentElement.querySelector('.member-marker-pulse').style.animationDuration='3s';
-              ">
-                <img src="${member.photo || getDefaultImage(member.mt_gender, member.original_index)}" 
-                     style="width: 100%; height: 100%; object-fit: cover;" 
-                     alt="${member.name}" 
-                     onerror="this.src='${getDefaultImage(member.mt_gender, member.original_index)}'" />
-              </div>
-              ${member.isSelected ? `
-                <div style="
-                  position: absolute;
-                  bottom: -8px;
-                  right: -8px;
-                  width: 20px;
-                  height: 20px;
-                  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-                  border: 2px solid white;
-                  border-radius: 50%;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  font-size: 10px;
-                  color: white;
-                  font-weight: bold;
-                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-                ">✓</div>
-              ` : ''}
-            </div>
-            <style>
-              @keyframes memberMarkerDrop {
-                0% {
-                  transform: translateY(-80px) scale(0.3);
-                  opacity: 0;
-                }
-                50% {
-                  transform: translateY(5px) scale(1.1);
-                  opacity: 0.8;
-                }
-                100% {
-                  transform: translateY(0) scale(1);
-                  opacity: 1;
-                }
-              }
-              @keyframes memberPulse {
-                0% {
-                  transform: translate(-50%, -50%) scale(0.9);
-                  opacity: 0.7;
-                }
-                50% {
-                  transform: translate(-50%, -50%) scale(1.3);
-                  opacity: 0.2;
-                }
-                100% {
-                  transform: translate(-50%, -50%) scale(0.9);
-                  opacity: 0.7;
-                }
-              }
-            </style>
-          `,
-          anchor: new window.naver.maps.Point(25, 25)
-        }
-      });
+    // 모든 그룹멤버에 대해 마커 생성 (home/page.tsx 방식)
+    if (members.length > 0) {
+      members.forEach((member, index) => {
+        // 좌표 안전성 검사
+        const lat = parseCoordinate(member.location.lat);
+        const lng = parseCoordinate(member.location.lng);
 
-      // 멤버 마커 클릭 이벤트
-      window.naver.maps.Event.addListener(marker, 'click', () => {
-        handleMemberSelect(member.id);
-        
-        // 기존 정보창 닫기
-        if (infoWindow) {
-          infoWindow.close();
-        }
+        if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+          const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+          const position = new window.naver.maps.LatLng(lat, lng);
+          // 선택된 멤버는 핑크색 외곽선, 일반 멤버는 인디고 외곽선 (home/page.tsx 스타일)
+          const borderColor = member.isSelected ? '#EC4899' : '#4F46E5';
+          
+          const marker = new window.naver.maps.Marker({
+            position: position,
+            map: map,
+            title: member.name,
+            icon: {
+              content: `
+                <div style="position: relative; text-align: center;">
+                  <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
+                    <img 
+                      src="${photoForMarker}" 
+                      alt="${member.name}" 
+                      style="width: 100%; height: 100%; object-fit: cover;" 
+                      data-gender="${member.mt_gender ?? ''}" 
+                      data-index="${member.original_index}"
+                      onerror="
+                        const genderStr = this.getAttribute('data-gender');
+                        const indexStr = this.getAttribute('data-index');
+                        const gender = genderStr ? parseInt(genderStr, 10) : null;
+                        const idx = indexStr ? parseInt(indexStr, 10) : 0;
+                        const imgNum = (idx % 4) + 1;
+                        let fallbackSrc = '/images/avatar' + ((idx % 3) + 1) + '.png';
+                        if (gender === 1) { fallbackSrc = '/images/male_' + imgNum + '.png'; }
+                        else if (gender === 2) { fallbackSrc = '/images/female_' + imgNum + '.png'; }
+                        this.src = fallbackSrc;
+                        this.onerror = null;
+                      "
+                    />
+                  </div>
+                  <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
+                    ${member.name}
+                  </div>
+                </div>
+              `,
+              size: new window.naver.maps.Size(36, 48),
+              anchor: new window.naver.maps.Point(18, 42)
+            },
+            zIndex: member.isSelected ? 200 : 150 // 선택된 멤버가 위에 표시되도록
+          });
 
-        // 멤버 정보창 생성
-        const memberInfoWindow = new window.naver.maps.InfoWindow({
-          content: `
-            <div style="
-              padding: 16px;
-              min-width: 200px;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background: white;
-              border-radius: 12px;
-              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            ">
-              <div style="
-                display: flex;
-                align-items: center;
-                margin-bottom: 12px;
-              ">
+          // 멤버 마커 클릭 이벤트
+          window.naver.maps.Event.addListener(marker, 'click', () => {
+            handleMemberSelect(member.id);
+            
+            // 기존 정보창 닫기
+            if (infoWindow) {
+              infoWindow.close();
+            }
+
+            // 멤버 정보창 생성
+            const memberInfoWindow = new window.naver.maps.InfoWindow({
+              content: `
                 <div style="
-                  width: 40px;
-                  height: 40px;
-                  border-radius: 50%;
-                  overflow: hidden;
-                  margin-right: 12px;
-                  border: 2px solid #3b82f6;
+                  padding: 16px;
+                  min-width: 200px;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                  background: white;
+                  border-radius: 12px;
+                  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
                 ">
-                  <img src="${member.photo || getDefaultImage(member.mt_gender, member.original_index)}" 
-                       style="width: 100%; height: 100%; object-fit: cover;" 
-                       alt="${member.name}" 
-                       onerror="this.src='${getDefaultImage(member.mt_gender, member.original_index)}'" />
+                  <div style="
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 12px;
+                  ">
+                    <div style="
+                      width: 40px;
+                      height: 40px;
+                      border-radius: 50%;
+                      overflow: hidden;
+                      margin-right: 12px;
+                      border: 2px solid ${borderColor};
+                    ">
+                      <img src="${photoForMarker}" 
+                           style="width: 100%; height: 100%; object-fit: cover;" 
+                           alt="${member.name}" />
+                    </div>
+                    <div>
+                      <h3 style="
+                        margin: 0;
+                        font-size: 16px;
+                        font-weight: 600;
+                        color: #1f2937;
+                      ">${member.name}</h3>
+                      <p style="
+                        margin: 4px 0 0 0;
+                        font-size: 12px;
+                        color: #6b7280;
+                      ">${member.isSelected ? '선택된 멤버' : '그룹 멤버'}</p>
+                    </div>
+                  </div>
+                  
+                  <div style="
+                    background: #f3f4f6;
+                    padding: 8px 12px;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    color: #374151;
+                  ">
+                    📍 현재 위치: ${lat.toFixed(4)}, ${lng.toFixed(4)}
+                  </div>
                 </div>
-                <div>
-                  <h3 style="
-                    margin: 0;
-                    font-size: 16px;
-                    font-weight: 600;
-                    color: #1f2937;
-                  ">${member.name}</h3>
-                  <p style="
-                    margin: 4px 0 0 0;
-                    font-size: 12px;
-                    color: #6b7280;
-                  ">${member.isSelected ? '선택된 멤버' : '그룹 멤버'}</p>
-                </div>
-              </div>
-              
-              <div style="
-                background: #f3f4f6;
-                padding: 8px 12px;
-                border-radius: 8px;
-                font-size: 13px;
-                color: #374151;
-              ">
-                📍 현재 위치: ${lat.toFixed(4)}, ${lng.toFixed(4)}
-              </div>
-            </div>
-          `,
-          borderWidth: 0,
-          backgroundColor: 'transparent',
-          pixelOffset: new window.naver.maps.Point(0, -15)
-        });
+              `,
+              borderWidth: 0,
+              backgroundColor: 'transparent',
+              pixelOffset: new window.naver.maps.Point(0, -15)
+            });
 
-        memberInfoWindow.open(map, marker);
-        setInfoWindow(memberInfoWindow);
+            memberInfoWindow.open(map, marker);
+            setInfoWindow(memberInfoWindow);
+          });
+
+          newMemberMarkers.push(marker);
+        } else {
+          console.warn('유효하지 않은 멤버 좌표:', member.name, member.location);
+        }
       });
 
-      newMemberMarkers.push(marker);
-    });
+      // 선택된 멤버가 있으면 해당 위치로 지도 이동 (home/page.tsx 방식)
+      const selectedMember = members.find(member => member.isSelected);
+      if (selectedMember) {
+        const lat = parseCoordinate(selectedMember.location.lat);
+        const lng = parseCoordinate(selectedMember.location.lng);
+
+        if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+          // 지도 중심 이동 및 줌 레벨 조정
+          setTimeout(() => {
+            map.setCenter(new window.naver.maps.LatLng(lat, lng));
+            map.setZoom(16);
+            console.log('지도 중심 이동:', selectedMember.name, { lat, lng });
+          }, 100);
+        } else {
+          console.warn('유효하지 않은 선택된 멤버 좌표:', selectedMember.name, selectedMember.location);
+        }
+      }
+    }
 
     setMemberMarkers(newMemberMarkers);
     console.log('[updateMemberMarkers] 멤버 마커 업데이트 완료:', newMemberMarkers.length, '개');
