@@ -488,6 +488,7 @@ export default function LocationPage() {
   // 지도 관련 상태
   const [map, setMap] = useState<NaverMap | null>(null);
   const [markers, setMarkers] = useState<NaverMarker[]>([]);
+  const [memberMarkers, setMemberMarkers] = useState<NaverMarker[]>([]); // Add state for member markers
   const [infoWindow, setInfoWindow] = useState<NaverInfoWindow | null>(null);
   const mapContainer = useRef<HTMLDivElement>(null);
   const tempMarker = useRef<NaverMarker | null>(null);
@@ -738,6 +739,10 @@ export default function LocationPage() {
     setOtherMembersSavedLocations([]);
     setFirstMemberSelected(false);
     setIsFirstMemberSelectionComplete(false);
+    
+    // 기존 멤버 마커들도 초기화
+    memberMarkers.forEach(marker => marker.setMap(null));
+    setMemberMarkers([]);
     
     // selectedMemberIdRef도 초기화
     selectedMemberIdRef.current = null;
@@ -1157,6 +1162,210 @@ export default function LocationPage() {
     }
   };
 
+  // 지도에 그룹멤버 마커 표시
+  const updateMemberMarkers = (members: GroupMember[]) => {
+    if (!map || !window.naver) return;
+
+    // 기존 멤버 마커들 제거
+    memberMarkers.forEach(marker => marker.setMap(null));
+    setMemberMarkers([]);
+
+    // 새 멤버 마커들 생성
+    const newMemberMarkers: NaverMarker[] = [];
+    
+    members.forEach((member, index) => {
+      const { lat, lng } = member.location;
+      
+      // 유효한 좌표인지 확인
+      if (lat === 0 && lng === 0) return;
+      
+      const position = new window.naver.maps.LatLng(lat, lng);
+      
+      const marker = new window.naver.maps.Marker({
+        position,
+        map,
+        title: member.name,
+        icon: {
+          content: `
+            <div class="member-marker" style="
+              position: relative;
+              width: 50px;
+              height: 50px;
+              cursor: pointer;
+              animation: memberMarkerDrop 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${index * 0.15}s both;
+            ">
+              <div class="member-marker-pulse" style="
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 50px;
+                height: 50px;
+                background: ${member.isSelected ? 'rgba(34, 197, 94, 0.4)' : 'rgba(59, 130, 246, 0.3)'};
+                border-radius: 50%;
+                animation: memberPulse 3s infinite;
+              "></div>
+              <div class="member-marker-avatar" style="
+                position: relative;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                border: 3px solid ${member.isSelected ? '#22c55e' : '#3b82f6'};
+                background: white;
+                overflow: hidden;
+                box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+                transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                z-index: ${member.isSelected ? '20' : '10'};
+                transform: ${member.isSelected ? 'scale(1.1)' : 'scale(1)'};
+              " 
+              onmouseover="
+                this.style.transform='scale(1.2) translateY(-3px)';
+                this.style.boxShadow='0 8px 25px rgba(0, 0, 0, 0.3)';
+                this.parentElement.querySelector('.member-marker-pulse').style.animationDuration='1.5s';
+              " 
+              onmouseout="
+                this.style.transform='${member.isSelected ? 'scale(1.1)' : 'scale(1)'} translateY(0)';
+                this.style.boxShadow='0 4px 15px rgba(0, 0, 0, 0.2)';
+                this.parentElement.querySelector('.member-marker-pulse').style.animationDuration='3s';
+              ">
+                <img src="${member.photo || getDefaultImage(member.mt_gender, member.original_index)}" 
+                     style="width: 100%; height: 100%; object-fit: cover;" 
+                     alt="${member.name}" />
+              </div>
+              ${member.isSelected ? `
+                <div style="
+                  position: absolute;
+                  bottom: -8px;
+                  right: -8px;
+                  width: 20px;
+                  height: 20px;
+                  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+                  border: 2px solid white;
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 10px;
+                  color: white;
+                  font-weight: bold;
+                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+                ">✓</div>
+              ` : ''}
+            </div>
+            <style>
+              @keyframes memberMarkerDrop {
+                0% {
+                  transform: translateY(-80px) scale(0.3);
+                  opacity: 0;
+                }
+                50% {
+                  transform: translateY(5px) scale(1.1);
+                  opacity: 0.8;
+                }
+                100% {
+                  transform: translateY(0) scale(1);
+                  opacity: 1;
+                }
+              }
+              @keyframes memberPulse {
+                0% {
+                  transform: translate(-50%, -50%) scale(0.9);
+                  opacity: 0.7;
+                }
+                50% {
+                  transform: translate(-50%, -50%) scale(1.3);
+                  opacity: 0.2;
+                }
+                100% {
+                  transform: translate(-50%, -50%) scale(0.9);
+                  opacity: 0.7;
+                }
+              }
+            </style>
+          `,
+          anchor: new window.naver.maps.Point(25, 25)
+        }
+      });
+
+      // 멤버 마커 클릭 이벤트
+      window.naver.maps.Event.addListener(marker, 'click', () => {
+        handleMemberSelect(member.id);
+        
+        // 기존 정보창 닫기
+        if (infoWindow) {
+          infoWindow.close();
+        }
+
+        // 멤버 정보창 생성
+        const memberInfoWindow = new window.naver.maps.InfoWindow({
+          content: `
+            <div style="
+              padding: 16px;
+              min-width: 200px;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background: white;
+              border-radius: 12px;
+              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            ">
+              <div style="
+                display: flex;
+                align-items: center;
+                margin-bottom: 12px;
+              ">
+                <div style="
+                  width: 40px;
+                  height: 40px;
+                  border-radius: 50%;
+                  overflow: hidden;
+                  margin-right: 12px;
+                  border: 2px solid #3b82f6;
+                ">
+                  <img src="${member.photo || getDefaultImage(member.mt_gender, member.original_index)}" 
+                       style="width: 100%; height: 100%; object-fit: cover;" 
+                       alt="${member.name}" />
+                </div>
+                <div>
+                  <h3 style="
+                    margin: 0;
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: #1f2937;
+                  ">${member.name}</h3>
+                  <p style="
+                    margin: 4px 0 0 0;
+                    font-size: 12px;
+                    color: #6b7280;
+                  ">${member.isSelected ? '선택된 멤버' : '그룹 멤버'}</p>
+                </div>
+              </div>
+              
+              <div style="
+                background: #f3f4f6;
+                padding: 8px 12px;
+                border-radius: 8px;
+                font-size: 13px;
+                color: #374151;
+              ">
+                📍 현재 위치: ${lat.toFixed(4)}, ${lng.toFixed(4)}
+              </div>
+            </div>
+          `,
+          borderWidth: 0,
+          backgroundColor: 'transparent',
+          pixelOffset: new window.naver.maps.Point(0, -15)
+        });
+
+        memberInfoWindow.open(map, marker);
+        setInfoWindow(memberInfoWindow);
+      });
+
+      newMemberMarkers.push(marker);
+    });
+
+    setMemberMarkers(newMemberMarkers);
+    console.log('[updateMemberMarkers] 멤버 마커 업데이트 완료:', newMemberMarkers.length, '개');
+  };
+
   // 지도에 장소 마커 표시
   const updateMapMarkers = (locations: LocationData[]) => {
     if (!map || !window.naver) return;
@@ -1454,6 +1663,22 @@ export default function LocationPage() {
       updateMapMarkers(selectedMemberSavedLocations);
     }
   }, [selectedLocationId]);
+
+  // 그룹멤버가 변경될 때 멤버 마커 업데이트
+  useEffect(() => {
+    if (groupMembers.length > 0 && map && window.naver) {
+      console.log('[useEffect] 그룹멤버 마커 업데이트:', groupMembers.length, '명');
+      updateMemberMarkers(groupMembers);
+    }
+  }, [groupMembers, map]);
+
+  // 멤버 선택이 변경될 때 멤버 마커 업데이트 (선택 상태 반영)
+  useEffect(() => {
+    if (groupMembers.length > 0 && map && window.naver) {
+      console.log('[useEffect] 멤버 선택 변경으로 멤버 마커 업데이트');
+      updateMemberMarkers(groupMembers);
+    }
+  }, [selectedMemberIdRef.current, groupMembers, map]);
 
   // 장소 카드 클릭 핸들러
   const handleLocationCardClick = (location: OtherMemberLocationRaw) => {
