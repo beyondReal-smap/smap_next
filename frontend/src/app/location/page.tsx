@@ -771,7 +771,7 @@ export default function LocationPage() {
         const convertedMembers: GroupMember[] = memberData.map((member: any, index: number) => ({
             id: member.mt_idx.toString(),
             name: member.mt_name || `멤버 ${index + 1}`,
-            photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `https://118.67.130.71:8000/storage/${member.mt_file1}`) : null,
+            photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `http://118.67.130.71:8000/storage/${member.mt_file1}`) : null, // Changed https to http
             isSelected: false,
             location: { 
               lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
@@ -1230,7 +1230,8 @@ export default function LocationPage() {
               ">
                 <img src="${member.photo || getDefaultImage(member.mt_gender, member.original_index)}" 
                      style="width: 100%; height: 100%; object-fit: cover;" 
-                     alt="${member.name}" />
+                     alt="${member.name}" 
+                     onerror="this.src='${getDefaultImage(member.mt_gender, member.original_index)}'" />
               </div>
               ${member.isSelected ? `
                 <div style="
@@ -1322,7 +1323,8 @@ export default function LocationPage() {
                 ">
                   <img src="${member.photo || getDefaultImage(member.mt_gender, member.original_index)}" 
                        style="width: 100%; height: 100%; object-fit: cover;" 
-                       alt="${member.name}" />
+                       alt="${member.name}" 
+                       onerror="this.src='${getDefaultImage(member.mt_gender, member.original_index)}'" />
                 </div>
                 <div>
                   <h3 style="
