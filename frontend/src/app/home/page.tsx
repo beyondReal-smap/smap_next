@@ -466,6 +466,27 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
   return `/images/avatar${(index % 3) + 1}.png`; 
 };
 
+// SSL 인증서 오류가 있는 URL인지 확인하는 함수
+const isUnsafeImageUrl = (url: string | null): boolean => {
+  if (!url) return true;
+  
+  // 알려진 문제가 있는 서버 URL들
+  const unsafeHosts = [
+    '118.67.130.71:8000',
+    // 필요시 다른 문제가 있는 호스트들을 추가
+  ];
+  
+  return unsafeHosts.some(host => url.includes(host));
+};
+
+// 안전한 이미지 URL을 반환하는 함수
+const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
+  if (isUnsafeImageUrl(photoUrl)) {
+    return getDefaultImage(gender, index);
+  }
+  return photoUrl || getDefaultImage(gender, index);
+};
+
 // 날씨 정보 타입 정의
 interface WeatherInfo {
   temp: string; 
@@ -1639,7 +1660,7 @@ export default function HomePage() {
 
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
           if (mapType === 'naver' && naverMap.current && window.naver?.maps) {
-            const photoForMarker = member.photo ?? getDefaultImage(member.mt_gender, member.original_index);
+            const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
             const position = new window.naver.maps.LatLng(lat, lng);
             // 선택된 멤버는 핑크색 외곽선, 일반 멤버는 인디고 외곽선
             const borderColor = member.isSelected ? '#EC4899' : '#4F46E5';
@@ -1684,7 +1705,7 @@ export default function HomePage() {
             
             memberMarkers.current.push(markerInstance);
           } else if (mapType === 'google' && map.current && window.google?.maps) {
-            const photoForMarker = member.photo ?? getDefaultImage(member.mt_gender, member.original_index);
+            const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
             
             const markerInstance = new window.google.maps.Marker({
               position: { lat, lng },
@@ -2224,7 +2245,7 @@ export default function HomePage() {
                             member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
                           }`}>
                             <img 
-                              src={member.photo ?? getDefaultImage(member.mt_gender, member.original_index)} // original_index 사용
+                              src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)} // original_index 사용
                               alt={member.name} 
                               className="w-full h-full object-cover" 
                               onError={(e) => {

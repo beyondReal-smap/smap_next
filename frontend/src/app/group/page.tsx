@@ -68,7 +68,28 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
   } else if (gender === 2) {
     return `/images/female_${imageNumber}.png`;
   }
-  return `/images/avatar${(index % 3) + 1}.png`; 
+  return `/images/avatar${(index % 3) + 1}.png`;
+};
+
+// SSL 인증서 오류가 있는 URL인지 확인하는 함수
+const isUnsafeImageUrl = (url: string | null): boolean => {
+  if (!url) return true;
+  
+  // 알려진 문제가 있는 서버 URL들
+  const unsafeHosts = [
+    '118.67.130.71:8000',
+    // 필요시 다른 문제가 있는 호스트들을 추가
+  ];
+  
+  return unsafeHosts.some(host => url.includes(host));
+};
+
+// 안전한 이미지 URL을 반환하는 함수
+const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
+  if (isUnsafeImageUrl(photoUrl)) {
+    return getDefaultImage(gender, index);
+  }
+  return photoUrl || getDefaultImage(gender, index);
 };
 
 // Framer Motion 애니메이션 variants
@@ -456,7 +477,6 @@ function GroupPageContent() {
         mt_idx: createdGroup.mt_idx,
         sgt_show: createdGroup.sgt_show,
         sgt_wdate: createdGroup.sgt_wdate,
-        sgt_code: createdGroup.sgt_code,
         memberCount: 1
       };
       
@@ -1065,7 +1085,7 @@ function GroupPageContent() {
                                 <div className="relative mr-3">
                                   <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center border-3 border-indigo-200">
                                     <img
-                                      src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}
+                                      src={getSafeImageUrl(member.photo || null, member.mt_gender, member.original_index)}
                                       alt={member.mt_name}
                                       className="w-full h-full object-cover"
                                       onError={(e) => {
@@ -1447,7 +1467,7 @@ function GroupPageContent() {
                   <div className="text-center mb-6">
                     <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
                       <img
-                        src={selectedMember.photo || getDefaultImage(selectedMember.mt_gender, selectedMember.original_index)}
+                        src={getSafeImageUrl(selectedMember.photo || null, selectedMember.mt_gender, selectedMember.original_index)}
                         alt={selectedMember.mt_name}
                         className="w-full h-full object-cover rounded-full"
                         onError={(e) => {

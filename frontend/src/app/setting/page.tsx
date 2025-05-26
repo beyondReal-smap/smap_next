@@ -475,7 +475,7 @@ export default function SettingsPage() {
 
         {/* 프로필 영역 - 개선된 디자인 */}
         <div className="px-4 pt-6 pb-6">
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl p-6 text-white shadow-xl">
+          <div className="bg-indigo-700 rounded-3xl p-6 text-white shadow-xl">
             <div className="flex items-center space-x-4">
               <div className="relative">
                 <button 

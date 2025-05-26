@@ -387,7 +387,7 @@ export default function AccountPage() {
 
         {/* 프로필 헤더 카드 */}
         <div className="px-4 pt-6 pb-4">
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-3xl p-6 text-white shadow-xl card-hover">
+          <div className="bg-indigo-700 rounded-3xl p-6 text-white shadow-xl card-hover">
             <div className="flex items-center space-x-4">
               <div className="relative">
                 <button
