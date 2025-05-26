@@ -820,13 +820,13 @@ export default function LocationPage() {
     // Find the newly selected member
     const newlySelectedMember = groupMembers.find(member => member.id === memberId);
 
-    if (!newlySelectedMember || (selectedMemberIdRef.current === memberId && isFirstMemberSelectionComplete)) {
-       console.log('[handleMemberSelect] 이미 선택된 멤버이거나 멤버를 찾을 수 없습니다. 중복 실행 또는 오류 방지');
-       // Ensure first selection complete is set even if selecting the same member again after initial load
-       if (!isFirstMemberSelectionComplete && newlySelectedMember) {
-          setIsFirstMemberSelectionComplete(true);
-          console.log('[handleMemberSelect] 첫번째 멤버 선택 완료 (중복 체크)');
-       }
+    if (!newlySelectedMember) {
+       console.log('[handleMemberSelect] 멤버를 찾을 수 없습니다:', memberId);
+       return;
+    }
+
+    if (selectedMemberIdRef.current === memberId && isFirstMemberSelectionComplete) {
+       console.log('[handleMemberSelect] 이미 선택된 멤버입니다. 중복 실행 방지:', memberId);
        return;
     }
 
@@ -1164,7 +1164,12 @@ export default function LocationPage() {
 
   // 지도에 그룹멤버 마커 표시
   const updateMemberMarkers = (members: GroupMember[]) => {
-    if (!map || !window.naver) return;
+    if (!map || !window.naver) {
+      console.log('[updateMemberMarkers] 지도 또는 네이버 API가 준비되지 않음');
+      return;
+    }
+
+    console.log('[updateMemberMarkers] 시작 - 기존 마커:', memberMarkers.length, '개, 새 멤버:', members.length, '명');
 
     // 기존 멤버 마커들 제거
     memberMarkers.forEach(marker => marker.setMap(null));
@@ -1666,21 +1671,13 @@ export default function LocationPage() {
     }
   }, [selectedLocationId]);
 
-  // 그룹멤버가 변경될 때 멤버 마커 업데이트
+  // 그룹멤버가 변경되거나 멤버 선택이 변경될 때 멤버 마커 업데이트 (중복 실행 방지)
   useEffect(() => {
     if (groupMembers.length > 0 && map && window.naver) {
-      console.log('[useEffect] 그룹멤버 마커 업데이트:', groupMembers.length, '명');
+      console.log('[useEffect] 멤버 마커 업데이트:', groupMembers.length, '명', '선택된 멤버:', selectedMemberIdRef.current);
       updateMemberMarkers(groupMembers);
     }
-  }, [groupMembers, map]);
-
-  // 멤버 선택이 변경될 때 멤버 마커 업데이트 (선택 상태 반영)
-  useEffect(() => {
-    if (groupMembers.length > 0 && map && window.naver) {
-      console.log('[useEffect] 멤버 선택 변경으로 멤버 마커 업데이트');
-      updateMemberMarkers(groupMembers);
-    }
-  }, [selectedMemberIdRef.current, groupMembers, map]);
+  }, [groupMembers, selectedMemberIdRef.current, map]);
 
   // 장소 카드 클릭 핸들러
   const handleLocationCardClick = (location: OtherMemberLocationRaw) => {
