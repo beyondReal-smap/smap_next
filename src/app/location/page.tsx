@@ -21,9 +21,130 @@ import {
   FiStar,
   FiHeart,
   FiCoffee,
-  FiShoppingBag
+  FiShoppingBag,
+  FiEye,
+  FiSettings,
+  FiChevronRight
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
+
+// 모바일 최적화된 CSS 애니메이션
+const pageAnimations = `
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+  position: relative;
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.animate-slideInFromRight {
+  animation: slideInFromRight 0.3s ease-out forwards;
+}
+
+.animate-slideInFromBottom {
+  animation: slideInFromBottom 0.3s ease-out forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+.animate-pulse {
+  animation: pulse 2s infinite;
+}
+
+.mobile-button {
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.mobile-button:active {
+  transform: scale(0.98);
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.glass-effect {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.menu-item-hover {
+  transition: all 0.2s ease;
+}
+
+.menu-item-hover:hover {
+  transform: translateX(4px);
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.floating-shadow {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.marker-glow {
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.4));
+}
+`;
 
 // 장소 타입 정의
 interface LocationData {
@@ -49,14 +170,14 @@ interface GroupMember {
   color: string;
 }
 
-// 카테고리 정의
+// 카테고리 정의 - 개선된 디자인
 const LOCATION_CATEGORIES = [
-  { id: 'restaurant', name: '맛집', icon: FiCoffee, color: '#ef4444' },
-  { id: 'shopping', name: '쇼핑', icon: FiShoppingBag, color: '#f59e0b' },
-  { id: 'attraction', name: '관광지', icon: FiStar, color: '#10b981' },
-  { id: 'accommodation', name: '숙박', icon: FiHome, color: '#3b82f6' },
-  { id: 'favorite', name: '즐겨찾기', icon: FiHeart, color: '#ec4899' },
-  { id: 'other', name: '기타', icon: FiMapPin, color: '#6b7280' }
+  { id: 'restaurant', name: '맛집', icon: FiCoffee, color: '#ef4444', bgColor: 'bg-red-500' },
+  { id: 'shopping', name: '쇼핑', icon: FiShoppingBag, color: '#f59e0b', bgColor: 'bg-amber-500' },
+  { id: 'attraction', name: '관광지', icon: FiStar, color: '#10b981', bgColor: 'bg-emerald-500' },
+  { id: 'accommodation', name: '숙박', icon: FiHome, color: '#3b82f6', bgColor: 'bg-blue-500' },
+  { id: 'favorite', name: '즐겨찾기', icon: FiHeart, color: '#ec4899', bgColor: 'bg-pink-500' },
+  { id: 'other', name: '기타', icon: FiMapPin, color: '#6b7280', bgColor: 'bg-gray-500' }
 ];
 
 // 모의 데이터
@@ -109,6 +230,8 @@ const LocationPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedMember, setSelectedMember] = useState<string>('all');
   const [showBottomSheet, setShowBottomSheet] = useState(false);
+  const [showMemberFilter, setShowMemberFilter] = useState(false);
+  const [isPageLoaded, setIsPageLoaded] = useState(false);
   const [newLocation, setNewLocation] = useState({
     name: '',
     address: '',
@@ -117,6 +240,14 @@ const LocationPage: React.FC = () => {
     tags: [] as string[],
     rating: 0
   });
+
+  // 페이지 로드 애니메이션
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsPageLoaded(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   // 지도 로드 핸들러
   const onMapLoad = (map: google.maps.Map) => {
@@ -195,7 +326,7 @@ const LocationPage: React.FC = () => {
       const member = MOCK_GROUP_MEMBERS.find(m => m.name === location.addedBy);
       const markerColor = member?.color || category?.color || '#6b7280';
       const isSelected = selectedLocation?.id === location.id;
-      const markerSize = isSelected ? 40 : 30;
+      const markerSize = isSelected ? 45 : 35;
 
       return (
         <Marker
@@ -203,7 +334,7 @@ const LocationPage: React.FC = () => {
           position={{ lat: location.latitude, lng: location.longitude }}
           onClick={() => handleMarkerClick(location)}
           icon={{
-            url: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="${markerSize}" height="${markerSize}" viewBox="0 0 24 24" fill="${markerColor}"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`,
+            url: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="${markerSize}" height="${markerSize}" viewBox="0 0 24 24" fill="${markerColor}" filter="drop-shadow(0 2px 4px rgba(0,0,0,0.3))"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>`,
             scaledSize: new google.maps.Size(markerSize, markerSize),
             anchor: new google.maps.Point(markerSize / 2, markerSize),
           }}
@@ -234,388 +365,524 @@ const LocationPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      {/* 헤더 */}
-      <motion.div 
-        initial={{ y: -50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="bg-white shadow-sm border-b border-gray-200 px-4 py-3 z-10"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <FiMapPin className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">우리의 장소</h1>
-              <p className="text-xs text-gray-500">{filteredLocations.length}개의 장소</p>
-            </div>
-          </div>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowAddModal(true)}
-            className="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center shadow-lg"
-          >
-            <FiPlus className="w-5 h-5 text-white" />
-          </motion.button>
-        </div>
-
-        {/* 검색 및 필터 */}
-        <div className="mt-3 space-y-3">
-          <div className="relative">
-            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="장소 검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-gray-100 border-0 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
-            />
-          </div>
-
-          <div className="flex space-x-2 overflow-x-auto pb-1">
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setSelectedCategory('all')}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-                selectedCategory === 'all' 
-                  ? 'bg-indigo-500 text-white' 
-                  : 'bg-gray-200 text-gray-600'
-              }`}
-            >
-              전체
-            </motion.button>
-            {LOCATION_CATEGORIES.map((category) => (
+    <>
+      <style jsx global>{pageAnimations}</style>
+      <div className={`bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen ${
+        isPageLoaded ? 'animate-fadeIn' : 'opacity-0'
+      }`}>
+        {/* 개선된 헤더 */}
+        <motion.div 
+          initial={{ y: -50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="sticky top-0 z-20 glass-effect border-b border-white/20 shadow-sm"
+        >
+          <div className="px-4 py-4">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <FiMapPin className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900">우리의 장소</h1>
+                  <p className="text-sm text-gray-600">{filteredLocations.length}개의 특별한 장소</p>
+                </div>
+              </div>
               <motion.button
-                key={category.id}
+                whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setSelectedCategory(category.id)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-                  selectedCategory === category.id 
-                    ? 'text-white' 
-                    : 'bg-gray-200 text-gray-600'
+                onClick={() => setShowAddModal(true)}
+                className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg mobile-button"
+              >
+                <FiPlus className="w-6 h-6 text-white" />
+              </motion.button>
+            </div>
+
+            {/* 개선된 검색 바 */}
+            <div className="relative mb-4">
+              <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="장소를 검색해보세요..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-white/80 border-0 rounded-2xl text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-sm"
+              />
+            </div>
+
+            {/* 개선된 필터 버튼들 */}
+            <div className="flex space-x-3 overflow-x-auto pb-2">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setSelectedCategory('all')}
+                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all shadow-sm mobile-button ${
+                  selectedCategory === 'all' 
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg' 
+                    : 'bg-white/80 text-gray-600 hover:bg-white'
                 }`}
-                style={{
-                  backgroundColor: selectedCategory === category.id ? category.color : undefined
+              >
+                전체
+              </motion.button>
+              {LOCATION_CATEGORIES.map((category) => (
+                <motion.button
+                  key={category.id}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setSelectedCategory(category.id)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all shadow-sm mobile-button flex items-center space-x-2 ${
+                    selectedCategory === category.id 
+                      ? 'text-white shadow-lg' 
+                      : 'bg-white/80 text-gray-600 hover:bg-white'
+                  }`}
+                  style={{
+                    background: selectedCategory === category.id 
+                      ? `linear-gradient(135deg, ${category.color}, ${category.color}dd)` 
+                      : undefined
+                  }}
+                >
+                  <category.icon className="w-4 h-4" />
+                  <span>{category.name}</span>
+                </motion.button>
+              ))}
+            </div>
+
+            {/* 멤버 필터 */}
+            <div className="flex items-center justify-between mt-3">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setShowMemberFilter(!showMemberFilter)}
+                className="flex items-center space-x-2 px-3 py-2 bg-white/80 rounded-xl text-sm font-medium text-gray-600 hover:bg-white transition-all shadow-sm mobile-button"
+              >
+                <FiUsers className="w-4 h-4" />
+                <span>멤버 필터</span>
+                <motion.div
+                  animate={{ rotate: showMemberFilter ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <FiChevronDown className="w-4 h-4" />
+                </motion.div>
+              </motion.button>
+            </div>
+
+            {/* 멤버 필터 드롭다운 */}
+            <AnimatePresence>
+              {showMemberFilter && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="overflow-hidden mt-3"
+                >
+                  <div className="bg-white/90 rounded-xl p-3 shadow-sm">
+                    <div className="flex flex-wrap gap-2">
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setSelectedMember('all')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all mobile-button ${
+                          selectedMember === 'all'
+                            ? 'bg-indigo-500 text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        전체 멤버
+                      </motion.button>
+                      {MOCK_GROUP_MEMBERS.map((member) => (
+                        <motion.button
+                          key={member.id}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setSelectedMember(member.name)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all mobile-button ${
+                            selectedMember === member.name
+                              ? 'text-white'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                          style={{
+                            backgroundColor: selectedMember === member.name ? member.color : undefined
+                          }}
+                        >
+                          {member.name}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.div>
+
+        {/* 지도 영역 */}
+        <div className="relative" style={{ height: 'calc(100vh - 280px)' }}>
+          <GoogleMap
+            mapContainerStyle={{ width: '100%', height: '100%' }}
+            center={center}
+            zoom={13}
+            onLoad={onMapLoad}
+            options={{
+              disableDefaultUI: true,
+              zoomControl: false,
+              mapTypeControl: false,
+              streetViewControl: false,
+              fullscreenControl: false,
+              styles: [
+                {
+                  featureType: 'poi',
+                  elementType: 'labels',
+                  stylers: [{ visibility: 'off' }]
+                },
+                {
+                  featureType: 'water',
+                  elementType: 'geometry',
+                  stylers: [{ color: '#e3f2fd' }]
+                },
+                {
+                  featureType: 'landscape',
+                  elementType: 'geometry',
+                  stylers: [{ color: '#f8f9fa' }]
+                }
+              ]
+            }}
+          >
+            {renderMarkers()}
+            
+            {showInfoWindow && selectedLocation && (
+              <InfoWindow
+                position={{
+                  lat: selectedLocation.latitude,
+                  lng: selectedLocation.longitude,
+                }}
+                onCloseClick={() => {
+                  setShowInfoWindow(false);
+                  setShowBottomSheet(false);
                 }}
               >
-                {category.name}
-              </motion.button>
-            ))}
-          </div>
-        </div>
-      </motion.div>
-
-      {/* 지도 */}
-      <div className="flex-1 relative">
-        <GoogleMap
-          mapContainerStyle={{ width: '100%', height: '100%' }}
-          center={center}
-          zoom={13}
-          onLoad={onMapLoad}
-          options={{
-            disableDefaultUI: true,
-            zoomControl: false,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: false,
-            styles: [
-              {
-                featureType: 'poi',
-                elementType: 'labels',
-                stylers: [{ visibility: 'off' }]
-              }
-            ]
-          }}
-        >
-          {renderMarkers()}
-          
-          {showInfoWindow && selectedLocation && (
-            <InfoWindow
-              position={{
-                lat: selectedLocation.latitude,
-                lng: selectedLocation.longitude,
-              }}
-              onCloseClick={() => {
-                setShowInfoWindow(false);
-                setShowBottomSheet(false);
-              }}
-            >
-              <div className="p-2 max-w-xs">
-                <h3 className="font-bold text-sm">{selectedLocation.name}</h3>
-                <p className="text-xs text-gray-600 mt-1">{selectedLocation.address}</p>
-              </div>
-            </InfoWindow>
-          )}
-        </GoogleMap>
-
-        {/* 플로팅 버튼들 */}
-        <div className="absolute bottom-4 right-4 space-y-3">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={moveToCurrentLocation}
-            className="w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center"
-          >
-            <FiNavigation className="w-5 h-5 text-gray-600" />
-          </motion.button>
-        </div>
-      </div>
-
-      {/* 하단 시트 */}
-      <AnimatePresence>
-        {showBottomSheet && selectedLocation && (
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 500 }}
-            className="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-20"
-          >
-            <div className="p-4">
-              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4" />
-              
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <h3 className="text-lg font-bold text-gray-900">{selectedLocation.name}</h3>
-                    {selectedLocation.rating && (
-                      <div className="flex items-center space-x-1">
-                        <FiStar className="w-4 h-4 text-yellow-400 fill-current" />
-                        <span className="text-sm text-gray-600">{selectedLocation.rating}</span>
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-600 mb-2">{selectedLocation.address}</p>
-                  {selectedLocation.description && (
-                    <p className="text-sm text-gray-800 mb-3">{selectedLocation.description}</p>
-                  )}
-                  
-                  <div className="flex items-center space-x-2 mb-3">
-                    <span className="text-xs text-gray-500">추가한 사람:</span>
-                    <span className="text-xs font-medium text-indigo-600">{selectedLocation.addedBy}</span>
-                  </div>
-
-                  {selectedLocation.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-4">
-                      {selectedLocation.tags.map((tag, index) => (
-                        <span
-                          key={index}
-                          className="px-2 py-1 bg-gray-100 text-xs text-gray-600 rounded-full"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
+                <div className="p-3 max-w-xs">
+                  <h3 className="font-bold text-base text-gray-900">{selectedLocation.name}</h3>
+                  <p className="text-sm text-gray-600 mt-1">{selectedLocation.address}</p>
+                  {selectedLocation.rating && (
+                    <div className="flex items-center space-x-1 mt-2">
+                      <FiStar className="w-4 h-4 text-yellow-400 fill-current" />
+                      <span className="text-sm font-medium text-gray-700">{selectedLocation.rating}</span>
                     </div>
                   )}
                 </div>
+              </InfoWindow>
+            )}
+          </GoogleMap>
 
-                <div className="flex space-x-2 ml-4">
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      setEditingLocation(selectedLocation);
-                      setShowEditModal(true);
-                      setShowBottomSheet(false);
-                    }}
-                    className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
-                  >
-                    <FiEdit3 className="w-4 h-4 text-gray-600" />
-                  </motion.button>
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => handleDeleteLocation(selectedLocation.id)}
-                    className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center"
-                  >
-                    <FiTrash2 className="w-4 h-4 text-red-600" />
-                  </motion.button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          {/* 개선된 플로팅 버튼들 */}
+          <div className="absolute bottom-6 right-4 space-y-3">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={moveToCurrentLocation}
+              className="w-14 h-14 bg-white rounded-full shadow-lg flex items-center justify-center mobile-button floating-shadow"
+            >
+              <FiNavigation className="w-6 h-6 text-indigo-600" />
+            </motion.button>
+            
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setShowAddModal(true)}
+              className="w-14 h-14 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full shadow-lg flex items-center justify-center mobile-button floating-shadow animate-pulse"
+            >
+              <FiPlus className="w-6 h-6 text-white" />
+            </motion.button>
+          </div>
+        </div>
 
-      {/* 장소 추가 모달 */}
-      <AnimatePresence>
-        {showAddModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end"
-            onClick={() => setShowAddModal(false)}
-          >
+        {/* 개선된 하단 시트 */}
+        <AnimatePresence>
+          {showBottomSheet && selectedLocation && (
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 500 }}
-              className="w-full bg-white rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-2xl z-30 max-h-[70vh] overflow-hidden"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">새 장소 추가</h2>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowAddModal(false)}
-                  className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
-                >
-                  <FiX className="w-4 h-4 text-gray-600" />
-                </motion.button>
-              </div>
+              <div className="p-6">
+                <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-6" />
+                
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className={`w-12 h-12 ${LOCATION_CATEGORIES.find(cat => cat.id === selectedLocation.category)?.bgColor || 'bg-gray-500'} rounded-xl flex items-center justify-center shadow-lg`}>
+                        {React.createElement(LOCATION_CATEGORIES.find(cat => cat.id === selectedLocation.category)?.icon || FiMapPin, {
+                          className: "w-6 h-6 text-white"
+                        })}
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900">{selectedLocation.name}</h3>
+                        {selectedLocation.rating && (
+                          <div className="flex items-center space-x-1 mt-1">
+                            <FiStar className="w-4 h-4 text-yellow-400 fill-current" />
+                            <span className="text-sm font-medium text-gray-700">{selectedLocation.rating}</span>
+                            <span className="text-xs text-gray-500">• 평점</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-start space-x-2">
+                        <FiMapPin className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-gray-600">{selectedLocation.address}</p>
+                      </div>
+                      
+                      {selectedLocation.description && (
+                        <div className="flex items-start space-x-2">
+                          <FiEye className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-gray-800">{selectedLocation.description}</p>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center space-x-2">
+                        <FiUsers className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-500">추가한 사람:</span>
+                        <span className="text-sm font-medium text-indigo-600">{selectedLocation.addedBy}</span>
+                      </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">장소명</label>
-                  <input
-                    type="text"
-                    value={newLocation.name}
-                    onChange={(e) => setNewLocation({...newLocation, name: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="장소명을 입력하세요"
-                  />
-                </div>
+                      {selectedLocation.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-4">
+                          {selectedLocation.tags.map((tag, index) => (
+                            <span
+                              key={index}
+                              className="px-3 py-1 bg-gradient-to-r from-indigo-50 to-purple-50 text-sm text-indigo-700 rounded-full border border-indigo-100"
+                            >
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">주소</label>
-                  <input
-                    type="text"
-                    value={newLocation.address}
-                    onChange={(e) => setNewLocation({...newLocation, address: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="주소를 입력하세요"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">카테고리</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {LOCATION_CATEGORIES.map((category) => (
-                      <motion.button
-                        key={category.id}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => setNewLocation({...newLocation, category: category.id})}
-                        className={`p-3 rounded-lg border-2 transition-all ${
-                          newLocation.category === category.id
-                            ? 'border-indigo-500 bg-indigo-50'
-                            : 'border-gray-200 bg-white'
-                        }`}
-                      >
-                        <category.icon className="w-5 h-5 mx-auto mb-1" style={{ color: category.color }} />
-                        <span className="text-xs font-medium">{category.name}</span>
-                      </motion.button>
-                    ))}
+                  <div className="flex space-x-2 ml-4">
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        setEditingLocation(selectedLocation);
+                        setShowEditModal(true);
+                        setShowBottomSheet(false);
+                      }}
+                      className="w-10 h-10 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-full flex items-center justify-center border border-blue-100 mobile-button"
+                    >
+                      <FiEdit3 className="w-4 h-4 text-blue-600" />
+                    </motion.button>
+                    <motion.button
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleDeleteLocation(selectedLocation.id)}
+                      className="w-10 h-10 bg-gradient-to-r from-red-50 to-pink-50 rounded-full flex items-center justify-center border border-red-100 mobile-button"
+                    >
+                      <FiTrash2 className="w-4 h-4 text-red-600" />
+                    </motion.button>
                   </div>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">설명 (선택)</label>
-                  <textarea
-                    value={newLocation.description}
-                    onChange={(e) => setNewLocation({...newLocation, description: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="장소에 대한 설명을 입력하세요"
-                    rows={3}
-                  />
-                </div>
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleAddLocation}
-                  disabled={!newLocation.name || !newLocation.address}
-                  className="w-full bg-indigo-500 text-white py-3 rounded-lg font-medium disabled:bg-gray-300 disabled:cursor-not-allowed transition-all"
-                >
-                  <div className="flex items-center justify-center space-x-2">
-                    <FiSave className="w-4 h-4" />
-                    <span>장소 추가</span>
-                  </div>
-                </motion.button>
               </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      {/* 장소 수정 모달 */}
-      <AnimatePresence>
-        {showEditModal && editingLocation && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end"
-            onClick={() => setShowEditModal(false)}
-          >
+        {/* 개선된 장소 추가 모달 */}
+        <AnimatePresence>
+          {showAddModal && (
             <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 500 }}
-              className="w-full bg-white rounded-t-3xl p-6 max-h-[80vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end"
+              onClick={() => setShowAddModal(false)}
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-gray-900">장소 수정</h2>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowEditModal(false)}
-                  className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center"
-                >
-                  <FiX className="w-4 h-4 text-gray-600" />
-                </motion.button>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">장소명</label>
-                  <input
-                    type="text"
-                    value={editingLocation.name}
-                    onChange={(e) => setEditingLocation({...editingLocation, name: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">주소</label>
-                  <input
-                    type="text"
-                    value={editingLocation.address}
-                    onChange={(e) => setEditingLocation({...editingLocation, address: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">설명</label>
-                  <textarea
-                    value={editingLocation.description || ''}
-                    onChange={(e) => setEditingLocation({...editingLocation, description: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    rows={3}
-                  />
-                </div>
-
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleEditLocation}
-                  className="w-full bg-indigo-500 text-white py-3 rounded-lg font-medium transition-all"
-                >
-                  <div className="flex items-center justify-center space-x-2">
-                    <FiSave className="w-4 h-4" />
-                    <span>수정 완료</span>
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 500 }}
+                className="w-full bg-white rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
+                      <FiPlus className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">새 장소 추가</h2>
+                      <p className="text-sm text-gray-600">특별한 장소를 공유해보세요</p>
+                    </div>
                   </div>
-                </motion.button>
-              </div>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowAddModal(false)}
+                    className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mobile-button"
+                  >
+                    <FiX className="w-5 h-5 text-gray-600" />
+                  </motion.button>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">장소명</label>
+                    <input
+                      type="text"
+                      value={newLocation.name}
+                      onChange={(e) => setNewLocation({...newLocation, name: e.target.value})}
+                      className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                      placeholder="어떤 장소인가요?"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">주소</label>
+                    <input
+                      type="text"
+                      value={newLocation.address}
+                      onChange={(e) => setNewLocation({...newLocation, address: e.target.value})}
+                      className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                      placeholder="주소를 입력해주세요"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">카테고리</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {LOCATION_CATEGORIES.map((category) => (
+                        <motion.button
+                          key={category.id}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setNewLocation({...newLocation, category: category.id})}
+                          className={`p-4 rounded-2xl border-2 transition-all mobile-button ${
+                            newLocation.category === category.id
+                              ? 'border-indigo-500 bg-gradient-to-r from-indigo-50 to-purple-50'
+                              : 'border-gray-200 bg-white hover:border-gray-300'
+                          }`}
+                        >
+                          <div className={`w-10 h-10 ${category.bgColor} rounded-xl flex items-center justify-center mx-auto mb-2 shadow-sm`}>
+                            <category.icon className="w-5 h-5 text-white" />
+                          </div>
+                          <span className="text-sm font-medium text-gray-700">{category.name}</span>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">설명 (선택사항)</label>
+                    <textarea
+                      value={newLocation.description}
+                      onChange={(e) => setNewLocation({...newLocation, description: e.target.value})}
+                      className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none"
+                      placeholder="이 장소에 대해 설명해주세요"
+                      rows={3}
+                    />
+                  </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleAddLocation}
+                    disabled={!newLocation.name || !newLocation.address}
+                    className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-4 rounded-2xl font-semibold disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg mobile-button"
+                  >
+                    <div className="flex items-center justify-center space-x-2">
+                      <FiSave className="w-5 h-5" />
+                      <span>장소 추가하기</span>
+                    </div>
+                  </motion.button>
+                </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+          )}
+        </AnimatePresence>
+
+        {/* 개선된 장소 수정 모달 */}
+        <AnimatePresence>
+          {showEditModal && editingLocation && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end"
+              onClick={() => setShowEditModal(false)}
+            >
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 500 }}
+                className="w-full bg-white rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                      <FiEdit3 className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">장소 수정</h2>
+                      <p className="text-sm text-gray-600">장소 정보를 업데이트하세요</p>
+                    </div>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setShowEditModal(false)}
+                    className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center mobile-button"
+                  >
+                    <FiX className="w-5 h-5 text-gray-600" />
+                  </motion.button>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">장소명</label>
+                    <input
+                      type="text"
+                      value={editingLocation.name}
+                      onChange={(e) => setEditingLocation({...editingLocation, name: e.target.value})}
+                      className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">주소</label>
+                    <input
+                      type="text"
+                      value={editingLocation.address}
+                      onChange={(e) => setEditingLocation({...editingLocation, address: e.target.value})}
+                      className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">설명</label>
+                    <textarea
+                      value={editingLocation.description || ''}
+                      onChange={(e) => setEditingLocation({...editingLocation, description: e.target.value})}
+                      className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all resize-none"
+                      rows={3}
+                    />
+                  </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleEditLocation}
+                    className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-4 rounded-2xl font-semibold transition-all shadow-lg mobile-button"
+                  >
+                    <div className="flex items-center justify-center space-x-2">
+                      <FiSave className="w-5 h-5" />
+                      <span>수정 완료</span>
+                    </div>
+                  </motion.button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </>
   );
 };
 
