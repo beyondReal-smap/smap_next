@@ -205,9 +205,9 @@ const bottomSheetVariants = {
     opacity: 1,
     transition: {
       type: "spring",
-      damping: 20,
-      stiffness: 300,
-      duration: 0.3
+      damping: 25,
+      stiffness: 400,
+      duration: 0.2
     }
   },
   peek: {
@@ -215,9 +215,9 @@ const bottomSheetVariants = {
     opacity: 1,
     transition: {
       type: "spring",
-      damping: 20,
-      stiffness: 300,
-      duration: 0.3
+      damping: 25,
+      stiffness: 400,
+      duration: 0.2
     }
   }
 };
@@ -231,26 +231,26 @@ const memberAvatarVariants = {
     scale: 1,
     opacity: 1,
     transition: {
-      delay: index * 0.1,
+      delay: index * 0.05,
       type: "spring",
-      stiffness: 200,
-      damping: 20
+      stiffness: 300,
+      damping: 15
     }
   }),
   hover: {
     scale: 1.1,
     transition: {
       type: "spring",
-      stiffness: 400,
-      damping: 10
+      stiffness: 500,
+      damping: 8
     }
   },
   selected: {
     scale: 1.05,
     transition: {
       type: "spring",
-      stiffness: 300,
-      damping: 15
+      stiffness: 400,
+      damping: 12
     }
   }
 };
@@ -258,50 +258,44 @@ const memberAvatarVariants = {
 const locationCardVariants = {
   hidden: { 
     opacity: 0, 
-    y: 30,
-    scale: 0.85,
-    rotateX: 15
+    y: 20,
+    scale: 0.9
   },
   visible: (index: number) => ({
     opacity: 1,
     y: 0,
     scale: 1,
-    rotateX: 0,
     transition: {
-      delay: index * 0.08,
-      duration: 0.5,
+      delay: index * 0.04,
+      duration: 0.3,
       ease: [0.25, 0.46, 0.45, 0.94],
       type: "spring",
-      stiffness: 200,
-      damping: 20
+      stiffness: 300,
+      damping: 15
     }
   }),
   hover: {
-    y: -8,
-    scale: 1.05,
-    rotateX: -2,
-    boxShadow: "0 25px 50px rgba(99, 102, 241, 0.25)",
+    y: -6,
+    scale: 1.03,
+    transition: {
+      type: "spring",
+      stiffness: 500,
+      damping: 12
+    }
+  },
+  selected: {
+    scale: 1.01,
+    y: -1,
     transition: {
       type: "spring",
       stiffness: 400,
       damping: 15
     }
   },
-  selected: {
-    scale: 1.01,
-    y: -1,
-    rotateX: 0,
-    boxShadow: "0 15px 150px rgba(99, 102, 241, 0.3)",
-    transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 20
-    }
-  },
   tap: {
     scale: 0.98,
     transition: {
-      duration: 0.1
+      duration: 0.05
     }
   }
 };
@@ -309,36 +303,35 @@ const locationCardVariants = {
 const floatingButtonVariants = {
   initial: { 
     scale: 0,
-    rotate: -180,
-    y: 100
+    rotate: -90,
+    y: 50
   },
   animate: { 
     scale: 1,
     rotate: 0,
     y: 0,
     transition: {
-      delay: 0.8,
-      type: "spring",
-      stiffness: 300,
-      damping: 20
-    }
-  },
-  hover: { 
-    scale: 1.15,
-    rotate: 90,
-    y: -5,
-    boxShadow: "0 20px 40px rgba(99, 102, 241, 0.4)",
-    transition: {
+      delay: 0.3,
       type: "spring",
       stiffness: 400,
       damping: 15
     }
   },
+  hover: { 
+    scale: 1.1,
+    rotate: 90,
+    y: -3,
+    transition: {
+      type: "spring",
+      stiffness: 500,
+      damping: 10
+    }
+  },
   tap: { 
-    scale: 0.9,
+    scale: 0.95,
     rotate: 45,
     transition: {
-      duration: 0.1
+      duration: 0.05
     }
   }
 };
@@ -346,8 +339,8 @@ const floatingButtonVariants = {
 const modalVariants = {
   hidden: {
     opacity: 0,
-    scale: 0.8,
-    y: 50
+    scale: 0.9,
+    y: 30
   },
   visible: {
     opacity: 1,
@@ -355,16 +348,16 @@ const modalVariants = {
     y: 0,
     transition: {
       type: "spring",
-      stiffness: 300,
-      damping: 25
+      stiffness: 400,
+      damping: 20
     }
   },
   exit: {
     opacity: 0,
-    scale: 0.8,
-    y: 50,
+    scale: 0.9,
+    y: 30,
     transition: {
-      duration: 0.2
+      duration: 0.15
     }
   }
 };
@@ -374,8 +367,8 @@ const staggerContainer = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2
+      staggerChildren: 0.05,
+      delayChildren: 0.1
     }
   }
 };
@@ -383,15 +376,15 @@ const staggerContainer = {
 const staggerItem = {
   hidden: { 
     opacity: 0, 
-    y: 20 
+    y: 15 
   },
   visible: {
     opacity: 1,
     y: 0,
     transition: {
       type: "spring",
-      stiffness: 200,
-      damping: 20
+      stiffness: 300,
+      damping: 15
     }
   }
 };
@@ -2298,7 +2291,7 @@ export default function LocationPage() {
         <motion.header 
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+          transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="fixed top-0 left-0 right-0 z-20 glass-effect"
         >
           <div className="flex items-center justify-between h-16 px-4">
@@ -2419,7 +2412,7 @@ export default function LocationPage() {
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.3, duration: 0.6 }}
+          transition={{ delay: 0.15, duration: 0.4 }}
           className="map-container fixed top-16 left-0 right-0 bottom-0 w-full"
         >
           <div 
@@ -2433,10 +2426,10 @@ export default function LocationPage() {
         {isLocationInfoPanelOpen && (
             <motion.div 
             ref={infoPanelRef} 
-              initial={{ opacity: 0, y: -50, scale: 0.9 }}
+              initial={{ opacity: 0, y: -30, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -50, scale: 0.9 }}
-              transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+              exit={{ opacity: 0, y: -30, scale: 0.95 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
               className="location-info-panel fixed top-20 left-4 right-4 z-30 rounded-2xl p-4 shadow-2xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -2691,7 +2684,7 @@ export default function LocationPage() {
         >
             {/* 바텀시트 핸들 */}
             <motion.div 
-              className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-4 mb-6 cursor-grab active:cursor-grabbing"
+              className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-3 cursor-grab active:cursor-grabbing"
               whileHover={{ scale: 1.2, backgroundColor: '#6366f1' }}
               transition={{ duration: 0.2 }}
             />
@@ -2942,10 +2935,10 @@ export default function LocationPage() {
                 {/* 다른 멤버들의 장소 뷰 */}
               <div className="w-full flex-shrink-0 snap-start">
                   <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
+                    initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4, duration: 0.6 }}
-                    className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-4 mb-6 border border-purple-100 h-[200px] overflow-y-auto hide-scrollbar"
+                    transition={{ delay: 0.1, duration: 0.3 }}
+                    className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
                   >
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center space-x-3">
@@ -3107,10 +3100,10 @@ export default function LocationPage() {
 
               {/* 개선된 좌우 스와이프 인디케이터 */}
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="flex justify-center items-center my-6 bg-gray-50 rounded-2xl py-3 px-6 mx-4"
+                transition={{ delay: 0.2 }}
+                className="flex justify-center items-center my-7 bg-gray-50 rounded-2xl py-3 px-6 mx-4"
               >
                 {/* 왼쪽 화살표 */}
                 <motion.div
