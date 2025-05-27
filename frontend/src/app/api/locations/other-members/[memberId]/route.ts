@@ -49,9 +49,9 @@ async function fetchWithFallback(url: string, options: any): Promise<any> {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { memberId: string } }
+  context: { params: Promise<{ memberId: string }> }
 ) {
-  const { memberId } = await params; // Next.js 15에서 params를 await해야 함
+  const { memberId } = await context.params; // Next.js 15에서 params는 Promise입니다
   try {
     // 다른 API와 동일하게 HTTPS 사용
     const backendUrl = `https://118.67.130.71:8000/api/v1/locations/member/${memberId}`;

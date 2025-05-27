@@ -1,6 +1,4 @@
 {
-  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
-  "/api/v1/groups/member/[id]/route": "app/api/v1/groups/member/[id]/route.js",
   "/schedule/page": "app/schedule/page.js",
   "/location/page": "app/location/page.js",
   "/group/page": "app/group/page.js"
