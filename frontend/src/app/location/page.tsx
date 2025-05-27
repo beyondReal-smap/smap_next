@@ -2202,7 +2202,7 @@ export default function LocationPage() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3, duration: 0.6 }}
-                    className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-6 mb-6 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
+                    className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-6 mb-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
                   >
                     <div className="flex justify-between items-center mb-2">
                        <div className="flex items-center space-x-3">
@@ -2454,74 +2454,126 @@ export default function LocationPage() {
                               animate="visible"
                               whileHover={!isSelected ? "hover" : undefined}
                               whileTap="tap"
-                              className={`location-card flex-shrink-0 w-64 rounded-2xl p-4 cursor-pointer shadow-lg transition-all duration-300 ${
-                                isSelected ? 'selected ring-2 ring-purple-400 border-purple-200' : 'hover:shadow-xl'
-                              } ${!hasValidCoords ? 'opacity-75 border-dashed border-2 border-gray-300' : ''}`}
+                              className={`flex-shrink-0 w-72 rounded-2xl p-5 shadow-lg transition-all duration-300 border-2 ${
+                                isSelected 
+                                  ? 'bg-gradient-to-br from-purple-50 to-pink-50 border-purple-300 shadow-purple-200/50' 
+                                  : 'bg-gradient-to-br from-white to-gray-50 border-gray-200 hover:border-purple-300 hover:shadow-purple-100/30'
+                              } ${!hasValidCoords ? 'opacity-75 border-dashed border-orange-300 bg-gradient-to-br from-orange-50 to-yellow-50' : ''}`}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleLocationCardClick(location);
                               }}
                             >
-                              <div className="flex items-center justify-between mb-4">
+                              {/* 헤더 부분 */}
+                              <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center min-w-0 flex-1">
                                   <motion.div
-                                    whileHover={{ rotate: hasValidCoords ? 360 : 0 }}
+                                    whileHover={{ rotate: hasValidCoords ? 360 : 0, scale: 1.1 }}
                                     transition={{ duration: 0.3 }}
-                                    className={`p-2 rounded-xl mr-3 flex-shrink-0 ${
+                                    className={`p-2.5 rounded-xl mr-3 flex-shrink-0 ${
                                       !hasValidCoords 
-                                        ? 'bg-gradient-to-r from-gray-400 to-gray-500' 
+                                        ? 'bg-gradient-to-r from-orange-400 to-red-400' 
                                         : isSelected 
-                                          ? 'bg-gradient-to-r from-purple-600 to-pink-700 shadow-lg' 
-                                          : 'bg-gradient-to-r from-purple-500 to-pink-600'
+                                          ? 'bg-gradient-to-r from-purple-500 to-pink-500 shadow-lg' 
+                                          : 'bg-gradient-to-r from-indigo-500 to-purple-500'
                                     }`}
                                   >
-                                    <FiMapPin className={`w-4 h-4 ${!hasValidCoords ? 'text-gray-200' : 'text-white'}`} />
+                                    <FiMapPin className={`w-5 h-5 text-white`} />
                                   </motion.div>
                                   <div className="min-w-0 flex-1">
-                                    <h4 className={`text-sm font-bold truncate ${
+                                    <h4 className={`text-base font-bold truncate mb-1 ${
                                       isSelected ? 'text-purple-800' : 'text-gray-800'
                                     }`}>
                                       {location.name || location.slt_title || '제목 없음'}
                                     </h4>
-                                    <p className={`text-xs truncate mt-1 ${
-                                      isSelected ? 'text-purple-600' : 'text-gray-500'
+                                    <p className={`text-sm truncate ${
+                                      isSelected ? 'text-purple-600' : 'text-gray-600'
                                     }`}>
                                       {location.address || location.slt_add || '주소 정보 없음'}
-                                      {!hasValidCoords && <span className="text-orange-500 ml-1">(위치 정보 없음)</span>}
                                     </p>
-                              </div>
+                                    {!hasValidCoords && (
+                                      <span className="inline-block text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full mt-1">
+                                        📍 위치 정보 없음
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                                
-                                <motion.div
-                                  whileHover={{ scale: 1.2 }}
-                                  className="flex-shrink-0 ml-2"
-                                >
-                                {(location.notifications || (location as any).slt_enter_alarm === 'Y') ? (
-                                    <div className="notification-badge p-2 rounded-xl">
-                                      <FiBell size={12} className="text-white" />
-                    </div>
-                  ) : (
-                                    <div className="danger-badge p-2 rounded-xl">
-                                      <FiBellOff size={12} className="text-white" />
-                    </div>
-                  )}
-                                </motion.div>
-                </div>
+                              </div>
                               
-                             
+                              {/* 액션 버튼들 */}
+                              <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-200">
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // 알림 토글 로직 (추후 구현)
+                                    console.log('알림 토글:', location.name);
+                                  }}
+                                  className={`p-2 rounded-lg transition-all duration-200 ${
+                                    (location.notifications || (location as any).slt_enter_alarm === 'Y')
+                                      ? 'bg-green-100 text-green-600 hover:bg-green-200' 
+                                      : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                  }`}
+                                  title={`알림 ${(location.notifications || (location as any).slt_enter_alarm === 'Y') ? '끄기' : '켜기'}`}
+                                >
+                                  {(location.notifications || (location as any).slt_enter_alarm === 'Y') ? (
+                                    <FiBell size={16} />
+                                  ) : (
+                                    <FiBellOff size={16} />
+                                  )}
+                                </motion.button>
+                                
+                                <motion.button
+                                  whileHover={{ scale: 1.1 }}
+                                  whileTap={{ scale: 0.9 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // 삭제 로직 (추후 구현)
+                                    console.log('장소 삭제:', location.name);
+                                    handleDeleteLocation(location.slt_idx || location.id);
+                                  }}
+                                  className="p-2 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-all duration-200"
+                                  title="장소 삭제"
+                                >
+                                  <FiTrash2 size={16} />
+                                </motion.button>
+                              </div>
                 </motion.div>
                         );
                       })}
               </motion.div>
                     ) : (
-                      <div className="bg-white rounded-xl shadow-lg p-4 text-center text-gray-500 border border-gray-200">
-                        <p className="font-medium">
+                      <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-2xl shadow-lg p-8 text-center border-2 border-dashed border-gray-300">
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 200 }}
+                          className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-indigo-400 to-purple-500 rounded-2xl flex items-center justify-center"
+                        >
+                          <FiMapPin className="w-8 h-8 text-white" />
+                        </motion.div>
+                        <h3 className="font-bold text-gray-800 mb-2">
                           {groupMembers.find((m: GroupMember) => m.isSelected)?.name ?
-                            `${groupMembers.find((m: GroupMember) => m.isSelected)?.name}님이 등록한 장소가 없습니다.` : 
-                            '다른 멤버들이 등록한 장소가 없습니다.'
+                            `${groupMembers.find((m: GroupMember) => m.isSelected)?.name}님의 장소가 없습니다` : 
+                            '등록된 장소가 없습니다'
                           }
+                        </h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          지도를 클릭하거나 검색하여 새로운 장소를 추가해보세요
                         </p>
-                        <p className="text-sm mt-1">새로운 장소를 추가해보세요</p>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-lg font-medium text-sm hover:shadow-lg transition-all duration-200"
+                          onClick={() => {
+                            // 장소 추가 로직 (추후 구현)
+                            console.log('장소 추가 버튼 클릭');
+                          }}
+                        >
+                          <FiPlus className="w-4 h-4 mr-2" />
+                          장소 추가하기
+                        </motion.button>
                   </div>
                   )}
                   </motion.div>
