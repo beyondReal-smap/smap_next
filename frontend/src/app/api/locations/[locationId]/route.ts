@@ -50,9 +50,9 @@ async function fetchWithFallback(url: string, options: any): Promise<any> {
 // 장소 숨김 처리를 위한 PATCH 핸들러
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { locationId: string } }
+  context: { params: Promise<{ locationId: string }> }
 ) {
-  const { locationId } = await params; // Next.js 15에서 params를 await해야 함
+  const { locationId } = await context.params; // Next.js 15에서 params는 Promise입니다
   try {
     // v1 locations API 사용하여 slt_show를 'N'으로 설정
     const backendUrl = `https://118.67.130.71:8000/api/v1/locations/${locationId}`;

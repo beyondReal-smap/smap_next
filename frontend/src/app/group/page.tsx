@@ -742,7 +742,7 @@ function GroupPageContent() {
                 <div className="px-4 mb-4">
                   <div className="grid grid-cols-2 gap-3">
                     <motion.div 
-                      className="bg-gradient-to-r from-indigo-400 to-indigo-400 rounded-2xl p-4 text-white shadow-lg"
+                      className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-lg"
                       variants={cardVariants}
                       initial="hidden"
                       animate="visible"
@@ -757,7 +757,7 @@ function GroupPageContent() {
                       </div>
                     </motion.div>
                     <motion.div 
-                      className="bg-gradient-to-r from-pink-400 to-pink-400 rounded-2xl p-4 text-white shadow-lg"
+                      className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg"
                       variants={cardVariants}
                       initial="hidden"
                       animate="visible"

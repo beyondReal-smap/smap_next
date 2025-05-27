@@ -681,7 +681,7 @@ export default function SchedulePage() {
             >
               <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
                 {/* 헤더 */}
-                <div className="px-6 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+                <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-lg font-bold">

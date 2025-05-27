@@ -2395,7 +2395,7 @@ export default function LocationPage() {
                   variants={staggerItem}
                   animate={{ rotate: 360 }}
                   transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                  className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center">
+                  className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl flex items-center justify-center">
                   <FiMapPin className="w-full h-full text-white" />
                 </motion.div>
                 
@@ -2853,8 +2853,7 @@ export default function LocationPage() {
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-10 h-10 mx-auto mb-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center"
-                        >
+                          className="w-10 h-10 mx-auto mb-4 bg-gradient-to-r from-pink-600 to-pink-700 rounded-xl flex items-center justify-center">
                           <FiLoader className="w-5 h-5 text-white" />
                         </motion.div>
                         <p className="font-medium">멤버 정보를 불러오는 중...</p>
@@ -2975,8 +2974,7 @@ export default function LocationPage() {
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-10 h-10 mx-auto mb-4 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center"
-                        >
+                          className="w-10 h-10 mx-auto mb-4 bg-gradient-to-r from-pink-600 to-pink-700 rounded-xl flex items-center justify-center">
                           <FiLoader className="w-5 h-5 text-white" />
                         </motion.div>
                         <p className="font-medium">다른 멤버 장소 로딩 중...</p>
@@ -3134,7 +3132,7 @@ export default function LocationPage() {
                     onClick={() => handleViewChange('selectedMemberPlaces')}
                     className={`w-4 h-4 rounded-full focus:outline-none transition-all duration-300 ${
                       activeView === 'selectedMemberPlaces' 
-                        ? 'bg-gradient-to-r from-indigo-500 to-purple-600 shadow-lg scale-125' 
+                        ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 shadow-lg scale-125' 
                         : 'bg-gray-300 hover:bg-gray-400'
                     }`}
                     aria-label="선택된 멤버 장소 뷰로 전환"
@@ -3155,7 +3153,7 @@ export default function LocationPage() {
                     onClick={() => handleViewChange('otherMembersPlaces')}
                     className={`w-4 h-4 rounded-full focus:outline-none transition-all duration-300 ${
                       activeView === 'otherMembersPlaces' 
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-600 shadow-lg scale-125' 
+                        ? 'bg-gradient-to-r from-pink-600 to-pink-700 shadow-lg scale-125' 
                         : 'bg-gray-300 hover:bg-gray-400'
                     }`}
                     aria-label="다른 멤버 장소 뷰로 전환"
