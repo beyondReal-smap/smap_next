@@ -1380,97 +1380,123 @@ export default function LocationPage() {
         title: location.name,
         icon: {
           content: `
-            <div class="marker-container" style="
+            <div class="modern-marker" style="
               position: relative;
-              width: 40px;
-              height: 40px;
+              width: 48px;
+              height: 56px;
               cursor: pointer;
-              animation: markerDrop 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${index * 0.1}s both;
+              animation: markerDrop 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${index * 0.15}s both;
             ">
-              <div class="marker-pulse" style="
+              <div class="marker-glow" style="
                 position: absolute;
                 top: 50%;
                 left: 50%;
-                transform: translate(-50%, -50%);
-                width: 40px;
-                height: 40px;
-                background: ${isMarkerSelected ? 'rgba(168, 85, 247, 0.4)' : 'rgba(99, 102, 241, 0.3)'};
+                transform: translate(-50%, -55%);
+                width: 52px;
+                height: 52px;
+                background: ${isMarkerSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(99, 102, 241, 0.2)'};
                 border-radius: 50%;
-                animation: pulse 2s infinite;
+                animation: markerGlow 3s ease-in-out infinite;
               "></div>
-              <div class="marker-main" style="
+              
+              <div class="marker-body" style="
                 position: relative;
-                background: ${isMarkerSelected ? 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)' : 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'};
-                width: ${isMarkerSelected ? '34px' : '32px'};
-                height: ${isMarkerSelected ? '34px' : '32px'};
-                border-radius: 50%;
+                width: 40px;
+                height: 48px;
+                background: ${isMarkerSelected ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'};
+                border-radius: 20px 20px 20px 4px;
                 border: 3px solid white;
-                box-shadow: ${isMarkerSelected ? '0 6px 20px rgba(168, 85, 247, 0.4)' : '0 6px 20px rgba(99, 102, 241, 0.4)'};
+                box-shadow: ${isMarkerSelected ? '0 8px 24px rgba(59, 130, 246, 0.4)' : '0 6px 20px rgba(99, 102, 241, 0.3)'};
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 color: white;
                 font-weight: bold;
-                font-size: 12px;
+                font-size: 14px;
                 transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-                z-index: ${isMarkerSelected ? '10' : '2'};
-                transform: ${isMarkerSelected ? 'scale(1.1)' : 'scale(1)'};
+                z-index: ${isMarkerSelected ? '100' : '10'};
+                transform: ${isMarkerSelected ? 'scale(1.15)' : 'scale(1)'};
               " 
               onmouseover="
-                this.style.transform='scale(1.2) translateY(-2px)';
-                this.style.boxShadow='0 10px 30px rgba(99, 102, 241, 0.6)';
-                this.parentElement.querySelector('.marker-pulse').style.animationDuration='1s';
+                this.style.transform='scale(1.25) translateY(-4px)';
+                this.style.boxShadow='0 12px 32px rgba(59, 130, 246, 0.5)';
+                this.parentElement.querySelector('.marker-glow').style.animation='markerGlow 1.5s ease-in-out infinite';
               " 
               onmouseout="
-                this.style.transform='${isMarkerSelected ? 'scale(1.1)' : 'scale(1)'} translateY(0)';
-                this.style.boxShadow='${isMarkerSelected ? '0 8px 25px rgba(168, 85, 247, 0.5)' : '0 6px 20px rgba(99, 102, 241, 0.4)'}';
-                this.parentElement.querySelector('.marker-pulse').style.animationDuration='2s';
+                this.style.transform='${isMarkerSelected ? 'scale(1.15)' : 'scale(1)'} translateY(0)';
+                this.style.boxShadow='${isMarkerSelected ? '0 8px 24px rgba(59, 130, 246, 0.4)' : '0 6px 20px rgba(99, 102, 241, 0.3)'}';
+                this.parentElement.querySelector('.marker-glow').style.animation='markerGlow 3s ease-in-out infinite';
               "
               onclick="
                 this.style.animation='markerBounce 0.6s ease-out';
                 setTimeout(() => this.style.animation = '', 600);
               ">
+                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                </svg>
+              </div>
+              
+              <div class="marker-number" style="
+                position: absolute;
+                top: -8px;
+                right: -8px;
+                width: 20px;
+                height: 20px;
+                background: ${isMarkerSelected ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'};
+                border: 2px solid white;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 10px;
+                font-weight: bold;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+              ">
                 ${index + 1}
               </div>
-          </div>
+            </div>
+            
             <style>
               @keyframes markerDrop {
                 0% {
-                  transform: translateY(-100px) scale(0.5);
+                  transform: translateY(-120px) scale(0.3) rotate(-15deg);
                   opacity: 0;
                 }
                 50% {
-                  transform: translateY(10px) scale(1.1);
+                  transform: translateY(8px) scale(1.1) rotate(5deg);
                   opacity: 0.8;
                 }
+                70% {
+                  transform: translateY(-4px) scale(0.95) rotate(-2deg);
+                  opacity: 0.9;
+                }
                 100% {
-                  transform: translateY(0) scale(1);
+                  transform: translateY(0) scale(1) rotate(0deg);
                   opacity: 1;
                 }
               }
-              @keyframes pulse {
-                0% {
-                  transform: translate(-50%, -50%) scale(0.8);
-                  opacity: 0.8;
+              
+              @keyframes markerGlow {
+                0%, 100% { 
+                  transform: translate(-50%, -55%) scale(0.8); 
+                  opacity: 0.5; 
                 }
-                50% {
-                  transform: translate(-50%, -50%) scale(1.2);
-                  opacity: 0.3;
-                }
-                100% {
-                  transform: translate(-50%, -50%) scale(0.8);
-                  opacity: 0.8;
+                50% { 
+                  transform: translate(-50%, -55%) scale(1.2); 
+                  opacity: 0.1; 
                 }
               }
+              
               @keyframes markerBounce {
-                0%, 100% { transform: scale(1) translateY(0); }
-                25% { transform: scale(1.1) translateY(-5px); }
-                50% { transform: scale(1.2) translateY(-8px); }
-                75% { transform: scale(1.1) translateY(-3px); }
+                0%, 100% { transform: scale(1) translateY(0) rotate(0deg); }
+                25% { transform: scale(1.1) translateY(-6px) rotate(2deg); }
+                50% { transform: scale(1.2) translateY(-10px) rotate(-1deg); }
+                75% { transform: scale(1.05) translateY(-3px) rotate(1deg); }
               }
             </style>
           `,
-          anchor: new window.naver.maps.Point(20, 20)
+          anchor: new window.naver.maps.Point(24, 48)
         }
       });
 
@@ -1485,127 +1511,136 @@ export default function LocationPage() {
         const newInfoWindow = new window.naver.maps.InfoWindow({
           content: `
             <div style="
-              padding: 16px;
-              min-width: 200px;
-              max-width: 280px;
+              padding: 20px;
+              min-width: 280px;
+              max-width: 320px;
               font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background: white;
-              border-radius: 12px;
-              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+              background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+              border-radius: 16px;
+              box-shadow: 0 20px 48px rgba(0, 0, 0, 0.15);
+              border: 1px solid rgba(59, 130, 246, 0.1);
             ">
-              <div style="
-                display: flex;
-                align-items: center;
-                margin-bottom: 12px;
-                padding-bottom: 8px;
-                border-bottom: 1px solid #e5e7eb;
-              ">
-                <div style="
-                  width: 24px;
-                  height: 24px;
-                  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-                  border-radius: 50%;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  margin-right: 8px;
-                ">
-                  <svg width="12" height="12" fill="white" viewBox="0 0 24 24">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                  </svg>
-                </div>
-                <h3 style="
-                  margin: 0;
-                  font-size: 16px;
-                  font-weight: 600;
-                  color: #1f2937;
-                  line-height: 1.2;
-                ">${location.name}</h3>
-              </div>
-              
-              <div style="margin-bottom: 12px;">
-                <p style="
-                  margin: 0;
-                  font-size: 14px;
-                  color: #6b7280;
-                  line-height: 1.4;
-                ">${location.address}</p>
-              </div>
-              
-              ${location.memo ? `
-                <div style="margin-bottom: 12px;">
-                  <p style="
-                    margin: 0;
-                    font-size: 13px;
-                    color: #9ca3af;
-                    font-style: italic;
-                    line-height: 1.3;
-                  ">"${location.memo}"</p>
-                </div>
-              ` : ''}
-              
+              <!-- 헤더 -->
               <div style="
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                margin-top: 12px;
-                padding-top: 8px;
-                border-top: 1px solid #e5e7eb;
+                margin-bottom: 16px;
+                padding-bottom: 12px;
+                border-bottom: 2px solid #e5e7eb;
               ">
-                <div style="
-                  display: flex;
-                  align-items: center;
-                  gap: 8px;
-                ">
-                  <span style="
-                    background: ${location.favorite ? '#10b981' : '#6b7280'};
-                    color: white;
-                    padding: 4px 8px;
-                    border-radius: 6px;
-                    font-size: 11px;
-                    font-weight: 500;
-                  ">${location.category}</span>
-                  
-                  ${location.favorite ? `
-                    <span style="
-                      background: #ef4444;
-                      color: white;
-                      padding: 4px 6px;
-                      border-radius: 6px;
-                      font-size: 10px;
-                    ">♥</span>
-                  ` : ''}
-            </div>
+                <div style="display: flex; align-items: center;">
+                  <div style="
+                    width: 32px;
+                    height: 32px;
+                    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+                    border-radius: 8px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-right: 12px;
+                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+                  ">
+                    <svg width="16" height="16" fill="white" viewBox="0 0 24 24">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 style="
+                      margin: 0;
+                      font-size: 18px;
+                      font-weight: 700;
+                      color: #111827;
+                      line-height: 1.2;
+                    ">${location.name}</h3>
+                  </div>
+                </div>
                 
-                <div style="
-                  display: flex;
-                  align-items: center;
-                  gap: 4px;
-                ">
-                  ${location.notifications ? `
-                    <div style="
-                      background: #10b981;
-                      color: white;
-                      padding: 4px;
-                      border-radius: 4px;
-                      font-size: 10px;
-                    ">🔔</div>
-                  ` : `
-                    <div style="
-                      background: #6b7280;
-                      color: white;
-                      padding: 4px;
-                      border-radius: 4px;
-                      font-size: 10px;
-                    ">🔕</div>
-                  `}
+                <!-- 액션 버튼들 -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <button onclick="
+                    console.log('알림 토글:', '${location.name}');
+                    event.stopPropagation();
+                  " style="
+                    padding: 8px;
+                    background: ${location.notifications ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'};
+                    border: none;
+                    border-radius: 8px;
+                    color: white;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                  " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                      ${location.notifications ? `
+                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                      ` : `
+                        <path d="M20 18.69L7.84 6.14 5.27 3.49 4 4.76l2.8 2.8v.01c-.52.99-.8 2.16-.8 3.42v5l-2 2v1h13.73l2 2L21 19.73l-1-1.04zM12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-7.32V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68c-.15.03-.29.08-.42.12-.1.03-.2.07-.3.11l1.27 1.27c.2-.03.4-.08.6-.1.23-.02.46-.04.7-.04 2.76 0 5 2.24 5 5v2.5l1.73 1.73z"/>
+                        <path d="M12 6.5c-2.49 0-4.5 2.01-4.5 4.5v2.5l1.73-1.73z"/>
+                      `}
+                    </svg>
+                  </button>
+                  
+                  <button onclick="
+                    console.log('장소 삭제:', '${location.name}');
+                    if(confirm('정말 삭제하시겠습니까?')) {
+                      // 삭제 로직 실행
+                    }
+                    event.stopPropagation();
+                  " style="
+                    padding: 8px;
+                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                    border: none;
+                    border-radius: 8px;
+                    color: white;
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+                  " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                    </svg>
+                  </button>
                 </div>
               </div>
+              
+              <!-- 주소 정보 -->
+              <div style="margin-bottom: 16px;">
+                <p style="
+                  margin: 0;
+                  font-size: 15px;
+                  color: #4b5563;
+                  line-height: 1.5;
+                  background: #f3f4f6;
+                  padding: 12px;
+                  border-radius: 8px;
+                  border-left: 4px solid #3b82f6;
+                ">${location.address}</p>
+              </div>
+              
+              ${location.memo ? `
+                <div style="margin-bottom: 16px;">
+                  <div style="
+                    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+                    padding: 12px;
+                    border-radius: 8px;
+                    border-left: 4px solid #f59e0b;
+                  ">
+                    <p style="
+                      margin: 0;
+                      font-size: 14px;
+                      color: #92400e;
+                      font-style: italic;
+                      line-height: 1.4;
+                    ">"${location.memo}"</p>
+                  </div>
+                </div>
+              ` : ''}
             </div>
           `,
           borderWidth: 0,
           backgroundColor: 'transparent',
-          pixelOffset: new window.naver.maps.Point(0, -10)
+          pixelOffset: new window.naver.maps.Point(0, -20)
         });
 
         newInfoWindow.open(map, marker);
@@ -2454,7 +2489,7 @@ export default function LocationPage() {
                               animate="visible"
                               whileHover={!isSelected ? "hover" : undefined}
                               whileTap="tap"
-                              className={`location-card flex-shrink-0 w-64 h-28 rounded-2xl p-4 cursor-pointer shadow-lg transition-all duration-300 ${
+                              className={`location-card flex-shrink-0 w-64 h-24 rounded-2xl p-4 cursor-pointer shadow-lg transition-all duration-300 ${
                                 isSelected ? 'selected ring-2 ring-blue-400 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50' : 'hover:shadow-xl'
                               } ${!hasValidCoords ? 'opacity-75 border-dashed border-2 border-gray-300' : ''}`}
                             onClick={(e) => {
