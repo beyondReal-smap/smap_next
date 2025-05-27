@@ -554,16 +554,98 @@ export default function LocationPage() {
     }, 300);
   };
 
-  // 장소 삭제 핸들러
-  const handleDeleteLocation = async (locationId: string | number | undefined) => {
-    if (!locationId) return;
-    
+  // 알림 토글 핸들러
+  const handleNotificationToggle = async (location: LocationData | OtherMemberLocationRaw) => {
     try {
-      // 실제 삭제 로직 구현
-      toast.success('장소가 삭제되었습니다.');
+      const locationId = 'slt_idx' in location ? location.slt_idx?.toString() : location.id;
+      const currentNotificationStatus = 'slt_enter_alarm' in location 
+        ? location.slt_enter_alarm === 'Y' 
+        : location.notifications;
+      
+      const newNotificationStatus = !currentNotificationStatus;
+      
+      console.log('[알림 토글] 시작:', locationId, '→', newNotificationStatus);
+      
+      // 1. 선택된 멤버의 장소 업데이트
+      if (selectedMemberSavedLocations) {
+        setSelectedMemberSavedLocations(prev => 
+          prev ? prev.map(loc => 
+            loc.id === locationId ? { ...loc, notifications: newNotificationStatus } : loc
+          ) : null
+        );
+      }
+      
+      // 2. 다른 멤버 장소 데이터 업데이트
+      if ('slt_idx' in location && location.slt_idx) {
+        setOtherMembersSavedLocations(prev => prev.map(loc => 
+          loc.slt_idx === location.slt_idx 
+            ? { ...loc, slt_enter_alarm: newNotificationStatus ? 'Y' : 'N', notifications: newNotificationStatus } 
+            : loc
+        ));
+      }
+      
+      // 3. 그룹멤버 상태 업데이트
+      setGroupMembers(prevMembers => prevMembers.map(member => ({
+        ...member,
+        savedLocations: member.savedLocations.map(loc => 
+          loc.id === locationId ? { ...loc, notifications: newNotificationStatus } : loc
+        )
+      })));
+      
+      toast.success(`알림이 ${newNotificationStatus ? '켜졌습니다' : '꺼졌습니다'}.`);
+    } catch (error) {
+      console.error('알림 토글 실패:', error);
+      toast.error('알림 설정에 실패했습니다.');
+    }
+  };
+
+  // 장소 삭제 핸들러
+  const handleDeleteLocation = async (location: LocationData | OtherMemberLocationRaw) => {
+    try {
+      const locationId = 'slt_idx' in location ? location.slt_idx?.toString() : location.id;
+      const locationName = 'slt_title' in location ? location.slt_title : location.name;
+      
+      if (!confirm(`'${locationName}'을(를) 정말 삭제하시겠습니까?`)) {
+        return;
+      }
+      
+      console.log('[장소 삭제] 시작:', locationId, locationName);
+      
+      // 1. 선택된 멤버의 장소에서 제거
+      if (selectedMemberSavedLocations) {
+        setSelectedMemberSavedLocations(prev => 
+          prev ? prev.filter(loc => loc.id !== locationId) : null
+        );
+      }
+      
+      // 2. 다른 멤버 장소 데이터에서 제거
+      if ('slt_idx' in location && location.slt_idx) {
+        setOtherMembersSavedLocations(prev => prev.filter(loc => loc.slt_idx !== location.slt_idx));
+      }
+      
+      // 3. 그룹멤버 상태에서 제거
+      setGroupMembers(prevMembers => prevMembers.map(member => ({
+        ...member,
+        savedLocations: member.savedLocations.filter(loc => loc.id !== locationId)
+      })));
+      
+      // 4. 선택된 장소가 삭제된 장소라면 선택 해제
+      if (selectedLocationId === locationId) {
+        setSelectedLocationId(null);
+        selectedLocationIdRef.current = null;
+      }
+      
+      // 5. 정보창 닫기
       setIsLocationInfoPanelOpen(false);
       setIsEditingPanel(false);
+      if (infoWindow) {
+        infoWindow.close();
+        setInfoWindow(null);
+      }
+      
+      toast.success('장소가 삭제되었습니다.');
     } catch (error) {
+      console.error('장소 삭제 실패:', error);
       toast.error('장소 삭제에 실패했습니다.');
     }
   };
@@ -1112,6 +1194,33 @@ export default function LocationPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // 지도 정보창에서 호출할 글로벌 함수 설정
+  useEffect(() => {
+    // 알림 토글 함수를 window 객체에 등록
+    (window as any).handleNotificationToggleFromMap = (locationId: string) => {
+      const location = selectedMemberSavedLocations?.find(loc => loc.id === locationId) ||
+                      otherMembersSavedLocations.find(loc => loc.slt_idx?.toString() === locationId);
+      if (location) {
+        handleNotificationToggle(location);
+      }
+    };
+
+    // 삭제 함수를 window 객체에 등록
+    (window as any).handleDeleteLocationFromMap = (locationId: string) => {
+      const location = selectedMemberSavedLocations?.find(loc => loc.id === locationId) ||
+                      otherMembersSavedLocations.find(loc => loc.slt_idx?.toString() === locationId);
+      if (location) {
+        handleDeleteLocation(location);
+      }
+    };
+
+    // 컴포넌트 언마운트 시 정리
+    return () => {
+      delete (window as any).handleNotificationToggleFromMap;
+      delete (window as any).handleDeleteLocationFromMap;
+    };
+  }, [selectedMemberSavedLocations, otherMembersSavedLocations]);
+
   // 다른 멤버 장소 로드
   useEffect(() => {
     const loadOtherMemberLocations = async () => {
@@ -1559,12 +1668,12 @@ export default function LocationPage() {
                 <!-- 액션 버튼들 -->
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <button onclick="
-                    console.log('알림 토글:', '${location.name}');
+                    window.handleNotificationToggleFromMap && window.handleNotificationToggleFromMap('${location.id}');
                     event.stopPropagation();
                   " style="
                     padding: 8px;
-                    background: ${location.notifications ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #6b7280 0%, #4b5563 100%)'};
-                    border: none;
+                    background: ${location.notifications ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)'};
+                    border: 1px solid ${location.notifications ? '#34d399' : '#fca5a5'};
                     border-radius: 8px;
                     color: white;
                     cursor: pointer;
@@ -1582,15 +1691,12 @@ export default function LocationPage() {
                   </button>
                   
                   <button onclick="
-                    console.log('장소 삭제:', '${location.name}');
-                    if(confirm('정말 삭제하시겠습니까?')) {
-                      // 삭제 로직 실행
-                    }
+                    window.handleDeleteLocationFromMap && window.handleDeleteLocationFromMap('${location.id}');
                     event.stopPropagation();
                   " style="
                     padding: 8px;
                     background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-                    border: none;
+                    border: 1px solid #fca5a5;
                     border-radius: 8px;
                     color: white;
                     cursor: pointer;
@@ -2529,13 +2635,12 @@ export default function LocationPage() {
                                     whileTap={{ scale: 0.9 }}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      // 알림 토글 로직
-                                      console.log('알림 토글:', location.name);
+                                      handleNotificationToggle(location);
                                     }}
                                     className={`p-1.5 rounded-lg transition-all duration-200 ${
                                       (location.notifications || (location as any).slt_enter_alarm === 'Y')
-                                        ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                        ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-100 border border-emerald-200' 
+                                        : 'bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200'
                                     }`}
                                     title={`알림 ${(location.notifications || (location as any).slt_enter_alarm === 'Y') ? '끄기' : '켜기'}`}
                                   >
@@ -2551,11 +2656,9 @@ export default function LocationPage() {
                                     whileTap={{ scale: 0.9 }}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      // 삭제 로직
-                                      console.log('장소 삭제:', location.name);
-                                      handleDeleteLocation(location.slt_idx || location.id);
+                                      handleDeleteLocation(location);
                                     }}
-                                    className="p-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-all duration-200"
+                                    className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition-all duration-200"
                                     title="장소 삭제"
                                   >
                                     <FiTrash2 size={14} />
