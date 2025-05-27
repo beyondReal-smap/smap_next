@@ -133,8 +133,42 @@ const locationService = {
     }
   },
 
+  // 새 장소 생성
+  createLocation: async (locationData: any): Promise<any> => {
+    try {
+      console.log(`[locationService] 장소 생성 API 호출:`, locationData);
+      const response = await apiClient.post('/locations/create', locationData);
+      console.log(`[locationService] 장소 생성 성공:`, response.status, response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error creating location:', error);
+      throw error;
+    }
+  },
+
+  // 멤버별 새 장소 생성
+  createMemberLocation: async (memberId: number, locationData: any): Promise<any> => {
+    try {
+      console.log(`[locationService] 멤버 ${memberId} 장소 생성 API 호출:`, locationData);
+      
+      // 멤버 ID를 데이터에 포함
+      const dataWithMember = {
+        ...locationData,
+        mt_idx: memberId,
+        insert_mt_idx: memberId
+      };
+      
+      const response = await apiClient.post('/locations/create', dataWithMember);
+      console.log(`[locationService] 멤버 ${memberId} 장소 생성 성공:`, response.status, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Error creating location for member ${memberId}:`, error);
+      throw error;
+    }
+  },
+
   // 여기에 다른 장소 관련 API 호출 함수들을 추가할 수 있습니다.
-  // 예: getMyLocations, createLocation, updateLocation 등
+  // 예: getMyLocations, updateLocation 등
 };
 
 export default locationService; 

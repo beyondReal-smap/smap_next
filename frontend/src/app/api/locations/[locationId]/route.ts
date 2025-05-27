@@ -1,5 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// node-fetch를 대안으로 사용
+let nodeFetch: any = null;
+try {
+  nodeFetch = require('node-fetch');
+} catch (e) {
+  console.log('[Location API] node-fetch 패키지를 찾을 수 없음');
+}
+
+async function fetchWithFallback(url: string, options: any): Promise<any> {
+  // Node.js 환경 변수로 SSL 검증 비활성화
+  const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  
+  let response: any;
+
+  try {
+    try {
+      // 기본 fetch 시도
+      response = await fetch(url, options);
+    } catch (fetchError) {
+      if (nodeFetch) {
+        // node-fetch 시도
+        response = await nodeFetch(url, {
+          ...options,
+          agent: function(_parsedURL: any) {
+            const https = require('https');
+            return new https.Agent({
+              rejectUnauthorized: false
+            });
+          }
+        });
+      } else {
+        throw fetchError;
+      }
+    }
+
+    return response;
+  } finally {
+    // 환경 변수 복원
+    if (originalTlsReject !== undefined) {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
+    } else {
+      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    }
+  }
+}
+
 // 장소 숨김 처리를 위한 PATCH 핸들러
 export async function PATCH(
   request: NextRequest,
@@ -7,23 +54,20 @@ export async function PATCH(
 ) {
   const { locationId } = await params; // Next.js 15에서 params를 await해야 함
   try {
-    // 백엔드는 PUT으로 필드 업데이트를 처리하지만, 여기서는 PATCH로 받고 PUT으로 전달합니다.
-    // 여기서는 기존 PUT /locations/{locationId} 를 활용하고 slt_show를 'N'으로 보냅니다.
+    // v1 locations API 사용하여 slt_show를 'N'으로 설정
     const backendUrl = `https://118.67.130.71:8000/api/v1/locations/${locationId}`;
-    const bodyToUpdate = { slt_show: 'N' }; // slt_show를 'N'으로 설정
+    const hidePayload = { slt_show: 'N' };
     
-    console.log('[API PROXY] 위치 숨김 처리 백엔드 호출 (PUT):', backendUrl, bodyToUpdate);
+    console.log('[API PROXY] 위치 숨김 처리 백엔드 호출 (PUT):', backendUrl, hidePayload);
     
-    const response = await fetch(backendUrl, {
-      method: 'PUT', // 백엔드가 PUT으로 업데이트를 받으므로 PUT 사용
+    const response = await fetchWithFallback(backendUrl, {
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'User-Agent': 'Next.js API Proxy',
       },
-      body: JSON.stringify(bodyToUpdate),
-      // @ts-ignore - Node.js fetch에서 SSL 인증서 검증 비활성화
-      rejectUnauthorized: false,
+      body: JSON.stringify(hidePayload),
     });
 
     console.log('[API PROXY] 위치 숨김 처리 백엔드 응답 상태:', response.status, response.statusText);
