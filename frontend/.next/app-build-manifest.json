@@ -14,18 +14,7 @@
     "/location/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/location/page.css",
       "static/chunks/app/location/page.js"
-    ],
-    "/schedule/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/schedule/layout.js"
-    ],
-    "/schedule/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/schedule/page.js"
     ],
     "/api/v1/groups/member/[id]/route": [
       "static/chunks/webpack.js",
@@ -41,6 +30,11 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/locations/other-members/[memberId]/route.js"
+    ],
+    "/api/locations/[locationId]/notification/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/locations/[locationId]/notification/route.js"
     ],
     "/_not-found/page": [
       "static/chunks/webpack.js",

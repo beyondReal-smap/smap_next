@@ -106,8 +106,35 @@ const locationService = {
     }
   },
 
+  // 장소 알림 설정 업데이트
+  updateLocationNotification: async (sltIdx: number, notifications: boolean): Promise<void> => {
+    try {
+      console.log(`[locationService] 알림 설정 업데이트 API 호출 - slt_idx: ${sltIdx}, notifications: ${notifications}`);
+      const response = await apiClient.patch(`/locations/${sltIdx}/notification`, {
+        slt_enter_alarm: notifications ? 'Y' : 'N'
+      });
+      console.log(`[locationService] 알림 설정 업데이트 성공:`, response.status);
+    } catch (error) {
+      console.error('Error updating location notification:', error);
+      throw error;
+    }
+  },
+
+  // 장소 숨김 처리 (기존 deleteLocation 대체)
+  hideLocation: async (sltIdx: number): Promise<void> => {
+    try {
+      console.log(`[locationService] 장소 숨김 처리 API 호출 - slt_idx: ${sltIdx}`);
+      // 프론트엔드 API 라우트 ([locationId]/route.ts)가 PATCH로 되어 있으므로 apiClient.patch 사용
+      const response = await apiClient.patch(`/locations/${sltIdx}`); 
+      console.log(`[locationService] 장소 숨김 처리 성공:`, response.status);
+    } catch (error) {
+      console.error('Error hiding location:', error);
+      throw error;
+    }
+  },
+
   // 여기에 다른 장소 관련 API 호출 함수들을 추가할 수 있습니다.
-  // 예: getMyLocations, createLocation, updateLocation, deleteLocation 등
+  // 예: getMyLocations, createLocation, updateLocation 등
 };
 
 export default locationService; 

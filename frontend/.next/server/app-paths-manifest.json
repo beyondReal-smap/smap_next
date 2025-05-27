@@ -1,8 +1,8 @@
 {
-  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
   "/api/v1/groups/member/[id]/route": "app/api/v1/groups/member/[id]/route.js",
+  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
+  "/api/locations/[locationId]/notification/route": "app/api/locations/[locationId]/notification/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/api/locations/other-members/[memberId]/route": "app/api/locations/other-members/[memberId]/route.js",
-  "/location/page": "app/location/page.js",
-  "/schedule/page": "app/schedule/page.js"
+  "/location/page": "app/location/page.js"
 }

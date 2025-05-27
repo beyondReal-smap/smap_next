@@ -6,37 +6,31 @@ import axios from 'axios';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { 
   FiSearch, 
-  FiPlus, 
-  FiEdit2, 
   FiTrash2, 
   FiMapPin, 
-  FiChevronUp, 
   FiChevronDown, 
   FiX, 
   FiLoader, 
   FiBell, 
   FiBellOff,
-  FiSettings,
-  FiUsers,
-  FiNavigation,
   FiFilter,
   FiMoreVertical,
-  FiSave,
-  FiCamera,
-  FiHeart,
-  FiStar,
   FiArrowLeft,
-  FiMenu,
-  FiRefreshCw
+  FiCheckCircle,
+  FiXCircle,
+  FiInfo
 } from 'react-icons/fi';
 import { FaSearch as FaSearchSolid } from 'react-icons/fa';
-import { HiSparkles } from 'react-icons/hi2';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import Link from 'next/link';
-import LoadingSpinner from '../components/common/LoadingSpinner';
-import { API_KEYS, MAP_CONFIG, KAKAO_SHARE } from '../../config'; 
-import { PageContainer, Button } from '../components/layout';
+import dynamic from 'next/dynamic';
+
+// 커스텀 알림 상태 추가 (react-toastify 관련 없음)
+interface CustomToast {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
+
+import { API_KEYS } from '../../config';
 import ReactDOM from 'react-dom';
 import memberService from '@/services/memberService';
 import locationService, { OtherMemberLocationRaw } from '@/services/locationService';
@@ -84,7 +78,7 @@ html, body {
 
 .location-card.selected {
   background: white; /* 배경색을 흰색으로 변경 */
-  border-color: #a855f7;
+  border-color: # ; /* 이 부분은 이전 코드에서 누락된 값으로 보입니다. 필요시 수정 */
   box-shadow: 0 8px 20px rgba(168, 85, 247, 0.25);
   transform: translateY(-1px) scale(1.01);
 }
@@ -217,7 +211,7 @@ const bottomSheetVariants = {
     }
   },
   peek: {
-    y: '60%',
+    y: '70%',
     opacity: 1,
     transition: {
       type: "spring",
@@ -296,7 +290,7 @@ const locationCardVariants = {
     scale: 1.01,
     y: -1,
     rotateX: 0,
-    boxShadow: "0 15px 35px rgba(99, 102, 241, 0.3)",
+    boxShadow: "0 15px 150px rgba(99, 102, 241, 0.3)",
     transition: {
       type: "spring",
       stiffness: 300,
@@ -546,6 +540,15 @@ export default function LocationPage() {
   // 멤버 선택 관련 상태
   const [firstMemberSelected, setFirstMemberSelected] = useState(false);
   
+  // 모달 상태 추가
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalContent, setModalContent] = useState<{
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info';
+    onConfirm?: () => void; // 확인 콜백 추가
+  } | null>(null);
+  
   // 뒤로가기 핸들러
   const handleBack = () => {
     setIsExiting(true);
@@ -554,17 +557,49 @@ export default function LocationPage() {
     }, 300);
   };
 
-  // 알림 토글 핸들러
+  // 모달 열기 함수 수정
+  const openModal = (
+    title: string, 
+    message: string, 
+    type: 'success' | 'error' | 'info', 
+    onConfirmCallback?: () => void // 콜백 파라미터 추가
+  ) => {
+    setModalContent({ title, message, type, onConfirm: onConfirmCallback });
+    setIsModalOpen(true);
+  };
+
+  // 모달 닫기 함수
+  const closeModal = () => {
+    setIsModalOpen(false);
+    // 모달이 닫힐 때 onConfirm 콜백이 남아있지 않도록 초기화 (선택적)
+    // setModalContent(null); // 이렇게 하면 onConfirm도 null이 됨
+  };
+
+  // 알림 토글 핸들러 (DB 업데이트 포함)
   const handleNotificationToggle = async (location: LocationData | OtherMemberLocationRaw) => {
     try {
       const locationId = 'slt_idx' in location ? location.slt_idx?.toString() : location.id;
+      const sltIdx = 'slt_idx' in location ? location.slt_idx : null;
       const currentNotificationStatus = 'slt_enter_alarm' in location 
         ? location.slt_enter_alarm === 'Y' 
         : location.notifications;
       
       const newNotificationStatus = !currentNotificationStatus;
       
-      console.log('[알림 토글] 시작:', locationId, '→', newNotificationStatus);
+      console.log('[알림 토글] 시작:', locationId, 'slt_idx:', sltIdx, '→', newNotificationStatus);
+      
+      // DB 업데이트 (slt_idx가 있는 경우에만)
+      if (sltIdx) {
+        try {
+          const sltIdxNumber = typeof sltIdx === 'string' ? parseInt(sltIdx, 10) : sltIdx;
+          await locationService.updateLocationNotification(sltIdxNumber, newNotificationStatus);
+          console.log('[알림 토글] DB 업데이트 성공:', sltIdxNumber, newNotificationStatus);
+        } catch (dbError) {
+          console.error('[알림 토글] DB 업데이트 실패:', dbError);
+          openModal('알림 설정 실패', '알림 설정 저장에 실패했습니다.', 'error');
+          return; // DB 업데이트 실패 시 UI 업데이트하지 않음
+        }
+      }
       
       // 1. 선택된 멤버의 장소 업데이트
       if (selectedMemberSavedLocations) {
@@ -592,50 +627,63 @@ export default function LocationPage() {
         )
       })));
       
-      toast.success(`알림이 ${newNotificationStatus ? '켜졌습니다' : '꺼졌습니다'}.`);
+      // 4. 정보창이 열려있고 현재 선택된 장소라면 패널도 업데이트
+      if (isLocationInfoPanelOpen && newLocation.id === locationId) {
+        setNewLocation(prev => ({ ...prev, notifications: newNotificationStatus }));
+      }
+      
+      openModal('알림 설정 완료', `알림이 ${newNotificationStatus ? '켜졌습니다' : '꺼졌습니다'}.`, 'success');
     } catch (error) {
       console.error('알림 토글 실패:', error);
-      toast.error('알림 설정에 실패했습니다.');
+      openModal('알림 설정 실패', '알림 설정 중 오류가 발생했습니다.', 'error');
     }
   };
 
-  // 장소 삭제 핸들러
-  const handleDeleteLocation = async (location: LocationData | OtherMemberLocationRaw) => {
+  // 장소 숨김 처리 핸들러 (DB 업데이트 포함)
+  const handleHideLocation = async (location: LocationData | OtherMemberLocationRaw) => {
+    // 이 함수는 confirm을 모달로 대체한 후 호출될 예정입니다.
     try {
       const locationId = 'slt_idx' in location ? location.slt_idx?.toString() : location.id;
+      const sltIdx = 'slt_idx' in location ? location.slt_idx : null;
       const locationName = 'slt_title' in location ? location.slt_title : location.name;
       
-      if (!confirm(`'${locationName}'을(를) 정말 삭제하시겠습니까?`)) {
-        return;
+      console.log('[장소 삭제] 시작:', locationId, 'slt_idx:', sltIdx, locationName);
+      
+      // DB에서 숨김 처리 (slt_idx가 있는 경우에만)
+      if (sltIdx) {
+        try {
+          const sltIdxNumber = typeof sltIdx === 'string' ? parseInt(sltIdx, 10) : sltIdx;
+          await locationService.hideLocation(sltIdxNumber); // 내부적으로는 hideLocation 호출 유지
+          console.log('[장소 삭제] DB 처리 성공 (숨김 처리):', sltIdxNumber);
+        } catch (dbError) {
+          console.error('[장소 삭제] DB 처리 실패:', dbError);
+          // 실패 시에는 onConfirm 콜백이 없는 일반 정보 모달 호출
+          openModal('장소 삭제 실패', '장소 삭제 중 오류가 발생했습니다. 다시 시도해주세요.', 'error');
+          return;
+        }
       }
       
-      console.log('[장소 삭제] 시작:', locationId, locationName);
-      
-      // 1. 선택된 멤버의 장소에서 제거
+      // UI 업데이트 로직
       if (selectedMemberSavedLocations) {
         setSelectedMemberSavedLocations(prev => 
           prev ? prev.filter(loc => loc.id !== locationId) : null
         );
       }
       
-      // 2. 다른 멤버 장소 데이터에서 제거
       if ('slt_idx' in location && location.slt_idx) {
         setOtherMembersSavedLocations(prev => prev.filter(loc => loc.slt_idx !== location.slt_idx));
       }
       
-      // 3. 그룹멤버 상태에서 제거
       setGroupMembers(prevMembers => prevMembers.map(member => ({
         ...member,
         savedLocations: member.savedLocations.filter(loc => loc.id !== locationId)
       })));
       
-      // 4. 선택된 장소가 삭제된 장소라면 선택 해제
       if (selectedLocationId === locationId) {
         setSelectedLocationId(null);
         selectedLocationIdRef.current = null;
       }
       
-      // 5. 정보창 닫기
       setIsLocationInfoPanelOpen(false);
       setIsEditingPanel(false);
       if (infoWindow) {
@@ -643,10 +691,11 @@ export default function LocationPage() {
         setInfoWindow(null);
       }
       
-      toast.success('장소가 삭제되었습니다.');
+      // 성공 시에는 onConfirm 콜백이 없는 일반 정보 모달 호출
+      openModal('장소 삭제 완료', `'${locationName}' 장소가 삭제되었습니다.`, 'success');
     } catch (error) {
-      console.error('장소 삭제 실패:', error);
-      toast.error('장소 삭제에 실패했습니다.');
+      console.error('장소 삭제 처리 중 전체 오류:', error);
+      openModal('장소 삭제 실패', '장소 삭제 처리 중 예기치 않은 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -677,7 +726,7 @@ export default function LocationPage() {
       setLocationSearchResults(response.data.documents || []);
     } catch (error) {
       console.error('주소 검색 실패:', error);
-      toast.error('주소 검색에 실패했습니다.');
+      openModal('주소 검색 실패', '주소 검색 중 오류가 발생했습니다.', 'error'); // toast -> openModal
     } finally {
         setIsSearchingLocationForPanel(false);
     }
@@ -704,14 +753,26 @@ export default function LocationPage() {
             tempMarker.current.setMap(null);
         }
       
+        console.log('[패널 장소 선택] 임시 마커 생성:', coordinates);
+        
       const position = new window.naver.maps.LatLng(coordinates[1], coordinates[0]);
         tempMarker.current = new window.naver.maps.Marker({
         position,
         map,
         icon: {
-          content: '<div style="background: #6366f1; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
-          anchor: new window.naver.maps.Point(10, 10)
-        }
+          content: `<div style="
+            width: 24px;
+            height: 24px;
+            background: #ef4444;
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 1000;
+          "></div>`,
+          anchor: new window.naver.maps.Point(12, 12)
+        },
+        zIndex: 1000
       });
       
       map.setCenter(position);
@@ -722,7 +783,7 @@ export default function LocationPage() {
   // 패널 액션 확인 핸들러
   const handleConfirmPanelAction = async () => {
     if (!newLocation.name.trim() || !newLocation.address.trim()) {
-      toast.error('장소 이름과 주소를 입력해주세요.');
+      openModal('입력 오류', '장소 이름과 주소를 입력해주세요.', 'error'); // toast -> openModal
       return;
     }
     
@@ -732,7 +793,7 @@ export default function LocationPage() {
       // 실제 장소 저장 로직 구현
       await new Promise(resolve => setTimeout(resolve, 1000)); // 모의 지연
       
-      toast.success('장소가 등록되었습니다.');
+      openModal('장소 등록 완료', '장소가 성공적으로 등록되었습니다.', 'success'); // toast -> openModal
       setIsLocationInfoPanelOpen(false);
         if (tempMarker.current) {
           tempMarker.current.setMap(null);
@@ -749,7 +810,7 @@ export default function LocationPage() {
         notifications: true
       });
     } catch (error) {
-      toast.error('장소 등록에 실패했습니다.');
+      openModal('장소 등록 실패', '장소 등록 중 오류가 발생했습니다.', 'error'); // toast -> openModal
     } finally {
       setIsSavingLocationPanel(false);
     }
@@ -811,25 +872,41 @@ export default function LocationPage() {
     console.log('[handleGroupSelect] 그룹 선택:', groupId);
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
-    
-    // 바텀시트를 peek 상태로 변경
     setBottomSheetState('peek');
     
-    // 기존 멤버 데이터 초기화
+    // *** 기존 마커 및 데이터 초기화 강화 ***
+    // 1. 현재 지도에 있는 모든 멤버 마커 즉시 제거
+    if (map && memberMarkers.length > 0) {
+      console.log('[handleGroupSelect] 기존 멤버 마커 즉시 제거 시작:', memberMarkers.length, '개');
+      memberMarkers.forEach(marker => {
+        if (marker && typeof marker.setMap === 'function') {
+          marker.setMap(null);
+        }
+      });
+      console.log('[handleGroupSelect] 기존 멤버 마커 지도에서 제거 완료');
+    }
+    setMemberMarkers([]); // 상태 배열도 확실히 비움
+
+    // 2. 다른 멤버/장소 관련 상태 초기화
     setGroupMembers([]);
     setSelectedMemberSavedLocations(null);
     setOtherMembersSavedLocations([]);
     setFirstMemberSelected(false);
     setIsFirstMemberSelectionComplete(false);
+    selectedMemberIdRef.current = null; // 선택된 멤버 ID도 초기화
     
-    // 기존 멤버 마커들도 초기화
-    memberMarkers.forEach(marker => marker.setMap(null));
-    setMemberMarkers([]);
-    
-    // selectedMemberIdRef도 초기화
-    selectedMemberIdRef.current = null;
+    // 선택된 장소 관련 상태도 초기화
+    setSelectedLocationId(null);
+    selectedLocationIdRef.current = null;
+    if (infoWindow) { // 열려있는 정보창이 있다면 닫기
+      infoWindow.close();
+      setInfoWindow(null);
+    }
+    markers.forEach(marker => marker.setMap(null)); // 장소 마커도 제거
+    setMarkers([]);
     
     console.log('[handleGroupSelect] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작');
+    // fetchGroupMembersData()는 selectedGroupId useEffect에 의해 호출될 것임
   };
 
   const fetchGroupMembersData = async () => {
@@ -899,7 +976,6 @@ export default function LocationPage() {
   const handleMemberSelect = async (memberId: string, openLocationPanel = false) => { 
     console.log('[handleMemberSelect] 멤버 선택:', memberId, '패널 열기:', openLocationPanel);
     
-    // Find the newly selected member
     const newlySelectedMember = groupMembers.find(member => member.id === memberId);
 
     if (!newlySelectedMember) {
@@ -907,28 +983,46 @@ export default function LocationPage() {
        return;
     }
 
+    // 이미 선택된 멤버이고, 첫 멤버 선택이 완료된 상태라면 중복 실행 방지
     if (selectedMemberIdRef.current === memberId && isFirstMemberSelectionComplete) {
        console.log('[handleMemberSelect] 이미 선택된 멤버입니다. 중복 실행 방지:', memberId);
        return;
     }
 
-    // Clear selected location state and ref first
+    // *** 마커 정리 로직 강화 ***
+    // 1. 현재 지도에 있는 모든 멤버 마커 즉시 제거
+    if (map && memberMarkers.length > 0) {
+      console.log('[handleMemberSelect] 기존 멤버 마커 제거 시작:', memberMarkers.length, '개');
+      memberMarkers.forEach(marker => {
+        if (marker && typeof marker.setMap === 'function') {
+          marker.setMap(null);
+        }
+      });
+      console.log('[handleMemberSelect] 기존 멤버 마커 지도에서 제거 완료');
+    }
+    // 2. 마커 상태 배열 비우기 (setMemberMarkers는 updateMemberMarkers 함수 내에서 처리되도록 변경 가능성 검토)
+    // setMemberMarkers([]); // 일단 여기서 상태를 비우는 것보다, updateMemberMarkers가 책임지도록 할 수 있음
+
+        // 선택된 장소 관련 상태 초기화
     setSelectedLocationId(null);
     selectedLocationIdRef.current = null;
-    // Explicitly clear saved locations to trigger marker removal
-    setSelectedMemberSavedLocations(null); // Add this line
-  
-    // Update selected member ID ref
+    setSelectedMemberSavedLocations(null);
+    
+    // 기존 장소 마커들 제거
+    if (markers.length > 0) {
+      markers.forEach(marker => marker.setMap(null));
+      setMarkers([]);
+    }
+    
     selectedMemberIdRef.current = memberId;
   
-    // Update groupMembers state (only isSelected property)
     const updatedMembers = groupMembers.map(member => ({
         ...member,
         isSelected: member.id === memberId
     }));
-    setGroupMembers(updatedMembers);
+    setGroupMembers(updatedMembers); // 이 호출이 updateMemberMarkers를 트리거 (useEffect를 통해)
   
-    if (newlySelectedMember && map && window.naver?.maps) {
+    if (map && window.naver?.maps) {
       // 선택된 멤버의 위치로 지도 중심 이동
       console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember.name, '위치:', newlySelectedMember.location);
       const memberPosition = new window.naver.maps.LatLng(newlySelectedMember.location.lat, newlySelectedMember.location.lng);
@@ -1132,14 +1226,35 @@ export default function LocationPage() {
           tempMarker.current.setMap(null);
         }
         
+        console.log('[지도 클릭] 임시 마커 생성 시작:', coord.lat(), coord.lng());
+        
         tempMarker.current = new window.naver.maps.Marker({
           position: coord,
           map: newMap,
           icon: {
-            content: '<div style="background: #6366f1; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
-            anchor: new window.naver.maps.Point(10, 10)
-          }
+            content: `<div style="
+              width: 24px;
+              height: 24px;
+              background: #ef4444;
+              border: 3px solid white;
+              border-radius: 50%;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+              position: relative;
+              z-index: 1000;
+            "></div>`,
+            anchor: new window.naver.maps.Point(12, 12)
+          },
+          zIndex: 1000
         });
+        
+        console.log('[지도 클릭] 임시 마커 생성 완료:', tempMarker.current);
+        
+        // 지도 중심을 클릭한 위치로 이동
+        newMap.setCenter(coord);
+        newMap.setZoom(16);
+        
+        // 바텀시트를 peek 상태로 변경
+        setBottomSheetState('peek');
         
         setIsLocationInfoPanelOpen(true);
         setIsEditingPanel(false);
@@ -1205,12 +1320,26 @@ export default function LocationPage() {
       }
     };
 
-    // 삭제 함수를 window 객체에 등록
-    (window as any).handleDeleteLocationFromMap = (locationId: string) => {
+    // 장소 숨김 함수를 window 객체에 등록
+    (window as any).handleHideLocationFromMap = (locationId: string) => {
       const location = selectedMemberSavedLocations?.find(loc => loc.id === locationId) ||
                       otherMembersSavedLocations.find(loc => loc.slt_idx?.toString() === locationId);
       if (location) {
-        handleDeleteLocation(location);
+        handleHideLocation(location); // 여기서는 handleHideLocation 호출
+      }
+    };
+
+    // 장소 숨김(삭제) 함수를 window 객체에 등록 (이제 모달을 띄우는 역할)
+    (window as any).handleDeleteLocationFromMap = (locationId: string, locationName: string) => {
+      const locationObject = selectedMemberSavedLocations?.find(loc => loc.id === locationId) ||
+                            otherMembersSavedLocations.find(loc => (loc.slt_idx ? loc.slt_idx.toString() : loc.id) === locationId);
+      if (locationObject) {
+        openModal(
+          `'${locationName}' 삭제 확인`,
+          '정말로 이 장소를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+          'info',
+          () => handleHideLocation(locationObject) // 실제 삭제는 handleHideLocation이 담당
+        );
       }
     };
 
@@ -1219,7 +1348,7 @@ export default function LocationPage() {
       delete (window as any).handleNotificationToggleFromMap;
       delete (window as any).handleDeleteLocationFromMap;
     };
-  }, [selectedMemberSavedLocations, otherMembersSavedLocations]);
+  }, [selectedMemberSavedLocations, otherMembersSavedLocations, handleNotificationToggle, handleHideLocation, openModal]); // openModal 의존성 추가
 
   // 다른 멤버 장소 로드
   useEffect(() => {
@@ -1280,8 +1409,8 @@ export default function LocationPage() {
 
   // 안전한 이미지 URL 가져오기 헬퍼 함수
   const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-    // URL이 안전하지 않거나 null인 경우 기본 이미지 사용
-    if (!photoUrl || photoUrl.includes('https://118.67.130.71:8000')) {
+    // URL이 안전하지 않거나 null인 경우, 또는 백엔드 서버 이미지인 경우 기본 이미지 사용
+    if (!photoUrl || photoUrl.includes('118.67.130.71:8000') || photoUrl.includes('http://118.67.130.71:8000')) {
       return getDefaultImage(gender, index);
     }
     return photoUrl;
@@ -1480,8 +1609,8 @@ export default function LocationPage() {
       const position = new window.naver.maps.LatLng(lat, lng);
       
       // 개선된 애니메이션 마커 생성
-      // 선택 상태 확인
-      const isMarkerSelected = selectedLocationId === location.id;
+      // 선택 상태 확인 - 현재 선택된 장소 ID와 정확히 일치하는지 확인
+      const isMarkerSelected = selectedLocationIdRef.current === location.id;
       
       const marker = new window.naver.maps.Marker({
         position,
@@ -1489,124 +1618,78 @@ export default function LocationPage() {
         title: location.name,
         icon: {
           content: `
-            <div class="modern-marker" style="
-              position: relative;
-              width: 48px;
-              height: 56px;
-              cursor: pointer;
-              animation: markerDrop 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) ${index * 0.15}s both;
-            ">
-              <div class="marker-glow" style="
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -55%);
-                width: 52px;
-                height: 52px;
-                background: ${isMarkerSelected ? 'rgba(59, 130, 246, 0.3)' : 'rgba(99, 102, 241, 0.2)'};
+            <div style="position: relative; text-align: center;">
+              <div style="
+                width: 32px;
+                height: 32px;
+                background-color: white;
+                border: 2px solid ${isMarkerSelected ? '#ec4899' : '#6366f1'};
                 border-radius: 50%;
-                animation: markerGlow 3s ease-in-out infinite;
-              "></div>
-              
-              <div class="marker-body" style="
-                position: relative;
-                width: 40px;
-                height: 48px;
-                background: ${isMarkerSelected ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)'};
-                border-radius: 20px 20px 20px 4px;
-                border: 3px solid white;
-                box-shadow: ${isMarkerSelected ? '0 8px 24px rgba(59, 130, 246, 0.4)' : '0 6px 20px rgba(99, 102, 241, 0.3)'};
+                overflow: hidden;
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                color: white;
-                font-weight: bold;
-                font-size: 14px;
-                transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-                z-index: ${isMarkerSelected ? '100' : '10'};
-                transform: ${isMarkerSelected ? 'scale(1.15)' : 'scale(1)'};
-              " 
-              onmouseover="
-                this.style.transform='scale(1.25) translateY(-4px)';
-                this.style.boxShadow='0 12px 32px rgba(59, 130, 246, 0.5)';
-                this.parentElement.querySelector('.marker-glow').style.animation='markerGlow 1.5s ease-in-out infinite';
-              " 
-              onmouseout="
-                this.style.transform='${isMarkerSelected ? 'scale(1.15)' : 'scale(1)'} translateY(0)';
-                this.style.boxShadow='${isMarkerSelected ? '0 8px 24px rgba(59, 130, 246, 0.4)' : '0 6px 20px rgba(99, 102, 241, 0.3)'}';
-                this.parentElement.querySelector('.marker-glow').style.animation='markerGlow 3s ease-in-out infinite';
-              "
-              onclick="
-                this.style.animation='markerBounce 0.6s ease-out';
-                setTimeout(() => this.style.animation = '', 600);
+                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                position: relative;
+                z-index: ${isMarkerSelected ? '200' : '150'};
+                transition: all 0.3s ease;
               ">
-                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                <svg width="16" height="16" fill="${isMarkerSelected ? '#ec4899' : '#6366f1'}" viewBox="0 0 24 24">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
                 </svg>
               </div>
               
-              <div class="marker-number" style="
+              ${isMarkerSelected ? `
+                <div style="
+                  position: absolute;
+                  top: 50%;
+                  left: 50%;
+                  transform: translate(-50%, -50%);
+                  width: 40px;
+                  height: 40px;
+                  background: rgba(236, 72, 153, 0.2);
+                  border-radius: 50%;
+                  animation: selectedGlow 2s ease-in-out infinite;
+                  z-index: 140;
+                "></div>
+              ` : ''}
+              
+              <div style="
                 position: absolute;
-                top: -8px;
-                right: -8px;
-                width: 20px;
-                height: 20px;
-                background: ${isMarkerSelected ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'};
-                border: 2px solid white;
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+                bottom: -18px;
+                left: 50%;
+                transform: translateX(-50%);
+                background-color: rgba(0,0,0,0.7);
                 color: white;
+                padding: 2px 5px;
+                border-radius: 3px;
+                white-space: nowrap;
                 font-size: 10px;
-                font-weight: bold;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+                font-weight: 500;
+                max-width: 80px;
+                overflow: hidden;
+                text-overflow: ellipsis;
               ">
-                ${index + 1}
+                ${location.name}
               </div>
             </div>
             
             <style>
-              @keyframes markerDrop {
-                0% {
-                  transform: translateY(-120px) scale(0.3) rotate(-15deg);
-                  opacity: 0;
-                }
-                50% {
-                  transform: translateY(8px) scale(1.1) rotate(5deg);
-                  opacity: 0.8;
-                }
-                70% {
-                  transform: translateY(-4px) scale(0.95) rotate(-2deg);
-                  opacity: 0.9;
-                }
-                100% {
-                  transform: translateY(0) scale(1) rotate(0deg);
-                  opacity: 1;
-                }
-              }
-              
-              @keyframes markerGlow {
+              @keyframes selectedGlow {
                 0%, 100% { 
-                  transform: translate(-50%, -55%) scale(0.8); 
-                  opacity: 0.5; 
+                  transform: translate(-50%, -50%) scale(0.8); 
+                  opacity: 0.4; 
                 }
                 50% { 
-                  transform: translate(-50%, -55%) scale(1.2); 
+                  transform: translate(-50%, -50%) scale(1.2); 
                   opacity: 0.1; 
                 }
               }
-              
-              @keyframes markerBounce {
-                0%, 100% { transform: scale(1) translateY(0) rotate(0deg); }
-                25% { transform: scale(1.1) translateY(-6px) rotate(2deg); }
-                50% { transform: scale(1.2) translateY(-10px) rotate(-1deg); }
-                75% { transform: scale(1.05) translateY(-3px) rotate(1deg); }
-              }
             </style>
           `,
-          anchor: new window.naver.maps.Point(24, 48)
-        }
+          anchor: new window.naver.maps.Point(16, 16)
+        },
+        zIndex: isMarkerSelected ? 200 : 150
       });
 
       // 마커 클릭 이벤트
@@ -1616,147 +1699,17 @@ export default function LocationPage() {
           infoWindow.close();
         }
 
-        // 새 정보창 생성
-        const newInfoWindow = new window.naver.maps.InfoWindow({
-          content: `
-            <div style="
-              padding: 20px;
-              min-width: 280px;
-              max-width: 320px;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-              border-radius: 16px;
-              box-shadow: 0 20px 48px rgba(0, 0, 0, 0.15);
-              border: 1px solid rgba(59, 130, 246, 0.1);
-            ">
-              <!-- 헤더 -->
-              <div style="
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                margin-bottom: 16px;
-                padding-bottom: 12px;
-                border-bottom: 2px solid #e5e7eb;
-              ">
-                <div style="display: flex; align-items: center;">
-                  <div style="
-                    width: 32px;
-                    height: 32px;
-                    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-                    border-radius: 8px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    margin-right: 12px;
-                    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-                  ">
-                    <svg width="16" height="16" fill="white" viewBox="0 0 24 24">
-                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 style="
-                      margin: 0;
-                      font-size: 18px;
-                      font-weight: 700;
-                      color: #111827;
-                      line-height: 1.2;
-                    ">${location.name}</h3>
-                  </div>
-                </div>
-                
-                <!-- 액션 버튼들 -->
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <button onclick="
-                    window.handleNotificationToggleFromMap && window.handleNotificationToggleFromMap('${location.id}');
-                    event.stopPropagation();
-                  " style="
-                    padding: 8px;
-                    background: ${location.notifications ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)'};
-                    border: 1px solid ${location.notifications ? '#34d399' : '#fca5a5'};
-                    border-radius: 8px;
-                    color: white;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                  " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
-                      ${location.notifications ? `
-                        <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
-                      ` : `
-                        <path d="M20 18.69L7.84 6.14 5.27 3.49 4 4.76l2.8 2.8v.01c-.52.99-.8 2.16-.8 3.42v5l-2 2v1h13.73l2 2L21 19.73l-1-1.04zM12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-7.32V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68c-.15.03-.29.08-.42.12-.1.03-.2.07-.3.11l1.27 1.27c.2-.03.4-.08.6-.1.23-.02.46-.04.7-.04 2.76 0 5 2.24 5 5v2.5l1.73 1.73z"/>
-                        <path d="M12 6.5c-2.49 0-4.5 2.01-4.5 4.5v2.5l1.73-1.73z"/>
-                      `}
-                    </svg>
-                  </button>
-                  
-                  <button onclick="
-                    window.handleDeleteLocationFromMap && window.handleDeleteLocationFromMap('${location.id}');
-                    event.stopPropagation();
-                  " style="
-                    padding: 8px;
-                    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-                    border: 1px solid #fca5a5;
-                    border-radius: 8px;
-                    color: white;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
-                  " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
-                    <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              
-              <!-- 주소 정보 -->
-              <div style="margin-bottom: 16px;">
-                <p style="
-                  margin: 0;
-                  font-size: 15px;
-                  color: #4b5563;
-                  line-height: 1.5;
-                  background: #f3f4f6;
-                  padding: 12px;
-                  border-radius: 8px;
-                  border-left: 4px solid #3b82f6;
-                ">${location.address}</p>
-              </div>
-              
-              ${location.memo ? `
-                <div style="margin-bottom: 16px;">
-                  <div style="
-                    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-                    padding: 12px;
-                    border-radius: 8px;
-                    border-left: 4px solid #f59e0b;
-                  ">
-                    <p style="
-                      margin: 0;
-                      font-size: 14px;
-                      color: #92400e;
-                      font-style: italic;
-                      line-height: 1.4;
-                    ">"${location.memo}"</p>
-                  </div>
-                </div>
-              ` : ''}
-            </div>
-          `,
-          borderWidth: 0,
-          backgroundColor: 'transparent',
-          pixelOffset: new window.naver.maps.Point(0, -20)
-        });
-
+        // 통일된 정보창 생성
+        const newInfoWindow = createLocationInfoWindow(location.name, location.address);
         newInfoWindow.open(map, marker);
         setInfoWindow(newInfoWindow);
 
-        // 선택된 장소 ID 설정
+        // 선택 상태 업데이트 (마커 재생성 없이)
+        const previousSelectedId = selectedLocationIdRef.current;
         setSelectedLocationId(location.id);
         selectedLocationIdRef.current = location.id;
         
-        console.log('[마커 클릭] 장소 선택됨:', location.id, location.name);
+        console.log('[마커 클릭] 장소 선택됨:', location.id, location.name, '이전 선택:', previousSelectedId);
       });
 
       newMarkers.push(marker);
@@ -1782,13 +1735,98 @@ export default function LocationPage() {
     }
   }, [selectedMemberSavedLocations, map]);
 
-  // 선택된 장소가 변경될 때 마커 스타일 업데이트
+  // 선택된 장소가 변경될 때만 마커 스타일 업데이트 (무한 루프 방지)
   useEffect(() => {
-    if (selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0) {
-      console.log('[useEffect] 선택된 장소 변경으로 마커 스타일 업데이트:', selectedLocationId);
-      updateMapMarkers(selectedMemberSavedLocations);
+    if (selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0 && markers.length > 0) {
+      console.log('[useEffect] 선택된 장소 변경으로 마커 스타일 업데이트:', selectedLocationIdRef.current);
+      
+      // 기존 마커들의 스타일만 업데이트 (재생성 없이)
+      markers.forEach((marker, index) => {
+        const location = selectedMemberSavedLocations[index];
+        if (location) {
+          const isSelected = selectedLocationIdRef.current === location.id;
+          
+          // 마커 아이콘 업데이트
+          marker.setIcon({
+            content: `
+              <div style="position: relative; text-align: center;">
+                <div style="
+                  width: 32px;
+                  height: 32px;
+                  background-color: white;
+                  border: 2px solid ${isSelected ? '#ec4899' : '#6366f1'};
+                  border-radius: 50%;
+                  overflow: hidden;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                  position: relative;
+                  z-index: ${isSelected ? '200' : '150'};
+                  transition: all 0.3s ease;
+                ">
+                  <svg width="16" height="16" fill="${isSelected ? '#ec4899' : '#6366f1'}" viewBox="0 0 24 24">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
+                  </svg>
+                </div>
+                
+                ${isSelected ? `
+                  <div style="
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 40px;
+                    height: 40px;
+                    background: rgba(236, 72, 153, 0.2);
+                    border-radius: 50%;
+                    animation: selectedGlow 2s ease-in-out infinite;
+                    z-index: 140;
+                  "></div>
+                ` : ''}
+                
+                <div style="
+                  position: absolute;
+                  bottom: -18px;
+                  left: 50%;
+                  transform: translateX(-50%);
+                  background-color: rgba(0,0,0,0.7);
+                  color: white;
+                  padding: 2px 5px;
+                  border-radius: 3px;
+                  white-space: nowrap;
+                  font-size: 10px;
+                  font-weight: 500;
+                  max-width: 80px;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                ">
+                  ${location.name}
+                </div>
+              </div>
+              
+              <style>
+                @keyframes selectedGlow {
+                  0%, 100% { 
+                    transform: translate(-50%, -50%) scale(0.8); 
+                    opacity: 0.4; 
+                  }
+                  50% { 
+                    transform: translate(-50%, -50%) scale(1.2); 
+                    opacity: 0.1; 
+                  }
+                }
+              </style>
+            `,
+            anchor: new window.naver.maps.Point(16, 16)
+          });
+          
+          // z-index 업데이트
+          marker.setZIndex(isSelected ? 200 : 150);
+        }
+      });
     }
-  }, [selectedLocationId]);
+  }, [selectedLocationId]); // selectedLocationId가 변경될 때만 실행
 
   // 그룹멤버가 변경되거나 멤버 선택이 변경될 때 멤버 마커 업데이트 (중복 실행 방지)
   useEffect(() => {
@@ -1798,6 +1836,38 @@ export default function LocationPage() {
     }
   }, [groupMembers, selectedMemberIdRef.current, map]);
 
+  // 통일된 정보창 생성 함수
+  const createLocationInfoWindow = (locationName: string, locationAddress: string) => {
+    return new window.naver.maps.InfoWindow({
+      content: `
+        <div style="
+          padding: 8px 12px;
+          min-width: 160px;
+          max-width: 200px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          border: 1px solid rgba(99, 102, 241, 0.1);
+        ">
+          <div style="
+            margin-bottom: 6px;
+          ">
+            <h3 style="margin: 0; font-size: 13px; font-weight: 600; color: #111827; line-height: 1.2;">${locationName}</h3>
+          </div>
+          
+          <div>
+            <p style="margin: 0; font-size: 11px; color: #4b5563; line-height: 1.3; background: #f3f4f6; padding: 4px 6px; border-radius: 4px; border-left: 2px solid #3b82f6; word-break: keep-all;">${locationAddress}</p>
+          </div>
+        </div>
+      `,
+      borderWidth: 0,
+      backgroundColor: 'transparent',
+      disableAnchor: true,
+      pixelOffset: new window.naver.maps.Point(100, -5)
+    });
+  };
+
   // 장소 카드 클릭 핸들러
   const handleLocationCardClick = (location: OtherMemberLocationRaw) => {
     const lat = parseFloat(String(location.slt_lat || '0')) || 0;
@@ -1805,10 +1875,13 @@ export default function LocationPage() {
     
     // 선택된 장소 ID 설정 - 좌표와 관계없이 항상 설정
     const locationId = location.slt_idx ? location.slt_idx.toString() : location.id;
+    const previousSelectedId = selectedLocationIdRef.current;
+    
+    // 상태 업데이트
     setSelectedLocationId(locationId);
     selectedLocationIdRef.current = locationId;
     
-    console.log('[handleLocationCardClick] 장소 선택됨:', locationId, location.name || location.slt_title);
+    console.log('[handleLocationCardClick] 장소 선택됨:', locationId, location.name || location.slt_title, '이전 선택:', previousSelectedId);
     
     // 지도와 좌표가 유효한 경우에만 지도 이동 및 마커 처리
     if (!map || !window.naver || lat === 0 || lng === 0) {
@@ -1833,143 +1906,11 @@ export default function LocationPage() {
         infoWindow.close();
       }
       
-      // 정보창 생성 및 표시
-      const locationData = {
-        id: locationId,
-        name: location.name || location.slt_title || '제목 없음',
-        address: location.address || location.slt_add || '주소 정보 없음',
-        category: location.category || '기타',
-        memo: location.memo || '',
-        favorite: location.favorite || false,
-        notifications: location.notifications !== undefined ? location.notifications : ((location as any).slt_enter_alarm === 'Y')
-      };
+      // 통일된 정보창 생성 및 표시
+      const locationName = location.name || location.slt_title || '제목 없음';
+      const locationAddress = location.address || location.slt_add || '주소 정보 없음';
       
-      const newInfoWindow = new window.naver.maps.InfoWindow({
-        content: `
-          <div style="
-            padding: 16px;
-            min-width: 200px;
-            max-width: 280px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-          ">
-            <div style="
-              display: flex;
-              align-items: center;
-              margin-bottom: 12px;
-              padding-bottom: 8px;
-              border-bottom: 1px solid #e5e7eb;
-            ">
-              <div style="
-                width: 24px;
-                height: 24px;
-                background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-                border-radius: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                margin-right: 8px;
-              ">
-                <svg width="12" height="12" fill="white" viewBox="0 0 24 24">
-                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                </svg>
-              </div>
-              <h3 style="
-                margin: 0;
-                font-size: 16px;
-                font-weight: 600;
-                color: #1f2937;
-                line-height: 1.2;
-              ">${locationData.name}</h3>
-            </div>
-            
-            <div style="margin-bottom: 12px;">
-              <p style="
-                margin: 0;
-                font-size: 14px;
-                color: #6b7280;
-                line-height: 1.4;
-              ">${locationData.address}</p>
-            </div>
-            
-            ${locationData.memo ? `
-              <div style="margin-bottom: 12px;">
-                <p style="
-                  margin: 0;
-                  font-size: 13px;
-                  color: #9ca3af;
-                  font-style: italic;
-                  line-height: 1.3;
-                ">"${locationData.memo}"</p>
-              </div>
-            ` : ''}
-            
-            <div style="
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              margin-top: 12px;
-              padding-top: 8px;
-              border-top: 1px solid #e5e7eb;
-            ">
-              <div style="
-                display: flex;
-                align-items: center;
-                gap: 8px;
-              ">
-                <span style="
-                  background: ${locationData.favorite ? '#10b981' : '#6b7280'};
-                  color: white;
-                  padding: 4px 8px;
-                  border-radius: 6px;
-                  font-size: 11px;
-                  font-weight: 500;
-                ">${locationData.category}</span>
-                
-                ${locationData.favorite ? `
-                  <span style="
-                    background: #ef4444;
-                    color: white;
-                    padding: 4px 6px;
-                    border-radius: 6px;
-                    font-size: 10px;
-                  ">♥</span>
-                ` : ''}
-              </div>
-              
-              <div style="
-                display: flex;
-                align-items: center;
-                gap: 4px;
-              ">
-                ${locationData.notifications ? `
-                  <div style="
-                    background: #10b981;
-                    color: white;
-                    padding: 4px;
-                    border-radius: 4px;
-                    font-size: 10px;
-                  ">🔔</div>
-                ` : `
-                  <div style="
-                    background: #6b7280;
-                    color: white;
-                    padding: 4px;
-                    border-radius: 4px;
-                    font-size: 10px;
-                  ">🔕</div>
-                `}
-              </div>
-            </div>
-          </div>
-        `,
-        borderWidth: 0,
-        backgroundColor: 'transparent',
-        pixelOffset: new window.naver.maps.Point(0, -10)
-      });
-      
+      const newInfoWindow = createLocationInfoWindow(locationName, locationAddress);
       newInfoWindow.open(map, markers[markerIndex]);
       setInfoWindow(newInfoWindow);
     }
@@ -1990,7 +1931,9 @@ export default function LocationPage() {
       
       <motion.div
         initial="initial"
-        animate={isExiting ? "out" : "in"}
+        animate={
+          isExiting ? "out" : "in"
+        }
         variants={pageVariants}
         className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen relative overflow-hidden"
       >
@@ -2003,7 +1946,8 @@ export default function LocationPage() {
         >
           <div className="flex items-center justify-between h-16 px-4">
             <div className="flex items-center space-x-3">
-              <motion.button 
+              {/* 뒤로가기 버튼 제거 */}
+              {/* <motion.button 
                 whileHover={{ scale: 1.05, rotate: -5 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleBack}
@@ -2011,14 +1955,14 @@ export default function LocationPage() {
                 className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 mobile-button disabled:opacity-50"
               >
                 <FiArrowLeft className="w-5 h-5 text-gray-700" />
-              </motion.button>
+              </motion.button> */}
               
               <div className="flex items-center space-x-3">
                 <motion.div
                   initial={{ rotate: -180, scale: 0 }}
                   animate={{ rotate: 0, scale: 1 }}
                   transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                  className="p-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl"
+                  className="p-2 bg-indigo-600 rounded-xl"
                 >
                   <FiMapPin className="w-5 h-5 text-white" />
                 </motion.div>
@@ -2034,26 +1978,41 @@ export default function LocationPage() {
                 whileHover={{ scale: 1.05, rotate: 90 }}
                 whileTap={{ scale: 0.95 }}
                 className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 mobile-button"
-                onClick={() => setIsLocationSearchModalOpen(true)}
+                onClick={() => {
+                  setIsLocationInfoPanelOpen(true);
+                  setIsEditingPanel(false);
+                  // 새 장소 입력을 위한 기본값 설정
+                  setNewLocation({
+                    name: '',
+                    address: '',
+                    coordinates: [0, 0],
+                    category: '기타',
+                    memo: '',
+                    favorite: false,
+                    notifications: true
+                  });
+                }}
               >
                 <FiSearch className="w-5 h-5 text-gray-600" />
               </motion.button>
               
-              <motion.button
+              {/* 필터 버튼 제거 */}
+              {/* <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 mobile-button"
               >
                 <FiFilter className="w-5 h-5 text-gray-600" />
-              </motion.button>
+              </motion.button> */}
               
-              <motion.button
+              {/* 점 세개 버튼 제거 */}
+              {/* <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 mobile-button"
               >
                 <FiMoreVertical className="w-5 h-5 text-gray-600" />
-              </motion.button>
+              </motion.button> */}
         </div>
           </div>
         </motion.header>
@@ -2119,10 +2078,10 @@ export default function LocationPage() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -50, scale: 0.9 }}
               transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-              className="location-info-panel fixed top-20 left-4 right-4 z-30 rounded-2xl p-6 shadow-2xl"
+              className="location-info-panel fixed top-20 left-4 right-4 z-30 rounded-2xl p-4 shadow-2xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
-              <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
+              <div className="flex justify-between items-center mb-1 pb-1">
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -2150,12 +2109,24 @@ export default function LocationPage() {
                       e.stopPropagation();
                       
                       const newNotificationStatus = !newLocation.notifications;
+                      
+                      // 정보창 패널의 알림 상태 즉시 업데이트
                       setNewLocation(prev => ({ ...prev, notifications: newNotificationStatus }));
+                      
+                      // 편집 모드에서만 실제 데이터 업데이트
+                      if (isEditingPanel && newLocation.id) {
+                        const locationData = selectedMemberSavedLocations?.find(loc => loc.id === newLocation.id) ||
+                                           otherMembersSavedLocations.find(loc => (loc.slt_idx ? loc.slt_idx.toString() : loc.id) === newLocation.id);
+                        
+                        if (locationData) {
+                          handleNotificationToggle(locationData);
+                        }
+                      }
                       }}
                       className={`p-2 rounded-lg transition-all duration-200 ${
                         newLocation.notifications 
-                          ? 'notification-badge text-white shadow-lg' 
-                          : 'danger-badge text-white shadow-lg'
+                          ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-100 border border-emerald-200' 
+                          : 'bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200'
                     }`}
                     aria-label={newLocation.notifications ? '알림 끄기' : '알림 켜기'}
                   >
@@ -2188,6 +2159,45 @@ export default function LocationPage() {
                   <p className="text-base font-semibold text-gray-800 truncate">{newLocation.name}</p>
                   <p className="text-sm text-gray-600 mt-1 break-words">{newLocation.address || '주소 정보 없음'}</p>
                 </div>
+                
+                {/* 편집 모드 액션 버튼들 */}
+                <motion.div className="flex space-x-3 mt-6"> 
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      // 삭제 확인 모달을 먼저 띄웁니다.
+                      const locationToProcess = selectedMemberSavedLocations?.find(loc => loc.id === newLocation.id) ||
+                                         otherMembersSavedLocations.find(loc => (loc.slt_idx ? loc.slt_idx.toString() : loc.id) === newLocation.id);
+                      if (locationToProcess) {
+                        openModal(
+                          `'${newLocation.name}' 삭제 확인`,
+                          '정말로 이 장소를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+                          'info', // type을 'info' 또는 'warning' 등으로 하여 확인 모달임을 표시
+                          () => handleHideLocation(locationToProcess) // 확인 시 실행할 콜백
+                        );
+                      }
+                    }}
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-red-500 to-red-600 text-white font-medium rounded-xl shadow-lg mobile-button"
+                  >
+                    <div className="flex items-center justify-center">
+                      <FiTrash2 className="mr-2" size={16} />
+                      삭제
+                    </div>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      setIsLocationInfoPanelOpen(false);
+                      if (tempMarker.current) tempMarker.current.setMap(null);
+                      setIsEditingPanel(false);
+                    }}
+                    className="flex-1 py-3 px-4 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-medium rounded-xl shadow-lg mobile-button"
+                  >
+                    닫기
+                  </motion.button>
+                </motion.div>
                 </motion.div>
               ) : (
                 <motion.div
@@ -2260,7 +2270,7 @@ export default function LocationPage() {
                   </div>
                 </div>
 
-                <div className="mb-6 mt-4"> 
+                <div className="mb-4 mt-4"> 
                     <label htmlFor="panelLocationName" className="block text-xs font-medium text-indigo-600 mb-2">장소 태그 (이름)</label>
                   <input
                     type="text"
@@ -2291,7 +2301,7 @@ export default function LocationPage() {
                       whileTap={{ scale: 0.98 }}
                       onClick={handleConfirmPanelAction}
                       disabled={isSavingLocationPanel}
-                      className="flex-1 py-3 px-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-xl shadow-lg mobile-button disabled:opacity-50"
+                      className="flex-1 py-3 px-4 bg-indigo-700 text-white font-medium rounded-xl shadow-lg mobile-button disabled:opacity-50"
                     >
                       {isSavingLocationPanel ? (
                         <div className="flex items-center justify-center">
@@ -2332,7 +2342,7 @@ export default function LocationPage() {
               transition={{ duration: 0.2 }}
             />
             
-            <div className="px-6 pb-6 overflow-y-auto max-h-full">
+            <div className="px-6 pb-2 overflow-y-auto max-h-full">
             <div
               ref={swipeContainerRef}
               className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar"
@@ -2343,7 +2353,7 @@ export default function LocationPage() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3, duration: 0.6 }}
-                    className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-6 mb-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
+                    className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
                   >
                     <div className="flex justify-between items-center mb-2">
                        <div className="flex items-center space-x-3">
@@ -2533,7 +2543,7 @@ export default function LocationPage() {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4, duration: 0.6 }}
-                    className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 mb-6 border border-purple-100 h-[200px] overflow-y-auto hide-scrollbar"
+                    className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-4 mb-6 border border-purple-100 h-[200px] overflow-y-auto hide-scrollbar"
                   >
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center space-x-3">
@@ -2583,7 +2593,7 @@ export default function LocationPage() {
                           
                           // 좌표가 없어도 장소 카드는 표시하되, 지도 이동만 제한
                           const locationId = location.slt_idx ? location.slt_idx.toString() : location.id;
-                          const isSelected = selectedLocationId === locationId;
+                          const isSelected = selectedLocationIdRef.current === locationId;
                           const hasValidCoords = lat !== 0 || lng !== 0;
                         
                         return (
@@ -2613,15 +2623,15 @@ export default function LocationPage() {
                                       !hasValidCoords 
                                         ? 'bg-gradient-to-r from-gray-400 to-gray-500' 
                                         : isSelected 
-                                          ? 'bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg' 
-                                          : 'bg-gradient-to-r from-purple-500 to-pink-600'
+                                          ? 'bg-pink-600 shadow-lg' 
+                                          : 'bg-indigo-600'
                                     }`}
                                   >
                                     <FiMapPin className={`w-4 h-4 ${!hasValidCoords ? 'text-gray-200' : 'text-white'}`} />
                                   </motion.div>
                                   <div className="min-w-0 flex-1">
                                     <h4 className={`text-sm font-bold truncate ${
-                                      isSelected ? 'text-blue-800' : 'text-gray-800'
+                                      isSelected ? 'text-gray-800' : 'text-gray-800'
                                     }`}>
                                       {location.name || location.slt_title || '제목 없음'}
                                     </h4>
@@ -2656,10 +2666,10 @@ export default function LocationPage() {
                                     whileTap={{ scale: 0.9 }}
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleDeleteLocation(location);
+                                      handleHideLocation(location);
                                     }}
                                     className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition-all duration-200"
-                                    title="장소 삭제"
+                                    title="장소 숨김"
                                   >
                                     <FiTrash2 size={14} />
                                   </motion.button>
@@ -2669,7 +2679,7 @@ export default function LocationPage() {
                               {/* 하단: 주소 */}
                               <div className="flex-1">
                                 <p className={`text-xs truncate ${
-                                  isSelected ? 'text-blue-600' : 'text-gray-500'
+                                  isSelected ? 'text-gray-600' : 'text-gray-500'
                                 }`}>
                                   {location.address || location.slt_add || '주소 정보 없음'}
                                   {!hasValidCoords && <span className="text-orange-500 ml-1">(위치 정보 없음)</span>}
@@ -2730,20 +2740,92 @@ export default function LocationPage() {
 
       </motion.div>
 
-      <ToastContainer 
-        position="bottom-center" 
-        autoClose={3000} 
-        hideProgressBar={false} 
-        newestOnTop={false} 
-        closeOnClick 
-        rtl={false} 
-        pauseOnFocusLoss 
-        draggable 
-        pauseOnHover 
-        theme="light"
-        toastClassName="rounded-xl shadow-lg"
-        bodyClassName="text-sm font-medium"
-      />
+      {/* 커스텀 모달 */}
+      <AnimatePresence>
+        {isModalOpen && modalContent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md"
+            onClick={closeModal} // 배경 클릭 시 닫기
+          >
+            <motion.div
+              variants={modalVariants} // 기존 modalVariants 사용
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className={`relative p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4
+                ${modalContent.type === 'success' ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 
+                  modalContent.type === 'error' ? 'bg-gradient-to-br from-red-500 to-rose-600' : 
+                  'bg-gradient-to-br from-blue-500 to-indigo-600'
+                }`}
+              onClick={(e) => e.stopPropagation()} // 모달 내부 클릭 시 전파 방지
+            >
+              <button 
+                onClick={closeModal}
+                className="absolute top-4 right-4 p-2 text-white/70 hover:text-white transition-colors rounded-full hover:bg-white/20"
+              >
+                <FiX size={20} />
+              </button>
+              
+              <div className="text-center">
+                <motion.div
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.1, type: 'spring', stiffness: 300, damping: 15 }}
+                  className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-6 shadow-inner"
+                >
+                  {modalContent.type === 'success' && <FiCheckCircle size={32} className="text-white" />}
+                  {modalContent.type === 'error' && <FiXCircle size={32} className="text-white" />}
+                  {modalContent.type === 'info' && <FiInfo size={32} className="text-white" />}
+                </motion.div>
+
+                <h3 className="text-2xl font-bold text-white mb-3 leading-tight">{modalContent.title}</h3>
+                <p className="text-white/80 text-base mb-8 leading-relaxed">{modalContent.message}</p>
+
+                {/* 버튼 영역 수정 */} 
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {modalContent.onConfirm ? (
+                    <>
+                      <motion.button
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          if (modalContent.onConfirm) {
+                            modalContent.onConfirm();
+                          }
+                          closeModal(); // 확인 후 모달 닫기
+                        }}
+                        className="w-full py-3 px-6 bg-white/90 hover:bg-white text-gray-800 font-semibold rounded-xl shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      >
+                        {modalContent.type === 'info' ? '삭제 확인' : '확인'} {/* 삭제 확인 모달의 경우 버튼 텍스트 변경 */}
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.05, y: -2 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={closeModal} // 취소 버튼은 항상 모달만 닫음
+                        className="w-full py-3 px-6 bg-transparent hover:bg-white/10 border border-white/30 text-white font-semibold rounded-xl shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      >
+                        취소
+                      </motion.button>
+                    </>
+                  ) : (
+                    <motion.button
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={closeModal}
+                      className="w-full py-3 px-6 bg-white/90 hover:bg-white text-gray-800 font-semibold rounded-xl shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50"
+                    >
+                      확인
+                    </motion.button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 } 
