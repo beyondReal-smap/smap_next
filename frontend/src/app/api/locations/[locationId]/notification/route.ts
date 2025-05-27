@@ -49,9 +49,9 @@ async function fetchWithFallback(url: string, options: any): Promise<any> {
 
 export async function PATCH(
   request: NextRequest,
-  params: { params: { locationId: string } }
+  context: { params: Promise<{ locationId: string }> }
 ) {
-  const { locationId } = params.params; // params.params에서 locationId를 가져옴
+  const { locationId } = await context.params; // Next.js 15에서 params는 Promise입니다
   try {
     const body = await request.json();
     

@@ -1252,17 +1252,13 @@ export default function LocationPage() {
         // 첫 번째 멤버 자동 선택 처리
         if (convertedMembers.length > 0 && !isFirstMemberSelectionComplete) {
           console.log('[fetchGroupMembersData] 첫 번째 멤버 자동 선택 실행:', convertedMembers[0].name);
-          // 즉시 실행하고, 별도 타이머로 안전장치 추가
-          handleMemberSelect(convertedMembers[0].id);
+          // 첫 번째 멤버 선택 완료 상태를 먼저 설정
           setIsFirstMemberSelectionComplete(true);
           
-          // 안전장치: 약간의 지연 후 한 번 더 확인
+          // 멤버 선택 실행 - 약간의 지연을 두어 상태 업데이트가 완료된 후 실행
           setTimeout(() => {
-            if (!groupMembers.some(m => m.isSelected)) {
-              console.log('[fetchGroupMembersData] 안전장치 실행: 첫 번째 멤버 재선택');
-              handleMemberSelect(convertedMembers[0].id);
-            }
-          }, 200);
+            handleMemberSelect(convertedMembers[0].id, false, convertedMembers);
+          }, 100);
         }
     } else {
         console.warn('[fetchGroupMembersData] 그룹멤버 데이터가 없거나 비어있습니다.');
@@ -1283,13 +1279,15 @@ export default function LocationPage() {
   };
 
   // 멤버 선택 핸들러
-  const handleMemberSelect = async (memberId: string, openLocationPanel = false) => { 
+  const handleMemberSelect = async (memberId: string, openLocationPanel = false, membersArray?: GroupMember[]) => { 
     console.log('[handleMemberSelect] 멤버 선택:', memberId, '패널 열기:', openLocationPanel);
     
-    const newlySelectedMember = groupMembers.find(member => member.id === memberId);
+    // membersArray가 제공되면 사용하고, 없으면 현재 상태의 groupMembers 사용
+    const membersToSearch = membersArray || groupMembers;
+    const newlySelectedMember = membersToSearch.find(member => member.id === memberId);
 
     if (!newlySelectedMember) {
-       console.log('[handleMemberSelect] 멤버를 찾을 수 없습니다:', memberId);
+       console.log('[handleMemberSelect] 멤버를 찾을 수 없습니다:', memberId, '검색 대상:', membersToSearch.length, '명');
        return;
     }
 
@@ -1326,7 +1324,7 @@ export default function LocationPage() {
     
     selectedMemberIdRef.current = memberId;
   
-    const updatedMembers = groupMembers.map(member => ({
+    const updatedMembers = (membersArray || groupMembers).map(member => ({
         ...member,
         isSelected: member.id === memberId
     }));
@@ -2340,6 +2338,8 @@ export default function LocationPage() {
                 onClick={() => {
                   setIsLocationInfoPanelOpen(true);
                   setIsEditingPanel(false);
+                  // 바텀시트를 peek 상태로 변경 (핸들이 보이도록)
+                  setBottomSheetState('peek');
                   // 새 장소 입력을 위한 기본값 설정
                   setNewLocation({
                     name: '',
@@ -2453,7 +2453,7 @@ export default function LocationPage() {
                         "새 장소 등록")
                 } 
               </h3>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-xs font-medium text-indigo-600 mt-1">
                     {isEditingPanel ? "장소 정보를 확인하고 관리하세요" : "지도를 클릭하거나 검색하세요"}
                   </p>
                 </motion.div>
