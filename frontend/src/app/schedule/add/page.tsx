@@ -145,6 +145,7 @@ export default function AddSchedulePage() {
   const endDateRef = useRef<DatePicker>(null);
   const endTimeRef = useRef<DatePicker>(null);
   const startDateRef = useRef<DatePicker>(null);
+  const startTimeRef = useRef<DatePicker>(null);
 
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [isFromHome, setIsFromHome] = useState(false);
@@ -222,52 +223,158 @@ export default function AddSchedulePage() {
     };
   }, [isRepeatModalOpen, isAlarmModalOpen, isLocationSearchModalOpen]); // isLocationSearchModalOpen 의존성 추가
 
-  // 날짜/시간 유효성 검사 useEffect 수정 (포커스 로직 추가)
+  // 날짜/시간 유효성 검사 useEffect 수정 (포괄적인 오입력 방지 로직 추가)
   useEffect(() => {
-    let hasError = false; // 오류 발생 여부 추적
+    let hasError = false;
+    let errorMessage = '';
+    let focusTarget: React.RefObject<any> | null = null;
 
-    // allDay일 경우 날짜만 비교
+    // 현재 시간
+    const now = dayjs();
+    
+    // 기본 필수 필드 검사
+    if (!scheduleForm.startDate) {
+      // 시작 날짜가 없으면 에러 표시하지 않음 (초기 상태)
+      setDateTimeError(null);
+      return;
+    }
+
+    // 날짜 형식 유효성 검사
+    const startDate = dayjs(scheduleForm.startDate);
+    if (!startDate.isValid()) {
+      setDateTimeError('시작 날짜 형식이 올바르지 않습니다.');
+      return;
+    }
+
+    // 과거 날짜 검사 (오늘 이전 날짜 방지)
+    if (startDate.isBefore(now, 'day')) {
+      setDateTimeError('과거 날짜로는 일정을 생성할 수 없습니다.');
+      focusTarget = startDateRef;
+      hasError = true;
+    }
+
+    // 너무 먼 미래 날짜 검사 (10년 후까지만 허용)
+    if (startDate.isAfter(now.add(10, 'year'))) {
+      setDateTimeError('10년 이후의 날짜는 설정할 수 없습니다.');
+      focusTarget = startDateRef;
+      hasError = true;
+    }
+
+    // 하루 종일 일정인 경우
     if (scheduleForm.allDay) {
-      if (scheduleForm.startDate && scheduleForm.endDate) {
-        const start = dayjs(scheduleForm.startDate);
-        const end = dayjs(scheduleForm.endDate);
-        if (end.isBefore(start)) {
-          setDateTimeError('종료일자는 시작일자보다 빠를 수 없습니다.');
-          endDateRef.current?.setFocus(); // 종료일자 필드로 포커스 이동
+      if (scheduleForm.endDate) {
+        const endDate = dayjs(scheduleForm.endDate);
+        
+        if (!endDate.isValid()) {
+          setDateTimeError('종료 날짜 형식이 올바르지 않습니다.');
+          focusTarget = endDateRef;
+          hasError = true;
+        } else if (endDate.isBefore(startDate)) {
+          setDateTimeError('종료 날짜는 시작 날짜보다 빠를 수 없습니다.');
+          focusTarget = endDateRef;
+          hasError = true;
+        } else if (endDate.isAfter(startDate.add(365, 'day'))) {
+          setDateTimeError('일정 기간은 1년을 초과할 수 없습니다.');
+          focusTarget = endDateRef;
           hasError = true;
         }
       }
-    }
-    // allDay가 아닐 경우 날짜와 시간 모두 비교
+    } 
+    // 시간이 설정된 일정인 경우
     else {
-      if (
-        scheduleForm.startDate &&
-        scheduleForm.startTime &&
-        scheduleForm.endDate &&
-        scheduleForm.endTime
-      ) {
-        const startDateTime = dayjs(`${scheduleForm.startDate}T${scheduleForm.startTime}`);
-        const endDateTime = dayjs(`${scheduleForm.endDate}T${scheduleForm.endTime}`);
-
-        if (startDateTime.isValid() && endDateTime.isValid()) {
-          if (endDateTime.isBefore(startDateTime)) {
-            setDateTimeError('종료일시는 시작일시보다 빠를 수 없습니다.');
-            // 종료 '일자'가 시작 '일자'보다 명확히 이전이면 종료일자 필드에 포커스
-            if (dayjs(scheduleForm.endDate).isBefore(dayjs(scheduleForm.startDate))) {
-              endDateRef.current?.setFocus();
-            } else {
-              // 날짜는 같거나 이후인데 시간이 문제면 종료시간 필드에 포커스
-              endTimeRef.current?.setFocus();
-            }
+      if (!scheduleForm.startTime) {
+        setDateTimeError('시작 시간을 설정해주세요.');
+        focusTarget = startTimeRef;
+        hasError = true;
+      } else if (!scheduleForm.endTime) {
+        setDateTimeError('종료 시간을 설정해주세요.');
+        focusTarget = endTimeRef;
+        hasError = true;
+      } else if (!scheduleForm.endDate) {
+        setDateTimeError('종료 날짜를 설정해주세요.');
+        focusTarget = endDateRef;
+        hasError = true;
+      } else {
+        // 시간 형식 유효성 검사
+        const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+        if (!timeRegex.test(scheduleForm.startTime)) {
+          setDateTimeError('시작 시간 형식이 올바르지 않습니다. (HH:MM)');
+          focusTarget = startTimeRef;
+          hasError = true;
+        } else if (!timeRegex.test(scheduleForm.endTime)) {
+          setDateTimeError('종료 시간 형식이 올바르지 않습니다. (HH:MM)');
+          focusTarget = endTimeRef;
+          hasError = true;
+        } else {
+          const endDate = dayjs(scheduleForm.endDate);
+          if (!endDate.isValid()) {
+            setDateTimeError('종료 날짜 형식이 올바르지 않습니다.');
+            focusTarget = endDateRef;
             hasError = true;
+          } else {
+            const startDateTime = dayjs(`${scheduleForm.startDate}T${scheduleForm.startTime}`);
+            const endDateTime = dayjs(`${scheduleForm.endDate}T${scheduleForm.endTime}`);
+
+            if (startDateTime.isValid() && endDateTime.isValid()) {
+              // 종료 시간이 시작 시간보다 빠른 경우
+              if (endDateTime.isBefore(startDateTime)) {
+                if (endDate.isBefore(startDate)) {
+                  setDateTimeError('종료 날짜는 시작 날짜보다 빠를 수 없습니다.');
+                  focusTarget = endDateRef;
+                } else {
+                  setDateTimeError('종료 시간은 시작 시간보다 빠를 수 없습니다.');
+                  focusTarget = endTimeRef;
+                }
+                hasError = true;
+              }
+              // 같은 날짜에서 시작 시간과 종료 시간이 같은 경우
+              else if (startDate.isSame(endDate, 'day') && scheduleForm.startTime === scheduleForm.endTime) {
+                setDateTimeError('시작 시간과 종료 시간이 같을 수 없습니다.');
+                focusTarget = endTimeRef;
+                hasError = true;
+              }
+              // 일정 기간이 너무 긴 경우 (7일 초과)
+              else if (endDateTime.diff(startDateTime, 'day') > 7) {
+                setDateTimeError('일정 기간은 7일을 초과할 수 없습니다.');
+                focusTarget = endDateRef;
+                hasError = true;
+              }
+              // 과거 시간 검사 (현재 시간 이전 방지)
+              else if (startDateTime.isBefore(now)) {
+                setDateTimeError('과거 시간으로는 일정을 생성할 수 없습니다.');
+                if (startDate.isBefore(now, 'day')) {
+                  focusTarget = startDateRef;
+                } else {
+                  focusTarget = startTimeRef;
+                }
+                hasError = true;
+              }
+              // 너무 짧은 일정 (5분 미만)
+              else if (endDateTime.diff(startDateTime, 'minute') < 5) {
+                setDateTimeError('일정은 최소 5분 이상이어야 합니다.');
+                focusTarget = endTimeRef;
+                hasError = true;
+              }
+              // 너무 긴 일정 (24시간 초과, 단일 날짜)
+              else if (startDate.isSame(endDate, 'day') && endDateTime.diff(startDateTime, 'hour') > 24) {
+                setDateTimeError('하루 일정은 24시간을 초과할 수 없습니다.');
+                focusTarget = endTimeRef;
+                hasError = true;
+              }
+            }
           }
         }
       }
     }
 
-    // 이번 실행에서 오류가 감지되지 않았으면 에러 상태 초기화
+    // 오류가 없으면 에러 상태 초기화
     if (!hasError) {
       setDateTimeError(null);
+    } else if (focusTarget?.current?.setFocus) {
+      // 포커스 이동 (약간의 지연을 두어 렌더링 완료 후 실행)
+      setTimeout(() => {
+        focusTarget?.current?.setFocus();
+      }, 100);
     }
 
   }, [
@@ -429,11 +536,28 @@ export default function AddSchedulePage() {
 
   // 저장 핸들러 (실제 저장 로직 추가 필요)
   const handleSaveSchedule = async () => {
+    // 유효성 검사
+    if (!scheduleForm.title.trim()) {
+      alert('일정 제목을 입력해주세요.');
+      return;
+    }
+
+    if (dateTimeError) {
+      alert('날짜/시간 설정에 오류가 있습니다. 확인 후 다시 시도해주세요.');
+      return;
+    }
+
+    if (!scheduleForm.allDay && (!scheduleForm.startTime || !scheduleForm.endTime)) {
+      alert('시작 시간과 종료 시간을 설정해주세요.');
+      return;
+    }
+
     setIsSaving(true);
     console.log('저장할 일정 데이터:', scheduleForm);
     // TODO: API 호출 또는 상태 관리 라이브러리를 사용하여 일정 저장 로직 구현
     await new Promise(resolve => setTimeout(resolve, 1000)); // 임시 지연
     setIsSaving(false);
+    setDateTimeError(null); // 에러 상태 초기화
     router.push('/schedule');
   };
 
@@ -666,6 +790,7 @@ export default function AddSchedulePage() {
                     <div className="flex-1 flex items-center p-2 rounded-md border border-gray-300"> {/* flex-1 추가 */} 
                       <FaClock className="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" />
                       <DatePicker
+                        ref={startTimeRef}
                         selected={scheduleForm.startTime ? dayjs(`1970-01-01T${scheduleForm.startTime}:00`).toDate() : null}
                         onChange={(date) => handleTimeChange(date, 'startTime')}
                         showTimeSelect
@@ -881,7 +1006,7 @@ export default function AddSchedulePage() {
             <Button type="button" variant="secondary" onClick={handleCancel} disabled={isSaving}>
               취소
             </Button>
-            <Button type="submit" variant="primary" disabled={isSaving}>
+            <Button type="submit" variant="primary" disabled={isSaving || !!dateTimeError}>
               {isSaving ? '저장 중...' : '일정 저장'}
             </Button>
           </div>
