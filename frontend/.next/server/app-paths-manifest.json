@@ -1,10 +1,11 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
   "/api/groups/member/[memberId]/route": "app/api/groups/member/[memberId]/route.js",
+  "/api/kakao-search/route": "app/api/kakao-search/route.js",
   "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
-  "/setting/page": "app/setting/page.js",
   "/setting/account/page": "app/setting/account/page.js",
+  "/setting/page": "app/setting/page.js",
   "/location/page": "app/location/page.js",
-  "/group/page": "app/group/page.js",
-  "/schedule/page": "app/schedule/page.js"
+  "/schedule/page": "app/schedule/page.js",
+  "/group/page": "app/group/page.js"
 }

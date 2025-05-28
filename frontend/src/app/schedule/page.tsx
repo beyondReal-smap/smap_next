@@ -614,6 +614,7 @@ export default function SchedulePage() {
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
   const [locationSearchResults, setLocationSearchResults] = useState<any[]>([]);
   const [isSearchingLocation, setIsSearchingLocation] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   // 날짜/시간 유효성 검사 상태
   const [dateTimeError, setDateTimeError] = useState<string | null>(null);
@@ -1054,6 +1055,7 @@ export default function SchedulePage() {
   const handleOpenLocationSearchModal = () => {
     const currentName = newEvent.locationName;
     setLocationSearchResults([]);
+    setHasSearched(false);
 
     const currentNameString = String(currentName || '');
 
@@ -1082,6 +1084,7 @@ export default function SchedulePage() {
     if (!searchQueryString.trim()) return;
 
     setIsSearchingLocation(true);
+    setHasSearched(true);
     setLocationSearchResults([]);
 
     try {
@@ -1935,19 +1938,19 @@ export default function SchedulePage() {
                         <div className="space-y-3">
                           <div className="flex justify-between items-center">
                             <span className="text-gray-700 text-sm font-medium">날짜</span>
-                            <span className="text-gray-900 text-sm font-normal">
+                            <span className="text-gray-500 text-sm font-normal">
                               {dayjs(newEvent.date).format('YYYY년 MM월 DD일')}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-700 text-sm font-medium">시간</span>
-                            <span className="text-gray-900 text-sm font-normal">
+                            <span className="text-gray-500 text-sm font-normal">
                               {newEvent.allDay ? '하루 종일' : `${newEvent.startTime} ~ ${newEvent.endTime}`}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-700 text-sm font-medium">하루 종일</span>
-                            <span className="text-gray-900 text-sm font-normal">
+                            <span className="text-gray-500 text-sm font-normal">
                               {newEvent.allDay ? 'ON' : 'OFF'}
                             </span>
                           </div>
@@ -2602,21 +2605,21 @@ export default function SchedulePage() {
                         </motion.button>
                       ))}
                     </div>
-                  ) : locationSearchQuery.trim() && !isSearchingLocation ? (
+                  ) : hasSearched && !isSearchingLocation ? (
                     <div className="text-center py-8 px-6">
-                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      {/* <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
-                      </div>
+                      </div> */}
                       <p className="text-gray-600 font-medium">검색 결과가 없습니다</p>
                       <p className="text-xs text-gray-500 mt-1">다른 검색어를 입력해보세요</p>
                     </div>
                   ) : (
                     <div className="text-center py-8 px-6">
-                      <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      {/* <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <span className="text-xl">🔍</span>
-                      </div>
+                      </div> */}
                       <p className="text-gray-600 font-medium">장소를 검색해보세요</p>
                       <p className="text-xs text-gray-500 mt-1">카페, 음식점, 회사명 등을 입력하세요</p>
                     </div>
