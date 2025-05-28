@@ -55,6 +55,12 @@ const floatingButtonStyles = `
   transform: scale(1.1);
   box-shadow: 0 12px 35px rgba(79, 70, 229, 0.4);
 }
+
+.glass-effect {
+  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
 `;
 
 // 백엔드 이미지 저장 경로의 기본 URL
@@ -678,14 +684,29 @@ function GroupPageContent() {
     <>
       <style jsx global>{floatingButtonStyles}</style>
       <div className="min-h-screen bg-indigo-50">
-        {/* 앱 헤더 - 완전히 고정 */}
-        <div className="sticky top-0 z-10 px-4 bg-white border-b border-gray-200">
-          <div className="flex items-center justify-between h-14">
+        {/* 개선된 헤더 */}
+        <motion.header 
+          initial={{ y: -100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="fixed top-0 left-0 right-0 z-20 glass-effect"
+        >
+          <div className="flex items-center justify-between h-16 px-4">
             {currentView === 'list' ? (
               <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2">
-                  <FaUsers className="w-5 h-5 text-indigo-600" />
-                  <span className="text-base font-semibold text-gray-900">그룹</span>
+                <div className="flex items-center space-x-3">
+                  <motion.div
+                    initial={{ rotate: -180, scale: 0 }}
+                    animate={{ rotate: 0, scale: 1 }}
+                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                    className="p-2 bg-indigo-600 rounded-xl"
+                  >
+                    <FaUsers className="w-5 h-5 text-white" />
+                  </motion.div>
+                  <div>
+                    <h1 className="text-lg font-bold text-gray-900">그룹</h1>
+                    <p className="text-xs text-gray-500">나의 소중한 그룹을 관리해보세요</p>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -698,17 +719,31 @@ function GroupPageContent() {
                 >
                   <FaArrowLeft className="w-5 h-5 text-gray-700" />
                 </motion.button>
-                <div className="flex items-center space-x-2">
-                  <FaUsers className="w-5 h-5 text-indigo-600" />
-                  <span className="text-lg font-semibold text-gray-900">그룹 상세</span>
+                <div className="flex items-center space-x-3">
+                  <motion.div
+                    initial={{ rotate: -180, scale: 0 }}
+                    animate={{ rotate: 0, scale: 1 }}
+                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                    className="p-2 bg-indigo-600 rounded-xl"
+                  >
+                    <FaUsers className="w-5 h-5 text-white" />
+                  </motion.div>
+                  <div>
+                    <h1 className="text-lg font-bold text-gray-900">그룹 상세</h1>
+                    <p className="text-xs text-gray-500">멤버들과 함께하는 즐거운 공간</p>
+                  </div>
                 </div>
               </div>
             )}
+            
+            <div className="flex items-center space-x-2">
+              {/* 필요시 추가 버튼들을 여기에 배치 */}
+            </div>
           </div>
-        </div>
+        </motion.header>
 
         {/* 메인 컨텐츠 - 애니메이션 제거 */}
-        <div className="pb-safe">
+        <div className="pb-safe pt-20">
           <AnimatePresence mode="wait">
             {currentView === 'list' ? (
               <motion.div
@@ -719,7 +754,7 @@ function GroupPageContent() {
                 transition={{ duration: 0.3 }}
               >
                 {/* 검색 섹션 */}
-                <div className="px-4 py-4">
+                <div className="px-4 pb-4">
                   <motion.div 
                     className="relative"
                     whileFocus={{ scale: 1.02 }}
