@@ -142,7 +142,7 @@ class ScheduleService {
   ): Promise<GroupScheduleResponse> {
     try {
       const params = new URLSearchParams({
-        groupId: groupId.toString(),
+        days: '7', // 기본 7일
         ...(options?.startDate && { startDate: options.startDate }),
         ...(options?.endDate && { endDate: options.endDate }),
         ...(options?.memberId && { memberId: options.memberId.toString() })
@@ -150,16 +150,32 @@ class ScheduleService {
 
       console.log('[SCHEDULE SERVICE] 그룹 스케줄 조회 시작:', { groupId, options });
       
-      const response = await apiClient.get(`/schedule/group-manage?${params}`);
+      const response = await apiClient.get(`/schedules/group/${groupId}?${params}`);
       
       console.log('[SCHEDULE SERVICE] 그룹 스케줄 조회 응답:', {
         status: response.status,
-        success: response.data.success,
-        schedulesCount: response.data.data?.schedules?.length || 0,
-        membersCount: response.data.data?.groupMembers?.length || 0,
-        userPermission: response.data.data?.userPermission
+        dataType: Array.isArray(response.data) ? 'array' : 'object',
+        schedulesCount: Array.isArray(response.data) ? response.data.length : (response.data.data?.schedules?.length || 0),
+        rawData: response.data
       });
 
+      // API 응답이 직접 배열인 경우 처리
+      if (Array.isArray(response.data)) {
+        return {
+          success: true,
+          data: {
+            groupMembers: [],
+            schedules: response.data,
+            userPermission: {
+              canManage: true,
+              isOwner: false,
+              isLeader: false
+            }
+          }
+        };
+      }
+
+      // 기존 구조 형태의 응답 처리
       return response.data;
     } catch (error) {
       console.error('[SCHEDULE SERVICE] 그룹 스케줄 조회 실패:', error);

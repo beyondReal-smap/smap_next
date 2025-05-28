@@ -809,8 +809,22 @@ export default function LocationPage() {
         zIndex: 1000
       });
       
-      map.setCenter(position);
-      map.setZoom(16);
+      // 지도 중심을 해당 위치로 부드럽게 이동
+      map.panTo(position, {
+        duration: 1500, // 1000ms 애니메이션 (더 느리게)
+        easing: 'easeOutCubic'
+      });
+      
+      // 줌 레벨 조정
+      const currentZoom = map.getZoom();
+      if (currentZoom < 15) {
+        setTimeout(() => {
+          map.setZoom(16, {
+            duration: 800, // 800ms 애니메이션 (더 느리게)
+            easing: 'easeOutQuad'
+          });
+        }, 400); // panTo 애니메이션과 겹치지 않도록 더 긴 지연
+      }
     }
   };
 
@@ -1656,15 +1670,28 @@ export default function LocationPage() {
           
           console.log('[지도 클릭] 임시 마커 생성 완료:', tempMarker.current);
           
-          // 지도 중심을 클릭한 위치로 이동
-          newMap.setCenter(coord);
-          newMap.setZoom(16);
+          // 지도 중심을 클릭한 위치로 부드럽게 이동
+          newMap.panTo(coord, {
+            duration: 1500, // 1000ms 애니메이션 (더 느리게)
+            easing: 'easeOutCubic'
+          });
           
-          // 바텀시트를 peek 상태로 변경
-          setBottomSheetState('peek');
+          // 줌 레벨도 부드럽게 변경
+          const currentZoom = newMap.getZoom();
+          if (currentZoom < 15) {
+            setTimeout(() => {
+              newMap.setZoom(16, {
+                duration: 800, // 800ms 애니메이션 (더 느리게)
+                easing: 'easeOutQuad'
+              });
+            }, 400); // panTo 애니메이션과 겹치지 않도록 더 긴 지연
+          }
         
         setIsLocationInfoPanelOpen(true);
         setIsEditingPanel(false);
+        
+        // 바텀시트를 peek 상태로 변경 (핸들이 보이는 정도로 내림)
+        setBottomSheetState('peek');
         
         // 주소 변환
         if (window.naver.maps.Service) {
@@ -2991,6 +3018,8 @@ export default function LocationPage() {
                   setIsLocationInfoPanelOpen(false);
                   if (tempMarker.current) tempMarker.current.setMap(null);
                   setIsEditingPanel(false);
+                  // 패널 닫을 때 바텀시트를 다시 visible 상태로 복원
+                  setBottomSheetState('visible');
                     }} 
                     className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-all duration-200"
                   > 
@@ -3142,6 +3171,8 @@ export default function LocationPage() {
                     setIsLocationInfoPanelOpen(false);
                     if (tempMarker.current) tempMarker.current.setMap(null);
                     setIsEditingPanel(false);
+                    // 패널 닫을 때 바텀시트를 다시 visible 상태로 복원
+                    setBottomSheetState('visible');
                       }}
                       className="flex-1 py-3 px-4 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-medium rounded-xl shadow-lg mobile-button"
                     >

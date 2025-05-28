@@ -1100,18 +1100,18 @@ export default function SchedulePage() {
         console.warn('[handleSearchLocation] 프록시 API 실패, 직접 호출 시도');
         
         // 프록시 실패 시 직접 카카오 API 호출
-        const KAKAO_API_KEY = 'bc7899314df5dc2bebcb2a7960ac89bf';
+    const KAKAO_API_KEY = 'bc7899314df5dc2bebcb2a7960ac89bf';
         const directUrl = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(searchQueryString)}`;
-        
-        response = await fetch(directUrl, {
-          headers: {
-            Authorization: `KakaoAK ${KAKAO_API_KEY}`,
-          },
-        });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        response = await fetch(directUrl, {
+        headers: {
+          Authorization: `KakaoAK ${KAKAO_API_KEY}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
         data = await response.json();
         console.log('[handleSearchLocation] 직접 카카오 API 호출 성공:', data);
@@ -1741,12 +1741,12 @@ export default function SchedulePage() {
                   >
                     {/* 1. 그룹 및 멤버 선택 */}
                     <div className="bg-indigo-50 rounded-xl p-4">
-                      <div className="flex items-center space-x-2 mb-4">
+                    <div className="flex items-center space-x-2 mb-4">
                         <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
                           <span className="text-xs font-bold text-white">1</span>
-                        </div>
-                        <h4 className="font-semibold text-gray-900">그룹 및 멤버 선택</h4>
                       </div>
+                        <h4 className="font-semibold text-gray-900">그룹 및 멤버 선택</h4>
+                    </div>
 
                       {/* 그룹 선택 */}
                       <div className="mb-4">
@@ -1783,16 +1783,16 @@ export default function SchedulePage() {
                                   </div>
                                 ) : userGroups.length > 0 ? (
                                   userGroups.map((group) => (
-                                    <button
-                                      key={group.sgt_idx}
-                                      type="button"
-                                      onClick={() => handleGroupSelect(group.sgt_idx)}
+                                  <button
+                                    key={group.sgt_idx}
+                                    type="button"
+                                    onClick={() => handleGroupSelect(group.sgt_idx)}
                                       className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
                                         selectedGroupId === group.sgt_idx ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'
                                       }`}
                                     >
                                       {group.sgt_title}
-                                    </button>
+                                  </button>
                                   ))
                                 ) : (
                                   <div className="p-4 text-center text-gray-500">
@@ -1818,15 +1818,15 @@ export default function SchedulePage() {
                             <div className="flex overflow-x-auto space-x-4 pt-2 pb-2 px-3 -mx-1">
                               {scheduleGroupMembers.map((member, index) => (
                                 <motion.div 
-                                  key={member.id} 
+                                key={member.id}
                                   initial={{ opacity: 0, y: 20 }}
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={{ delay: index * 0.1 }}
                                   className="flex flex-col items-center flex-shrink-0"
                                 >
                                   <button
-                                    type="button"
-                                    onClick={() => handleScheduleMemberSelect(member.id)}
+                                type="button"
+                                onClick={() => handleScheduleMemberSelect(member.id)}
                                     className="flex flex-col items-center focus:outline-none mobile-button"
                                   >
                                     <div className={`w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
@@ -1835,23 +1835,23 @@ export default function SchedulePage() {
                                       {member.photo ? (
                                         <img 
                                           src={getSafeImageUrl(member.photo, member.mt_gender, member.mt_idx || 0)}
-                                          alt={member.name} 
-                                          className="w-full h-full object-cover" 
-                                          onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
+                                      alt={member.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
                                             const fallbackSrc = getDefaultImage(member.mt_gender, member.mt_idx || 0);
                                             console.log(`[이미지 오류] ${member.name}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
-                                            target.src = fallbackSrc;
+                                        target.src = fallbackSrc;
                                             target.onerror = null; // 무한 루프 방지
                                           }}
                                           onLoad={() => {
                                             console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
-                                          }}
-                                        />
-                                      ) : (
+                                      }}
+                                    />
+                                  ) : (
                                         <FiUser className="w-6 h-6 text-gray-400" />
-                                      )}
-                                    </div>
+                                  )}
+                                </div>
                                     <span className={`block text-xs font-medium mt-2 transition-colors duration-200 ${
                                       member.isSelected ? 'text-indigo-700' : 'text-gray-700'
                                     }`}>
@@ -1859,75 +1859,75 @@ export default function SchedulePage() {
                                     </span>
                                   </button>
                                 </motion.div>
-                              ))}
-                            </div>
+                            ))}
+                          </div>
                           ) : (
                             <div className="text-center py-6 text-gray-500">
                               <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
                                 <FiUsers className="w-6 h-6 text-gray-300" />
                               </div>
                               <p className="text-sm">그룹에 참여한 멤버가 없습니다</p>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
+                      )}
+                  </div>
 
                     {/* 2. 일정 제목 및 내용 */}
                     <div className="bg-blue-50 rounded-xl p-4">
-                      <div className="flex items-center space-x-2 mb-4">
+                    <div className="flex items-center space-x-2 mb-4">
                         <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
                           <span className="text-xs font-bold text-white">2</span>
-                        </div>
-                        <h4 className="font-semibold text-gray-900">일정 제목 및 내용</h4>
                       </div>
+                        <h4 className="font-semibold text-gray-900">일정 제목 및 내용</h4>
+                    </div>
 
-                      {/* 제목 입력 */}
+                    {/* 제목 입력 */}
                       <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          일정 제목 <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={newEvent.title}
-                          onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                          placeholder="일정 제목을 입력하세요"
-                          required
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        일정 제목 <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newEvent.title}
+                        onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                        placeholder="일정 제목을 입력하세요"
+                        required
                           maxLength={100}
                         />
                         <div className="flex justify-between mt-2">
                           <p className="text-xs text-gray-500">예) 팀 회의, 프로젝트 미팅 등</p>
                           <p className="text-xs text-gray-500">({newEvent.title.length}/100)</p>
-                        </div>
-                      </div>
-
-                      {/* 내용 입력 */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">일정 내용 (선택)</label>
-                        <textarea
-                          value={newEvent.content || ''}
-                          onChange={(e) => setNewEvent({ ...newEvent, content: e.target.value })}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
-                          placeholder="일정에 대한 상세 내용을 입력하세요"
-                          rows={3}
-                          maxLength={500}
-                        />
-                        <div className="flex justify-between mt-2">
-                          <p className="text-xs text-gray-500">예) 회의 안건, 준비물, 참고사항 등</p>
-                          <p className="text-xs text-gray-500">({(newEvent.content || '').length}/500)</p>
-                        </div>
                       </div>
                     </div>
 
+                      {/* 내용 입력 */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">일정 내용 (선택)</label>
+                      <textarea
+                        value={newEvent.content || ''}
+                        onChange={(e) => setNewEvent({ ...newEvent, content: e.target.value })}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+                        placeholder="일정에 대한 상세 내용을 입력하세요"
+                          rows={3}
+                          maxLength={500}
+                      />
+                        <div className="flex justify-between mt-2">
+                        <p className="text-xs text-gray-500">예) 회의 안건, 준비물, 참고사항 등</p>
+                          <p className="text-xs text-gray-500">({(newEvent.content || '').length}/500)</p>
+                      </div>
+                    </div>
+                  </div>
+
                     {/* 3. 날짜 및 시간 */}
                     <div className="bg-green-50 rounded-xl p-4">
-                      <div className="flex items-center space-x-2 mb-4">
+                    <div className="flex items-center space-x-2 mb-4">
                         <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
                           <span className="text-xs font-bold text-white">3</span>
-                        </div>
-                        <h4 className="font-semibold text-gray-900">날짜 및 시간</h4>
                       </div>
+                      <h4 className="font-semibold text-gray-900">날짜 및 시간</h4>
+                    </div>
 
                       {/* 날짜와 시간 정보 카드 */}
                       <button
@@ -1940,70 +1940,70 @@ export default function SchedulePage() {
                             <span className="text-gray-700 text-sm font-medium">날짜</span>
                             <span className="text-gray-500 text-sm font-normal">
                               {dayjs(newEvent.date).format('YYYY년 MM월 DD일')}
-                            </span>
-                          </div>
+                        </span>
+                    </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-700 text-sm font-medium">시간</span>
                             <span className="text-gray-500 text-sm font-normal">
                               {newEvent.allDay ? '하루 종일' : `${newEvent.startTime} ~ ${newEvent.endTime}`}
-                            </span>
+                              </span>
                           </div>
                           <div className="flex justify-between items-center">
                             <span className="text-gray-700 text-sm font-medium">하루 종일</span>
                             <span className="text-gray-500 text-sm font-normal">
                               {newEvent.allDay ? 'ON' : 'OFF'}
-                            </span>
+                              </span>
                           </div>
                         </div>
                       </button>
 
                       {/* 설정 안내 텍스트 */}
                       <p className="text-xs text-gray-500 text-center">위 카드를 클릭하여 날짜와 시간을 설정하세요</p>
-                    </div>
+                        </div>
 
                     {/* 4. 추가 설정 */}
                     <div className="bg-amber-50 rounded-xl p-4">
-                      <div className="flex items-center space-x-2 mb-4">
+                    <div className="flex items-center space-x-2 mb-4">
                         <div className="w-6 h-6 bg-amber-600 rounded-full flex items-center justify-center">
                           <span className="text-xs font-bold text-white">4</span>
-                        </div>
-                        <h4 className="font-semibold text-gray-900">추가 설정</h4>
                       </div>
+                      <h4 className="font-semibold text-gray-900">추가 설정</h4>
+                    </div>
 
-                      <div className="space-y-4">
-                        {/* 반복 및 알림 설정 */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">반복</label>
-                            <button
-                              type="button"
-                              onClick={() => setIsRepeatModalOpen(true)}
-                              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left text-sm transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                            >
-                              {newEvent.repeat}
-                            </button>
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">알림</label>
-                            <button
-                              type="button"
-                              onClick={() => setIsAlarmModalOpen(true)}
-                              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left text-sm transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                            >
-                              {newEvent.alarm}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* 장소 정보 */}
+                    <div className="space-y-4">
+                      {/* 반복 및 알림 설정 */}
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">장소 정보 (선택)</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">반복</label>
                           <button
                             type="button"
-                            onClick={handleOpenLocationSearchModal}
-                            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                              onClick={() => setIsRepeatModalOpen(true)}
+                              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left text-sm transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                           >
+                            {newEvent.repeat}
+                          </button>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">알림</label>
+                          <button
+                            type="button"
+                              onClick={() => setIsAlarmModalOpen(true)}
+                              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left text-sm transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                          >
+                            {newEvent.alarm}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 장소 정보 */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">장소 정보 (선택)</label>
+                        <button
+                          type="button"
+                          onClick={handleOpenLocationSearchModal}
+                            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                        >
                             <div className="flex justify-between items-center">
                               <span className="text-sm font-medium text-gray-700">장소명</span>
                               <span className="text-sm text-gray-500">
@@ -2018,10 +2018,10 @@ export default function SchedulePage() {
                                 </span>
                               </div>
                             )}
-                          </button>
-                        </div>
+                        </button>
                       </div>
                     </div>
+                  </div>
 
                     {/* 액션 버튼 */}
                     <div className="pt-2 space-y-3">
@@ -2527,7 +2527,7 @@ export default function SchedulePage() {
                   </div>
 
                   {/* 검색 버튼 */}
-                  <button
+                    <button
                     onClick={() => handleSearchLocation()}
                     disabled={!locationSearchQuery.trim() || isSearchingLocation}
                     className="w-full py-3 bg-amber-600 text-white rounded-xl font-medium mobile-button hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"

@@ -24,7 +24,8 @@ import {
   HiSparkles, 
   HiUserGroup, 
   HiChatBubbleLeftEllipsis,
-  HiEllipsisVertical 
+  HiEllipsisVertical,
+  HiOutlineChevronLeft
 } from 'react-icons/hi2';
 import { RiKakaoTalkFill } from 'react-icons/ri';
 import { FiLink, FiX, FiCopy, FiSettings, FiPlus } from 'react-icons/fi';
@@ -44,7 +45,7 @@ const floatingButtonStyles = `
   bottom: 80px;
   right: 20px;
   z-index: 40;
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  background: #4f46e5;
   box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
   transition: all 0.2s ease;
   touch-action: manipulation;
@@ -384,19 +385,25 @@ function GroupPageContent() {
       let weeklySchedules = 0;
       let totalLocations = 0;
       
+      // 올바른 스케줄 API 호출
       try {
         const allGroupSchedules = await scheduleService.getGroupSchedules(group.sgt_idx);
-        weeklySchedules = allGroupSchedules.data.schedules.length;
+        if (allGroupSchedules.success && allGroupSchedules.data?.schedules) {
+          weeklySchedules = allGroupSchedules.data.schedules.length;
+        }
       } catch (error) {
         console.error('그룹 스케줄 조회 오류:', error);
+        weeklySchedules = 0; // 오류 시 기본값
       }
       
+      // 위치 정보는 오류가 발생해도 계속 진행
       for (const member of members) {
         try {
           const memberLocations = await locationService.getOtherMembersLocations(member.mt_idx.toString());
           totalLocations += memberLocations.length;
         } catch (error) {
           console.error(`멤버 ${member.mt_name} 위치 조회 오류:`, error);
+          // 오류가 발생해도 계속 진행
         }
       }
       
@@ -417,7 +424,21 @@ function GroupPageContent() {
       setGroupStats(statsData);
     } catch (error) {
       console.error('그룹 통계 조회 오류:', error);
-      setGroupStats(null);
+      // 오류가 발생해도 기본 통계 데이터 설정
+      const basicStatsData = {
+        group_id: group.sgt_idx,
+        group_title: group.sgt_title,
+        member_count: members.length,
+        weekly_schedules: 0,
+        total_locations: 0,
+        stats_period: {
+          start_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+          end_date: new Date().toISOString(),
+          days: 7
+        },
+        member_stats: []
+      };
+      setGroupStats(basicStatsData);
     } finally {
       setStatsLoading(false);
     }
@@ -717,7 +738,7 @@ function GroupPageContent() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
-                  <FaArrowLeft className="w-5 h-5 text-gray-700" />
+                  <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
                 </motion.button>
                 <div className="flex items-center space-x-3">
                   <motion.div
@@ -885,8 +906,8 @@ function GroupPageContent() {
                       <div className="p-6 bg-indigo-100 rounded-full w-fit mx-auto mb-4">
                         <FaSearch className="w-8 h-8 text-indigo-400" />
                       </div>
-                      <p className="text-indigo-500 text-lg font-medium">검색 결과가 없습니다</p>
-                      <p className="text-indigo-400 text-sm mt-1">다른 키워드로 검색해보세요</p>
+                      <p className="text-gray-500 text-lg font-medium">검색 결과가 없습니다</p>
+                      <p className="text-gray-400 text-sm mt-1">다른 키워드로 검색해보세요</p>
                     </motion.div>
                   )}
                 </div>
@@ -1129,7 +1150,12 @@ function GroupPageContent() {
                                     />
                                   </div>
                                   {member.sgdt_owner_chk === 'Y' && (
-                                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center">
+                                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg">
+                                      <FaCrown className="w-2.5 h-2.5 text-white" />
+                                    </div>
+                                  )}
+                                  {member.sgdt_owner_chk !== 'Y' && member.sgdt_leader_chk === 'Y' && (
+                                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center shadow-lg">
                                       <FaCrown className="w-2.5 h-2.5 text-white" />
                                     </div>
                                   )}
@@ -1536,7 +1562,7 @@ function GroupPageContent() {
                       <motion.button 
                         onClick={() => handleChangeMemberRole('leader')}
                         disabled={isUpdatingMember}
-                        className="w-full flex items-center justify-center p-4 rounded-2xl bg-yellow-500 text-white disabled:opacity-50"
+                        className="w-full flex items-center justify-center p-4 rounded-2xl bg-gradient-to-r from-gray-400 to-gray-500 text-white disabled:opacity-50"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                       >
