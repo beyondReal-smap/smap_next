@@ -19,10 +19,12 @@ import {
   FiCheckCircle,
   FiXCircle,
   FiInfo,
-  FiUser
+  FiUser,
+  FiAlertTriangle
 } from 'react-icons/fi';
 import { FaSearch as FaSearchSolid } from 'react-icons/fa';
 import dynamic from 'next/dynamic';
+import { FaTrash } from 'react-icons/fa';
 
 // 커스텀 알림 상태 추가 (react-toastify 관련 없음)
 interface CustomToast {
@@ -585,6 +587,11 @@ export default function LocationPage() {
     onConfirm?: () => void; // 확인 콜백 추가
   } | null>(null);
   
+  // 장소 삭제 모달 상태 추가
+  const [isLocationDeleteModalOpen, setIsLocationDeleteModalOpen] = useState(false);
+  const [locationToDelete, setLocationToDelete] = useState<LocationData | OtherMemberLocationRaw | null>(null);
+  const [isDeletingLocation, setIsDeletingLocation] = useState(false);
+  
   // 뒤로가기 핸들러
   const handleBack = () => {
     setIsExiting(true);
@@ -598,10 +605,18 @@ export default function LocationPage() {
     title: string, 
     message: string, 
     type: 'success' | 'error' | 'info', 
-    onConfirmCallback?: () => void // 콜백 파라미터 추가
+    onConfirmCallback?: () => void, // 콜백 파라미터 추가
+    autoClose?: boolean // 자동 닫기 옵션 추가
   ) => {
     setModalContent({ title, message, type, onConfirm: onConfirmCallback });
     setIsModalOpen(true);
+    
+    // 자동 닫기 옵션이 true이고 onConfirm이 없는 경우 (단순 정보 모달)
+    if (autoClose && !onConfirmCallback) {
+      setTimeout(() => {
+        closeModal();
+      }, 3000);
+    }
   };
 
   // 모달 닫기 함수
@@ -611,11 +626,12 @@ export default function LocationPage() {
     // setModalContent(null); // 이렇게 하면 onConfirm도 null이 됨
   };
 
-  // 알림 토글 핸들러 (DB 업데이트 포함)
+  // 알림 토글 핸들러 (바로 실행, 3초 후 자동 닫기)
   const handleNotificationToggle = async (location: LocationData | OtherMemberLocationRaw) => {
     try {
       const locationId = 'slt_idx' in location ? location.slt_idx?.toString() : location.id;
       const sltIdx = 'slt_idx' in location ? location.slt_idx : null;
+      const locationName = 'slt_title' in location ? location.slt_title : location.name;
       
       // 현재 알림 상태 정확히 파악
       let currentNotificationStatus = false;
@@ -703,7 +719,9 @@ export default function LocationPage() {
         상태업데이트완료: true
       });
       
-      openModal('알림 설정 완료', `알림이 ${newNotificationStatus ? '켜졌습니다' : '꺼졌습니다'}.`, 'success');
+      // 알림 설정 완료 모달 (3초 후 자동 닫기)
+      openModal('알림 설정 완료', `'${locationName}' 장소의 알림이 ${newNotificationStatus ? '켜졌습니다' : '꺼졌습니다'}.`, 'success', undefined, true);
+      
     } catch (error) {
       console.error('알림 토글 실패:', error);
       openModal('알림 설정 실패', '알림 설정 중 오류가 발생했습니다.', 'error');
@@ -712,62 +730,7 @@ export default function LocationPage() {
 
   // 장소 숨김 처리 핸들러 (DB 업데이트 포함)
   const handleHideLocation = async (location: LocationData | OtherMemberLocationRaw) => {
-    // 이 함수는 confirm을 모달로 대체한 후 호출될 예정입니다.
-    try {
-      const locationId = 'slt_idx' in location ? location.slt_idx?.toString() : location.id;
-      const sltIdx = 'slt_idx' in location ? location.slt_idx : null;
-      const locationName = 'slt_title' in location ? location.slt_title : location.name;
-      
-      console.log('[장소 삭제] 시작:', locationId, 'slt_idx:', sltIdx, locationName);
-      
-      // DB에서 숨김 처리 (slt_idx가 있는 경우에만)
-      if (sltIdx) {
-        try {
-          const sltIdxNumber = typeof sltIdx === 'string' ? parseInt(sltIdx, 10) : sltIdx;
-          await locationService.hideLocation(sltIdxNumber); // 내부적으로는 hideLocation 호출 유지
-          console.log('[장소 삭제] DB 처리 성공 (숨김 처리):', sltIdxNumber);
-        } catch (dbError) {
-          console.error('[장소 삭제] DB 처리 실패:', dbError);
-          // 실패 시에는 onConfirm 콜백이 없는 일반 정보 모달 호출
-          openModal('장소 삭제 실패', '장소 삭제 중 오류가 발생했습니다. 다시 시도해주세요.', 'error');
-          return;
-        }
-      }
-      
-      // UI 업데이트 로직
-      if (selectedMemberSavedLocations) {
-        setSelectedMemberSavedLocations(prev => 
-          prev ? prev.filter(loc => loc.id !== locationId) : null
-        );
-      }
-      
-      if ('slt_idx' in location && location.slt_idx) {
-        setOtherMembersSavedLocations(prev => prev.filter(loc => loc.slt_idx !== location.slt_idx));
-      }
-      
-      setGroupMembers(prevMembers => prevMembers.map(member => ({
-        ...member,
-        savedLocations: member.savedLocations.filter(loc => loc.id !== locationId)
-      })));
-      
-      if (selectedLocationId === locationId) {
-        setSelectedLocationId(null);
-        selectedLocationIdRef.current = null;
-      }
-      
-      setIsLocationInfoPanelOpen(false);
-      setIsEditingPanel(false);
-      if (infoWindow) {
-        infoWindow.close();
-        setInfoWindow(null);
-      }
-      
-      // 성공 시에는 onConfirm 콜백이 없는 일반 정보 모달 호출
-      openModal('장소 삭제 완료', `'${locationName}' 장소가 삭제되었습니다.`, 'success');
-    } catch (error) {
-      console.error('장소 삭제 처리 중 전체 오류:', error);
-      openModal('장소 삭제 실패', '장소 삭제 처리 중 예기치 않은 오류가 발생했습니다.', 'error');
-    }
+    openLocationDeleteModal(location);
   };
 
   // 다른 멤버 장소 조회 헬퍼
@@ -1878,8 +1841,9 @@ export default function LocationPage() {
       return photoUrl;
     }
     
-    // 상대 경로인 경우 백엔드 서버 URL 추가
-    return `http://118.67.130.71:8000/storage/${photoUrl}`;
+    // 백엔드 서버가 연결되지 않는 경우가 많으므로 기본 이미지 사용
+    console.log(`[getSafeImageUrl] 백엔드 서버 이미지 대신 기본 이미지 사용: ${photoUrl}`);
+    return getDefaultImage(gender, index);
   };
 
   // 지도에 그룹멤버 마커 표시 (home/page.tsx 방식 참고)
@@ -2704,6 +2668,88 @@ export default function LocationPage() {
     }
   }, [isMapReady, groupMembers, isFetchingGroupMembers]);
 
+  // 장소 삭제 모달 열기
+  const openLocationDeleteModal = (location: LocationData | OtherMemberLocationRaw) => {
+    setLocationToDelete(location);
+    setIsLocationDeleteModalOpen(true);
+  };
+
+  // 장소 삭제 모달 닫기
+  const closeLocationDeleteModal = () => {
+    if (!isDeletingLocation) {
+      setLocationToDelete(null);
+      setIsLocationDeleteModalOpen(false);
+    }
+  };
+
+  // 실제 장소 삭제 처리
+  const handleLocationDelete = async () => {
+    if (!locationToDelete) return;
+    
+    setIsDeletingLocation(true);
+    
+    try {
+      const locationId = 'slt_idx' in locationToDelete ? locationToDelete.slt_idx?.toString() : locationToDelete.id;
+      const sltIdx = 'slt_idx' in locationToDelete ? locationToDelete.slt_idx : null;
+      const locationName = 'slt_title' in locationToDelete ? locationToDelete.slt_title : locationToDelete.name;
+      
+      console.log('[장소 삭제] 시작:', locationId, 'slt_idx:', sltIdx, locationName);
+      
+      // DB에서 숨김 처리 (slt_idx가 있는 경우에만)
+      if (sltIdx) {
+        try {
+          const sltIdxNumber = typeof sltIdx === 'string' ? parseInt(sltIdx, 10) : sltIdx;
+          await locationService.hideLocation(sltIdxNumber);
+          console.log('[장소 삭제] DB 처리 성공 (숨김 처리):', sltIdxNumber);
+        } catch (dbError) {
+          console.error('[장소 삭제] DB 처리 실패:', dbError);
+          openModal('장소 삭제 실패', '장소 삭제 중 오류가 발생했습니다. 다시 시도해주세요.', 'error');
+          return;
+        }
+      }
+      
+      // UI 업데이트 로직
+      if (selectedMemberSavedLocations) {
+        setSelectedMemberSavedLocations(prev => 
+          prev ? prev.filter(loc => loc.id !== locationId) : null
+        );
+      }
+      
+      if ('slt_idx' in locationToDelete && locationToDelete.slt_idx) {
+        setOtherMembersSavedLocations(prev => prev.filter(loc => loc.slt_idx !== locationToDelete.slt_idx));
+      }
+      
+      setGroupMembers(prevMembers => prevMembers.map(member => ({
+        ...member,
+        savedLocations: member.savedLocations.filter(loc => loc.id !== locationId)
+      })));
+      
+      if (selectedLocationId === locationId) {
+        setSelectedLocationId(null);
+        selectedLocationIdRef.current = null;
+      }
+      
+      setIsLocationInfoPanelOpen(false);
+      setIsEditingPanel(false);
+      if (infoWindow) {
+        infoWindow.close();
+        setInfoWindow(null);
+      }
+      
+      // 삭제 모달 닫기
+      closeLocationDeleteModal();
+      
+      // 성공 모달 표시 (3초 자동 닫기)
+      openModal('장소 삭제 완료', `'${locationName}' 장소가 삭제되었습니다.`, 'success', undefined, true);
+      
+    } catch (error) {
+      console.error('장소 삭제 처리 중 전체 오류:', error);
+      openModal('장소 삭제 실패', '장소 삭제 처리 중 예기치 않은 오류가 발생했습니다.', 'error');
+    } finally {
+      setIsDeletingLocation(false);
+    }
+  };
+
   return (
     <>
       <style jsx global>{mobileStyles}</style>
@@ -2969,10 +3015,11 @@ export default function LocationPage() {
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       // 삭제 확인 모달을 먼저 띄웁니다.
                       const locationToProcess = selectedMemberSavedLocations?.find(loc => loc.id === newLocation.id) ||
-                                         otherMembersSavedLocations.find(loc => (loc.slt_idx ? loc.slt_idx.toString() : loc.id) === newLocation.id);
+                                           otherMembersSavedLocations.find(loc => (loc.slt_idx ? loc.slt_idx.toString() : loc.id) === newLocation.id);
                       if (locationToProcess) {
                         openModal(
                           `'${newLocation.name}' 삭제 확인`,
@@ -3637,7 +3684,7 @@ export default function LocationPage() {
 
       </motion.div>
 
-      {/* 커스텀 모달 */}
+      {/* 개선된 커스텀 모달 */}
       <AnimatePresence>
         {isModalOpen && modalContent && (
           <motion.div
@@ -3645,78 +3692,213 @@ export default function LocationPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md"
-            onClick={closeModal} // 배경 클릭 시 닫기
+            onClick={closeModal}
           >
-            <motion.div
-              variants={modalVariants} // 기존 modalVariants 사용
+            <motion.div 
+              className="bg-white rounded-3xl w-full max-w-md mx-4"
+              variants={{
+                hidden: { 
+                  opacity: 0, 
+                  y: 100,
+                  scale: 0.95
+                },
+                visible: { 
+                  opacity: 1, 
+                  y: 0,
+                  scale: 1,
+                  transition: {
+                    duration: 0.3,
+                    ease: [0.25, 0.46, 0.45, 0.94]
+                  }
+                },
+                exit: { 
+                  opacity: 0, 
+                  y: 100,
+                  scale: 0.95,
+                  transition: {
+                    duration: 0.2,
+                    ease: [0.55, 0.06, 0.68, 0.19]
+                  }
+                }
+              }}
               initial="hidden"
               animate="visible"
               exit="exit"
-              className={`relative p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4
-                ${modalContent.type === 'success' ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 
-                  modalContent.type === 'error' ? 'bg-gradient-to-br from-red-500 to-rose-600' : 
-                  'bg-gradient-to-br from-blue-500 to-indigo-600'
-                }`}
-              onClick={(e) => e.stopPropagation()} // 모달 내부 클릭 시 전파 방지
+              onClick={(e) => e.stopPropagation()}
             >
-              <button 
-                onClick={closeModal}
-                className="absolute top-4 right-4 p-2 text-white/70 hover:text-white transition-colors rounded-full hover:bg-white/20"
-              >
-                <FiX size={20} />
-              </button>
-              
-              <div className="text-center">
-                <motion.div
-                  initial={{ scale: 0.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1, type: 'spring', stiffness: 300, damping: 15 }}
-                  className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-6 shadow-inner"
-                >
-                  {modalContent.type === 'success' && <FiCheckCircle size={32} className="text-white" />}
-                  {modalContent.type === 'error' && <FiXCircle size={32} className="text-white" />}
-                  {modalContent.type === 'info' && <FiInfo size={32} className="text-white" />}
-                </motion.div>
-
-                <h3 className="text-2xl font-bold text-white mb-3 leading-tight">{modalContent.title}</h3>
-                <p className="text-white/80 text-base mb-8 leading-relaxed">{modalContent.message}</p>
-
-                {/* 버튼 영역 수정 */} 
-                <div className="flex flex-col sm:flex-row gap-3">
+              <div className="p-6 pb-8">
+                <div className="text-center mb-6">
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                    modalContent.type === 'success' ? 'bg-green-100' : 
+                    modalContent.type === 'error' ? 'bg-red-100' : 
+                    modalContent.type === 'info' ? 'bg-orange-100' : 'bg-blue-100'
+                  }`}>
+                    {modalContent.type === 'success' && <FiCheckCircle className="w-8 h-8 text-green-500" />}
+                    {modalContent.type === 'error' && <FiXCircle className="w-8 h-8 text-red-500" />}
+                    {modalContent.type === 'info' && <FiAlertTriangle className="w-8 h-8 text-orange-500" />}
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">{modalContent.title}</h3>
+                  <p className="text-gray-600 mb-4">{modalContent.message}</p>
+                  
+                  {/* 삭제 확인 모달인 경우 진행 바 표시 */}
+                  {modalContent.onConfirm && modalContent.type === 'info' && (
+                    <div className="w-full bg-gray-200 rounded-full h-1 mb-2">
+                      <motion.div 
+                        className="bg-orange-500 h-1 rounded-full"
+                        initial={{ width: "0%" }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: 3 }}
+                      />
+                    </div>
+                  )}
+                  
+                  {/* 알림 설정 완료 모달인 경우 자동 닫기 진행 바 및 텍스트 표시 */}
+                  {!modalContent.onConfirm && modalContent.type === 'success' && modalContent.title.includes('알림 설정') && (
+                    <>
+                      <div className="w-full bg-gray-200 rounded-full h-1 mb-3">
+                        <motion.div 
+                          className="bg-green-500 h-1 rounded-full"
+                          initial={{ width: "0%" }}
+                          animate={{ width: "100%" }}
+                          transition={{ duration: 3, ease: "linear" }}
+                        />
+                      </div>
+                      <p className="text-sm text-gray-500 mb-2">3초 후 자동으로 닫힙니다</p>
+                    </>
+                  )}
+                </div>
+                
+                {/* 버튼 영역 */}
+                <div className="flex flex-col gap-3">
                   {modalContent.onConfirm ? (
                     <>
                       <motion.button
-                        whileHover={{ scale: 1.05, y: -2 }}
-                        whileTap={{ scale: 0.95 }}
                         onClick={() => {
                           if (modalContent.onConfirm) {
                             modalContent.onConfirm();
                           }
-                          closeModal(); // 확인 후 모달 닫기
+                          closeModal();
                         }}
-                        className="w-full py-3 px-6 bg-white/90 hover:bg-white text-gray-800 font-semibold rounded-xl shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50"
+                        className={`w-full py-4 rounded-2xl font-medium flex items-center justify-center transition-all duration-200 ${
+                          modalContent.type === 'info' 
+                            ? 'bg-red-500 hover:bg-red-600 text-white' 
+                            : 'bg-green-500 hover:bg-green-600 text-white'
+                        }`}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                       >
-                        {modalContent.type === 'info' ? '삭제 확인' : '확인'} {/* 삭제 확인 모달의 경우 버튼 텍스트 변경 */}
+                        {modalContent.type === 'info' ? '삭제하기' : '확인'}
                       </motion.button>
                       <motion.button
-                        whileHover={{ scale: 1.05, y: -2 }}
-                        whileTap={{ scale: 0.95 }}
-                        onClick={closeModal} // 취소 버튼은 항상 모달만 닫음
-                        className="w-full py-3 px-6 bg-transparent hover:bg-white/10 border border-white/30 text-white font-semibold rounded-xl shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50"
+                        onClick={closeModal}
+                        className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-medium transition-all duration-200"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                       >
                         취소
                       </motion.button>
                     </>
                   ) : (
                     <motion.button
-                      whileHover={{ scale: 1.05, y: -2 }}
-                      whileTap={{ scale: 0.95 }}
                       onClick={closeModal}
-                      className="w-full py-3 px-6 bg-white/90 hover:bg-white text-gray-800 font-semibold rounded-xl shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-white/50"
+                      className={`w-full py-4 rounded-2xl font-medium flex items-center justify-center transition-all duration-200 ${
+                        modalContent.type === 'success' ? 'bg-green-500 hover:bg-green-600 text-white' :
+                        modalContent.type === 'error' ? 'bg-red-500 hover:bg-red-600 text-white' :
+                        'bg-blue-500 hover:bg-blue-600 text-white'
+                      }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                     >
                       확인
                     </motion.button>
                   )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 장소 삭제 확인 모달 */}
+      <AnimatePresence>
+        {isLocationDeleteModalOpen && locationToDelete && (
+          <motion.div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[120] p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeLocationDeleteModal}
+          >
+            <motion.div 
+              className="bg-white rounded-3xl w-full max-w-md mx-auto"
+              variants={{
+                hidden: { 
+                  opacity: 0, 
+                  y: 100,
+                  scale: 0.95
+                },
+                visible: { 
+                  opacity: 1, 
+                  y: 0,
+                  scale: 1,
+                  transition: {
+                    duration: 0.3,
+                    ease: [0.25, 0.46, 0.45, 0.94]
+                  }
+                },
+                exit: { 
+                  opacity: 0, 
+                  y: 100,
+                  scale: 0.95,
+                  transition: {
+                    duration: 0.2,
+                    ease: [0.55, 0.06, 0.68, 0.19]
+                  }
+                }
+              }}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 pb-8">
+                <div className="text-center mb-6">
+                  <FaTrash className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                  <h3 className="text-xl font-bold text-gray-900">장소 삭제</h3>
+                  <p className="text-gray-600 mt-2 mb-4">
+                    <span className="font-medium text-red-600">
+                      "{'slt_title' in locationToDelete ? locationToDelete.slt_title : locationToDelete.name}"
+                    </span> 장소를 정말 삭제하시겠습니까?
+                  </p>
+                </div>
+                
+                <div className="space-y-3">
+                  <motion.button
+                    onClick={handleLocationDelete}
+                    disabled={isDeletingLocation}
+                    className="w-full py-4 bg-red-500 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isDeletingLocation ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        삭제 중...
+                      </>
+                    ) : (
+                      '장소 삭제'
+                    )}
+                  </motion.button>
+                  
+                  <motion.button
+                    onClick={closeLocationDeleteModal}
+                    disabled={isDeletingLocation}
+                    className="w-full py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium disabled:opacity-50"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    취소
+                  </motion.button>
                 </div>
               </div>
             </motion.div>

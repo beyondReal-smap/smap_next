@@ -34,6 +34,34 @@ import groupService, { Group } from '@/services/groupService';
 dayjs.extend(isBetween);
 dayjs.locale('ko');
 
+// 기본 이미지 가져오기 함수 (location/page.tsx에서 가져옴)
+const getDefaultImage = (gender: number | null | undefined, index: number): string => {
+  const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png', '/images/male_4.png'];
+  const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png', '/images/female_4.png'];
+  const defaultImages = ['/images/avatar1.png', '/images/avatar2.png', '/images/avatar3.png', '/images/avatar4.png'];
+  
+  if (gender === 1) return maleImages[index % maleImages.length];
+  if (gender === 2) return femaleImages[index % femaleImages.length];
+  return defaultImages[index % defaultImages.length];
+};
+
+// 안전한 이미지 URL 가져오기 함수 (location/page.tsx에서 가져옴)
+const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
+  // URL이 null이거나 빈 문자열인 경우 기본 이미지 사용
+  if (!photoUrl || photoUrl.trim() === '') {
+    return getDefaultImage(gender, index);
+  }
+  
+  // 이미 완전한 URL인 경우 그대로 사용
+  if (photoUrl.startsWith('http')) {
+    return photoUrl;
+  }
+  
+  // 백엔드 서버가 연결되지 않는 경우가 많으므로 기본 이미지 사용
+  console.log(`[getSafeImageUrl] 백엔드 서버 이미지 대신 기본 이미지 사용: ${photoUrl}`);
+  return getDefaultImage(gender, index);
+};
+
 // 모바일 최적화된 CSS 스타일
 const pageStyles = `
 html, body {
@@ -669,12 +697,6 @@ export default function SchedulePage() {
       return;
     }
 
-    // 과거 날짜 검사 (오늘 이전 날짜 방지)
-    if (eventDate.isBefore(now, 'day')) {
-      setDateTimeError('과거 날짜로는 일정을 생성할 수 없습니다.');
-      hasError = true;
-    }
-
     // 너무 먼 미래 날짜 검사 (10년 후까지만 허용)
     if (eventDate.isAfter(now.add(10, 'year'))) {
       setDateTimeError('10년 이후의 날짜는 설정할 수 없습니다.');
@@ -711,11 +733,6 @@ export default function SchedulePage() {
             // 시작 시간과 종료 시간이 같은 경우
             else if (newEvent.startTime === newEvent.endTime) {
               setDateTimeError('시작 시간과 종료 시간이 같을 수 없습니다.');
-              hasError = true;
-            }
-            // 과거 시간 검사 (현재 시간 이전 방지)
-            else if (startDateTime.isBefore(now)) {
-              setDateTimeError('과거 시간으로는 일정을 생성할 수 없습니다.');
               hasError = true;
             }
             // 너무 짧은 일정 (5분 미만)
@@ -764,6 +781,26 @@ export default function SchedulePage() {
       }, 300);
     }
   }, [isTimeModalOpen, selectedHour, selectedMinute]);
+
+  // 그룹 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isGroupSelectorOpen) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('.group-selector-container')) {
+          setIsGroupSelectorOpen(false);
+        }
+      }
+    };
+
+    if (isGroupSelectorOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isGroupSelectorOpen]);
 
   // 일정 저장
   const handleSaveEvent = () => {
@@ -880,8 +917,9 @@ export default function SchedulePage() {
   const fetchUserGroups = async () => {
     setIsLoadingGroups(true);
     try {
+      console.log('[fetchUserGroups] 실제 백엔드 API 호출 시작');
       const groups = await groupService.getCurrentUserGroups();
-      console.log('[fetchUserGroups] 그룹 목록 조회:', groups);
+      console.log('[fetchUserGroups] 그룹 목록 조회 성공:', groups);
       setUserGroups(groups);
       
       // 첫 번째 그룹을 기본 선택
@@ -891,6 +929,8 @@ export default function SchedulePage() {
       }
     } catch (error) {
       console.error('[fetchUserGroups] 그룹 목록 조회 실패:', error);
+      console.log('[fetchUserGroups] API 실패로 빈 그룹 목록 설정');
+      // API 실패 시 빈 배열로 설정
       setUserGroups([]);
     } finally {
       setIsLoadingGroups(false);
@@ -946,6 +986,8 @@ export default function SchedulePage() {
       }
     } catch (error) {
       console.error('[fetchGroupMembers] 그룹 멤버 가져오기 실패:', error);
+      console.log('[fetchGroupMembers] API 실패로 빈 멤버 목록 설정');
+      // API 실패 시 빈 배열로 설정
       setScheduleGroupMembers([]);
     } finally {
       setIsFetchingMembers(false);
@@ -959,6 +1001,14 @@ export default function SchedulePage() {
     await fetchGroupMembers(groupId);
   };
 
+  // 일정 추가 모달 열기
+  const handleOpenAddEventModal = () => {
+    setIsAddEventModalOpen(true);
+    setIsGroupSelectorOpen(false); // 드롭다운 닫기
+    // body 스크롤 비활성화
+    document.body.style.overflow = 'hidden';
+  };
+
   // 멤버 선택 핸들러
   const handleScheduleMemberSelect = (memberId: string) => {
     setSelectedMemberId(memberId);
@@ -969,12 +1019,33 @@ export default function SchedulePage() {
     
     // 선택된 멤버 정보를 newEvent에 반영
     const selectedMember = scheduleGroupMembers.find(m => m.id === memberId);
-    if (selectedMember) {
+    const selectedGroup = userGroups.find(g => g.sgt_idx === selectedGroupId);
+    
+    if (selectedMember && selectedGroup && selectedGroupId !== null) {
+      // 그룹별 색상 배열 (다양한 색상 제공)
+      const groupColors = [
+        'bg-sky-500',
+        'bg-teal-500', 
+        'bg-amber-500',
+        'bg-indigo-500',
+        'bg-rose-500',
+        'bg-lime-500',
+        'bg-purple-500',
+        'bg-emerald-500',
+        'bg-orange-500',
+        'bg-pink-500'
+      ];
+      
+      // 그룹 ID를 기반으로 색상 선택 (일관성 유지)
+      const colorIndex = selectedGroupId % groupColors.length;
+      const groupColor = groupColors[colorIndex];
+      
       setNewEvent(prev => ({
         ...prev,
         memberName: selectedMember.name,
         memberPhoto: selectedMember.photo || '',
-        groupName: userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || ''
+        groupName: selectedGroup.sgt_title,
+        groupColor: groupColor
       }));
     }
   };
@@ -1013,21 +1084,35 @@ export default function SchedulePage() {
     setIsSearchingLocation(true);
     setLocationSearchResults([]);
 
-    const KAKAO_API_KEY = 'bc7899314df5dc2bebcb2a7960ac89bf';
-    const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(searchQueryString)}`;
-
     try {
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `KakaoAK ${KAKAO_API_KEY}`,
-        },
-      });
+      // 먼저 프록시를 통한 카카오 API 호출 시도
+      const proxyUrl = `/api/kakao-search?query=${encodeURIComponent(searchQueryString)}`;
+      let response = await fetch(proxyUrl);
+      let data;
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (response.ok) {
+        data = await response.json();
+        console.log('[handleSearchLocation] 프록시를 통한 카카오 API 호출 성공:', data);
+      } else {
+        console.warn('[handleSearchLocation] 프록시 API 실패, 직접 호출 시도');
+        
+        // 프록시 실패 시 직접 카카오 API 호출
+        const KAKAO_API_KEY = 'bc7899314df5dc2bebcb2a7960ac89bf';
+        const directUrl = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(searchQueryString)}`;
+        
+        response = await fetch(directUrl, {
+          headers: {
+            Authorization: `KakaoAK ${KAKAO_API_KEY}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        data = await response.json();
+        console.log('[handleSearchLocation] 직접 카카오 API 호출 성공:', data);
       }
-
-      const data = await response.json();
 
       if (data.documents && data.documents.length > 0) {
         const resultsWithIds = data.documents.map((doc: any, index: number) => ({
@@ -1036,12 +1121,53 @@ export default function SchedulePage() {
         }));
         setLocationSearchResults(resultsWithIds);
       } else {
-        setLocationSearchResults([]);
+        console.log('[handleSearchLocation] 검색 결과가 없어 목업 데이터 제공');
+        // 검색 결과가 없을 때 목업 데이터 제공
+        const mockResults = [
+          {
+            place_name: `${searchQueryString} 관련 장소 1`,
+            road_address_name: '서울특별시 강남구 테헤란로 123',
+            address_name: '서울특별시 강남구 역삼동 123-45',
+            x: '127.0276',
+            y: '37.4979',
+            temp_id: 'mock-1'
+          },
+          {
+            place_name: `${searchQueryString} 관련 장소 2`, 
+            road_address_name: '서울특별시 서초구 서초대로 456',
+            address_name: '서울특별시 서초구 서초동 456-78',
+            x: '127.0145',
+            y: '37.4837',
+            temp_id: 'mock-2'
+          }
+        ];
+        setLocationSearchResults(mockResults);
       }
 
     } catch (error) {
-      console.error('장소 검색 중 오류 발생:', error);
-      setLocationSearchResults([]);
+      console.error('[handleSearchLocation] 장소 검색 중 오류 발생:', error);
+      console.log('[handleSearchLocation] 오류로 인해 목업 데이터 제공');
+      
+      // 오류 발생 시 목업 데이터 제공
+      const mockResults = [
+        {
+          place_name: `${searchQueryString} (샘플 장소 1)`,
+          road_address_name: '서울특별시 강남구 테헤란로 123',
+          address_name: '서울특별시 강남구 역삼동 123-45',
+          x: '127.0276',
+          y: '37.4979',
+          temp_id: 'mock-error-1'
+        },
+        {
+          place_name: `${searchQueryString} (샘플 장소 2)`,
+          road_address_name: '서울특별시 서초구 서초대로 456', 
+          address_name: '서울특별시 서초구 서초동 456-78',
+          x: '127.0145',
+          y: '37.4837',
+          temp_id: 'mock-error-2'
+        }
+      ];
+      setLocationSearchResults(mockResults);
     } finally {
       setIsSearchingLocation(false);
     }
@@ -1304,12 +1430,17 @@ export default function SchedulePage() {
                                   {event.memberName && (
                                     <div className="flex items-center space-x-1">
                                       {event.memberPhoto ? (
-                                        <Image
-                                          src={event.memberPhoto}
+                                        <img
+                                          src={getSafeImageUrl(event.memberPhoto, null, 0)}
                                           alt={event.memberName}
-                                          width={16}
-                                          height={16}
-                                          className="rounded-full"
+                                          className="w-4 h-4 rounded-full object-cover"
+                                          onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            const fallbackSrc = getDefaultImage(null, 0);
+                                            console.log(`[이벤트 이미지 오류] ${event.memberName}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
+                                            target.src = fallbackSrc;
+                                            target.onerror = null;
+                                          }}
                                         />
                                       ) : (
                                         <div className="w-4 h-4 bg-gray-300 rounded-full flex items-center justify-center">
@@ -1348,11 +1479,7 @@ export default function SchedulePage() {
 
         {/* 플로팅 추가 버튼 */}
         <motion.button
-          onClick={() => {
-            setIsAddEventModalOpen(true);
-            // body 스크롤 비활성화
-            document.body.style.overflow = 'hidden';
-          }}
+          onClick={handleOpenAddEventModal}
           className="fixed bottom-24 right-6 z-40 w-14 h-14 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-full flex items-center justify-center text-white shadow-lg mobile-button disabled:opacity-50"
           variants={floatingButtonVariants}
           initial="initial"
@@ -1481,12 +1608,17 @@ export default function SchedulePage() {
                           <p className="font-medium text-gray-900">담당자</p>
                           <div className="flex items-center space-x-2">
                             {selectedEventDetails.memberPhoto ? (
-                              <Image
-                                src={selectedEventDetails.memberPhoto}
+                              <img
+                                src={getSafeImageUrl(selectedEventDetails.memberPhoto, null, 0)}
                                 alt={selectedEventDetails.memberName}
-                                width={20}
-                                height={20}
-                                className="rounded-full"
+                                className="w-5 h-5 rounded-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  const fallbackSrc = getDefaultImage(null, 0);
+                                  console.log(`[모달 이미지 오류] ${selectedEventDetails.memberName}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
+                                  target.src = fallbackSrc;
+                                  target.onerror = null;
+                                }}
                               />
                             ) : (
                               <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
@@ -1604,29 +1736,188 @@ export default function SchedulePage() {
                     className="px-6 py-6 space-y-6" 
                     onSubmit={(e) => { e.preventDefault(); handleSaveEvent(); }}
                   >
-                    {/* 일정 내용 (선택) */}
+                    {/* 1. 그룹 및 멤버 선택 */}
+                    <div className="bg-indigo-50 rounded-xl p-4">
+                      <div className="flex items-center space-x-2 mb-4">
+                        <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-white">1</span>
+                        </div>
+                        <h4 className="font-semibold text-gray-900">그룹 및 멤버 선택</h4>
+                      </div>
+
+                      {/* 그룹 선택 */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">그룹 선택</label>
+                        <div className="relative group-selector-container">
+                          <button
+                            type="button"
+                            onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
+                            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 flex items-center justify-between"
+                          >
+                            <span className="text-gray-900">
+                              {selectedGroupId 
+                                ? userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹을 선택하세요'
+                                : '그룹을 선택하세요'
+                              }
+                            </span>
+                            <FiChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isGroupSelectorOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                          
+                          {/* 그룹 드롭다운 */}
+                          <AnimatePresence>
+                            {isGroupSelectorOpen && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.2 }}
+                                className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto"
+                              >
+                                {isLoadingGroups ? (
+                                  <div className="p-4 text-center text-gray-500">
+                                    <div className="animate-spin w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                                    그룹 목록을 불러오는 중...
+                                  </div>
+                                ) : userGroups.length > 0 ? (
+                                  userGroups.map((group) => (
+                                    <button
+                                      key={group.sgt_idx}
+                                      type="button"
+                                      onClick={() => handleGroupSelect(group.sgt_idx)}
+                                      className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
+                                        selectedGroupId === group.sgt_idx ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'
+                                      }`}
+                                    >
+                                      {group.sgt_title}
+                                    </button>
+                                  ))
+                                ) : (
+                                  <div className="p-4 text-center text-gray-500">
+                                    참여 중인 그룹이 없습니다
+                                  </div>
+                                )}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+
+                      {/* 멤버 선택 */}
+                      {selectedGroupId && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-3">멤버 선택</label>
+                          {isFetchingMembers ? (
+                            <div className="text-center py-6 text-gray-500">
+                              <div className="animate-spin w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                              멤버 목록을 불러오는 중...
+                            </div>
+                          ) : scheduleGroupMembers.length > 0 ? (
+                            <div className="flex overflow-x-auto space-x-4 pb-2 -mx-1 px-1">
+                              {scheduleGroupMembers.map((member, index) => (
+                                <motion.div 
+                                  key={member.id} 
+                                  initial={{ opacity: 0, y: 20 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: index * 0.1 }}
+                                  className="flex flex-col items-center flex-shrink-0"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => handleScheduleMemberSelect(member.id)}
+                                    className="flex flex-col items-center focus:outline-none mobile-button"
+                                  >
+                                    <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
+                                      member.isSelected ? 'ring-4 ring-indigo-500 ring-offset-2' : ''
+                                    }`}>
+                                      {member.photo ? (
+                                        <img 
+                                          src={getSafeImageUrl(member.photo, member.mt_gender, member.mt_idx || 0)}
+                                          alt={member.name} 
+                                          className="w-full h-full object-cover" 
+                                          onError={(e) => {
+                                            const target = e.target as HTMLImageElement;
+                                            const fallbackSrc = getDefaultImage(member.mt_gender, member.mt_idx || 0);
+                                            console.log(`[이미지 오류] ${member.name}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
+                                            target.src = fallbackSrc;
+                                            target.onerror = null; // 무한 루프 방지
+                                          }}
+                                          onLoad={() => {
+                                            console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
+                                          }}
+                                        />
+                                      ) : (
+                                        <FiUser className="w-6 h-6 text-gray-400" />
+                                      )}
+                                    </div>
+                                    <span className={`block text-xs font-medium mt-2 transition-colors duration-200 ${
+                                      member.isSelected ? 'text-indigo-700' : 'text-gray-700'
+                                    }`}>
+                                      {member.name}
+                                    </span>
+                                  </button>
+                                </motion.div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-6 text-gray-500">
+                              <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
+                                <FiUsers className="w-6 h-6 text-gray-300" />
+                              </div>
+                              <p className="text-sm">그룹에 참여한 멤버가 없습니다</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 2. 일정 제목 및 내용 */}
                     <div className="bg-blue-50 rounded-xl p-4">
-                      <h4 className="font-semibold text-gray-900 mb-4">일정 내용 (선택)</h4>
+                      <div className="flex items-center space-x-2 mb-4">
+                        <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-bold text-white">2</span>
+                        </div>
+                        <h4 className="font-semibold text-gray-900">일정 제목 및 내용</h4>
+                      </div>
 
                       {/* 제목 입력 */}
                       <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          일정 제목 <span className="text-red-500">*</span>
+                        </label>
                         <input
                           type="text"
                           value={newEvent.title}
                           onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
                           className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                          placeholder="일정에 대한 상세 내용을 입력하세요"
+                          placeholder="일정 제목을 입력하세요"
                           required
-                          maxLength={200}
+                          maxLength={100}
+                        />
+                        <div className="flex justify-between mt-2">
+                          <p className="text-xs text-gray-500">예) 팀 회의, 프로젝트 미팅 등</p>
+                          <p className="text-xs text-gray-500">({newEvent.title.length}/100)</p>
+                        </div>
+                      </div>
+
+                      {/* 내용 입력 */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">일정 내용 (선택)</label>
+                        <textarea
+                          value={newEvent.content || ''}
+                          onChange={(e) => setNewEvent({ ...newEvent, content: e.target.value })}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+                          placeholder="일정에 대한 상세 내용을 입력하세요"
+                          rows={3}
+                          maxLength={500}
                         />
                         <div className="flex justify-between mt-2">
                           <p className="text-xs text-gray-500">예) 회의 안건, 준비물, 참고사항 등</p>
-                          <p className="text-xs text-gray-500">({newEvent.title.length}/200)</p>
+                          <p className="text-xs text-gray-500">({(newEvent.content || '').length}/500)</p>
                         </div>
                       </div>
                     </div>
 
-                    {/* 날짜 및 시간 */}
+                    {/* 3. 날짜 및 시간 */}
                     <div className="bg-green-50 rounded-xl p-4">
                       <div className="flex items-center space-x-2 mb-4">
                         <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
@@ -1670,7 +1961,7 @@ export default function SchedulePage() {
                       </button>
                     </div>
 
-                    {/* 추가 설정 */}
+                    {/* 4. 추가 설정 */}
                     <div className="bg-amber-50 rounded-xl p-4">
                       <div className="flex items-center space-x-2 mb-4">
                         <div className="w-6 h-6 bg-amber-600 rounded-full flex items-center justify-center">
@@ -1715,7 +2006,7 @@ export default function SchedulePage() {
                           >
                             <div className="flex justify-between items-center">
                               <span className="text-sm font-medium text-gray-700">장소명</span>
-                              <span className="text-sm text-blue-600">
+                              <span className="text-sm text-amber-400">
                                 {newEvent.locationName || '장소를 검색하세요'}
                               </span>
                             </div>

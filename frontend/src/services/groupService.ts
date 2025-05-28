@@ -126,7 +126,13 @@ class GroupService {
   // 특정 멤버의 그룹 목록 조회
   async getMemberGroups(memberId: number): Promise<Group[]> {
     try {
-      const response = await apiClient.get(`/v1/groups/member/${memberId}`);
+      console.log(`[GroupService] 멤버 그룹 조회 시작 - memberId: ${memberId}`);
+      console.log(`[GroupService] API 요청 URL: /groups/member/${memberId}`);
+      
+      const response = await apiClient.get(`/groups/member/${memberId}`);
+      
+      console.log(`[GroupService] API 응답:`, response.data);
+      
       return response.data;
     } catch (error) {
       console.error('Failed to fetch member groups:', error);

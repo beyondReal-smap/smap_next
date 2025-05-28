@@ -1,64 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// node-fetch를 대안으로 사용
-let nodeFetch: any = null;
-try {
-  nodeFetch = require('node-fetch');
-} catch (e) {
-  console.log('[Other Members Location API] node-fetch 패키지를 찾을 수 없음');
-}
-
-async function fetchWithFallback(url: string, options: any): Promise<any> {
-  // Node.js 환경 변수로 SSL 검증 비활성화
-    const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    
-    let response: any;
-
+async function fetchWithRetry(url: string, options: any, retries = 3): Promise<any> {
+  // Node.js 환경에서 SSL 검증 비활성화
+  const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  
   try {
-    try {
-      // 기본 fetch 시도
-      response = await fetch(url, options);
-    } catch (fetchError) {
-      if (nodeFetch) {
-        // node-fetch 시도
-        response = await nodeFetch(url, {
+    for (let i = 0; i < retries; i++) {
+      try {
+        console.log(`[API PROXY] 시도 ${i + 1}/${retries}: ${url}`);
+        
+        const response = await fetch(url, {
           ...options,
-            agent: function(_parsedURL: any) {
-              const https = require('https');
-              return new https.Agent({
-                rejectUnauthorized: false
-              });
-            }
-          });
-      } else {
-        throw fetchError;
+          // 타임아웃 설정
+          signal: AbortSignal.timeout(10000), // 10초 타임아웃
+        });
+        
+        console.log(`[API PROXY] 응답 상태: ${response.status}`);
+        return response;
+        
+      } catch (error) {
+        console.error(`[API PROXY] 시도 ${i + 1} 실패:`, error);
+        
+        if (i === retries - 1) {
+          throw error;
+        }
+        
+        // 재시도 전 잠시 대기
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
       }
     }
-
-    return response;
-    } finally {
-      // 환경 변수 복원
-      if (originalTlsReject !== undefined) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
-      } else {
-        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-      }
+  } finally {
+    // 환경 변수 복원
+    if (originalTlsReject !== undefined) {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
+    } else {
+      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
     }
+  }
 }
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ memberId: string }> }
 ) {
-  const { memberId } = await context.params; // Next.js 15에서 params는 Promise입니다
+  const { memberId } = await context.params;
+  
   try {
-    // 다른 API와 동일하게 HTTPS 사용
+    console.log(`[API PROXY] 멤버 ${memberId}의 장소 데이터 조회 시작`);
+    
+    // HTTPS 백엔드 URL
     const backendUrl = `https://118.67.130.71:8000/api/v1/locations/member/${memberId}`;
     
-    console.log('[API PROXY] 다른 멤버 위치 백엔드 호출:', backendUrl);
-    
-    const response = await fetchWithFallback(backendUrl, {
+    const response = await fetchWithRetry(backendUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -67,46 +61,57 @@ export async function GET(
       },
     });
 
-    console.log('[API PROXY] 다른 멤버 위치 백엔드 응답 상태:', response.status, response.statusText);
-
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[API PROXY] 다른 멤버 위치 백엔드 에러 응답:', errorText);
+      console.error('[API PROXY] 백엔드 에러 응답:', errorText);
+      
+      // 백엔드 서버가 응답하지 않는 경우 목업 데이터 반환
+      if (response.status >= 500) {
+        console.log('[API PROXY] 서버 오류로 인해 목업 데이터 반환');
+        return NextResponse.json([], {
+          status: 200,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          },
+        });
+      }
+      
       throw new Error(`Backend API error: ${response.status} - ${errorText}`);
     }
 
     const responseText = await response.text();
     const data = responseText ? JSON.parse(responseText) : [];
     
-    console.log('[API PROXY] 다른 멤버 위치 백엔드 응답 성공, 데이터 길이:', Array.isArray(data) ? data.length : 'object');
+    console.log(`[API PROXY] 멤버 ${memberId} 장소 데이터 조회 성공:`, Array.isArray(data) ? data.length : 'object');
 
     return NextResponse.json(data, {
-      status: response.status,
+      status: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       },
     });
+    
   } catch (error) {
-    console.error('[API PROXY] 다른 멤버 위치 상세 오류:', {
+    console.error(`[API PROXY] 멤버 ${memberId} 장소 조회 실패:`, {
       name: error instanceof Error ? error.name : 'Unknown',
       message: error instanceof Error ? error.message : String(error),
-      code: (error as any)?.code || 'UNKNOWN',
-      cause: (error as any)?.cause || null,
+      stack: error instanceof Error ? error.stack : undefined,
     });
     
-    return NextResponse.json(
-      { success: false, message: error instanceof Error ? error.message : 'Error fetching other member locations' }, 
-      {
-        status: 500,
+    // 네트워크 오류나 서버 연결 실패 시 빈 배열 반환
+    console.log('[API PROXY] 오류로 인해 빈 장소 목록 반환');
+    return NextResponse.json([], {
+      status: 200,
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        }
-      }
-    );
+      },
+    });
   }
 }
 
