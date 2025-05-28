@@ -1812,7 +1812,7 @@ export default function SchedulePage() {
                               멤버 목록을 불러오는 중...
                             </div>
                           ) : scheduleGroupMembers.length > 0 ? (
-                            <div className="flex overflow-x-auto space-x-4 pb-2 -mx-1 px-1">
+                            <div className="flex overflow-x-auto space-x-4 pt-2 pb-2 px-3 -mx-1">
                               {scheduleGroupMembers.map((member, index) => (
                                 <motion.div 
                                   key={member.id} 
@@ -1826,7 +1826,7 @@ export default function SchedulePage() {
                                     onClick={() => handleScheduleMemberSelect(member.id)}
                                     className="flex flex-col items-center focus:outline-none mobile-button"
                                   >
-                                    <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
+                                    <div className={`w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                                       member.isSelected ? 'ring-4 ring-indigo-500 ring-offset-2' : ''
                                     }`}>
                                       {member.photo ? (
@@ -1927,38 +1927,35 @@ export default function SchedulePage() {
                       </div>
 
                       {/* 날짜와 시간 정보 카드 */}
-                      <div className="bg-white rounded-xl p-4 mb-4 border border-gray-200">
+                      <button
+                        type="button"
+                        onClick={() => setIsDateTimeModalOpen(true)}
+                        className="w-full bg-white rounded-xl p-4 mb-4 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 mobile-button"
+                      >
                         <div className="space-y-3">
                           <div className="flex justify-between items-center">
-                            <span className="text-gray-700 font-medium">날짜</span>
-                            <span className="text-gray-900 font-normal">
+                            <span className="text-gray-700 text-sm font-medium">날짜</span>
+                            <span className="text-gray-900 text-sm font-normal">
                               {dayjs(newEvent.date).format('YYYY년 MM월 DD일')}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-gray-700 font-medium">시간</span>
-                            <span className="text-gray-900 font-normal">
+                            <span className="text-gray-700 text-sm font-medium">시간</span>
+                            <span className="text-gray-900 text-sm font-normal">
                               {newEvent.allDay ? '하루 종일' : `${newEvent.startTime} ~ ${newEvent.endTime}`}
                             </span>
                           </div>
                           <div className="flex justify-between items-center">
-                            <span className="text-gray-700 font-medium">하루 종일</span>
-                            <span className="text-gray-900 font-normal">
+                            <span className="text-gray-700 text-sm font-medium">하루 종일</span>
+                            <span className="text-gray-900 text-sm font-normal">
                               {newEvent.allDay ? 'ON' : 'OFF'}
                             </span>
                           </div>
                         </div>
-                      </div>
-
-                      {/* 날짜/시간 설정 버튼 */}
-                      <button
-                        type="button"
-                        onClick={() => setIsDateTimeModalOpen(true)}
-                        className="w-full px-4 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
-                      >
-                        <FiCalendar className="w-4 h-4" />
-                        <span>날짜 및 시간 설정</span>
                       </button>
+
+                      {/* 설정 안내 텍스트 */}
+                      <p className="text-xs text-gray-500 text-center">위 카드를 클릭하여 날짜와 시간을 설정하세요</p>
                     </div>
 
                     {/* 4. 추가 설정 */}
@@ -2006,14 +2003,14 @@ export default function SchedulePage() {
                           >
                             <div className="flex justify-between items-center">
                               <span className="text-sm font-medium text-gray-700">장소명</span>
-                              <span className="text-sm text-amber-400">
+                              <span className="text-sm text-gray-500">
                                 {newEvent.locationName || '장소를 검색하세요'}
                               </span>
                             </div>
                             {newEvent.locationAddress && (
                               <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
                                 <span className="text-sm font-medium text-gray-700">주소</span>
-                                <span className="text-xs text-gray-600 truncate max-w-48">
+                                <span className="text-sm text-gray-500 truncate max-w-48">
                                   {newEvent.locationAddress}
                                 </span>
                               </div>
@@ -2378,7 +2375,7 @@ export default function SchedulePage() {
                       {selectedHour.toString().padStart(2, '0')}:{selectedMinute.toString().padStart(2, '0')}
                     </div>
                     <div className="text-sm text-green-600 mt-1">
-                      {selectedHour < 12 ? '오전' : '오후'} {selectedHour === 0 ? 12 : selectedHour > 12 ? selectedHour - 12 : selectedHour}시 {selectedMinute}분
+                      {selectedHour < 12 ? '오전' : '오후'} {selectedHour === 0 ? 12 : selectedHour > 12 ? (selectedHour - 12).toString().padStart(2, '0') : selectedHour.toString().padStart(2, '0')}시 {selectedMinute.toString().padStart(2, '0')}분
                     </div>
                   </div>
 
@@ -2492,7 +2489,7 @@ export default function SchedulePage() {
               transition={{ duration: 0.2 }}
             >
               <motion.div 
-                className="w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4"
+                className="w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4 max-h-[80vh] flex flex-col"
                 onClick={e => e.stopPropagation()}
                 onWheel={e => e.stopPropagation()}
                 onTouchMove={e => e.stopPropagation()}
@@ -2501,74 +2498,139 @@ export default function SchedulePage() {
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
                 transition={{ duration: 0.3 }}
               >
-                <div className="p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-6 text-center">장소 검색</h3>
-                  
-                  <div className="space-y-6">
-                    {/* 장소 검색 입력 */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">장소명 또는 주소 입력</label>
-                      <input
-                        type="text"
-                        value={locationSearchQuery}
-                        onChange={(e) => setLocationSearchQuery(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                        placeholder="장소명 또는 주소를 입력하세요"
-                      />
-                    </div>
-
-                    {/* 검색 버튼 */}
-                    <div className="flex justify-center">
-                      <button
-                        onClick={() => handleSearchLocation()}
-                        className="w-full py-3 bg-indigo-600 text-white rounded-xl font-medium mobile-button hover:bg-indigo-700 transition-colors"
-                      >
-                        검색
-                      </button>
-                    </div>
-
-                    {/* 검색 결과 표시 */}
-                    {isSearchingLocation ? (
-                      <div className="text-center py-6">
-                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <svg className="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        </div>
-                        <p className="text-gray-600">장소를 검색하는 중입니다...</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {locationSearchResults.length > 0 ? (
-                          <div>
-                            <h4 className="text-lg font-semibold text-gray-900 mb-2">검색 결과</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                              {locationSearchResults.map((place) => (
-                                <div key={place.temp_id} className="bg-white rounded-lg shadow-md p-4 transition-transform hover:scale-105">
-                                  <h5 className="text-lg font-semibold mb-2">{place.place_name}</h5>
-                                  <p className="text-gray-600 mb-2">{place.road_address_name || place.address_name}</p>
-                                  <button
-                                    onClick={() => handleSelectLocation(place)}
-                                    className="w-full py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-                                  >
-                                    선택
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center py-6">
-                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                              <FiAlertTriangle className="w-8 h-8 text-gray-400" />
-                            </div>
-                            <p className="text-gray-600">검색 결과가 없습니다. 다른 검색어를 입력해보세요.</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                <div className="p-6 flex-shrink-0">
+                  <div className="flex items-center space-x-2 mb-6">
+                    <h3 className="text-lg font-bold text-gray-900">장소 검색</h3>
                   </div>
+                  
+                  {/* 장소 검색 입력 */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">장소명 또는 주소 입력</label>
+                    <input
+                      type="text"
+                      value={locationSearchQuery}
+                      onChange={(e) => setLocationSearchQuery(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleSearchLocation();
+                        }
+                      }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors"
+                      placeholder="장소명 또는 주소를 입력하세요"
+                      autoFocus
+                    />
+                    <p className="text-xs text-gray-500 mt-2">엔터키를 누르거나 검색 버튼을 클릭하세요</p>
+                  </div>
+
+                  {/* 검색 버튼 */}
+                  <button
+                    onClick={() => handleSearchLocation()}
+                    disabled={!locationSearchQuery.trim() || isSearchingLocation}
+                    className="w-full py-3 bg-amber-600 text-white rounded-xl font-medium mobile-button hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    {isSearchingLocation ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>검색 중...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span>검색</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* 구분선 */}
+                <div className="border-t border-gray-200"></div>
+
+                {/* 검색 결과 헤더 - 고정 */}
+                {locationSearchResults.length > 0 && !isSearchingLocation && (
+                  <div className="px-6 py-4 flex-shrink-0 bg-gray-50">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                        <span className="text-xs text-green-600">✓</span>
+                      </div>
+                      <h4 className="text-sm font-semibold text-gray-900">검색 결과 ({locationSearchResults.length}개)</h4>
+                    </div>
+                  </div>
+                )}
+
+                {/* 검색 결과 영역 - 스크롤 가능 */}
+                <div className="flex-1 overflow-y-auto">
+                  {isSearchingLocation ? (
+                    <div className="text-center py-8 px-6">
+                      <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg className="animate-spin h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      </div>
+                      <p className="text-gray-600 font-medium">장소를 검색하는 중입니다...</p>
+                      <p className="text-xs text-gray-500 mt-1">잠시만 기다려주세요</p>
+                    </div>
+                  ) : locationSearchResults.length > 0 ? (
+                    <div className="px-6 py-4 space-y-3">
+                      {locationSearchResults.map((place, index) => (
+                        <motion.button
+                          key={place.temp_id}
+                          onClick={() => handleSelectLocation(place)}
+                          className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 rounded-xl p-4 text-left transition-all duration-200 mobile-button"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className="flex-1 min-w-0">
+                              <h5 className="font-semibold text-gray-900 mb-1 truncate">{place.place_name}</h5>
+                              <p className="text-sm text-gray-600 line-clamp-2" style={{ wordBreak: 'keep-all' }}>
+                                {place.road_address_name || place.address_name}
+                              </p>
+                              <div className="flex items-center mt-2 space-x-2">
+                                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium">
+                                  선택하기
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.button>
+                      ))}
+                    </div>
+                  ) : locationSearchQuery.trim() && !isSearchingLocation ? (
+                    <div className="text-center py-8 px-6">
+                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      </div>
+                      <p className="text-gray-600 font-medium">검색 결과가 없습니다</p>
+                      <p className="text-xs text-gray-500 mt-1">다른 검색어를 입력해보세요</p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 px-6">
+                      <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span className="text-xl">🔍</span>
+                      </div>
+                      <p className="text-gray-600 font-medium">장소를 검색해보세요</p>
+                      <p className="text-xs text-gray-500 mt-1">카페, 음식점, 회사명 등을 입력하세요</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 닫기 버튼 */}
+                <div className="px-6 pb-6 flex-shrink-0">
+                  <button
+                    onClick={handleCloseLocationSearchModal}
+                    className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                  >
+                    닫기
+                  </button>
                 </div>
               </motion.div>
             </motion.div>

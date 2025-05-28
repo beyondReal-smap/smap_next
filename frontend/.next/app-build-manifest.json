@@ -91,6 +91,11 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/groups/[groupId]/route.js"
     ],
+    "/api/kakao-search/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/kakao-search/route.js"
+    ],
     "/_not-found/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
