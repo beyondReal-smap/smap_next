@@ -379,8 +379,8 @@ function GroupPageContent() {
       let totalLocations = 0;
       
       try {
-        const allGroupSchedules = await scheduleService.getGroupSchedules(group.sgt_idx.toString(), 7);
-        weeklySchedules = allGroupSchedules.length;
+        const allGroupSchedules = await scheduleService.getGroupSchedules(group.sgt_idx);
+        weeklySchedules = allGroupSchedules.data.schedules.length;
       } catch (error) {
         console.error('그룹 스케줄 조회 오류:', error);
       }

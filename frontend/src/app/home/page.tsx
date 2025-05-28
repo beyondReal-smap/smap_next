@@ -877,8 +877,9 @@ export default function HomePage() {
         }
 
         if (dataFetchedRef.current.members && !dataFetchedRef.current.schedules) {
-          const rawSchedules: Schedule[] = await scheduleService.getGroupSchedules(groupIdToUse, 7); 
+          const scheduleResponse = await scheduleService.getGroupSchedules(parseInt(groupIdToUse)); 
           if (isMounted) {
+            const rawSchedules = scheduleResponse.data.schedules;
             if (rawSchedules && rawSchedules.length > 0) {
               setGroupSchedules(rawSchedules); 
               setGroupMembers(prevMembers =>

@@ -10,10 +10,10 @@ try {
 
 async function fetchWithFallback(url: string, options: any): Promise<any> {
   // Node.js 환경 변수로 SSL 검증 비활성화
-  const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  
-  let response: any;
+    const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    
+    let response: any;
 
   try {
     try {
@@ -24,27 +24,27 @@ async function fetchWithFallback(url: string, options: any): Promise<any> {
         // node-fetch 시도
         response = await nodeFetch(url, {
           ...options,
-          agent: function(_parsedURL: any) {
-            const https = require('https');
-            return new https.Agent({
-              rejectUnauthorized: false
-            });
-          }
-        });
+            agent: function(_parsedURL: any) {
+              const https = require('https');
+              return new https.Agent({
+                rejectUnauthorized: false
+              });
+            }
+          });
       } else {
         throw fetchError;
       }
     }
 
     return response;
-  } finally {
-    // 환경 변수 복원
-    if (originalTlsReject !== undefined) {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
-    } else {
-      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    } finally {
+      // 환경 변수 복원
+      if (originalTlsReject !== undefined) {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
+      } else {
+        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      }
     }
-  }
 }
 
 export async function GET(
@@ -100,10 +100,10 @@ export async function GET(
       { success: false, message: error instanceof Error ? error.message : 'Error fetching other member locations' }, 
       {
         status: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         }
       }
     );

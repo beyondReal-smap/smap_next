@@ -775,7 +775,7 @@ export default function AddSchedulePage() {
                     <DatePicker
                       ref={startDateRef}
                       selected={scheduleForm.startDate ? dayjs(scheduleForm.startDate).toDate() : null}
-                      onChange={(date) => handleDateChange(date, 'startDate')}
+                      onChange={(date: Date | null) => handleDateChange(date, 'startDate')}
                       dateFormat="yyyy-MM-dd"
                       locale={ko}
                       className="block w-full border-none p-0 text-left text-sm font-medium focus:ring-0 bg-transparent cursor-pointer"
@@ -792,7 +792,7 @@ export default function AddSchedulePage() {
                       <DatePicker
                         ref={startTimeRef}
                         selected={scheduleForm.startTime ? dayjs(`1970-01-01T${scheduleForm.startTime}:00`).toDate() : null}
-                        onChange={(date) => handleTimeChange(date, 'startTime')}
+                        onChange={(date: Date | null) => handleTimeChange(date, 'startTime')}
                         showTimeSelect
                         showTimeSelectOnly
                         timeIntervals={5}
@@ -822,7 +822,7 @@ export default function AddSchedulePage() {
                      <DatePicker
                        ref={endDateRef}
                        selected={scheduleForm.endDate ? dayjs(scheduleForm.endDate).toDate() : null}
-                       onChange={(date) => handleDateChange(date, 'endDate')}
+                       onChange={(date: Date | null) => handleDateChange(date, 'endDate')}
                        dateFormat="yyyy-MM-dd"
                        locale={ko}
                        className="block w-full border-none p-0 text-left text-sm font-medium focus:ring-0 bg-transparent cursor-pointer"
@@ -839,7 +839,7 @@ export default function AddSchedulePage() {
                        <DatePicker
                          ref={endTimeRef}
                          selected={scheduleForm.endTime ? dayjs(`1970-01-01T${scheduleForm.endTime}:00`).toDate() : null}
-                         onChange={(date) => handleTimeChange(date, 'endTime')}
+                         onChange={(date: Date | null) => handleTimeChange(date, 'endTime')}
                          showTimeSelect
                          showTimeSelectOnly
                          timeIntervals={5}

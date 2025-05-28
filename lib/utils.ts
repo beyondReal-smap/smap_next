@@ -1,3 +1,10 @@
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
 // 거리 계산 (Haversine formula)
 export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // 지구 반지름 (km)

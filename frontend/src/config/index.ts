@@ -46,16 +46,16 @@ export const getLocalizedAppInfo = (language: string = 'ko') => {
 
 // API 키
 export const API_KEYS = {
-  // 지도 API 키
-  GOOGLE_MAPS_API_KEY: 'AIzaSyBkWlND5fvW4tmxaj11y24XNs_LQfplwpw', // com.dmonster.smap
-  NAVER_MAPS_CLIENT_ID: 'unxdi5mt3f',
+  // 지도 API 키 - 환경변수 우선, 없으면 하드코딩된 값 사용
+  GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBkWlND5fvW4tmxaj11y24XNs_LQfplwpw', // com.dmonster.smap
+  NAVER_MAPS_CLIENT_ID: process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || 'unxdi5mt3f',
   NAVER_MAPS_API_KEY: 'bKRzkFBbAvfdHDTZB0mJ81jmO8ufULvQavQIQZmp',
   MAPBOX_ACCESS_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '',
   
   // 소셜/메시징 API 키
   KAKAO_JAVASCRIPT_KEY: 'e7e1c921e506e190875b4c8f4321c5ac',
   KAKAO_NATIVEAPP_KEY: '56b34b5e5e538073805559cabc81e1d8',
-  KAKAO_REST_API_KEY: 'bc7899314df5dc2bebcb2a7960ac89bf', // 카카오 로컬 API용 REST API 키 추가
+  KAKAO_REST_API_KEY: process.env.NEXT_PUBLIC_KAKAO_MAPS_API_KEY || 'bc7899314df5dc2bebcb2a7960ac89bf', // 카카오 로컬 API용 REST API 키 추가
   FIREBASEKEY: 'BOCzkX45zE3u0HFfNpfZDbUHH33OHNoe3k5KeTalEesHgnaBqCykjJUxnDcS6mv9MPSxU8EV3QHCL61gmwzkXlE',
   
   // NCP 관련 키

@@ -999,10 +999,10 @@ export default function LocationPage() {
       setIsLocationInfoPanelOpen(false);
         
       // 임시 마커를 실제 장소 마커로 교체
-      if (tempMarker.current) {
-        tempMarker.current.setMap(null);
+        if (tempMarker.current) {
+          tempMarker.current.setMap(null);
         tempMarker.current = null;
-      }
+        }
       
       // 상태 초기화
       setNewLocation({ 
@@ -1023,7 +1023,7 @@ export default function LocationPage() {
         // selectedMemberSavedLocations가 업데이트되면 useEffect에 의해 자동으로 마커 업데이트됨
         console.log('[handleConfirmPanelAction] 마커 자동 업데이트 대기 중...');
       }, 100);
-          } catch (error) {
+    } catch (error) {
         console.error('[handleConfirmPanelAction] 장소 등록 오류:', error);
         openModal('장소 등록 완료', '장소가 등록되었습니다. (네트워크 에러 발생했지만 정상 처리)', 'success');
         
@@ -1051,7 +1051,7 @@ export default function LocationPage() {
             console.log('[handleConfirmPanelAction] 에러 후 마커 강제 업데이트 완료, 총 장소 수:', selectedMemberSavedLocations.length);
           }
         }, 100);
-      } finally {
+    } finally {
       setIsSavingLocationPanel(false);
     }
   };
@@ -1073,7 +1073,7 @@ export default function LocationPage() {
 
   const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
     if (!isDragging) return;
-
+    
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
 
@@ -1102,7 +1102,7 @@ export default function LocationPage() {
 
   const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
     if (!isDragging) return;
-
+    
     setIsDragging(false);
     const clientX = 'touches' in e ? e.changedTouches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.changedTouches[0].clientY : e.clientY;
@@ -1151,10 +1151,10 @@ export default function LocationPage() {
         }
     } else { // 세로 드래그 완료 처리 (isHorizontalSwipe === false)
         console.log('[DragEnd] 세로 드래그 처리');
-        const triggerHaptic = () => {
+    const triggerHaptic = () => {
           try {
-            if ('vibrate' in navigator) { 
-              navigator.vibrate(30); 
+      if ('vibrate' in navigator) {
+        navigator.vibrate(30);
             }
           } catch (error) {
             // 햅틱 피드백이 차단되어도 조용히 무시
@@ -1170,7 +1170,7 @@ export default function LocationPage() {
              if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
                  nextState = 'visible';
                  console.log('[DragEnd] 위로 드래그 감지 (peek -> visible)');
-                 triggerHaptic();
+        triggerHaptic();
              }
         } 
         // 아래로 드래그 (Y 증가) - 더 민감하게 반응
@@ -1178,9 +1178,9 @@ export default function LocationPage() {
             if (bottomSheetState === 'visible' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
                 nextState = 'peek';
                 console.log('[DragEnd] 아래로 드래그 감지 (visible -> peek)');
-                triggerHaptic();
-            }
-        }
+        triggerHaptic();
+      }
+    }
 
         // 즉시 상태 업데이트 (무거운 계산 제거)
         if (nextState !== bottomSheetState) {
@@ -1284,8 +1284,8 @@ export default function LocationPage() {
               lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
               lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
             },
-            schedules: [], 
-            savedLocations: [],
+          schedules: [], 
+          savedLocations: [],
             mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
             original_index: index
           };
@@ -1597,7 +1597,7 @@ export default function LocationPage() {
         console.log('[네이버 지도 로드] 스크립트 로드 완료');
         // 약간의 지연을 두고 지도 로딩 완료로 설정
         setTimeout(() => {
-          setIsMapLoading(false);
+        setIsMapLoading(false);
           console.log('[네이버 지도 로드] 지도 로딩 상태 해제');
         }, 100);
       };
@@ -1631,51 +1631,51 @@ export default function LocationPage() {
       console.log('[지도 초기화] 시작');
       
       try {
-        const mapOptions = {
+      const mapOptions = {
           center: new window.naver.maps.LatLng(37.5665, 126.9780), // 서울 시청
-          zoom: 13,
-          minZoom: 8,
-          maxZoom: 18,
-          mapTypeControl: false,
-          scaleControl: false,
-          logoControl: false,
-          mapDataControl: false,
-          zoomControl: true,
-          zoomControlOptions: {
-            position: window.naver.maps.Position.TOP_RIGHT,
-            style: window.naver.maps.ZoomControlStyle.SMALL
-          }
-        };
+        zoom: 13,
+        minZoom: 8,
+        maxZoom: 18,
+        mapTypeControl: false,
+        scaleControl: false,
+        logoControl: false,
+        mapDataControl: false,
+        zoomControl: true,
+        zoomControlOptions: {
+          position: window.naver.maps.Position.TOP_RIGHT,
+          style: window.naver.maps.ZoomControlStyle.SMALL
+        }
+      };
 
-        const newMap = new window.naver.maps.Map(mapContainer.current, mapOptions);
-        setMap(newMap);
-        setIsMapInitialized(true);
+      const newMap = new window.naver.maps.Map(mapContainer.current, mapOptions);
+      setMap(newMap);
+      setIsMapInitialized(true);
         setIsMapReady(true); // 즉시 준비 완료로 설정
         console.log('[지도 초기화] 완료 - 지도 준비됨');
 
-        // 지도 클릭 이벤트
-        window.naver.maps.Event.addListener(newMap, 'click', (e: any) => {
-          const coord = e.coord;
-          const coordinates: [number, number] = [coord.lng(), coord.lat()];
-          
-          setClickedCoordinates(coordinates);
-          setNewLocation(prev => ({
-            ...prev,
-            coordinates,
-            address: '주소 변환 중...'
-          }));
-          
-          // 임시 마커 표시
-          if (tempMarker.current) {
-            tempMarker.current.setMap(null);
-          }
+      // 지도 클릭 이벤트
+      window.naver.maps.Event.addListener(newMap, 'click', (e: any) => {
+        const coord = e.coord;
+        const coordinates: [number, number] = [coord.lng(), coord.lat()];
+        
+        setClickedCoordinates(coordinates);
+        setNewLocation(prev => ({
+          ...prev,
+          coordinates,
+          address: '주소 변환 중...'
+        }));
+        
+        // 임시 마커 표시
+        if (tempMarker.current) {
+          tempMarker.current.setMap(null);
+        }
           
           console.log('[지도 클릭] 임시 마커 생성 시작:', coord.lat(), coord.lng());
-          
-          tempMarker.current = new window.naver.maps.Marker({
-            position: coord,
-            map: newMap,
-            icon: {
+        
+        tempMarker.current = new window.naver.maps.Marker({
+          position: coord,
+          map: newMap,
+          icon: {
               content: `<div style="
                 width: 24px;
                 height: 24px;
@@ -1699,43 +1699,43 @@ export default function LocationPage() {
           
           // 바텀시트를 peek 상태로 변경
           setBottomSheetState('peek');
-          
-          setIsLocationInfoPanelOpen(true);
-          setIsEditingPanel(false);
-          
-          // 주소 변환
-          if (window.naver.maps.Service) {
-            window.naver.maps.Service.reverseGeocode({
-              coords: coord,
-              orders: [
-                window.naver.maps.Service.OrderType.ADDR,
-                window.naver.maps.Service.OrderType.ROAD_ADDR
-              ].join(',')
-            }, (status: any, response: any) => {
-              if (status === window.naver.maps.Service.Status.OK) {
-                const result = response.v2;
-                const address = result.address;
-                const roadAddress = result.roadAddress;
-                
-                const finalAddress = roadAddress ? roadAddress.jibunAddress : address.jibunAddress;
-                
-                setNewLocation(prev => ({
-                  ...prev,
-                  address: finalAddress || '주소를 찾을 수 없습니다.'
-                }));
-              }
-            });
-          }
-        });
+        
+        setIsLocationInfoPanelOpen(true);
+        setIsEditingPanel(false);
+        
+        // 주소 변환
+        if (window.naver.maps.Service) {
+          window.naver.maps.Service.reverseGeocode({
+            coords: coord,
+            orders: [
+              window.naver.maps.Service.OrderType.ADDR,
+              window.naver.maps.Service.OrderType.ROAD_ADDR
+            ].join(',')
+          }, (status: any, response: any) => {
+            if (status === window.naver.maps.Service.Status.OK) {
+              const result = response.v2;
+              const address = result.address;
+              const roadAddress = result.roadAddress;
+              
+              const finalAddress = roadAddress ? roadAddress.jibunAddress : address.jibunAddress;
+              
+              setNewLocation(prev => ({
+                ...prev,
+                address: finalAddress || '주소를 찾을 수 없습니다.'
+              }));
+            }
+          });
+        }
+      });
       } catch (error) {
         console.error('[지도 초기화] 오류:', error);
-      }
+    }
     }
   }, [isMapLoading, map, groupMembers]);
 
   // 컴포넌트 마운트 시 그룹 데이터 먼저 로드
   useEffect(() => {
-    fetchUserGroups();
+      fetchUserGroups();
   }, []);
 
   // 선택된 그룹이 변경될 때 멤버 데이터 불러오기
@@ -2095,7 +2095,7 @@ export default function LocationPage() {
                 align-items: center;
                 justify-content: center;
                 box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-                position: relative;
+              position: relative;
                 z-index: ${isMarkerSelected ? '200' : '150'};
                 transition: all 0.3s ease;
               ">
@@ -2106,17 +2106,17 @@ export default function LocationPage() {
               
               ${isMarkerSelected ? `
                 <div style="
-                  position: absolute;
-                  top: 50%;
-                  left: 50%;
-                  transform: translate(-50%, -50%);
-                  width: 40px;
-                  height: 40px;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 40px;
+                height: 40px;
                   background: rgba(236, 72, 153, 0.2);
-                  border-radius: 50%;
+                border-radius: 50%;
                   animation: selectedGlow 2s ease-in-out infinite;
                   z-index: 140;
-                "></div>
+              "></div>
                   ` : ''}
                 
                 <div style="
@@ -2125,7 +2125,7 @@ export default function LocationPage() {
                 left: 50%;
                 transform: translateX(-50%);
                 background-color: rgba(0,0,0,0.7);
-                      color: white;
+                color: white;
                 padding: 2px 5px;
                 border-radius: 3px;
                 white-space: nowrap;
@@ -2136,17 +2136,17 @@ export default function LocationPage() {
                 text-overflow: ellipsis;
               ">
                 ${location.name}
-            </div>
+              </div>
           </div>
             
             <style>
               @keyframes selectedGlow {
                 0%, 100% { 
-                  transform: translate(-50%, -50%) scale(0.8); 
+                  transform: translate(-50%, -50%) scale(0.8);
                   opacity: 0.4; 
                 }
-                50% { 
-                  transform: translate(-50%, -50%) scale(1.2); 
+                50% {
+                  transform: translate(-50%, -50%) scale(1.2);
                   opacity: 0.1; 
                 }
               }
@@ -2216,13 +2216,15 @@ export default function LocationPage() {
           const position = new window.naver.maps.LatLng(lat, lng);
           const borderColor = member.isSelected ? '#EC4899' : '#4F46E5';
       
+      
           const marker = new window.naver.maps.Marker({
             position: position,
             map: map,
             title: member.name,
             icon: {
               content: `
-                <div style="position: relative; text-align: center;">
+                <div  style="position: relative; text-align: center; ">
+                <div  style="position: relative; text-align: center; ">
                   <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
                     <img 
                       src="${photoForMarker}" 
@@ -2264,24 +2266,24 @@ export default function LocationPage() {
             }
 
             const memberInfoWindow = new window.naver.maps.InfoWindow({
-              content: `
+          content: `
+            <div style="
+              padding: 16px;
+              min-width: 200px;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background: white;
+              border-radius: 12px;
+              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            ">
+              <div style="
+                display: flex;
+                align-items: center;
+                margin-bottom: 12px;
+              ">
                 <div style="
-                  padding: 16px;
-                  min-width: 200px;
-                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                  background: white;
-                  border-radius: 12px;
-                  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-                ">
-                  <div style="
-                    display: flex;
-                    align-items: center;
-                    margin-bottom: 12px;
-                  ">
-                    <div style="
                       width: 40px;
                       height: 40px;
-                      border-radius: 50%;
+                  border-radius: 50%;
                       overflow: hidden;
                       margin-right: 12px;
                       border: 2px solid ${borderColor};
@@ -2289,22 +2291,22 @@ export default function LocationPage() {
                       <img src="${photoForMarker}" 
                            style="width: 100%; height: 100%; object-fit: cover;" 
                            alt="${member.name}" />
-                    </div>
+                </div>
                     <div>
-                      <h3 style="
-                        margin: 0;
-                        font-size: 16px;
-                        font-weight: 600;
-                        color: #1f2937;
+                <h3 style="
+                  margin: 0;
+                  font-size: 16px;
+                  font-weight: 600;
+                  color: #1f2937;
                       ">${member.name}</h3>
-                      <p style="
+                <p style="
                         margin: 4px 0 0 0;
                         font-size: 12px;
-                        color: #6b7280;
+                  color: #6b7280;
                       ">${member.isSelected ? '선택된 멤버' : '그룹 멤버'}</p>
                     </div>
-                  </div>
-                  
+              </div>
+              
                   <div style="
                     background: #f3f4f6;
                     padding: 8px 12px;
@@ -2313,7 +2315,7 @@ export default function LocationPage() {
                     color: #374151;
                   ">
                     📍 현재 위치: ${lat.toFixed(4)}, ${lng.toFixed(4)}
-                  </div>
+                </div>
                 </div>
               `,
               borderWidth: 0,
@@ -2355,22 +2357,24 @@ export default function LocationPage() {
         const position = new window.naver.maps.LatLng(lat, lng);
         const isMarkerSelected = selectedLocationIdRef.current === location.id;
         
+        const memberCount = members.length;
+        
         const marker = new window.naver.maps.Marker({
           position,
           map,
           title: location.name,
           icon: {
             content: `
-              <div style="position: relative; text-align: center;">
-                <div style="
+              <div  style="position: relative; text-align: center;" >
+              <div style="
                   width: 32px;
                   height: 32px;
                   background-color: white;
                   border: 2px solid ${isMarkerSelected ? '#ec4899' : '#6366f1'};
                   border-radius: 50%;
                   overflow: hidden;
-                  display: flex;
-                  align-items: center;
+                display: flex;
+                align-items: center;
                   justify-content: center;
                   box-shadow: 0 1px 3px rgba(0,0,0,0.2);
                   position: relative;
@@ -2395,7 +2399,7 @@ export default function LocationPage() {
                     animation: selectedGlow 2s ease-in-out infinite;
                     z-index: 140;
                   "></div>
-                ` : ''}
+                  ` : ''}
                 
                 <div style="
                   position: absolute;
@@ -2403,19 +2407,19 @@ export default function LocationPage() {
                   left: 50%;
                   transform: translateX(-50%);
                   background-color: rgba(0,0,0,0.7);
-                  color: white;
+                      color: white;
                   padding: 2px 5px;
                   border-radius: 3px;
                   white-space: nowrap;
-                  font-size: 10px;
+                      font-size: 10px;
                   font-weight: 500;
                   max-width: 80px;
                   overflow: hidden;
                   text-overflow: ellipsis;
                 ">
                   ${location.name}
-                </div>
-              </div>
+            </div>
+          </div>
               
               <style>
                 @keyframes selectedGlow {
@@ -2429,6 +2433,16 @@ export default function LocationPage() {
                   }
                 }
               </style>
+              
+              <script>
+                setTimeout(() => {
+                  const markerEl = document.querySelector('[]');
+                  if (markerEl && markerEl.classList.contains('location-marker-animate-in')) {
+                    markerEl.classList.remove('location-marker-animate-in');
+                    markerEl.classList.add('marker-animated');
+                  }
+                }, 600);
+              </script>
             `,
             anchor: new window.naver.maps.Point(16, 16)
           },
@@ -2442,13 +2456,13 @@ export default function LocationPage() {
           }
 
           const newInfoWindow = createLocationInfoWindow(location.name, location.address);
-          newInfoWindow.open(map, marker);
-          setInfoWindow(newInfoWindow);
+        newInfoWindow.open(map, marker);
+        setInfoWindow(newInfoWindow);
 
           const previousSelectedId = selectedLocationIdRef.current;
-          setSelectedLocationId(location.id);
-          selectedLocationIdRef.current = location.id;
-          
+        setSelectedLocationId(location.id);
+        selectedLocationIdRef.current = location.id;
+        
           console.log('[updateAllMarkers] 장소 선택됨:', location.id, location.name, '이전 선택:', previousSelectedId);
         });
 
@@ -3117,13 +3131,13 @@ export default function LocationPage() {
             animate={bottomSheetState}
             className="bottom-sheet fixed bottom-0 left-0 right-0 z-30 rounded-t-3xl shadow-2xl max-h-[50vh] overflow-hidden"
             style={{ touchAction: isHorizontalSwipe ? 'none' : 'pan-y' }}
-            onTouchStart={handleDragStart}
-            onTouchMove={handleDragMove}
-            onTouchEnd={handleDragEnd}
-            onMouseDown={handleDragStart}
-            onMouseMove={handleDragMove}
-            onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
+          onTouchStart={handleDragStart}
+          onTouchMove={handleDragMove}
+          onTouchEnd={handleDragEnd}
+          onMouseDown={handleDragStart}
+          onMouseMove={handleDragMove}
+          onMouseUp={handleDragEnd}
+          onMouseLeave={handleDragEnd}
         >
             {/* 바텀시트 핸들 */}
             <motion.div 
@@ -3246,22 +3260,22 @@ export default function LocationPage() {
                               >
                                 {userGroups.map((group) => (
                                   <button
-                                    key={group.sgt_idx}
-                                    onClick={() => handleGroupSelect(group.sgt_idx)}
-                                    className={`w-full px-4 py-3 text-left text-sm hover:bg-indigo-50 focus:outline-none focus:bg-indigo-50 transition-all duration-200 mobile-button ${
-                                      selectedGroupId === group.sgt_idx 
-                                        ? 'bg-indigo-50 text-indigo-700 font-semibold' 
-                                        : 'text-gray-900'
-                                    }`}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <span className="truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</span>
-                                      {selectedGroupId === group.sgt_idx && (
+                                   key={group.sgt_idx}
+                                   onClick={() => handleGroupSelect(group.sgt_idx)}
+                                      className={`w-full px-4 py-3 text-left text-sm hover:bg-indigo-50 focus:outline-none focus:bg-indigo-50 transition-all duration-200 mobile-button ${
+                                     selectedGroupId === group.sgt_idx 
+                                          ? 'bg-indigo-50 text-indigo-700 font-semibold' 
+                                       : 'text-gray-900'
+                                   }`}
+                                 >
+                                   <div className="flex items-center justify-between">
+                                     <span className="truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</span>
+                                     {selectedGroupId === group.sgt_idx && (
                                         <span className="text-indigo-500 ml-2">✓</span>
-                                      )}
-                                    </div>
+                                     )}
+                                   </div>
                                   </button>
-                                ))}
+                               ))}
                               </motion.div>
                            )}
                           </AnimatePresence>
@@ -3302,26 +3316,26 @@ export default function LocationPage() {
                           const fallbackImage = getDefaultImage(member.mt_gender, member.original_index);
                           
                           return (
-                            <motion.div 
-                              key={member.id} 
-                              custom={index}
-                              variants={memberAvatarVariants}
-                              initial="initial"
-                              animate="animate"
-                              whileHover="hover"
-                              className="flex flex-col items-center p-0 flex-shrink-0"
+                          <motion.div 
+                            key={member.id} 
+                            custom={index}
+                            variants={memberAvatarVariants}
+                            initial="initial"
+                            animate="animate"
+                            whileHover="hover"
+                            className="flex flex-col items-center p-0 flex-shrink-0"
+                          >
+                            <motion.button
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 handleMemberSelect(member.id);
+                               }}
+                               onTouchStart={(e) => e.stopPropagation()}
+                               onTouchMove={(e) => e.stopPropagation()}
+                               onTouchEnd={(e) => e.stopPropagation()}
+                              className="flex flex-col items-center focus:outline-none mobile-button"
+                              animate={member.isSelected ? "selected" : "animate"}
                             >
-                              <motion.button
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   handleMemberSelect(member.id);
-                                 }}
-                                 onTouchStart={(e) => e.stopPropagation()}
-                                 onTouchMove={(e) => e.stopPropagation()}
-                                 onTouchEnd={(e) => e.stopPropagation()}
-                                className="flex flex-col items-center focus:outline-none mobile-button"
-                                animate={member.isSelected ? "selected" : "animate"}
-                              >
                                 <motion.div
                                   className={`member-avatar w-13 h-13 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                                     member.isSelected ? 'selected' : ''
@@ -3330,10 +3344,10 @@ export default function LocationPage() {
                                 >
                                   <img 
                                     src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}
-                                    alt={member.name} 
-                                    className="w-full h-full object-cover rounded-xl" 
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
+                                alt={member.name} 
+                                  className="w-full h-full object-cover rounded-xl" 
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
                                       const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
                                       console.log(`[이미지 오류] ${member.name}의 이미지 로딩 실패, 기본 이미지로 대체:`, defaultImg);
                                       target.src = defaultImg;
@@ -3344,13 +3358,13 @@ export default function LocationPage() {
                                     }}
                                   />
                                 </motion.div>
-                                <span className={`block text-sm font-semibold mt-3 transition-colors duration-200 ${
-                                  member.isSelected ? 'text-indigo-700' : 'text-gray-700'
-                                }`}>
-                                 {member.name}
-                               </span>
-                              </motion.button>
-                            </motion.div>
+                              <span className={`block text-sm font-semibold mt-3 transition-colors duration-200 ${
+                                member.isSelected ? 'text-indigo-700' : 'text-gray-700'
+                              }`}>
+                               {member.name}
+                             </span>
+                            </motion.button>
+                          </motion.div>
                           );
                         })}
                       </motion.div>
@@ -3557,17 +3571,17 @@ export default function LocationPage() {
                 
                 {/* 뷰 인디케이터 */}
                 <div className="flex items-center space-x-3">
-                  <motion.button
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.9 }}
+                <motion.button
+                  whileHover={{ scale: 1.2 }}
+                  whileTap={{ scale: 0.9 }}
                     onClick={() => handleViewChange('selectedMemberPlaces')}
                     className={`w-4 h-4 rounded-full focus:outline-none transition-all duration-300 ${
-                      activeView === 'selectedMemberPlaces' 
+                    activeView === 'selectedMemberPlaces' 
                         ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 shadow-lg scale-125' 
-                        : 'bg-gray-300 hover:bg-gray-400'
-                    }`}
-                    aria-label="선택된 멤버 장소 뷰로 전환"
-                  />
+                      : 'bg-gray-300 hover:bg-gray-400'
+                  }`}
+                  aria-label="선택된 멤버 장소 뷰로 전환"
+                />
                   
                   {/* 연결선 */}
                   <motion.div 
@@ -3578,17 +3592,17 @@ export default function LocationPage() {
                     transition={{ duration: 0.3 }}
                   />
                   
-                  <motion.button
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.9 }}
+                <motion.button
+                  whileHover={{ scale: 1.2 }}
+                  whileTap={{ scale: 0.9 }}
                     onClick={() => handleViewChange('otherMembersPlaces')}
                     className={`w-4 h-4 rounded-full focus:outline-none transition-all duration-300 ${
-                      activeView === 'otherMembersPlaces' 
+                    activeView === 'otherMembersPlaces' 
                         ? 'bg-gradient-to-r from-pink-600 to-pink-700 shadow-lg scale-125' 
-                        : 'bg-gray-300 hover:bg-gray-400'
-                    }`}
-                    aria-label="다른 멤버 장소 뷰로 전환"
-                  />
+                      : 'bg-gray-300 hover:bg-gray-400'
+                  }`}
+                  aria-label="다른 멤버 장소 뷰로 전환"
+                />
                 </div>
                 
                 {/* 오른쪽 화살표 */}
