@@ -334,11 +334,13 @@ function getEventStatus(event: ScheduleEvent): { text: string; color: string; bg
 function MobileCalendar({ 
   selectedDay, 
   onDayClick, 
-  events 
+  events,
+  onMonthChange // 월 변경 콜백 추가
 }: { 
   selectedDay: Dayjs | null; 
   onDayClick: (day: Dayjs) => void;
   events: ScheduleEvent[];
+  onMonthChange?: (year: number, month: number) => void; // 월 변경 콜백 프롭 추가
 }) {
   const [currentMonth, setCurrentMonth] = useState(dayjs());
   const [isAnimating, setIsAnimating] = useState(false);
@@ -359,7 +361,12 @@ function MobileCalendar({
     setAnimationDirection('left');
     setIsAnimating(true);
     setTimeout(() => {
-      setCurrentMonth(prev => prev.subtract(1, 'month'));
+      const newMonth = currentMonth.subtract(1, 'month');
+      setCurrentMonth(newMonth);
+      // 월 변경 콜백 호출
+      if (onMonthChange) {
+        onMonthChange(newMonth.year(), newMonth.month() + 1); // dayjs month는 0부터 시작하므로 +1
+      }
       setIsAnimating(false);
     }, 150);
   };
@@ -368,7 +375,12 @@ function MobileCalendar({
     setAnimationDirection('right');
     setIsAnimating(true);
     setTimeout(() => {
-      setCurrentMonth(prev => prev.add(1, 'month'));
+      const newMonth = currentMonth.add(1, 'month');
+      setCurrentMonth(newMonth);
+      // 월 변경 콜백 호출
+      if (onMonthChange) {
+        onMonthChange(newMonth.year(), newMonth.month() + 1); // dayjs month는 0부터 시작하므로 +1
+      }
       setIsAnimating(false);
     }, 150);
   };
@@ -379,6 +391,10 @@ function MobileCalendar({
     setTimeout(() => {
       setCurrentMonth(today);
       onDayClick(today);
+      // 오늘로 이동 시에도 월 변경 콜백 호출
+      if (onMonthChange) {
+        onMonthChange(today.year(), today.month() + 1);
+      }
       setIsAnimating(false);
     }, 150);
   };
@@ -577,7 +593,9 @@ export default function SchedulePage() {
   useEffect(() => {
     if (userGroups.length > 0) {
       console.log('[useEffect] userGroups 로드 완료, 스케줄 로드 시작');
-      loadAllGroupSchedules();
+      // 현재 월의 스케줄을 로드
+      const now = dayjs();
+      loadAllGroupSchedules(now.year(), now.month() + 1); // dayjs month는 0부터 시작하므로 +1
     }
   }, [userGroups]);
 
@@ -1361,19 +1379,26 @@ export default function SchedulePage() {
     setSelectedMinute(minute);
   };
 
+  // 캘린더 월 변경 핸들러 추가
+  const handleCalendarMonthChange = async (year: number, month: number) => {
+    console.log('[handleCalendarMonthChange] 캘린더 월 변경:', { year, month });
+    await loadAllGroupSchedules(year, month);
+  };
+
   // 모든 그룹의 스케줄 로드 - 실제 백엔드 API 사용
-  const loadAllGroupSchedules = async () => {
+  const loadAllGroupSchedules = async (year?: number, month?: number) => {
     try {
-      console.log('[loadAllGroupSchedules] 오너 그룹 전체 스케줄 로드 시작');
+      console.log('[loadAllGroupSchedules] 오너 그룹 전체 스케줄 로드 시작:', { year, month });
       
-      // 새로운 API 사용: 오너 그룹의 모든 멤버 스케줄을 한 번에 조회
-      const response = await scheduleService.getOwnerGroupsAllSchedules(7); // 7일간의 스케줄 조회
+      // 새로운 API 사용: 오너 그룹의 모든 멤버 스케줄을 월별로 조회
+      const response = await scheduleService.getOwnerGroupsAllSchedules(year, month);
       
       if (response.success && response.data?.schedules) {
         console.log('[loadAllGroupSchedules] 오너 그룹 스케줄 조회 성공:', {
           totalSchedules: response.data.totalSchedules,
           ownerGroupsCount: response.data.ownerGroups.length,
           schedulesLength: response.data.schedules.length,
+          queryPeriod: response.data.queryPeriod,
           userLocation: (response.data as any).userLocation
         });
         
@@ -1665,6 +1690,7 @@ export default function SchedulePage() {
               selectedDay={selectedDay}
               onDayClick={setSelectedDay}
               events={events}
+              onMonthChange={handleCalendarMonthChange} // 올바른 월 변경 콜백 전달
             />
           </motion.div>
 

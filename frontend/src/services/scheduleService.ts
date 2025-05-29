@@ -576,28 +576,49 @@ class ScheduleService {
 
   /**
    * 현재 사용자가 오너인 그룹들의 모든 멤버 스케줄 조회
-   * @param days 조회할 일수 (기본값: 7일)
+   * @param year 조회할 년도 (예: 2024)
+   * @param month 조회할 월 (1-12)
    */
   async getOwnerGroupsAllSchedules(
-    days: number = 7
+    year?: number,
+    month?: number
   ): Promise<{
     success: boolean;
     data: {
       schedules: Schedule[];
       ownerGroups: Array<{ sgt_idx: number; sgt_title: string }>;
       totalSchedules: number;
+      queryPeriod?: {
+        year: number;
+        month: number;
+        startDate: string;
+        endDate: string;
+      };
       userPermission: UserPermission;
     };
   }> {
     try {
-      console.log('[SCHEDULE SERVICE] 오너 그룹 전체 스케줄 조회 시작:', { days });
+      console.log('[SCHEDULE SERVICE] 오너 그룹 전체 스케줄 조회 시작:', { year, month });
       
-      const response = await apiClient.get(`/schedule/owner-groups/all-schedules?current_user_id=1186&days=${days}`);
+      // URL 파라미터 구성
+      const params = new URLSearchParams({
+        current_user_id: '1186'
+      });
+      
+      if (year !== undefined) {
+        params.append('year', year.toString());
+      }
+      if (month !== undefined) {
+        params.append('month', month.toString());
+      }
+      
+      const response = await apiClient.get(`/schedule/owner-groups/all-schedules?${params}`);
       
       console.log('[SCHEDULE SERVICE] 오너 그룹 전체 스케줄 조회 응답:', {
         status: response.status,
         totalSchedules: response.data?.data?.totalSchedules || 0,
         ownerGroupsCount: response.data?.data?.ownerGroups?.length || 0,
+        queryPeriod: response.data?.data?.queryPeriod,
         rawData: response.data
       });
 

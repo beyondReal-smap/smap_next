@@ -181,14 +181,36 @@ def test_all_columns(
 @router.get("/owner-groups/all-schedules")
 def get_owner_groups_all_schedules(
     current_user_id: int = Query(..., description="현재 사용자 ID"),
-    days: Optional[int] = Query(7, description="조회할 일수 (기본값: 7일)"),
+    year: Optional[int] = Query(None, description="조회할 년도 (예: 2024)"),
+    month: Optional[int] = Query(None, description="조회할 월 (1-12)"),
     db: Session = Depends(deps.get_db)
 ):
     """
-    현재 사용자가 오너인 그룹들의 모든 멤버 스케줄을 조회합니다.
+    현재 사용자가 오너인 그룹들의 모든 멤버 스케줄을 월별로 조회합니다.
     사용자의 최근 위치와 각 스케줄 위치 간의 거리를 계산합니다.
     """
     try:
+        # 기본값 설정 (현재 년월)
+        from datetime import datetime
+        now = datetime.now()
+        if year is None:
+            year = now.year
+        if month is None:
+            month = now.month
+            
+        # 월의 시작일과 마지막일 계산
+        if month == 12:
+            next_year = year + 1
+            next_month = 1
+        else:
+            next_year = year
+            next_month = month + 1
+            
+        start_date = f"{year}-{month:02d}-01"
+        end_date = f"{next_year}-{next_month:02d}-01"
+        
+        print(f"[DEBUG] 조회 기간: {start_date} ~ {end_date}")
+        
         # 단계 0: 사용자의 최근 위치 조회
         user_location_query = text("""
             SELECT mlt_lat, mlt_long
@@ -274,14 +296,17 @@ def get_owner_groups_all_schedules(
                 WHERE
                     sst.sgt_idx IN ({group_ids_str})
                     AND sst.sst_show = 'Y'
-                    AND sst.sst_sdate >= NOW() - INTERVAL 1 DAY
-                    AND sst.sst_sdate <= NOW() + INTERVAL :days DAY
+                    AND sst.sst_sdate >= :start_date
+                    AND sst.sst_sdate < :end_date
                 ORDER BY
                     sst.sst_sdate
-                LIMIT 50
+                LIMIT 100
             """)
             
-            schedule_results = db.execute(schedule_query, {"days": days}).fetchall()
+            schedule_results = db.execute(schedule_query, {
+                "start_date": start_date,
+                "end_date": end_date
+            }).fetchall()
             
             # 스케줄 데이터 변환 (모든 컬럼 포함)
             print(f"[DEBUG] 스케줄 결과 개수: {len(schedule_results)}")
@@ -353,6 +378,12 @@ def get_owner_groups_all_schedules(
                 "schedules": schedules,
                 "ownerGroups": groups,
                 "totalSchedules": len(schedules),
+                "queryPeriod": {
+                    "year": year,
+                    "month": month,
+                    "startDate": start_date,
+                    "endDate": end_date
+                },
                 "userLocation": {
                     "lat": user_lat,
                     "lng": user_lng

@@ -903,8 +903,8 @@ function GroupPageContent() {
                       animate="visible"
                       custom={2}
                     >
-                      <div className="p-6 bg-indigo-100 rounded-full w-fit mx-auto mb-4">
-                        <FaSearch className="w-8 h-8 text-indigo-400" />
+                      <div className="p-6 bg-gray-100 rounded-full w-fit mx-auto mb-4">
+                        <FaSearch className="w-8 h-8 text-gray-400" />
                       </div>
                       <p className="text-gray-500 text-lg font-medium">검색 결과가 없습니다</p>
                       <p className="text-gray-400 text-sm mt-1">다른 키워드로 검색해보세요</p>
