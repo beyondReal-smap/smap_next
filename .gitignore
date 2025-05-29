@@ -6,6 +6,12 @@
 # Next.js build output
 /.next/
 /out/
+frontend/.next/
+frontend/.next/cache/
+frontend/.next/cache/webpack/
+frontend/.next/**/*.gz
+frontend/.next/**/*.pack.gz
+frontend/.next/**/*.pack.gz.old
 
 # Optional SvelteKit build output
 .svelte-kit/
@@ -88,3 +94,55 @@ temp/
 
 docker_data/
 node_modules/
+
+# Python / 백엔드 관련
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/venv/
+venv/
+ENV/
+env/
+*.pyc
+backend/__pycache__/
+backend/app/__pycache__/
+backend/app/**/__pycache__/
+backend/tests/__pycache__/
+backend/tests/**/__pycache__/
+backend/app/api/**/__pycache__/
+backend/app/core/__pycache__/
+backend/app/models/__pycache__/
+backend/app/schemas/__pycache__/
+backend/app/utils/__pycache__/
+pip-log.txt
+pip-delete-this-directory.txt
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.pytest_cache/
+cover/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 압축 파일
+*.gz
+*.tar
+*.zip
+*.rar
+*.7z
+*.tgz
+*.bz2
+*.xz
+
+# 추가 캐시 및 임시 파일
+**/.cache/
+**/__pycache__/
+**/dist/
+**/build/
+**/node_modules/
+**/.next/cache/
