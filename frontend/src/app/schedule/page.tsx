@@ -37,13 +37,14 @@ dayjs.locale('ko');
 
 // 기본 이미지 가져오기 함수 (location/page.tsx에서 가져옴)
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png', '/images/male_4.png'];
-  const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png', '/images/female_4.png'];
-  const defaultImages = ['/images/avatar1.png', '/images/avatar2.png', '/images/avatar3.png', '/images/avatar4.png'];
-  
-  if (gender === 1) return maleImages[index % maleImages.length];
-  if (gender === 2) return femaleImages[index % femaleImages.length];
-  return defaultImages[index % defaultImages.length];
+  // frontend/public/images/ 폴더의 기본 이미지 사용
+  if (gender === 2) { // 여성
+    const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png'];
+    return femaleImages[index % femaleImages.length];
+  } else { // 남성 또는 미정
+    const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png'];
+    return maleImages[index % maleImages.length];
+  }
 };
 
 // 안전한 이미지 URL 가져오기 함수 (location/page.tsx에서 가져옴)
@@ -53,14 +54,13 @@ const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefi
     return getDefaultImage(gender, index);
   }
   
-  // 이미 완전한 URL인 경우 그대로 사용
+  // 이미 완전한 URL인 경우 그대로 사용 (하지만 로딩 실패 시 기본 이미지로 대체)
   if (photoUrl.startsWith('http')) {
     return photoUrl;
   }
   
-  // 백엔드 서버가 연결되지 않는 경우가 많으므로 기본 이미지 사용
-  console.log(`[getSafeImageUrl] 백엔드 서버 이미지 대신 기본 이미지 사용: ${photoUrl}`);
-  return getDefaultImage(gender, index);
+  // 백엔드 이미지 경로를 완전한 URL로 변환
+  return `${process.env.NEXT_PUBLIC_API_URL || 'http://118.67.130.71:8000'}${photoUrl}`;
 };
 
 // 모바일 최적화된 CSS 스타일
@@ -280,6 +280,8 @@ interface ScheduleEvent {
   groupColor?: string;
   memberName?: string;
   memberPhoto?: string;
+  memberGender?: number | null; // 멤버 성별 정보 추가
+  memberIdx?: number; // 멤버 인덱스 추가
   canEdit?: boolean; // 편집 권한
   canDelete?: boolean; // 삭제 권한
   locationName?: string;
@@ -1225,7 +1227,7 @@ export default function SchedulePage() {
       // 그룹별 색상 배열 (다양한 색상 제공)
       const groupColors = [
         'bg-sky-500',
-        'bg-teal-500', 
+        'bg-yellow-500', 
         'bg-amber-500',
         'bg-indigo-500',
         'bg-rose-500',
@@ -1562,6 +1564,8 @@ export default function SchedulePage() {
             // tgt_mt_idx와 일치하는 멤버 정보 찾기
             let targetMemberName = schedule.member_name || '';
             let targetMemberPhoto = schedule.member_photo || '';
+            let targetMemberGender: number | null = null;
+            let targetMemberIdx = 0;
             
             if (schedule.tgt_mt_idx && schedule.sgt_idx && allGroupMembers[schedule.sgt_idx]) {
               const targetMember = allGroupMembers[schedule.sgt_idx].find(
@@ -1571,6 +1575,8 @@ export default function SchedulePage() {
               if (targetMember) {
                 targetMemberName = targetMember.mt_name || targetMember.name || '';
                 targetMemberPhoto = targetMember.mt_file1 || targetMember.photo || '';
+                targetMemberGender = targetMember.mt_gender || null;
+                targetMemberIdx = targetMember.mt_idx || 0;
               }
             }
             
@@ -1587,6 +1593,8 @@ export default function SchedulePage() {
               groupColor: groupColor,
               memberName: targetMemberName, // tgt_mt_idx에 해당하는 멤버 이름 사용
               memberPhoto: targetMemberPhoto, // tgt_mt_idx에 해당하는 멤버 사진 사용
+              memberGender: targetMemberGender, // 멤버 성별 정보 추가
+              memberIdx: targetMemberIdx, // 멤버 인덱스 추가
               canEdit: response.data.userPermission.canManage,
               canDelete: response.data.userPermission.canManage,
               // 추가 표시 정보
@@ -1749,11 +1757,54 @@ export default function SchedulePage() {
                     >
                       {eventsForSelectedDay.map((event, index) => {
                         const status = getEventStatus(event);
+                        
+                        // 소요 시간 계산
+                        const startTime = dayjs(`${event.date} ${event.startTime}`);
+                        const endTime = dayjs(`${event.date} ${event.endTime}`);
+                        const durationMinutes = endTime.diff(startTime, 'minute');
+                        const durationHours = Math.floor(durationMinutes / 60);
+                        const remainingMinutes = durationMinutes % 60;
+                        const durationText = durationHours > 0 
+                          ? `${durationHours}시간 ${remainingMinutes}분`
+                          : `${remainingMinutes}분`;
+
+                        // 상태별 색상 설정
+                        const getStatusColor = (statusText: string) => {
+                          switch (statusText) {
+                            case '완료':
+                              return {
+                                color: 'text-green-700',
+                                bgColor: 'bg-green-100',
+                                dotColor: 'bg-green-500'
+                              };
+                            case '진행중':
+                              return {
+                                color: 'text-orange-700',
+                                bgColor: 'bg-orange-100',
+                                dotColor: 'bg-orange-500'
+                              };
+                            case '예정':
+                              return {
+                                color: 'text-blue-700',
+                                bgColor: 'bg-blue-100',
+                                dotColor: 'bg-blue-500'
+                              };
+                            default:
+                              return {
+                                color: 'text-gray-700',
+                                bgColor: 'bg-gray-100',
+                                dotColor: 'bg-gray-500'
+                              };
+                          }
+                        };
+
+                        const statusColors = getStatusColor(status.text);
+
                         return (
                           <motion.div
                             key={event.id}
                             onClick={() => handleEventItemClick(event)}
-                            className="event-card bg-white border border-gray-200 rounded-2xl p-4 mobile-button"
+                            className="relative group cursor-pointer"
                             variants={{
                               hidden: { opacity: 0, y: 20 },
                               visible: { 
@@ -1766,77 +1817,148 @@ export default function SchedulePage() {
                               }
                             }}
                             whileHover={{ 
-                              y: -4,
+                              y: -2,
                               transition: { duration: 0.2 }
                             }}
                             whileTap={{ scale: 0.98 }}
                           >
-                            <div className="flex items-start space-x-3">
-                              {/* 시간 표시 */}
-                              <div className="flex-shrink-0 text-center">
-                                <div className="text-sm font-bold text-gray-900">
-                                  {event.startTime}
-                                </div>
-                                {event.endTime && (
-                                  <div className="text-xs text-gray-500">
-                                    ~ {event.endTime}
+                            {/* 메인 카드 - 컴팩트 버전 */}
+                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-300 group-hover:shadow-md group-hover:border-gray-200 transition-all duration-200">
+                              
+                              {/* 상단: 시간 정보와 상태 배지 */}
+                              <div className="flex items-start justify-between mb-3">
+                                {/* 왼쪽: 시간 아이콘과 시간 */}
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                    <FiClock className="w-5 h-5 text-pink-600" />
                                   </div>
-                                )}
-                                <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium mt-1 ${status.color} ${status.bgColor}`}>
-                                  {status.text}
+                                  <div>
+                                    {event.isAllDay ? (
+                                      <div>
+                                        <div className="text-xl font-bold text-gray-900">하루종일</div>
+                                        <div className="text-xs text-gray-500">{durationText}</div>
+                                      </div>
+                                    ) : (
+                                      <div>
+                                        <div className="flex items-baseline space-x-1">
+                                          <span className="text-xl font-bold text-gray-900">{event.startTime}</span>
+                                          <span className="text-sm text-gray-400">~</span>
+                                          <span className="text-sm font-medium text-gray-500">{event.endTime}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-500">{durationText}</div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {/* 오른쪽: 상태 배지와 반복 정보 */}
+                                <div className="flex flex-col items-end space-y-1">
+                                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${statusColors.color} ${statusColors.bgColor}`}>
+                                    <div className={`w-2 h-2 rounded-full mr-1.5 ${statusColors.dotColor} ${
+                                      status.text === '진행중' ? 'animate-pulse' : ''
+                                    }`}></div>
+                                    {status.text}
+                                  </div>
+
+                                  {/* 반복 정보 */}
+                                  {event.repeatText && event.repeatText !== '없음' && (
+                                    <div className="flex items-center space-x-1 bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                      </svg>
+                                      <span>{event.repeatText}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 
-                              {/* 일정 내용 */}
-                              <div className="flex-1 min-w-0">
-                                <h4 className="font-semibold text-gray-900 mb-1 truncate">
+                              {/* 제목 */}
+                              <div className="mb-4">
+                                <h3 className="pl-2 text-2xl font-bold text-gray-900 leading-tight" style={{ wordBreak: 'keep-all' }}>
                                   {event.title}
-                                </h4>
-                                
+                                </h3>
                                 {event.content && (
-                                  <p className="text-sm text-gray-600 mb-2 line-clamp-2" style={{ wordBreak: 'keep-all' }}>
+                                  <p className="pl-4 text-gray-500 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
                                     {event.content}
                                   </p>
                                 )}
+                              </div>
 
-                                <div className="flex items-center space-x-3">
+                              {/* 장소 정보 */}
+                              {event.locationName && (
+                                <div className="mb-4 bg-blue-50 rounded-xl p-4 pl-0 pr-4">
+                                  <div className="space-y-1 pl-4">
+                                    <h4 className="text-lg font-bold text-blue-900" style={{ wordBreak: 'keep-all' }}>
+                                      {event.locationName}
+                                    </h4>
+                                    {event.locationAddress && (
+                                      <p className="text-sm text-blue-700" style={{ wordBreak: 'keep-all' }}>
+                                        {event.locationAddress}
+                                      </p>
+                                    )}
+                                    {event.distanceText && (
+                                      <div className="flex items-center mt-3">
+                                        <div className="flex items-center space-x-1 bg-blue-200 px-3 py-1 rounded-full">
+                                          <svg className="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                          </svg>
+                                          <span className="text-sm font-semibold text-blue-700">{event.distanceText}</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 하단: 그룹과 멤버 정보 */}
+                              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                                <div className="flex items-center space-x-4">
+                                  {/* 그룹 정보 */}
                                   {event.groupName && (
-                                    <div className="flex items-center space-x-1">
-                                      <div className={`w-3 h-3 rounded-full ${event.groupColor || 'bg-gray-400'}`}></div>
-                                      <span className="text-xs text-gray-600">{event.groupName}</span>
+                                    <div className="flex items-center space-x-2">
+                                      <div className={`w-4 h-4 rounded-full ${event.groupColor || 'bg-gray-400'} border-2 border-white shadow-sm`}></div>
+                                      <span className="text-sm font-medium text-gray-700">{event.groupName}</span>
                                     </div>
                                   )}
                                   
+                                  {/* 멤버 정보 */}
                                   {event.memberName && (
-                                    <div className="flex items-center space-x-1">
+                                    <div className="flex items-center space-x-2">
                                       {event.memberPhoto ? (
                                         <img
-                                          src={getSafeImageUrl(event.memberPhoto, null, 0)}
+                                          src={getSafeImageUrl(event.memberPhoto, event.memberGender, event.memberIdx || 0)}
                                           alt={event.memberName}
-                                          className="w-4 h-4 rounded-full object-cover"
+                                          className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm"
                                           onError={(e) => {
                                             const target = e.target as HTMLImageElement;
-                                            const fallbackSrc = getDefaultImage(null, 0);
+                                            const fallbackSrc = getDefaultImage(event.memberGender, event.memberIdx || 0);
                                             console.log(`[이벤트 이미지 오류] ${event.memberName}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
                                             target.src = fallbackSrc;
                                             target.onerror = null;
                                           }}
                                         />
                                       ) : (
-                                        <div className="w-4 h-4 bg-gray-300 rounded-full flex items-center justify-center">
-                                          <FiUser className="w-2 h-2 text-gray-600" />
+                                        <div className="w-8 h-8 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                                          <FiUser className="w-4 h-4 text-gray-500" />
                                         </div>
                                       )}
-                                      <span className="text-xs text-gray-600">{event.memberName}</span>
+                                      <span className="text-sm font-medium text-gray-700" style={{ wordBreak: 'keep-all' }}>
+                                        {event.memberName}
+                                      </span>
                                     </div>
                                   )}
                                 </div>
-                              </div>
 
-                              {/* 더보기 버튼 */}
-                              <button className="flex-shrink-0 p-1 hover:bg-gray-100 rounded-full mobile-button">
-                                <FiMoreVertical className="w-4 h-4 text-gray-400" />
-                              </button>
+                                {/* 알림 정보 */}
+                                {event.hasAlarm && (
+                                  <div className="flex items-center space-x-1 bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-medium">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>{event.alarmTime || '알림'}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </motion.div>
                         );
@@ -1989,12 +2111,12 @@ export default function SchedulePage() {
                           <div className="flex items-center space-x-2">
                             {selectedEventDetails.memberPhoto ? (
                               <img
-                                src={getSafeImageUrl(selectedEventDetails.memberPhoto, null, 0)}
+                                src={getSafeImageUrl(selectedEventDetails.memberPhoto, selectedEventDetails.memberGender, selectedEventDetails.memberIdx || 0)}
                                 alt={selectedEventDetails.memberName}
                                 className="w-5 h-5 rounded-full object-cover"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
-                                  const fallbackSrc = getDefaultImage(null, 0);
+                                  const fallbackSrc = getDefaultImage(selectedEventDetails.memberGender, selectedEventDetails.memberIdx || 0);
                                   console.log(`[모달 이미지 오류] ${selectedEventDetails.memberName}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
                                   target.src = fallbackSrc;
                                   target.onerror = null;
