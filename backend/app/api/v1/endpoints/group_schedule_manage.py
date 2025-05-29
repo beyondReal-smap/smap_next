@@ -193,23 +193,31 @@ def get_owner_groups_all_schedules(
         # 기본값 설정 (현재 년월)
         from datetime import datetime
         now = datetime.now()
-        if year is None:
-            year = now.year
-        if month is None:
-            month = now.month
-            
+        
+        # 요청 파라미터 로깅 및 안전한 복사
+        request_year = year
+        request_month = month
+        print(f"[DEBUG] 원본 파라미터 - year: {request_year}, month: {request_month}")
+        
+        # 기본값 설정 (원본 파라미터를 변경하지 않고 새 변수 사용)
+        final_year = request_year if request_year is not None else now.year
+        final_month = request_month if request_month is not None else now.month
+        
+        print(f"[DEBUG] 처리 후 파라미터 - final_year: {final_year}, final_month: {final_month}")
+        
         # 월의 시작일과 마지막일 계산
-        if month == 12:
-            next_year = year + 1
+        if final_month == 12:
+            next_year = final_year + 1
             next_month = 1
         else:
-            next_year = year
-            next_month = month + 1
+            next_year = final_year
+            next_month = final_month + 1
             
-        start_date = f"{year}-{month:02d}-01"
+        start_date = f"{final_year}-{final_month:02d}-01"
         end_date = f"{next_year}-{next_month:02d}-01"
         
-        print(f"[DEBUG] 조회 기간: {start_date} ~ {end_date}")
+        print(f"[DEBUG] 날짜 계산 결과 - start_date: {start_date}, end_date: {end_date}")
+        print(f"[DEBUG] next_year: {next_year}, next_month: {next_month}")
         
         # 단계 0: 사용자의 최근 위치 조회
         user_location_query = text("""
@@ -376,10 +384,20 @@ def get_owner_groups_all_schedules(
                 "ownerGroups": groups,
                 "totalSchedules": len(schedules),
                 "queryPeriod": {
-                    "year": year,
-                    "month": month,
+                    "year": final_year,
+                    "month": final_month,
                     "startDate": start_date,
                     "endDate": end_date
+                },
+                "debugInfo": {
+                    "originalYear": request_year,
+                    "originalMonth": request_month,
+                    "finalYear": final_year,
+                    "finalMonth": final_month,
+                    "nextYear": next_year,
+                    "nextMonth": next_month,
+                    "calculatedStartDate": start_date,
+                    "calculatedEndDate": end_date
                 },
                 "userLocation": {
                     "lat": user_lat,

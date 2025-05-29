@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// node-fetch를 대안으로 사용
-let nodeFetch: any = null;
-try {
-  nodeFetch = require('node-fetch');
-} catch (e) {
-  console.log('[API PROXY] node-fetch 패키지를 찾을 수 없음');
-}
-
 export async function GET(request: NextRequest) {
   console.log('[API PROXY] ⭐ Owner Groups All Schedules GET 요청 시작 ⭐');
   console.log('[API PROXY] 요청 URL:', request.url);
@@ -16,11 +8,28 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const currentUserId = searchParams.get('current_user_id') || '1186'; // 기본값
     const days = searchParams.get('days') || '7'; // 기본 7일
+    const year = searchParams.get('year'); // 년도 파라미터
+    const month = searchParams.get('month'); // 월 파라미터
 
-    console.log('[API PROXY] 파라미터 추출 완료:', { currentUserId, days });
+    console.log('[API PROXY] 파라미터 추출 완료:', { currentUserId, days, year, month });
 
-    // 백엔드 API 호출 경로
-    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/owner-groups/all-schedules?current_user_id=${currentUserId}&days=${days}`;
+    // 백엔드 API 호출 경로 - year와 month 파라미터 포함
+    const backendParams = new URLSearchParams({
+      current_user_id: currentUserId,
+      days: days
+    });
+    
+    // year와 month 파라미터가 있으면 추가
+    if (year) {
+      backendParams.append('year', year);
+      console.log('[API PROXY] year 파라미터 추가:', year);
+    }
+    if (month) {
+      backendParams.append('month', month);
+      console.log('[API PROXY] month 파라미터 추가:', month);
+    }
+    
+    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/owner-groups/all-schedules?${backendParams.toString()}`;
     
     console.log('[API PROXY] 🚀 백엔드 호출 준비');
     console.log('[API PROXY] ✨ 최종 백엔드 URL:', backendUrl);
@@ -42,13 +51,12 @@ export async function GET(request: NextRequest) {
     console.log('[API PROXY] SSL 검증 비활성화 완료');
     
     let response: any;
-    let usedMethod = 'default-fetch';
 
     try {
-      console.log('[API PROXY] 🔄 기본 fetch 시작...');
+      console.log('[API PROXY] 🔄 백엔드 API 호출 시작...');
       // 기본 fetch 시도
       response = await fetch(backendUrl, fetchOptions);
-      console.log('[API PROXY] 기본 fetch 응답 상태:', response.status, response.statusText);
+      console.log('[API PROXY] 백엔드 응답 상태:', response.status, response.statusText);
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -56,43 +64,27 @@ export async function GET(request: NextRequest) {
         throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
       
-      console.log('[API PROXY] ✅ 기본 fetch 성공');
+      console.log('[API PROXY] ✅ 백엔드 호출 성공');
     } catch (fetchError) {
-      console.error('[API PROXY] ❌ 기본 fetch 실패:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+      console.error('[API PROXY] ❌ 백엔드 호출 실패:', fetchError instanceof Error ? fetchError.message : String(fetchError));
       
-      if (nodeFetch) {
-        console.log('[API PROXY] 🔄 node-fetch 시도...');
-        try {
-          response = await nodeFetch(backendUrl, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'User-Agent': 'Next.js API Proxy (node-fetch)',
-            },
-            agent: function(_parsedURL: any) {
-              const https = require('https');
-              return new https.Agent({
-                rejectUnauthorized: false
-              });
-            }
-          });
-          usedMethod = 'node-fetch';
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[API PROXY] node-fetch 응답 에러:', response.status, errorText);
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
-          }
-          
-          console.log('[API PROXY] ✅ node-fetch 성공');
-        } catch (nodeFetchError) {
-          console.error('[API PROXY] ❌ node-fetch도 실패:', nodeFetchError instanceof Error ? nodeFetchError.message : String(nodeFetchError));
-          throw nodeFetchError;
-        }
+      // SSL 검증 설정 복원
+      if (originalTlsReject !== undefined) {
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
       } else {
-        throw fetchError;
+        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
       }
+      
+      // 백엔드 연결 실패 시 에러 응답 반환
+      return NextResponse.json(
+        { 
+          success: false,
+          message: 'Backend connection failed',
+          error: fetchError instanceof Error ? fetchError.message : String(fetchError),
+          details: '백엔드 서버 연결에 실패했습니다.'
+        },
+        { status: 502 }
+      );
     } finally {
       // SSL 검증 설정 복원
       if (originalTlsReject !== undefined) {
@@ -104,24 +96,25 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    console.log('[API PROXY] ✅ 백엔드 데이터 파싱 성공 (방법:', usedMethod + ')');
+    console.log('[API PROXY] ✅ 백엔드 데이터 파싱 성공');
     console.log('[API PROXY] 응답 데이터 구조:', {
-      hasSchedules: !!data.schedules,
-      schedulesCount: data.schedules?.length || 0,
-      hasOwnerGroups: !!data.ownerGroups,
-      ownerGroupsCount: data.ownerGroups?.length || 0,
-      totalSchedules: data.totalSchedules
+      success: data.success,
+      hasData: !!data.data,
+      schedulesCount: data.data?.schedules?.length || 0,
+      hasQueryPeriod: !!data.data?.queryPeriod,
+      queryPeriod: data.data?.queryPeriod
     });
 
     return NextResponse.json(data);
 
   } catch (error) {
     console.error('[API PROXY] ❌ 최종 에러:', error instanceof Error ? error.message : String(error));
+    console.error('[API PROXY] 에러 스택:', error instanceof Error ? error.stack : 'No stack trace');
     
     return NextResponse.json(
       { 
         success: false,
-        message: 'Failed to fetch owner groups schedules',
+        message: 'API Proxy Error',
         error: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
