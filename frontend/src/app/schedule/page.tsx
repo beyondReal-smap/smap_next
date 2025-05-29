@@ -49,7 +49,10 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
 
 // 안전한 이미지 URL 가져오기 함수 (frontend/public/images의 로컬 이미지 사용)
 const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  // 항상 로컬 이미지를 사용
+  // photoUrl이 있고 유효한 URL이면 그것을 사용, 없으면 로컬 이미지 사용
+  if (photoUrl && photoUrl.trim() && !photoUrl.startsWith('/images/')) {
+    return photoUrl;
+  }
   return getDefaultImage(gender, index);
 };
 
@@ -1336,7 +1339,7 @@ export default function SchedulePage() {
           return {
             id: member.mt_idx.toString(),
             name: member.mt_name || `멤버 ${index + 1}`,
-            photo: null, // 항상 null로 설정하여 로컬 이미지 사용
+            photo: member.mt_file1 || getDefaultImage(member.mt_gender, member.mt_idx || index), // 서버 이미지가 있으면 사용, 없으면 기본 이미지
             isSelected: index === 0,
             mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
             mt_idx: member.mt_idx,
@@ -1746,7 +1749,7 @@ export default function SchedulePage() {
 
             // tgt_mt_idx와 일치하는 멤버 정보 찾기
             let targetMemberName = schedule.member_name || '';
-            let targetMemberPhoto = ''; // 빈 문자열로 설정하여 로컬 이미지 사용
+            let targetMemberPhoto = ''; // 기본값
             let targetMemberGender: number | null = null;
             let targetMemberIdx = 0;
             
@@ -1757,7 +1760,8 @@ export default function SchedulePage() {
               
               if (targetMember) {
                 targetMemberName = targetMember.mt_name || targetMember.name || '';
-                targetMemberPhoto = ''; // 빈 문자열로 설정하여 로컬 이미지 사용
+                // 서버 이미지가 있으면 사용, 없으면 기본 이미지 사용
+                targetMemberPhoto = targetMember.mt_file1 || getDefaultImage(targetMember.mt_gender, targetMember.mt_idx || 0);
                 targetMemberGender = targetMember.mt_gender || null;
                 targetMemberIdx = targetMember.mt_idx || 0;
               }
@@ -2541,25 +2545,21 @@ export default function SchedulePage() {
                                     <div className={`w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                                       member.isSelected ? 'ring-4 ring-indigo-500 ring-offset-2' : ''
                                     }`}>
-                                      {member.photo ? (
-                                        <img 
-                                          src={getSafeImageUrl(member.photo, member.mt_gender, member.mt_idx || 0)}
-                                      alt={member.name}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                            const fallbackSrc = getDefaultImage(member.mt_gender, member.mt_idx || 0);
-                                            console.log(`[이미지 오류] ${member.name}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
-                                        target.src = fallbackSrc;
-                                            target.onerror = null; // 무한 루프 방지
-                                          }}
-                                          onLoad={() => {
-                                            console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
-                                      }}
-                                    />
-                                  ) : (
-                                        <FiUser className="w-6 h-6 text-gray-400" />
-                                  )}
+                                      <img 
+                                        src={getSafeImageUrl(member.photo, member.mt_gender, member.mt_idx || 0)}
+                                        alt={member.name}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          const target = e.target as HTMLImageElement;
+                                          const fallbackSrc = getDefaultImage(member.mt_gender, member.mt_idx || 0);
+                                          console.log(`[이미지 오류] ${member.name}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
+                                          target.src = fallbackSrc;
+                                          target.onerror = null; // 무한 루프 방지
+                                        }}
+                                        onLoad={() => {
+                                          console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
+                                        }}
+                                      />
                                 </div>
                                     <span className={`block text-xs font-medium mt-2 transition-colors duration-200 ${
                                       member.isSelected ? 'text-indigo-700' : 'text-gray-700'
