@@ -102,6 +102,82 @@ class GroupScheduleManager:
             logger.error(f"그룹 멤버 조회 오류: {e}")
             return []
 
+@router.get("/test-all-columns")
+def test_all_columns(
+    current_user_id: int = Query(1186, description="현재 사용자 ID"),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    모든 컬럼 테스트용 엔드포인트
+    """
+    try:
+        # 단일 스케줄만 조회하여 모든 컬럼 확인
+        schedule_query = text("""
+            SELECT sst.* 
+            FROM smap_schedule_t sst
+            WHERE sst.mt_idx = :current_user_id 
+            AND sst.sst_show = 'Y'
+            LIMIT 1
+        """)
+        
+        result = db.execute(schedule_query, {"current_user_id": current_user_id}).fetchone()
+        
+        if not result:
+            return {"success": False, "message": "No schedule found"}
+        
+        # 모든 컬럼을 딕셔너리로 변환
+        schedule_data = {
+            "sst_idx": result.sst_idx,
+            "sst_pidx": result.sst_pidx,
+            "mt_idx": result.mt_idx,
+            "sst_title": result.sst_title,
+            "sst_sdate": str(result.sst_sdate) if result.sst_sdate else None,
+            "sst_edate": str(result.sst_edate) if result.sst_edate else None,
+            "sst_sedate": result.sst_sedate,
+            "sst_all_day": result.sst_all_day,
+            "sst_repeat_json": result.sst_repeat_json,
+            "sst_repeat_json_v": result.sst_repeat_json_v,
+            "sgt_idx": result.sgt_idx,
+            "sgdt_idx": result.sgdt_idx,
+            "sgdt_idx_t": result.sgdt_idx_t,
+            "sst_alram": result.sst_alram,
+            "sst_alram_t": result.sst_alram_t,
+            "sst_adate": str(result.sst_adate) if result.sst_adate else None,
+            "slt_idx": result.slt_idx,
+            "slt_idx_t": result.slt_idx_t,
+            "sst_location_title": result.sst_location_title,
+            "sst_location_add": result.sst_location_add,
+            "sst_location_lat": float(result.sst_location_lat) if result.sst_location_lat else None,
+            "sst_location_long": float(result.sst_location_long) if result.sst_location_long else None,
+            "sst_supplies": result.sst_supplies,
+            "sst_memo": result.sst_memo,
+            "sst_show": result.sst_show,
+            "sst_location_alarm": result.sst_location_alarm,
+            "sst_schedule_alarm_chk": result.sst_schedule_alarm_chk,
+            "sst_pick_type": result.sst_pick_type,
+            "sst_pick_result": result.sst_pick_result,
+            "sst_schedule_alarm": str(result.sst_schedule_alarm) if result.sst_schedule_alarm else None,
+            "sst_update_chk": result.sst_update_chk,
+            "sst_wdate": str(result.sst_wdate) if result.sst_wdate else None,
+            "sst_udate": str(result.sst_udate) if result.sst_udate else None,
+            "sst_ddate": str(result.sst_ddate) if result.sst_ddate else None,
+            "sst_in_chk": result.sst_in_chk,
+            "sst_schedule_chk": result.sst_schedule_chk,
+            "sst_entry_cnt": result.sst_entry_cnt,
+            "sst_exit_cnt": result.sst_exit_cnt,
+        }
+        
+        return {
+            "success": True,
+            "data": schedule_data,
+            "total_columns": len(schedule_data),
+            "column_names": list(schedule_data.keys())
+        }
+        
+    except Exception as e:
+        logger.error(f"테스트 엔드포인트 오류: {e}")
+        return {"success": False, "error": str(e)}
+
 @router.get("/owner-groups/all-schedules")
 def get_owner_groups_all_schedules(
     current_user_id: int = Query(..., description="현재 사용자 ID"),
@@ -110,11 +186,32 @@ def get_owner_groups_all_schedules(
 ):
     """
     현재 사용자가 오너인 그룹들의 모든 멤버 스케줄을 조회합니다.
+    사용자의 최근 위치와 각 스케줄 위치 간의 거리를 계산합니다.
     """
     try:
+        # 단계 0: 사용자의 최근 위치 조회
+        user_location_query = text("""
+            SELECT mlt_lat, mlt_long
+            FROM member_location_log_t
+            WHERE mt_idx = :current_user_id
+            ORDER BY mlt_idx DESC
+            LIMIT 1
+        """)
+        
+        user_location = db.execute(user_location_query, {"current_user_id": current_user_id}).fetchone()
+        user_lat = None
+        user_lng = None
+        
+        if user_location:
+            user_lat = float(user_location.mlt_lat) if user_location.mlt_lat else None
+            user_lng = float(user_location.mlt_long) if user_location.mlt_long else None
+            print(f"[DEBUG] 사용자 최근 위치: lat={user_lat}, lng={user_lng}")
+        else:
+            print(f"[DEBUG] 사용자 {current_user_id}의 위치 정보 없음")
+        
         # 단계 1: 현재 사용자 그룹 목록 먼저 조회
         owner_groups_query = text("""
-            SELECT sg.sgt_idx, sg.sgt_title 
+            SELECT sg.sgt_idx, sg.sgt_title, sgd.sgdt_idx, sgd.sgdt_owner_chk, sgd.sgdt_leader_chk, sgd.mt_idx
             FROM smap_group_t sg
             JOIN smap_group_detail_t sgd ON sg.sgt_idx = sgd.sgt_idx
             WHERE sgd.mt_idx = :current_user_id 
@@ -126,7 +223,11 @@ def get_owner_groups_all_schedules(
         groups = [
             {
                 "sgt_idx": group.sgt_idx,
-                "sgt_title": group.sgt_title
+                "sgt_title": group.sgt_title,
+                "sgdt_idx": group.sgdt_idx,
+                "sgdt_owner_chk": group.sgdt_owner_chk,
+                "sgdt_leader_chk": group.sgdt_leader_chk,
+                "mt_idx": group.mt_idx
             }
             for group in owner_groups
         ]
@@ -138,25 +239,38 @@ def get_owner_groups_all_schedules(
             group_ids = [str(group["sgt_idx"]) for group in groups]
             group_ids_str = ",".join(group_ids)
             
-            # 간단한 스케줄 조회 쿼리
+            # 거리 계산 포함 스케줄 조회 쿼리
+            distance_calc = ""
+            if user_lat is not None and user_lng is not None:
+                distance_calc = f"""
+                    CASE 
+                        WHEN sst.sst_location_lat IS NOT NULL AND sst.sst_location_long IS NOT NULL THEN
+                            6371 * acos(
+                                cos(radians({user_lat})) * cos(radians(sst.sst_location_lat)) * 
+                                cos(radians(sst.sst_location_long) - radians({user_lng})) + 
+                                sin(radians({user_lat})) * sin(radians(sst.sst_location_lat))
+                            )
+                        ELSE NULL
+                    END AS sch_calc_dist,
+                """
+            else:
+                distance_calc = "NULL AS sch_calc_dist,"
+            
             schedule_query = text(f"""
                 SELECT
-                    sst.sst_idx,
-                    sst.sst_pidx,
-                    sst.mt_idx,
-                    sst.sst_title,
-                    sst.sst_sdate,
-                    sst.sst_edate,
-                    sst.sst_location_title,
-                    sst.sst_memo,
-                    sst.sgt_idx,
+                    sst.*,
+                    {distance_calc}
                     m.mt_name as member_name,
                     m.mt_file1 as member_photo,
-                    sg.sgt_title as group_title
+                    sg.sgt_title as group_title,
+                    sgd_target.mt_idx as tgt_mt_idx,
+                    sgd_target.sgdt_owner_chk as tgt_sgdt_owner_chk,
+                    sgd_target.sgdt_leader_chk as tgt_sgdt_leader_chk
                 FROM
                     smap_schedule_t sst
                 JOIN member_t m ON sst.mt_idx = m.mt_idx
                 JOIN smap_group_t sg ON sst.sgt_idx = sg.sgt_idx
+                LEFT JOIN smap_group_detail_t sgd_target ON sst.sgdt_idx = sgd_target.sgdt_idx
                 WHERE
                     sst.sgt_idx IN ({group_ids_str})
                     AND sst.sst_show = 'Y'
@@ -169,21 +283,61 @@ def get_owner_groups_all_schedules(
             
             schedule_results = db.execute(schedule_query, {"days": days}).fetchall()
             
-            # 스케줄 데이터 변환 (기본 필드만)
+            # 스케줄 데이터 변환 (모든 컬럼 포함)
+            print(f"[DEBUG] 스케줄 결과 개수: {len(schedule_results)}")
+            for row in schedule_results:
+                print(f"[DEBUG] 첫 번째 스케줄 row 속성: {dir(row)}")
+                break  # 첫 번째만 출력
+                
             for row in schedule_results:
                 schedule_data = {
+                    # 모든 smap_schedule_t 컬럼
                     "sst_idx": row.sst_idx,
                     "sst_pidx": row.sst_pidx,
                     "mt_idx": row.mt_idx,
                     "sst_title": row.sst_title,
                     "sst_sdate": str(row.sst_sdate) if row.sst_sdate else None,
                     "sst_edate": str(row.sst_edate) if row.sst_edate else None,
-                    "sst_location_title": row.sst_location_title,
-                    "sst_memo": row.sst_memo,
+                    "sst_sedate": row.sst_sedate,
+                    "sst_all_day": row.sst_all_day,
+                    "sst_repeat_json": row.sst_repeat_json,
+                    "sst_repeat_json_v": row.sst_repeat_json_v,
                     "sgt_idx": row.sgt_idx,
+                    "sgdt_idx": row.sgdt_idx,
+                    "sgdt_idx_t": row.sgdt_idx_t,
+                    "sst_alram": row.sst_alram,
+                    "sst_alram_t": row.sst_alram_t,
+                    "sst_adate": str(row.sst_adate) if row.sst_adate else None,
+                    "slt_idx": row.slt_idx,
+                    "slt_idx_t": row.slt_idx_t,
+                    "sst_location_title": row.sst_location_title,
+                    "sst_location_add": row.sst_location_add,
+                    "sst_location_lat": float(row.sst_location_lat) if row.sst_location_lat else None,
+                    "sst_location_long": float(row.sst_location_long) if row.sst_location_long else None,
+                    "sst_supplies": row.sst_supplies,
+                    "sst_memo": row.sst_memo,
+                    "sst_show": row.sst_show,
+                    "sst_location_alarm": row.sst_location_alarm,
+                    "sst_schedule_alarm_chk": row.sst_schedule_alarm_chk,
+                    "sst_pick_type": row.sst_pick_type,
+                    "sst_pick_result": row.sst_pick_result,
+                    "sst_schedule_alarm": str(row.sst_schedule_alarm) if row.sst_schedule_alarm else None,
+                    "sst_update_chk": row.sst_update_chk,
+                    "sst_wdate": str(row.sst_wdate) if row.sst_wdate else None,
+                    "sst_udate": str(row.sst_udate) if row.sst_udate else None,
+                    "sst_ddate": str(row.sst_ddate) if row.sst_ddate else None,
+                    "sst_in_chk": row.sst_in_chk,
+                    "sst_schedule_chk": row.sst_schedule_chk,
+                    "sst_entry_cnt": row.sst_entry_cnt,
+                    "sst_exit_cnt": row.sst_exit_cnt,
+                    # 거리 계산 결과
+                    "sch_calc_dist": round(float(row.sch_calc_dist), 2) if row.sch_calc_dist is not None else None,
+                    # JOIN된 추가 정보
                     "member_name": row.member_name,
                     "member_photo": row.member_photo,
                     "group_title": row.group_title,
+                    # 타겟 멤버 ID 추가 (sgdt_idx로 조회한 mt_idx)
+                    "tgt_mt_idx": row.tgt_mt_idx,
                     # 프론트엔드 호환성을 위한 추가 필드
                     "id": str(row.sst_idx),
                     "title": row.sst_title,
@@ -199,6 +353,10 @@ def get_owner_groups_all_schedules(
                 "schedules": schedules,
                 "ownerGroups": groups,
                 "totalSchedules": len(schedules),
+                "userLocation": {
+                    "lat": user_lat,
+                    "lng": user_lng
+                } if user_lat is not None and user_lng is not None else None,
                 "userPermission": {
                     "canManage": True,  # 오너이므로 모든 스케줄 관리 가능
                     "isOwner": True,
