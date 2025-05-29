@@ -309,11 +309,6 @@ def get_owner_groups_all_schedules(
             }).fetchall()
             
             # 스케줄 데이터 변환 (모든 컬럼 포함)
-            print(f"[DEBUG] 스케줄 결과 개수: {len(schedule_results)}")
-            for row in schedule_results:
-                print(f"[DEBUG] 첫 번째 스케줄 row 속성: {dir(row)}")
-                break  # 첫 번째만 출력
-                
             for row in schedule_results:
                 schedule_data = {
                     # 모든 smap_schedule_t 컬럼
@@ -363,6 +358,8 @@ def get_owner_groups_all_schedules(
                     "group_title": row.group_title,
                     # 타겟 멤버 ID 추가 (sgdt_idx로 조회한 mt_idx)
                     "tgt_mt_idx": row.tgt_mt_idx,
+                    "tgt_sgdt_owner_chk": row.tgt_sgdt_owner_chk,
+                    "tgt_sgdt_leader_chk": row.tgt_sgdt_leader_chk,
                     # 프론트엔드 호환성을 위한 추가 필드
                     "id": str(row.sst_idx),
                     "title": row.sst_title,
