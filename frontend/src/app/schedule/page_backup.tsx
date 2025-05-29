@@ -24,16 +24,9 @@ import {
   FiChevronRight,
   FiMoreVertical,
   FiChevronDown,
-  FiAlertTriangle,
-  FiMapPin,
-  FiCheck,
-  FiRotateCcw,
-  FiCheckCircle,
-  FiXCircle,
-  FiInfo
+  FiAlertTriangle
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
-import { FaTrash } from 'react-icons/fa';
 import Image from 'next/image';
 import memberService from '@/services/memberService';
 import groupService, { Group } from '@/services/groupService';
@@ -613,8 +606,9 @@ export default function SchedulePage() {
   const router = useRouter();
   const [selectedDay, setSelectedDay] = useState<Dayjs | null>(dayjs());
   const [events, setEvents] = useState<ScheduleEvent[]>([]);  // 목업 데이터 제거
-  const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEventDetails, setSelectedEventDetails] = useState<ScheduleEvent | null>(null);
+  const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
 
   // 그룹 및 멤버 선택 관련 상태 추가
   const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
@@ -667,10 +661,6 @@ export default function SchedulePage() {
     type: 'success' | 'error' | 'info';
     onConfirm?: () => void;
   } | null>(null);
-
-  // 스케줄 액션 선택 모달 상태
-  const [isScheduleActionModalOpen, setIsScheduleActionModalOpen] = useState(false);
-  const [selectedEventForAction, setSelectedEventForAction] = useState<ScheduleEvent | null>(null);
 
   // 컴포넌트 마운트 감지
   useEffect(() => {
@@ -1208,6 +1198,7 @@ export default function SchedulePage() {
         
         // 로컬 상태에서도 제거
         setEvents(prev => prev.filter(event => event.id !== selectedEventDetails.id));
+        setIsModalOpen(false);
         setSelectedEventDetails(null);
         
         // 스케줄 목록 새로 고침
@@ -1262,15 +1253,16 @@ export default function SchedulePage() {
         memberName: selectedEventDetails.memberName || '',
         memberPhoto: '', // 빈 문자열로 설정하여 로컬 이미지 사용
       });
+      setIsModalOpen(false);
       setIsAddEventModalOpen(true);
       // body 스크롤은 이미 비활성화되어 있으므로 유지
     }
   };
 
-  // 일정 클릭 핸들러 - 바로 액션 선택 모달 표시
+  // 일정 클릭 핸들러
   const handleEventItemClick = (event: ScheduleEvent) => {
-    setSelectedEventForAction(event);
-    setIsScheduleActionModalOpen(true);
+    setSelectedEventDetails(event);
+    setIsModalOpen(true);
     // body 스크롤 비활성화
     document.body.style.overflow = 'hidden';
   };
@@ -1282,6 +1274,7 @@ export default function SchedulePage() {
 
   // 모달 닫기 핸들러
   const closeModal = () => {
+    setIsModalOpen(false);
     setSelectedEventDetails(null);
     // body 스크롤 복원
     document.body.style.overflow = '';
@@ -1867,99 +1860,6 @@ export default function SchedulePage() {
     setSuccessModalContent(null);
   };
 
-  // 스케줄 액션 선택 모달 닫기
-  const closeScheduleActionModal = () => {
-    setIsScheduleActionModalOpen(false);
-    setSelectedEventForAction(null);
-    // body 스크롤 복원
-    document.body.style.overflow = '';
-  };
-
-  // 수정 액션 핸들러
-  const handleEditAction = (event: ScheduleEvent) => {
-    // 반복 패턴 역변환 함수
-    const convertRepeatTextToSelect = (repeatText: string): string => {
-      if (!repeatText || repeatText === '없음') return '안함';
-      if (repeatText === '매일') return '매일';
-      if (repeatText === '매월') return '매월';
-      if (repeatText === '매년') return '매년';
-      if (repeatText.includes('매주')) return '매주';
-      return '안함';
-    };
-
-    // 알림 텍스트 역변환 함수
-    const convertAlarmTextToSelect = (alarmTime: string, hasAlarm: boolean): string => {
-      if (!hasAlarm || !alarmTime) return '없음';
-      return alarmTime; // 백엔드에서 받은 알림 시간 그대로 사용
-    };
-
-    setNewEvent({
-      id: event.id,
-      title: event.title,
-      date: event.date,
-      startTime: event.startTime,
-      endTime: event.endTime,
-      allDay: event.isAllDay || false, // 하루종일 설정 로드
-      repeat: convertRepeatTextToSelect(event.repeatText || ''), // 반복 설정 역변환
-      alarm: convertAlarmTextToSelect(event.alarmTime || '', event.hasAlarm || false), // 알림 설정 역변환
-      locationName: event.locationName || '',
-      locationAddress: event.locationAddress || '',
-      locationLat: event.locationLat, // 위도 로드
-      locationLng: event.locationLng, // 경도 로드
-      content: event.content || '',
-      groupName: event.groupName || '',
-      groupColor: event.groupColor || '',
-      memberName: event.memberName || '',
-      memberPhoto: '', // 빈 문자열로 설정하여 로컬 이미지 사용
-    });
-    setIsScheduleActionModalOpen(false);
-    setIsAddEventModalOpen(true);
-    // body 스크롤은 이미 비활성화되어 있으므로 유지
-  };
-
-  // 삭제 액션 핸들러
-  const handleDeleteAction = async (event: ScheduleEvent) => {
-    if (!event.sst_idx) {
-      openSuccessModal('삭제 오류', '삭제할 수 없는 스케줄입니다.', 'error');
-      return;
-    }
-
-    if (!selectedGroupId) {
-      openSuccessModal('그룹 오류', '그룹 정보가 없습니다.', 'error');
-      return;
-    }
-
-    try {
-      console.log('[handleDeleteAction] 스케줄 삭제 시작:', {
-        sst_idx: event.sst_idx,
-        groupId: selectedGroupId,
-      });
-
-      const response = await scheduleService.deleteSchedule(
-        event.sst_idx,
-        selectedGroupId
-      );
-
-      if (response.success) {
-        console.log('[handleDeleteAction] 스케줄 삭제 성공');
-        
-        // 로컬 상태에서도 제거
-        setEvents(prev => prev.filter(e => e.id !== event.id));
-        
-        // 스케줄 목록 새로 고침
-        await loadAllGroupSchedules();
-        
-        // 성공 모달 표시 (3초 후 자동 닫기)
-        openSuccessModal('일정 삭제 완료', '일정이 성공적으로 삭제되었습니다.', 'success', undefined, true);
-      } else {
-        openSuccessModal('일정 삭제 실패', response.error || '일정 삭제에 실패했습니다.', 'error');
-      }
-    } catch (error) {
-      console.error('[handleDeleteAction] 스케줄 삭제 실패:', error);
-      openSuccessModal('일정 삭제 실패', '일정 삭제 중 오류가 발생했습니다.', 'error');
-    }
-  };
-
   return (
     <>
       <style jsx global>{pageStyles}</style>
@@ -2308,6 +2208,176 @@ export default function SchedulePage() {
         >
           <FiPlus className="w-6 h-6 stroke-2" />
         </motion.button>
+
+        {/* 일정 상세 모달 */}
+        <AnimatePresence>
+          {isModalOpen && selectedEventDetails && (
+            <motion.div 
+              className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
+              onClick={closeModal}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div 
+                className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl"
+                onClick={e => e.stopPropagation()}
+                onWheel={e => e.stopPropagation()}
+                onTouchMove={e => e.stopPropagation()}
+                variants={modalVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                drag="y"
+                dragElastic={0.1}
+                dragMomentum={false}
+                onDrag={(event, info) => {
+                  // 드래그 중 실시간 피드백
+                  if (info.offset.y > 20) {
+                    const target = event.currentTarget as HTMLElement;
+                    if (target) {
+                      target.style.opacity = String(Math.max(0.5, 1 - info.offset.y / 150));
+                    }
+                  }
+                }}
+                onDragEnd={(event, info) => {
+                  // 매우 민감한 조건으로 설정
+                  if (info.offset.y > 25 || info.velocity.y > 150) {
+                    closeModal();
+                  } else {
+                    // 원래 위치로 복귀
+                    const target = event.currentTarget as HTMLElement;
+                    if (target) {
+                      target.style.opacity = '1';
+                    }
+                  }
+                }}
+                whileDrag={{ 
+                  scale: 0.99,
+                  transition: { duration: 0.05 }
+                }}
+              >
+                {/* 모달 핸들 */}
+                <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-6"></div>
+                
+                {/* 모달 헤더 */}
+                <div className="px-6 pb-4 border-b border-gray-100">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-gray-900">일정 상세</h3>
+                    <button
+                      onClick={closeModal}
+                      className="p-2 hover:bg-gray-100 rounded-full mobile-button"
+                    >
+                      <FiX className="w-5 h-5 text-gray-500" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* 모달 내용 */}
+                <div className="px-6 py-6 space-y-6">
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                      {selectedEventDetails.title}
+                    </h4>
+                    {selectedEventDetails.content && (
+                      <p className="text-gray-600" style={{ wordBreak: 'keep-all' }}>{selectedEventDetails.content}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <FiClock className="w-5 h-5 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {dayjs(selectedEventDetails.date).format('YYYY년 MM월 DD일')}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {selectedEventDetails.startTime} ~ {selectedEventDetails.endTime}
+                        </p>
+                      </div>
+                    </div>
+
+                    {selectedEventDetails.groupName && (
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                          <FiUsers className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">그룹</p>
+                          <div className="flex items-center space-x-2">
+                            <div className={`w-3 h-3 rounded-full ${selectedEventDetails.groupColor || 'bg-gray-400'}`}></div>
+                            <span className="text-sm text-gray-600">{selectedEventDetails.groupName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedEventDetails.memberName && (
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                          <FiUser className="w-5 h-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">담당자</p>
+                          <div className="flex items-center space-x-2">
+                            {selectedEventDetails.memberPhoto ? (
+                              <img
+                                src={getSafeImageUrl(selectedEventDetails.memberPhoto, selectedEventDetails.memberGender, selectedEventDetails.memberIdx || 0)}
+                                alt={selectedEventDetails.memberName}
+                                className="w-5 h-5 rounded-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  const fallbackSrc = getDefaultImage(selectedEventDetails.memberGender, selectedEventDetails.memberIdx || 0);
+                                  console.log(`[모달 이미지 오류] ${selectedEventDetails.memberName}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
+                                  target.src = fallbackSrc;
+                                  target.onerror = null;
+                                }}
+                              />
+                            ) : (
+                              <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
+                            )}
+                            <span className="text-sm text-gray-600">{selectedEventDetails.memberName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 모달 액션 버튼 */}
+                <div className="px-6 py-4 bg-gray-50 rounded-t-3xl space-y-3">
+                  <button
+                    onClick={handleOpenEditModal}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-2xl font-medium mobile-button flex items-center justify-center space-x-2"
+                  >
+                    <FiEdit3 className="w-4 h-4" />
+                    <span>수정하기</span>
+                  </button>
+                  
+                  <div className="flex space-x-3">
+                    <button
+                      onClick={handleDeleteEvent}
+                      className="flex-1 py-3 bg-red-500 text-white rounded-2xl font-medium mobile-button flex items-center justify-center space-x-2"
+                    >
+                      <FiTrash2 className="w-4 h-4" />
+                      <span>삭제</span>
+                    </button>
+                    
+                    <button
+                      onClick={closeModal}
+                      className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-2xl font-medium mobile-button"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* 일정 추가/수정 모달 */}
         <AnimatePresence>
@@ -3421,7 +3491,7 @@ export default function SchedulePage() {
         <AnimatePresence>
           {isSuccessModalOpen && successModalContent && (
             <motion.div 
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md" 
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
               onClick={closeSuccessModal}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -3431,248 +3501,78 @@ export default function SchedulePage() {
               <motion.div 
                 className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
                 onClick={e => e.stopPropagation()}
-                variants={{
-                  hidden: { 
-                    opacity: 0, 
-                    y: 100,
-                    scale: 0.95
-                  },
-                  visible: { 
-                    opacity: 1, 
-                    y: 0,
-                    scale: 1,
-                    transition: {
-                      duration: 0.3,
-                      ease: [0.25, 0.46, 0.45, 0.94]
-                    }
-                  },
-                  exit: { 
-                    opacity: 0, 
-                    y: 100,
-                    scale: 0.95,
-                    transition: {
-                      duration: 0.2,
-                      ease: [0.55, 0.06, 0.68, 0.19]
-                    }
-                  }
-                }}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                transition={{ duration: 0.3 }}
               >
-                <div className="p-6 pb-8">
-                  <div className="text-center mb-6">
-                    {/* 아이콘 */}
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
-                      successModalContent.type === 'success' ? 'bg-green-100' : 
-                      successModalContent.type === 'error' ? 'bg-red-100' : 
-                      successModalContent.type === 'info' ? 'bg-red-100' : 'bg-blue-100'
-                    }`}>
-                      {successModalContent.type === 'success' && <FiCheckCircle className="w-8 h-8 text-green-500" />}
-                      {successModalContent.type === 'error' && <FiXCircle className="w-8 h-8 text-red-500" />}
-                      {successModalContent.type === 'info' && <FaTrash className="w-8 h-8 text-red-500" />}
-                    </div>
-
-                    {/* 제목 */}
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">
-                      {successModalContent.title}
-                    </h3>
-
-                    {/* 메시지 */}
-                    <div className="text-gray-600 mb-4 leading-relaxed" style={{ wordBreak: 'break-all' }}>
-                      {successModalContent.message.split('\n').map((line, index) => (
-                        <div key={index}>
-                          {line.includes('"') ? (
-                            line.split('"').map((part, partIndex) => (
-                              partIndex % 2 === 1 ? (
-                                <span key={partIndex} className="font-bold text-red-600" style={{ wordBreak: 'break-all' }}>
-                                  "{part}"
-                                </span>
-                              ) : (
-                                <span key={partIndex}>{part}</span>
-                              )
-                            ))
-                          ) : (
-                            <span>{line}</span>
-                          )}
-                          {index < successModalContent.message.split('\n').length - 1 && <br />}
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* 자동 닫기 진행 바 (자동 닫기인 경우) */}
-                    {!successModalContent.onConfirm && successModalContent.type === 'success' && (
-                      <>
-                        <div className="w-full bg-gray-200 rounded-full h-1 mb-3">
-                          <motion.div 
-                            className="bg-green-500 h-1 rounded-full"
-                            initial={{ width: "0%" }}
-                            animate={{ width: "100%" }}
-                            transition={{ duration: 3, ease: "linear" }}
-                          />
-                        </div>
-                        <p className="text-sm text-gray-500 mb-2">3초 후 자동으로 닫힙니다</p>
-                      </>
+                <div className="p-6 text-center">
+                  {/* 아이콘 */}
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center">
+                    {successModalContent.type === 'success' && (
+                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
                     )}
-
-                    {/* 삭제 확인 모달인 경우 진행 바 표시 */}
-                    {successModalContent.onConfirm && successModalContent.type === 'info' && (
-                      <div className="w-full bg-gray-200 rounded-full h-1 mb-2">
-                        <motion.div 
-                          className="bg-orange-500 h-1 rounded-full"
-                          initial={{ width: "0%" }}
-                          animate={{ width: "100%" }}
-                          transition={{ duration: 3 }}
-                        />
+                    {successModalContent.type === 'error' && (
+                      <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                        <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                    )}
+                    {successModalContent.type === 'info' && (
+                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                        <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
                       </div>
                     )}
                   </div>
 
-                  {/* 버튼 영역 */}
-                  <div className="flex flex-col gap-3">
-                    {successModalContent.onConfirm ? (
-                      <>
-                        <motion.button
-                          onClick={() => {
-                            successModalContent.onConfirm?.();
-                            closeSuccessModal();
-                          }}
-                          className={`w-full py-4 rounded-2xl font-medium flex items-center justify-center transition-all duration-200 ${
-                            successModalContent.type === 'info' 
-                              ? 'bg-red-500 hover:bg-red-600 text-white' 
-                              : 'bg-green-500 hover:bg-green-600 text-white'
-                          }`}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          {successModalContent.type === 'info' ? '삭제하기' : '확인'}
-                        </motion.button>
-                        <motion.button
-                          onClick={closeSuccessModal}
-                          className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-medium transition-all duration-200"
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          취소
-                        </motion.button>
-                      </>
-                    ) : (
-                      <motion.button
-                        onClick={closeSuccessModal}
-                        className={`w-full py-4 rounded-2xl font-medium flex items-center justify-center transition-all duration-200 ${
-                          successModalContent.type === 'success' ? 'bg-green-500 hover:bg-green-600 text-white' :
-                          successModalContent.type === 'error' ? 'bg-red-500 hover:bg-red-600 text-white' :
-                          'bg-blue-500 hover:bg-blue-600 text-white'
-                        }`}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                  {/* 제목 */}
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    {successModalContent.title}
+                  </h3>
+
+                  {/* 메시지 */}
+                  <p className="text-gray-600 mb-6 leading-relaxed">
+                    {successModalContent.message}
+                  </p>
+
+                  {/* 버튼 */}
+                  {successModalContent.onConfirm ? (
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => {
+                          successModalContent.onConfirm?.();
+                          closeSuccessModal();
+                        }}
+                        className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
                       >
                         확인
-                      </motion.button>
-                    )}
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 스케줄 액션 선택 모달 */}
-        <AnimatePresence>
-          {isScheduleActionModalOpen && selectedEventForAction && (
-            <motion.div 
-              className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeScheduleActionModal}
-            >
-              <motion.div 
-                className="bg-white rounded-3xl w-full max-w-md mx-auto"
-                variants={{
-                  hidden: { 
-                    opacity: 0, 
-                    y: 100,
-                    scale: 0.95
-                  },
-                  visible: { 
-                    opacity: 1, 
-                    y: 0,
-                    scale: 1,
-                    transition: {
-                      duration: 0.3,
-                      ease: [0.25, 0.46, 0.45, 0.94]
-                    }
-                  },
-                  exit: { 
-                    opacity: 0, 
-                    y: 100,
-                    scale: 0.95,
-                    transition: {
-                      duration: 0.2,
-                      ease: [0.55, 0.06, 0.68, 0.19]
-                    }
-                  }
-                }}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6 pb-8">
-                  {/* 스케줄 정보 미리보기 */}
-                  <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FiClock className="w-8 h-8 text-indigo-600" />
+                      </button>
+                      <button
+                        onClick={closeSuccessModal}
+                        className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                      >
+                        취소
+                      </button>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">{selectedEventForAction.title}</h3>
-                    <p className="text-gray-600 mb-4">
-                      {dayjs(selectedEventForAction.date).format('M월 D일')} {selectedEventForAction.startTime} - {selectedEventForAction.endTime}
-                    </p>
-                    <p className="text-sm text-gray-500">이 일정을 어떻게 처리하시겠습니까?</p>
-                  </div>
-
-                  {/* 액션 버튼들 */}
-                  <div className="space-y-3">
-                    <motion.button
-                      onClick={() => handleEditAction(selectedEventForAction)}
-                      className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-medium flex items-center justify-center space-x-2 transition-all duration-200"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                  ) : (
+                    <button
+                      onClick={closeSuccessModal}
+                      className={`w-full py-3 text-white rounded-xl font-medium mobile-button transition-colors ${
+                        successModalContent.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
+                        successModalContent.type === 'error' ? 'bg-red-600 hover:bg-red-700' :
+                        'bg-blue-600 hover:bg-blue-700'
+                      }`}
                     >
-                      <FiEdit3 className="w-4 h-4" />
-                      <span>수정하기</span>
-                    </motion.button>
-                    
-                    <motion.button
-                      onClick={() => {
-                        closeScheduleActionModal();
-                        setTimeout(() => {
-                          openSuccessModal(
-                            '일정 삭제',
-                            `"${selectedEventForAction.title}" 일정을 정말 삭제하시겠습니까?\n삭제된 일정은 복구할 수 없습니다.`,
-                            'info',
-                            () => handleDeleteAction(selectedEventForAction)
-                          );
-                        }, 200);
-                      }}
-                      className="w-full py-4 bg-red-500 text-white rounded-2xl font-medium flex items-center justify-center space-x-2 transition-all duration-200"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <FaTrash className="w-4 h-4" />
-                      <span>삭제하기</span>
-                    </motion.button>
-
-                    <motion.button
-                      onClick={closeScheduleActionModal}
-                      className="w-full py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium transition-all duration-200"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      취소
-                    </motion.button>
-                  </div>
+                      확인
+                    </button>
+                  )}
                 </div>
               </motion.div>
             </motion.div>
