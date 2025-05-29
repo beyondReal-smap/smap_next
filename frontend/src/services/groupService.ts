@@ -251,13 +251,29 @@ class GroupService {
    */
   async getGroupMembers(sgt_idx: number | string): Promise<GroupMember[]> {
     try {
-      const response = await apiClient.get(`/groups/${sgt_idx}/members`);
+      console.log(`[GroupService] 그룹 멤버 조회 시작 - sgt_idx: ${sgt_idx}`);
+      console.log(`[GroupService] API 요청 URL: /group-members/member/${sgt_idx}`);
       
-      if (!response.data.success) {
-        throw new Error(response.data.message || '그룹 멤버 조회에 실패했습니다.');
+      const response = await apiClient.get(`/group-members/member/${sgt_idx}`);
+      
+      console.log(`[GroupService] API 응답 상태:`, response.status);
+      console.log(`[GroupService] API 응답 데이터:`, response.data);
+      
+      // 응답이 배열 형태인 경우 직접 반환
+      if (Array.isArray(response.data)) {
+        console.log('[GroupService] 배열 형태 응답, 직접 반환');
+        return response.data;
       }
       
-      return response.data.data || [];
+      // 일반적인 success/data 구조인 경우
+      if (response.data.success) {
+        console.log('[GroupService] success 구조 응답, data 필드 반환');
+        return response.data.data || [];
+      }
+      
+      // success가 false인 경우
+      throw new Error(response.data.message || '그룹 멤버 조회에 실패했습니다.');
+      
     } catch (error) {
       console.error('그룹 멤버 조회 오류:', error);
       throw new Error('그룹 멤버를 가져오는데 실패했습니다.');

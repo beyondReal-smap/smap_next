@@ -30,6 +30,7 @@ import { HiSparkles } from 'react-icons/hi2';
 import Image from 'next/image';
 import memberService from '@/services/memberService';
 import groupService, { Group } from '@/services/groupService';
+import scheduleService, { Schedule, UserPermission } from '@/services/scheduleService';
 
 dayjs.extend(isBetween);
 dayjs.locale('ko');
@@ -261,20 +262,26 @@ interface ScheduleGroupMember {
   mt_idx: number;
   mt_name: string;
   mt_file1?: string;
+  sgdt_owner_chk?: string;
+  sgdt_leader_chk?: string;
 }
 
 // ScheduleEvent 인터페이스 정의
 interface ScheduleEvent {
   id: string;
+  sst_idx?: number; // 백엔드 스케줄 ID
   date: string; // YYYY-MM-DD
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   title: string;
   content?: string;
+  groupId?: number;
   groupName?: string;
   groupColor?: string;
   memberName?: string;
   memberPhoto?: string;
+  canEdit?: boolean; // 편집 권한
+  canDelete?: boolean; // 삭제 권한
 }
 
 // 모의 일정 데이터
@@ -574,7 +581,7 @@ function MobileCalendar({
 export default function SchedulePage() {
   const router = useRouter();
   const [selectedDay, setSelectedDay] = useState<Dayjs | null>(dayjs());
-  const [events, setEvents] = useState<ScheduleEvent[]>(MOCK_SCHEDULE_EVENTS);
+  const [events, setEvents] = useState<ScheduleEvent[]>([]);  // 목업 데이터 제거
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEventDetails, setSelectedEventDetails] = useState<ScheduleEvent | null>(null);
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
@@ -624,8 +631,12 @@ export default function SchedulePage() {
     document.body.style.overflowX = 'hidden';
     document.documentElement.style.overflowX = 'hidden';
     
-    // 그룹 데이터 로드
-    fetchUserGroups();
+    // 그룹 데이터 로드 (스케줄 로드는 별도 useEffect에서 처리)
+    const loadData = async () => {
+      await fetchUserGroups();
+    };
+    
+    loadData();
     
     return () => {
       document.body.style.overflowX = '';
@@ -634,6 +645,14 @@ export default function SchedulePage() {
       document.body.style.overflow = '';
     };
   }, []);
+
+  // userGroups가 로드된 후 스케줄 로드
+  useEffect(() => {
+    if (userGroups.length > 0) {
+      console.log('[useEffect] userGroups 로드 완료, 스케줄 로드 시작');
+      loadAllGroupSchedules();
+    }
+  }, [userGroups]);
 
   // 선택된 그룹이 변경될 때 멤버 데이터 로드
   useEffect(() => {
@@ -644,11 +663,26 @@ export default function SchedulePage() {
 
   // 선택된 날짜의 일정들
   const eventsForSelectedDay = useMemo(() => {
-    if (!selectedDay) return [];
+    if (!selectedDay) {
+      console.log('[eventsForSelectedDay] 선택된 날짜가 없음');
+      return [];
+    }
+    
     const dateString = selectedDay.format('YYYY-MM-DD');
-    return events
-      .filter(event => event.date === dateString)
+    console.log('[eventsForSelectedDay] 선택된 날짜:', dateString);
+    console.log('[eventsForSelectedDay] 전체 이벤트 수:', events.length);
+    console.log('[eventsForSelectedDay] 전체 이벤트 목록:', events);
+    
+    const filteredEvents = events
+      .filter(event => {
+        const matches = event.date === dateString;
+        console.log(`[eventsForSelectedDay] 이벤트 "${event.title}" (${event.date}) - 매칭:`, matches);
+        return matches;
+      })
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    
+    console.log('[eventsForSelectedDay] 필터링된 이벤트:', filteredEvents);
+    return filteredEvents;
   }, [selectedDay, events]);
 
   const initialNewEventState: NewEvent = useMemo(() => ({
@@ -803,8 +837,8 @@ export default function SchedulePage() {
     };
   }, [isGroupSelectorOpen]);
 
-  // 일정 저장
-  const handleSaveEvent = () => {
+  // 일정 저장 - 실제 백엔드 API 사용
+  const handleSaveEvent = async () => {
     // 유효성 검사
     if (!newEvent.title || !newEvent.date) {
       alert('제목과 날짜는 필수 입력 항목입니다.');
@@ -821,41 +855,165 @@ export default function SchedulePage() {
       return;
     }
 
-    const eventToSave: ScheduleEvent = {
-      id: newEvent.id || uuidv4(),
-      title: newEvent.title,
-      date: newEvent.date,
-      startTime: newEvent.startTime,
-      endTime: newEvent.endTime,
-      content: newEvent.content,
-      groupName: newEvent.groupName,
-      groupColor: newEvent.groupColor,
-      memberName: newEvent.memberName,
-      memberPhoto: newEvent.memberPhoto,
-    };
-
-    if (newEvent.id) {
-      // 수정
-      setEvents(prev => prev.map(event => 
-        event.id === newEvent.id ? eventToSave : event
-      ));
-    } else {
-      // 추가
-      setEvents(prev => [...prev, eventToSave]);
+    if (!selectedGroupId) {
+      alert('그룹을 선택해주세요.');
+      return;
     }
 
-    setIsAddEventModalOpen(false);
-    setNewEvent(initialNewEventState);
-    setSelectedEventDetails(null);
-    setDateTimeError(null); // 에러 상태 초기화
+    // 현재 사용자의 권한 확인
+    const currentMember = scheduleGroupMembers.find(member => member.isSelected);
+    const isOwnerOrLeader = currentMember && 
+      (currentMember.sgdt_owner_chk === 'Y' || currentMember.sgdt_leader_chk === 'Y');
+
+    // 다른 멤버의 스케줄을 생성/수정하려는 경우 권한 확인
+    if (selectedMemberId && selectedMemberId !== currentMember?.id && !isOwnerOrLeader) {
+      alert('다른 멤버의 스케줄을 관리할 권한이 없습니다.');
+      return;
+    }
+
+    try {
+      console.log('[handleSaveEvent] 스케줄 저장 시작:', {
+        isEdit: !!newEvent.id,
+        groupId: selectedGroupId,
+        memberId: selectedMemberId,
+        hasPermission: isOwnerOrLeader
+      });
+
+      // 날짜/시간 형식 변환
+      const startDateTime = newEvent.allDay 
+        ? `${newEvent.date}T00:00:00`
+        : `${newEvent.date}T${newEvent.startTime}:00`;
+      
+      const endDateTime = newEvent.allDay 
+        ? `${newEvent.date}T23:59:59`
+        : `${newEvent.date}T${newEvent.endTime}:00`;
+
+      if (newEvent.id) {
+        // 수정
+        const response = await scheduleService.updateSchedule({
+          sst_idx: parseInt(newEvent.id),
+          groupId: selectedGroupId,
+          sst_title: newEvent.title,
+          sst_sdate: startDateTime,
+          sst_edate: endDateTime,
+          sst_all_day: newEvent.allDay ? 'Y' : 'N',
+          sst_location_title: newEvent.locationName || undefined,
+          sst_location_add: newEvent.locationAddress || undefined,
+          sst_memo: newEvent.content || undefined,
+          sst_alram: 0 // 기본값
+        });
+
+        if (response.success) {
+          console.log('[handleSaveEvent] 스케줄 수정 성공');
+          alert('스케줄이 수정되었습니다.');
+        } else {
+          alert(response.error || '스케줄 수정에 실패했습니다.');
+          return;
+        }
+      } else {
+        // 추가
+        const response = await scheduleService.createSchedule({
+          groupId: selectedGroupId,
+          targetMemberId: selectedMemberId && selectedMemberId !== currentMember?.id 
+            ? parseInt(selectedMemberId) 
+            : undefined,
+          sst_title: newEvent.title,
+          sst_sdate: startDateTime,
+          sst_edate: endDateTime,
+          sst_all_day: newEvent.allDay ? 'Y' : 'N',
+          sst_location_title: newEvent.locationName,
+          sst_location_add: newEvent.locationAddress,
+          sst_memo: newEvent.content,
+          sst_alram: 0 // 기본값
+        });
+
+        if (response.success && response.data) {
+          console.log('[handleSaveEvent] 스케줄 생성 성공:', response.data);
+          alert('스케줄이 생성되었습니다.');
+        } else {
+          alert(response.error || '스케줄 생성에 실패했습니다.');
+          return;
+        }
+      }
+
+      // 성공적으로 완료되었을 때만 모달 닫기
+      setIsAddEventModalOpen(false);
+      setNewEvent(initialNewEventState);
+      setSelectedEventDetails(null);
+      setDateTimeError(null);
+      
+      // 스케줄 목록 새로 고침
+      await loadAllGroupSchedules();
+      
+    } catch (error) {
+      console.error('[handleSaveEvent] 스케줄 저장 실패:', error);
+      alert('스케줄 저장 중 오류가 발생했습니다.');
+    }
   };
 
-  // 일정 삭제
-  const handleDeleteEvent = () => {
-    if (selectedEventDetails) {
-      setEvents(prev => prev.filter(event => event.id !== selectedEventDetails.id));
-      setIsModalOpen(false);
-      setSelectedEventDetails(null);
+  // 일정 삭제 - 권한 확인 포함
+  const handleDeleteEvent = async () => {
+    if (!selectedEventDetails) {
+      return;
+    }
+
+    if (!selectedEventDetails.sst_idx) {
+      alert('삭제할 수 없는 스케줄입니다.');
+      return;
+    }
+
+    if (!selectedGroupId) {
+      alert('그룹 정보가 없습니다.');
+      return;
+    }
+
+    // 현재 사용자의 권한 확인
+    const currentMember = scheduleGroupMembers.find(member => member.isSelected);
+    const isOwnerOrLeader = currentMember && 
+      (currentMember.sgdt_owner_chk === 'Y' || currentMember.sgdt_leader_chk === 'Y');
+
+    // 삭제 권한 확인 - 자신의 스케줄이거나 오너/리더인 경우만 삭제 가능
+    if (!selectedEventDetails.canDelete && !isOwnerOrLeader) {
+      alert('이 스케줄을 삭제할 권한이 없습니다.');
+      return;
+    }
+
+    const confirmDelete = confirm('정말로 이 스케줄을 삭제하시겠습니까?');
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      console.log('[handleDeleteEvent] 스케줄 삭제 시작:', {
+        sst_idx: selectedEventDetails.sst_idx,
+        groupId: selectedGroupId,
+        hasPermission: isOwnerOrLeader,
+        canDelete: selectedEventDetails.canDelete
+      });
+
+      const response = await scheduleService.deleteSchedule(
+        selectedEventDetails.sst_idx,
+        selectedGroupId
+      );
+
+      if (response.success) {
+        console.log('[handleDeleteEvent] 스케줄 삭제 성공');
+        alert('스케줄이 삭제되었습니다.');
+        
+        // 로컬 상태에서도 제거
+        setEvents(prev => prev.filter(event => event.id !== selectedEventDetails.id));
+        setIsModalOpen(false);
+        setSelectedEventDetails(null);
+        
+        // 스케줄 목록 새로 고침
+        await loadAllGroupSchedules();
+        
+      } else {
+        alert(response.error || '스케줄 삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('[handleDeleteEvent] 스케줄 삭제 실패:', error);
+      alert('스케줄 삭제 중 오류가 발생했습니다.');
     }
   };
 
@@ -914,35 +1072,50 @@ export default function SchedulePage() {
     document.body.style.overflow = '';
   };
 
-  // 그룹 목록 가져오기
+  // 그룹 목록 가져오기 - 실제 백엔드 API 사용
   const fetchUserGroups = async () => {
     setIsLoadingGroups(true);
     try {
-      console.log('[fetchUserGroups] 실제 백엔드 API 호출 시작');
-      const groups = await groupService.getCurrentUserGroups();
-      console.log('[fetchUserGroups] 그룹 목록 조회 성공:', groups);
-      setUserGroups(groups);
+      console.log('[fetchUserGroups] 현재 사용자의 그룹 목록 조회 시작');
       
-      // 첫 번째 그룹을 기본 선택
-      if (groups.length > 0 && !selectedGroupId) {
-        setSelectedGroupId(groups[0].sgt_idx);
-        console.log('[fetchUserGroups] 첫 번째 그룹 자동 선택:', groups[0].sgt_title);
+      // scheduleService의 getCurrentUserGroups 메서드 사용
+      const response = await scheduleService.getCurrentUserGroups();
+      console.log('[fetchUserGroups] API 응답:', response);
+      
+      if (response.success && response.data?.groups) {
+        const groups = response.data.groups.map(group => ({
+          sgt_idx: group.sgt_idx,
+          sgt_title: group.sgt_title
+        }));
+        
+        console.log('[fetchUserGroups] 변환된 그룹 목록:', groups);
+        setUserGroups(groups);
+        
+        // 첫 번째 그룹을 기본 선택
+        if (groups.length > 0 && !selectedGroupId) {
+          setSelectedGroupId(groups[0].sgt_idx);
+          console.log('[fetchUserGroups] 첫 번째 그룹 자동 선택:', groups[0].sgt_title);
+        }
+      } else {
+        console.warn('[fetchUserGroups] 그룹 데이터가 없거나 API 실패');
+        setUserGroups([]);
       }
     } catch (error) {
       console.error('[fetchUserGroups] 그룹 목록 조회 실패:', error);
-      console.log('[fetchUserGroups] API 실패로 빈 그룹 목록 설정');
-      // API 실패 시 빈 배열로 설정
       setUserGroups([]);
     } finally {
       setIsLoadingGroups(false);
     }
   };
 
-  // 그룹 멤버 가져오기
+  // 그룹 멤버 가져오기 - 실제 백엔드 API 사용
   const fetchGroupMembers = async (groupId: number) => {
     setIsFetchingMembers(true);
     try {
-      const memberData = await memberService.getGroupMembers(groupId.toString());
+      console.log('[fetchGroupMembers] 그룹 멤버 조회 시작:', groupId);
+      
+      // memberService 대신 groupService 사용
+      const memberData = await groupService.getGroupMembers(groupId.toString());
       console.log('[fetchGroupMembers] API 응답:', memberData);
 
       if (memberData && memberData.length > 0) {
@@ -956,19 +1129,20 @@ export default function SchedulePage() {
               photoUrl = `http://118.67.130.71:8000/storage/${member.mt_file1}`;
             }
             console.log(`[fetchGroupMembers] ${member.mt_name}의 이미지 URL:`, photoUrl);
-          } else {
-            console.log(`[fetchGroupMembers] ${member.mt_name}의 이미지가 없어 기본 이미지 사용`);
           }
           
           return {
             id: member.mt_idx.toString(),
             name: member.mt_name || `멤버 ${index + 1}`,
             photo: photoUrl,
-            isSelected: index === 0, // 첫 번째 멤버를 기본 선택
+            isSelected: index === 0,
             mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
             mt_idx: member.mt_idx,
             mt_name: member.mt_name,
-            mt_file1: member.mt_file1
+            mt_file1: member.mt_file1,
+            // 권한 정보 추가
+            sgdt_owner_chk: member.sgdt_owner_chk || 'N',
+            sgdt_leader_chk: member.sgdt_leader_chk || 'N'
           };
         });
 
@@ -987,8 +1161,6 @@ export default function SchedulePage() {
       }
     } catch (error) {
       console.error('[fetchGroupMembers] 그룹 멤버 가져오기 실패:', error);
-      console.log('[fetchGroupMembers] API 실패로 빈 멤버 목록 설정');
-      // API 실패 시 빈 배열로 설정
       setScheduleGroupMembers([]);
     } finally {
       setIsFetchingMembers(false);
@@ -1260,6 +1432,109 @@ export default function SchedulePage() {
 
   const handleMinuteChange = (minute: number) => {
     setSelectedMinute(minute);
+  };
+
+  // 모든 그룹의 스케줄 로드 - 실제 백엔드 API 사용
+  const loadAllGroupSchedules = async () => {
+    try {
+      console.log('[loadAllGroupSchedules] 오너 그룹 전체 스케줄 로드 시작');
+      
+      // 새로운 API 사용: 오너 그룹의 모든 멤버 스케줄을 한 번에 조회
+      const response = await scheduleService.getOwnerGroupsAllSchedules(7); // 7일간의 스케줄 조회
+      
+      if (response.success && response.data?.schedules) {
+        console.log('[loadAllGroupSchedules] 오너 그룹 스케줄 조회 성공:', {
+          totalSchedules: response.data.totalSchedules,
+          ownerGroupsCount: response.data.ownerGroups.length,
+          schedulesLength: response.data.schedules.length
+        });
+        
+        const allEvents: ScheduleEvent[] = [];
+        
+        // 그룹별 색상 배열
+        const groupColors = [
+          'bg-sky-500', 'bg-teal-500', 'bg-amber-500', 'bg-indigo-500',
+          'bg-rose-500', 'bg-lime-500', 'bg-purple-500', 'bg-emerald-500'
+        ];
+        
+        // 백엔드에서 받은 스케줄 데이터를 프론트엔드 형식으로 변환
+        response.data.schedules.forEach((schedule: any, index) => {
+          try {
+            console.log(`[loadAllGroupSchedules] 스케줄 ${index} 변환 중:`, schedule);
+            
+            // sst_sdate와 sst_edate를 사용하여 날짜 파싱
+            let startDate: Date;
+            let endDate: Date;
+            
+            if (schedule.sst_sdate) {
+              startDate = new Date(schedule.sst_sdate);
+              console.log('[loadAllGroupSchedules] 시작 날짜 파싱:', schedule.sst_sdate, '->', startDate);
+            } else {
+              console.warn('[loadAllGroupSchedules] 시작 날짜가 없음, 현재 날짜 사용');
+              startDate = new Date();
+            }
+            
+            if (schedule.sst_edate) {
+              endDate = new Date(schedule.sst_edate);
+              console.log('[loadAllGroupSchedules] 종료 날짜 파싱:', schedule.sst_edate, '->', endDate);
+            } else {
+              console.warn('[loadAllGroupSchedules] 종료 날짜가 없음, 시작 날짜 + 1시간 사용');
+              endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // 1시간 추가
+            }
+            
+            // 그룹 색상 결정
+            const groupColor = schedule.sgt_idx ? 
+              groupColors[schedule.sgt_idx % groupColors.length] : 
+              'bg-gray-500';
+            
+            const event: ScheduleEvent = {
+              id: schedule.sst_idx?.toString() || schedule.id || `temp-${Date.now()}-${index}`,
+              sst_idx: schedule.sst_idx || undefined,
+              date: dayjs(startDate).format('YYYY-MM-DD'),
+              startTime: dayjs(startDate).format('HH:mm'),
+              endTime: dayjs(endDate).format('HH:mm'),
+              title: schedule.sst_title || schedule.title || '제목 없음',
+              content: schedule.sst_memo || '',
+              groupId: schedule.sgt_idx || undefined,
+              groupName: schedule.group_title || '',
+              groupColor: groupColor,
+              memberName: schedule.member_name || '',
+              memberPhoto: schedule.member_photo || undefined,
+              canEdit: response.data.userPermission.canManage,
+              canDelete: response.data.userPermission.canManage
+            };
+            
+            console.log(`[loadAllGroupSchedules] 변환된 이벤트 ${index}:`, event);
+            allEvents.push(event);
+            
+          } catch (parseError) {
+            console.error(`[loadAllGroupSchedules] 스케줄 ${index} 파싱 실패:`, parseError);
+          }
+        });
+        
+        console.log('[loadAllGroupSchedules] 모든 변환된 이벤트:', allEvents);
+        console.log('[loadAllGroupSchedules] 총 이벤트 수:', allEvents.length);
+        
+        setEvents(allEvents);
+        
+      } else {
+        console.log('[loadAllGroupSchedules] 오너 그룹 스케줄 조회 실패 또는 데이터 없음:', response);
+        setEvents([]);
+      }
+      
+    } catch (error) {
+      console.error('[loadAllGroupSchedules] 스케줄 로드 실패:', error);
+      setEvents([]);
+    }
+  };
+
+  // 그룹별 색상 생성
+  const getGroupColor = (groupId: number): string => {
+    const colors = [
+      '#4f46e5', '#06b6d4', '#10b981', '#f59e0b', 
+      '#ef4444', '#8b5cf6', '#ec4899', '#84cc16'
+    ];
+    return colors[groupId % colors.length];
   };
 
   return (

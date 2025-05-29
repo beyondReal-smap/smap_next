@@ -102,6 +102,117 @@ class GroupScheduleManager:
             logger.error(f"그룹 멤버 조회 오류: {e}")
             return []
 
+@router.get("/owner-groups/all-schedules")
+def get_owner_groups_all_schedules(
+    current_user_id: int = Query(..., description="현재 사용자 ID"),
+    days: Optional[int] = Query(7, description="조회할 일수 (기본값: 7일)"),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    현재 사용자가 오너인 그룹들의 모든 멤버 스케줄을 조회합니다.
+    """
+    try:
+        # 단계 1: 현재 사용자 그룹 목록 먼저 조회
+        owner_groups_query = text("""
+            SELECT sg.sgt_idx, sg.sgt_title 
+            FROM smap_group_t sg
+            JOIN smap_group_detail_t sgd ON sg.sgt_idx = sgd.sgt_idx
+            WHERE sgd.mt_idx = :current_user_id 
+            AND sg.sgt_show = 'Y'
+        """)
+        
+        owner_groups = db.execute(owner_groups_query, {"current_user_id": current_user_id}).fetchall()
+        
+        groups = [
+            {
+                "sgt_idx": group.sgt_idx,
+                "sgt_title": group.sgt_title
+            }
+            for group in owner_groups
+        ]
+        
+        # 단계 2: 오너 그룹이 있는 경우에만 스케줄 조회
+        schedules = []
+        if groups:
+            # 그룹 ID 목록 생성
+            group_ids = [str(group["sgt_idx"]) for group in groups]
+            group_ids_str = ",".join(group_ids)
+            
+            # 간단한 스케줄 조회 쿼리
+            schedule_query = text(f"""
+                SELECT
+                    sst.sst_idx,
+                    sst.sst_pidx,
+                    sst.mt_idx,
+                    sst.sst_title,
+                    sst.sst_sdate,
+                    sst.sst_edate,
+                    sst.sst_location_title,
+                    sst.sst_memo,
+                    sst.sgt_idx,
+                    m.mt_name as member_name,
+                    m.mt_file1 as member_photo,
+                    sg.sgt_title as group_title
+                FROM
+                    smap_schedule_t sst
+                JOIN member_t m ON sst.mt_idx = m.mt_idx
+                JOIN smap_group_t sg ON sst.sgt_idx = sg.sgt_idx
+                WHERE
+                    sst.sgt_idx IN ({group_ids_str})
+                    AND sst.sst_show = 'Y'
+                    AND sst.sst_sdate >= NOW() - INTERVAL 1 DAY
+                    AND sst.sst_sdate <= NOW() + INTERVAL :days DAY
+                ORDER BY
+                    sst.sst_sdate
+                LIMIT 50
+            """)
+            
+            schedule_results = db.execute(schedule_query, {"days": days}).fetchall()
+            
+            # 스케줄 데이터 변환 (기본 필드만)
+            for row in schedule_results:
+                schedule_data = {
+                    "sst_idx": row.sst_idx,
+                    "sst_pidx": row.sst_pidx,
+                    "mt_idx": row.mt_idx,
+                    "sst_title": row.sst_title,
+                    "sst_sdate": str(row.sst_sdate) if row.sst_sdate else None,
+                    "sst_edate": str(row.sst_edate) if row.sst_edate else None,
+                    "sst_location_title": row.sst_location_title,
+                    "sst_memo": row.sst_memo,
+                    "sgt_idx": row.sgt_idx,
+                    "member_name": row.member_name,
+                    "member_photo": row.member_photo,
+                    "group_title": row.group_title,
+                    # 프론트엔드 호환성을 위한 추가 필드
+                    "id": str(row.sst_idx),
+                    "title": row.sst_title,
+                    "date": str(row.sst_sdate) if row.sst_sdate else None,
+                    "location": row.sst_location_title,
+                    "memberId": str(row.mt_idx)
+                }
+                schedules.append(schedule_data)
+        
+        return {
+            "success": True,
+            "data": {
+                "schedules": schedules,
+                "ownerGroups": groups,
+                "totalSchedules": len(schedules),
+                "userPermission": {
+                    "canManage": True,  # 오너이므로 모든 스케줄 관리 가능
+                    "isOwner": True,
+                    "isLeader": False
+                }
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"오너 그룹 전체 스케줄 조회 오류: {e}")
+        import traceback
+        logger.error(f"상세 오류: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 @router.get("/group/{group_id}/schedules")
 def get_group_schedules(
     group_id: int,
@@ -162,8 +273,8 @@ def get_group_schedules(
                 "sst_pidx": row.sst_pidx,
                 "mt_idx": row.mt_idx,
                 "sst_title": row.sst_title,
-                "sst_sdate": row.sst_sdate.isoformat() if row.sst_sdate else None,
-                "sst_edate": row.sst_edate.isoformat() if row.sst_edate else None,
+                "sst_sdate": str(row.sst_sdate) if row.sst_sdate else None,
+                "sst_edate": str(row.sst_edate) if row.sst_edate else None,
                 "sst_sedate": row.sst_sedate,
                 "sst_all_day": row.sst_all_day,
                 "sst_repeat_json": row.sst_repeat_json,
@@ -201,7 +312,7 @@ def get_group_schedules(
                 # 프론트엔드 호환성을 위한 추가 필드
                 "id": str(row.sst_idx),
                 "title": row.sst_title,
-                "date": row.sst_sdate.isoformat() if row.sst_sdate else None,
+                "date": str(row.sst_sdate) if row.sst_sdate else None,
                 "location": row.sst_location_title,
                 "memberId": str(row.mt_idx)
             }

@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from 'axios';
 
-// API 기본 URL 설정 - Next.js API 라우트를 통한 프록시
+// API 기본 URL 설정 - Next.js API 라우트를 프록시로 사용 (CORS 우회)
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 // 커스텀 API 클라이언트 타입 정의
@@ -11,7 +11,7 @@ interface CustomApiClient extends AxiosInstance {
 // Axios 인스턴스 생성
 const apiClient: CustomApiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000, // 백엔드 서버가 원격에 있으므로 타임아웃 증가
   headers: {
     'Content-Type': 'application/json',
   },

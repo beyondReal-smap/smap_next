@@ -208,7 +208,14 @@ class ScheduleService {
     try {
       console.log('[SCHEDULE SERVICE] 스케줄 생성 시작:', scheduleData);
       
-      const response = await apiClient.post('/schedule/group-manage', scheduleData);
+      const response = await apiClient.post(`/schedules/group/${scheduleData.groupId}`, {
+        title: scheduleData.sst_title,
+        date: scheduleData.sst_sdate,
+        endDate: scheduleData.sst_edate,
+        location: scheduleData.sst_location_title,
+        memo: scheduleData.sst_memo,
+        targetMemberId: scheduleData.targetMemberId
+      });
       
       console.log('[SCHEDULE SERVICE] 스케줄 생성 응답:', {
         status: response.status,
@@ -239,7 +246,14 @@ class ScheduleService {
     try {
       console.log('[SCHEDULE SERVICE] 스케줄 수정 시작:', scheduleData);
       
-      const response = await apiClient.put('/schedule/group-manage', scheduleData);
+      const response = await apiClient.put(`/schedules/group/${scheduleData.groupId}`, {
+        sst_idx: scheduleData.sst_idx,
+        title: scheduleData.sst_title,
+        date: scheduleData.sst_sdate,
+        endDate: scheduleData.sst_edate,
+        location: scheduleData.sst_location_title,
+        memo: scheduleData.sst_memo
+      });
       
       console.log('[SCHEDULE SERVICE] 스케줄 수정 응답:', {
         status: response.status,
@@ -271,12 +285,7 @@ class ScheduleService {
     try {
       console.log('[SCHEDULE SERVICE] 스케줄 삭제 시작:', { sst_idx, groupId });
       
-      const params = new URLSearchParams({
-        sst_idx: sst_idx.toString(),
-        groupId: groupId.toString()
-      });
-
-      const response = await apiClient.delete(`/schedule/group-manage?${params}`);
+      const response = await apiClient.delete(`/schedules/group/${groupId}?scheduleId=${sst_idx}`);
       
       console.log('[SCHEDULE SERVICE] 스케줄 삭제 응답:', {
         status: response.status,
@@ -386,6 +395,270 @@ class ScheduleService {
     }
 
     return { isValid: true };
+  }
+
+  /**
+   * 현재 사용자의 그룹 정보 조회
+   */
+  async getCurrentUserGroups(): Promise<{
+    success: boolean;
+    data: {
+      groups: Array<{
+        sgt_idx: number;
+        sgt_title: string;
+        sgdt_owner_chk: 'Y' | 'N';
+        sgdt_leader_chk: 'Y' | 'N';
+        memberCount: number;
+      }>;
+    };
+  }> {
+    try {
+      console.log('[SCHEDULE SERVICE] 현재 사용자 그룹 조회 시작');
+      
+      // groupService를 사용하여 그룹 정보 조회
+      const { default: groupService } = await import('./groupService');
+      const groups = await groupService.getCurrentUserGroups();
+      
+      console.log('[SCHEDULE SERVICE] 현재 사용자 그룹 조회 응답:', groups);
+      
+      // groupService 응답을 scheduleService 형식으로 변환
+      // 콘솔 로그를 보면 실제 API 응답에 권한 정보가 있을 수 있음
+      const formattedGroups = groups.map(group => {
+        // 타입 안정성을 위해 any로 캐스팅 후 권한 정보 추출
+        const groupWithPermissions = group as any;
+        
+        return {
+          sgt_idx: group.sgt_idx,
+          sgt_title: group.sgt_title,
+          sgdt_owner_chk: (groupWithPermissions.sgdt_owner_chk || 'N') as 'Y' | 'N',
+          sgdt_leader_chk: (groupWithPermissions.sgdt_leader_chk || 'N') as 'Y' | 'N',
+          memberCount: group.memberCount || group.member_count || 0
+        };
+      });
+      
+      console.log('[SCHEDULE SERVICE] 변환된 그룹 데이터:', formattedGroups);
+      
+      return {
+        success: true,
+        data: {
+          groups: formattedGroups
+        }
+      };
+    } catch (error) {
+      console.error('[SCHEDULE SERVICE] 현재 사용자 그룹 조회 실패:', error);
+      
+      // 에러 시 기본 그룹 반환
+      return {
+        success: false,
+        data: {
+          groups: []
+        }
+      };
+    }
+  }
+
+  /**
+   * 그룹 멤버의 권한 확인
+   */
+  async checkUserPermission(
+    groupId: number,
+    userId: number = 1186 // 기본 사용자 ID
+  ): Promise<UserPermission> {
+    try {
+      console.log('[SCHEDULE SERVICE] 사용자 권한 확인:', { groupId, userId });
+      
+      const response = await apiClient.get(`/groups/${groupId}/members/${userId}/permission`);
+      
+      return response.data || {
+        canManage: false,
+        isOwner: false,
+        isLeader: false
+      };
+    } catch (error) {
+      console.error('[SCHEDULE SERVICE] 사용자 권한 확인 실패:', error);
+      
+      return {
+        canManage: false,
+        isOwner: false,
+        isLeader: false
+      };
+    }
+  }
+
+  /**
+   * 모든 그룹의 스케줄 조회
+   */
+  async getAllUserGroupSchedules(
+    options?: {
+      startDate?: string;
+      endDate?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    data: {
+      schedulesByGroup: Array<{
+        groupId: number;
+        groupName: string;
+        schedules: Schedule[];
+        userPermission: UserPermission;
+      }>;
+    };
+  }> {
+    try {
+      console.log('[SCHEDULE SERVICE] 모든 그룹 스케줄 조회 시작');
+      
+      // 1. 사용자 그룹 목록 조회
+      const userGroupsResponse = await this.getCurrentUserGroups();
+      if (!userGroupsResponse.success || !userGroupsResponse.data.groups) {
+        console.log('[SCHEDULE SERVICE] 사용자 그룹이 없음');
+        return {
+          success: true,
+          data: { schedulesByGroup: [] }
+        };
+      }
+
+      const userGroups = userGroupsResponse.data.groups;
+      console.log('[SCHEDULE SERVICE] 사용자 그룹 목록:', userGroups.length, '개');
+
+      // 2. 각 그룹의 스케줄 조회
+      const schedulesByGroup = [];
+      
+      for (const group of userGroups) {
+        try {
+          console.log(`[SCHEDULE SERVICE] 그룹 ${group.sgt_title}(${group.sgt_idx}) 스케줄 조회 중...`);
+          
+          // 그룹 스케줄 조회
+          const groupScheduleResponse = await this.getGroupSchedules(group.sgt_idx, {
+            startDate: options?.startDate,
+            endDate: options?.endDate
+          });
+
+          if (groupScheduleResponse.success) {
+            // 사용자 권한 정보 생성
+            const userPermission: UserPermission = {
+              canManage: group.sgdt_owner_chk === 'Y' || group.sgdt_leader_chk === 'Y',
+              isOwner: group.sgdt_owner_chk === 'Y',
+              isLeader: group.sgdt_leader_chk === 'Y'
+            };
+
+            schedulesByGroup.push({
+              groupId: group.sgt_idx,
+              groupName: group.sgt_title,
+              schedules: groupScheduleResponse.data.schedules,
+              userPermission
+            });
+
+            console.log(`[SCHEDULE SERVICE] 그룹 ${group.sgt_title} 스케줄 조회 성공:`, groupScheduleResponse.data.schedules.length, '개');
+          } else {
+            console.log(`[SCHEDULE SERVICE] 그룹 ${group.sgt_title} 스케줄 조회 실패`);
+          }
+        } catch (groupError) {
+          console.error(`[SCHEDULE SERVICE] 그룹 ${group.sgt_title} 스케줄 조회 중 오류:`, groupError);
+          // 개별 그룹 오류는 무시하고 계속 진행
+        }
+      }
+
+      console.log('[SCHEDULE SERVICE] 전체 그룹 스케줄 조회 완료:', schedulesByGroup.length, '개 그룹');
+
+      return {
+        success: true,
+        data: { schedulesByGroup }
+      };
+
+    } catch (error) {
+      console.error('[SCHEDULE SERVICE] 전체 그룹 스케줄 조회 실패:', error);
+      return {
+        success: false,
+        data: { schedulesByGroup: [] }
+      };
+    }
+  }
+
+  /**
+   * 현재 사용자가 오너인 그룹들의 모든 멤버 스케줄 조회
+   * @param days 조회할 일수 (기본값: 7일)
+   */
+  async getOwnerGroupsAllSchedules(
+    days: number = 7
+  ): Promise<{
+    success: boolean;
+    data: {
+      schedules: Schedule[];
+      ownerGroups: Array<{ sgt_idx: number; sgt_title: string }>;
+      totalSchedules: number;
+      userPermission: UserPermission;
+    };
+  }> {
+    try {
+      console.log('[SCHEDULE SERVICE] 오너 그룹 전체 스케줄 조회 시작:', { days });
+      
+      const response = await apiClient.get(`/schedule/owner-groups/all-schedules?current_user_id=1186&days=${days}`);
+      
+      console.log('[SCHEDULE SERVICE] 오너 그룹 전체 스케줄 조회 응답:', {
+        status: response.status,
+        totalSchedules: response.data?.data?.totalSchedules || 0,
+        ownerGroupsCount: response.data?.data?.ownerGroups?.length || 0,
+        rawData: response.data
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('[SCHEDULE SERVICE] 오너 그룹 전체 스케줄 조회 실패:', error);
+      
+      return {
+        success: false,
+        data: {
+          schedules: [],
+          ownerGroups: [],
+          totalSchedules: 0,
+          userPermission: {
+            canManage: false,
+            isOwner: false,
+            isLeader: false
+          }
+        }
+      };
+    }
+  }
+
+  /**
+   * 현재 사용자의 그룹 목록 조회
+   */
+  async getCurrentUserGroupsList(): Promise<{
+    success: boolean;
+    data: {
+      groups: Array<{
+        sgt_idx: number;
+        sgt_title: string;
+      }>;
+    };
+  }> {
+    try {
+      console.log('[SCHEDULE SERVICE] 현재 사용자 그룹 목록 조회 시작');
+      
+      const response = await apiClient.get('/groups/current-user-groups');
+      
+      console.log('[SCHEDULE SERVICE] 현재 사용자 그룹 목록 조회 응답:', response.data);
+      
+      return {
+        success: true,
+        data: {
+          groups: response.data.map((group: any) => ({
+            sgt_idx: group.sgt_idx,
+            sgt_title: group.sgt_title
+          }))
+        }
+      };
+    } catch (error) {
+      console.error('[SCHEDULE SERVICE] 현재 사용자 그룹 목록 조회 실패:', error);
+      
+      return {
+        success: false,
+        data: {
+          groups: []
+        }
+      };
+    }
   }
 }
 
