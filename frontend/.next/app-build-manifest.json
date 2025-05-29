@@ -46,6 +46,16 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/group-members/member/[groupId]/route.js"
     ],
+    "/api/kakao-search/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/kakao-search/route.js"
+    ],
+    "/api/schedules/group/[groupId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/schedules/group/[groupId]/route.js"
+    ],
     "/_not-found/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",

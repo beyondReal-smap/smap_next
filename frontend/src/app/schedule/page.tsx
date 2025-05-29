@@ -653,6 +653,18 @@ export default function SchedulePage() {
   // 날짜/시간 유효성 검사 상태
   const [dateTimeError, setDateTimeError] = useState<string | null>(null);
 
+  // 로드된 년월 추적 (중복 API 호출 방지)
+  const [loadedYearMonth, setLoadedYearMonth] = useState<string | null>(null);
+
+  // 저장 완료 모달 상태
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
+  const [successModalContent, setSuccessModalContent] = useState<{
+    title: string;
+    message: string;
+    type: 'success' | 'error' | 'info';
+    onConfirm?: () => void;
+  } | null>(null);
+
   // 컴포넌트 마운트 감지
   useEffect(() => {
     document.body.style.overflowX = 'hidden';
@@ -870,22 +882,22 @@ export default function SchedulePage() {
   const handleSaveEvent = async () => {
     // 유효성 검사
     if (!newEvent.title || !newEvent.date) {
-      alert('제목과 날짜는 필수 입력 항목입니다.');
+      openSuccessModal('입력 오류', '제목과 날짜는 필수 입력 항목입니다.', 'error');
       return;
     }
 
     if (dateTimeError) {
-      alert('날짜/시간 설정에 오류가 있습니다. 확인 후 다시 시도해주세요.');
+      openSuccessModal('날짜/시간 오류', '날짜/시간 설정에 오류가 있습니다. 확인 후 다시 시도해주세요.', 'error');
       return;
     }
 
     if (!newEvent.allDay && (!newEvent.startTime || !newEvent.endTime)) {
-      alert('시작 시간과 종료 시간을 설정해주세요.');
+      openSuccessModal('시간 입력 오류', '시작 시간과 종료 시간을 설정해주세요.', 'error');
       return;
     }
 
     if (!selectedGroupId) {
-      alert('그룹을 선택해주세요.');
+      openSuccessModal('그룹 선택 오류', '그룹을 선택해주세요.', 'error');
       return;
     }
 
@@ -896,7 +908,7 @@ export default function SchedulePage() {
 
     // 다른 멤버의 스케줄을 생성/수정하려는 경우 권한 확인
     if (selectedMemberId && selectedMemberId !== currentMember?.id && !isOwnerOrLeader) {
-      alert('다른 멤버의 스케줄을 관리할 권한이 없습니다.');
+      openSuccessModal('권한 오류', '다른 멤버의 스케줄을 관리할 권한이 없습니다.', 'error');
       return;
     }
 
@@ -934,9 +946,20 @@ export default function SchedulePage() {
 
         if (response.success) {
           console.log('[handleSaveEvent] 스케줄 수정 성공');
-          alert('스케줄이 수정되었습니다.');
+          
+          // 성공적으로 완료되었을 때만 모달 닫기
+          setIsAddEventModalOpen(false);
+          setNewEvent(initialNewEventState);
+          setSelectedEventDetails(null);
+          setDateTimeError(null);
+          
+          // 스케줄 목록 새로 고침
+          await loadAllGroupSchedules();
+          
+          // 성공 모달 표시 (3초 후 자동 닫기)
+          openSuccessModal('일정 수정 완료', '일정이 성공적으로 수정되었습니다.', 'success', undefined, true);
         } else {
-          alert(response.error || '스케줄 수정에 실패했습니다.');
+          openSuccessModal('일정 수정 실패', response.error || '일정 수정에 실패했습니다.', 'error');
           return;
         }
       } else {
@@ -958,9 +981,20 @@ export default function SchedulePage() {
 
         if (response.success && response.data) {
           console.log('[handleSaveEvent] 스케줄 생성 성공:', response.data);
-          alert('스케줄이 생성되었습니다.');
+          
+          // 성공적으로 완료되었을 때만 모달 닫기
+          setIsAddEventModalOpen(false);
+          setNewEvent(initialNewEventState);
+          setSelectedEventDetails(null);
+          setDateTimeError(null);
+          
+          // 스케줄 목록 새로 고침
+          await loadAllGroupSchedules();
+          
+          // 성공 모달 표시 (3초 후 자동 닫기)
+          openSuccessModal('일정 등록 완료', '일정이 성공적으로 등록되었습니다.', 'success', undefined, true);
         } else {
-          alert(response.error || '스케줄 생성에 실패했습니다.');
+          openSuccessModal('일정 등록 실패', response.error || '일정 등록에 실패했습니다.', 'error');
           return;
         }
       }
@@ -976,7 +1010,7 @@ export default function SchedulePage() {
       
     } catch (error) {
       console.error('[handleSaveEvent] 스케줄 저장 실패:', error);
-      alert('스케줄 저장 중 오류가 발생했습니다.');
+      openSuccessModal('일정 저장 실패', '일정 저장 중 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -987,12 +1021,12 @@ export default function SchedulePage() {
     }
 
     if (!selectedEventDetails.sst_idx) {
-      alert('삭제할 수 없는 스케줄입니다.');
+      openSuccessModal('삭제 오류', '삭제할 수 없는 스케줄입니다.', 'error');
       return;
     }
 
     if (!selectedGroupId) {
-      alert('그룹 정보가 없습니다.');
+      openSuccessModal('그룹 오류', '그룹 정보가 없습니다.', 'error');
       return;
     }
 
@@ -1003,7 +1037,7 @@ export default function SchedulePage() {
 
     // 삭제 권한 확인 - 자신의 스케줄이거나 오너/리더인 경우만 삭제 가능
     if (!selectedEventDetails.canDelete && !isOwnerOrLeader) {
-      alert('이 스케줄을 삭제할 권한이 없습니다.');
+      openSuccessModal('권한 오류', '이 스케줄을 삭제할 권한이 없습니다.', 'error');
       return;
     }
 
@@ -1027,7 +1061,6 @@ export default function SchedulePage() {
 
       if (response.success) {
         console.log('[handleDeleteEvent] 스케줄 삭제 성공');
-        alert('스케줄이 삭제되었습니다.');
         
         // 로컬 상태에서도 제거
         setEvents(prev => prev.filter(event => event.id !== selectedEventDetails.id));
@@ -1037,12 +1070,14 @@ export default function SchedulePage() {
         // 스케줄 목록 새로 고침
         await loadAllGroupSchedules();
         
+        // 성공 모달 표시 (3초 후 자동 닫기)
+        openSuccessModal('일정 삭제 완료', '일정이 성공적으로 삭제되었습니다.', 'success', undefined, true);
       } else {
-        alert(response.error || '스케줄 삭제에 실패했습니다.');
+        openSuccessModal('일정 삭제 실패', response.error || '일정 삭제에 실패했습니다.', 'error');
       }
     } catch (error) {
       console.error('[handleDeleteEvent] 스케줄 삭제 실패:', error);
-      alert('스케줄 삭제 중 오류가 발생했습니다.');
+      openSuccessModal('일정 삭제 실패', '일정 삭제 중 오류가 발생했습니다.', 'error');
     }
   };
 
@@ -1093,12 +1128,12 @@ export default function SchedulePage() {
     document.body.style.overflow = '';
   };
 
+  // 새 일정 추가 모달 닫기
   const closeAddModal = () => {
     setIsAddEventModalOpen(false);
     setNewEvent(initialNewEventState);
     setSelectedEventDetails(null);
-    // body 스크롤 복원
-    document.body.style.overflow = '';
+    setDateTimeError(null);
   };
 
   // 그룹 목록 가져오기 - 실제 백엔드 API 사용
@@ -1644,6 +1679,31 @@ export default function SchedulePage() {
       '#ef4444', '#8b5cf6', '#ec4899', '#84cc16'
     ];
     return colors[groupId % colors.length];
+  };
+
+  // 저장 완료 모달 열기 (3초 후 자동 닫기 옵션 포함)
+  const openSuccessModal = (
+    title: string, 
+    message: string, 
+    type: 'success' | 'error' | 'info', 
+    onConfirmCallback?: () => void,
+    autoClose?: boolean
+  ) => {
+    setSuccessModalContent({ title, message, type, onConfirm: onConfirmCallback });
+    setIsSuccessModalOpen(true);
+    
+    // 자동 닫기 옵션이 true이고 onConfirm이 없는 경우 (단순 정보 모달)
+    if (autoClose && !onConfirmCallback) {
+      setTimeout(() => {
+        closeSuccessModal();
+      }, 3000);
+    }
+  };
+
+  // 저장 완료 모달 닫기
+  const closeSuccessModal = () => {
+    setIsSuccessModalOpen(false);
+    setSuccessModalContent(null);
   };
 
   return (
