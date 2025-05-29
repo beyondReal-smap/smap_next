@@ -549,84 +549,206 @@ def create_group_schedule(
     db: Session = Depends(deps.get_db)
 ):
     """
-    그룹 스케줄 생성 (권한 기반)
+    그룹 스케줄 생성 (향상된 PHP 로직 기반)
     """
     try:
+        logger.info(f"🔥 [CREATE_SCHEDULE] 스케줄 생성 시작 - group_id: {group_id}, user_id: {current_user_id}")
+        logger.info(f"📝 [CREATE_SCHEDULE] 원본 요청 데이터: {schedule_data}")
+        
         # 그룹 권한 확인
         member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
         if not member_auth:
+            logger.error(f"❌ [CREATE_SCHEDULE] 그룹 권한 없음 - group_id: {group_id}, user_id: {current_user_id}")
             raise HTTPException(status_code=403, detail="Group access denied")
         
-        # 필수 필드 확인
-        required_fields = ["sst_title", "sst_sdate", "sst_edate"]
-        for field in required_fields:
-            if not schedule_data.get(field):
-                raise HTTPException(status_code=400, detail=f"{field} is required")
+        logger.info(f"✅ [CREATE_SCHEDULE] 그룹 권한 확인 완료 - member_auth: {member_auth}")
         
-        # 대상 멤버 ID 결정
-        target_member_id = schedule_data.get("targetMemberId", current_user_id)
+        # 대상 멤버 설정 (기본값: 현재 사용자)
+        target_member_id = current_user_id
         
-        # 다른 멤버 스케줄 생성 시 권한 확인
-        if target_member_id != current_user_id:
+        # 다른 멤버의 스케줄을 생성하려는 경우
+        if "targetMemberId" in schedule_data and schedule_data["targetMemberId"]:
+            target_member_id = int(schedule_data["targetMemberId"])
+            logger.info(f"👤 [CREATE_SCHEDULE] 다른 멤버 스케줄 생성 요청 - target_member_id: {target_member_id}")
+            
+            # 권한 확인: 오너/리더만 다른 멤버의 스케줄 생성 가능
             if not GroupScheduleManager.has_manage_permission(member_auth):
+                logger.error(f"❌ [CREATE_SCHEDULE] 다른 멤버 스케줄 생성 권한 없음 - user_id: {current_user_id}")
                 raise HTTPException(
                     status_code=403, 
-                    detail="Only group owner or leader can create schedules for other members"
+                    detail="Only group owners or leaders can create schedules for other members"
                 )
             
             # 대상 멤버가 같은 그룹에 속하는지 확인
             target_member_auth = GroupScheduleManager.check_group_permission(db, target_member_id, group_id)
             if not target_member_auth:
+                logger.error(f"❌ [CREATE_SCHEDULE] 대상 멤버가 같은 그룹에 속하지 않음 - target_member_id: {target_member_id}")
                 raise HTTPException(status_code=400, detail="Target member is not in the same group")
         
-        # 스케줄 생성 쿼리
+        logger.info(f"👤 [CREATE_SCHEDULE] 최종 대상 멤버: {target_member_id}")
+        
+        # 필수 필드 검증 및 기본값 설정 (PHP 로직 참고)
+        if not schedule_data.get('sst_title', '').strip():
+            schedule_data['sst_title'] = '제목 없음'
+            logger.warning(f"⚠️ [CREATE_SCHEDULE] 제목이 비어있어 기본값으로 설정")
+            
+        if not schedule_data.get('sst_sdate'):
+            logger.error(f"❌ [CREATE_SCHEDULE] 시작 날짜가 없음")
+            raise HTTPException(status_code=400, detail="Start date is required")
+            
+        if not schedule_data.get('sst_edate'):
+            schedule_data['sst_edate'] = schedule_data['sst_sdate']
+            logger.info(f"📅 [CREATE_SCHEDULE] 종료 날짜가 없어 시작 날짜로 설정")
+        
+        logger.info(f"📝 [CREATE_SCHEDULE] 필수 필드 검증 완료 - title: {schedule_data['sst_title']}")
+        
+        # 시작/종료 날짜/시간 처리 (PHP 로직 참고)
+        sst_sdate = schedule_data['sst_sdate']
+        sst_edate = schedule_data['sst_edate']
+        
+        logger.info(f"📅 [CREATE_SCHEDULE] 원본 날짜/시간 - sdate: {sst_sdate}, edate: {sst_edate}")
+        
+        # 시간이 포함되지 않은 경우 시간 추가
+        if 'T' not in sst_sdate and ':' not in sst_sdate:
+            sst_stime = schedule_data.get('sst_stime', '00:00:00')
+            sst_sdate = f"{sst_sdate}T{sst_stime}" if 'T' not in sst_stime else f"{sst_sdate} {sst_stime}"
+            logger.info(f"⏰ [CREATE_SCHEDULE] 시작 시간 추가 - 결과: {sst_sdate}")
+            
+        if 'T' not in sst_edate and ':' not in sst_edate:
+            sst_etime = schedule_data.get('sst_etime', '23:59:59')
+            sst_edate = f"{sst_edate}T{sst_etime}" if 'T' not in sst_etime else f"{sst_edate} {sst_etime}"
+            logger.info(f"⏰ [CREATE_SCHEDULE] 종료 시간 추가 - 결과: {sst_edate}")
+        
+        # 하루종일 및 반복 설정 처리 (사용자 요구사항에 맞게)
+        sst_all_day = schedule_data.get('sst_all_day', 'N')
+        sst_repeat_json = schedule_data.get('sst_repeat_json', '')
+        sst_repeat_json_v = schedule_data.get('sst_repeat_json_v', '')
+        
+        logger.info(f"🔄 [CREATE_SCHEDULE] 원본 반복 설정 - all_day: {sst_all_day}, repeat_json: {sst_repeat_json}, repeat_json_v: {sst_repeat_json_v}")
+        
+        # 하루종일인 경우 반복을 null로 설정
+        if sst_all_day == 'Y':
+            sst_repeat_json = ''
+            sst_repeat_json_v = ''
+            logger.info("🔄 [CREATE_SCHEDULE] 하루종일 이벤트: 반복 설정을 null로 변경")
+        
+        logger.info(f"🔄 [CREATE_SCHEDULE] 최종 반복 설정 - repeat_json: {sst_repeat_json}, repeat_json_v: {sst_repeat_json_v}")
+        
+        # 알림 시간 계산 (PHP 로직 참고)
+        sst_schedule_alarm = None
+        logger.info(f"🔔 [CREATE_SCHEDULE] 알림 설정 시작 - alarm_chk: {schedule_data.get('sst_schedule_alarm_chk')}, pick_type: {schedule_data.get('sst_pick_type')}, pick_result: {schedule_data.get('sst_pick_result')}")
+        
+        if (schedule_data.get('sst_schedule_alarm_chk') == 'Y' and 
+            schedule_data.get('sst_pick_type') and 
+            schedule_data.get('sst_pick_result')):
+            
+            try:
+                from datetime import datetime, timedelta
+                start_datetime = datetime.fromisoformat(sst_sdate.replace('T', ' '))
+                pick_result = int(schedule_data['sst_pick_result'])
+                pick_type = schedule_data['sst_pick_type']
+                
+                logger.info(f"🔔 [CREATE_SCHEDULE] 알림 시간 계산 - start_datetime: {start_datetime}, pick_result: {pick_result}, pick_type: {pick_type}")
+                
+                if pick_type == 'minute':
+                    sst_schedule_alarm = start_datetime - timedelta(minutes=pick_result)
+                elif pick_type == 'hour':
+                    sst_schedule_alarm = start_datetime - timedelta(hours=pick_result)
+                elif pick_type == 'day':
+                    sst_schedule_alarm = start_datetime - timedelta(days=pick_result)
+                
+                logger.info(f"🔔 [CREATE_SCHEDULE] 계산된 알림 시간: {sst_schedule_alarm}")
+                    
+            except (ValueError, TypeError) as e:
+                logger.warning(f"⚠️ [CREATE_SCHEDULE] 알림 시간 계산 실패: {e}")
+                sst_schedule_alarm = None
+
+        # 스케줄 생성 쿼리 (PHP의 모든 필드 지원)
+        logger.info(f"💾 [CREATE_SCHEDULE] 데이터베이스 삽입 시작")
+        
         insert_query = text("""
             INSERT INTO smap_schedule_t (
-                mt_idx, sst_title, sst_sdate, sst_edate, sst_all_day,
-                sgt_idx, sgdt_idx, sst_location_title, sst_location_add,
-                sst_location_lat, sst_location_long, sst_memo, sst_supplies,
-                sst_alram, sst_schedule_alarm_chk, sst_show, sst_wdate
+                mt_idx, sst_title, sst_sdate, sst_edate, sst_sedate, sst_all_day,
+                sgt_idx, sgdt_idx, sgdt_idx_t,
+                sst_location_title, sst_location_add, sst_location_lat, sst_location_long,
+                sst_location_alarm, sst_location_detail,
+                sst_memo, sst_supplies, sst_content, sst_place,
+                sst_alram, sst_alram_t, sst_schedule_alarm_chk, 
+                sst_pick_type, sst_pick_result, sst_schedule_alarm,
+                sst_repeat_json, sst_repeat_json_v,
+                slt_idx, slt_idx_t, sst_update_chk,
+                sst_show, sst_wdate, sst_adate
             ) VALUES (
-                :mt_idx, :sst_title, :sst_sdate, :sst_edate, :sst_all_day,
-                :sgt_idx, :sgdt_idx, :sst_location_title, :sst_location_add,
-                :sst_location_lat, :sst_location_long, :sst_memo, :sst_supplies,
-                :sst_alram, :sst_schedule_alarm_chk, 'Y', NOW()
+                :mt_idx, :sst_title, :sst_sdate, :sst_edate, :sst_sedate, :sst_all_day,
+                :sgt_idx, :sgdt_idx, :sgdt_idx_t,
+                :sst_location_title, :sst_location_add, :sst_location_lat, :sst_location_long,
+                :sst_location_alarm, :sst_location_detail,
+                :sst_memo, :sst_supplies, :sst_content, :sst_place,
+                :sst_alram, :sst_alram_t, :sst_schedule_alarm_chk,
+                :sst_pick_type, :sst_pick_result, :sst_schedule_alarm,
+                :sst_repeat_json, :sst_repeat_json_v,
+                :slt_idx, :slt_idx_t, :sst_update_chk,
+                'Y', NOW(), :sst_adate
             )
         """)
         
         insert_params = {
             "mt_idx": target_member_id,
-            "sst_title": schedule_data["sst_title"],
-            "sst_sdate": schedule_data["sst_sdate"],
-            "sst_edate": schedule_data["sst_edate"],
-            "sst_all_day": schedule_data.get("sst_all_day", "Y"),
+            "sst_title": schedule_data.get('sst_title'),
+            "sst_sdate": sst_sdate,
+            "sst_edate": sst_edate,
+            "sst_sedate": f"{sst_sdate} ~ {sst_edate}",
+            "sst_all_day": sst_all_day,
             "sgt_idx": group_id,
             "sgdt_idx": member_auth["sgdt_idx"],
+            "sgdt_idx_t": schedule_data.get("sgdt_idx_t"),
             "sst_location_title": schedule_data.get("sst_location_title"),
             "sst_location_add": schedule_data.get("sst_location_add"),
             "sst_location_lat": schedule_data.get("sst_location_lat"),
             "sst_location_long": schedule_data.get("sst_location_long"),
+            "sst_location_alarm": schedule_data.get("sst_location_alarm", "N"),
+            "sst_location_detail": schedule_data.get("sst_location_detail"),
             "sst_memo": schedule_data.get("sst_memo"),
             "sst_supplies": schedule_data.get("sst_supplies"),
-            "sst_alram": schedule_data.get("sst_alram"),
-            "sst_schedule_alarm_chk": schedule_data.get("sst_schedule_alarm_chk", "Y")
+            "sst_content": schedule_data.get("sst_content"),
+            "sst_place": schedule_data.get("sst_place"),
+            "sst_alram": schedule_data.get("sst_alram", "N"),
+            "sst_alram_t": schedule_data.get("sst_alram_t"),
+            "sst_schedule_alarm_chk": schedule_data.get("sst_schedule_alarm_chk", "N"),
+            "sst_pick_type": schedule_data.get("sst_pick_type"),
+            "sst_pick_result": schedule_data.get("sst_pick_result"),
+            "sst_schedule_alarm": sst_schedule_alarm.strftime('%Y-%m-%d %H:%M:%S') if sst_schedule_alarm else None,
+            "sst_repeat_json": sst_repeat_json,
+            "sst_repeat_json_v": sst_repeat_json_v,
+            "slt_idx": schedule_data.get("slt_idx"),
+            "slt_idx_t": schedule_data.get("sst_location_add"), # PHP에서 location_add를 slt_idx_t로 사용
+            "sst_update_chk": schedule_data.get("sst_update_chk", "Y"),
+            "sst_adate": schedule_data.get("sst_adate")
         }
+        
+        logger.info(f"💾 [CREATE_SCHEDULE] 삽입 파라미터:")
+        for key, value in insert_params.items():
+            logger.info(f"    {key}: {value}")
         
         result = db.execute(insert_query, insert_params)
         db.commit()
         
+        new_schedule_id = result.lastrowid
+        logger.info(f"✅ [CREATE_SCHEDULE] 스케줄 생성 성공: schedule_id={new_schedule_id}, user_id={current_user_id}, target_user_id={target_member_id}")
+        
         return {
             "success": True,
             "data": {
-                "sst_idx": result.lastrowid,
-                "message": "Schedule created successfully"
+                "sst_idx": new_schedule_id,
+                "message": "Schedule created successfully",
+                "target_member_id": target_member_id
             }
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"스케줄 생성 오류: {e}")
+        logger.error(f"💥 [CREATE_SCHEDULE] 스케줄 생성 오류: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -639,13 +761,19 @@ def update_group_schedule(
     db: Session = Depends(deps.get_db)
 ):
     """
-    그룹 스케줄 수정 (권한 기반)
+    그룹 스케줄 수정 (향상된 PHP 로직 기반)
     """
     try:
+        logger.info(f"🔥 [UPDATE_SCHEDULE] 스케줄 수정 시작 - group_id: {group_id}, schedule_id: {schedule_id}, user_id: {current_user_id}")
+        logger.info(f"📝 [UPDATE_SCHEDULE] 원본 요청 데이터: {schedule_data}")
+        
         # 그룹 권한 확인
         member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
         if not member_auth:
+            logger.error(f"❌ [UPDATE_SCHEDULE] 그룹 권한 없음 - group_id: {group_id}, user_id: {current_user_id}")
             raise HTTPException(status_code=403, detail="Group access denied")
+        
+        logger.info(f"✅ [UPDATE_SCHEDULE] 그룹 권한 확인 완료 - member_auth: {member_auth}")
         
         # 기존 스케줄 조회
         schedule_query = text("""
@@ -656,7 +784,10 @@ def update_group_schedule(
         schedule_result = db.execute(schedule_query, {"schedule_id": schedule_id}).fetchone()
         
         if not schedule_result:
+            logger.error(f"❌ [UPDATE_SCHEDULE] 스케줄을 찾을 수 없음 - schedule_id: {schedule_id}")
             raise HTTPException(status_code=404, detail="Schedule not found")
+        
+        logger.info(f"📅 [UPDATE_SCHEDULE] 기존 스케줄 확인 - 소유자: {schedule_result.mt_idx}, 제목: {schedule_result.sst_title}")
         
         # 권한 확인: 본인 스케줄이거나 오너/리더인 경우만 수정 가능
         can_edit = (
@@ -664,30 +795,162 @@ def update_group_schedule(
             GroupScheduleManager.has_manage_permission(member_auth)
         )
         
+        logger.info(f"👤 [UPDATE_SCHEDULE] 편집 권한 확인 - 본인스케줄: {schedule_result.mt_idx == current_user_id}, 관리권한: {GroupScheduleManager.has_manage_permission(member_auth)}, 최종권한: {can_edit}")
+        
         if not can_edit:
+            logger.error(f"❌ [UPDATE_SCHEDULE] 편집 권한 없음 - user_id: {current_user_id}")
             raise HTTPException(
                 status_code=403, 
                 detail="You can only edit your own schedules or you need owner/leader permission"
             )
         
-        # 업데이트 쿼리 구성
+        # 필수 필드 검증 및 기본값 설정 (PHP 로직 참고)
+        if not schedule_data.get('sst_title', '').strip():
+            schedule_data['sst_title'] = '제목 없음'
+            logger.warning(f"⚠️ [UPDATE_SCHEDULE] 제목이 비어있어 기본값으로 설정")
+            
+        if not schedule_data.get('sst_sdate'):
+            logger.error(f"❌ [UPDATE_SCHEDULE] 시작 날짜가 없음")
+            raise HTTPException(status_code=400, detail="Start date is required")
+            
+        if not schedule_data.get('sst_edate'):
+            schedule_data['sst_edate'] = schedule_data['sst_sdate']
+            logger.info(f"📅 [UPDATE_SCHEDULE] 종료 날짜가 없어 시작 날짜로 설정")
+        
+        logger.info(f"📝 [UPDATE_SCHEDULE] 필수 필드 검증 완료 - title: {schedule_data['sst_title']}")
+        
+        # 시작/종료 날짜/시간 처리 (PHP 로직 참고)
+        sst_sdate = schedule_data['sst_sdate']
+        sst_edate = schedule_data['sst_edate']
+        
+        logger.info(f"📅 [UPDATE_SCHEDULE] 원본 날짜/시간 - sdate: {sst_sdate}, edate: {sst_edate}")
+        
+        # 시간이 포함되지 않은 경우 시간 추가
+        if 'T' not in sst_sdate and ':' not in sst_sdate:
+            sst_stime = schedule_data.get('sst_stime', '00:00:00')
+            sst_sdate = f"{sst_sdate}T{sst_stime}" if 'T' not in sst_stime else f"{sst_sdate} {sst_stime}"
+            logger.info(f"⏰ [UPDATE_SCHEDULE] 시작 시간 추가 - 결과: {sst_sdate}")
+            
+        if 'T' not in sst_edate and ':' not in sst_edate:
+            sst_etime = schedule_data.get('sst_etime', '23:59:59')
+            sst_edate = f"{sst_edate}T{sst_etime}" if 'T' not in sst_etime else f"{sst_edate} {sst_etime}"
+            logger.info(f"⏰ [UPDATE_SCHEDULE] 종료 시간 추가 - 결과: {sst_edate}")
+        
+        # 하루종일 및 반복 설정 처리 (사용자 요구사항에 맞게)
+        sst_all_day = schedule_data.get('sst_all_day', 'N')
+        sst_repeat_json = schedule_data.get('sst_repeat_json', '')
+        sst_repeat_json_v = schedule_data.get('sst_repeat_json_v', '')
+        
+        logger.info(f"🔄 [UPDATE_SCHEDULE] 원본 반복 설정 - all_day: {sst_all_day}, repeat_json: {sst_repeat_json}, repeat_json_v: {sst_repeat_json_v}")
+        
+        # 하루종일인 경우 반복을 null로 설정
+        if sst_all_day == 'Y':
+            sst_repeat_json = ''
+            sst_repeat_json_v = ''
+            logger.info("🔄 [UPDATE_SCHEDULE] 하루종일 이벤트: 반복 설정을 null로 변경")
+        
+        logger.info(f"🔄 [UPDATE_SCHEDULE] 최종 반복 설정 - repeat_json: {sst_repeat_json}, repeat_json_v: {sst_repeat_json_v}")
+        
+        # 알림 시간 계산 (PHP 로직 참고)
+        sst_schedule_alarm = None
+        logger.info(f"🔔 [UPDATE_SCHEDULE] 알림 설정 시작 - alarm_chk: {schedule_data.get('sst_schedule_alarm_chk')}, pick_type: {schedule_data.get('sst_pick_type')}, pick_result: {schedule_data.get('sst_pick_result')}")
+        
+        if (schedule_data.get('sst_schedule_alarm_chk') == 'Y' and 
+            schedule_data.get('sst_pick_type') and 
+            schedule_data.get('sst_pick_result')):
+            
+            try:
+                from datetime import datetime, timedelta
+                start_datetime = datetime.fromisoformat(sst_sdate.replace('T', ' '))
+                pick_result = int(schedule_data['sst_pick_result'])
+                pick_type = schedule_data['sst_pick_type']
+                
+                logger.info(f"🔔 [UPDATE_SCHEDULE] 알림 시간 계산 - start_datetime: {start_datetime}, pick_result: {pick_result}, pick_type: {pick_type}")
+                
+                if pick_type == 'minute':
+                    sst_schedule_alarm = start_datetime - timedelta(minutes=pick_result)
+                elif pick_type == 'hour':
+                    sst_schedule_alarm = start_datetime - timedelta(hours=pick_result)
+                elif pick_type == 'day':
+                    sst_schedule_alarm = start_datetime - timedelta(days=pick_result)
+                
+                logger.info(f"🔔 [UPDATE_SCHEDULE] 계산된 알림 시간: {sst_schedule_alarm}")
+                    
+            except (ValueError, TypeError) as e:
+                logger.warning(f"⚠️ [UPDATE_SCHEDULE] 알림 시간 계산 실패: {e}")
+                sst_schedule_alarm = None
+
+        # 업데이트할 필드 구성 (PHP의 모든 필드 지원)
+        logger.info(f"💾 [UPDATE_SCHEDULE] 업데이트 필드 구성 시작")
+        
         update_fields = []
         update_params = {"schedule_id": schedule_id}
         
-        updatable_fields = [
-            "sst_title", "sst_sdate", "sst_edate", "sst_all_day",
-            "sst_location_title", "sst_location_add", "sst_location_lat", "sst_location_long",
-            "sst_memo", "sst_supplies", "sst_alram", "sst_schedule_alarm_chk"
-        ]
+        # 기본 필드들
+        basic_fields = {
+            "sst_title": schedule_data.get('sst_title'),
+            "sst_sdate": sst_sdate,
+            "sst_edate": sst_edate,
+            "sst_sedate": f"{sst_sdate} ~ {sst_edate}",
+            "sst_all_day": sst_all_day,
+        }
         
-        for field in updatable_fields:
-            if field in schedule_data:
+        # 위치 관련 필드들
+        location_fields = {
+            "sst_location_title": schedule_data.get('sst_location_title'),
+            "sst_location_add": schedule_data.get('sst_location_add'),
+            "sst_location_lat": schedule_data.get('sst_location_lat'),
+            "sst_location_long": schedule_data.get('sst_location_long'),
+            "sst_location_alarm": schedule_data.get('sst_location_alarm', 'N'),
+            "sst_location_detail": schedule_data.get('sst_location_detail'),
+        }
+        
+        # 알림 관련 필드들
+        alarm_fields = {
+            "sst_alram": schedule_data.get('sst_alram', 'N'),
+            "sst_alram_t": schedule_data.get('sst_alram_t'),
+            "sst_schedule_alarm_chk": schedule_data.get('sst_schedule_alarm_chk', 'N'),
+            "sst_pick_type": schedule_data.get('sst_pick_type'),
+            "sst_pick_result": schedule_data.get('sst_pick_result'),
+            "sst_schedule_alarm": sst_schedule_alarm.strftime('%Y-%m-%d %H:%M:%S') if sst_schedule_alarm else None,
+        }
+        
+        # 반복 관련 필드들
+        repeat_fields = {
+            "sst_repeat_json": sst_repeat_json,
+            "sst_repeat_json_v": sst_repeat_json_v,
+        }
+        
+        # 기타 필드들
+        other_fields = {
+            "sst_memo": schedule_data.get('sst_memo'),
+            "sst_supplies": schedule_data.get('sst_supplies'),
+            "sst_content": schedule_data.get('sst_content'),
+            "sst_place": schedule_data.get('sst_place'),
+            "slt_idx": schedule_data.get('slt_idx'),
+            "slt_idx_t": schedule_data.get('sst_location_add'), # PHP에서 location_add를 slt_idx_t로 사용
+            "sst_update_chk": schedule_data.get('sst_update_chk', 'Y'),
+        }
+        
+        # 모든 필드 병합
+        all_fields = {**basic_fields, **location_fields, **alarm_fields, **repeat_fields, **other_fields}
+        
+        # None이 아닌 값만 업데이트에 포함
+        for field, value in all_fields.items():
+            if value is not None:
                 update_fields.append(f"{field} = :{field}")
-                update_params[field] = schedule_data[field]
+                update_params[field] = value
+        
+        # 업데이트 시간 추가
+        update_fields.append("sst_udate = NOW()")
+        
+        logger.info(f"💾 [UPDATE_SCHEDULE] 업데이트 필드 수: {len(update_fields)}")
+        logger.info(f"💾 [UPDATE_SCHEDULE] 업데이트 파라미터:")
+        for key, value in update_params.items():
+            if key != 'schedule_id':
+                logger.info(f"    {key}: {value}")
         
         if update_fields:
-            update_fields.append("sst_udate = NOW()")
-            
             update_query = text(f"""
                 UPDATE smap_schedule_t SET {', '.join(update_fields)}
                 WHERE sst_idx = :schedule_id
@@ -695,18 +958,22 @@ def update_group_schedule(
             
             db.execute(update_query, update_params)
             db.commit()
+            
+            logger.info(f"✅ [UPDATE_SCHEDULE] 스케줄 수정 성공: schedule_id={schedule_id}, user_id={current_user_id}")
         
         return {
             "success": True,
             "data": {
-                "message": "Schedule updated successfully"
+                "message": "Schedule updated successfully",
+                "sst_idx": schedule_id,
+                "updated_fields": len(update_fields) - 1  # sst_udate 제외
             }
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"스케줄 수정 오류: {e}")
+        logger.error(f"💥 [UPDATE_SCHEDULE] 스케줄 수정 오류: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
 

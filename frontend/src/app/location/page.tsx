@@ -1233,36 +1233,17 @@ export default function LocationPage() {
       if (memberData && memberData.length > 0) {
         // 첫 번째 멤버를 자동으로 선택된 상태로 설정
         const convertedMembers: GroupMember[] = memberData.map((member: any, index: number) => {
-          // 이미지 URL 안전하게 처리 - 기본 이미지를 미리 설정
-          const fallbackImage = getDefaultImage(
-            typeof member.mt_gender === 'number' ? member.mt_gender : null, 
-            index
-          );
-          
-          let photoUrl = fallbackImage; // 기본값을 fallback 이미지로 설정
-          
-          if (member.mt_file1 && member.mt_file1.trim() !== '') {
-            if (member.mt_file1.startsWith('http')) {
-              photoUrl = member.mt_file1;
-            } else {
-              photoUrl = `http://118.67.130.71:8000/storage/${member.mt_file1}`;
-            }
-            console.log(`[fetchGroupMembersData] ${member.mt_name}의 이미지 URL:`, photoUrl);
-          } else {
-            console.log(`[fetchGroupMembersData] ${member.mt_name}의 이미지가 없어 기본 이미지 사용:`, fallbackImage);
-          }
-          
           return {
             id: member.mt_idx.toString(),
             name: member.mt_name || `멤버 ${index + 1}`,
-            photo: photoUrl,
+            photo: null, // 항상 null로 설정하여 로컬 이미지 사용
             isSelected: index === 0, // 첫 번째 멤버를 기본 선택
             location: { 
               lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
               lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
             },
-          schedules: [], 
-          savedLocations: [],
+            schedules: [], 
+            savedLocations: [],
             mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
             original_index: index
           };
@@ -1858,18 +1839,7 @@ export default function LocationPage() {
 
   // 안전한 이미지 URL 가져오기 헬퍼 함수
   const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-    // URL이 null이거나 빈 문자열인 경우 기본 이미지 사용
-    if (!photoUrl || photoUrl.trim() === '') {
-      return getDefaultImage(gender, index);
-    }
-    
-    // 이미 완전한 URL인 경우 그대로 사용
-    if (photoUrl.startsWith('http')) {
-      return photoUrl;
-    }
-    
-    // 백엔드 서버가 연결되지 않는 경우가 많으므로 기본 이미지 사용
-    console.log(`[getSafeImageUrl] 백엔드 서버 이미지 대신 기본 이미지 사용: ${photoUrl}`);
+    // 항상 로컬 이미지를 사용
     return getDefaultImage(gender, index);
   };
 

@@ -31,6 +31,16 @@ interface CreateScheduleRequest {
   location?: string;
   memo?: string;
   targetMemberId?: number;
+  sst_all_day?: 'Y' | 'N';
+  sst_repeat_json?: string;
+  sst_repeat_json_v?: string;
+  sst_alram?: string;
+  sst_alram_t?: string;
+  sst_schedule_alarm_chk?: 'Y' | 'N';
+  sst_pick_type?: string;
+  sst_pick_result?: string;
+  sst_location_add?: string;
+  sst_content?: string;
 }
 
 interface UpdateScheduleRequest {
@@ -40,6 +50,16 @@ interface UpdateScheduleRequest {
   endDate?: string;
   location?: string;
   memo?: string;
+  sst_all_day?: 'Y' | 'N';
+  sst_repeat_json?: string;
+  sst_repeat_json_v?: string;
+  sst_alram?: string;
+  sst_alram_t?: string;
+  sst_schedule_alarm_chk?: 'Y' | 'N';
+  sst_pick_type?: string;
+  sst_pick_result?: string;
+  sst_location_add?: string;
+  sst_content?: string;
 }
 
 // 모의 데이터
@@ -281,9 +301,33 @@ export async function POST(
   try {
     const body = await request.json() as CreateScheduleRequest;
     
+    console.log('[API PROXY] 🔥 스케줄 생성 요청 시작 - groupId:', groupId);
+    console.log('[API PROXY] 📝 프론트엔드 요청 데이터:', body);
+    
     // 백엔드 API 호출
     const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules?current_user_id=1186`;
-    console.log('[API PROXY] 스케줄 생성 백엔드 호출:', backendUrl);
+    console.log('[API PROXY] 🎯 백엔드 호출 URL:', backendUrl);
+    
+    const backendRequestData = {
+      sst_title: body.title,
+      sst_sdate: body.date,
+      sst_edate: body.endDate,
+      sst_location_title: body.location,
+      sst_memo: body.memo,
+      target_member_id: body.targetMemberId,
+      sst_all_day: body.sst_all_day,
+      sst_repeat_json: body.sst_repeat_json,
+      sst_repeat_json_v: body.sst_repeat_json_v,
+      sst_alram: body.sst_alram,
+      sst_alram_t: body.sst_alram_t,
+      sst_schedule_alarm_chk: body.sst_schedule_alarm_chk,
+      sst_pick_type: body.sst_pick_type,
+      sst_pick_result: body.sst_pick_result,
+      sst_location_add: body.sst_location_add,
+      sst_content: body.sst_content
+    };
+    
+    console.log('[API PROXY] 📦 백엔드 전송 데이터:', backendRequestData);
     
     const fetchOptions: RequestInit = {
       method: 'POST',
@@ -292,14 +336,7 @@ export async function POST(
         'Accept': 'application/json',
         'User-Agent': 'Next.js API Proxy',
       },
-      body: JSON.stringify({
-        sst_title: body.title,
-        sst_sdate: body.date,
-        sst_edate: body.endDate,
-        sst_location_title: body.location,
-        sst_memo: body.memo,
-        target_member_id: body.targetMemberId
-      }),
+      body: JSON.stringify(backendRequestData),
       // @ts-ignore
       rejectUnauthorized: false,
     };
@@ -316,9 +353,11 @@ export async function POST(
         delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
       }
 
+      console.log('[API PROXY] 📡 백엔드 응답 상태:', response.status);
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[API PROXY] 스케줄 생성 백엔드 에러:', errorText);
+        console.error('[API PROXY] ❌ 백엔드 에러 응답:', errorText);
         return NextResponse.json(
           { success: false, error: '스케줄 생성에 실패했습니다.' },
           { status: response.status }
@@ -326,7 +365,7 @@ export async function POST(
       }
 
       const data = await response.json();
-      console.log('[API PROXY] 스케줄 생성 성공:', data);
+      console.log('[API PROXY] ✅ 백엔드 성공 응답:', data);
       
       return NextResponse.json({
         success: true,
@@ -337,7 +376,7 @@ export async function POST(
       });
       
     } catch (fetchError) {
-      console.error('[API PROXY] 스케줄 생성 네트워크 에러:', fetchError);
+      console.error('[API PROXY] 💥 백엔드 네트워크 에러:', fetchError);
       
       // 모의 응답 반환
       return NextResponse.json({
@@ -350,7 +389,7 @@ export async function POST(
     }
     
   } catch (error) {
-    console.error('[API] 스케줄 생성 오류:', error);
+    console.error('[API PROXY] 💥 스케줄 생성 오류:', error);
     return NextResponse.json(
       { success: false, error: '스케줄 생성 중 오류가 발생했습니다.' },
       { status: 500 }
@@ -368,9 +407,32 @@ export async function PUT(
   try {
     const body = await request.json() as UpdateScheduleRequest;
     
+    console.log('[API PROXY] 🔥 스케줄 수정 요청 시작 - groupId:', groupId);
+    console.log('[API PROXY] 📝 프론트엔드 요청 데이터:', body);
+    
     // 백엔드 API 호출
     const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules/${body.sst_idx}?current_user_id=1186`;
-    console.log('[API PROXY] 스케줄 수정 백엔드 호출:', backendUrl);
+    console.log('[API PROXY] 🎯 백엔드 호출 URL:', backendUrl);
+    
+    const backendRequestData = {
+      sst_title: body.title,
+      sst_sdate: body.date,
+      sst_edate: body.endDate,
+      sst_location_title: body.location,
+      sst_memo: body.memo,
+      sst_all_day: body.sst_all_day,
+      sst_repeat_json: body.sst_repeat_json,
+      sst_repeat_json_v: body.sst_repeat_json_v,
+      sst_alram: body.sst_alram,
+      sst_alram_t: body.sst_alram_t,
+      sst_schedule_alarm_chk: body.sst_schedule_alarm_chk,
+      sst_pick_type: body.sst_pick_type,
+      sst_pick_result: body.sst_pick_result,
+      sst_location_add: body.sst_location_add,
+      sst_content: body.sst_content
+    };
+    
+    console.log('[API PROXY] 📦 백엔드 전송 데이터:', backendRequestData);
     
     const fetchOptions: RequestInit = {
       method: 'PUT',
@@ -379,13 +441,7 @@ export async function PUT(
         'Accept': 'application/json',
         'User-Agent': 'Next.js API Proxy',
       },
-      body: JSON.stringify({
-        sst_title: body.title,
-        sst_sdate: body.date,
-        sst_edate: body.endDate,
-        sst_location_title: body.location,
-        sst_memo: body.memo
-      }),
+      body: JSON.stringify(backendRequestData),
       // @ts-ignore
       rejectUnauthorized: false,
     };
@@ -402,9 +458,11 @@ export async function PUT(
         delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
       }
 
+      console.log('[API PROXY] 📡 백엔드 응답 상태:', response.status);
+
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[API PROXY] 스케줄 수정 백엔드 에러:', errorText);
+        console.error('[API PROXY] ❌ 백엔드 에러 응답:', errorText);
         return NextResponse.json(
           { success: false, error: '스케줄 수정에 실패했습니다.' },
           { status: response.status }
@@ -412,7 +470,7 @@ export async function PUT(
       }
 
       const data = await response.json();
-      console.log('[API PROXY] 스케줄 수정 성공:', data);
+      console.log('[API PROXY] ✅ 백엔드 성공 응답:', data);
       
       return NextResponse.json({
         success: true,
@@ -422,7 +480,7 @@ export async function PUT(
       });
       
     } catch (fetchError) {
-      console.error('[API PROXY] 스케줄 수정 네트워크 에러:', fetchError);
+      console.error('[API PROXY] 💥 백엔드 네트워크 에러:', fetchError);
       
       // 모의 응답 반환
       return NextResponse.json({
@@ -434,7 +492,7 @@ export async function PUT(
     }
     
   } catch (error) {
-    console.error('[API] 스케줄 수정 오류:', error);
+    console.error('[API PROXY] 💥 스케줄 수정 오류:', error);
     return NextResponse.json(
       { success: false, error: '스케줄 수정 중 오류가 발생했습니다.' },
       { status: 500 }

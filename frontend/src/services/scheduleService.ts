@@ -94,6 +94,12 @@ export interface CreateScheduleRequest {
   sst_supplies?: string;
   sst_alram?: number;
   sst_schedule_alarm_chk?: 'Y' | 'N';
+  // 새로운 필드들 추가
+  sst_repeat_json?: string;
+  sst_repeat_json_v?: string;
+  sst_alram_t?: string; // 알림 시간
+  sst_pick_type?: string; // 알림 타입 (minute, hour, day)
+  sst_pick_result?: string; // 알림 값
 }
 
 // 스케줄 수정 요청
@@ -112,6 +118,12 @@ export interface UpdateScheduleRequest {
   sst_supplies?: string;
   sst_alram?: number;
   sst_schedule_alarm_chk?: 'Y' | 'N';
+  // 새로운 필드들 추가
+  sst_repeat_json?: string;
+  sst_repeat_json_v?: string;
+  sst_alram_t?: string; // 알림 시간
+  sst_pick_type?: string; // 알림 타입 (minute, hour, day)
+  sst_pick_result?: string; // 알림 값
 }
 
 class ScheduleService {
@@ -206,25 +218,41 @@ class ScheduleService {
     error?: string;
   }> {
     try {
-      console.log('[SCHEDULE SERVICE] 스케줄 생성 시작:', scheduleData);
+      console.log('[SCHEDULE SERVICE] 🔥 스케줄 생성 시작:', scheduleData);
       
-      const response = await apiClient.post(`/schedules/group/${scheduleData.groupId}`, {
+      // 새로운 필드들을 포함한 요청 데이터 구성
+      const requestData = {
         title: scheduleData.sst_title,
         date: scheduleData.sst_sdate,
         endDate: scheduleData.sst_edate,
         location: scheduleData.sst_location_title,
         memo: scheduleData.sst_memo,
-        targetMemberId: scheduleData.targetMemberId
-      });
+        targetMemberId: scheduleData.targetMemberId,
+        // 새로운 필드들 추가
+        sst_all_day: scheduleData.sst_all_day,
+        sst_repeat_json: scheduleData.sst_repeat_json,
+        sst_repeat_json_v: scheduleData.sst_repeat_json_v,
+        sst_alram: scheduleData.sst_alram ? 'Y' : 'N',
+        sst_alram_t: scheduleData.sst_alram_t,
+        sst_schedule_alarm_chk: scheduleData.sst_schedule_alarm_chk,
+        sst_pick_type: scheduleData.sst_pick_type,
+        sst_pick_result: scheduleData.sst_pick_result,
+        sst_location_add: scheduleData.sst_location_add,
+        sst_content: scheduleData.sst_memo, // memo와 content 동일하게 처리
+      };
       
-      console.log('[SCHEDULE SERVICE] 스케줄 생성 응답:', {
+      console.log('[SCHEDULE SERVICE] 📦 백엔드 전송 데이터:', requestData);
+      
+      const response = await apiClient.post(`/schedules/group/${scheduleData.groupId}`, requestData);
+      
+      console.log('[SCHEDULE SERVICE] ✅ 스케줄 생성 응답:', {
         status: response.status,
         data: response.data
       });
 
       return response.data;
     } catch (error: any) {
-      console.error('[SCHEDULE SERVICE] 스케줄 생성 실패:', error);
+      console.error('[SCHEDULE SERVICE] ❌ 스케줄 생성 실패:', error);
       
       const errorMessage = error.message || '스케줄 생성 중 오류가 발생했습니다.';
       return {
@@ -244,25 +272,41 @@ class ScheduleService {
     error?: string;
   }> {
     try {
-      console.log('[SCHEDULE SERVICE] 스케줄 수정 시작:', scheduleData);
+      console.log('[SCHEDULE SERVICE] 🔥 스케줄 수정 시작:', scheduleData);
       
-      const response = await apiClient.put(`/schedules/group/${scheduleData.groupId}`, {
+      // 새로운 필드들을 포함한 요청 데이터 구성
+      const requestData = {
         sst_idx: scheduleData.sst_idx,
         title: scheduleData.sst_title,
         date: scheduleData.sst_sdate,
         endDate: scheduleData.sst_edate,
         location: scheduleData.sst_location_title,
-        memo: scheduleData.sst_memo
-      });
+        memo: scheduleData.sst_memo,
+        // 새로운 필드들 추가
+        sst_all_day: scheduleData.sst_all_day,
+        sst_repeat_json: scheduleData.sst_repeat_json,
+        sst_repeat_json_v: scheduleData.sst_repeat_json_v,
+        sst_alram: scheduleData.sst_alram ? 'Y' : 'N',
+        sst_alram_t: scheduleData.sst_alram_t,
+        sst_schedule_alarm_chk: scheduleData.sst_schedule_alarm_chk,
+        sst_pick_type: scheduleData.sst_pick_type,
+        sst_pick_result: scheduleData.sst_pick_result,
+        sst_location_add: scheduleData.sst_location_add,
+        sst_content: scheduleData.sst_memo, // memo와 content 동일하게 처리
+      };
       
-      console.log('[SCHEDULE SERVICE] 스케줄 수정 응답:', {
+      console.log('[SCHEDULE SERVICE] 📦 백엔드 전송 데이터:', requestData);
+      
+      const response = await apiClient.put(`/schedules/group/${scheduleData.groupId}`, requestData);
+      
+      console.log('[SCHEDULE SERVICE] ✅ 스케줄 수정 응답:', {
         status: response.status,
         data: response.data
       });
 
       return response.data;
     } catch (error: any) {
-      console.error('[SCHEDULE SERVICE] 스케줄 수정 실패:', error);
+      console.error('[SCHEDULE SERVICE] ❌ 스케줄 수정 실패:', error);
       
       const errorMessage = error.message || '스케줄 수정 중 오류가 발생했습니다.';
       return {

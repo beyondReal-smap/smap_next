@@ -47,20 +47,10 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
   }
 };
 
-// 안전한 이미지 URL 가져오기 함수 (location/page.tsx에서 가져옴)
+// 안전한 이미지 URL 가져오기 함수 (frontend/public/images의 로컬 이미지 사용)
 const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  // URL이 null이거나 빈 문자열인 경우 기본 이미지 사용
-  if (!photoUrl || photoUrl.trim() === '') {
-    return getDefaultImage(gender, index);
-  }
-  
-  // 이미 완전한 URL인 경우 그대로 사용 (하지만 로딩 실패 시 기본 이미지로 대체)
-  if (photoUrl.startsWith('http')) {
-    return photoUrl;
-  }
-  
-  // 백엔드 이미지 경로를 완전한 URL로 변환
-  return `${process.env.NEXT_PUBLIC_API_URL || 'http://118.67.130.71:8000'}${photoUrl}`;
+  // 항상 로컬 이미지를 사용
+  return getDefaultImage(gender, index);
 };
 
 // 모바일 최적화된 CSS 스타일
@@ -880,23 +870,30 @@ export default function SchedulePage() {
 
   // 일정 저장 - 실제 백엔드 API 사용
   const handleSaveEvent = async () => {
+    console.log('[handleSaveEvent] 🔥 스케줄 저장 시작');
+    console.log('[handleSaveEvent] 📝 현재 newEvent 상태:', newEvent);
+    
     // 유효성 검사
     if (!newEvent.title || !newEvent.date) {
+      console.log('[handleSaveEvent] ❌ 유효성 검사 실패: 제목 또는 날짜 없음');
       openSuccessModal('입력 오류', '제목과 날짜는 필수 입력 항목입니다.', 'error');
       return;
     }
 
     if (dateTimeError) {
+      console.log('[handleSaveEvent] ❌ 날짜/시간 오류:', dateTimeError);
       openSuccessModal('날짜/시간 오류', '날짜/시간 설정에 오류가 있습니다. 확인 후 다시 시도해주세요.', 'error');
       return;
     }
 
     if (!newEvent.allDay && (!newEvent.startTime || !newEvent.endTime)) {
+      console.log('[handleSaveEvent] ❌ 시간 입력 오류: 시작/종료 시간 없음');
       openSuccessModal('시간 입력 오류', '시작 시간과 종료 시간을 설정해주세요.', 'error');
       return;
     }
 
     if (!selectedGroupId) {
+      console.log('[handleSaveEvent] ❌ 그룹 선택 오류: selectedGroupId 없음');
       openSuccessModal('그룹 선택 오류', '그룹을 선택해주세요.', 'error');
       return;
     }
@@ -906,19 +903,23 @@ export default function SchedulePage() {
     const isOwnerOrLeader = currentMember && 
       (currentMember.sgdt_owner_chk === 'Y' || currentMember.sgdt_leader_chk === 'Y');
 
+    console.log('[handleSaveEvent] 👤 권한 정보:', {
+      currentMember: currentMember?.name,
+      selectedMemberId,
+      isOwnerOrLeader,
+      sgdt_owner_chk: currentMember?.sgdt_owner_chk,
+      sgdt_leader_chk: currentMember?.sgdt_leader_chk
+    });
+
     // 다른 멤버의 스케줄을 생성/수정하려는 경우 권한 확인
     if (selectedMemberId && selectedMemberId !== currentMember?.id && !isOwnerOrLeader) {
+      console.log('[handleSaveEvent] ❌ 권한 없음: 다른 멤버 스케줄 관리 권한 없음');
       openSuccessModal('권한 오류', '다른 멤버의 스케줄을 관리할 권한이 없습니다.', 'error');
       return;
     }
 
     try {
-      console.log('[handleSaveEvent] 스케줄 저장 시작:', {
-        isEdit: !!newEvent.id,
-        groupId: selectedGroupId,
-        memberId: selectedMemberId,
-        hasPermission: isOwnerOrLeader
-      });
+      console.log('[handleSaveEvent] ✅ 유효성 검사 통과, 데이터 처리 시작');
 
       // 날짜/시간 형식 변환
       const startDateTime = newEvent.allDay 
@@ -929,23 +930,138 @@ export default function SchedulePage() {
         ? `${newEvent.date}T23:59:59`
         : `${newEvent.date}T${newEvent.endTime}:00`;
 
+      console.log('[handleSaveEvent] 📅 날짜/시간 변환:', {
+        원본_날짜: newEvent.date,
+        원본_시작시간: newEvent.startTime,
+        원본_종료시간: newEvent.endTime,
+        하루종일: newEvent.allDay,
+        변환된_시작시간: startDateTime,
+        변환된_종료시간: endDateTime
+      });
+
+      // 반복 설정 JSON 변환 (사용자 요구사항에 맞게)
+      const getRepeatJson = (repeat: string, allDay: boolean): { sst_repeat_json: string, sst_repeat_json_v: string } => {
+        console.log('[getRepeatJson] 🔄 반복 설정 처리:', { repeat, allDay });
+        
+        if (allDay) {
+          // 하루종일인 경우: null 값
+          console.log('[getRepeatJson] 🔄 하루종일이므로 반복 설정 null로 변경');
+          return { sst_repeat_json: '', sst_repeat_json_v: '' };
+        }
+
+        switch (repeat) {
+          case '매일':
+            console.log('[getRepeatJson] 🔄 매일 반복 설정');
+            return { sst_repeat_json: '{"r1":"2","r2":""}', sst_repeat_json_v: '매일' };
+          case '매주':
+            // 현재 날짜의 요일 계산 (일요일=0, 월요일=1, ...)
+            const dayOfWeek = dayjs(newEvent.date).day();
+            const weekDays = dayOfWeek === 0 ? '7' : dayOfWeek.toString(); // 일요일을 7로 변환
+            console.log('[getRepeatJson] 🔄 매주 반복 설정:', { dayOfWeek, weekDays });
+            return { sst_repeat_json: `{"r1":"3","r2":"${weekDays}"}`, sst_repeat_json_v: `1주마다 ${['일', '월', '화', '수', '목', '금', '토'][dayOfWeek]}` };
+          case '매월':
+            console.log('[getRepeatJson] 🔄 매월 반복 설정');
+            return { sst_repeat_json: '{"r1":"4","r2":""}', sst_repeat_json_v: '매월' };
+          case '매년':
+            console.log('[getRepeatJson] 🔄 매년 반복 설정');
+            return { sst_repeat_json: '{"r1":"5","r2":""}', sst_repeat_json_v: '매년' };
+          case '안함':
+          default:
+            console.log('[getRepeatJson] 🔄 반복 안함 설정');
+            return { sst_repeat_json: '', sst_repeat_json_v: '' };
+        }
+      };
+
+      const repeatData = getRepeatJson(newEvent.repeat, newEvent.allDay);
+      console.log('[handleSaveEvent] 🔄 최종 반복 데이터:', repeatData);
+
+      // 알림 시간 타입과 값 계산 함수
+      function getAlarmPickType(alarm: string): string {
+        console.log('[getAlarmPickType] 🔔 알림 타입 계산:', alarm);
+        if (alarm.includes('분')) return 'minute';
+        if (alarm.includes('시간')) return 'hour';
+        if (alarm.includes('일')) return 'day';
+        return 'minute';
+      }
+
+      function getAlarmPickResult(alarm: string): string {
+        console.log('[getAlarmPickResult] 🔔 알림 값 계산:', alarm);
+        const match = alarm.match(/(\d+)/);
+        const result = match ? match[1] : '0';
+        console.log('[getAlarmPickResult] 🔔 추출된 숫자:', result);
+        return result;
+      }
+
+      const alarmPickType = newEvent.alarm === '없음' ? '' : getAlarmPickType(newEvent.alarm);
+      const alarmPickResult = newEvent.alarm === '없음' ? '' : getAlarmPickResult(newEvent.alarm);
+      
+      console.log('[handleSaveEvent] 🔔 알림 설정 처리:', {
+        원본_알림: newEvent.alarm,
+        알림_여부: newEvent.alarm === '없음' ? 'N' : 'Y',
+        알림_시간: newEvent.alarm === '없음' ? '' : newEvent.alarm,
+        알림_타입: alarmPickType,
+        알림_값: alarmPickResult
+      });
+
+      // PHP 로직 기반 요청 데이터 구성
+      const requestData = {
+        sst_title: newEvent.title,
+        sst_sdate: startDateTime,
+        sst_edate: endDateTime,
+        sst_all_day: (newEvent.allDay ? 'Y' : 'N') as 'Y' | 'N',
+        sst_location_title: newEvent.locationName || undefined,
+        sst_location_add: newEvent.locationAddress || undefined,
+        sst_memo: newEvent.content || undefined,
+        sst_content: newEvent.content || undefined, // PHP에서 memo와 content 둘 다 사용
+        sst_alram: newEvent.alarm === '없음' ? 'N' : 'Y',
+        sst_schedule_alarm_chk: newEvent.alarm === '없음' ? 'N' : 'Y',
+        sst_repeat_json: repeatData.sst_repeat_json,
+        sst_repeat_json_v: repeatData.sst_repeat_json_v,
+        sst_update_chk: 'Y',
+        sst_location_alarm: 'N',
+        sst_supplies: '', // 준비물 (향후 추가 가능)
+        sst_place: newEvent.locationName || '', // 장소명
+        // 알림 관련 필드들 - sst_alarm_t에 선택한 알림 시간 저장
+        sst_alram_t: newEvent.alarm === '없음' ? '' : newEvent.alarm,
+        sst_pick_type: alarmPickType,
+        sst_pick_result: alarmPickResult,
+        // 다른 멤버의 스케줄 생성 시
+        targetMemberId: selectedMemberId && selectedMemberId !== currentMember?.id 
+          ? parseInt(selectedMemberId) 
+          : undefined,
+      };
+
+      console.log('[handleSaveEvent] 📦 최종 요청 데이터:', requestData);
+
       if (newEvent.id) {
+        console.log('[handleSaveEvent] ✏️ 스케줄 수정 모드');
         // 수정
-        const response = await scheduleService.updateSchedule({
+        const updateData = {
           sst_idx: parseInt(newEvent.id),
           groupId: selectedGroupId,
           sst_title: newEvent.title,
           sst_sdate: startDateTime,
           sst_edate: endDateTime,
-          sst_all_day: newEvent.allDay ? 'Y' : 'N',
+          sst_all_day: (newEvent.allDay ? 'Y' : 'N') as 'Y' | 'N',
           sst_location_title: newEvent.locationName || undefined,
           sst_location_add: newEvent.locationAddress || undefined,
           sst_memo: newEvent.content || undefined,
-          sst_alram: 0 // 기본값
-        });
+          sst_alram: 0, // 기존 인터페이스 유지
+          // 새로운 필드들 추가
+          sst_repeat_json: repeatData.sst_repeat_json,
+          sst_repeat_json_v: repeatData.sst_repeat_json_v,
+          sst_alram_t: newEvent.alarm === '없음' ? '' : newEvent.alarm,
+          sst_schedule_alarm_chk: (newEvent.alarm === '없음' ? 'N' : 'Y') as 'Y' | 'N',
+          sst_pick_type: alarmPickType,
+          sst_pick_result: alarmPickResult,
+        };
+
+        console.log('[handleSaveEvent] 🔄 수정 요청 데이터:', updateData);
+        const response = await scheduleService.updateSchedule(updateData);
+        console.log('[handleSaveEvent] 🔄 수정 응답:', response);
 
         if (response.success) {
-          console.log('[handleSaveEvent] 스케줄 수정 성공');
+          console.log('[handleSaveEvent] ✅ 스케줄 수정 성공');
           
           // 성공적으로 완료되었을 때만 모달 닫기
           setIsAddEventModalOpen(false);
@@ -959,12 +1075,14 @@ export default function SchedulePage() {
           // 성공 모달 표시 (3초 후 자동 닫기)
           openSuccessModal('일정 수정 완료', '일정이 성공적으로 수정되었습니다.', 'success', undefined, true);
         } else {
+          console.log('[handleSaveEvent] ❌ 스케줄 수정 실패:', response.error);
           openSuccessModal('일정 수정 실패', response.error || '일정 수정에 실패했습니다.', 'error');
           return;
         }
       } else {
+        console.log('[handleSaveEvent] ➕ 스케줄 생성 모드');
         // 추가
-        const response = await scheduleService.createSchedule({
+        const createData = {
           groupId: selectedGroupId,
           targetMemberId: selectedMemberId && selectedMemberId !== currentMember?.id 
             ? parseInt(selectedMemberId) 
@@ -972,15 +1090,26 @@ export default function SchedulePage() {
           sst_title: newEvent.title,
           sst_sdate: startDateTime,
           sst_edate: endDateTime,
-          sst_all_day: newEvent.allDay ? 'Y' : 'N',
+          sst_all_day: (newEvent.allDay ? 'Y' : 'N') as 'Y' | 'N',
           sst_location_title: newEvent.locationName,
           sst_location_add: newEvent.locationAddress,
           sst_memo: newEvent.content,
-          sst_alram: 0 // 기본값
-        });
+          sst_alram: 0, // 기존 인터페이스 유지
+          // 새로운 필드들 추가
+          sst_repeat_json: repeatData.sst_repeat_json,
+          sst_repeat_json_v: repeatData.sst_repeat_json_v,
+          sst_alram_t: newEvent.alarm === '없음' ? '' : newEvent.alarm,
+          sst_schedule_alarm_chk: (newEvent.alarm === '없음' ? 'N' : 'Y') as 'Y' | 'N',
+          sst_pick_type: alarmPickType,
+          sst_pick_result: alarmPickResult,
+        };
+
+        console.log('[handleSaveEvent] ➕ 생성 요청 데이터:', createData);
+        const response = await scheduleService.createSchedule(createData);
+        console.log('[handleSaveEvent] ➕ 생성 응답:', response);
 
         if (response.success && response.data) {
-          console.log('[handleSaveEvent] 스케줄 생성 성공:', response.data);
+          console.log('[handleSaveEvent] ✅ 스케줄 생성 성공:', response.data);
           
           // 성공적으로 완료되었을 때만 모달 닫기
           setIsAddEventModalOpen(false);
@@ -994,22 +1123,14 @@ export default function SchedulePage() {
           // 성공 모달 표시 (3초 후 자동 닫기)
           openSuccessModal('일정 등록 완료', '일정이 성공적으로 등록되었습니다.', 'success', undefined, true);
         } else {
+          console.log('[handleSaveEvent] ❌ 스케줄 생성 실패:', response.error);
           openSuccessModal('일정 등록 실패', response.error || '일정 등록에 실패했습니다.', 'error');
           return;
         }
       }
-
-      // 성공적으로 완료되었을 때만 모달 닫기
-      setIsAddEventModalOpen(false);
-      setNewEvent(initialNewEventState);
-      setSelectedEventDetails(null);
-      setDateTimeError(null);
-      
-      // 스케줄 목록 새로 고침
-      await loadAllGroupSchedules();
       
     } catch (error) {
-      console.error('[handleSaveEvent] 스케줄 저장 실패:', error);
+      console.error('[handleSaveEvent] 💥 스케줄 저장 중 예외 발생:', error);
       openSuccessModal('일정 저장 실패', '일정 저장 중 오류가 발생했습니다.', 'error');
     }
   };
@@ -1084,22 +1205,38 @@ export default function SchedulePage() {
   // 일정 수정 모달 열기
   const handleOpenEditModal = () => {
     if (selectedEventDetails) {
+      // 반복 패턴 역변환 함수
+      const convertRepeatTextToSelect = (repeatText: string): string => {
+        if (!repeatText || repeatText === '없음') return '안함';
+        if (repeatText === '매일') return '매일';
+        if (repeatText === '매월') return '매월';
+        if (repeatText === '매년') return '매년';
+        if (repeatText.includes('매주')) return '매주';
+        return '안함';
+      };
+
+      // 알림 텍스트 역변환 함수
+      const convertAlarmTextToSelect = (alarmTime: string, hasAlarm: boolean): string => {
+        if (!hasAlarm || !alarmTime) return '없음';
+        return alarmTime; // 백엔드에서 받은 알림 시간 그대로 사용
+      };
+
       setNewEvent({
         id: selectedEventDetails.id,
         title: selectedEventDetails.title,
         date: selectedEventDetails.date,
         startTime: selectedEventDetails.startTime,
         endTime: selectedEventDetails.endTime,
-        allDay: false,
-        repeat: '안함',
-        alarm: '없음',
-        locationName: '',
-        locationAddress: '',
+        allDay: selectedEventDetails.isAllDay || false, // 하루종일 설정 로드
+        repeat: convertRepeatTextToSelect(selectedEventDetails.repeatText || ''), // 반복 설정 역변환
+        alarm: convertAlarmTextToSelect(selectedEventDetails.alarmTime || '', selectedEventDetails.hasAlarm || false), // 알림 설정 역변환
+        locationName: selectedEventDetails.locationName || '',
+        locationAddress: selectedEventDetails.locationAddress || '',
         content: selectedEventDetails.content || '',
         groupName: selectedEventDetails.groupName || '',
         groupColor: selectedEventDetails.groupColor || '',
         memberName: selectedEventDetails.memberName || '',
-        memberPhoto: selectedEventDetails.memberPhoto || '',
+        memberPhoto: '', // 빈 문자열로 설정하여 로컬 이미지 사용
       });
       setIsModalOpen(false);
       setIsAddEventModalOpen(true);
@@ -1184,21 +1321,10 @@ export default function SchedulePage() {
 
       if (memberData && memberData.length > 0) {
         const convertedMembers: ScheduleGroupMember[] = memberData.map((member: any, index: number) => {
-          // 이미지 URL 안전하게 처리
-          let photoUrl = null;
-          if (member.mt_file1 && member.mt_file1.trim() !== '') {
-            if (member.mt_file1.startsWith('http')) {
-              photoUrl = member.mt_file1;
-            } else {
-              photoUrl = `http://118.67.130.71:8000/storage/${member.mt_file1}`;
-            }
-            console.log(`[fetchGroupMembers] ${member.mt_name}의 이미지 URL:`, photoUrl);
-          }
-          
           return {
             id: member.mt_idx.toString(),
             name: member.mt_name || `멤버 ${index + 1}`,
-            photo: photoUrl,
+            photo: null, // 항상 null로 설정하여 로컬 이미지 사용
             isSelected: index === 0,
             mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
             mt_idx: member.mt_idx,
@@ -1280,7 +1406,7 @@ export default function SchedulePage() {
       setNewEvent(prev => ({
         ...prev,
         memberName: selectedMember.name,
-        memberPhoto: selectedMember.photo || '',
+        memberPhoto: '', // 빈 문자열로 설정하여 로컬 이미지 사용
         groupName: selectedGroup.sgt_title,
         groupColor: groupColor
       }));
@@ -1598,7 +1724,7 @@ export default function SchedulePage() {
 
             // tgt_mt_idx와 일치하는 멤버 정보 찾기
             let targetMemberName = schedule.member_name || '';
-            let targetMemberPhoto = schedule.member_photo || '';
+            let targetMemberPhoto = ''; // 빈 문자열로 설정하여 로컬 이미지 사용
             let targetMemberGender: number | null = null;
             let targetMemberIdx = 0;
             
@@ -1609,7 +1735,7 @@ export default function SchedulePage() {
               
               if (targetMember) {
                 targetMemberName = targetMember.mt_name || targetMember.name || '';
-                targetMemberPhoto = targetMember.mt_file1 || targetMember.photo || '';
+                targetMemberPhoto = ''; // 빈 문자열로 설정하여 로컬 이미지 사용
                 targetMemberGender = targetMember.mt_gender || null;
                 targetMemberIdx = targetMember.mt_idx || 0;
               }
@@ -3331,6 +3457,98 @@ export default function SchedulePage() {
                       취소
                     </button>
                   </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 저장 완료 모달 */}
+        <AnimatePresence>
+          {isSuccessModalOpen && successModalContent && (
+            <motion.div 
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+              onClick={closeSuccessModal}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div 
+                className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+                onClick={e => e.stopPropagation()}
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="p-6 text-center">
+                  {/* 아이콘 */}
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center">
+                    {successModalContent.type === 'success' && (
+                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    )}
+                    {successModalContent.type === 'error' && (
+                      <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+                        <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                    )}
+                    {successModalContent.type === 'info' && (
+                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                        <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 제목 */}
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    {successModalContent.title}
+                  </h3>
+
+                  {/* 메시지 */}
+                  <p className="text-gray-600 mb-6 leading-relaxed">
+                    {successModalContent.message}
+                  </p>
+
+                  {/* 버튼 */}
+                  {successModalContent.onConfirm ? (
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => {
+                          successModalContent.onConfirm?.();
+                          closeSuccessModal();
+                        }}
+                        className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
+                      >
+                        확인
+                      </button>
+                      <button
+                        onClick={closeSuccessModal}
+                        className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                      >
+                        취소
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={closeSuccessModal}
+                      className={`w-full py-3 text-white rounded-xl font-medium mobile-button transition-colors ${
+                        successModalContent.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
+                        successModalContent.type === 'error' ? 'bg-red-600 hover:bg-red-700' :
+                        'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      확인
+                    </button>
+                  )}
                 </div>
               </motion.div>
             </motion.div>
