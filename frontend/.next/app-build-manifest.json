@@ -31,6 +31,26 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/group-members/member/[groupId]/route.js"
     ],
+    "/location/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/location/layout.js"
+    ],
+    "/location/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/location/page.js"
+    ],
+    "/api/groups/[groupId]/members/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/groups/[groupId]/members/route.js"
+    ],
+    "/api/locations/other-members/[memberId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/locations/other-members/[memberId]/route.js"
+    ],
     "/api/kakao-search/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -40,6 +60,26 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/schedules/group/[groupId]/route.js"
+    ],
+    "/home/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/home/layout.js"
+    ],
+    "/home/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/home/page.js"
+    ],
+    "/group/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/group/layout.js"
+    ],
+    "/group/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/group/page.js"
     ],
     "/_not-found/page": [
       "static/chunks/webpack.js",

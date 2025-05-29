@@ -238,19 +238,36 @@ class ScheduleService {
         sst_pick_type: scheduleData.sst_pick_type,
         sst_pick_result: scheduleData.sst_pick_result,
         sst_location_add: scheduleData.sst_location_add,
-        sst_content: scheduleData.sst_memo, // memo와 content 동일하게 처리
+        sst_location_lat: scheduleData.sst_location_lat,
+        sst_location_long: scheduleData.sst_location_long,
+        sst_content: scheduleData.sst_memo,
       };
-      
+
       console.log('[SCHEDULE SERVICE] 📦 백엔드 전송 데이터:', requestData);
       
-      const response = await apiClient.post(`/schedules/group/${scheduleData.groupId}`, requestData);
-      
+      const response = await apiClient.post(`/schedule/group/${scheduleData.groupId}/schedules`, requestData);
+
       console.log('[SCHEDULE SERVICE] ✅ 스케줄 생성 응답:', {
         status: response.status,
-        data: response.data
+        statusText: response.statusText,
+        data: response.data,
+        headers: response.headers
       });
 
-      return response.data;
+      // 성공 응답인지 확인
+      if (response.status === 200 || response.status === 201) {
+        console.log('[SCHEDULE SERVICE] 🎉 스케줄 생성 성공!');
+        return {
+          success: true,
+          data: response.data
+        };
+      } else {
+        console.warn('[SCHEDULE SERVICE] ⚠️ 예상치 못한 응답 상태:', response.status);
+        return {
+          success: false,
+          error: `예상치 못한 응답 상태: ${response.status}`
+        };
+      }
     } catch (error: any) {
       console.error('[SCHEDULE SERVICE] ❌ 스케줄 생성 실패:', error);
       
@@ -292,12 +309,14 @@ class ScheduleService {
         sst_pick_type: scheduleData.sst_pick_type,
         sst_pick_result: scheduleData.sst_pick_result,
         sst_location_add: scheduleData.sst_location_add,
+        sst_location_lat: scheduleData.sst_location_lat,
+        sst_location_long: scheduleData.sst_location_long,
         sst_content: scheduleData.sst_memo, // memo와 content 동일하게 처리
       };
       
       console.log('[SCHEDULE SERVICE] 📦 백엔드 전송 데이터:', requestData);
       
-      const response = await apiClient.put(`/schedules/group/${scheduleData.groupId}`, requestData);
+      const response = await apiClient.put(`/schedule/group/${scheduleData.groupId}/schedules/${scheduleData.sst_idx}`, requestData);
       
       console.log('[SCHEDULE SERVICE] ✅ 스케줄 수정 응답:', {
         status: response.status,
@@ -329,7 +348,7 @@ class ScheduleService {
     try {
       console.log('[SCHEDULE SERVICE] 스케줄 삭제 시작:', { sst_idx, groupId });
       
-      const response = await apiClient.delete(`/schedules/group/${groupId}?scheduleId=${sst_idx}`);
+      const response = await apiClient.delete(`/schedule/group/${groupId}/schedules/${sst_idx}`);
       
       console.log('[SCHEDULE SERVICE] 스케줄 삭제 응답:', {
         status: response.status,

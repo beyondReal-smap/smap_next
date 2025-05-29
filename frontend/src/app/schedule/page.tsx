@@ -276,6 +276,8 @@ interface ScheduleEvent {
   canDelete?: boolean; // 삭제 권한
   locationName?: string;
   locationAddress?: string;
+  locationLat?: number; // 위도 추가
+  locationLng?: number; // 경도 추가
   hasAlarm?: boolean;
   alarmText?: string;
   alarmTime?: string; // 알림 시간
@@ -385,6 +387,8 @@ interface NewEvent {
   alarm: string;
   locationName: string;
   locationAddress: string;
+  locationLat?: number; // 위도 추가
+  locationLng?: number; // 경도 추가
   content?: string;
   groupName?: string;
   groupColor?: string;
@@ -707,7 +711,7 @@ export default function SchedulePage() {
     const filteredEvents = events
       .filter(event => {
         const matches = event.date === dateString;
-        console.log(`[eventsForSelectedDay] 이벤트 "${event.title}" (${event.date}) - 매칭:`, matches);
+        // console.log(`[eventsForSelectedDay] 이벤트 "${event.title}" (${event.date}) - 매칭:`, matches);
         return matches;
       })
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -726,6 +730,8 @@ export default function SchedulePage() {
     alarm: '없음',
     locationName: '',
     locationAddress: '',
+    locationLat: undefined, // 위도 초기값
+    locationLng: undefined, // 경도 초기값
     content: '',
     groupName: '',
     groupColor: '',
@@ -1037,7 +1043,7 @@ export default function SchedulePage() {
         console.log('[handleSaveEvent] ✏️ 스케줄 수정 모드');
         // 수정
         const updateData = {
-          sst_idx: parseInt(newEvent.id),
+          sst_idx: parseInt(newEvent.id!),
           groupId: selectedGroupId,
           sst_title: newEvent.title,
           sst_sdate: startDateTime,
@@ -1045,6 +1051,8 @@ export default function SchedulePage() {
           sst_all_day: (newEvent.allDay ? 'Y' : 'N') as 'Y' | 'N',
           sst_location_title: newEvent.locationName || undefined,
           sst_location_add: newEvent.locationAddress || undefined,
+          sst_location_lat: newEvent.locationLat, // 위도 추가
+          sst_location_long: newEvent.locationLng, // 경도 추가
           sst_memo: newEvent.content || undefined,
           sst_alram: 0, // 기존 인터페이스 유지
           // 새로운 필드들 추가
@@ -1093,6 +1101,8 @@ export default function SchedulePage() {
           sst_all_day: (newEvent.allDay ? 'Y' : 'N') as 'Y' | 'N',
           sst_location_title: newEvent.locationName,
           sst_location_add: newEvent.locationAddress,
+          sst_location_lat: newEvent.locationLat, // 위도 추가
+          sst_location_long: newEvent.locationLng, // 경도 추가
           sst_memo: newEvent.content,
           sst_alram: 0, // 기존 인터페이스 유지
           // 새로운 필드들 추가
@@ -1232,6 +1242,8 @@ export default function SchedulePage() {
         alarm: convertAlarmTextToSelect(selectedEventDetails.alarmTime || '', selectedEventDetails.hasAlarm || false), // 알림 설정 역변환
         locationName: selectedEventDetails.locationName || '',
         locationAddress: selectedEventDetails.locationAddress || '',
+        locationLat: selectedEventDetails.locationLat, // 위도 로드
+        locationLng: selectedEventDetails.locationLng, // 경도 로드
         content: selectedEventDetails.content || '',
         groupName: selectedEventDetails.groupName || '',
         groupColor: selectedEventDetails.groupColor || '',
@@ -1540,11 +1552,21 @@ export default function SchedulePage() {
 
   // 검색 결과 선택
   const handleSelectLocation = (place: any) => {
+    console.log('[handleSelectLocation] 📍 선택된 장소:', place);
+    
     setNewEvent(prev => ({
       ...prev,
       locationName: place.place_name || '',
       locationAddress: place.road_address_name || place.address_name || '',
+      locationLat: place.y ? parseFloat(place.y) : undefined, // 위도 (카카오 API에서는 y가 위도)
+      locationLng: place.x ? parseFloat(place.x) : undefined, // 경도 (카카오 API에서는 x가 경도)
     }));
+    
+    console.log('[handleSelectLocation] 💾 저장된 좌표:', {
+      lat: place.y ? parseFloat(place.y) : undefined,
+      lng: place.x ? parseFloat(place.x) : undefined
+    });
+    
     handleCloseLocationSearchModal();
   };
 
@@ -1761,6 +1783,8 @@ export default function SchedulePage() {
               // 추가 표시 정보
               locationName: schedule.sst_location_title || '',
               locationAddress: schedule.sst_location_add || '', // 백엔드 원본 주소 사용
+              locationLat: schedule.sst_location_lat || undefined, // 위도 추가
+              locationLng: schedule.sst_location_long || undefined, // 경도 추가
               hasAlarm: hasAlarm,
               alarmText: hasAlarm ? (alarmTime ? `알림 ${alarmTime}` : '알림 ON') : '알림 OFF',
               alarmTime: alarmTime, // 알림 시간 추가

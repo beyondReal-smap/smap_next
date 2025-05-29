@@ -1,7 +1,16 @@
 import axios, { AxiosInstance } from 'axios';
 
 // API 기본 URL 설정 - Next.js API 라우트를 프록시로 사용 (CORS 우회)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    // 클라이언트 사이드에서는 현재 호스트의 API 라우트 사용
+    return `${window.location.protocol}//${window.location.host}/api`;
+  }
+  // 서버 사이드에서는 환경 변수 또는 기본값 사용
+  return process.env.NEXT_PUBLIC_API_URL || '/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // 커스텀 API 클라이언트 타입 정의
 interface CustomApiClient extends AxiosInstance {
@@ -10,7 +19,7 @@ interface CustomApiClient extends AxiosInstance {
 
 // Axios 인스턴스 생성
 const apiClient: CustomApiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: '', // 동적으로 설정
   timeout: 30000, // 백엔드 서버가 원격에 있으므로 타임아웃 증가
   headers: {
     'Content-Type': 'application/json',
@@ -36,6 +45,13 @@ const removeToken = (): void => {
 // 요청 인터셉터
 apiClient.interceptors.request.use(
   (config) => {
+    // 동적으로 baseURL 설정
+    if (!config.baseURL && typeof window !== 'undefined') {
+      config.baseURL = `${window.location.protocol}//${window.location.host}/api`;
+    } else if (!config.baseURL) {
+      config.baseURL = '/api';
+    }
+    
     // 인증이 필요한 요청에 토큰 추가
     const token = getToken();
     if (token) {
@@ -44,7 +60,7 @@ apiClient.interceptors.request.use(
     
     // 요청 로깅 (개발 환경에서만)
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[API REQUEST] ${config.method?.toUpperCase()} ${config.url}`, {
+      console.log(`[API REQUEST] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`, {
         headers: config.headers,
         data: config.data
       });

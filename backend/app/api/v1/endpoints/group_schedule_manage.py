@@ -68,26 +68,32 @@ class GroupScheduleManager:
     def get_group_members(db: Session, group_id: int) -> List[Dict[str, Any]]:
         """그룹 멤버 목록 조회"""
         try:
-            query = text("""
+            members_query = text("""
                 SELECT 
-                    m.mt_idx,
-                    m.mt_name,
-                    m.mt_file1,
-                    sgd.sgt_idx,
-                    sgd.sgdt_idx,
-                    sgd.sgdt_owner_chk,
-                    sgd.sgdt_leader_chk
-                FROM member_t m
-                JOIN smap_group_detail_t sgd ON m.mt_idx = sgd.mt_idx
-                WHERE sgd.sgt_idx = :group_id 
-                    AND sgd.sgdt_discharge = 'N' 
-                    AND sgd.sgdt_exit = 'N'
+                    mt.mt_idx,
+                    mt.mt_name,
+                    COALESCE(mt.mt_file1, '') as mt_file1,
+                    sgdt.sgt_idx,
+                    sgdt.sgdt_idx,
+                    sgdt.sgdt_owner_chk,
+                    sgdt.sgdt_leader_chk
+                FROM smap_group_detail_t sgdt
+                JOIN member_t mt ON sgdt.mt_idx = mt.mt_idx
+                WHERE sgdt.sgt_idx = :group_id 
+                AND sgdt.sgdt_discharge = 'N' 
+                AND sgdt.sgdt_exit = 'N'
+                AND sgdt.sgdt_show = 'Y'
+                ORDER BY 
+                    CASE sgdt.sgdt_owner_chk WHEN 'Y' THEN 1 ELSE 2 END,
+                    CASE sgdt.sgdt_leader_chk WHEN 'Y' THEN 1 ELSE 2 END,
+                    mt.mt_name
             """)
             
-            results = db.execute(query, {"group_id": group_id}).fetchall()
+            result = db.execute(members_query, {"group_id": group_id})
+            members = []
             
-            return [
-                {
+            for row in result:
+                member_data = {
                     "mt_idx": row.mt_idx,
                     "mt_name": row.mt_name,
                     "mt_file1": row.mt_file1,
@@ -96,11 +102,173 @@ class GroupScheduleManager:
                     "sgdt_owner_chk": row.sgdt_owner_chk,
                     "sgdt_leader_chk": row.sgdt_leader_chk
                 }
-                for row in results
-            ]
+                members.append(member_data)
+            
+            return members
+            
         except Exception as e:
             logger.error(f"그룹 멤버 조회 오류: {e}")
             return []
+
+def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params: Dict[str, Any], 
+                             repeat_json: str, repeat_json_v: str) -> int:
+    """
+    반복 일정을 3년간 생성하는 함수
+    
+    Args:
+        db: 데이터베이스 세션
+        parent_schedule_id: 부모 스케줄 ID (sst_pidx로 사용)
+        base_params: 기본 스케줄 파라미터
+        repeat_json: 반복 설정 JSON (예: {"r1":"3","r2":"4"})
+        repeat_json_v: 반복 설정 텍스트 (예: "1주마다 목")
+    
+    Returns:
+        생성된 반복 일정 개수
+    """
+    import json
+    from datetime import datetime, timedelta
+    
+    try:
+        logger.info(f"🔄 [RECURRING] 반복 일정 생성 시작 - parent_id: {parent_schedule_id}")
+        
+        # 반복 설정 파싱
+        repeat_config = json.loads(repeat_json) if repeat_json else {}
+        r1 = repeat_config.get("r1")  # 반복 주기 (1: 매일, 2: 매주, 3: 매월, 4: 매년)
+        r2 = repeat_config.get("r2")  # 반복 값 (요일, 날짜 등)
+        
+        logger.info(f"🔄 [RECURRING] 반복 설정 파싱 - r1: {r1}, r2: {r2}")
+        
+        if not r1:
+            logger.warning(f"⚠️ [RECURRING] 반복 주기가 없음")
+            return 0
+        
+        # 기준 시작일/종료일
+        base_start = datetime.fromisoformat(base_params["sst_sdate"].replace('T', ' '))
+        base_end = datetime.fromisoformat(base_params["sst_edate"].replace('T', ' '))
+        
+        # 3년 후까지의 기간
+        end_date = base_start + timedelta(days=365 * 3)
+        
+        logger.info(f"🔄 [RECURRING] 기간 설정 - 시작: {base_start}, 종료: {end_date}")
+        
+        created_count = 0
+        current_date = base_start
+        
+        # 반복 주기별 처리
+        if r1 == "1":  # 매일
+            delta = timedelta(days=1)
+        elif r1 == "2":  # 매주
+            delta = timedelta(weeks=1)
+        elif r1 == "3":  # 매월
+            # 월간 반복은 특별 처리 필요 (dateutil 사용)
+            delta = None
+        elif r1 == "4":  # 매년
+            delta = timedelta(days=365)
+        else:
+            logger.warning(f"⚠️ [RECURRING] 지원하지 않는 반복 주기: {r1}")
+            return 0
+        
+        # 반복 일정 생성
+        while current_date < end_date:
+            # 매주 반복의 경우 특별 처리
+            if r1 == "2":  # 매주
+                current_date += timedelta(weeks=1)
+                
+                # 특정 요일이 지정된 경우 해당 요일로 조정
+                if r2 and r2.isdigit():
+                    target_weekday = int(r2)
+                    # r2 값: 1=월요일, 2=화요일, 3=수요일, 4=목요일, 5=금요일, 6=토요일, 7=일요일
+                    # Python weekday(): 월요일=0, 화요일=1, 수요일=2, 목요일=3, 금요일=4, 토요일=5, 일요일=6
+                    python_weekday = (target_weekday - 1) % 7
+                    
+                    # 현재 날짜를 목표 요일로 조정
+                    days_diff = python_weekday - current_date.weekday()
+                    if days_diff != 0:
+                        current_date += timedelta(days=days_diff)
+            elif r1 == "3":  # 매월
+                # 월 단위 계산을 위해 직접 계산
+                try:
+                    if current_date.month == 12:
+                        current_date = current_date.replace(year=current_date.year + 1, month=1)
+                    else:
+                        current_date = current_date.replace(month=current_date.month + 1)
+                except ValueError:
+                    # 2월 29일 등의 경우 처리
+                    if current_date.month == 12:
+                        current_date = current_date.replace(year=current_date.year + 1, month=1, day=28)
+                    else:
+                        current_date = current_date.replace(month=current_date.month + 1, day=28)
+            else:
+                # 일일, 연간 반복
+                current_date += delta
+            
+            if current_date >= end_date:
+                break
+                
+            # 종료시간 계산
+            duration = base_end - base_start
+            next_end = current_date + duration
+            
+            # 알림시간 계산
+            alarm_time = None
+            if base_params.get("sst_schedule_alarm"):
+                base_alarm = datetime.strptime(base_params["sst_schedule_alarm"], '%Y-%m-%d %H:%M:%S')
+                alarm_duration = base_start - base_alarm
+                alarm_time = current_date - alarm_duration
+            
+            # 새로운 반복 일정 파라미터 구성
+            recurring_params = base_params.copy()
+            recurring_params.update({
+                "sst_pidx": parent_schedule_id,  # 부모 스케줄 ID
+                "sst_sdate": current_date.strftime('%Y-%m-%dT%H:%M:%S'),
+                "sst_edate": next_end.strftime('%Y-%m-%dT%H:%M:%S'),
+                "sst_sedate": f"{current_date.strftime('%Y-%m-%dT%H:%M:%S')} ~ {next_end.strftime('%Y-%m-%dT%H:%M:%S')}",
+                "sst_schedule_alarm": alarm_time.strftime('%Y-%m-%d %H:%M:%S') if alarm_time else None
+            })
+            
+            # 반복 일정 삽입
+            insert_query = text("""
+                INSERT INTO smap_schedule_t (
+                    sst_pidx, mt_idx, sst_title, sst_sdate, sst_edate, sst_sedate, sst_all_day,
+                    sgt_idx, sgdt_idx, sgdt_idx_t,
+                    sst_location_title, sst_location_add, sst_location_lat, sst_location_long,
+                    sst_location_alarm,
+                    sst_memo, sst_supplies,
+                    sst_alram, sst_alram_t, sst_schedule_alarm_chk, 
+                    sst_pick_type, sst_pick_result, sst_schedule_alarm,
+                    sst_repeat_json, sst_repeat_json_v,
+                    slt_idx, slt_idx_t, sst_update_chk,
+                    sst_show, sst_wdate, sst_adate
+                ) VALUES (
+                    :sst_pidx, :mt_idx, :sst_title, :sst_sdate, :sst_edate, :sst_sedate, :sst_all_day,
+                    :sgt_idx, :sgdt_idx, :sgdt_idx_t,
+                    :sst_location_title, :sst_location_add, :sst_location_lat, :sst_location_long,
+                    :sst_location_alarm,
+                    :sst_memo, :sst_supplies,
+                    :sst_alram, :sst_alram_t, :sst_schedule_alarm_chk,
+                    :sst_pick_type, :sst_pick_result, :sst_schedule_alarm,
+                    :sst_repeat_json, :sst_repeat_json_v,
+                    :slt_idx, :slt_idx_t, :sst_update_chk,
+                    'Y', NOW(), :sst_adate
+                )
+            """)
+            
+            db.execute(insert_query, recurring_params)
+            created_count += 1
+            
+            # 너무 많은 일정 생성 방지 (최대 500개)
+            if created_count >= 500:
+                logger.warning(f"⚠️ [RECURRING] 최대 생성 개수 제한에 도달: {created_count}")
+                break
+        
+        db.commit()
+        logger.info(f"✅ [RECURRING] 반복 일정 생성 완료 - 총 {created_count}개 생성")
+        return created_count
+        
+    except Exception as e:
+        logger.error(f"💥 [RECURRING] 반복 일정 생성 오류: {e}")
+        db.rollback()
+        raise e
 
 @router.get("/test-all-columns")
 def test_all_columns(
@@ -335,7 +503,7 @@ def get_owner_groups_all_schedules(
                     "sgdt_idx_t": row.sgdt_idx_t,
                     "sst_alram": row.sst_alram,
                     "sst_alram_t": row.sst_alram_t,
-                    "sst_adate": str(row.sst_adate) if row.sst_adate else None,
+                    "sst_adate": row.sst_adate.isoformat() if row.sst_adate and hasattr(row.sst_adate, 'isoformat') else str(row.sst_adate) if row.sst_adate else None,
                     "slt_idx": row.slt_idx,
                     "slt_idx_t": row.slt_idx_t,
                     "sst_location_title": row.sst_location_title,
@@ -349,11 +517,11 @@ def get_owner_groups_all_schedules(
                     "sst_schedule_alarm_chk": row.sst_schedule_alarm_chk,
                     "sst_pick_type": row.sst_pick_type,
                     "sst_pick_result": row.sst_pick_result,
-                    "sst_schedule_alarm": str(row.sst_schedule_alarm) if row.sst_schedule_alarm else None,
+                    "sst_schedule_alarm": row.sst_schedule_alarm.isoformat() if row.sst_schedule_alarm and hasattr(row.sst_schedule_alarm, 'isoformat') else str(row.sst_schedule_alarm) if row.sst_schedule_alarm else None,
                     "sst_update_chk": row.sst_update_chk,
-                    "sst_wdate": str(row.sst_wdate) if row.sst_wdate else None,
-                    "sst_udate": str(row.sst_udate) if row.sst_udate else None,
-                    "sst_ddate": str(row.sst_ddate) if row.sst_ddate else None,
+                    "sst_wdate": row.sst_wdate.isoformat() if row.sst_wdate and hasattr(row.sst_wdate, 'isoformat') else str(row.sst_wdate) if row.sst_wdate else None,
+                    "sst_udate": row.sst_udate.isoformat() if row.sst_udate and hasattr(row.sst_udate, 'isoformat') else str(row.sst_udate) if row.sst_udate else None,
+                    "sst_ddate": row.sst_ddate.isoformat() if row.sst_ddate and hasattr(row.sst_ddate, 'isoformat') else str(row.sst_ddate) if row.sst_ddate else None,
                     "sst_in_chk": row.sst_in_chk,
                     "sst_schedule_chk": row.sst_schedule_chk,
                     "sst_entry_cnt": row.sst_entry_cnt,
@@ -422,6 +590,7 @@ def get_group_schedules(
     group_id: int,
     start_date: Optional[str] = Query(None, description="시작 날짜 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="종료 날짜 (YYYY-MM-DD)"),
+    days: Optional[int] = Query(None, description="오늘부터 며칠간의 스케줄 조회 (예: 7)"),
     member_id: Optional[int] = Query(None, description="특정 멤버 ID"),
     current_user_id: int = Query(..., description="현재 사용자 ID"),
     db: Session = Depends(deps.get_db)
@@ -430,6 +599,16 @@ def get_group_schedules(
     그룹 스케줄 조회 (권한 기반)
     """
     try:
+        logger.info(f"📅 [GET_SCHEDULES] 스케줄 조회 시작 - group_id: {group_id}, days: {days}, start_date: {start_date}, end_date: {end_date}")
+        
+        # days 파라미터가 있는 경우 자동으로 날짜 범위 계산
+        if days is not None and not start_date and not end_date:
+            from datetime import datetime, timedelta
+            today = datetime.now().date()
+            start_date = today.strftime('%Y-%m-%d')
+            end_date = (today + timedelta(days=days)).strftime('%Y-%m-%d')
+            logger.info(f"📅 [GET_SCHEDULES] days 파라미터로 날짜 범위 계산 - start: {start_date}, end: {end_date}")
+        
         # 그룹 권한 확인
         member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
         if not member_auth:
@@ -446,15 +625,21 @@ def get_group_schedules(
         if start_date:
             where_conditions.append("s.sst_sdate >= :start_date")
             query_params["start_date"] = start_date
+            logger.info(f"📅 [GET_SCHEDULES] start_date 조건 추가: {start_date}")
         
         if end_date:
-            where_conditions.append("s.sst_edate <= :end_date")
+            where_conditions.append("s.sst_sdate < :end_date")  # 종료일은 포함하지 않음
             query_params["end_date"] = end_date
+            logger.info(f"📅 [GET_SCHEDULES] end_date 조건 추가: {end_date}")
         
         # 특정 멤버 조건 추가
         if member_id:
             where_conditions.append("s.mt_idx = :member_id")
             query_params["member_id"] = member_id
+            logger.info(f"👤 [GET_SCHEDULES] member_id 조건 추가: {member_id}")
+        
+        logger.info(f"🔍 [GET_SCHEDULES] 쿼리 조건: {where_conditions}")
+        logger.info(f"🔍 [GET_SCHEDULES] 쿼리 파라미터: {query_params}")
         
         schedule_query = text(f"""
             SELECT 
@@ -465,9 +650,12 @@ def get_group_schedules(
             JOIN member_t m ON s.mt_idx = m.mt_idx
             WHERE {' AND '.join(where_conditions)}
             ORDER BY s.sst_sdate ASC
+            LIMIT 1000
         """)
         
         schedule_results = db.execute(schedule_query, query_params).fetchall()
+        
+        logger.info(f"📊 [GET_SCHEDULES] 조회된 스케줄 수: {len(schedule_results)}")
         
         # 스케줄 데이터 변환
         schedules = []
@@ -488,7 +676,7 @@ def get_group_schedules(
                 "sgdt_idx_t": row.sgdt_idx_t,
                 "sst_alram": row.sst_alram,
                 "sst_alram_t": row.sst_alram_t,
-                "sst_adate": row.sst_adate.isoformat() if row.sst_adate else None,
+                "sst_adate": row.sst_adate.isoformat() if row.sst_adate and hasattr(row.sst_adate, 'isoformat') else str(row.sst_adate) if row.sst_adate else None,
                 "slt_idx": row.slt_idx,
                 "slt_idx_t": row.slt_idx_t,
                 "sst_location_title": row.sst_location_title,
@@ -502,11 +690,11 @@ def get_group_schedules(
                 "sst_schedule_alarm_chk": row.sst_schedule_alarm_chk,
                 "sst_pick_type": row.sst_pick_type,
                 "sst_pick_result": row.sst_pick_result,
-                "sst_schedule_alarm": row.sst_schedule_alarm.isoformat() if row.sst_schedule_alarm else None,
+                "sst_schedule_alarm": row.sst_schedule_alarm.isoformat() if row.sst_schedule_alarm and hasattr(row.sst_schedule_alarm, 'isoformat') else str(row.sst_schedule_alarm) if row.sst_schedule_alarm else None,
                 "sst_update_chk": row.sst_update_chk,
-                "sst_wdate": row.sst_wdate.isoformat() if row.sst_wdate else None,
-                "sst_udate": row.sst_udate.isoformat() if row.sst_udate else None,
-                "sst_ddate": row.sst_ddate.isoformat() if row.sst_ddate else None,
+                "sst_wdate": row.sst_wdate.isoformat() if row.sst_wdate and hasattr(row.sst_wdate, 'isoformat') else str(row.sst_wdate) if row.sst_wdate else None,
+                "sst_udate": row.sst_udate.isoformat() if row.sst_udate and hasattr(row.sst_udate, 'isoformat') else str(row.sst_udate) if row.sst_udate else None,
+                "sst_ddate": row.sst_ddate.isoformat() if row.sst_ddate and hasattr(row.sst_ddate, 'isoformat') else str(row.sst_ddate) if row.sst_ddate else None,
                 "sst_in_chk": row.sst_in_chk,
                 "sst_schedule_chk": row.sst_schedule_chk,
                 "sst_entry_cnt": row.sst_entry_cnt,
@@ -671,8 +859,8 @@ def create_group_schedule(
                 mt_idx, sst_title, sst_sdate, sst_edate, sst_sedate, sst_all_day,
                 sgt_idx, sgdt_idx, sgdt_idx_t,
                 sst_location_title, sst_location_add, sst_location_lat, sst_location_long,
-                sst_location_alarm, sst_location_detail,
-                sst_memo, sst_supplies, sst_content, sst_place,
+                sst_location_alarm,
+                sst_memo, sst_supplies,
                 sst_alram, sst_alram_t, sst_schedule_alarm_chk, 
                 sst_pick_type, sst_pick_result, sst_schedule_alarm,
                 sst_repeat_json, sst_repeat_json_v,
@@ -682,8 +870,8 @@ def create_group_schedule(
                 :mt_idx, :sst_title, :sst_sdate, :sst_edate, :sst_sedate, :sst_all_day,
                 :sgt_idx, :sgdt_idx, :sgdt_idx_t,
                 :sst_location_title, :sst_location_add, :sst_location_lat, :sst_location_long,
-                :sst_location_alarm, :sst_location_detail,
-                :sst_memo, :sst_supplies, :sst_content, :sst_place,
+                :sst_location_alarm,
+                :sst_memo, :sst_supplies,
                 :sst_alram, :sst_alram_t, :sst_schedule_alarm_chk,
                 :sst_pick_type, :sst_pick_result, :sst_schedule_alarm,
                 :sst_repeat_json, :sst_repeat_json_v,
@@ -707,11 +895,8 @@ def create_group_schedule(
             "sst_location_lat": schedule_data.get("sst_location_lat"),
             "sst_location_long": schedule_data.get("sst_location_long"),
             "sst_location_alarm": schedule_data.get("sst_location_alarm", "N"),
-            "sst_location_detail": schedule_data.get("sst_location_detail"),
             "sst_memo": schedule_data.get("sst_memo"),
             "sst_supplies": schedule_data.get("sst_supplies"),
-            "sst_content": schedule_data.get("sst_content"),
-            "sst_place": schedule_data.get("sst_place"),
             "sst_alram": schedule_data.get("sst_alram", "N"),
             "sst_alram_t": schedule_data.get("sst_alram_t"),
             "sst_schedule_alarm_chk": schedule_data.get("sst_schedule_alarm_chk", "N"),
@@ -736,6 +921,18 @@ def create_group_schedule(
         new_schedule_id = result.lastrowid
         logger.info(f"✅ [CREATE_SCHEDULE] 스케줄 생성 성공: schedule_id={new_schedule_id}, user_id={current_user_id}, target_user_id={target_member_id}")
         
+        # 반복 일정이 있는 경우 3년간 자동 생성
+        if sst_repeat_json and sst_repeat_json.strip() and sst_repeat_json != '':
+            try:
+                logger.info(f"🔄 [CREATE_SCHEDULE] 반복 일정 생성 시작 - repeat_json: {sst_repeat_json}")
+                repeat_schedules_created = create_recurring_schedules(
+                    db, new_schedule_id, insert_params, sst_repeat_json, sst_repeat_json_v
+                )
+                logger.info(f"✅ [CREATE_SCHEDULE] 반복 일정 생성 완료 - 생성된 개수: {repeat_schedules_created}")
+            except Exception as e:
+                logger.warning(f"⚠️ [CREATE_SCHEDULE] 반복 일정 생성 실패: {e}")
+                # 반복 일정 생성 실패해도 메인 일정은 유지
+        
         return {
             "success": True,
             "data": {
@@ -749,8 +946,12 @@ def create_group_schedule(
         raise
     except Exception as e:
         logger.error(f"💥 [CREATE_SCHEDULE] 스케줄 생성 오류: {e}")
+        logger.error(f"💥 [CREATE_SCHEDULE] 오류 타입: {type(e).__name__}")
+        logger.error(f"💥 [CREATE_SCHEDULE] 오류 상세: {str(e)}")
+        import traceback
+        logger.error(f"💥 [CREATE_SCHEDULE] 스택 트레이스: {traceback.format_exc()}")
         db.rollback()
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.put("/group/{group_id}/schedules/{schedule_id}")
 def update_group_schedule(
@@ -902,7 +1103,6 @@ def update_group_schedule(
             "sst_location_lat": schedule_data.get('sst_location_lat'),
             "sst_location_long": schedule_data.get('sst_location_long'),
             "sst_location_alarm": schedule_data.get('sst_location_alarm', 'N'),
-            "sst_location_detail": schedule_data.get('sst_location_detail'),
         }
         
         # 알림 관련 필드들
@@ -925,8 +1125,6 @@ def update_group_schedule(
         other_fields = {
             "sst_memo": schedule_data.get('sst_memo'),
             "sst_supplies": schedule_data.get('sst_supplies'),
-            "sst_content": schedule_data.get('sst_content'),
-            "sst_place": schedule_data.get('sst_place'),
             "slt_idx": schedule_data.get('slt_idx'),
             "slt_idx_t": schedule_data.get('sst_location_add'), # PHP에서 location_add를 slt_idx_t로 사용
             "sst_update_chk": schedule_data.get('sst_update_chk', 'Y'),

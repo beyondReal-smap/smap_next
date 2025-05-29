@@ -40,6 +40,8 @@ interface CreateScheduleRequest {
   sst_pick_type?: string;
   sst_pick_result?: string;
   sst_location_add?: string;
+  sst_location_lat?: number;
+  sst_location_long?: number;
   sst_content?: string;
 }
 
@@ -59,6 +61,8 @@ interface UpdateScheduleRequest {
   sst_pick_type?: string;
   sst_pick_result?: string;
   sst_location_add?: string;
+  sst_location_lat?: number;
+  sst_location_long?: number;
   sst_content?: string;
 }
 
@@ -122,6 +126,64 @@ try {
   console.log('[API PROXY] node-fetch 패키지를 찾을 수 없음');
 }
 
+async function fetchWithFallback(url: string, options?: RequestInit): Promise<any> {
+  const defaultOptions: RequestInit = {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'Next.js API Proxy',
+    },
+  };
+  
+  const fetchOptions = { ...defaultOptions, ...options };
+  
+  // Node.js 환경 변수로 SSL 검증 비활성화
+  const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  
+  let response: any;
+
+  try {
+    try {
+      // 기본 fetch 시도
+      response = await fetch(url, fetchOptions);
+    } catch (fetchError) {
+      if (nodeFetch) {
+        // node-fetch 시도
+        const nodeFetchOptions = {
+          method: fetchOptions.method,
+          headers: fetchOptions.headers,
+          body: fetchOptions.body,
+          agent: function(_parsedURL: any) {
+            const https = require('https');
+            return new https.Agent({
+              rejectUnauthorized: false
+            });
+          }
+        };
+        response = await nodeFetch(url, nodeFetchOptions);
+      } else {
+        throw fetchError;
+      }
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API error: ${response.status} - ${errorText}`);
+    }
+
+    return await response.json();
+  } finally {
+    // 환경 변수 복원
+    if (originalTlsReject !== undefined) {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
+    } else {
+      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    }
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ groupId: string }> }
@@ -176,93 +238,7 @@ export async function GET(
     
     console.log('[API PROXY] fetch 옵션 설정 완료');
     
-    // Node.js 환경 변수로 SSL 검증 비활성화
-    const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    console.log('[API PROXY] SSL 검증 비활성화 완료');
-    
-    let response: any;
-    let usedMethod = 'default-fetch';
-
-    try {
-      console.log('[API PROXY] 🔄 기본 fetch 시작...');
-      // 기본 fetch 시도
-      response = await fetch(backendUrl, fetchOptions);
-      console.log('[API PROXY] 기본 fetch 응답 상태:', response.status, response.statusText);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[API PROXY] 백엔드 응답 에러:', response.status, errorText);
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
-      }
-      
-      console.log('[API PROXY] ✅ 기본 fetch 성공');
-    } catch (fetchError) {
-      console.error('[API PROXY] ❌ 기본 fetch 실패:', fetchError instanceof Error ? fetchError.message : String(fetchError));
-      
-      if (nodeFetch) {
-        console.log('[API PROXY] 🔄 node-fetch 시도...');
-        try {
-          response = await nodeFetch(backendUrl, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'User-Agent': 'Next.js API Proxy (node-fetch)',
-            },
-            agent: function(_parsedURL: any) {
-              const https = require('https');
-              return new https.Agent({
-                rejectUnauthorized: false
-              });
-            }
-          });
-          usedMethod = 'node-fetch';
-          console.log('[API PROXY] node-fetch 성공, 상태:', response.status);
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[API PROXY] node-fetch 응답 에러:', response.status, errorText);
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
-          }
-          
-        } catch (nodeFetchError) {
-          console.error('[API PROXY] ❌ node-fetch도 실패:', nodeFetchError);
-          
-          // 백엔드 호출 실패 시 에러 반환 (목업 데이터 대신)
-          return NextResponse.json(
-            { 
-              success: false, 
-              error: '백엔드 서버에 연결할 수 없습니다.',
-              details: fetchError instanceof Error ? fetchError.message : String(fetchError)
-            },
-            { status: 500 }
-          );
-        }
-      } else {
-        // 백엔드 호출 실패 시 에러 반환 (목업 데이터 대신)
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: '백엔드 서버에 연결할 수 없습니다.',
-            details: fetchError instanceof Error ? fetchError.message : String(fetchError)
-          },
-          { status: 500 }
-        );
-      }
-    } finally {
-      // 환경 변수 복원
-      if (originalTlsReject !== undefined) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
-      } else {
-        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-      }
-      console.log('[API PROXY] SSL 검증 설정 복원 완료');
-    }
-
-    console.log('[API PROXY] 그룹 스케줄 백엔드 응답 상태:', response.status, response.statusText, '(사용된 방법:', usedMethod + ')');
-
-    const data = await response.json();
+    const data = await fetchWithFallback(backendUrl, fetchOptions);
     console.log('[API PROXY] ✅ 백엔드에서 실제 데이터 받음 ✅');
     console.log('[API PROXY] 그룹 스케줄 백엔드 응답 데이터:', {
       dataType: Array.isArray(data) ? 'array' : typeof data,
@@ -314,17 +290,19 @@ export async function POST(
       sst_edate: body.endDate,
       sst_location_title: body.location,
       sst_memo: body.memo,
-      target_member_id: body.targetMemberId,
+      sst_content: body.sst_content,
+      targetMemberId: body.targetMemberId,
       sst_all_day: body.sst_all_day,
-      sst_repeat_json: body.sst_repeat_json,
-      sst_repeat_json_v: body.sst_repeat_json_v,
+      sst_repeat_json: body.sst_repeat_json || null,
+      sst_repeat_json_v: body.sst_repeat_json_v || null,
       sst_alram: body.sst_alram,
       sst_alram_t: body.sst_alram_t,
       sst_schedule_alarm_chk: body.sst_schedule_alarm_chk,
       sst_pick_type: body.sst_pick_type,
       sst_pick_result: body.sst_pick_result,
       sst_location_add: body.sst_location_add,
-      sst_content: body.sst_content
+      sst_location_lat: body.sst_location_lat,
+      sst_location_long: body.sst_location_long
     };
     
     console.log('[API PROXY] 📦 백엔드 전송 데이터:', backendRequestData);
@@ -337,61 +315,29 @@ export async function POST(
         'User-Agent': 'Next.js API Proxy',
       },
       body: JSON.stringify(backendRequestData),
-      // @ts-ignore
-      rejectUnauthorized: false,
     };
     
-    const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    const data = await fetchWithFallback(backendUrl, fetchOptions);
+    console.log('[API PROXY] ✅ 백엔드 성공 응답:', data);
     
-    try {
-      const response = await fetch(backendUrl, fetchOptions);
-      
-      if (originalTlsReject !== undefined) {
-        process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
-      } else {
-        delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    return NextResponse.json({
+      success: true,
+      data: {
+        sst_idx: data.sst_idx || data.data?.sst_idx || Date.now(),
+        message: data.message || data.data?.message || '스케줄이 성공적으로 생성되었습니다.'
       }
-
-      console.log('[API PROXY] 📡 백엔드 응답 상태:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[API PROXY] ❌ 백엔드 에러 응답:', errorText);
-        return NextResponse.json(
-          { success: false, error: '스케줄 생성에 실패했습니다.' },
-          { status: response.status }
-        );
-      }
-
-      const data = await response.json();
-      console.log('[API PROXY] ✅ 백엔드 성공 응답:', data);
-      
-      return NextResponse.json({
-        success: true,
-        data: {
-          sst_idx: data.sst_idx || Date.now(),
-          message: '스케줄이 성공적으로 생성되었습니다.'
-        }
-      });
-      
-    } catch (fetchError) {
-      console.error('[API PROXY] 💥 백엔드 네트워크 에러:', fetchError);
-      
-      // 모의 응답 반환
-      return NextResponse.json({
-        success: true,
-        data: {
-          sst_idx: Date.now(),
-          message: '스케줄이 성공적으로 생성되었습니다.'
-        }
-      });
-    }
+    });
     
   } catch (error) {
     console.error('[API PROXY] 💥 스케줄 생성 오류:', error);
+    console.error('[API PROXY] 🔍 에러 상세:', {
+      message: error instanceof Error ? error.message : String(error),
+      name: error instanceof Error ? error.name : 'Unknown',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
     return NextResponse.json(
-      { success: false, error: '스케줄 생성 중 오류가 발생했습니다.' },
+      { success: false, error: '스케줄 생성 중 오류가 발생했습니다.', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
@@ -420,16 +366,18 @@ export async function PUT(
       sst_edate: body.endDate,
       sst_location_title: body.location,
       sst_memo: body.memo,
+      sst_content: body.sst_content,
       sst_all_day: body.sst_all_day,
-      sst_repeat_json: body.sst_repeat_json,
-      sst_repeat_json_v: body.sst_repeat_json_v,
+      sst_repeat_json: body.sst_repeat_json || null,
+      sst_repeat_json_v: body.sst_repeat_json_v || null,
       sst_alram: body.sst_alram,
       sst_alram_t: body.sst_alram_t,
       sst_schedule_alarm_chk: body.sst_schedule_alarm_chk,
       sst_pick_type: body.sst_pick_type,
       sst_pick_result: body.sst_pick_result,
       sst_location_add: body.sst_location_add,
-      sst_content: body.sst_content
+      sst_location_lat: body.sst_location_lat,
+      sst_location_long: body.sst_location_long
     };
     
     console.log('[API PROXY] 📦 백엔드 전송 데이터:', backendRequestData);
