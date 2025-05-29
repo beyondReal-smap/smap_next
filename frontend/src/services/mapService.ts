@@ -47,7 +47,7 @@ export const loadNaverMapsAPI = (callback: () => void): void => {
 
   // 스크립트 요소 생성 (만약 Next.js Script 컴포넌트를 사용하지 않을 경우)
   const script = document.createElement('script');
-  script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${MAP_API_KEYS.NAVER_CLIENT_ID}`;
+  script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${MAP_API_KEYS.NAVER_CLIENT_ID}`;
   script.async = true;
   script.defer = true;
   script.onload = callback;

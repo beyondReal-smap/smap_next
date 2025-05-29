@@ -299,6 +299,7 @@ interface ScheduleEvent {
   repeatJsonV?: string; // 반복 JSON 버전
   tgtSgdtOwnerChk?: string; // 타겟 멤버의 오너 권한
   tgtSgdtLeaderChk?: string; // 타겟 멤버의 리더 권한
+  sst_pidx?: number; // 반복 일정 인덱스
 }
 
 // 모의 일정 데이터
@@ -404,6 +405,7 @@ interface NewEvent {
   groupColor?: string;
   memberName?: string;
   memberPhoto?: string;
+  editOption?: 'this' | 'future' | 'all';
 }
 
 // 일정 상태 판단 함수
@@ -671,6 +673,11 @@ export default function SchedulePage() {
   // 스케줄 액션 선택 모달 상태
   const [isScheduleActionModalOpen, setIsScheduleActionModalOpen] = useState(false);
   const [selectedEventForAction, setSelectedEventForAction] = useState<ScheduleEvent | null>(null);
+
+  // 반복 일정 처리 모달 상태
+  const [isRepeatActionModalOpen, setIsRepeatActionModalOpen] = useState(false);
+  const [repeatActionType, setRepeatActionType] = useState<'edit' | 'delete'>('edit');
+  const [pendingRepeatEvent, setPendingRepeatEvent] = useState<ScheduleEvent | null>(null);
 
   // 컴포넌트 마운트 감지
   useEffect(() => {
@@ -1807,7 +1814,8 @@ export default function SchedulePage() {
               isAllDay: isAllDay, // 하루 종일 여부
               repeatJsonV: schedule.sst_repeat_json_v || '', // 반복 JSON 버전
               tgtSgdtOwnerChk: schedule.tgt_sgdt_owner_chk || 'N', // 타겟 멤버의 오너 권한
-              tgtSgdtLeaderChk: schedule.tgt_sgdt_leader_chk || 'N' // 타겟 멤버의 리더 권한
+              tgtSgdtLeaderChk: schedule.tgt_sgdt_leader_chk || 'N', // 타겟 멤버의 리더 권한
+              sst_pidx: schedule.sst_pidx || undefined // 반복 일정 인덱스 추가
             }
             
             allEvents.push(event);
@@ -1877,6 +1885,89 @@ export default function SchedulePage() {
 
   // 수정 액션 핸들러
   const handleEditAction = (event: ScheduleEvent) => {
+    // 반복 일정인지 확인 (sst_repeat_json이 있는 경우)
+    if (event.repeatText && event.repeatText !== '없음') {
+      // 반복 일정인 경우 선택 모달 표시
+      setPendingRepeatEvent(event);
+      setRepeatActionType('edit');
+      setIsScheduleActionModalOpen(false);
+      setIsRepeatActionModalOpen(true);
+      return;
+    }
+
+    // 일반 일정 수정 처리
+    executeEditAction(event);
+  };
+
+  // 반복 일정 옵션 선택 핸들러
+  const handleRepeatOption = async (option: 'this' | 'future' | 'all') => {
+    if (!pendingRepeatEvent) return;
+
+    setIsRepeatActionModalOpen(false);
+
+    if (repeatActionType === 'delete') {
+      await executeDeleteAction(pendingRepeatEvent, option);
+    } else if (repeatActionType === 'edit') {
+      executeEditAction(pendingRepeatEvent, option);
+    }
+
+    setPendingRepeatEvent(null);
+  };
+
+  // 실제 삭제 실행
+  const executeDeleteAction = async (event: ScheduleEvent, option: 'single' | 'this' | 'future' | 'all') => {
+    if (!selectedGroupId) {
+      openSuccessModal('그룹 오류', '그룹 정보가 없습니다.', 'error');
+      return;
+    }
+
+    try {
+      console.log('[executeDeleteAction] 스케줄 삭제 시작:', {
+        sst_idx: event.sst_idx,
+        groupId: selectedGroupId,
+        option
+      });
+
+      // TODO: 백엔드가 준비되면 option 파라미터 추가 필요
+      const response = await scheduleService.deleteSchedule(
+        event.sst_idx!,
+        selectedGroupId
+      );
+
+      if (response.success) {
+        console.log('[executeDeleteAction] 스케줄 삭제 성공');
+        
+        // 모든 관련 모달 상태 초기화
+        setIsScheduleActionModalOpen(false);
+        setIsRepeatActionModalOpen(false);
+        setSelectedEventForAction(null);
+        setPendingRepeatEvent(null);
+        
+        // 로컬 상태에서도 제거
+        setEvents(prev => prev.filter(e => e.id !== event.id));
+        
+        // 스케줄 목록 새로 고침
+        await loadAllGroupSchedules();
+        
+        // 성공 모달 표시 (3초 후 자동 닫기)
+        const deleteMessage = option === 'single' || option === 'this' 
+          ? '일정이 성공적으로 삭제되었습니다.' 
+          : option === 'future'
+          ? '현재 이후의 반복 일정이 성공적으로 삭제되었습니다.'
+          : '모든 반복 일정이 성공적으로 삭제되었습니다.';
+        
+        openSuccessModal('일정 삭제 완료', deleteMessage, 'success', undefined, true);
+      } else {
+        openSuccessModal('일정 삭제 실패', response.error || '일정 삭제에 실패했습니다.', 'error');
+      }
+    } catch (error) {
+      console.error('[executeDeleteAction] 스케줄 삭제 실패:', error);
+      openSuccessModal('일정 삭제 실패', '일정 삭제 중 오류가 발생했습니다.', 'error');
+    }
+  };
+
+  // 실제 수정 실행
+  const executeEditAction = (event: ScheduleEvent, option?: 'this' | 'future' | 'all') => {
     // 반복 패턴 역변환 함수
     const convertRepeatTextToSelect = (repeatText: string): string => {
       if (!repeatText || repeatText === '없음') return '안함';
@@ -1911,6 +2002,7 @@ export default function SchedulePage() {
       groupColor: event.groupColor || '',
       memberName: event.memberName || '',
       memberPhoto: '', // 빈 문자열로 설정하여 로컬 이미지 사용
+      editOption: option // 반복 일정 옵션 저장
     });
     setIsScheduleActionModalOpen(false);
     setIsAddEventModalOpen(true);
@@ -1924,40 +2016,19 @@ export default function SchedulePage() {
       return;
     }
 
-    if (!selectedGroupId) {
-      openSuccessModal('그룹 오류', '그룹 정보가 없습니다.', 'error');
+    // 반복 일정인지 확인 (sst_repeat_json이 있는 경우)
+    if (event.repeatText && event.repeatText !== '없음') {
+      // 반복 일정인 경우 선택 모달 표시
+      setPendingRepeatEvent(event);
+      setRepeatActionType('delete');
+      setIsScheduleActionModalOpen(false);
+      setIsRepeatActionModalOpen(true);
       return;
     }
 
-    try {
-      console.log('[handleDeleteAction] 스케줄 삭제 시작:', {
-        sst_idx: event.sst_idx,
-        groupId: selectedGroupId,
-      });
-
-      const response = await scheduleService.deleteSchedule(
-        event.sst_idx,
-        selectedGroupId
-      );
-
-      if (response.success) {
-        console.log('[handleDeleteAction] 스케줄 삭제 성공');
-        
-        // 로컬 상태에서도 제거
-        setEvents(prev => prev.filter(e => e.id !== event.id));
-        
-        // 스케줄 목록 새로 고침
-        await loadAllGroupSchedules();
-        
-        // 성공 모달 표시 (3초 후 자동 닫기)
-        openSuccessModal('일정 삭제 완료', '일정이 성공적으로 삭제되었습니다.', 'success', undefined, true);
-      } else {
-        openSuccessModal('일정 삭제 실패', response.error || '일정 삭제에 실패했습니다.', 'error');
-      }
-    } catch (error) {
-      console.error('[handleDeleteAction] 스케줄 삭제 실패:', error);
-      openSuccessModal('일정 삭제 실패', '일정 삭제 중 오류가 발생했습니다.', 'error');
-    }
+    // 일반 일정 삭제 처리 - 액션 모달 먼저 닫기
+    setIsScheduleActionModalOpen(false);
+    await executeDeleteAction(event, 'single');
   };
 
   return (
@@ -3474,13 +3545,13 @@ export default function SchedulePage() {
                     </div>
 
                     {/* 제목 */}
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">
                       {successModalContent.title}
                     </h3>
 
                     {/* 메시지 */}
                     <div className="text-gray-600 mb-4 leading-relaxed" style={{ wordBreak: 'break-all' }}>
-                      {successModalContent.message.split('\n').map((line, index) => (
+                      {successModalContent.message.split('\\n').map((line, index) => (
                         <div key={index}>
                           {line.includes('"') ? (
                             line.split('"').map((part, partIndex) => (
@@ -3495,7 +3566,6 @@ export default function SchedulePage() {
                           ) : (
                             <span>{line}</span>
                           )}
-                          {index < successModalContent.message.split('\n').length - 1 && <br />}
                         </div>
                       ))}
                     </div>
@@ -3513,18 +3583,6 @@ export default function SchedulePage() {
                         </div>
                         <p className="text-sm text-gray-500 mb-2">3초 후 자동으로 닫힙니다</p>
                       </>
-                    )}
-
-                    {/* 삭제 확인 모달인 경우 진행 바 표시 */}
-                    {successModalContent.onConfirm && successModalContent.type === 'info' && (
-                      <div className="w-full bg-gray-200 rounded-full h-1 mb-2">
-                        <motion.div 
-                          className="bg-orange-500 h-1 rounded-full"
-                          initial={{ width: "0%" }}
-                          animate={{ width: "100%" }}
-                          transition={{ duration: 3 }}
-                        />
-                      </div>
                     )}
                   </div>
 
@@ -3625,54 +3683,153 @@ export default function SchedulePage() {
                     <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
                       <FiClock className="w-8 h-8 text-indigo-600" />
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">{selectedEventForAction.title}</h3>
-                    <p className="text-gray-600 mb-4">
-                      {dayjs(selectedEventForAction.date).format('M월 D일')} {selectedEventForAction.startTime} - {selectedEventForAction.endTime}
+                    <h3 className="text-lg font-bold text-gray-900">{selectedEventForAction.title}</h3>
+                    <p className="text-gray-500 font-bold">
+                      {dayjs(selectedEventForAction.date).format('MM월 DD일')} {selectedEventForAction.startTime} - {selectedEventForAction.endTime}
                     </p>
-                    <p className="text-sm text-gray-500">이 일정을 어떻게 처리하시겠습니까?</p>
+                    
+                    {/* 반복 일정 배지 */}
+                    {selectedEventForAction.repeatText && selectedEventForAction.repeatText !== '없음' && (
+                      <div className="inline-flex items-center space-x-1 bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium mt-2 mb-2">
+                        <FiRotateCcw className="w-4 h-4" />
+                        <span>반복 일정 ({selectedEventForAction.repeatText})</span>
+                      </div>
+                    )}
+                    
+                    <p className="text-sm text-gray-400">선택한 일정에 대해 수정하거나 삭제할 수 있습니다.</p>
                   </div>
 
                   {/* 액션 버튼들 */}
                   <div className="space-y-3">
                     <motion.button
-                      onClick={() => handleEditAction(selectedEventForAction)}
-                      className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-medium flex items-center justify-center space-x-2 transition-all duration-200"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleEditAction(selectedEventForAction!)}
+                      className="w-full flex items-center justify-center space-x-3 py-4 bg-blue-50 text-blue-700 rounded-xl font-semibold mobile-button hover:bg-blue-100 transition-colors"
                     >
-                      <FiEdit3 className="w-4 h-4" />
+                      <FiEdit3 className="w-5 h-5" />
                       <span>수정하기</span>
                     </motion.button>
                     
                     <motion.button
                       onClick={() => {
-                        closeScheduleActionModal();
-                        setTimeout(() => {
+                        // 반복 일정인지 확인하여 처리 방식 결정
+                        if (selectedEventForAction?.repeatText && selectedEventForAction.repeatText !== '없음') {
+                          // 반복 일정인 경우 바로 handleDeleteAction 호출
+                          handleDeleteAction(selectedEventForAction);
+                        } else {
+                          // 일반 일정인 경우 삭제 확인 모달 표시
+                          const eventTitle = selectedEventForAction?.title || '일정';
+                          const confirmMessage = `일정 "${eventTitle}"\n정말 삭제하시겠습니까?`;
+                          
+                          // 먼저 액션 모달을 닫고 삭제 확인 모달을 열기
+                          setIsScheduleActionModalOpen(false);
+                          
                           openSuccessModal(
-                            '일정 삭제',
-                            `"${selectedEventForAction.title}" 일정을 정말 삭제하시겠습니까?\n삭제된 일정은 복구할 수 없습니다.`,
-                            'info',
-                            () => handleDeleteAction(selectedEventForAction)
+                            '일정 삭제 확인', 
+                            confirmMessage, 
+                            'info', 
+                            () => handleDeleteAction(selectedEventForAction!)
                           );
-                        }, 200);
+                        }
                       }}
-                      className="w-full py-4 bg-red-500 text-white rounded-2xl font-medium flex items-center justify-center space-x-2 transition-all duration-200"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                      className="w-full flex items-center justify-center space-x-3 py-4 bg-red-50 text-red-700 rounded-xl font-semibold mobile-button hover:bg-red-100 transition-colors"
                     >
-                      <FaTrash className="w-4 h-4" />
+                      <FaTrash className="w-5 h-5" />
                       <span>삭제하기</span>
                     </motion.button>
-
-                    <motion.button
+                    
+                    <button
                       onClick={closeScheduleActionModal}
-                      className="w-full py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium transition-all duration-200"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
+                      className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                     >
                       취소
-                    </motion.button>
+                    </button>
                   </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 반복 일정 처리 모달 */}
+        <AnimatePresence>
+          {isRepeatActionModalOpen && (
+            <motion.div 
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+              onClick={() => {
+                setIsRepeatActionModalOpen(false);
+                setSelectedEventForAction(null);
+                setPendingRepeatEvent(null);
+                // body 스크롤 복원
+                document.body.style.overflow = '';
+              }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <motion.div 
+                className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+                onClick={e => e.stopPropagation()}
+                onWheel={e => e.stopPropagation()}
+                onTouchMove={e => e.stopPropagation()}
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">반복 일정 {repeatActionType === 'edit' ? '수정' : '삭제'}</h3>
+                  
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => handleRepeatOption('this')}
+                      className="w-full px-4 py-4 text-left rounded-xl transition-all duration-200 mobile-button bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-transparent hover:border-gray-300"
+                    >
+                      <div className="space-y-1">
+                        <div className="font-semibold">이것만 {repeatActionType === 'edit' ? '수정' : '삭제'}</div>
+                        <div className="text-sm text-gray-500">선택한 일정만 처리합니다</div>
+                      </div>
+                    </button>
+                    
+                    <button
+                      onClick={() => handleRepeatOption('future')}
+                      className="w-full px-4 py-4 text-left rounded-xl transition-all duration-200 mobile-button bg-blue-50 text-blue-700 hover:bg-blue-100 border-2 border-transparent hover:border-blue-300"
+                    >
+                      <div className="space-y-1">
+                        <div className="font-semibold">현재 이후 {repeatActionType === 'edit' ? '수정' : '삭제'}</div>
+                        <div className="text-sm text-blue-500">이 일정부터 앞으로의 모든 반복 일정을 처리합니다</div>
+                      </div>
+                    </button>
+                    
+                    <button
+                      onClick={() => handleRepeatOption('all')}
+                      className={`w-full px-4 py-4 text-left rounded-xl transition-all duration-200 mobile-button border-2 border-transparent ${
+                        repeatActionType === 'edit' 
+                          ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300' 
+                          : 'bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="font-semibold">모든 반복 {repeatActionType === 'edit' ? '수정' : '삭제'}</div>
+                        <div className={`text-sm ${repeatActionType === 'edit' ? 'text-amber-500' : 'text-red-500'}`}>
+                          과거를 포함한 모든 반복 일정을 처리합니다
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      setIsRepeatActionModalOpen(false);
+                      setSelectedEventForAction(null);
+                      setPendingRepeatEvent(null);
+                      // body 스크롤 복원
+                      document.body.style.overflow = '';
+                    }}
+                    className="w-full mt-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                  >
+                    취소
+                  </button>
                 </div>
               </motion.div>
             </motion.div>

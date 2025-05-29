@@ -1549,7 +1549,7 @@ export default function LocationPage() {
       }
       
       const script = document.createElement('script');
-      script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${API_KEYS.NAVER_MAPS_CLIENT_ID}&submodules=geocoder`;
+      script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEYS.NAVER_MAPS_CLIENT_ID}&submodules=geocoder`;
       script.async = true;
       script.onload = () => {
         console.log('[네이버 지도 로드] 스크립트 로드 완료');

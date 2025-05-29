@@ -1024,8 +1024,8 @@ export default function HomePage() {
 
     console.log('Naver Maps API 로드 시작');
     // 네이버 지도 API 로드용 URL 생성
-    const naverMapUrl = new URL(`https://openapi.map.naver.com/openapi/v3/maps.js`);
-    naverMapUrl.searchParams.append('ncpClientId', NAVER_MAPS_CLIENT_ID);
+    const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
+    naverMapUrl.searchParams.append('ncpKeyId', NAVER_MAPS_CLIENT_ID);
     naverMapUrl.searchParams.append('submodules', 'panorama,geocoder,drawing,visualization');
     
     // script 요소 생성 및 로드

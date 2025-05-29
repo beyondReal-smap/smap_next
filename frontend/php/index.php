@@ -562,7 +562,7 @@ $member_info_row = get_member_t_info($_SESSION['_mt_idx']);
 // 한국어 사용자를 위한 네이버 지도 API 스크립트
 if ($userLang == 'ko' && $mem_row['mt_map'] == 'N') {
 ?>
-    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=<?= NCPCLIENTID ?>&submodules=geocoder&callback=CALLBACK_FUNCTION"></script>
+    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=<?= NCPCLIENTID ?>&submodules=geocoder&callback=CALLBACK_FUNCTION"></script>
     <!-- SK TMAP -->
     <script>
         map = new naver.maps.Map("map", {
@@ -838,7 +838,7 @@ if ($userLang == 'ko' && $mem_row['mt_map'] == 'N') {
     // 한국어 이외의 사용자를 위한 구글 지도 API 스크립트
 } else {
 ?>
-    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=<?= NCPCLIENTID ?>&submodules=geocoder&callback=CALLBACK_FUNCTION"></script>
+    <script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=<?= NCPCLIENTID ?>&submodules=geocoder&callback=CALLBACK_FUNCTION"></script>
     <script>
         // Google Maps API 로드 함수를 네이버 맵스 API 로드 함수로 변경
         // let map = null; // 이미 전역에 선언되어 있으므로 제거

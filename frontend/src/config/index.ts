@@ -48,7 +48,7 @@ export const getLocalizedAppInfo = (language: string = 'ko') => {
 export const API_KEYS = {
   // 지도 API 키 - 환경변수 우선, 없으면 하드코딩된 값 사용
   GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBkWlND5fvW4tmxaj11y24XNs_LQfplwpw', // com.dmonster.smap
-  NAVER_MAPS_CLIENT_ID: process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || 'unxdi5mt3f',
+  NAVER_MAPS_CLIENT_ID: process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '91y2nh0yff',
   NAVER_MAPS_API_KEY: 'bKRzkFBbAvfdHDTZB0mJ81jmO8ufULvQavQIQZmp',
   MAPBOX_ACCESS_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '',
   

@@ -140,7 +140,7 @@ $s_date = date("Y-m-d");
         min-height: 100px; /* 최소 높이 설정으로 레이아웃 이동 방지 */
     }
 </style>
-<script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=<?= NCPCLIENTID ?>&submodules=geocoder&callback=CALLBACK_FUNCTION"></script>
+<script type="text/javascript" src="https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=<?= NCPCLIENTID ?>&submodules=geocoder&callback=CALLBACK_FUNCTION"></script>
 <div class="container sub_pg px-0 py-0">
     <!-- 로딩 화면 추가 -->
     <div id="map-loading" style="display: none;">

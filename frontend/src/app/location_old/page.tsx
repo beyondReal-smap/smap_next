@@ -641,7 +641,7 @@ export default function LocationPage() {
     }
     const script = document.createElement('script');
     script.id = 'naver-maps-script'; 
-    script.src = `https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${NAVER_MAPS_CLIENT_ID}&submodules=geocoder,drawing,visualization`;
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAPS_CLIENT_ID}&submodules=geocoder,drawing,visualization`;
     script.async = true;
     script.defer = true;
     script.onload = () => {
