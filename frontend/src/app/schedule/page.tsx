@@ -292,6 +292,8 @@ interface ScheduleEvent {
   tgtMtIdx?: number | null;
   isAllDay?: boolean; // 하루 종일 여부
   repeatJsonV?: string; // 반복 JSON 버전
+  tgtSgdtOwnerChk?: string; // 타겟 멤버의 오너 권한
+  tgtSgdtLeaderChk?: string; // 타겟 멤버의 리더 권한
 }
 
 interface NewEvent {
@@ -324,7 +326,7 @@ function getEventStatus(event: ScheduleEvent): { text: string; color: string; bg
   } else if (now.isBetween(eventStart, eventEnd)) {
     return { text: '진행중', color: 'text-green-600', bgColor: 'bg-green-50' };
   } else {
-    return { text: '완료', color: 'text-gray-600', bgColor: 'bg-gray-50' };
+    return { text: '완료', color: 'text-amber-600', bgColor: 'bg-amber-50' };
   }
 }
 
@@ -1051,7 +1053,7 @@ export default function SchedulePage() {
             if (member.mt_file1.startsWith('http')) {
               photoUrl = member.mt_file1;
             } else {
-              photoUrl = `http://118.67.130.71:8000/storage/${member.mt_file1}`;
+              photoUrl = `/${member.mt_file1}`;
             }
             console.log(`[fetchGroupMembers] ${member.mt_name}의 이미지 URL:`, photoUrl);
           }
@@ -1468,6 +1470,12 @@ export default function SchedulePage() {
             if (schedule.tgt_mt_idx) {
               console.log(`[loadAllGroupSchedules] 스케줄 ${index} 타겟 멤버 ID:`, schedule.tgt_mt_idx);
             }
+            if (schedule.tgt_sgdt_owner_chk) {
+              console.log(`[loadAllGroupSchedules] 스케줄 ${index} 타겟 멤버 오너 권한:`, schedule.tgt_sgdt_owner_chk);
+            }
+            if (schedule.tgt_sgdt_leader_chk) {
+              console.log(`[loadAllGroupSchedules] 스케줄 ${index} 타겟 멤버 리더 권한:`, schedule.tgt_sgdt_leader_chk);
+            }
             
             console.log(`[loadAllGroupSchedules] 스케줄 ${index} 변환 중:`, schedule);
             
@@ -1557,7 +1565,9 @@ export default function SchedulePage() {
               // 타겟 멤버 정보
               tgtMtIdx: schedule.tgt_mt_idx || null,
               isAllDay: isAllDay, // 하루 종일 여부
-              repeatJsonV: schedule.sst_repeat_json_v || '' // 반복 JSON 버전
+              repeatJsonV: schedule.sst_repeat_json_v || '', // 반복 JSON 버전
+              tgtSgdtOwnerChk: schedule.tgt_sgdt_owner_chk || 'N', // 타겟 멤버의 오너 권한
+              tgtSgdtLeaderChk: schedule.tgt_sgdt_leader_chk || 'N' // 타겟 멤버의 리더 권한
             };
             
             console.log(`[loadAllGroupSchedules] 변환된 이벤트 ${index}:`, event);
@@ -1689,7 +1699,7 @@ export default function SchedulePage() {
                 <div className="p-4">
                   {eventsForSelectedDay.length > 0 ? (
                     <motion.div 
-                      className="space-y-3"
+                      className="space-y-4"
                       initial="hidden"
                       animate="visible"
                       variants={{
@@ -1720,95 +1730,152 @@ export default function SchedulePage() {
                               }
                             }}
                             whileHover={{ 
-                              y: -6,
+                              y: -4,
                               transition: { duration: 0.2 }
                             }}
                             whileTap={{ scale: 0.98 }}
                           >
-                            {/* 메인 카드 */}
-                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 group-hover:shadow-xl group-hover:border-gray-200 transition-all duration-300">
+                            {/* 메인 카드 - 컴팩트 버전 */}
+                            <div className="bg-white rounded-2xl p-4 shadow-md border border-gray-200 group-hover:shadow-lg group-hover:border-indigo-300 transition-all duration-300">
                               {/* 상단: 시간과 상태를 한 줄로 */}
-                              <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center space-x-3">
-                                  {/* 시간 정보 - 시작시간 강조 */}
+                                  {/* 시간 정보 - 컴팩트 */}
                                   <div className="flex items-center space-x-2">
-                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                    <div className="w-8 h-8 bg-pink-100 rounded-lg flex items-center justify-center">
+                                      <svg className="w-4 h-4 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      </svg>
+                                    </div>
                                     {event.isAllDay ? (
-                                      <span className="text-lg font-bold text-gray-900">하루종일</span>
+                                      <div className="flex flex-col">
+                                        <span className="text-lg font-bold text-gray-900">하루종일</span>
+                                        <span className="text-xs text-gray-400">전일 일정</span>
+                                      </div>
                                     ) : (
-                                      <div className="flex items-center space-x-1">
-                                        <span className="text-lg font-bold text-gray-900">{event.startTime}</span>
-                                        <span className="text-sm text-gray-500">~</span>
-                                        <span className="text-sm font-medium text-gray-600">{event.endTime}</span>
+                                      <div className="flex flex-col">
+                                        <div className="flex items-center space-x-1">
+                                          <span className="text-lg font-bold text-gray-900">{event.startTime}</span>
+                                          <span className="text-sm text-gray-400">~</span>
+                                          <span className="text-base font-semibold text-gray-600">{event.endTime}</span>
+                                        </div>
+                                        <span className="text-xs text-gray-400">
+                                          {(() => {
+                                            const start = dayjs(`${event.date} ${event.startTime}`);
+                                            const end = dayjs(`${event.date} ${event.endTime}`);
+                                            const duration = end.diff(start, 'minute');
+                                            const hours = Math.floor(duration / 60);
+                                            const minutes = duration % 60;
+                                            return hours > 0 ? `${hours}시간 ${minutes}분` : `${minutes}분`;
+                                          })()}
+                                        </span>
                                       </div>
                                     )}
                                   </div>
                                 </div>
                                 
-                                {/* 상태 배지 - 우측으로 이동 */}
-                                <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${status.color} ${status.bgColor}`}>
-                                  <div className={`w-2 h-2 rounded-full mr-1.5 ${status.text === '진행중' ? 'bg-green-500 animate-pulse' : status.text === '예정' ? 'bg-blue-500' : 'bg-gray-400'}`}></div>
-                                  {status.text}
-                                </div>
-                              </div>
+                                {/* 오른쪽 상단: 상태 배지와 반복/알림 정보 */}
+                                <div className="flex flex-col items-end space-y-2">
+                                  {/* 상태 배지 - 컴팩트 */}
+                                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold shadow-sm ${status.color} ${status.bgColor}`}>
+                                    <div className={`w-2 h-2 rounded-full mr-1.5 ${status.text === '진행중' ? 'bg-green-500 animate-pulse' : status.text === '예정' ? 'bg-blue-500' : 'bg-amber-400'}`}></div>
+                                    {status.text}
+                                  </div>
 
-                              {/* 제목과 내용 통합 섹션 */}
-                              <div className="mb-4">
-                                <h3 className="text-xl font-bold text-gray-900 mb-2 leading-tight group-hover:text-indigo-700 transition-colors duration-200">
-                                  {event.title}
-                                </h3>
-                                {event.content && (
-                                  <p className="text-gray-600 text-sm leading-relaxed line-clamp-2" style={{ wordBreak: 'keep-all' }}>
-                                    {event.content}
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* 장소 정보 - 카드 형태로 개선 */}
-                              {event.locationName && (
-                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 mb-4 border border-blue-100">
-                                  <div className="flex items-start space-x-3">
-                                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                      <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                      </svg>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <h4 className="text-sm font-semibold text-blue-900">{event.locationName}</h4>
-                                      {event.locationAddress && (
-                                        <p className="text-xs text-blue-700 mt-1 opacity-80 truncate">
-                                          {event.locationAddress}
-                                        </p>
-                                      )}
-                                      {event.distanceText && (
-                                        <div className="flex items-center mt-2">
-                                          <svg className="w-3 h-3 text-blue-600 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                  {/* 반복 및 알림 정보 - 오른쪽 상단으로 이동 */}
+                                  {((event.repeatText && event.repeatText !== '없음') || event.hasAlarm || event.isAllDay) && (
+                                    <div className="flex flex-wrap items-center justify-end gap-1">
+                                      {/* 반복 배지 - 작게 */}
+                                      {event.repeatText && event.repeatText !== '없음' && (
+                                        <div className="flex items-center space-x-1 bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 px-2 py-0.5 rounded-full text-xs"
+                                             title={`반복 설정: ${event.repeatText}`}>
+                                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                           </svg>
-                                          <span className="text-xs text-blue-600 font-medium">{event.distanceText}</span>
+                                          <span className="font-medium text-xs">{event.repeatText}</span>
+                                        </div>
+                                      )}
+
+                                      {/* 알림 배지 - 작게 */}
+                                      {event.hasAlarm && (
+                                        <div className="flex items-center space-x-1 bg-gradient-to-r from-yellow-100 to-orange-100 text-yellow-700 px-2 py-0.5 rounded-full border border-yellow-200 text-xs" 
+                                             title={event.alarmTime ? `알림 시간: ${event.alarmTime}` : '알림 설정됨'}>
+                                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                          </svg>
+                                          <span className="font-medium text-xs">
+                                            {event.alarmTime || '알림'}
+                                          </span>
+                                        </div>
+                                      )}
+
+                                      {/* 하루종일 배지 - 작게 */}
+                                      {event.isAllDay && (
+                                        <div className="flex items-center space-x-1 bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 px-2 py-0.5 rounded-full border border-green-200 text-xs">
+                                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                                          </svg>
+                                          <span className="font-medium text-xs">종일</span>
                                         </div>
                                       )}
                                     </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 제목과 내용 통합 섹션 - 컴팩트 */}
+                              <div className="bg-gray-100 rounded-xl p-3 mb-3">
+                                <div className="space-y-2">
+                                  <h3 className="text-lg font-bold text-gray-900 leading-tight group-hover:text-indigo-700 transition-colors duration-200">
+                                    {event.title}
+                                  </h3>
+                                  {event.content && (
+                                    <div className="border-l-3 border-indigo-300 pl-3">
+                                      <p className="text-gray-600 text-sm leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+                                        {event.content}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 장소 정보 - 컴팩트 */}
+                              {event.locationName && (
+                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-3 mb-3">
+                                  <div className="space-y-1">
+                                    <h4 className="text-sm font-bold text-blue-900">{event.locationName}</h4>
+                                    {event.locationAddress && (
+                                      <p className="text-xs text-blue-700 leading-relaxed">
+                                        {event.locationAddress}
+                                      </p>
+                                    )}
+                                    {event.distanceText && (
+                                      <div className="flex items-center">
+                                        <div className="flex items-center space-x-1 bg-blue-200 px-2 py-0.5 rounded-full">
+                                          <svg className="w-3 h-3 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                          </svg>
+                                          <span className="text-xs text-blue-700 font-medium">{event.distanceText}</span>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               )}
 
-                              {/* 하단: 그룹/멤버 정보와 설정들 */}
-                              <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                                {/* 좌측: 그룹과 멤버 */}
+                              {/* 하단: 그룹/멤버 정보만 - 컴팩트 */}
+                              <div className="flex items-center justify-start pt-3 border-t border-gray-200">
+                                {/* 그룹과 멤버 정보만 */}
                                 <div className="flex items-center space-x-4">
                                   {/* 그룹 정보 */}
                                   {event.groupName && (
                                     <div className="flex items-center space-x-2">
-                                      <div className={`w-3 h-3 rounded-full ${event.groupColor || 'bg-gray-400'} shadow-sm`}></div>
-                                      <span className="text-xs font-medium text-gray-700">{event.groupName}</span>
+                                      <div className={`w-3 h-3 rounded-full ${event.groupColor || 'bg-gray-400'} border border-white shadow-sm`}></div>
+                                      <span className="text-xs font-medium text-gray-600">{event.groupName}</span>
                                     </div>
                                   )}
                                   
-                                  {/* 멤버 정보 - 초록색 원형 제거 */}
+                                  {/* 멤버 정보 */}
                                   {event.memberName && (
                                     <div className="flex items-center space-x-2">
                                       {event.memberPhoto ? (
@@ -1831,54 +1898,17 @@ export default function SchedulePage() {
                                           </svg>
                                         </div>
                                       )}
-                                      <span className="text-xs font-medium text-gray-700">{event.memberName}</span>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* 우측: 설정 배지들 */}
-                                <div className="flex items-center space-x-2">
-                                  {/* 알림 배지 */}
-                                  {event.hasAlarm && (
-                                    <div className="flex items-center space-x-1 bg-gradient-to-r from-yellow-100 to-orange-100 text-yellow-700 px-2 py-1 rounded-full border border-yellow-200" 
-                                         title={event.alarmTime ? `알림 시간: ${event.alarmTime}` : '알림 설정됨'}>
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                      </svg>
-                                      <span className="text-xs font-medium">
-                                        {event.alarmTime || '알림'}
-                                      </span>
-                                    </div>
-                                  )}
-                                  
-                                  {/* 반복 배지 */}
-                                  {event.repeatText && event.repeatText !== '없음' && (
-                                    <div className="flex items-center space-x-1 bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 px-2 py-1 rounded-full border border-purple-200"
-                                         title={`반복 설정: ${event.repeatText}`}>
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                      </svg>
-                                      <span className="text-xs font-medium">{event.repeatText}</span>
-                                    </div>
-                                  )}
-
-                                  {/* 하루종일 배지 */}
-                                  {event.isAllDay && (
-                                    <div className="flex items-center space-x-1 bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 px-2 py-1 rounded-full border border-green-200">
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                                      </svg>
-                                      <span className="text-xs font-medium">종일</span>
+                                      <span className="text-xs font-medium text-gray-600">{event.memberName}</span>
                                     </div>
                                   )}
                                 </div>
                               </div>
                             </div>
 
-                            {/* 호버 시 나타나는 액션 버튼 */}
-                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-y-2 group-hover:translate-y-0">
-                              <div className="flex items-center space-x-2">
-                                <button className="w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-600 hover:text-indigo-600 transition-colors">
+                            {/* 호버 시 나타나는 액션 버튼 - 컴팩트 */}
+                            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-y-1 group-hover:translate-y-0">
+                              <div className="flex items-center space-x-1">
+                                <button className="w-8 h-8 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-600 hover:text-indigo-600 transition-colors border border-gray-200 hover:border-indigo-300">
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                                   </svg>
