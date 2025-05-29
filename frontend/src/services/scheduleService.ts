@@ -607,12 +607,17 @@ class ScheduleService {
       
       if (year !== undefined) {
         params.append('year', year.toString());
+        console.log('[SCHEDULE SERVICE] year 파라미터 추가:', year);
       }
       if (month !== undefined) {
         params.append('month', month.toString());
+        console.log('[SCHEDULE SERVICE] month 파라미터 추가:', month);
       }
       
-      const response = await apiClient.get(`/schedule/owner-groups/all-schedules?${params}`);
+      const requestUrl = `/schedule/owner-groups/all-schedules?${params}`;
+      console.log('[SCHEDULE SERVICE] 요청 URL:', requestUrl);
+      
+      const response = await apiClient.get(requestUrl);
       
       console.log('[SCHEDULE SERVICE] 오너 그룹 전체 스케줄 조회 응답:', {
         status: response.status,
@@ -621,6 +626,21 @@ class ScheduleService {
         queryPeriod: response.data?.data?.queryPeriod,
         rawData: response.data
       });
+
+      // 파라미터와 응답 비교 검증
+      const responseQueryPeriod = response.data?.data?.queryPeriod;
+      if (responseQueryPeriod) {
+        console.log('[SCHEDULE SERVICE] 파라미터 vs 응답 비교:');
+        console.log(`  요청 year: ${year} -> 응답 year: ${responseQueryPeriod.year}`);
+        console.log(`  요청 month: ${month} -> 응답 month: ${responseQueryPeriod.month}`);
+        
+        if (year && responseQueryPeriod.year !== year) {
+          console.warn('[SCHEDULE SERVICE] ⚠️ YEAR 불일치! 요청:', year, '응답:', responseQueryPeriod.year);
+        }
+        if (month && responseQueryPeriod.month !== month) {
+          console.warn('[SCHEDULE SERVICE] ⚠️ MONTH 불일치! 요청:', month, '응답:', responseQueryPeriod.month);
+        }
+      }
 
       return response.data;
     } catch (error) {

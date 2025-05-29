@@ -1950,37 +1950,6 @@ export default function SchedulePage() {
                         </svg>
                         <span>일정 추가하기</span>
                       </motion.button>
-                      
-                      {/* 힌트 카드들 */}
-                      <div className="grid grid-cols-2 gap-3 mt-8 px-4">
-                        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-100">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
-                              <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </div>
-                            <span className="text-xs font-semibold text-blue-900">시간 관리</span>
-                          </div>
-                          <p className="text-xs text-blue-700 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-                            시간을 설정하거나 하루종일 일정으로 등록
-                          </p>
-                        </div>
-                        
-                        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-100">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <div className="w-6 h-6 bg-purple-100 rounded-lg flex items-center justify-center">
-                              <svg className="w-3 h-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                              </svg>
-                            </div>
-                            <span className="text-xs font-semibold text-purple-900">그룹 공유</span>
-                          </div>
-                          <p className="text-xs text-purple-700 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-                            그룹 멤버와 일정을 공유하고 협업
-                          </p>
-                        </div>
-                      </div>
                     </div>
                   )}
                 </div>

@@ -904,7 +904,7 @@ export default function SchedulePage() {
           })));
         }
       } else {
-        console.warn('[fetchGroupMembers] 그룹멤버 데이터가 없거나 비어있습니다.');
+        // console.warn('[fetchGroupMembers] 그룹멤버 데이터가 없거나 비어있습니다.');
         setScheduleGroupMembers([]);
       }
     } catch (error) {
