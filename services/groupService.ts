@@ -126,7 +126,8 @@ class GroupService {
   // 특정 멤버의 그룹 목록 조회
   async getMemberGroups(memberId: number): Promise<Group[]> {
     try {
-      const response = await apiClient.get(`/v1/groups/member/${memberId}`);
+      // 백엔드 API 문서에 따라 정확한 엔드포인트 사용
+      const response = await apiClient.get(`/groups/member/${memberId}`);
       return response.data;
     } catch (error) {
       console.error('Failed to fetch member groups:', error);
@@ -210,14 +211,20 @@ class GroupService {
     }
   }
 
-  // 현재 로그인한 사용자의 그룹 목록 조회 (임시로 고정 멤버 ID 사용)
+  // 현재 로그인한 사용자의 그룹 목록 조회
   async getCurrentUserGroups(): Promise<Group[]> {
     try {
-      // TODO: 실제 로그인한 사용자의 mt_idx를 가져와야 함
-      const CURRENT_USER_ID = 1186; // 1에서 1186으로 변경
-      return await this.getMemberGroups(CURRENT_USER_ID);
+      console.log('[GroupService] 현재 사용자 그룹 목록 조회 시작');
+      
+      // 백엔드 API 문서에 따라 현재 사용자가 속한 그룹 목록 조회
+      // Authorization 헤더를 통해 현재 사용자 식별
+      const response = await apiClient.get('/groups/current-user');
+      
+      console.log('[GroupService] 현재 사용자 그룹 목록 응답:', response.data);
+      
+      return response.data;
     } catch (error) {
-      console.error('Failed to fetch current user groups:', error);
+      console.error('[GroupService] 현재 사용자 그룹 목록 조회 실패:', error);
       throw error;
     }
   }
@@ -245,13 +252,30 @@ class GroupService {
    */
   async getGroupMembers(sgt_idx: number | string): Promise<GroupMember[]> {
     try {
-      const response = await apiClient.get(`/groups/${sgt_idx}/members`);
+      console.log(`[GroupService] 그룹 멤버 조회 시작 - sgt_idx: ${sgt_idx}`);
       
-      if (!response.data.success) {
-        throw new Error(response.data.message || '그룹 멤버 조회에 실패했습니다.');
+      // 백엔드 API 문서에 따라 정확한 엔드포인트 사용
+      // group-members/member/{group_id} 엔드포인트 사용
+      const response = await apiClient.get(`/group-members/member/${sgt_idx}`);
+      
+      console.log(`[GroupService] API 응답 상태:`, response.status);
+      console.log(`[GroupService] API 응답 데이터:`, response.data);
+      
+      // 백엔드에서 직접 배열 형태로 반환
+      if (Array.isArray(response.data)) {
+        console.log('[GroupService] 배열 형태 응답, 직접 반환');
+        return response.data;
       }
       
+      // 혹시 success/data 구조인 경우 처리
+      if (response.data.success) {
+        console.log('[GroupService] success 구조 응답, data 필드 반환');
       return response.data.data || [];
+      }
+      
+      // success가 false인 경우
+      throw new Error(response.data.message || '그룹 멤버 조회에 실패했습니다.');
+      
     } catch (error) {
       console.error('그룹 멤버 조회 오류:', error);
       throw new Error('그룹 멤버를 가져오는데 실패했습니다.');

@@ -3,7 +3,19 @@ const nextConfig = {
   reactStrictMode: false, // 개발 환경에서 두 번 렌더링 방지
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   images: {
-    domains: ['localhost'],
+    remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3000',
+        pathname: '/images/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**',
+      }
+    ],
+    unoptimized: process.env.NODE_ENV === 'development', // 개발 환경에서 이미지 최적화 비활성화
   },
   // API Routes가 서버사이드에서 프록시 처리하므로 rewrites와 headers 설정 불필요
   webpack: (config, { isServer }) => {

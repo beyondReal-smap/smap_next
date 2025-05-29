@@ -11,45 +11,25 @@
       "static/chunks/main-app.js",
       "static/chunks/app/schedule/layout.js"
     ],
-    "/api/groups/member/[memberId]/route": [
+    "/schedule/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/groups/member/[memberId]/route.js"
-    ],
-    "/api/schedules/group/[groupId]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/schedules/group/[groupId]/route.js"
-    ],
-    "/api/group-members/member/[groupId]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/group-members/member/[groupId]/route.js"
+      "static/chunks/app/schedule/page.js"
     ],
     "/api/schedule/owner-groups/all-schedules/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/schedule/owner-groups/all-schedules/route.js"
     ],
-    "/location/layout": [
+    "/api/group-members/member/[groupId]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/location/layout.js"
+      "static/chunks/app/api/group-members/member/[groupId]/route.js"
     ],
-    "/location/page": [
+    "/api/groups/current-user/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/location/page.js"
-    ],
-    "/api/groups/[groupId]/members/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/groups/[groupId]/members/route.js"
-    ],
-    "/api/locations/other-members/[memberId]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/locations/other-members/[memberId]/route.js"
+      "static/chunks/app/api/groups/current-user/route.js"
     ],
     "/group/layout": [
       "static/chunks/webpack.js",
@@ -61,30 +41,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/group/page.js"
     ],
-    "/schedule/page": [
+    "/api/groups/[groupId]/members/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/schedule/page.js"
+      "static/chunks/app/api/groups/[groupId]/members/route.js"
     ],
-    "/api/members/[id]/route": [
+    "/api/kakao-search/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/members/[id]/route.js"
-    ],
-    "/api/group-details/member/[id]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/group-details/member/[id]/route.js"
-    ],
-    "/api/groups/[groupId]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/groups/[groupId]/route.js"
-    ],
-    "/_not-found/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/api/kakao-search/route.js"
     ]
   }
 }

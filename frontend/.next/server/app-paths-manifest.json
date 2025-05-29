@@ -1,10 +1,6 @@
 {
-  "/api/groups/member/[memberId]/route": "app/api/groups/member/[memberId]/route.js",
-  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
-  "/api/locations/other-members/[memberId]/route": "app/api/locations/other-members/[memberId]/route.js",
   "/api/schedule/owner-groups/all-schedules/route": "app/api/schedule/owner-groups/all-schedules/route.js",
   "/api/group-members/member/[groupId]/route": "app/api/group-members/member/[groupId]/route.js",
   "/group/page": "app/group/page.js",
-  "/location/page": "app/location/page.js",
   "/schedule/page": "app/schedule/page.js"
 }

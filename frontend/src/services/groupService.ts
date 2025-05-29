@@ -216,14 +216,20 @@ class GroupService {
     }
   }
 
-  // 현재 로그인한 사용자의 그룹 목록 조회 (임시로 고정 멤버 ID 사용)
+  // 현재 로그인한 사용자의 그룹 목록 조회
   async getCurrentUserGroups(): Promise<Group[]> {
     try {
-      // TODO: 실제 로그인한 사용자의 mt_idx를 가져와야 함
-      const CURRENT_USER_ID = 1186; // 1에서 1186으로 변경
-      return await this.getMemberGroups(CURRENT_USER_ID);
+      console.log('[GroupService] 현재 사용자 그룹 목록 조회 시작');
+      
+      // 백엔드 API 문서에 따라 현재 사용자가 속한 그룹 목록 조회
+      // Authorization 헤더를 통해 현재 사용자 식별
+      const response = await apiClient.get('/groups/current-user');
+      
+      console.log('[GroupService] 현재 사용자 그룹 목록 응답:', response.data);
+      
+      return response.data;
     } catch (error) {
-      console.error('Failed to fetch current user groups:', error);
+      console.error('[GroupService] 현재 사용자 그룹 목록 조회 실패:', error);
       throw error;
     }
   }
