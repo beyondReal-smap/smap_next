@@ -1,12 +1,15 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.api import deps
 from app.models.member import Member
 from app.models.group_detail import GroupDetail
 from app.schemas.member import MemberResponse
 from app.models.enums import StatusEnum, ShowEnum
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/member/{group_id}", response_model=List[dict])
@@ -15,56 +18,125 @@ def get_group_members(
     db: Session = Depends(deps.get_db)
 ):
     """
-    그룹에 속한 멤버 목록과 그룹 상세 정보를 조회합니다.
+    그룹에 속한 멤버 목록과 그룹 상세 정보, 최신 위치 정보를 조회합니다.
     """
-    # 그룹 상세 테이블에서 그룹 ID로 멤버 ID 목록 조회
-    group_details = db.query(GroupDetail).filter(
-        GroupDetail.sgt_idx == group_id,
-        GroupDetail.sgdt_show == ShowEnum.Y
-    ).all()
-    
-    if not group_details:
-        return []
-    
-    # 멤버 ID 목록 추출
-    member_ids = [gd.mt_idx for gd in group_details]
-    
-    # 멤버 ID 목록으로 멤버 정보 조회
-    db_members = db.query(Member).filter(
-        Member.mt_idx.in_(member_ids),
-        Member.mt_status == 1
-    ).all()
-    
-    # mt_idx를 키로 사용하여 그룹 상세 정보를 딕셔너리로 변환
-    group_details_dict = {gd.mt_idx: gd for gd in group_details}
-    
-    # 결과 리스트 생성
-    result = []
-    for member in db_members:
-        # 멤버 데이터를 딕셔너리로 변환
-        member_dict = {c.name: getattr(member, c.name) for c in member.__table__.columns}
+    try:
+        logger.info(f"📋 [GET_GROUP_MEMBERS] 그룹 멤버 조회 시작 - group_id: {group_id}")
         
-        # mt_weather_pop 처리
-        if "mt_weather_pop" in member_dict and member_dict["mt_weather_pop"] is not None:
-            if isinstance(member_dict["mt_weather_pop"], str):
-                try:
-                    member_dict["mt_weather_pop"] = int(member_dict["mt_weather_pop"].replace('%', ''))
-                except ValueError:
-                    member_dict["mt_weather_pop"] = None
-            elif not isinstance(member_dict["mt_weather_pop"], int):
-                member_dict["mt_weather_pop"] = None
+        # 1단계: 그룹 멤버 기본 정보 조회 (빠른 쿼리)
+        basic_query = text("""
+            SELECT 
+                sgd.sgdt_idx,
+                sgd.sgt_idx,
+                sgd.mt_idx,
+                sgd.sgdt_owner_chk,
+                sgd.sgdt_leader_chk,
+                m.mt_name,
+                m.mt_nickname,
+                m.mt_birth,
+                m.mt_file1,
+                m.mt_gender,
+                m.mt_status
+            FROM smap_group_detail_t sgd
+            JOIN member_t m ON sgd.mt_idx = m.mt_idx
+            WHERE sgd.sgt_idx = :group_id 
+                AND sgd.sgdt_show = 'Y'
+                AND sgd.sgdt_discharge = 'N'
+                AND sgd.sgdt_exit = 'N'
+                AND m.mt_status = 1
+            ORDER BY 
+                CASE sgd.sgdt_owner_chk WHEN 'Y' THEN 1 ELSE 2 END,
+                CASE sgd.sgdt_leader_chk WHEN 'Y' THEN 1 ELSE 2 END,
+                m.mt_name
+        """)
         
-        # 해당 멤버의 그룹 상세 정보 가져오기
-        group_detail = group_details_dict.get(member.mt_idx)
-        if group_detail:
-            # 그룹 상세 정보를 딕셔너리로 변환하여 추가
-            group_detail_dict = {c.name: getattr(group_detail, c.name) for c in group_detail.__table__.columns}
+        basic_result = db.execute(basic_query, {"group_id": group_id}).fetchall()
+        logger.info(f"📊 [GET_GROUP_MEMBERS] 기본 정보 조회 완료 - 멤버 수: {len(basic_result)}")
+        
+        # 2단계: 모든 멤버의 최신 위치 정보를 한 번에 조회 (더 효율적)
+        member_ids = [row.mt_idx for row in basic_result]
+        location_data = {}
+        
+        if member_ids:
+            # IN 절을 사용하여 한 번에 모든 멤버의 최신 위치 조회
+            location_query = text("""
+                SELECT DISTINCT
+                    mll1.mt_idx,
+                    mll1.mlt_lat,
+                    mll1.mlt_long,
+                    mll1.mlt_speed,
+                    mll1.mlt_battery,
+                    mll1.mlt_gps_time
+                FROM member_location_log_t mll1
+                INNER JOIN (
+                    SELECT mt_idx, MAX(mlt_gps_time) as max_time
+                    FROM member_location_log_t
+                    WHERE mt_idx IN :member_ids 
+                        AND mlt_gps_time IS NOT NULL
+                    GROUP BY mt_idx
+                ) mll2 ON mll1.mt_idx = mll2.mt_idx AND mll1.mlt_gps_time = mll2.max_time
+            """)
             
-            # 멤버 정보와 그룹 상세 정보를 합쳐서 결과에 추가
-            combined_dict = {**member_dict, **group_detail_dict}
-            result.append(combined_dict)
-    
-    return result
+            location_results = db.execute(location_query, {"member_ids": tuple(member_ids)}).fetchall()
+            
+            # 위치 데이터를 딕셔너리로 변환
+            for loc in location_results:
+                location_data[loc.mt_idx] = {
+                    "mlt_lat": float(loc.mlt_lat) if loc.mlt_lat else None,
+                    "mlt_long": float(loc.mlt_long) if loc.mlt_long else None,
+                    "mlt_speed": float(loc.mlt_speed) if loc.mlt_speed else None,
+                    "mlt_battery": int(loc.mlt_battery) if loc.mlt_battery else None,
+                    "mlt_gps_time": str(loc.mlt_gps_time) if loc.mlt_gps_time else None,
+                }
+        
+        # 3단계: 결과 데이터 조합
+        members = []
+        for row in basic_result:
+            # 해당 멤버의 위치 정보 가져오기
+            location_info = location_data.get(row.mt_idx, {})
+            
+            member_data = {
+                # 그룹 상세 정보
+                "sgdt_idx": row.sgdt_idx,
+                "sgt_idx": row.sgt_idx,
+                "mt_idx": row.mt_idx,
+                "sgdt_owner_chk": row.sgdt_owner_chk,
+                "sgdt_leader_chk": row.sgdt_leader_chk,
+                
+                # 멤버 기본 정보
+                "mt_name": row.mt_name,
+                "mt_nickname": row.mt_nickname,
+                "mt_birth": str(row.mt_birth) if row.mt_birth else None,
+                "mt_file1": row.mt_file1,
+                "mt_gender": row.mt_gender,
+                "mt_status": row.mt_status,
+                
+                # 최신 위치 정보
+                "mlt_lat": location_info.get("mlt_lat"),
+                "mlt_long": location_info.get("mlt_long"),
+                "mlt_speed": location_info.get("mlt_speed"),
+                "mlt_battery": location_info.get("mlt_battery"),
+                "mlt_gps_time": location_info.get("mlt_gps_time"),
+                
+                # 호환성을 위한 추가 필드
+                "id": str(row.mt_idx),
+                "name": row.mt_name,
+                "photo": row.mt_file1,
+                "isSelected": False
+            }
+            
+            members.append(member_data)
+            
+            logger.info(f"👤 [GET_GROUP_MEMBERS] 멤버 정보 - ID: {row.mt_idx}, 이름: {row.mt_name}, 권한: O={row.sgdt_owner_chk}/L={row.sgdt_leader_chk}")
+        
+        logger.info(f"✅ [GET_GROUP_MEMBERS] 그룹 멤버 조회 완료 - 총 {len(members)}명")
+        return members
+        
+    except Exception as e:
+        logger.error(f"💥 [GET_GROUP_MEMBERS] 그룹 멤버 조회 오류: {e}")
+        import traceback
+        logger.error(f"💥 [GET_GROUP_MEMBERS] 상세 오류: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.post("/add")
 def add_member_to_group(

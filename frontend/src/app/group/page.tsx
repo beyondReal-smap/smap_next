@@ -233,6 +233,13 @@ interface GroupMember {
   sgdt_adate?: string;
   photo?: string | null;
   original_index: number;
+  
+  // 새로 추가된 위치 정보
+  mlt_lat?: number | null;
+  mlt_long?: number | null;
+  mlt_speed?: number | null;
+  mlt_battery?: number | null;
+  mlt_gps_time?: string | null;
 }
 
 // 새 그룹 폼 타입 정의
@@ -361,6 +368,11 @@ function GroupPageContent() {
         sgdt_adate: member.sgdt_adate,
         photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
         original_index: index,
+        mlt_lat: member.mlt_lat,
+        mlt_long: member.mlt_long,
+        mlt_speed: member.mlt_speed,
+        mlt_battery: member.mlt_battery,
+        mlt_gps_time: member.mlt_gps_time,
       }));
       
       setGroupMembers(transformedMembers);

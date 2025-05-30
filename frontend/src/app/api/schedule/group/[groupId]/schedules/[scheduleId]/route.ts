@@ -24,6 +24,7 @@ interface DeleteScheduleRequest {
   // 반복 일정 처리 옵션
   deleteOption?: 'this' | 'future' | 'all';
   sst_pidx?: number | null; // 반복 일정의 부모 ID
+  sgdt_idx?: number | null; // 그룹 상세 ID (null 허용)
 }
 
 async function makeBackendRequest(url: string, options: RequestInit): Promise<any> {
@@ -195,12 +196,15 @@ export async function DELETE(
     // 요청 본문에서 삭제 옵션 추출 (선택사항)
     let deleteOption: string | undefined;
     let sst_pidx: number | null = null;
+    let sgdt_idx: number | null = null;
     try {
       const body: DeleteScheduleRequest = await request.json();
       deleteOption = body.deleteOption;
       sst_pidx = body.sst_pidx || null;
+      sgdt_idx = body.sgdt_idx || null;
       console.log('[SCHEDULE API] 삭제 옵션:', deleteOption);
       console.log('[SCHEDULE API] 반복 일정 부모 ID:', sst_pidx);
+      console.log('[SCHEDULE API] 그룹 상세 ID:', sgdt_idx);
     } catch (e) {
       // 본문이 없는 경우 기본 삭제
       console.log('[SCHEDULE API] 삭제 옵션 없음, 기본 삭제 진행');
@@ -223,6 +227,12 @@ export async function DELETE(
       // 반복 일정의 부모 ID가 있는 경우
       requestData.sst_pidx = sst_pidx;
       console.log('[SCHEDULE API] 반복 일정 부모 ID 전달:', sst_pidx);
+    }
+    
+    if (sgdt_idx !== null) {
+      // 그룹 상세 ID가 있는 경우
+      requestData.sgdt_idx = sgdt_idx;
+      console.log('[SCHEDULE API] 그룹 상세 ID 전달:', sgdt_idx);
     }
     
     console.log('[SCHEDULE API] 백엔드 요청 URL:', apiUrl);

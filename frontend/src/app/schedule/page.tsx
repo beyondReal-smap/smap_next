@@ -264,6 +264,14 @@ interface ScheduleGroupMember {
   mt_file1?: string;
   sgdt_owner_chk?: string;
   sgdt_leader_chk?: string;
+  sgdt_idx?: number;
+  
+  // 새로 추가된 위치 정보
+  mlt_lat?: number | null;
+  mlt_long?: number | null;
+  mlt_speed?: number | null;
+  mlt_battery?: number | null;
+  mlt_gps_time?: string | null;
 }
 
 // ScheduleEvent 인터페이스 정의
@@ -299,6 +307,7 @@ interface ScheduleEvent {
   repeatJsonV?: string; // 반복 JSON 버전
   tgtSgdtOwnerChk?: string; // 타겟 멤버의 오너 권한
   tgtSgdtLeaderChk?: string; // 타겟 멤버의 리더 권한
+  tgtSgdtIdx?: number; // 타겟 멤버의 그룹 상세 인덱스
   sst_pidx?: number; // 반복 일정 인덱스
 }
 
@@ -510,7 +519,7 @@ function MobileCalendar({
           key={day}
           onClick={() => onDayClick(currentDate)}
           className={`
-            h-10 w-full rounded-lg flex items-center justify-center text-sm font-medium calendar-day mobile-button
+            h-10 w-full rounded-lg flex items-center justify-center text-basic font-bold calendar-day mobile-button
             ${isSelected ? 'calendar-day selected' : ''}
             ${isToday && !isSelected ? 'bg-indigo-200 text-indigo-800 font-semibold' : ''}
             ${!isSelected && !isToday ? 'hover:bg-gray-100 text-gray-800' : ''}
@@ -924,21 +933,21 @@ export default function SchedulePage() {
       return;
     }
 
-    // 현재 사용자의 권한 확인
-    const currentMember = scheduleGroupMembers.find(member => member.isSelected);
-    const isOwnerOrLeader = currentMember && 
-      (currentMember.sgdt_owner_chk === 'Y' || currentMember.sgdt_leader_chk === 'Y');
+    // 현재 사용자의 권한 확인 (로그인한 사용자)
+    const currentUser = scheduleGroupMembers.find(member => member.isSelected);
+    const isOwnerOrLeader = currentUser && 
+      (currentUser.sgdt_owner_chk === 'Y' || currentUser.sgdt_leader_chk === 'Y');
 
     console.log('[handleSaveEvent] 👤 권한 정보:', {
-      currentMember: currentMember?.name,
+      currentUser: currentUser?.name,
       selectedMemberId,
       isOwnerOrLeader,
-      sgdt_owner_chk: currentMember?.sgdt_owner_chk,
-      sgdt_leader_chk: currentMember?.sgdt_leader_chk
+      sgdt_owner_chk: currentUser?.sgdt_owner_chk,
+      sgdt_leader_chk: currentUser?.sgdt_leader_chk
     });
 
     // 다른 멤버의 스케줄을 생성/수정하려는 경우 권한 확인
-    if (selectedMemberId && selectedMemberId !== currentMember?.id && !isOwnerOrLeader) {
+    if (selectedMemberId && selectedMemberId !== currentUser?.id && !isOwnerOrLeader) {
       console.log('[handleSaveEvent] ❌ 권한 없음: 다른 멤버 스케줄 관리 권한 없음');
       openSuccessModal('권한 오류', '다른 멤버의 스케줄을 관리할 권한이 없습니다.', 'error');
       return;
@@ -1018,15 +1027,115 @@ export default function SchedulePage() {
         return result;
       }
 
+      // 알림 시간 계산 함수 (sst_sdate에서 알림 시간만큼 빼기)
+      function calculateAlarmTime(startDateTime: string, alarm: string): string {
+        console.log('[calculateAlarmTime] 🔔 알림 시간 계산 시작:', { startDateTime, alarm });
+        
+        if (alarm === '없음' || alarm === '정시') {
+          console.log('[calculateAlarmTime] 🔔 알림 없음 또는 정시');
+          return startDateTime;
+        }
+
+        const startTime = dayjs(startDateTime);
+        let alarmTime = startTime;
+
+        if (alarm.includes('분 전')) {
+          const minutes = parseInt(alarm.match(/(\d+)/)?.[1] || '0');
+          alarmTime = startTime.subtract(minutes, 'minute');
+          console.log('[calculateAlarmTime] 🔔 분 단위 알림:', { minutes, alarmTime: alarmTime.format() });
+        } else if (alarm.includes('시간 전')) {
+          const hours = parseInt(alarm.match(/(\d+)/)?.[1] || '0');
+          alarmTime = startTime.subtract(hours, 'hour');
+          console.log('[calculateAlarmTime] 🔔 시간 단위 알림:', { hours, alarmTime: alarmTime.format() });
+        } else if (alarm.includes('일 전')) {
+          const days = parseInt(alarm.match(/(\d+)/)?.[1] || '0');
+          alarmTime = startTime.subtract(days, 'day');
+          console.log('[calculateAlarmTime] 🔔 일 단위 알림:', { days, alarmTime: alarmTime.format() });
+        }
+
+        const result = alarmTime.format('YYYY-MM-DD HH:mm:ss');
+        console.log('[calculateAlarmTime] 🔔 최종 알림 시간:', result);
+        return result;
+      }
+
       const alarmPickType = newEvent.alarm === '없음' ? '' : getAlarmPickType(newEvent.alarm);
       const alarmPickResult = newEvent.alarm === '없음' ? '' : getAlarmPickResult(newEvent.alarm);
+      const calculatedAlarmTime = calculateAlarmTime(startDateTime, newEvent.alarm);
       
       console.log('[handleSaveEvent] 🔔 알림 설정 처리:', {
         원본_알림: newEvent.alarm,
         알림_여부: newEvent.alarm === '없음' ? 'N' : 'Y',
         알림_시간: newEvent.alarm === '없음' ? '' : newEvent.alarm,
         알림_타입: alarmPickType,
-        알림_값: alarmPickResult
+        알림_값: alarmPickResult,
+        계산된_알림시간: calculatedAlarmTime,
+        스케줄_체크: 'Y'
+      });
+
+      // 선택된 멤버 정보 찾기
+      let selectedMember: ScheduleGroupMember | undefined;
+      
+      if (selectedMemberId) {
+        // selectedMemberId가 있으면 해당 멤버만 찾기
+        selectedMember = scheduleGroupMembers.find(member => member.id === selectedMemberId);
+        console.log('[handleSaveEvent] 🎯 selectedMemberId로 멤버 찾기:', {
+          selectedMemberId,
+          foundMember: selectedMember ? {
+            id: selectedMember.id,
+            name: selectedMember.name,
+            mt_idx: selectedMember.mt_idx,
+            sgdt_idx: selectedMember.sgdt_idx
+          } : null
+        });
+      } else {
+        // selectedMemberId가 없으면 기본 선택된 멤버 사용
+        selectedMember = scheduleGroupMembers.find(member => member.isSelected);
+        console.log('[handleSaveEvent] 🎯 기본 선택된 멤버 사용:', {
+          foundMember: selectedMember ? {
+            id: selectedMember.id,
+            name: selectedMember.name,
+            mt_idx: selectedMember.mt_idx,
+            sgdt_idx: selectedMember.sgdt_idx
+          } : null
+        });
+      }
+      
+      // 멤버를 찾지 못한 경우에만 첫 번째 멤버 사용
+      if (!selectedMember && scheduleGroupMembers.length > 0) {
+        selectedMember = scheduleGroupMembers[0];
+        console.log('[handleSaveEvent] 🎯 첫 번째 멤버 사용:', {
+          foundMember: {
+            id: selectedMember.id,
+            name: selectedMember.name,
+            mt_idx: selectedMember.mt_idx,
+            sgdt_idx: selectedMember.sgdt_idx
+          }
+        });
+      }
+
+      console.log('[handleSaveEvent] 🔍 멤버 선택 디버깅:', {
+        selectedMemberId,
+        scheduleGroupMembersCount: scheduleGroupMembers.length,
+        scheduleGroupMembers: scheduleGroupMembers.map(m => ({
+          id: m.id,
+          name: m.name,
+          mt_idx: m.mt_idx,
+          sgdt_idx: m.sgdt_idx,
+          isSelected: m.isSelected
+        })),
+        currentMember: currentUser ? {
+          id: currentUser.id,
+          name: currentUser.name,
+          mt_idx: currentUser.mt_idx,
+          sgdt_idx: currentUser.sgdt_idx
+        } : null
+      });
+
+      console.log('[handleSaveEvent] 👤 선택된 멤버 정보:', {
+        selectedMemberId,
+        selectedMember: selectedMember?.name,
+        mt_idx: selectedMember?.mt_idx,
+        sgdt_idx: selectedMember?.sgdt_idx // 실제 sgdt_idx 필드 사용
       });
 
       // PHP 로직 기반 요청 데이터 구성
@@ -1037,10 +1146,14 @@ export default function SchedulePage() {
         sst_all_day: (newEvent.allDay ? 'Y' : 'N') as 'Y' | 'N',
         sst_location_title: newEvent.locationName || undefined,
         sst_location_add: newEvent.locationAddress || undefined,
+        sst_location_lat: newEvent.locationLat, // 위도 추가
+        sst_location_long: newEvent.locationLng, // 경도 추가
         sst_memo: newEvent.content || undefined,
         sst_content: newEvent.content || undefined, // PHP에서 memo와 content 둘 다 사용
         sst_alram: newEvent.alarm === '없음' ? 'N' : 'Y',
         sst_schedule_alarm_chk: newEvent.alarm === '없음' ? 'N' : 'Y',
+        sst_schedule_chk: 'Y', // 항상 'Y'로 설정
+        sst_schedule_alarm: calculatedAlarmTime, // 계산된 알림 시간
         sst_repeat_json: repeatData.sst_repeat_json,
         sst_repeat_json_v: repeatData.sst_repeat_json_v,
         sst_update_chk: 'Y',
@@ -1052,9 +1165,8 @@ export default function SchedulePage() {
         sst_pick_type: alarmPickType,
         sst_pick_result: alarmPickResult,
         // 다른 멤버의 스케줄 생성 시
-        targetMemberId: selectedMemberId && selectedMemberId !== currentMember?.id 
-          ? parseInt(selectedMemberId) 
-          : undefined,
+        targetMemberId: selectedMember?.mt_idx || undefined,
+        sgdt_idx: selectedMember?.sgdt_idx || undefined, // 실제 sgdt_idx 필드 사용
       };
 
       console.log('[handleSaveEvent] 📦 최종 요청 데이터:', requestData);
@@ -1080,10 +1192,15 @@ export default function SchedulePage() {
           sst_repeat_json_v: repeatData.sst_repeat_json_v,
           sst_alram_t: newEvent.alarm === '없음' ? '' : newEvent.alarm,
           sst_schedule_alarm_chk: (newEvent.alarm === '없음' ? 'N' : 'Y') as 'Y' | 'N',
+          sst_schedule_chk: 'Y', // 항상 'Y'로 설정
+          sst_schedule_alarm: calculatedAlarmTime, // 계산된 알림 시간
           sst_pick_type: alarmPickType,
           sst_pick_result: alarmPickResult,
           // 반복 일정 처리 옵션 추가
-          editOption: newEvent.editOption
+          editOption: newEvent.editOption,
+          // 선택된 멤버 정보 추가
+          targetMemberId: selectedMember?.mt_idx || undefined,
+          sgdt_idx: selectedMember?.sgdt_idx || undefined, // 실제 sgdt_idx 필드 사용
         };
 
         console.log('[handleSaveEvent] 🔄 수정 요청 데이터:', updateData);
@@ -1109,7 +1226,7 @@ export default function SchedulePage() {
           setDateTimeError(null);
           
           // 스케줄 목록 새로 고침
-          await loadAllGroupSchedules();
+          await loadAllGroupSchedules(undefined, undefined, true);
           
           // 성공 모달 표시 (3초 후 자동 닫기)
           const updateMessage = newEvent.editOption === 'all' 
@@ -1129,9 +1246,8 @@ export default function SchedulePage() {
         // 추가
         const createData = {
           groupId: selectedGroupId,
-          targetMemberId: selectedMemberId && selectedMemberId !== currentMember?.id 
-            ? parseInt(selectedMemberId) 
-            : undefined,
+          targetMemberId: selectedMember?.mt_idx || undefined,
+          sgdt_idx: selectedMember?.sgdt_idx || undefined, // 타겟 멤버의 그룹 상세 인덱스
           sst_title: newEvent.title,
           sst_sdate: startDateTime,
           sst_edate: endDateTime,
@@ -1147,6 +1263,7 @@ export default function SchedulePage() {
           sst_repeat_json_v: repeatData.sst_repeat_json_v,
           sst_alram_t: newEvent.alarm === '없음' ? '' : newEvent.alarm,
           sst_schedule_alarm_chk: (newEvent.alarm === '없음' ? 'N' : 'Y') as 'Y' | 'N',
+          sst_schedule_alarm: calculatedAlarmTime, // 계산된 알림 시간 추가
           sst_pick_type: alarmPickType,
           sst_pick_result: alarmPickResult,
         };
@@ -1165,7 +1282,7 @@ export default function SchedulePage() {
           setDateTimeError(null);
           
           // 스케줄 목록 새로 고침
-          await loadAllGroupSchedules();
+          await loadAllGroupSchedules(undefined, undefined, true);
           
           // 성공 모달 표시 (3초 후 자동 닫기)
           openSuccessModal('일정 등록 완료', '일정이 성공적으로 등록되었습니다.', 'success', undefined, true);
@@ -1235,7 +1352,7 @@ export default function SchedulePage() {
         setSelectedEventDetails(null);
         
         // 스케줄 목록 새로 고침
-        await loadAllGroupSchedules();
+        await loadAllGroupSchedules(undefined, undefined, true);
         
         // 성공 모달 표시 (3초 후 자동 닫기)
         openSuccessModal('일정 삭제 완료', '일정이 성공적으로 삭제되었습니다.', 'success', undefined, true);
@@ -1378,7 +1495,16 @@ export default function SchedulePage() {
             mt_file1: member.mt_file1,
             // 권한 정보 추가
             sgdt_owner_chk: member.sgdt_owner_chk || 'N',
-            sgdt_leader_chk: member.sgdt_leader_chk || 'N'
+            sgdt_leader_chk: member.sgdt_leader_chk || 'N',
+            // 그룹 상세 인덱스 추가
+            sgdt_idx: member.sgdt_idx,
+            
+            // 새로 추가된 위치 정보
+            mlt_lat: member.mlt_lat,
+            mlt_long: member.mlt_long,
+            mlt_speed: member.mlt_speed,
+            mlt_battery: member.mlt_battery,
+            mlt_gps_time: member.mlt_gps_time,
           };
         });
 
@@ -1432,7 +1558,14 @@ export default function SchedulePage() {
       return;
     }
     
+    console.log('[handleScheduleMemberSelect] 멤버 선택:', {
+      selectedMemberId: memberId,
+      previousSelectedMemberId: selectedMemberId
+    });
+    
     setSelectedMemberId(memberId);
+    
+    // scheduleGroupMembers의 isSelected 상태 업데이트
     setScheduleGroupMembers(prev => prev.map(member => ({
       ...member,
       isSelected: member.id === memberId
@@ -1441,6 +1574,15 @@ export default function SchedulePage() {
     // 선택된 멤버 정보를 newEvent에 반영
     const selectedMember = scheduleGroupMembers.find(m => m.id === memberId);
     const selectedGroup = userGroups.find(g => g.sgt_idx === selectedGroupId);
+    
+    console.log('[handleScheduleMemberSelect] 선택된 멤버 정보:', {
+      selectedMember: selectedMember ? {
+        id: selectedMember.id,
+        name: selectedMember.name,
+        mt_idx: selectedMember.mt_idx,
+        sgdt_idx: selectedMember.sgdt_idx
+      } : null
+    });
     
     if (selectedMember && selectedGroup && selectedGroupId !== null) {
       // 그룹별 색상 배열 (다양한 색상 제공)
@@ -1693,9 +1835,9 @@ export default function SchedulePage() {
   };
 
   // 모든 그룹의 스케줄 로드 - 실제 백엔드 API 사용
-  const loadAllGroupSchedules = async (year?: number, month?: number) => {
+  const loadAllGroupSchedules = async (year?: number, month?: number, keepSelectedDate?: boolean) => {
     try {
-      console.log('[SCHEDULE] 스케줄 로드 시작:', { year, month });
+      console.log('[SCHEDULE] 스케줄 로드 시작:', { year, month, keepSelectedDate });
       
       // 새로운 API 사용: 오너 그룹의 모든 멤버 스케줄을 월별로 조회
       const response = await scheduleService.getOwnerGroupsAllSchedules(year, month);
@@ -1760,9 +1902,18 @@ export default function SchedulePage() {
         };
         
         // 백엔드에서 받은 스케줄 데이터를 프론트엔드 형식으로 변환
-        response.data.schedules.forEach((schedule: any, index) => {
+        response.data.schedules.forEach((schedule: any, index: number) => {
           try {
-            // sst_sdate와 sst_edate를 사용하여 날짜 파싱
+            // 백엔드 원본 데이터 로깅 (반복 일정인 경우만)
+            // if (schedule.sst_repeat_json || schedule.sst_pidx) {
+            //   console.log(`[DEBUG] 백엔드 원본 데이터 - 스케줄 ${schedule.sst_idx}:`, {
+            //     sst_pidx: schedule.sst_pidx,
+            //     sst_repeat_json: schedule.sst_repeat_json,
+            //     sst_title: schedule.sst_title
+            //   });
+            // }
+            
+            // 시작/종료 시간 파싱
             let startDate: Date;
             let endDate: Date;
             
@@ -1792,11 +1943,11 @@ export default function SchedulePage() {
               const pickType = schedule.sst_pick_type;
               const pickResult = parseInt(schedule.sst_pick_result) || 0;
               
-              console.log('[loadAllGroupSchedules] 알림 계산:', {
-                pickType,
-                pickResult,
-                sst_alram_t: schedule.sst_alram_t
-              });
+              // console.log('[loadAllGroupSchedules] 알림 계산:', {
+              //   pickType,
+              //   pickResult,
+              //   sst_alram_t: schedule.sst_alram_t
+              // });
               
               if (pickResult === 0) {
                 alarmTime = '정시';
@@ -1815,58 +1966,71 @@ export default function SchedulePage() {
               alarmTime = schedule.sst_alram_t;
             }
             
-            console.log('[loadAllGroupSchedules] 최종 알림 시간:', {
-              hasAlarm,
-              alarmTime,
-              pickType: schedule.sst_pick_type,
-              pickResult: schedule.sst_pick_result
-            });
+            // console.log('[loadAllGroupSchedules] 최종 알림 시간:', {
+            //   hasAlarm,
+            //   alarmTime,
+            //   pickType: schedule.sst_pick_type,
+            //   pickResult: schedule.sst_pick_result
+            // });
 
             // 하루 종일 여부 확인
             const isAllDay = schedule.sst_all_day === 'Y';
 
-            // 타겟 멤버 정보 설정 (스케줄 생성자 기준)
+            // 타겟 멤버 정보 설정 (실제 스케줄 대상자 기준)
             let targetMemberName = schedule.member_name || '';
             let targetMemberPhoto = schedule.member_photo || '';
-            let targetMemberGender: number | null = null;
-            let targetMemberIdx = schedule.mt_idx || 0; // 실제 스케줄 생성자 ID 사용
+            let targetMemberGender = schedule.mt_gender || null;
+            let targetMemberIdx = schedule.tgt_mt_idx || schedule.mt_idx || 0; // 타겟 멤버 ID 우선, 없으면 생성자 ID
             
-            // 스케줄 생성자 멤버 정보를 그룹 멤버 리스트에서 찾기
-            if (schedule.mt_idx && schedule.sgt_idx && allGroupMembers[schedule.sgt_idx]) {
-              const creatorMember = allGroupMembers[schedule.sgt_idx].find(
-                (member: any) => member.mt_idx === schedule.mt_idx
+            // 실제 타겟 멤버 정보를 그룹 멤버 리스트에서 찾기
+            const targetMtIdx = schedule.tgt_mt_idx || schedule.mt_idx; // 타겟 멤버 ID 우선
+            
+            // 디버깅 로그 추가
+            // if (schedule.tgt_mt_idx && schedule.tgt_mt_idx !== schedule.mt_idx) {
+            //   console.log(`[DEBUG] 타겟 멤버 불일치 - 스케줄 ${schedule.sst_idx}: tgt_mt_idx=${schedule.tgt_mt_idx}, mt_idx=${schedule.mt_idx}, 사용할 ID=${targetMtIdx}`);
+            // }
+            
+            if (targetMtIdx && schedule.sgt_idx && allGroupMembers[schedule.sgt_idx]) {
+              const targetMember = allGroupMembers[schedule.sgt_idx].find(
+                (member: any) => member.mt_idx === targetMtIdx
               );
               
-              if (creatorMember) {
-                targetMemberName = creatorMember.mt_name || creatorMember.name || targetMemberName;
-                targetMemberPhoto = creatorMember.mt_file1 || targetMemberPhoto;
-                targetMemberGender = creatorMember.mt_gender || null;
-                targetMemberIdx = creatorMember.mt_idx;
+              if (targetMember) {
+                targetMemberName = targetMember.mt_name || targetMember.name || targetMemberName;
+                targetMemberPhoto = targetMember.mt_file1 || targetMemberPhoto;
+                targetMemberGender = targetMember.mt_gender || null;
+                targetMemberIdx = targetMember.mt_idx;
+                
+                console.log(`[DEBUG] 타겟 멤버 찾음 - ID: ${targetMtIdx}, 이름: ${targetMemberName}`);
+              } else {
+                console.log(`[DEBUG] 타겟 멤버 못 찾음 - ID: ${targetMtIdx}, 그룹: ${schedule.sgt_idx}`);
               }
+            } else if (!targetMtIdx) {
+              // tgt_mt_idx가 없으면 기본 멤버 정보 사용 (생성자 정보)
+              console.log(`[DEBUG] 타겟 멤버 ID 없음, 생성자 정보 사용 - 생성자: ${schedule.mt_idx}, 이름: ${targetMemberName}`);
             }
-            
+
             const event: ScheduleEvent = {
-              id: schedule.sst_idx?.toString() || schedule.id || `temp-${Date.now()}-${index}`,
-              sst_idx: schedule.sst_idx || undefined,
-              date: dayjs(startDate).format('YYYY-MM-DD'),
-              startTime: dayjs(startDate).format('HH:mm'),
-              endTime: dayjs(endDate).format('HH:mm'),
-              title: schedule.sst_title || schedule.title || '제목 없음',
+              id: schedule.sst_idx?.toString() || `temp-${index}`,
+              sst_idx: schedule.sst_idx,
+              date: schedule.sst_sdate ? schedule.sst_sdate.split(' ')[0] : '',
+              startTime: schedule.sst_sdate ? schedule.sst_sdate.split(' ')[1]?.substring(0, 5) || '00:00' : '00:00',
+              endTime: schedule.sst_edate ? schedule.sst_edate.split(' ')[1]?.substring(0, 5) || '23:59' : '23:59',
+              title: schedule.sst_title || '제목 없음',
               content: schedule.sst_memo || '',
-              groupId: schedule.sgt_idx || undefined,
+              groupId: schedule.sgt_idx,
               groupName: schedule.group_title || '',
-              groupColor: groupColor,
+              groupColor: getGroupColor(schedule.sgt_idx || 0),
               memberName: targetMemberName,
               memberPhoto: targetMemberPhoto,
               memberGender: targetMemberGender,
               memberIdx: targetMemberIdx,
-              canEdit: response.data.userPermission.canManage,
-              canDelete: response.data.userPermission.canManage,
-              // 추가 표시 정보
+              canEdit: true,
+              canDelete: true,
               locationName: schedule.sst_location_title || '',
-              locationAddress: schedule.sst_location_add || '', // 백엔드 원본 주소 사용
-              locationLat: schedule.sst_location_lat || undefined, // 위도 추가
-              locationLng: schedule.sst_location_long || undefined, // 경도 추가
+              locationAddress: schedule.sst_location_add || '',
+              locationLat: schedule.sst_location_lat || undefined,
+              locationLng: schedule.sst_location_long || undefined,
               hasAlarm: hasAlarm,
               alarmText: hasAlarm ? (alarmTime ? `알림 ${alarmTime}` : '알림 ON') : '알림 OFF',
               alarmTime: alarmTime, // 알림 시간 추가
@@ -1874,13 +2038,19 @@ export default function SchedulePage() {
               distance: schedule.sch_calc_dist || null,
               distanceText: schedule.sch_calc_dist ? `${schedule.sch_calc_dist}km` : '',
               // 타겟 멤버 정보 (수정 시 사용)
-              tgtMtIdx: schedule.mt_idx || null, // 실제 스케줄 생성자 ID 사용
+              tgtMtIdx: schedule.tgt_mt_idx || null, // DB의 실제 타겟 멤버 ID 사용
               isAllDay: isAllDay, // 하루 종일 여부
               repeatJsonV: schedule.sst_repeat_json_v || '', // 반복 JSON 버전
               tgtSgdtOwnerChk: schedule.tgt_sgdt_owner_chk || 'N', // 타겟 멤버의 오너 권한
               tgtSgdtLeaderChk: schedule.tgt_sgdt_leader_chk || 'N', // 타겟 멤버의 리더 권한
-              sst_pidx: schedule.sst_pidx || undefined // 반복 일정 인덱스 추가
+              tgtSgdtIdx: schedule.tgt_sgdt_idx || undefined, // 타겟 멤버의 그룹 상세 인덱스
+              sst_pidx: schedule.sst_pidx !== null && schedule.sst_pidx !== undefined ? schedule.sst_pidx : null // 반복 일정 인덱스 (0도 유효한 값으로 처리)
             }
+            
+            // sst_pidx 디버깅 로그 추가
+            // if (schedule.sst_repeat_json || schedule.sst_pidx) {
+            //   console.log(`[DEBUG] 스케줄 ${schedule.sst_idx} - sst_pidx: ${schedule.sst_pidx}, repeat_json: ${schedule.sst_repeat_json}, 최종 sst_pidx: ${event.sst_pidx}`);
+            // }
             
             allEvents.push(event);
             
@@ -1891,8 +2061,18 @@ export default function SchedulePage() {
         
         console.log('[loadAllGroupSchedules] 모든 변환된 이벤트:', allEvents);
         console.log('[loadAllGroupSchedules] 총 이벤트 수:', allEvents.length);
+        console.log('[loadAllGroupSchedules] keepSelectedDate:', keepSelectedDate);
+        console.log('[loadAllGroupSchedules] 현재 selectedDay:', selectedDay?.format('YYYY-MM-DD'));
         
         setEvents(allEvents);
+        
+        // keepSelectedDate가 false이거나 undefined이고, selectedDay가 없는 경우에만 오늘로 초기화
+        if (!keepSelectedDate && !selectedDay) {
+          console.log('[loadAllGroupSchedules] 선택된 날짜를 오늘로 초기화');
+          setSelectedDay(dayjs());
+        } else {
+          console.log('[loadAllGroupSchedules] 선택된 날짜 유지:', selectedDay?.format('YYYY-MM-DD'));
+        }
         
       } else {
         console.log('[loadAllGroupSchedules] 오너 그룹 스케줄 조회 실패 또는 데이터 없음:', response);
@@ -1988,7 +2168,7 @@ export default function SchedulePage() {
     try {
       console.log('[executeDeleteAction] 스케줄 삭제 시작:', {
         sst_idx: event.sst_idx,
-        sst_pidx: event.sst_pidx, // 반복 일정 부모 ID 로깅
+        sst_pidx: event.sst_pidx || null, // undefined인 경우 null로 설정
         groupId: selectedGroupId,
         option
       });
@@ -2005,7 +2185,8 @@ export default function SchedulePage() {
         // 반복 일정 처리 옵션이 있는 삭제
         response = await scheduleService.deleteScheduleWithRepeatOption({
           sst_idx: event.sst_idx!,
-          sst_pidx: event.sst_pidx, // 반복 일정의 부모 ID 전달
+          sst_pidx: event.sst_pidx || null, // undefined인 경우 null로 설정
+          sgdt_idx: event.tgtSgdtIdx || null, // undefined인 경우 null로 설정
           groupId: selectedGroupId,
           deleteOption: option as 'this' | 'future' | 'all'
         });
@@ -2024,7 +2205,7 @@ export default function SchedulePage() {
         setEvents(prev => prev.filter(e => e.id !== event.id));
         
         // 스케줄 목록 새로 고침
-        await loadAllGroupSchedules();
+        await loadAllGroupSchedules(undefined, undefined, true);
         
         // 성공 모달 표시 (3초 후 자동 닫기)
         const deleteMessage = option === 'single' || option === 'this' 
@@ -2253,7 +2434,7 @@ export default function SchedulePage() {
               selectedDay={selectedDay}
               onDayClick={setSelectedDay}
               events={events}
-              onMonthChange={loadAllGroupSchedules}
+              onMonthChange={(year, month) => loadAllGroupSchedules(year, month, true)}
             />
           </motion.div>
 
@@ -2461,7 +2642,10 @@ export default function SchedulePage() {
                                   {/* 그룹 정보 */}
                                   {event.groupName && (
                                     <div className="flex items-center space-x-2">
-                                      <div className={`w-4 h-4 rounded-full ${event.groupColor || 'bg-gray-400'} border-2 border-white shadow-sm`}></div>
+                                      <div 
+                                        className="w-4 h-4 rounded-full border-2 border-white shadow-sm"
+                                        style={{ backgroundColor: event.groupColor || '#06b6d4' }}
+                                      ></div>
                                       <span className="text-sm font-medium text-gray-700">{event.groupName}</span>
                                     </div>
                                   )}
@@ -2735,7 +2919,7 @@ export default function SchedulePage() {
                                       newEvent.id ? 'cursor-not-allowed opacity-60' : ''
                                     }`}
                                   >
-                                    <div className={`w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
+                                    <div className={`w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 relative ${
                                       member.isSelected 
                                         ? newEvent.id 
                                           ? 'ring-4 ring-gray-300 ring-offset-2' 
@@ -2757,18 +2941,65 @@ export default function SchedulePage() {
                                           console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
                                         }}
                                       />
-                                </div>
-                                    <span className={`block text-xs font-medium mt-2 transition-colors duration-200 ${
-                                      member.isSelected 
-                                        ? newEvent.id 
-                                          ? 'text-gray-500' 
-                                          : 'text-indigo-700' 
-                                        : newEvent.id 
-                                          ? 'text-gray-400' 
-                                          : 'text-gray-700'
-                                    }`}>
-                                      {member.name}
-                                    </span>
+                                      
+                                      {/* 배터리 정보 표시 */}
+                                      {member.mlt_battery !== null && member.mlt_battery !== undefined && (
+                                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full border border-gray-200 flex items-center justify-center">
+                                          <span className={`text-xs font-bold ${
+                                            member.mlt_battery > 20 ? 'text-green-600' : 
+                                            member.mlt_battery > 10 ? 'text-yellow-600' : 'text-red-600'
+                                          }`}>
+                                            {member.mlt_battery}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <div className="text-center">
+                                      <span className={`block text-xs font-medium mt-1 transition-colors duration-200 ${
+                                        member.isSelected 
+                                          ? newEvent.id 
+                                            ? 'text-gray-500' 
+                                            : 'text-indigo-700' 
+                                          : newEvent.id 
+                                            ? 'text-gray-400' 
+                                            : 'text-gray-700'
+                                      }`}>
+                                        {member.name}
+                                      </span>
+                                      
+                                      {/* 권한 표시 */}
+                                      {(member.sgdt_owner_chk === 'Y' || member.sgdt_leader_chk === 'Y') && (
+                                        <span className={`text-xs px-1 py-0.5 rounded-full ${
+                                          member.sgdt_owner_chk === 'Y' 
+                                            ? 'bg-red-100 text-red-600' 
+                                            : 'bg-blue-100 text-blue-600'
+                                        }`}>
+                                          {member.sgdt_owner_chk === 'Y' ? '오너' : '리더'}
+                                        </span>
+                                      )}
+                                      
+                                      {/* 최근 위치 업데이트 시간 */}
+                                      {member.mlt_gps_time && (
+                                        <span className="text-xs text-gray-400 block mt-0.5">
+                                          {(() => {
+                                            const gpsTime = new Date(member.mlt_gps_time);
+                                            const now = new Date();
+                                            const diffMs = now.getTime() - gpsTime.getTime();
+                                            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                                            const diffDays = Math.floor(diffHours / 24);
+                                            
+                                            if (diffDays > 0) {
+                                              return `${diffDays}일 전`;
+                                            } else if (diffHours > 0) {
+                                              return `${diffHours}시간 전`;
+                                            } else {
+                                              return '방금 전';
+                                            }
+                                          })()}
+                                        </span>
+                                      )}
+                                    </div>
                                   </button>
                                 </motion.div>
                             ))}

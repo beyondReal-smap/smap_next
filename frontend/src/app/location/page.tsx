@@ -453,6 +453,17 @@ interface GroupMember {
   savedLocations: LocationData[];
   mt_gender?: number | null;
   original_index: number;
+  
+  // 새로 추가된 위치 정보
+  mlt_lat?: number | null;
+  mlt_long?: number | null;
+  mlt_speed?: number | null;
+  mlt_battery?: number | null;
+  mlt_gps_time?: string | null;
+  
+  // 그룹 권한 정보
+  sgdt_owner_chk?: string;
+  sgdt_leader_chk?: string;
 }
 
 type NaverMap = any; 
@@ -1239,13 +1250,29 @@ export default function LocationPage() {
             photo: null, // 항상 null로 설정하여 로컬 이미지 사용
             isSelected: index === 0, // 첫 번째 멤버를 기본 선택
             location: { 
-              lat: parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
-              lng: parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
+              // 최신 위치 정보가 있으면 사용, 없으면 기본 위치 사용
+              lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
+                ? parseFloat(member.mlt_lat.toString()) 
+                : parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
+              lng: member.mlt_long !== null && member.mlt_long !== undefined 
+                ? parseFloat(member.mlt_long.toString()) 
+                : parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
             },
             schedules: [], 
             savedLocations: [],
             mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
-            original_index: index
+            original_index: index,
+            
+            // 새로 추가된 위치 정보
+            mlt_lat: member.mlt_lat,
+            mlt_long: member.mlt_long,
+            mlt_speed: member.mlt_speed,
+            mlt_battery: member.mlt_battery,
+            mlt_gps_time: member.mlt_gps_time,
+            
+            // 그룹 권한 정보
+            sgdt_owner_chk: member.sgdt_owner_chk,
+            sgdt_leader_chk: member.sgdt_leader_chk
           };
         });
 

@@ -14,34 +14,36 @@ export interface Group {
 }
 
 export interface GroupMember {
+  // 기본 멤버 정보
   mt_idx: number;
-  mt_type: number;
-  mt_level: number;
+  mt_type?: number;
+  mt_level?: number;
   mt_status: number;
-  mt_id: string;
+  mt_id?: string;
   mt_name: string;
-  mt_nickname: string;
-  mt_hp: string;
-  mt_email: string;
+  mt_nickname?: string;
+  mt_hp?: string;
+  mt_email?: string;
   mt_birth?: string;
-  mt_gender: number;
-  mt_file1: string;
-  mt_lat: number;
-  mt_long: number;
-  mt_sido: string;
-  mt_gu: string;
-  mt_dong: string;
+  mt_gender?: number;
+  mt_file1?: string;
+  mt_lat?: number;
+  mt_long?: number;
+  mt_sido?: string;
+  mt_gu?: string;
+  mt_dong?: string;
   mt_onboarding?: string;
   mt_push1?: string;
   mt_plan_check?: string;
   mt_plan_date?: string;
   mt_weather_pop?: string;
-  mt_weather_sky: number;
-  mt_weather_tmn: number;
-  mt_weather_tmx: number;
-  mt_weather_date: string;
-  mt_ldate: string;
-  mt_adate: string;
+  mt_weather_sky?: number;
+  mt_weather_tmn?: number;
+  mt_weather_tmx?: number;
+  mt_weather_date?: string;
+  mt_ldate?: string;
+  mt_adate?: string;
+  
   // 그룹 상세 정보
   sgdt_idx: number;
   sgt_idx: number;
@@ -57,6 +59,19 @@ export interface GroupMember {
   sgdt_ddate?: string;
   sgdt_xdate?: string;
   sgdt_adate?: string;
+  
+  // 최신 위치 정보 (새로 추가)
+  mlt_lat?: number | null;
+  mlt_long?: number | null;
+  mlt_speed?: number | null;
+  mlt_battery?: number | null;
+  mlt_gps_time?: string | null;
+  
+  // 호환성을 위한 필드
+  id?: string;
+  name?: string;
+  photo?: string;
+  isSelected?: boolean;
 }
 
 export interface GroupMemberStats {

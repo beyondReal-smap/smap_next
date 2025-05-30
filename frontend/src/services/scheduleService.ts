@@ -48,6 +48,11 @@ export interface Schedule {
   // 추가 필드 (조인으로 가져온 데이터)
   member_name?: string;
   member_photo?: string;
+  // 타겟 멤버 정보 (백엔드에서 추가된 필드)
+  tgt_mt_idx?: number | null;
+  tgt_sgdt_owner_chk?: string | null;
+  tgt_sgdt_leader_chk?: string | null;
+  tgt_sgdt_idx?: number | null; // 새로 추가된 필드
 }
 
 // 그룹 멤버 권한 정보
@@ -82,6 +87,7 @@ export interface GroupScheduleResponse {
 export interface CreateScheduleRequest {
   groupId: number;
   targetMemberId?: number; // 다른 멤버 스케줄 생성 시
+  sgdt_idx?: number; // 타겟 멤버의 그룹 상세 인덱스
   sst_title: string;
   sst_sdate: string;
   sst_edate: string;
@@ -106,6 +112,8 @@ export interface CreateScheduleRequest {
 export interface UpdateScheduleRequest {
   sst_idx: number;
   groupId: number;
+  targetMemberId?: number; // 다른 멤버 스케줄 수정 시
+  sgdt_idx?: number; // 타겟 멤버의 그룹 상세 인덱스
   sst_title?: string;
   sst_sdate?: string;
   sst_edate?: string;
@@ -132,6 +140,7 @@ export interface UpdateScheduleRequest {
 export interface DeleteScheduleRequest {
   sst_idx: number;
   sst_pidx?: number | null; // 반복 일정의 부모 ID
+  sgdt_idx?: number | null; // 그룹 상세 ID (null 허용)
   groupId: number;
   // 반복 일정 처리 옵션
   deleteOption?: 'this' | 'future' | 'all';
@@ -250,6 +259,7 @@ class ScheduleService {
         sst_pick_type: scheduleData.sst_pick_type,
         sst_pick_result: scheduleData.sst_pick_result,
         targetMemberId: scheduleData.targetMemberId,
+        sgdt_idx: scheduleData.sgdt_idx, // 타겟 멤버의 그룹 상세 인덱스
       };
 
       console.log('[SCHEDULE SERVICE] 📦 백엔드 전송 데이터:', requestData);
@@ -321,6 +331,9 @@ class ScheduleService {
         sst_location_lat: scheduleData.sst_location_lat,
         sst_location_long: scheduleData.sst_location_long,
         sst_content: scheduleData.sst_memo, // memo와 content 동일하게 처리
+        // 타겟 멤버 정보 추가
+        targetMemberId: scheduleData.targetMemberId,
+        sgdt_idx: scheduleData.sgdt_idx,
       };
       
       console.log('[SCHEDULE SERVICE] 📦 백엔드 전송 데이터:', requestData);
@@ -407,6 +420,9 @@ class ScheduleService {
         sst_schedule_alarm_chk: updateData.sst_schedule_alarm_chk,
         sst_pick_type: updateData.sst_pick_type,
         sst_pick_result: updateData.sst_pick_result,
+        // 타겟 멤버 정보 추가
+        targetMemberId: updateData.targetMemberId,
+        sgdt_idx: updateData.sgdt_idx,
         // 반복 일정 처리 옵션 추가
         editOption: editOption
       };
@@ -446,7 +462,8 @@ class ScheduleService {
       
       const requestData = {
         deleteOption: deleteData.deleteOption,
-        sst_pidx: deleteData.sst_pidx // 반복 일정의 부모 ID 추가
+        sst_pidx: deleteData.sst_pidx, // 반복 일정의 부모 ID 추가
+        sgdt_idx: deleteData.sgdt_idx, // 그룹 상세 ID 추가
       };
       
       console.log('[SCHEDULE SERVICE] 📦 반복 일정 삭제 요청 데이터:', requestData);

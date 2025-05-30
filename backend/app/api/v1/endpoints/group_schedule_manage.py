@@ -221,17 +221,48 @@ def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params
             # 알림시간 계산
             alarm_time = None
             if base_params.get("sst_schedule_alarm"):
-                base_alarm = datetime.strptime(base_params["sst_schedule_alarm"], '%Y-%m-%d %H:%M:%S')
-                alarm_duration = base_start - base_alarm
-                alarm_time = current_date - alarm_duration
+                try:
+                    # base_params의 sst_schedule_alarm이 문자열인지 확인
+                    base_alarm_str = base_params["sst_schedule_alarm"]
+                    if isinstance(base_alarm_str, str):
+                        base_alarm = datetime.strptime(base_alarm_str, '%Y-%m-%d %H:%M:%S')
+                        alarm_duration = base_start - base_alarm
+                        alarm_time = current_date - alarm_duration
+                        logger.info(f"🔔 [RECURRING] 반복 일정 알림 시간 계산 - base_alarm: {base_alarm}, alarm_time: {alarm_time}")
+                    else:
+                        logger.warning(f"⚠️ [RECURRING] base_params의 sst_schedule_alarm이 문자열이 아님: {type(base_alarm_str)}")
+                except Exception as alarm_error:
+                    logger.warning(f"⚠️ [RECURRING] 알림 시간 계산 실패: {alarm_error}")
+                    alarm_time = None
+            
+            # 알림 시간이 없는 경우 원본 스케줄의 알림 설정을 기반으로 재계산
+            if not alarm_time and base_params.get("sst_schedule_alarm_chk") == "Y":
+                try:
+                    pick_type = base_params.get("sst_pick_type")
+                    pick_result = base_params.get("sst_pick_result")
+                    
+                    if pick_type and pick_result:
+                        pick_result_int = int(pick_result)
+                        
+                        if pick_type == 'minute':
+                            alarm_time = current_date - timedelta(minutes=pick_result_int)
+                        elif pick_type == 'hour':
+                            alarm_time = current_date - timedelta(hours=pick_result_int)
+                        elif pick_type == 'day':
+                            alarm_time = current_date - timedelta(days=pick_result_int)
+                        
+                        logger.info(f"🔔 [RECURRING] 반복 일정 알림 시간 재계산 - pick_type: {pick_type}, pick_result: {pick_result}, alarm_time: {alarm_time}")
+                except Exception as recalc_error:
+                    logger.warning(f"⚠️ [RECURRING] 알림 시간 재계산 실패: {recalc_error}")
+                    alarm_time = None
             
             # 새로운 반복 일정 파라미터 구성
             recurring_params = base_params.copy()
             recurring_params.update({
                 "sst_pidx": parent_schedule_id,  # 부모 스케줄 ID
-                "sst_sdate": current_date.strftime('%Y-%m-%dT%H:%M:%S'),
-                "sst_edate": next_end.strftime('%Y-%m-%dT%H:%M:%S'),
-                "sst_sedate": f"{current_date.strftime('%Y-%m-%dT%H:%M:%S')} ~ {next_end.strftime('%Y-%m-%dT%H:%M:%S')}",
+                "sst_sdate": current_date.strftime('%Y-%m-%d %H:%M:%S'),  # T 제거
+                "sst_edate": next_end.strftime('%Y-%m-%d %H:%M:%S'),  # T 제거
+                "sst_sedate": f"{current_date.strftime('%Y-%m-%d %H:%M:%S')} ~ {next_end.strftime('%Y-%m-%d %H:%M:%S')}",  # T 제거
                 "sst_schedule_alarm": alarm_time.strftime('%Y-%m-%d %H:%M:%S') if alarm_time else None
             })
             
@@ -472,7 +503,8 @@ def get_owner_groups_all_schedules(
                     sg.sgt_title as group_title,
                     sgd_target.mt_idx as tgt_mt_idx,
                     sgd_target.sgdt_owner_chk as tgt_sgdt_owner_chk,
-                    sgd_target.sgdt_leader_chk as tgt_sgdt_leader_chk
+                    sgd_target.sgdt_leader_chk as tgt_sgdt_leader_chk,
+                    sgd_target.sgdt_idx as tgt_sgdt_idx
                 FROM
                     smap_schedule_t sst
                 JOIN member_t m ON sst.mt_idx = m.mt_idx
@@ -545,6 +577,7 @@ def get_owner_groups_all_schedules(
                     "tgt_mt_idx": row.tgt_mt_idx,
                     "tgt_sgdt_owner_chk": row.tgt_sgdt_owner_chk,
                     "tgt_sgdt_leader_chk": row.tgt_sgdt_leader_chk,
+                    "tgt_sgdt_idx": row.tgt_sgdt_idx,
                     # 프론트엔드 호환성을 위한 추가 필드
                     "id": str(row.sst_idx),
                     "title": row.sst_title,
@@ -669,6 +702,9 @@ def get_group_schedules(
         # 스케줄 데이터 변환
         schedules = []
         for row in schedule_results:
+            # sst_pidx 디버깅 로그 추가
+            logger.info(f"🔍 [GET_SCHEDULES] 스케줄 {row.sst_idx} - sst_pidx: {row.sst_pidx}, repeat_json: {row.sst_repeat_json}")
+            
             schedule_data = {
                 "sst_idx": row.sst_idx,
                 "sst_pidx": row.sst_pidx,
@@ -763,10 +799,12 @@ def create_group_schedule(
         # 대상 멤버 설정 (기본값: 현재 사용자)
         target_member_id = current_user_id
         
+        # 타겟 멤버의 sgdt_idx 조회
+        target_sgdt_idx = member_auth["sgdt_idx"]  # 기본값: 현재 사용자의 sgdt_idx
+        
         # 다른 멤버의 스케줄을 생성하려는 경우
         if "targetMemberId" in schedule_data and schedule_data["targetMemberId"]:
             target_member_id = int(schedule_data["targetMemberId"])
-            logger.info(f"👤 [CREATE_SCHEDULE] 다른 멤버 스케줄 생성 요청 - target_member_id: {target_member_id}")
             
             # 권한 확인: 오너/리더만 다른 멤버의 스케줄 생성 가능
             if not GroupScheduleManager.has_manage_permission(member_auth):
@@ -776,13 +814,15 @@ def create_group_schedule(
                     detail="Only group owners or leaders can create schedules for other members"
                 )
             
-            # 대상 멤버가 같은 그룹에 속하는지 확인
+            # 타겟 멤버의 sgdt_idx 조회
             target_member_auth = GroupScheduleManager.check_group_permission(db, target_member_id, group_id)
-            if not target_member_auth:
-                logger.error(f"❌ [CREATE_SCHEDULE] 대상 멤버가 같은 그룹에 속하지 않음 - target_member_id: {target_member_id}")
-                raise HTTPException(status_code=400, detail="Target member is not in the same group")
+            if target_member_auth:
+                target_sgdt_idx = target_member_auth["sgdt_idx"]
+                logger.info(f"🆕 [CREATE_NEW_SCHEDULE] 타겟 멤버의 sgdt_idx 조회 완료 - target_sgdt_idx: {target_sgdt_idx}")
+            else:
+                logger.warning(f"⚠️ [CREATE_NEW_SCHEDULE] 타겟 멤버의 sgdt_idx 조회 실패, 기본값 사용")
         
-        logger.info(f"👤 [CREATE_SCHEDULE] 최종 대상 멤버: {target_member_id}")
+        logger.info(f"🆕 [CREATE_NEW_SCHEDULE] 사용할 sgdt_idx: {target_sgdt_idx}")
         
         # 필수 필드 검증 및 기본값 설정 (PHP 로직 참고)
         if not schedule_data.get('sst_title', '').strip():
@@ -805,15 +845,24 @@ def create_group_schedule(
         
         logger.info(f"📅 [CREATE_SCHEDULE] 원본 날짜/시간 - sdate: {sst_sdate}, edate: {sst_edate}")
         
+        # T를 공백으로 변경하여 MySQL 형식으로 변환
+        if 'T' in sst_sdate:
+            sst_sdate = sst_sdate.replace('T', ' ')
+            logger.info(f"📅 [CREATE_SCHEDULE] 시작 날짜 형식 변환 - 결과: {sst_sdate}")
+            
+        if 'T' in sst_edate:
+            sst_edate = sst_edate.replace('T', ' ')
+            logger.info(f"📅 [CREATE_SCHEDULE] 종료 날짜 형식 변환 - 결과: {sst_edate}")
+        
         # 시간이 포함되지 않은 경우 시간 추가
-        if 'T' not in sst_sdate and ':' not in sst_sdate:
+        if ':' not in sst_sdate:
             sst_stime = schedule_data.get('sst_stime', '00:00:00')
-            sst_sdate = f"{sst_sdate}T{sst_stime}" if 'T' not in sst_stime else f"{sst_sdate} {sst_stime}"
+            sst_sdate = f"{sst_sdate} {sst_stime}"
             logger.info(f"⏰ [CREATE_SCHEDULE] 시작 시간 추가 - 결과: {sst_sdate}")
             
-        if 'T' not in sst_edate and ':' not in sst_edate:
+        if ':' not in sst_edate:
             sst_etime = schedule_data.get('sst_etime', '23:59:59')
-            sst_edate = f"{sst_edate}T{sst_etime}" if 'T' not in sst_etime else f"{sst_edate} {sst_etime}"
+            sst_edate = f"{sst_edate} {sst_etime}"
             logger.info(f"⏰ [CREATE_SCHEDULE] 종료 시간 추가 - 결과: {sst_edate}")
         
         # 하루종일 및 반복 설정 처리 (사용자 요구사항에 맞게)
@@ -890,14 +939,14 @@ def create_group_schedule(
         """)
         
         insert_params = {
-            "mt_idx": current_user_id,
+            "mt_idx": target_member_id,  # 타겟 멤버 ID로 변경
             "sst_title": schedule_data.get('sst_title'),
-            "sst_sdate": schedule_data.get("sst_sdate"),
-            "sst_edate": schedule_data.get("sst_edate"),
-            "sst_sedate": f"{schedule_data.get('sst_sdate')} ~ {schedule_data.get('sst_edate')}",
+            "sst_sdate": sst_sdate,  # 변환된 날짜 형식 사용
+            "sst_edate": sst_edate,  # 변환된 날짜 형식 사용
+            "sst_sedate": f"{sst_sdate} ~ {sst_edate}",  # 변환된 날짜 형식 사용
             "sst_all_day": schedule_data.get("sst_all_day", "N"),
             "sgt_idx": group_id,
-            "sgdt_idx": member_auth["sgdt_idx"],
+            "sgdt_idx": target_sgdt_idx,  # 타겟 멤버의 sgdt_idx 사용
             "sgdt_idx_t": schedule_data.get("sgdt_idx_t"),
             "sst_location_title": schedule_data.get("sst_location_title"),
             "sst_location_add": schedule_data.get("sst_location_add"),
@@ -911,7 +960,7 @@ def create_group_schedule(
             "sst_schedule_alarm_chk": schedule_data.get("sst_schedule_alarm_chk", "N"),
             "sst_pick_type": schedule_data.get("sst_pick_type"),
             "sst_pick_result": schedule_data.get("sst_pick_result"),
-            "sst_schedule_alarm": None,
+            "sst_schedule_alarm": sst_schedule_alarm.strftime('%Y-%m-%d %H:%M:%S') if sst_schedule_alarm else None,  # 계산된 알림 시간 사용
             "sst_repeat_json": sst_repeat_json,
             "sst_repeat_json_v": sst_repeat_json_v,
             "slt_idx": schedule_data.get("slt_idx"),
@@ -1051,6 +1100,7 @@ def update_group_schedule_with_repeat_option(
                 # 먼저 부모 스케줄 생성
                 new_parent_schedule_data = schedule_data.copy()
                 new_parent_schedule_data['sst_pidx'] = None  # 부모는 pidx가 없음
+                new_parent_schedule_data['targetMemberId'] = schedule_result.mt_idx  # 원본 스케줄의 멤버 ID 사용
                 
                 new_parent_id = create_new_schedule(db, group_id, current_user_id, new_parent_schedule_data, logger)
                 
@@ -1059,16 +1109,41 @@ def update_group_schedule_with_repeat_option(
                 repeat_json_v = schedule_data.get('sst_repeat_json_v', '')
                 
                 if repeat_json and repeat_json.strip():
+                    # 알림 시간 계산
+                    calculated_alarm_time = None
+                    if (schedule_data.get('sst_schedule_alarm_chk') == 'Y' and 
+                        schedule_data.get('sst_pick_type') and 
+                        schedule_data.get('sst_pick_result')):
+                        
+                        try:
+                            from datetime import datetime, timedelta
+                            start_datetime = datetime.fromisoformat(schedule_data.get("sst_sdate").replace('T', ' '))
+                            pick_result = int(schedule_data['sst_pick_result'])
+                            pick_type = schedule_data['sst_pick_type']
+                            
+                            if pick_type == 'minute':
+                                calculated_alarm_time = start_datetime - timedelta(minutes=pick_result)
+                            elif pick_type == 'hour':
+                                calculated_alarm_time = start_datetime - timedelta(hours=pick_result)
+                            elif pick_type == 'day':
+                                calculated_alarm_time = start_datetime - timedelta(days=pick_result)
+                            
+                            logger.info(f"🔔 [UPDATE_REPEAT_SCHEDULE] 계산된 알림 시간: {calculated_alarm_time}")
+                                
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"⚠️ [UPDATE_REPEAT_SCHEDULE] 알림 시간 계산 실패: {e}")
+                            calculated_alarm_time = None
+                    
                     # create_recurring_schedules에 전달할 파라미터 구성
                     recurring_params = {
-                        "mt_idx": current_user_id,
+                        "mt_idx": schedule_result.mt_idx,  # 원본 스케줄의 멤버 ID 사용
                         "sst_title": schedule_data.get('sst_title'),
                         "sst_sdate": schedule_data.get("sst_sdate"),
                         "sst_edate": schedule_data.get("sst_edate"),
                         "sst_sedate": f"{schedule_data.get('sst_sdate')} ~ {schedule_data.get('sst_edate')}",
                         "sst_all_day": schedule_data.get("sst_all_day", "N"),
                         "sgt_idx": group_id,
-                        "sgdt_idx": member_auth["sgdt_idx"],
+                        "sgdt_idx": schedule_result.sgdt_idx,  # 원본 스케줄의 sgdt_idx 사용
                         "sgdt_idx_t": schedule_data.get("sgdt_idx_t"),
                         "sst_location_title": schedule_data.get("sst_location_title"),
                         "sst_location_add": schedule_data.get("sst_location_add"),
@@ -1082,7 +1157,7 @@ def update_group_schedule_with_repeat_option(
                         "sst_schedule_alarm_chk": schedule_data.get("sst_schedule_alarm_chk", "N"),
                         "sst_pick_type": schedule_data.get("sst_pick_type"),
                         "sst_pick_result": schedule_data.get("sst_pick_result"),
-                        "sst_schedule_alarm": None,
+                        "sst_schedule_alarm": calculated_alarm_time.strftime('%Y-%m-%d %H:%M:%S') if calculated_alarm_time else None,
                         "sst_repeat_json": repeat_json,
                         "sst_repeat_json_v": repeat_json_v,
                         "slt_idx": schedule_data.get("slt_idx"),
@@ -1128,6 +1203,7 @@ def update_group_schedule_with_repeat_option(
                 # 현재 스케줄을 새로운 부모로 생성
                 new_current_schedule_data = schedule_data.copy()
                 new_current_schedule_data['sst_pidx'] = None  # 새로운 부모는 pidx가 없음
+                new_current_schedule_data['targetMemberId'] = schedule_result.mt_idx  # 원본 스케줄의 멤버 ID 사용
                 
                 new_current_id = create_new_schedule(db, group_id, current_user_id, new_current_schedule_data, logger)
                 
@@ -1136,16 +1212,41 @@ def update_group_schedule_with_repeat_option(
                 repeat_json_v = schedule_data.get('sst_repeat_json_v', '')
                 
                 if repeat_json and repeat_json.strip():
+                    # 알림 시간 계산
+                    calculated_alarm_time = None
+                    if (schedule_data.get('sst_schedule_alarm_chk') == 'Y' and 
+                        schedule_data.get('sst_pick_type') and 
+                        schedule_data.get('sst_pick_result')):
+                        
+                        try:
+                            from datetime import datetime, timedelta
+                            start_datetime = datetime.fromisoformat(schedule_data.get("sst_sdate").replace('T', ' '))
+                            pick_result = int(schedule_data['sst_pick_result'])
+                            pick_type = schedule_data['sst_pick_type']
+                            
+                            if pick_type == 'minute':
+                                calculated_alarm_time = start_datetime - timedelta(minutes=pick_result)
+                            elif pick_type == 'hour':
+                                calculated_alarm_time = start_datetime - timedelta(hours=pick_result)
+                            elif pick_type == 'day':
+                                calculated_alarm_time = start_datetime - timedelta(days=pick_result)
+                            
+                            logger.info(f"🔔 [UPDATE_REPEAT_SCHEDULE] 계산된 알림 시간: {calculated_alarm_time}")
+                                
+                        except (ValueError, TypeError) as e:
+                            logger.warning(f"⚠️ [UPDATE_REPEAT_SCHEDULE] 알림 시간 계산 실패: {e}")
+                            calculated_alarm_time = None
+                    
                     # create_recurring_schedules에 전달할 파라미터 구성
                     recurring_params = {
-                        "mt_idx": current_user_id,
+                        "mt_idx": schedule_result.mt_idx,  # 원본 스케줄의 멤버 ID 사용
                         "sst_title": schedule_data.get('sst_title'),
                         "sst_sdate": schedule_data.get("sst_sdate"),
                         "sst_edate": schedule_data.get("sst_edate"),
                         "sst_sedate": f"{schedule_data.get('sst_sdate')} ~ {schedule_data.get('sst_edate')}",
                         "sst_all_day": schedule_data.get("sst_all_day", "N"),
                         "sgt_idx": group_id,
-                        "sgdt_idx": member_auth["sgdt_idx"],
+                        "sgdt_idx": schedule_result.sgdt_idx,  # 원본 스케줄의 sgdt_idx 사용
                         "sgdt_idx_t": schedule_data.get("sgdt_idx_t"),
                         "sst_location_title": schedule_data.get("sst_location_title"),
                         "sst_location_add": schedule_data.get("sst_location_add"),
@@ -1159,7 +1260,7 @@ def update_group_schedule_with_repeat_option(
                         "sst_schedule_alarm_chk": schedule_data.get("sst_schedule_alarm_chk", "N"),
                         "sst_pick_type": schedule_data.get("sst_pick_type"),
                         "sst_pick_result": schedule_data.get("sst_pick_result"),
-                        "sst_schedule_alarm": None,
+                        "sst_schedule_alarm": calculated_alarm_time.strftime('%Y-%m-%d %H:%M:%S') if calculated_alarm_time else None,
                         "sst_repeat_json": repeat_json,
                         "sst_repeat_json_v": repeat_json_v,
                         "slt_idx": schedule_data.get("slt_idx"),
@@ -1228,14 +1329,21 @@ def update_single_schedule(db: Session, schedule_id: int, schedule_data: Dict[st
         sst_sdate = schedule_data['sst_sdate']
         sst_edate = schedule_data['sst_edate']
         
-        # 시간이 포함되지 않은 경우 시간 추가
-        if 'T' not in sst_sdate and ':' not in sst_sdate:
-            sst_stime = schedule_data.get('sst_stime', '00:00:00')
-            sst_sdate = f"{sst_sdate}T{sst_stime}" if 'T' not in sst_stime else f"{sst_sdate} {sst_stime}"
+        # T를 공백으로 변경하여 MySQL 형식으로 변환
+        if 'T' in sst_sdate:
+            sst_sdate = sst_sdate.replace('T', ' ')
             
-        if 'T' not in sst_edate and ':' not in sst_edate:
+        if 'T' in sst_edate:
+            sst_edate = sst_edate.replace('T', ' ')
+        
+        # 시간이 포함되지 않은 경우 시간 추가
+        if ':' not in sst_sdate:
+            sst_stime = schedule_data.get('sst_stime', '00:00:00')
+            sst_sdate = f"{sst_sdate} {sst_stime}"
+            
+        if ':' not in sst_edate:
             sst_etime = schedule_data.get('sst_etime', '23:59:59')
-            sst_edate = f"{sst_edate}T{sst_etime}" if 'T' not in sst_etime else f"{sst_edate} {sst_etime}"
+            sst_edate = f"{sst_edate} {sst_etime}"
         
         # 하루종일 및 반복 설정 처리
         sst_all_day = schedule_data.get('sst_all_day', 'N')
@@ -1277,9 +1385,9 @@ def update_single_schedule(db: Session, schedule_id: int, schedule_data: Dict[st
         # 기본 필드들
         basic_fields = {
             "sst_title": schedule_data.get('sst_title'),
-            "sst_sdate": schedule_data.get("sst_sdate"),
-            "sst_edate": schedule_data.get("sst_edate"),
-            "sst_sedate": f"{schedule_data.get('sst_sdate')} ~ {schedule_data.get('sst_edate')}",
+            "sst_sdate": sst_sdate,  # 변환된 날짜 형식 사용
+            "sst_edate": sst_edate,  # 변환된 날짜 형식 사용
+            "sst_sedate": f"{sst_sdate} ~ {sst_edate}",  # 변환된 날짜 형식 사용
             "sst_all_day": schedule_data.get("sst_all_day", "N"),
         }
         
@@ -1299,7 +1407,7 @@ def update_single_schedule(db: Session, schedule_id: int, schedule_data: Dict[st
             "sst_schedule_alarm_chk": schedule_data.get('sst_schedule_alarm_chk', 'N'),
             "sst_pick_type": schedule_data.get('sst_pick_type'),
             "sst_pick_result": schedule_data.get('sst_pick_result'),
-            "sst_schedule_alarm": None,
+            "sst_schedule_alarm": sst_schedule_alarm.strftime('%Y-%m-%d %H:%M:%S') if sst_schedule_alarm else None,  # 계산된 알림 시간 사용
         }
         
         # 반복 관련 필드들
@@ -1457,11 +1565,11 @@ def delete_group_schedule_with_repeat_option(
                 # 'this' - 현재 스케줄만 삭제
                 logger.info(f"🗑️ [DELETE_REPEAT_SCHEDULE] 현재 스케줄만 삭제")
                 delete_single_query = text("""
-                    UPDATE smap_schedule_t 
-                    SET sst_show = 'N', sst_ddate = NOW() 
-                    WHERE sst_idx = :schedule_id
-                """)
-                
+            UPDATE smap_schedule_t 
+            SET sst_show = 'N', sst_ddate = NOW() 
+            WHERE sst_idx = :schedule_id
+        """)
+        
                 result = db.execute(delete_single_query, {"schedule_id": schedule_id})
                 deleted_count = result.rowcount
         else:
@@ -1521,6 +1629,9 @@ def create_new_schedule(db: Session, group_id: int, current_user_id: int, schedu
         # 대상 멤버 설정 (기본값: 현재 사용자)
         target_member_id = current_user_id
         
+        # 타겟 멤버의 sgdt_idx 조회
+        target_sgdt_idx = member_auth["sgdt_idx"]  # 기본값: 현재 사용자의 sgdt_idx
+        
         # 다른 멤버의 스케줄을 생성하려는 경우
         if "targetMemberId" in schedule_data and schedule_data["targetMemberId"]:
             target_member_id = int(schedule_data["targetMemberId"])
@@ -1528,42 +1639,77 @@ def create_new_schedule(db: Session, group_id: int, current_user_id: int, schedu
             # 권한 확인: 오너/리더만 다른 멤버의 스케줄 생성 가능
             if not GroupScheduleManager.has_manage_permission(member_auth):
                 raise ValueError("Only group owners or leaders can create schedules for other members")
+            
+            # 타겟 멤버의 sgdt_idx 조회
+            target_member_auth = GroupScheduleManager.check_group_permission(db, target_member_id, group_id)
+            if target_member_auth:
+                target_sgdt_idx = target_member_auth["sgdt_idx"]
+                logger.info(f"🆕 [CREATE_NEW_SCHEDULE] 타겟 멤버의 sgdt_idx 조회 완료 - target_sgdt_idx: {target_sgdt_idx}")
+            else:
+                logger.warning(f"⚠️ [CREATE_NEW_SCHEDULE] 타겟 멤버의 sgdt_idx 조회 실패, 기본값 사용")
         
-        # 필수 필드 검증 및 기본값 설정
+        logger.info(f"🆕 [CREATE_NEW_SCHEDULE] 사용할 sgdt_idx: {target_sgdt_idx}")
+        
+        # 필수 필드 검증 및 기본값 설정 (PHP 로직 참고)
         if not schedule_data.get('sst_title', '').strip():
             schedule_data['sst_title'] = '제목 없음'
+            logger.warning(f"⚠️ [CREATE_SCHEDULE] 제목이 비어있어 기본값으로 설정")
             
         if not schedule_data.get('sst_sdate'):
-            raise ValueError("Start date is required")
+            logger.error(f"❌ [CREATE_SCHEDULE] 시작 날짜가 없음")
+            raise HTTPException(status_code=400, detail="Start date is required")
             
         if not schedule_data.get('sst_edate'):
             schedule_data['sst_edate'] = schedule_data['sst_sdate']
+            logger.info(f"📅 [CREATE_SCHEDULE] 종료 날짜가 없어 시작 날짜로 설정")
         
-        # 시작/종료 날짜/시간 처리
+        logger.info(f"📝 [CREATE_SCHEDULE] 필수 필드 검증 완료 - title: {schedule_data['sst_title']}")
+        
+        # 시작/종료 날짜/시간 처리 (PHP 로직 참고)
         sst_sdate = schedule_data['sst_sdate']
         sst_edate = schedule_data['sst_edate']
         
-        # 시간이 포함되지 않은 경우 시간 추가
-        if 'T' not in sst_sdate and ':' not in sst_sdate:
-            sst_stime = schedule_data.get('sst_stime', '00:00:00')
-            sst_sdate = f"{sst_sdate}T{sst_stime}" if 'T' not in sst_stime else f"{sst_sdate} {sst_stime}"
-            
-        if 'T' not in sst_edate and ':' not in sst_edate:
-            sst_etime = schedule_data.get('sst_etime', '23:59:59')
-            sst_edate = f"{sst_edate}T{sst_etime}" if 'T' not in sst_etime else f"{sst_edate} {sst_etime}"
+        logger.info(f"📅 [CREATE_SCHEDULE] 원본 날짜/시간 - sdate: {sst_sdate}, edate: {sst_edate}")
         
-        # 하루종일 및 반복 설정 처리
+        # T를 공백으로 변경하여 MySQL 형식으로 변환
+        if 'T' in sst_sdate:
+            sst_sdate = sst_sdate.replace('T', ' ')
+            logger.info(f"📅 [CREATE_SCHEDULE] 시작 날짜 형식 변환 - 결과: {sst_sdate}")
+            
+        if 'T' in sst_edate:
+            sst_edate = sst_edate.replace('T', ' ')
+            logger.info(f"📅 [CREATE_SCHEDULE] 종료 날짜 형식 변환 - 결과: {sst_edate}")
+        
+        # 시간이 포함되지 않은 경우 시간 추가
+        if ':' not in sst_sdate:
+            sst_stime = schedule_data.get('sst_stime', '00:00:00')
+            sst_sdate = f"{sst_sdate} {sst_stime}"
+            logger.info(f"⏰ [CREATE_SCHEDULE] 시작 시간 추가 - 결과: {sst_sdate}")
+            
+        if ':' not in sst_edate:
+            sst_etime = schedule_data.get('sst_etime', '23:59:59')
+            sst_edate = f"{sst_edate} {sst_etime}"
+            logger.info(f"⏰ [CREATE_SCHEDULE] 종료 시간 추가 - 결과: {sst_edate}")
+        
+        # 하루종일 및 반복 설정 처리 (사용자 요구사항에 맞게)
         sst_all_day = schedule_data.get('sst_all_day', 'N')
         sst_repeat_json = schedule_data.get('sst_repeat_json', '')
         sst_repeat_json_v = schedule_data.get('sst_repeat_json_v', '')
+        
+        logger.info(f"🔄 [CREATE_SCHEDULE] 원본 반복 설정 - all_day: {sst_all_day}, repeat_json: {sst_repeat_json}, repeat_json_v: {sst_repeat_json_v}")
         
         # 하루종일인 경우 반복을 null로 설정
         if sst_all_day == 'Y':
             sst_repeat_json = ''
             sst_repeat_json_v = ''
+            logger.info("🔄 [CREATE_SCHEDULE] 하루종일 이벤트: 반복 설정을 null로 변경")
         
-        # 알림 시간 계산
+        logger.info(f"🔄 [CREATE_SCHEDULE] 최종 반복 설정 - repeat_json: {sst_repeat_json}, repeat_json_v: {sst_repeat_json_v}")
+        
+        # 알림 시간 계산 (PHP 로직 참고)
         sst_schedule_alarm = None
+        logger.info(f"🔔 [CREATE_SCHEDULE] 알림 설정 시작 - alarm_chk: {schedule_data.get('sst_schedule_alarm_chk')}, pick_type: {schedule_data.get('sst_pick_type')}, pick_result: {schedule_data.get('sst_pick_result')}")
+        
         if (schedule_data.get('sst_schedule_alarm_chk') == 'Y' and 
             schedule_data.get('sst_pick_type') and 
             schedule_data.get('sst_pick_result')):
@@ -1574,15 +1720,19 @@ def create_new_schedule(db: Session, group_id: int, current_user_id: int, schedu
                 pick_result = int(schedule_data['sst_pick_result'])
                 pick_type = schedule_data['sst_pick_type']
                 
+                logger.info(f"🔔 [CREATE_SCHEDULE] 알림 시간 계산 - start_datetime: {start_datetime}, pick_result: {pick_result}, pick_type: {pick_type}")
+                
                 if pick_type == 'minute':
                     sst_schedule_alarm = start_datetime - timedelta(minutes=pick_result)
                 elif pick_type == 'hour':
                     sst_schedule_alarm = start_datetime - timedelta(hours=pick_result)
                 elif pick_type == 'day':
                     sst_schedule_alarm = start_datetime - timedelta(days=pick_result)
+                
+                logger.info(f"🔔 [CREATE_SCHEDULE] 계산된 알림 시간: {sst_schedule_alarm}")
                     
             except (ValueError, TypeError) as e:
-                logger.warning(f"⚠️ [CREATE_NEW_SCHEDULE] 알림 시간 계산 실패: {e}")
+                logger.warning(f"⚠️ [CREATE_SCHEDULE] 알림 시간 계산 실패: {e}")
                 sst_schedule_alarm = None
 
         # 스케줄 생성 쿼리
@@ -1613,14 +1763,14 @@ def create_new_schedule(db: Session, group_id: int, current_user_id: int, schedu
         """)
         
         insert_params = {
-            "mt_idx": current_user_id,
+            "mt_idx": target_member_id,  # 타겟 멤버 ID 사용
             "sst_title": schedule_data.get('sst_title'),
-            "sst_sdate": schedule_data.get("sst_sdate"),
-            "sst_edate": schedule_data.get("sst_edate"),
-            "sst_sedate": f"{schedule_data.get('sst_sdate')} ~ {schedule_data.get('sst_edate')}",
+            "sst_sdate": sst_sdate,  # 변환된 날짜 형식 사용
+            "sst_edate": sst_edate,  # 변환된 날짜 형식 사용
+            "sst_sedate": f"{sst_sdate} ~ {sst_edate}",  # 변환된 날짜 형식 사용
             "sst_all_day": schedule_data.get("sst_all_day", "N"),
             "sgt_idx": group_id,
-            "sgdt_idx": member_auth["sgdt_idx"],
+            "sgdt_idx": target_sgdt_idx,  # 타겟 멤버의 sgdt_idx 사용
             "sgdt_idx_t": schedule_data.get("sgdt_idx_t"),
             "sst_location_title": schedule_data.get("sst_location_title"),
             "sst_location_add": schedule_data.get("sst_location_add"),
@@ -1634,7 +1784,7 @@ def create_new_schedule(db: Session, group_id: int, current_user_id: int, schedu
             "sst_schedule_alarm_chk": schedule_data.get("sst_schedule_alarm_chk", "N"),
             "sst_pick_type": schedule_data.get("sst_pick_type"),
             "sst_pick_result": schedule_data.get("sst_pick_result"),
-            "sst_schedule_alarm": None,
+            "sst_schedule_alarm": sst_schedule_alarm.strftime('%Y-%m-%d %H:%M:%S') if sst_schedule_alarm else None,  # 계산된 알림 시간 사용
             "sst_repeat_json": sst_repeat_json,
             "sst_repeat_json_v": sst_repeat_json_v,
             "slt_idx": schedule_data.get("slt_idx"),
@@ -1654,3 +1804,79 @@ def create_new_schedule(db: Session, group_id: int, current_user_id: int, schedu
     except Exception as e:
         logger.error(f"💥 [CREATE_NEW_SCHEDULE] 스케줄 생성 오류: {e}")
         raise
+
+@router.get("/debug/schedule/{schedule_id}")
+def debug_schedule_info(
+    schedule_id: int,
+    current_user_id: int = Query(1186, description="현재 사용자 ID"),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    특정 스케줄의 상세 정보 디버깅용 엔드포인트
+    """
+    try:
+        # 스케줄 정보 조회
+        schedule_query = text("""
+            SELECT * FROM smap_schedule_t 
+            WHERE sst_idx = :schedule_id
+        """)
+        
+        result = db.execute(schedule_query, {"schedule_id": schedule_id}).fetchone()
+        
+        if not result:
+            return {"success": False, "message": "Schedule not found"}
+        
+        # 관련 반복 일정들도 조회
+        related_query = text("""
+            SELECT sst_idx, sst_pidx, sst_title, sst_sdate, sst_repeat_json
+            FROM smap_schedule_t 
+            WHERE (sst_pidx = :schedule_id OR sst_idx = :schedule_id OR 
+                   (sst_pidx = :parent_id AND :parent_id IS NOT NULL))
+            AND sst_show = 'Y'
+            ORDER BY sst_sdate
+        """)
+        
+        parent_id = result.sst_pidx if result.sst_pidx else schedule_id
+        related_results = db.execute(related_query, {
+            "schedule_id": schedule_id,
+            "parent_id": parent_id
+        }).fetchall()
+        
+        # 스케줄 데이터 변환
+        schedule_data = {
+            "sst_idx": result.sst_idx,
+            "sst_pidx": result.sst_pidx,
+            "mt_idx": result.mt_idx,
+            "sst_title": result.sst_title,
+            "sst_sdate": str(result.sst_sdate) if result.sst_sdate else None,
+            "sst_edate": str(result.sst_edate) if result.sst_edate else None,
+            "sst_repeat_json": result.sst_repeat_json,
+            "sst_repeat_json_v": result.sst_repeat_json_v,
+            "sst_show": result.sst_show,
+            "sst_wdate": str(result.sst_wdate) if result.sst_wdate else None,
+        }
+        
+        # 관련 스케줄들
+        related_schedules = []
+        for row in related_results:
+            related_schedules.append({
+                "sst_idx": row.sst_idx,
+                "sst_pidx": row.sst_pidx,
+                "sst_title": row.sst_title,
+                "sst_sdate": str(row.sst_sdate) if row.sst_sdate else None,
+                "sst_repeat_json": row.sst_repeat_json,
+            })
+        
+        return {
+            "success": True,
+            "data": {
+                "target_schedule": schedule_data,
+                "related_schedules": related_schedules,
+                "total_related": len(related_schedules),
+                "parent_id": parent_id
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"디버깅 엔드포인트 오류: {e}")
+        return {"success": False, "error": str(e)}
