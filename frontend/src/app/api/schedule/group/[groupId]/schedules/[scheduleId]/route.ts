@@ -18,6 +18,7 @@ interface UpdateScheduleRequest {
   sst_pick_result?: string;
   // 반복 일정 처리 옵션
   editOption?: 'this' | 'future' | 'all';
+  targetMemberId?: number;
 }
 
 interface DeleteScheduleRequest {
@@ -25,6 +26,7 @@ interface DeleteScheduleRequest {
   deleteOption?: 'this' | 'future' | 'all';
   sst_pidx?: number | null; // 반복 일정의 부모 ID
   sgdt_idx?: number | null; // 그룹 상세 ID (null 허용)
+  targetMemberId?: number; // 다른 멤버 스케줄 삭제 시
 }
 
 async function makeBackendRequest(url: string, options: RequestInit): Promise<any> {
@@ -124,15 +126,20 @@ export async function PUT(
     const body: UpdateScheduleRequest = await request.json();
     console.log('[SCHEDULE API] 수정 요청 데이터:', body);
     
-    const { editOption, ...scheduleData } = body;
+    const { editOption, targetMemberId, ...scheduleData } = body;
+    
+    // current_user_id 결정: targetMemberId가 있으면 사용, 없으면 기본값 1186
+    const currentUserId = targetMemberId || 1186;
     
     // 백엔드 API URL 구성
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
-    let apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=1186`;
+    let apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=${currentUserId}`;
     
     // 반복 일정 처리 옵션에 따른 URL 및 데이터 구성
     let requestData: any = {
-      ...scheduleData
+      ...scheduleData,
+      // targetMemberId는 백엔드 요청 데이터에 포함
+      ...(targetMemberId && { targetMemberId })
     };
     
     if (editOption && editOption !== 'this') {
@@ -197,22 +204,28 @@ export async function DELETE(
     let deleteOption: string | undefined;
     let sst_pidx: number | null = null;
     let sgdt_idx: number | null = null;
+    let targetMemberId: number | undefined;
     try {
       const body: DeleteScheduleRequest = await request.json();
       deleteOption = body.deleteOption;
       sst_pidx = body.sst_pidx || null;
       sgdt_idx = body.sgdt_idx || null;
+      targetMemberId = body.targetMemberId;
       console.log('[SCHEDULE API] 삭제 옵션:', deleteOption);
       console.log('[SCHEDULE API] 반복 일정 부모 ID:', sst_pidx);
       console.log('[SCHEDULE API] 그룹 상세 ID:', sgdt_idx);
+      console.log('[SCHEDULE API] 대상 멤버 ID:', targetMemberId);
     } catch (e) {
       // 본문이 없는 경우 기본 삭제
       console.log('[SCHEDULE API] 삭제 옵션 없음, 기본 삭제 진행');
     }
     
+    // current_user_id 결정: targetMemberId가 있으면 사용, 없으면 기본값 1186
+    const currentUserId = targetMemberId || 1186;
+    
     // 백엔드 API URL 구성
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
-    let apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=1186`;
+    let apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=${currentUserId}`;
     
     // 요청 데이터 구성
     let requestData: any = {};
@@ -233,6 +246,12 @@ export async function DELETE(
       // 그룹 상세 ID가 있는 경우
       requestData.sgdt_idx = sgdt_idx;
       console.log('[SCHEDULE API] 그룹 상세 ID 전달:', sgdt_idx);
+    }
+    
+    if (targetMemberId !== undefined) {
+      // 대상 멤버 ID가 있는 경우
+      requestData.targetMemberId = targetMemberId;
+      console.log('[SCHEDULE API] 대상 멤버 ID 전달:', targetMemberId);
     }
     
     console.log('[SCHEDULE API] 백엔드 요청 URL:', apiUrl);
@@ -287,9 +306,16 @@ export async function GET(
   console.log('[SCHEDULE API] 파라미터:', { groupId, scheduleId });
   
   try {
+    // 쿼리 파라미터에서 targetMemberId 추출
+    const { searchParams } = new URL(request.url);
+    const targetMemberId = searchParams.get('targetMemberId') ? parseInt(searchParams.get('targetMemberId')!) : undefined;
+    
+    // current_user_id 결정: targetMemberId가 있으면 사용, 없으면 기본값 1186
+    const currentUserId = targetMemberId || 1186;
+    
     // 백엔드 API URL 구성
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
-    const apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=1186`;
+    const apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=${currentUserId}`;
     
     console.log('[SCHEDULE API] 백엔드 요청 URL:', apiUrl);
     

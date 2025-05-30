@@ -707,7 +707,6 @@ export default function SchedulePage() {
   // 매주 반복 시 요일 선택 상태
   const [selectedWeekdays, setSelectedWeekdays] = useState<Set<number>>(new Set());
   const [showWeekdaySelector, setShowWeekdaySelector] = useState(false);
-  const [originalRepeatSetting, setOriginalRepeatSetting] = useState('');
 
   // 로컬 스토리지에서 캐시 데이터 로드
   const loadCacheFromStorage = () => {
@@ -1425,6 +1424,10 @@ export default function SchedulePage() {
         if (response.success) {
           console.log('[handleSaveEvent] ✅ 스케줄 수정 성공');
           
+          // 수정 성공 시 로컬 스토리지 캐시 완전 초기화
+          clearCacheFromStorage();
+          console.log('[handleSaveEvent] 🗑️ 수정 후 로컬 스토리지 캐시 완전 초기화');
+          
           // 성공적으로 완료되었을 때만 모달 닫기
           setIsAddEventModalOpen(false);
           setNewEvent(initialNewEventState);
@@ -1590,6 +1593,10 @@ export default function SchedulePage() {
 
       if (response.success) {
         console.log('[handleDeleteEvent] 스케줄 삭제 성공');
+        
+        // 삭제 성공 시 로컬 스토리지 캐시 완전 초기화
+        clearCacheFromStorage();
+        console.log('[handleDeleteEvent] 🗑️ 삭제 후 로컬 스토리지 캐시 완전 초기화');
         
         // 로컬 상태에서도 제거
         setEvents(prev => prev.filter(event => event.id !== selectedEventDetails.id));
@@ -2576,6 +2583,10 @@ export default function SchedulePage() {
       if (response.success) {
         console.log('[executeDeleteAction] 스케줄 삭제 성공');
         
+        // 삭제 성공 시 로컬 스토리지 캐시 완전 초기화
+        clearCacheFromStorage();
+        console.log('[executeDeleteAction] 🗑️ 삭제 후 로컬 스토리지 캐시 완전 초기화');
+        
         // 모든 관련 모달 상태 초기화
         setIsScheduleActionModalOpen(false);
         setIsRepeatActionModalOpen(false);
@@ -2922,43 +2933,15 @@ export default function SchedulePage() {
       });
       
       setSelectedWeekdays(weekdayIndices);
-      // 원래 설정을 기억해두기 위해 상태 저장
-      setOriginalRepeatSetting(currentRepeat);
       // 매주를 선택된 상태로 설정
       setNewEvent({ ...newEvent, repeat: '매주' });
     } else {
       // 다른 반복 설정이거나 새로 설정하는 경우
       setShowWeekdaySelector(false);
       setSelectedWeekdays(new Set());
-      setOriginalRepeatSetting(currentRepeat);
     }
     
     setIsRepeatModalOpen(true);
-  };
-
-  // 알림 모달 열기 핸들러 (스크롤 중앙 정렬 포함)
-  const handleOpenAlarmModal = () => {
-    setIsAlarmModalOpen(true);
-    
-    // 모달이 열린 후 선택된 항목으로 스크롤
-    setTimeout(() => {
-      const alarmContainer = document.querySelector('.alarm-scroll-container');
-      const selectedButton = document.querySelector('.alarm-selected-option');
-      
-      if (alarmContainer && selectedButton) {
-        const containerHeight = alarmContainer.clientHeight;
-        const buttonTop = (selectedButton as HTMLElement).offsetTop;
-        const buttonHeight = selectedButton.clientHeight;
-        
-        // 선택된 항목이 컨테이너 중앙에 오도록 스크롤 위치 계산
-        const scrollTop = buttonTop - (containerHeight / 2) + (buttonHeight / 2);
-        
-        alarmContainer.scrollTo({
-          top: Math.max(0, scrollTop),
-          behavior: 'smooth'
-        });
-      }
-    }, 100);
   };
 
   return (
@@ -3753,7 +3736,7 @@ export default function SchedulePage() {
                           <label className="block text-sm font-medium text-gray-700 mb-2">알림</label>
                           <button
                             type="button"
-                              onClick={() => handleOpenAlarmModal()}
+                              onClick={() => setIsAlarmModalOpen(true)}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left text-sm transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                           >
                             {newEvent.alarm}
@@ -3920,11 +3903,9 @@ export default function SchedulePage() {
                       <>
                         <button
                           onClick={() => {
-                            // 원래 설정으로 복원
-                            setNewEvent({ ...newEvent, repeat: originalRepeatSetting });
                             setShowWeekdaySelector(false);
                             setSelectedWeekdays(new Set());
-                            setIsRepeatModalOpen(false);
+                            setNewEvent({ ...newEvent, repeat: '안함' });
                           }}
                           className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                         >
@@ -4003,7 +3984,7 @@ export default function SchedulePage() {
                 <div className="p-6">
                   <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">알림 설정</h3>
                   
-                  <div className="space-y-2 max-h-64 overflow-y-auto alarm-scroll-container">
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
                     {['없음', '정시', '5분 전', '10분 전', '15분 전', '30분 전', '1시간 전', '1일 전'].map((option) => (
                       <button
                         key={option}
@@ -4013,7 +3994,7 @@ export default function SchedulePage() {
                         }}
                         className={`w-full px-4 py-3 text-left rounded-xl transition-all duration-200 mobile-button ${
                           newEvent.alarm === option
-                            ? 'bg-amber-100 text-amber-800 font-semibold border-2 border-amber-300 alarm-selected-option'
+                            ? 'bg-amber-100 text-amber-800 font-semibold border-2 border-amber-300'
                             : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-transparent'
                         }`}
                       >
