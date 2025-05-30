@@ -33,7 +33,7 @@ import {
   FiInfo
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
-import { FaTrash } from 'react-icons/fa';
+import { FaTrash, FaCrown } from 'react-icons/fa';
 import Image from 'next/image';
 import memberService from '@/services/memberService';
 import groupService, { Group } from '@/services/groupService';
@@ -309,6 +309,11 @@ interface ScheduleEvent {
   tgtSgdtLeaderChk?: string; // 타겟 멤버의 리더 권한
   tgtSgdtIdx?: number; // 타겟 멤버의 그룹 상세 인덱스
   sst_pidx?: number; // 반복 일정 인덱스
+  memberNickname?: string; // nickname 추가
+  memberCurrentLat?: number | null; // current latitude 추가
+  memberCurrentLng?: number | null; // current longitude 추가
+  memberBattery?: number | null; // battery 추가
+  memberGpsTime?: string | null; // gps time 추가
 }
 
 // 모의 일정 데이터
@@ -2052,7 +2057,10 @@ export default function SchedulePage() {
             //   console.log(`[DEBUG] 스케줄 ${schedule.sst_idx} - sst_pidx: ${schedule.sst_pidx}, repeat_json: ${schedule.sst_repeat_json}, 최종 sst_pidx: ${event.sst_pidx}`);
             // }
             
-            allEvents.push(event);
+            // 멤버 위치 정보 매핑 및 거리 계산
+            const eventWithLocation = mapMemberLocationToSchedule(event, allGroupMembers[schedule.sgt_idx] || []);
+            
+            allEvents.push(eventWithLocation);
             
           } catch (parseError) {
             console.error(`[loadAllGroupSchedules] 스케줄 ${index} 파싱 실패:`, parseError);
@@ -2372,6 +2380,72 @@ export default function SchedulePage() {
     await executeDeleteAction(event, 'single');
   };
 
+  // 거리 계산 함수 (Haversine formula)
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371; // 지구 반지름 (km)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    return distance;
+  };
+
+  // 거리 텍스트 포맷팅 함수
+  const formatDistance = (distance: number): string => {
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)}m`;
+    } else {
+      return `${distance.toFixed(1)}km`;
+    }
+  };
+
+  // 멤버 위치 정보를 스케줄에 매핑하는 함수
+  const mapMemberLocationToSchedule = (
+    schedule: ScheduleEvent, 
+    groupMembers: any[] // 실제 백엔드 그룹 멤버 데이터
+  ): ScheduleEvent => {
+    // tgtSgdtIdx와 일치하는 멤버 찾기
+    const targetMember = groupMembers.find(member => 
+      member.sgdt_idx === schedule.tgtSgdtIdx
+    );
+    
+    if (!targetMember) {
+      return schedule;
+    }
+    
+    // 스케줄에 멤버 정보 추가
+    const updatedSchedule = {
+      ...schedule,
+      memberNickname: targetMember.mt_nickname || targetMember.mt_name, // nickname 우선, 없으면 name
+      memberCurrentLat: targetMember.mlt_lat,
+      memberCurrentLng: targetMember.mlt_long,
+      memberBattery: targetMember.mlt_battery,
+      memberGpsTime: targetMember.mlt_gps_time,
+    };
+    
+    // 거리 계산 (스케줄 위치와 멤버 현재 위치)
+    if (schedule.locationLat && schedule.locationLng && 
+        targetMember.mlt_lat && targetMember.mlt_long) {
+      const distance = calculateDistance(
+        schedule.locationLat,
+        schedule.locationLng,
+        targetMember.mlt_lat,
+        targetMember.mlt_long
+      );
+      
+      updatedSchedule.distance = distance;
+      updatedSchedule.distanceText = formatDistance(distance);
+      
+      console.log(`[DISTANCE] 스케줄 "${schedule.title}" - 멤버 "${targetMember.mt_name}": ${formatDistance(distance)}`);
+    }
+    
+    return updatedSchedule;
+  };
+
   return (
     <>
       <style jsx global>{pageStyles}</style>
@@ -2604,7 +2678,7 @@ export default function SchedulePage() {
                                   {event.title}
                                 </h3>
                                 {event.content && (
-                                  <p className="pl-4 text-gray-500 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+                                  <p className="pl-3 text-gray-500 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
                                     {event.content}
                                   </p>
                                 )}
@@ -2622,14 +2696,49 @@ export default function SchedulePage() {
                                         {event.locationAddress}
                                       </p>
                                     )}
-                                    {event.distanceText && (
-                                      <div className="flex items-center mt-3">
-                                        <div className="flex items-center space-x-1 bg-blue-200 px-3 py-1 rounded-full">
-                                          <svg className="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                          </svg>
-                                          <span className="text-sm font-semibold text-blue-700">{event.distanceText}</span>
-                                        </div>
+                                    
+                                    {/* 거리와 GPS 시간 정보 */}
+                                    {(event.distanceText || event.memberGpsTime) && (
+                                      <div className="flex items-center space-x-4 mt-3">
+                                        {/* 거리 정보 */}
+                                        {event.distanceText && (
+                                          <div className="flex items-center space-x-1 bg-blue-200 px-3 py-1 rounded-full">
+                                            <svg className="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                            <span className="text-sm font-semibold text-blue-700">{event.distanceText}</span>
+                                          </div>
+                                        )}
+                                        
+                                        {/* GPS 시간 정보 */}
+                                        {/* {event.memberGpsTime && (
+                                          <div className="flex items-center space-x-1 bg-amber-200 px-3 py-1 rounded-full">
+                                            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14v6.5" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8l4-2m0 0l4-2m-4 2v3m0-3L12 8" />
+                                            </svg>
+                                            <span className="text-sm font-semibold text-amber-600">
+                                              {(() => {
+                                                const gpsTime = new Date(event.memberGpsTime);
+                                                const now = new Date();
+                                                const diffMs = now.getTime() - gpsTime.getTime();
+                                                const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                                                const diffDays = Math.floor(diffHours / 24);
+                                                
+                                                if (diffDays > 0) {
+                                                  return `${diffDays}일 전`;
+                                                } else if (diffHours > 0) {
+                                                  return `${diffHours}시간 전`;
+                                                } else {
+                                                  return '방금 전';
+                                                }
+                                              })()}
+                                            </span>
+                                          </div>
+                                        )} */}
                                       </div>
                                     )}
                                   </div>
@@ -2676,12 +2785,15 @@ export default function SchedulePage() {
                                           }}
                                         />
                                       ) : (
-                                        <div className="w-8 h-8 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                                          <FiUser className="w-4 h-4 text-gray-500" />
-                                        </div>
+                                        <img
+                                          src={getDefaultImage(event.memberGender, event.memberIdx || 0)}
+                                          alt={event.memberName}
+                                          className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm"
+                                        />
                                       )}
+                                      
                                       <span className="text-sm font-medium text-gray-700" style={{ wordBreak: 'keep-all' }}>
-                                        {event.memberName}
+                                        {event.memberNickname || event.memberName}
                                       </span>
                                     </div>
                                   )}
@@ -2690,8 +2802,9 @@ export default function SchedulePage() {
                                 {/* 알림 정보 */}
                                 {event.hasAlarm && (
                                   <div className="flex items-center space-x-1 bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-medium">
+                                    {/* 종모양 아이콘 (Bell) */}
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 15V11a6 6 0 10-12 0v4c0 .386-.146.735-.405 1.005L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                                     </svg>
                                     <span>{event.alarmTime || '알림'}</span>
                                   </div>
@@ -2919,7 +3032,7 @@ export default function SchedulePage() {
                                       newEvent.id ? 'cursor-not-allowed opacity-60' : ''
                                     }`}
                                   >
-                                    <div className={`w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 relative ${
+                                    <div className={`w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                                       member.isSelected 
                                         ? newEvent.id 
                                           ? 'ring-4 ring-gray-300 ring-offset-2' 
@@ -2941,18 +3054,6 @@ export default function SchedulePage() {
                                           console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
                                         }}
                                       />
-                                      
-                                      {/* 배터리 정보 표시 */}
-                                      {member.mlt_battery !== null && member.mlt_battery !== undefined && (
-                                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full border border-gray-200 flex items-center justify-center">
-                                          <span className={`text-xs font-bold ${
-                                            member.mlt_battery > 20 ? 'text-green-600' : 
-                                            member.mlt_battery > 10 ? 'text-yellow-600' : 'text-red-600'
-                                          }`}>
-                                            {member.mlt_battery}
-                                          </span>
-                                        </div>
-                                      )}
                                     </div>
                                     
                                     <div className="text-center">
@@ -2968,36 +3069,16 @@ export default function SchedulePage() {
                                         {member.name}
                                       </span>
                                       
-                                      {/* 권한 표시 */}
-                                      {(member.sgdt_owner_chk === 'Y' || member.sgdt_leader_chk === 'Y') && (
-                                        <span className={`text-xs px-1 py-0.5 rounded-full ${
-                                          member.sgdt_owner_chk === 'Y' 
-                                            ? 'bg-red-100 text-red-600' 
-                                            : 'bg-blue-100 text-blue-600'
-                                        }`}>
-                                          {member.sgdt_owner_chk === 'Y' ? '오너' : '리더'}
-                                        </span>
+                                      {/* 왕관 표시 (오너/리더) - 이름 아래 */}
+                                      {member.sgdt_owner_chk === 'Y' && (
+                                        <div className="w-4 h-4 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-sm mx-auto mt-1">
+                                          <FaCrown className="w-2 h-2 text-white" />
+                                        </div>
                                       )}
-                                      
-                                      {/* 최근 위치 업데이트 시간 */}
-                                      {member.mlt_gps_time && (
-                                        <span className="text-xs text-gray-400 block mt-0.5">
-                                          {(() => {
-                                            const gpsTime = new Date(member.mlt_gps_time);
-                                            const now = new Date();
-                                            const diffMs = now.getTime() - gpsTime.getTime();
-                                            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-                                            const diffDays = Math.floor(diffHours / 24);
-                                            
-                                            if (diffDays > 0) {
-                                              return `${diffDays}일 전`;
-                                            } else if (diffHours > 0) {
-                                              return `${diffHours}시간 전`;
-                                            } else {
-                                              return '방금 전';
-                                            }
-                                          })()}
-                                        </span>
+                                      {member.sgdt_owner_chk !== 'Y' && member.sgdt_leader_chk === 'Y' && (
+                                        <div className="w-4 h-4 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center shadow-sm mx-auto mt-1">
+                                          <FaCrown className="w-2 h-2 text-white" />
+                                        </div>
                                       )}
                                     </div>
                                   </button>
