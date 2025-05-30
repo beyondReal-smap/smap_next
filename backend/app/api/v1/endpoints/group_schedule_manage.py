@@ -155,14 +155,14 @@ def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params
         current_date = base_start
         
         # 반복 주기별 처리
-        if r1 == "1":  # 매일
+        if r1 == "2":  # 매일
             delta = timedelta(days=1)
-        elif r1 == "2":  # 매주
+        elif r1 == "3":  # 매주
             delta = timedelta(weeks=1)
-        elif r1 == "3":  # 매월
+        elif r1 == "4":  # 매월
             # 월간 반복은 특별 처리 필요 (dateutil 사용)
             delta = None
-        elif r1 == "4":  # 매년
+        elif r1 == "5":  # 매년
             delta = timedelta(days=365)
         else:
             logger.warning(f"⚠️ [RECURRING] 지원하지 않는 반복 주기: {r1}")
@@ -170,8 +170,10 @@ def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params
         
         # 반복 일정 생성
         while current_date < end_date:
-            # 매주 반복의 경우 특별 처리
-            if r1 == "2":  # 매주
+            # 첫 번째 반복 일정은 다음 주기부터 생성
+            if r1 == "2":  # 매일
+                current_date += timedelta(days=1)
+            elif r1 == "3":  # 매주
                 current_date += timedelta(weeks=1)
                 
                 # 특정 요일이 지정된 경우 해당 요일로 조정
@@ -179,13 +181,21 @@ def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params
                     target_weekday = int(r2)
                     # r2 값: 1=월요일, 2=화요일, 3=수요일, 4=목요일, 5=금요일, 6=토요일, 7=일요일
                     # Python weekday(): 월요일=0, 화요일=1, 수요일=2, 목요일=3, 금요일=4, 토요일=5, 일요일=6
-                    python_weekday = (target_weekday - 1) % 7
                     
-                    # 현재 날짜를 목표 요일로 조정
-                    days_diff = python_weekday - current_date.weekday()
-                    if days_diff != 0:
-                        current_date += timedelta(days=days_diff)
-            elif r1 == "3":  # 매월
+                    if target_weekday == 7:  # 일요일
+                        python_weekday = 6
+                    else:  # 월요일(1) ~ 토요일(6)
+                        python_weekday = target_weekday - 1
+                    
+                    # 현재 날짜의 요일과 목표 요일이 다른 경우에만 조정
+                    current_weekday = current_date.weekday()
+                    if current_weekday != python_weekday:
+                        # 다음 주의 해당 요일로 이동
+                        days_to_add = (python_weekday - current_weekday) % 7
+                        if days_to_add == 0:  # 같은 요일이면 다음 주
+                            days_to_add = 7
+                        current_date += timedelta(days=days_to_add)
+            elif r1 == "4":  # 매월
                 # 월 단위 계산을 위해 직접 계산
                 try:
                     if current_date.month == 12:
@@ -198,9 +208,8 @@ def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params
                         current_date = current_date.replace(year=current_date.year + 1, month=1, day=28)
                     else:
                         current_date = current_date.replace(month=current_date.month + 1, day=28)
-            else:
-                # 일일, 연간 반복
-                current_date += delta
+            elif r1 == "5":  # 매년
+                current_date += timedelta(days=365)
             
             if current_date >= end_date:
                 break
@@ -881,12 +890,12 @@ def create_group_schedule(
         """)
         
         insert_params = {
-            "mt_idx": target_member_id,
+            "mt_idx": current_user_id,
             "sst_title": schedule_data.get('sst_title'),
-            "sst_sdate": sst_sdate,
-            "sst_edate": sst_edate,
-            "sst_sedate": f"{sst_sdate} ~ {sst_edate}",
-            "sst_all_day": sst_all_day,
+            "sst_sdate": schedule_data.get("sst_sdate"),
+            "sst_edate": schedule_data.get("sst_edate"),
+            "sst_sedate": f"{schedule_data.get('sst_sdate')} ~ {schedule_data.get('sst_edate')}",
+            "sst_all_day": schedule_data.get("sst_all_day", "N"),
             "sgt_idx": group_id,
             "sgdt_idx": member_auth["sgdt_idx"],
             "sgdt_idx_t": schedule_data.get("sgdt_idx_t"),
@@ -894,7 +903,7 @@ def create_group_schedule(
             "sst_location_add": schedule_data.get("sst_location_add"),
             "sst_location_lat": schedule_data.get("sst_location_lat"),
             "sst_location_long": schedule_data.get("sst_location_long"),
-            "sst_location_alarm": schedule_data.get("sst_location_alarm", "N"),
+            "sst_location_alarm": schedule_data.get("sst_location_alarm", "4"),
             "sst_memo": schedule_data.get("sst_memo"),
             "sst_supplies": schedule_data.get("sst_supplies"),
             "sst_alram": schedule_data.get("sst_alram", "N"),
@@ -902,12 +911,12 @@ def create_group_schedule(
             "sst_schedule_alarm_chk": schedule_data.get("sst_schedule_alarm_chk", "N"),
             "sst_pick_type": schedule_data.get("sst_pick_type"),
             "sst_pick_result": schedule_data.get("sst_pick_result"),
-            "sst_schedule_alarm": sst_schedule_alarm.strftime('%Y-%m-%d %H:%M:%S') if sst_schedule_alarm else None,
+            "sst_schedule_alarm": None,
             "sst_repeat_json": sst_repeat_json,
             "sst_repeat_json_v": sst_repeat_json_v,
             "slt_idx": schedule_data.get("slt_idx"),
-            "slt_idx_t": schedule_data.get("sst_location_add"), # PHP에서 location_add를 slt_idx_t로 사용
-            "sst_update_chk": schedule_data.get("sst_update_chk", "Y"),
+            "slt_idx_t": schedule_data.get("sst_location_add"),
+            "sst_update_chk": schedule_data.get("sst_update_chk", "3"),
             "sst_adate": schedule_data.get("sst_adate")
         }
         
@@ -954,7 +963,7 @@ def create_group_schedule(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @router.put("/group/{group_id}/schedules/{schedule_id}")
-def update_group_schedule(
+def update_group_schedule_with_repeat_option(
     group_id: int,
     schedule_id: int,
     schedule_data: Dict[str, Any],
@@ -962,19 +971,17 @@ def update_group_schedule(
     db: Session = Depends(deps.get_db)
 ):
     """
-    그룹 스케줄 수정 (향상된 PHP 로직 기반)
+    그룹 스케줄 수정 (반복 일정 처리 옵션 지원)
     """
     try:
-        logger.info(f"🔥 [UPDATE_SCHEDULE] 스케줄 수정 시작 - group_id: {group_id}, schedule_id: {schedule_id}, user_id: {current_user_id}")
-        logger.info(f"📝 [UPDATE_SCHEDULE] 원본 요청 데이터: {schedule_data}")
+        logger.info(f"🔥 [UPDATE_REPEAT_SCHEDULE] 반복 일정 수정 시작 - group_id: {group_id}, schedule_id: {schedule_id}, user_id: {current_user_id}")
+        logger.info(f"📝 [UPDATE_REPEAT_SCHEDULE] 요청 데이터: {schedule_data}")
         
         # 그룹 권한 확인
         member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
         if not member_auth:
-            logger.error(f"❌ [UPDATE_SCHEDULE] 그룹 권한 없음 - group_id: {group_id}, user_id: {current_user_id}")
+            logger.error(f"❌ [UPDATE_REPEAT_SCHEDULE] 그룹 권한 없음 - group_id: {group_id}, user_id: {current_user_id}")
             raise HTTPException(status_code=403, detail="Group access denied")
-        
-        logger.info(f"✅ [UPDATE_SCHEDULE] 그룹 권한 확인 완료 - member_auth: {member_auth}")
         
         # 기존 스케줄 조회
         schedule_query = text("""
@@ -985,10 +992,8 @@ def update_group_schedule(
         schedule_result = db.execute(schedule_query, {"schedule_id": schedule_id}).fetchone()
         
         if not schedule_result:
-            logger.error(f"❌ [UPDATE_SCHEDULE] 스케줄을 찾을 수 없음 - schedule_id: {schedule_id}")
+            logger.error(f"❌ [UPDATE_REPEAT_SCHEDULE] 스케줄을 찾을 수 없음 - schedule_id: {schedule_id}")
             raise HTTPException(status_code=404, detail="Schedule not found")
-        
-        logger.info(f"📅 [UPDATE_SCHEDULE] 기존 스케줄 확인 - 소유자: {schedule_result.mt_idx}, 제목: {schedule_result.sst_title}")
         
         # 권한 확인: 본인 스케줄이거나 오너/리더인 경우만 수정 가능
         can_edit = (
@@ -996,66 +1001,254 @@ def update_group_schedule(
             GroupScheduleManager.has_manage_permission(member_auth)
         )
         
-        logger.info(f"👤 [UPDATE_SCHEDULE] 편집 권한 확인 - 본인스케줄: {schedule_result.mt_idx == current_user_id}, 관리권한: {GroupScheduleManager.has_manage_permission(member_auth)}, 최종권한: {can_edit}")
-        
         if not can_edit:
-            logger.error(f"❌ [UPDATE_SCHEDULE] 편집 권한 없음 - user_id: {current_user_id}")
+            logger.error(f"❌ [UPDATE_REPEAT_SCHEDULE] 편집 권한 없음 - user_id: {current_user_id}")
             raise HTTPException(
                 status_code=403, 
                 detail="You can only edit your own schedules or you need owner/leader permission"
             )
         
-        # 필수 필드 검증 및 기본값 설정 (PHP 로직 참고)
+        # 반복 일정 처리 옵션 확인
+        edit_option = schedule_data.get('editOption', 'this')
+        logger.info(f"🔄 [UPDATE_REPEAT_SCHEDULE] 편집 옵션: {edit_option}")
+        
+        # 반복 일정인지 확인
+        is_repeat_schedule = (
+            schedule_result.sst_repeat_json and 
+            schedule_result.sst_repeat_json.strip() and 
+            schedule_result.sst_repeat_json != ''
+        ) or (
+            schedule_result.sst_pidx and 
+            schedule_result.sst_pidx > 0
+        )
+        
+        logger.info(f"🔄 [UPDATE_REPEAT_SCHEDULE] 반복 일정 여부: {is_repeat_schedule}")
+        logger.info(f"🔄 [UPDATE_REPEAT_SCHEDULE] sst_repeat_json: {schedule_result.sst_repeat_json}")
+        logger.info(f"🔄 [UPDATE_REPEAT_SCHEDULE] sst_pidx: {schedule_result.sst_pidx}")
+        
+        if (is_repeat_schedule or schedule_data.get('sst_repeat_json')) and edit_option != 'this':
+            # 반복 일정 처리 - 삭제 후 재생성 방식
+            if edit_option == 'all':
+                # 모든 반복 일정 삭제 후 재생성
+                logger.info(f"🔄 [UPDATE_REPEAT_SCHEDULE] 모든 반복 일정 삭제 후 재생성 시작")
+                
+                # 부모 스케줄 ID 찾기
+                parent_id = schedule_result.sst_pidx if schedule_result.sst_pidx else schedule_id
+                
+                # 모든 관련 반복 일정 삭제 (soft delete)
+                delete_all_query = text("""
+                    UPDATE smap_schedule_t 
+                    SET sst_show = 'N', sst_udate = NOW()
+                    WHERE (sst_pidx = :parent_id OR sst_idx = :parent_id) 
+                    AND sst_show = 'Y'
+                """)
+                
+                delete_result = db.execute(delete_all_query, {"parent_id": parent_id})
+                deleted_count = delete_result.rowcount
+                logger.info(f"🗑️ [UPDATE_REPEAT_SCHEDULE] 삭제된 반복 일정 개수: {deleted_count}")
+                
+                # 새로운 반복 일정 생성
+                # 먼저 부모 스케줄 생성
+                new_parent_schedule_data = schedule_data.copy()
+                new_parent_schedule_data['sst_pidx'] = None  # 부모는 pidx가 없음
+                
+                new_parent_id = create_new_schedule(db, group_id, current_user_id, new_parent_schedule_data, logger)
+                
+                # 반복 설정이 있으면 반복 일정들 생성
+                repeat_json = schedule_data.get('sst_repeat_json', '')
+                repeat_json_v = schedule_data.get('sst_repeat_json_v', '')
+                
+                if repeat_json and repeat_json.strip():
+                    # create_recurring_schedules에 전달할 파라미터 구성
+                    recurring_params = {
+                        "mt_idx": current_user_id,
+                        "sst_title": schedule_data.get('sst_title'),
+                        "sst_sdate": schedule_data.get("sst_sdate"),
+                        "sst_edate": schedule_data.get("sst_edate"),
+                        "sst_sedate": f"{schedule_data.get('sst_sdate')} ~ {schedule_data.get('sst_edate')}",
+                        "sst_all_day": schedule_data.get("sst_all_day", "N"),
+                        "sgt_idx": group_id,
+                        "sgdt_idx": member_auth["sgdt_idx"],
+                        "sgdt_idx_t": schedule_data.get("sgdt_idx_t"),
+                        "sst_location_title": schedule_data.get("sst_location_title"),
+                        "sst_location_add": schedule_data.get("sst_location_add"),
+                        "sst_location_lat": schedule_data.get("sst_location_lat"),
+                        "sst_location_long": schedule_data.get("sst_location_long"),
+                        "sst_location_alarm": schedule_data.get("sst_location_alarm", "4"),
+                        "sst_memo": schedule_data.get("sst_memo"),
+                        "sst_supplies": schedule_data.get("sst_supplies"),
+                        "sst_alram": schedule_data.get("sst_alram", "N"),
+                        "sst_alram_t": schedule_data.get("sst_alram_t"),
+                        "sst_schedule_alarm_chk": schedule_data.get("sst_schedule_alarm_chk", "N"),
+                        "sst_pick_type": schedule_data.get("sst_pick_type"),
+                        "sst_pick_result": schedule_data.get("sst_pick_result"),
+                        "sst_schedule_alarm": None,
+                        "sst_repeat_json": repeat_json,
+                        "sst_repeat_json_v": repeat_json_v,
+                        "slt_idx": schedule_data.get("slt_idx"),
+                        "slt_idx_t": schedule_data.get("sst_location_add"),
+                        "sst_update_chk": schedule_data.get("sst_update_chk", "3"),
+                        "sst_adate": schedule_data.get("sst_adate")
+                    }
+                    
+                    created_count = create_recurring_schedules(
+                        db, new_parent_id, recurring_params, repeat_json, repeat_json_v
+                    )
+                    logger.info(f"✨ [UPDATE_REPEAT_SCHEDULE] 새로 생성된 반복 일정 개수: {created_count}")
+                    updated_count = created_count + 1  # 부모 포함
+                else:
+                    updated_count = 1  # 부모만
+            elif edit_option == 'future':
+                # 현재 이후의 반복 일정 삭제 후 재생성
+                logger.info(f"🔄 [UPDATE_REPEAT_SCHEDULE] 현재 이후 반복 일정 삭제 후 재생성 시작")
+                
+                # 부모 스케줄 ID 찾기
+                parent_id = schedule_result.sst_pidx if schedule_result.sst_pidx else schedule_id
+                
+                # 현재 스케줄의 시작 날짜
+                current_start_date = schedule_result.sst_sdate
+                
+                # 현재 이후의 관련 반복 일정 삭제 (soft delete)
+                delete_future_query = text("""
+                    UPDATE smap_schedule_t 
+                    SET sst_show = 'N', sst_udate = NOW()
+                    WHERE (sst_pidx = :parent_id OR sst_idx = :parent_id) 
+                    AND sst_sdate >= :current_start_date
+                    AND sst_show = 'Y'
+                """)
+                
+                delete_result = db.execute(delete_future_query, {
+                    "parent_id": parent_id,
+                    "current_start_date": current_start_date
+                })
+                deleted_count = delete_result.rowcount
+                logger.info(f"🗑️ [UPDATE_REPEAT_SCHEDULE] 삭제된 미래 반복 일정 개수: {deleted_count}")
+                
+                # 새로운 반복 일정 생성 (현재 날짜부터)
+                # 현재 스케줄을 새로운 부모로 생성
+                new_current_schedule_data = schedule_data.copy()
+                new_current_schedule_data['sst_pidx'] = None  # 새로운 부모는 pidx가 없음
+                
+                new_current_id = create_new_schedule(db, group_id, current_user_id, new_current_schedule_data, logger)
+                
+                # 반복 설정이 있으면 미래 반복 일정들 생성
+                repeat_json = schedule_data.get('sst_repeat_json', '')
+                repeat_json_v = schedule_data.get('sst_repeat_json_v', '')
+                
+                if repeat_json and repeat_json.strip():
+                    # create_recurring_schedules에 전달할 파라미터 구성
+                    recurring_params = {
+                        "mt_idx": current_user_id,
+                        "sst_title": schedule_data.get('sst_title'),
+                        "sst_sdate": schedule_data.get("sst_sdate"),
+                        "sst_edate": schedule_data.get("sst_edate"),
+                        "sst_sedate": f"{schedule_data.get('sst_sdate')} ~ {schedule_data.get('sst_edate')}",
+                        "sst_all_day": schedule_data.get("sst_all_day", "N"),
+                        "sgt_idx": group_id,
+                        "sgdt_idx": member_auth["sgdt_idx"],
+                        "sgdt_idx_t": schedule_data.get("sgdt_idx_t"),
+                        "sst_location_title": schedule_data.get("sst_location_title"),
+                        "sst_location_add": schedule_data.get("sst_location_add"),
+                        "sst_location_lat": schedule_data.get("sst_location_lat"),
+                        "sst_location_long": schedule_data.get("sst_location_long"),
+                        "sst_location_alarm": schedule_data.get("sst_location_alarm", "4"),
+                        "sst_memo": schedule_data.get("sst_memo"),
+                        "sst_supplies": schedule_data.get("sst_supplies"),
+                        "sst_alram": schedule_data.get("sst_alram", "N"),
+                        "sst_alram_t": schedule_data.get("sst_alram_t"),
+                        "sst_schedule_alarm_chk": schedule_data.get("sst_schedule_alarm_chk", "N"),
+                        "sst_pick_type": schedule_data.get("sst_pick_type"),
+                        "sst_pick_result": schedule_data.get("sst_pick_result"),
+                        "sst_schedule_alarm": None,
+                        "sst_repeat_json": repeat_json,
+                        "sst_repeat_json_v": repeat_json_v,
+                        "slt_idx": schedule_data.get("slt_idx"),
+                        "slt_idx_t": schedule_data.get("sst_location_add"),
+                        "sst_update_chk": schedule_data.get("sst_update_chk", "3"),
+                        "sst_adate": schedule_data.get("sst_adate")
+                    }
+                    
+                    created_count = create_recurring_schedules(
+                        db, new_current_id, recurring_params, repeat_json, repeat_json_v
+                    )
+                    logger.info(f"✨ [UPDATE_REPEAT_SCHEDULE] 새로 생성된 미래 반복 일정 개수: {created_count}")
+                    updated_count = created_count + 1  # 현재 스케줄 포함
+                else:
+                    updated_count = 1  # 현재 스케줄만
+            else:
+                # 'this' - 현재 스케줄만 수정
+                logger.info(f"🔄 [UPDATE_REPEAT_SCHEDULE] 현재 스케줄만 수정")
+                update_single_schedule(db, schedule_id, schedule_data, logger)
+                updated_count = 1
+        else:
+            # 일반 스케줄 또는 'this' 옵션
+            logger.info(f"🔄 [UPDATE_REPEAT_SCHEDULE] 일반 스케줄 수정")
+            update_single_schedule(db, schedule_id, schedule_data, logger)
+            updated_count = 1
+        
+        db.commit()
+        
+        logger.info(f"✅ [UPDATE_REPEAT_SCHEDULE] 스케줄 수정 완료 - 수정된 개수: {updated_count}")
+        
+        return {
+            "success": True,
+            "data": {
+                "message": f"Successfully updated {updated_count} schedule(s)",
+                "updated_count": updated_count,
+                "edit_option": edit_option
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"💥 [UPDATE_REPEAT_SCHEDULE] 스케줄 수정 오류: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+def update_single_schedule(db: Session, schedule_id: int, schedule_data: Dict[str, Any], logger):
+    """
+    단일 스케줄 업데이트 헬퍼 함수
+    """
+    try:
+        logger.info(f"📝 [UPDATE_SINGLE] 스케줄 {schedule_id} 업데이트 시작")
+        
+        # 필수 필드 검증 및 기본값 설정
         if not schedule_data.get('sst_title', '').strip():
             schedule_data['sst_title'] = '제목 없음'
-            logger.warning(f"⚠️ [UPDATE_SCHEDULE] 제목이 비어있어 기본값으로 설정")
             
         if not schedule_data.get('sst_sdate'):
-            logger.error(f"❌ [UPDATE_SCHEDULE] 시작 날짜가 없음")
-            raise HTTPException(status_code=400, detail="Start date is required")
+            logger.error(f"❌ [UPDATE_SINGLE] 시작 날짜가 없음")
+            raise ValueError("Start date is required")
             
         if not schedule_data.get('sst_edate'):
             schedule_data['sst_edate'] = schedule_data['sst_sdate']
-            logger.info(f"📅 [UPDATE_SCHEDULE] 종료 날짜가 없어 시작 날짜로 설정")
         
-        logger.info(f"📝 [UPDATE_SCHEDULE] 필수 필드 검증 완료 - title: {schedule_data['sst_title']}")
-        
-        # 시작/종료 날짜/시간 처리 (PHP 로직 참고)
+        # 시작/종료 날짜/시간 처리
         sst_sdate = schedule_data['sst_sdate']
         sst_edate = schedule_data['sst_edate']
-        
-        logger.info(f"📅 [UPDATE_SCHEDULE] 원본 날짜/시간 - sdate: {sst_sdate}, edate: {sst_edate}")
         
         # 시간이 포함되지 않은 경우 시간 추가
         if 'T' not in sst_sdate and ':' not in sst_sdate:
             sst_stime = schedule_data.get('sst_stime', '00:00:00')
             sst_sdate = f"{sst_sdate}T{sst_stime}" if 'T' not in sst_stime else f"{sst_sdate} {sst_stime}"
-            logger.info(f"⏰ [UPDATE_SCHEDULE] 시작 시간 추가 - 결과: {sst_sdate}")
             
         if 'T' not in sst_edate and ':' not in sst_edate:
             sst_etime = schedule_data.get('sst_etime', '23:59:59')
             sst_edate = f"{sst_edate}T{sst_etime}" if 'T' not in sst_etime else f"{sst_edate} {sst_etime}"
-            logger.info(f"⏰ [UPDATE_SCHEDULE] 종료 시간 추가 - 결과: {sst_edate}")
         
-        # 하루종일 및 반복 설정 처리 (사용자 요구사항에 맞게)
+        # 하루종일 및 반복 설정 처리
         sst_all_day = schedule_data.get('sst_all_day', 'N')
         sst_repeat_json = schedule_data.get('sst_repeat_json', '')
         sst_repeat_json_v = schedule_data.get('sst_repeat_json_v', '')
-        
-        logger.info(f"🔄 [UPDATE_SCHEDULE] 원본 반복 설정 - all_day: {sst_all_day}, repeat_json: {sst_repeat_json}, repeat_json_v: {sst_repeat_json_v}")
         
         # 하루종일인 경우 반복을 null로 설정
         if sst_all_day == 'Y':
             sst_repeat_json = ''
             sst_repeat_json_v = ''
-            logger.info("🔄 [UPDATE_SCHEDULE] 하루종일 이벤트: 반복 설정을 null로 변경")
         
-        logger.info(f"🔄 [UPDATE_SCHEDULE] 최종 반복 설정 - repeat_json: {sst_repeat_json}, repeat_json_v: {sst_repeat_json_v}")
-        
-        # 알림 시간 계산 (PHP 로직 참고)
+        # 알림 시간 계산
         sst_schedule_alarm = None
-        logger.info(f"🔔 [UPDATE_SCHEDULE] 알림 설정 시작 - alarm_chk: {schedule_data.get('sst_schedule_alarm_chk')}, pick_type: {schedule_data.get('sst_pick_type')}, pick_result: {schedule_data.get('sst_pick_result')}")
-        
         if (schedule_data.get('sst_schedule_alarm_chk') == 'Y' and 
             schedule_data.get('sst_pick_type') and 
             schedule_data.get('sst_pick_result')):
@@ -1066,34 +1259,28 @@ def update_group_schedule(
                 pick_result = int(schedule_data['sst_pick_result'])
                 pick_type = schedule_data['sst_pick_type']
                 
-                logger.info(f"🔔 [UPDATE_SCHEDULE] 알림 시간 계산 - start_datetime: {start_datetime}, pick_result: {pick_result}, pick_type: {pick_type}")
-                
                 if pick_type == 'minute':
                     sst_schedule_alarm = start_datetime - timedelta(minutes=pick_result)
                 elif pick_type == 'hour':
                     sst_schedule_alarm = start_datetime - timedelta(hours=pick_result)
                 elif pick_type == 'day':
                     sst_schedule_alarm = start_datetime - timedelta(days=pick_result)
-                
-                logger.info(f"🔔 [UPDATE_SCHEDULE] 계산된 알림 시간: {sst_schedule_alarm}")
                     
             except (ValueError, TypeError) as e:
-                logger.warning(f"⚠️ [UPDATE_SCHEDULE] 알림 시간 계산 실패: {e}")
+                logger.warning(f"⚠️ [UPDATE_SINGLE] 알림 시간 계산 실패: {e}")
                 sst_schedule_alarm = None
 
-        # 업데이트할 필드 구성 (PHP의 모든 필드 지원)
-        logger.info(f"💾 [UPDATE_SCHEDULE] 업데이트 필드 구성 시작")
-        
+        # 업데이트할 필드 구성
         update_fields = []
         update_params = {"schedule_id": schedule_id}
         
         # 기본 필드들
         basic_fields = {
             "sst_title": schedule_data.get('sst_title'),
-            "sst_sdate": sst_sdate,
-            "sst_edate": sst_edate,
-            "sst_sedate": f"{sst_sdate} ~ {sst_edate}",
-            "sst_all_day": sst_all_day,
+            "sst_sdate": schedule_data.get("sst_sdate"),
+            "sst_edate": schedule_data.get("sst_edate"),
+            "sst_sedate": f"{schedule_data.get('sst_sdate')} ~ {schedule_data.get('sst_edate')}",
+            "sst_all_day": schedule_data.get("sst_all_day", "N"),
         }
         
         # 위치 관련 필드들
@@ -1112,7 +1299,7 @@ def update_group_schedule(
             "sst_schedule_alarm_chk": schedule_data.get('sst_schedule_alarm_chk', 'N'),
             "sst_pick_type": schedule_data.get('sst_pick_type'),
             "sst_pick_result": schedule_data.get('sst_pick_result'),
-            "sst_schedule_alarm": sst_schedule_alarm.strftime('%Y-%m-%d %H:%M:%S') if sst_schedule_alarm else None,
+            "sst_schedule_alarm": None,
         }
         
         # 반복 관련 필드들
@@ -1126,8 +1313,9 @@ def update_group_schedule(
             "sst_memo": schedule_data.get('sst_memo'),
             "sst_supplies": schedule_data.get('sst_supplies'),
             "slt_idx": schedule_data.get('slt_idx'),
-            "slt_idx_t": schedule_data.get('sst_location_add'), # PHP에서 location_add를 slt_idx_t로 사용
-            "sst_update_chk": schedule_data.get('sst_update_chk', 'Y'),
+            "slt_idx_t": schedule_data.get('sst_location_add'),
+            "sst_update_chk": schedule_data.get("sst_update_chk", "3"),
+            "sst_adate": schedule_data.get("sst_adate")
         }
         
         # 모든 필드 병합
@@ -1142,12 +1330,6 @@ def update_group_schedule(
         # 업데이트 시간 추가
         update_fields.append("sst_udate = NOW()")
         
-        logger.info(f"💾 [UPDATE_SCHEDULE] 업데이트 필드 수: {len(update_fields)}")
-        logger.info(f"💾 [UPDATE_SCHEDULE] 업데이트 파라미터:")
-        for key, value in update_params.items():
-            if key != 'schedule_id':
-                logger.info(f"    {key}: {value}")
-        
         if update_fields:
             update_query = text(f"""
                 UPDATE smap_schedule_t SET {', '.join(update_fields)}
@@ -1155,40 +1337,30 @@ def update_group_schedule(
             """)
             
             db.execute(update_query, update_params)
-            db.commit()
-            
-            logger.info(f"✅ [UPDATE_SCHEDULE] 스케줄 수정 성공: schedule_id={schedule_id}, user_id={current_user_id}")
+            logger.info(f"✅ [UPDATE_SINGLE] 스케줄 {schedule_id} 업데이트 완료")
         
-        return {
-            "success": True,
-            "data": {
-                "message": "Schedule updated successfully",
-                "sst_idx": schedule_id,
-                "updated_fields": len(update_fields) - 1  # sst_udate 제외
-            }
-        }
-        
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"💥 [UPDATE_SCHEDULE] 스케줄 수정 오류: {e}")
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f"💥 [UPDATE_SINGLE] 스케줄 {schedule_id} 업데이트 실패: {e}")
+        raise e
 
 @router.delete("/group/{group_id}/schedules/{schedule_id}")
-def delete_group_schedule(
+def delete_group_schedule_with_repeat_option(
     group_id: int,
     schedule_id: int,
+    delete_data: Optional[Dict[str, Any]] = None,
     current_user_id: int = Query(..., description="현재 사용자 ID"),
     db: Session = Depends(deps.get_db)
 ):
     """
-    그룹 스케줄 삭제 (권한 기반)
+    그룹 스케줄 삭제 (반복 일정 처리 옵션 지원)
     """
     try:
+        logger.info(f"🗑️ [DELETE_REPEAT_SCHEDULE] 반복 일정 삭제 시작 - group_id: {group_id}, schedule_id: {schedule_id}, user_id: {current_user_id}")
+        
         # 그룹 권한 확인
         member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
         if not member_auth:
+            logger.error(f"❌ [DELETE_REPEAT_SCHEDULE] 그룹 권한 없음 - group_id: {group_id}, user_id: {current_user_id}")
             raise HTTPException(status_code=403, detail="Group access denied")
         
         # 기존 스케줄 조회
@@ -1200,6 +1372,7 @@ def delete_group_schedule(
         schedule_result = db.execute(schedule_query, {"schedule_id": schedule_id}).fetchone()
         
         if not schedule_result:
+            logger.error(f"❌ [DELETE_REPEAT_SCHEDULE] 스케줄을 찾을 수 없음 - schedule_id: {schedule_id}")
             raise HTTPException(status_code=404, detail="Schedule not found")
         
         # 권한 확인: 본인 스케줄이거나 오너/리더인 경우만 삭제 가능
@@ -1209,31 +1382,275 @@ def delete_group_schedule(
         )
         
         if not can_delete:
+            logger.error(f"❌ [DELETE_REPEAT_SCHEDULE] 삭제 권한 없음 - user_id: {current_user_id}")
             raise HTTPException(
                 status_code=403, 
                 detail="You can only delete your own schedules or you need owner/leader permission"
             )
         
-        # 스케줄 소프트 삭제
-        delete_query = text("""
-            UPDATE smap_schedule_t 
-            SET sst_show = 'N', sst_ddate = NOW() 
-            WHERE sst_idx = :schedule_id
-        """)
+        # 삭제 옵션 확인
+        delete_option = 'this'  # 기본값
+        if delete_data and 'deleteOption' in delete_data:
+            delete_option = delete_data['deleteOption']
         
-        db.execute(delete_query, {"schedule_id": schedule_id})
+        logger.info(f"🗑️ [DELETE_REPEAT_SCHEDULE] 삭제 옵션: {delete_option}")
+        
+        # 반복 일정인지 확인
+        is_repeat_schedule = (
+            schedule_result.sst_repeat_json and 
+            schedule_result.sst_repeat_json.strip() and 
+            schedule_result.sst_repeat_json != ''
+        ) or (
+            schedule_result.sst_pidx and 
+            schedule_result.sst_pidx > 0
+        )
+        
+        logger.info(f"🗑️ [DELETE_REPEAT_SCHEDULE] 반복 일정 여부: {is_repeat_schedule}")
+        
+        deleted_count = 0
+        
+        if is_repeat_schedule and delete_option != 'this':
+            # 반복 일정 처리
+            if delete_option == 'all':
+                # 모든 반복 일정 삭제
+                logger.info(f"🗑️ [DELETE_REPEAT_SCHEDULE] 모든 반복 일정 삭제 시작")
+                
+                # 부모 스케줄 ID 찾기
+                parent_id = schedule_result.sst_pidx if schedule_result.sst_pidx else schedule_id
+                
+                # 모든 관련 반복 일정 삭제
+                delete_all_query = text("""
+                    UPDATE smap_schedule_t 
+                    SET sst_show = 'N', sst_ddate = NOW() 
+                    WHERE (sst_pidx = :parent_id OR sst_idx = :parent_id) 
+                    AND sst_show = 'Y'
+                """)
+                
+                result = db.execute(delete_all_query, {"parent_id": parent_id})
+                deleted_count = result.rowcount
+                
+            elif delete_option == 'future':
+                # 현재 이후의 반복 일정 삭제
+                logger.info(f"🗑️ [DELETE_REPEAT_SCHEDULE] 현재 이후 반복 일정 삭제 시작")
+                
+                # 부모 스케줄 ID 찾기
+                parent_id = schedule_result.sst_pidx if schedule_result.sst_pidx else schedule_id
+                
+                # 현재 스케줄의 시작 날짜
+                current_start_date = schedule_result.sst_sdate
+                
+                # 현재 이후의 관련 반복 일정 삭제
+                delete_future_query = text("""
+                    UPDATE smap_schedule_t 
+                    SET sst_show = 'N', sst_ddate = NOW() 
+                    WHERE (sst_pidx = :parent_id OR sst_idx = :parent_id) 
+                    AND sst_sdate >= :current_start_date
+                    AND sst_show = 'Y'
+                """)
+                
+                result = db.execute(delete_future_query, {
+                    "parent_id": parent_id,
+                    "current_start_date": current_start_date
+                })
+                deleted_count = result.rowcount
+            else:
+                # 'this' - 현재 스케줄만 삭제
+                logger.info(f"🗑️ [DELETE_REPEAT_SCHEDULE] 현재 스케줄만 삭제")
+                delete_single_query = text("""
+                    UPDATE smap_schedule_t 
+                    SET sst_show = 'N', sst_ddate = NOW() 
+                    WHERE sst_idx = :schedule_id
+                """)
+                
+                result = db.execute(delete_single_query, {"schedule_id": schedule_id})
+                deleted_count = result.rowcount
+        else:
+            # 일반 스케줄 또는 'this' 옵션
+            logger.info(f"🗑️ [DELETE_REPEAT_SCHEDULE] 일반 스케줄 삭제")
+            delete_single_query = text("""
+                UPDATE smap_schedule_t 
+                SET sst_show = 'N', sst_ddate = NOW() 
+                WHERE sst_idx = :schedule_id
+            """)
+            
+            result = db.execute(delete_single_query, {"schedule_id": schedule_id})
+            deleted_count = result.rowcount
+        
         db.commit()
+        
+        logger.info(f"✅ [DELETE_REPEAT_SCHEDULE] 스케줄 삭제 완료 - 삭제된 개수: {deleted_count}")
         
         return {
             "success": True,
             "data": {
-                "message": "Schedule deleted successfully"
+                "message": f"Successfully deleted {deleted_count} schedule(s)",
+                "deleted_count": deleted_count,
+                "delete_option": delete_option
             }
         }
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"스케줄 삭제 오류: {e}")
+        logger.error(f"💥 [DELETE_REPEAT_SCHEDULE] 스케줄 삭제 오류: {e}")
         db.rollback()
         raise HTTPException(status_code=500, detail="Internal server error") 
+
+def create_new_schedule(db: Session, group_id: int, current_user_id: int, schedule_data: Dict[str, Any], logger) -> int:
+    """
+    새로운 스케줄 생성 헬퍼 함수
+    
+    Args:
+        db: 데이터베이스 세션
+        group_id: 그룹 ID
+        current_user_id: 현재 사용자 ID
+        schedule_data: 스케줄 데이터
+        logger: 로거
+    
+    Returns:
+        생성된 스케줄 ID
+    """
+    try:
+        logger.info(f"🆕 [CREATE_NEW_SCHEDULE] 새 스케줄 생성 시작")
+        
+        # 그룹 권한 확인
+        member_auth = GroupScheduleManager.check_group_permission(db, current_user_id, group_id)
+        if not member_auth:
+            raise ValueError(f"Group access denied for user {current_user_id} in group {group_id}")
+        
+        # 대상 멤버 설정 (기본값: 현재 사용자)
+        target_member_id = current_user_id
+        
+        # 다른 멤버의 스케줄을 생성하려는 경우
+        if "targetMemberId" in schedule_data and schedule_data["targetMemberId"]:
+            target_member_id = int(schedule_data["targetMemberId"])
+            
+            # 권한 확인: 오너/리더만 다른 멤버의 스케줄 생성 가능
+            if not GroupScheduleManager.has_manage_permission(member_auth):
+                raise ValueError("Only group owners or leaders can create schedules for other members")
+        
+        # 필수 필드 검증 및 기본값 설정
+        if not schedule_data.get('sst_title', '').strip():
+            schedule_data['sst_title'] = '제목 없음'
+            
+        if not schedule_data.get('sst_sdate'):
+            raise ValueError("Start date is required")
+            
+        if not schedule_data.get('sst_edate'):
+            schedule_data['sst_edate'] = schedule_data['sst_sdate']
+        
+        # 시작/종료 날짜/시간 처리
+        sst_sdate = schedule_data['sst_sdate']
+        sst_edate = schedule_data['sst_edate']
+        
+        # 시간이 포함되지 않은 경우 시간 추가
+        if 'T' not in sst_sdate and ':' not in sst_sdate:
+            sst_stime = schedule_data.get('sst_stime', '00:00:00')
+            sst_sdate = f"{sst_sdate}T{sst_stime}" if 'T' not in sst_stime else f"{sst_sdate} {sst_stime}"
+            
+        if 'T' not in sst_edate and ':' not in sst_edate:
+            sst_etime = schedule_data.get('sst_etime', '23:59:59')
+            sst_edate = f"{sst_edate}T{sst_etime}" if 'T' not in sst_etime else f"{sst_edate} {sst_etime}"
+        
+        # 하루종일 및 반복 설정 처리
+        sst_all_day = schedule_data.get('sst_all_day', 'N')
+        sst_repeat_json = schedule_data.get('sst_repeat_json', '')
+        sst_repeat_json_v = schedule_data.get('sst_repeat_json_v', '')
+        
+        # 하루종일인 경우 반복을 null로 설정
+        if sst_all_day == 'Y':
+            sst_repeat_json = ''
+            sst_repeat_json_v = ''
+        
+        # 알림 시간 계산
+        sst_schedule_alarm = None
+        if (schedule_data.get('sst_schedule_alarm_chk') == 'Y' and 
+            schedule_data.get('sst_pick_type') and 
+            schedule_data.get('sst_pick_result')):
+            
+            try:
+                from datetime import datetime, timedelta
+                start_datetime = datetime.fromisoformat(sst_sdate.replace('T', ' '))
+                pick_result = int(schedule_data['sst_pick_result'])
+                pick_type = schedule_data['sst_pick_type']
+                
+                if pick_type == 'minute':
+                    sst_schedule_alarm = start_datetime - timedelta(minutes=pick_result)
+                elif pick_type == 'hour':
+                    sst_schedule_alarm = start_datetime - timedelta(hours=pick_result)
+                elif pick_type == 'day':
+                    sst_schedule_alarm = start_datetime - timedelta(days=pick_result)
+                    
+            except (ValueError, TypeError) as e:
+                logger.warning(f"⚠️ [CREATE_NEW_SCHEDULE] 알림 시간 계산 실패: {e}")
+                sst_schedule_alarm = None
+
+        # 스케줄 생성 쿼리
+        insert_query = text("""
+            INSERT INTO smap_schedule_t (
+                mt_idx, sst_title, sst_sdate, sst_edate, sst_sedate, sst_all_day,
+                sgt_idx, sgdt_idx, sgdt_idx_t,
+                sst_location_title, sst_location_add, sst_location_lat, sst_location_long,
+                sst_location_alarm,
+                sst_memo, sst_supplies,
+                sst_alram, sst_alram_t, sst_schedule_alarm_chk, 
+                sst_pick_type, sst_pick_result, sst_schedule_alarm,
+                sst_repeat_json, sst_repeat_json_v,
+                slt_idx, slt_idx_t, sst_update_chk,
+                sst_pidx, sst_show, sst_wdate, sst_adate
+            ) VALUES (
+                :mt_idx, :sst_title, :sst_sdate, :sst_edate, :sst_sedate, :sst_all_day,
+                :sgt_idx, :sgdt_idx, :sgdt_idx_t,
+                :sst_location_title, :sst_location_add, :sst_location_lat, :sst_location_long,
+                :sst_location_alarm,
+                :sst_memo, :sst_supplies,
+                :sst_alram, :sst_alram_t, :sst_schedule_alarm_chk,
+                :sst_pick_type, :sst_pick_result, :sst_schedule_alarm,
+                :sst_repeat_json, :sst_repeat_json_v,
+                :slt_idx, :slt_idx_t, :sst_update_chk,
+                :sst_pidx, 'Y', NOW(), :sst_adate
+            )
+        """)
+        
+        insert_params = {
+            "mt_idx": current_user_id,
+            "sst_title": schedule_data.get('sst_title'),
+            "sst_sdate": schedule_data.get("sst_sdate"),
+            "sst_edate": schedule_data.get("sst_edate"),
+            "sst_sedate": f"{schedule_data.get('sst_sdate')} ~ {schedule_data.get('sst_edate')}",
+            "sst_all_day": schedule_data.get("sst_all_day", "N"),
+            "sgt_idx": group_id,
+            "sgdt_idx": member_auth["sgdt_idx"],
+            "sgdt_idx_t": schedule_data.get("sgdt_idx_t"),
+            "sst_location_title": schedule_data.get("sst_location_title"),
+            "sst_location_add": schedule_data.get("sst_location_add"),
+            "sst_location_lat": schedule_data.get("sst_location_lat"),
+            "sst_location_long": schedule_data.get("sst_location_long"),
+            "sst_location_alarm": schedule_data.get("sst_location_alarm", "4"),
+            "sst_memo": schedule_data.get("sst_memo"),
+            "sst_supplies": schedule_data.get("sst_supplies"),
+            "sst_alram": schedule_data.get("sst_alram", "N"),
+            "sst_alram_t": schedule_data.get("sst_alram_t"),
+            "sst_schedule_alarm_chk": schedule_data.get("sst_schedule_alarm_chk", "N"),
+            "sst_pick_type": schedule_data.get("sst_pick_type"),
+            "sst_pick_result": schedule_data.get("sst_pick_result"),
+            "sst_schedule_alarm": None,
+            "sst_repeat_json": sst_repeat_json,
+            "sst_repeat_json_v": sst_repeat_json_v,
+            "slt_idx": schedule_data.get("slt_idx"),
+            "slt_idx_t": schedule_data.get("sst_location_add"),
+            "sst_update_chk": schedule_data.get("sst_update_chk", "3"),
+            "sst_pidx": schedule_data.get("sst_pidx"),
+            "sst_adate": schedule_data.get("sst_adate")
+        }
+        
+        result = db.execute(insert_query, insert_params)
+        new_schedule_id = result.lastrowid
+        
+        logger.info(f"✅ [CREATE_NEW_SCHEDULE] 스케줄 생성 성공: schedule_id={new_schedule_id}")
+        
+        return new_schedule_id
+        
+    except Exception as e:
+        logger.error(f"💥 [CREATE_NEW_SCHEDULE] 스케줄 생성 오류: {e}")
+        raise

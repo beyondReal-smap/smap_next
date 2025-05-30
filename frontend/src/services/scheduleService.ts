@@ -102,7 +102,7 @@ export interface CreateScheduleRequest {
   sst_pick_result?: string; // 알림 값
 }
 
-// 스케줄 수정 요청
+// 스케줄 수정 요청 (반복 옵션 추가)
 export interface UpdateScheduleRequest {
   sst_idx: number;
   groupId: number;
@@ -124,6 +124,17 @@ export interface UpdateScheduleRequest {
   sst_alram_t?: string; // 알림 시간
   sst_pick_type?: string; // 알림 타입 (minute, hour, day)
   sst_pick_result?: string; // 알림 값
+  // 반복 일정 처리 옵션 추가
+  editOption?: 'this' | 'future' | 'all';
+}
+
+// 스케줄 삭제 요청 (반복 옵션 추가)
+export interface DeleteScheduleRequest {
+  sst_idx: number;
+  sst_pidx?: number | null; // 반복 일정의 부모 ID
+  groupId: number;
+  // 반복 일정 처리 옵션
+  deleteOption?: 'this' | 'future' | 'all';
 }
 
 class ScheduleService {
@@ -220,27 +231,25 @@ class ScheduleService {
     try {
       console.log('[SCHEDULE SERVICE] 🔥 스케줄 생성 시작:', scheduleData);
       
-      // 새로운 필드들을 포함한 요청 데이터 구성
+      // 백엔드가 기대하는 필드명으로 요청 데이터 구성
       const requestData = {
-        title: scheduleData.sst_title,
-        date: scheduleData.sst_sdate,
-        endDate: scheduleData.sst_edate,
-        location: scheduleData.sst_location_title,
-        memo: scheduleData.sst_memo,
-        targetMemberId: scheduleData.targetMemberId,
-        // 새로운 필드들 추가
+        sst_title: scheduleData.sst_title,
+        sst_sdate: scheduleData.sst_sdate,
+        sst_edate: scheduleData.sst_edate,
         sst_all_day: scheduleData.sst_all_day,
+        sst_location_title: scheduleData.sst_location_title,
+        sst_location_add: scheduleData.sst_location_add,
+        sst_location_lat: scheduleData.sst_location_lat,
+        sst_location_long: scheduleData.sst_location_long,
+        sst_memo: scheduleData.sst_memo,
+        sst_supplies: scheduleData.sst_supplies,
         sst_repeat_json: scheduleData.sst_repeat_json,
         sst_repeat_json_v: scheduleData.sst_repeat_json_v,
-        sst_alram: scheduleData.sst_alram ? 'Y' : 'N',
         sst_alram_t: scheduleData.sst_alram_t,
         sst_schedule_alarm_chk: scheduleData.sst_schedule_alarm_chk,
         sst_pick_type: scheduleData.sst_pick_type,
         sst_pick_result: scheduleData.sst_pick_result,
-        sst_location_add: scheduleData.sst_location_add,
-        sst_location_lat: scheduleData.sst_location_lat,
-        sst_location_long: scheduleData.sst_location_long,
-        sst_content: scheduleData.sst_memo,
+        targetMemberId: scheduleData.targetMemberId,
       };
 
       console.log('[SCHEDULE SERVICE] 📦 백엔드 전송 데이터:', requestData);
@@ -360,6 +369,134 @@ class ScheduleService {
       console.error('[SCHEDULE SERVICE] 스케줄 삭제 실패:', error);
       
       const errorMessage = error.message || '스케줄 삭제 중 오류가 발생했습니다.';
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
+   * 반복 일정 처리 옵션을 지원하는 스케줄 수정
+   * @param scheduleData 수정할 스케줄 데이터 (반복 옵션 포함)
+   */
+  async updateScheduleWithRepeatOption(scheduleData: UpdateScheduleRequest): Promise<{
+    success: boolean;
+    data?: { message: string };
+    error?: string;
+  }> {
+    try {
+      console.log('[SCHEDULE SERVICE] 🔄 반복 일정 수정 시작:', scheduleData);
+      
+      const { editOption, ...updateData } = scheduleData;
+      
+      // 새로운 필드들을 포함한 요청 데이터 구성
+      const requestData = {
+        sst_title: updateData.sst_title,
+        sst_sdate: updateData.sst_sdate,
+        sst_edate: updateData.sst_edate,
+        sst_all_day: updateData.sst_all_day,
+        sst_location_title: updateData.sst_location_title,
+        sst_location_add: updateData.sst_location_add,
+        sst_location_lat: updateData.sst_location_lat,
+        sst_location_long: updateData.sst_location_long,
+        sst_memo: updateData.sst_memo,
+        sst_repeat_json: updateData.sst_repeat_json,
+        sst_repeat_json_v: updateData.sst_repeat_json_v,
+        sst_alram_t: updateData.sst_alram_t,
+        sst_schedule_alarm_chk: updateData.sst_schedule_alarm_chk,
+        sst_pick_type: updateData.sst_pick_type,
+        sst_pick_result: updateData.sst_pick_result,
+        // 반복 일정 처리 옵션 추가
+        editOption: editOption
+      };
+      
+      console.log('[SCHEDULE SERVICE] 📦 반복 일정 수정 요청 데이터:', requestData);
+      
+      const response = await apiClient.put(`/schedule/group/${scheduleData.groupId}/schedules/${scheduleData.sst_idx}`, requestData);
+      
+      console.log('[SCHEDULE SERVICE] ✅ 반복 일정 수정 응답:', {
+        status: response.status,
+        data: response.data
+      });
+
+      return response.data;
+    } catch (error: any) {
+      console.error('[SCHEDULE SERVICE] ❌ 반복 일정 수정 실패:', error);
+      
+      const errorMessage = error.message || '반복 일정 수정 중 오류가 발생했습니다.';
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
+   * 반복 일정 처리 옵션을 지원하는 스케줄 삭제
+   * @param deleteData 삭제할 스케줄 데이터 (반복 옵션 포함)
+   */
+  async deleteScheduleWithRepeatOption(deleteData: DeleteScheduleRequest): Promise<{
+    success: boolean;
+    data?: { message: string };
+    error?: string;
+  }> {
+    try {
+      console.log('[SCHEDULE SERVICE] 🗑️ 반복 일정 삭제 시작:', deleteData);
+      
+      const requestData = {
+        deleteOption: deleteData.deleteOption,
+        sst_pidx: deleteData.sst_pidx // 반복 일정의 부모 ID 추가
+      };
+      
+      console.log('[SCHEDULE SERVICE] 📦 반복 일정 삭제 요청 데이터:', requestData);
+      
+      const response = await apiClient.delete(`/schedule/group/${deleteData.groupId}/schedules/${deleteData.sst_idx}`, {
+        data: requestData
+      });
+      
+      console.log('[SCHEDULE SERVICE] ✅ 반복 일정 삭제 응답:', {
+        status: response.status,
+        data: response.data
+      });
+
+      return response.data;
+    } catch (error: any) {
+      console.error('[SCHEDULE SERVICE] ❌ 반복 일정 삭제 실패:', error);
+      
+      const errorMessage = error.message || '반복 일정 삭제 중 오류가 발생했습니다.';
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  }
+
+  /**
+   * 개별 스케줄 조회
+   * @param sst_idx 스케줄 ID
+   * @param groupId 그룹 ID
+   */
+  async getScheduleById(sst_idx: number, groupId: number): Promise<{
+    success: boolean;
+    data?: Schedule;
+    error?: string;
+  }> {
+    try {
+      console.log('[SCHEDULE SERVICE] 📋 개별 스케줄 조회 시작:', { sst_idx, groupId });
+      
+      const response = await apiClient.get(`/schedule/group/${groupId}/schedules/${sst_idx}`);
+      
+      console.log('[SCHEDULE SERVICE] 📋 개별 스케줄 조회 응답:', {
+        status: response.status,
+        data: response.data
+      });
+
+      return response.data;
+    } catch (error: any) {
+      console.error('[SCHEDULE SERVICE] ❌ 개별 스케줄 조회 실패:', error);
+      
+      const errorMessage = error.message || '스케줄 조회 중 오류가 발생했습니다.';
       return {
         success: false,
         error: errorMessage
