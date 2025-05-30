@@ -696,14 +696,176 @@ export default function SchedulePage() {
   // 월 변경 로딩 상태 추가
   const [isMonthChanging, setIsMonthChanging] = useState(false);
 
-  // 월별 데이터 캐시 시스템 추가
+  // 월별 데이터 캐시 시스템 추가 (로컬 스토리지 기반)
   const [monthlyCache, setMonthlyCache] = useState<Map<string, ScheduleEvent[]>>(new Map());
   const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
+
+  // 로컬 스토리지 키 상수
+  const CACHE_PREFIX = 'schedule_cache_';
+  const LOADED_MONTHS_KEY = 'schedule_loaded_months';
+
+  // 매주 반복 시 요일 선택 상태
+  const [selectedWeekdays, setSelectedWeekdays] = useState<Set<number>>(new Set());
+  const [showWeekdaySelector, setShowWeekdaySelector] = useState(false);
+  const [originalRepeatSetting, setOriginalRepeatSetting] = useState('');
+
+  // 로컬 스토리지에서 캐시 데이터 로드
+  const loadCacheFromStorage = () => {
+    try {
+      // 로드된 월 목록 복원
+      const savedLoadedMonths = localStorage.getItem(LOADED_MONTHS_KEY);
+      if (savedLoadedMonths) {
+        const monthsArray = JSON.parse(savedLoadedMonths);
+        setLoadedMonths(new Set(monthsArray));
+        
+        // 각 월의 캐시 데이터 복원
+        const newCache = new Map<string, ScheduleEvent[]>();
+        monthsArray.forEach((monthKey: string) => {
+          const cacheData = localStorage.getItem(CACHE_PREFIX + monthKey);
+          if (cacheData) {
+            try {
+              const events = JSON.parse(cacheData);
+              newCache.set(monthKey, events);
+            } catch (error) {
+              console.error(`[CACHE] 월 ${monthKey} 캐시 데이터 파싱 실패:`, error);
+              // 손상된 캐시 데이터 제거
+              localStorage.removeItem(CACHE_PREFIX + monthKey);
+            }
+          }
+        });
+        setMonthlyCache(newCache);
+        console.log('[CACHE] 로컬 스토리지에서 캐시 복원 완료:', Array.from(newCache.keys()));
+      }
+    } catch (error) {
+      console.error('[CACHE] 로컬 스토리지 캐시 로드 실패:', error);
+      // 캐시 초기화
+      clearCacheFromStorage();
+    }
+  };
+
+  // 로컬 스토리지에 캐시 데이터 저장
+  const saveCacheToStorage = (monthKey: string, events: ScheduleEvent[]) => {
+    try {
+      // 월별 데이터 저장
+      localStorage.setItem(CACHE_PREFIX + monthKey, JSON.stringify(events));
+      
+      // 로드된 월 목록 업데이트
+      const currentLoadedMonths = Array.from(loadedMonths);
+      if (!currentLoadedMonths.includes(monthKey)) {
+        currentLoadedMonths.push(monthKey);
+        localStorage.setItem(LOADED_MONTHS_KEY, JSON.stringify(currentLoadedMonths));
+      }
+      
+      console.log(`[CACHE] 월 ${monthKey} 데이터 로컬 스토리지에 저장 완료 (${events.length}개 이벤트)`);
+    } catch (error) {
+      console.error(`[CACHE] 월 ${monthKey} 데이터 저장 실패:`, error);
+      // 스토리지 용량 부족 등의 경우 오래된 캐시 정리
+      if (error instanceof DOMException && error.code === 22) {
+        console.log('[CACHE] 스토리지 용량 부족, 오래된 캐시 정리 시도');
+        clearOldCacheFromStorage();
+        // 정리 후 다시 시도
+        try {
+          localStorage.setItem(CACHE_PREFIX + monthKey, JSON.stringify(events));
+        } catch (retryError) {
+          console.error('[CACHE] 캐시 정리 후에도 저장 실패:', retryError);
+        }
+      }
+    }
+  };
+
+  // 로컬 스토리지에서 특정 월 캐시 데이터 로드
+  const loadMonthCacheFromStorage = (monthKey: string): ScheduleEvent[] | null => {
+    try {
+      const cacheData = localStorage.getItem(CACHE_PREFIX + monthKey);
+      if (cacheData) {
+        return JSON.parse(cacheData);
+      }
+    } catch (error) {
+      console.error(`[CACHE] 월 ${monthKey} 캐시 로드 실패:`, error);
+      // 손상된 캐시 데이터 제거
+      localStorage.removeItem(CACHE_PREFIX + monthKey);
+    }
+    return null;
+  };
+
+  // 오래된 캐시 정리 (최근 6개월만 유지)
+  const clearOldCacheFromStorage = () => {
+    try {
+      const savedLoadedMonths = localStorage.getItem(LOADED_MONTHS_KEY);
+      if (savedLoadedMonths) {
+        const monthsArray = JSON.parse(savedLoadedMonths);
+        const currentMonth = dayjs();
+        const validMonths: string[] = [];
+        
+        monthsArray.forEach((monthKey: string) => {
+          const [year, month] = monthKey.split('-').map(Number);
+          const monthDate = dayjs().year(year).month(month - 1);
+          
+          // 현재 월 기준 6개월 이내의 데이터만 유지
+          if (Math.abs(monthDate.diff(currentMonth, 'month')) <= 6) {
+            validMonths.push(monthKey);
+          } else {
+            // 오래된 캐시 삭제
+            localStorage.removeItem(CACHE_PREFIX + monthKey);
+            console.log(`[CACHE] 오래된 캐시 삭제: ${monthKey}`);
+          }
+        });
+        
+        // 유효한 월 목록 업데이트
+        localStorage.setItem(LOADED_MONTHS_KEY, JSON.stringify(validMonths));
+        setLoadedMonths(new Set(validMonths));
+        
+        console.log(`[CACHE] 오래된 캐시 정리 완료. 유지된 월: ${validMonths.length}개`);
+      }
+    } catch (error) {
+      console.error('[CACHE] 오래된 캐시 정리 실패:', error);
+    }
+  };
+
+  // 전체 캐시 초기화
+  const clearCacheFromStorage = () => {
+    try {
+      // 로드된 월 목록 가져오기
+      const savedLoadedMonths = localStorage.getItem(LOADED_MONTHS_KEY);
+      if (savedLoadedMonths) {
+        const monthsArray = JSON.parse(savedLoadedMonths);
+        monthsArray.forEach((monthKey: string) => {
+          localStorage.removeItem(CACHE_PREFIX + monthKey);
+        });
+      }
+      
+      // 메타데이터 삭제
+      localStorage.removeItem(LOADED_MONTHS_KEY);
+      
+      // 상태 초기화
+      setMonthlyCache(new Map());
+      setLoadedMonths(new Set());
+      
+      console.log('[CACHE] 전체 캐시 초기화 완료');
+    } catch (error) {
+      console.error('[CACHE] 캐시 초기화 실패:', error);
+    }
+  };
 
   // 컴포넌트 마운트 감지
   useEffect(() => {
     document.body.style.overflowX = 'hidden';
     document.documentElement.style.overflowX = 'hidden';
+    
+    // 로컬 스토리지에서 캐시 데이터 로드
+    loadCacheFromStorage();
+    
+    // 개발자 도구에서 캐시 상태 확인을 위한 디버그 함수 추가
+    if (typeof window !== 'undefined') {
+      (window as any).scheduleCache = {
+        getStats: getCacheStats,
+        clearCache: clearCache,
+        clearOldCache: clearOldCacheFromStorage,
+        getLoadedMonths: () => Array.from(loadedMonths),
+        getCacheSize: () => monthlyCache.size,
+        getCacheData: (monthKey: string) => monthlyCache.get(monthKey) || null
+      };
+    }
     
     // 그룹 데이터 로드 (스케줄 로드는 별도 useEffect에서 처리)
     const loadData = async () => {
@@ -717,6 +879,11 @@ export default function SchedulePage() {
       document.documentElement.style.overflowX = '';
       // 컴포넌트 언마운트 시 body 스크롤 복원
       document.body.style.overflow = '';
+      
+      // 디버그 함수 정리
+      if (typeof window !== 'undefined') {
+        delete (window as any).scheduleCache;
+      }
     };
   }, []);
 
@@ -1006,6 +1173,34 @@ export default function SchedulePage() {
             const weekDays = dayOfWeek === 0 ? '7' : dayOfWeek.toString(); // 일요일을 7로 변환
             console.log('[getRepeatJson] 🔄 매주 반복 설정:', { dayOfWeek, weekDays });
             return { sst_repeat_json: `{"r1":"3","r2":"${weekDays}"}`, sst_repeat_json_v: `1주마다 ${['일', '월', '화', '수', '목', '금', '토'][dayOfWeek]}` };
+          default:
+            // 매주 다중 요일 선택 처리
+            if (repeat.startsWith('매주 ')) {
+              const selectedDays = repeat.replace('매주 ', '');
+              const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+              const selectedWeekdayIndices: string[] = [];
+              
+              selectedDays.split(',').forEach(dayName => {
+                const index = dayNames.indexOf(dayName.trim());
+                if (index !== -1) {
+                  // 일요일(0)을 7로 변환, 나머지는 그대로
+                  selectedWeekdayIndices.push(index === 0 ? '7' : index.toString());
+                }
+              });
+              
+              const weekdaysString = selectedWeekdayIndices.join(',');
+              console.log('[getRepeatJson] 🔄 매주 다중 요일 반복 설정:', { 
+                selectedDays, 
+                selectedWeekdayIndices, 
+                weekdaysString 
+              });
+              
+              return { 
+                sst_repeat_json: `{"r1":"3","r2":"${weekdaysString}"}`, 
+                sst_repeat_json_v: `1주마다 ${selectedDays}` 
+              };
+            }
+            
           case '매월':
             console.log('[getRepeatJson] 🔄 매월 반복 설정');
             return { sst_repeat_json: '{"r1":"4","r2":""}', sst_repeat_json_v: '매월' };
@@ -1013,7 +1208,6 @@ export default function SchedulePage() {
             console.log('[getRepeatJson] 🔄 매년 반복 설정');
             return { sst_repeat_json: '{"r1":"5","r2":""}', sst_repeat_json_v: '매년' };
           case '안함':
-          default:
             console.log('[getRepeatJson] 🔄 반복 안함 설정');
             return { sst_repeat_json: '', sst_repeat_json_v: '' };
         }
@@ -1293,6 +1487,44 @@ export default function SchedulePage() {
           setSelectedEventDetails(null);
           setDateTimeError(null);
           
+          // 새로 생성된 이벤트를 캐시에 추가
+          const newEventForCache: ScheduleEvent = {
+            id: response.data.sst_idx?.toString() || `temp-${Date.now()}`,
+            sst_idx: response.data.sst_idx,
+            date: newEvent.date,
+            startTime: newEvent.startTime,
+            endTime: newEvent.endTime,
+            title: newEvent.title,
+            content: newEvent.content,
+            groupId: selectedGroupId,
+            groupName: newEvent.groupName,
+            groupColor: newEvent.groupColor,
+            memberName: selectedMember?.name || '',
+            memberPhoto: selectedMember?.photo || '',
+            memberGender: selectedMember?.mt_gender || null,
+            memberIdx: selectedMember?.mt_idx || 0,
+            canEdit: true,
+            canDelete: true,
+            locationName: newEvent.locationName,
+            locationAddress: newEvent.locationAddress,
+            locationLat: newEvent.locationLat,
+            locationLng: newEvent.locationLng,
+            hasAlarm: newEvent.alarm !== '없음',
+            alarmText: newEvent.alarm !== '없음' ? `알림 ${newEvent.alarm}` : '알림 OFF',
+            alarmTime: newEvent.alarm !== '없음' ? newEvent.alarm : '',
+            repeatText: newEvent.repeat === '안함' ? '없음' : newEvent.repeat,
+            isAllDay: newEvent.allDay,
+            tgtMtIdx: selectedMember?.mt_idx || null,
+            repeatJsonV: repeatData.sst_repeat_json_v,
+            tgtSgdtOwnerChk: selectedMember?.sgdt_owner_chk || 'N',
+            tgtSgdtLeaderChk: selectedMember?.sgdt_leader_chk || 'N',
+            tgtSgdtIdx: selectedMember?.sgdt_idx,
+            sst_pidx: undefined
+          };
+          
+          // 캐시에 새 이벤트 추가
+          updateCacheForEvent(newEventForCache, 'add');
+          
           // 스케줄 목록 새로 고침
           await loadAllGroupSchedules(undefined, undefined, true);
           
@@ -1389,7 +1621,10 @@ export default function SchedulePage() {
         if (repeatText === '매일') return '매일';
         if (repeatText === '매월') return '매월';
         if (repeatText === '매년') return '매년';
-        if (repeatText.includes('매주')) return '매주';
+        if (repeatText.includes('매주')) {
+          // 다중 요일 선택된 경우 그대로 반환 (예: "매주 월,화,수")
+          return repeatText;
+        }
         return '안함';
       };
 
@@ -1418,6 +1653,28 @@ export default function SchedulePage() {
         memberName: selectedEventDetails.memberName || '',
         memberPhoto: '', // 빈 문자열로 설정하여 로컬 이미지 사용
       });
+      
+      // 매주 다중 요일 선택이 된 경우 요일 선택기 상태 설정
+      const repeatText = selectedEventDetails.repeatText || '';
+      if (repeatText.includes('매주 ') && repeatText !== '매주') {
+        setShowWeekdaySelector(true);
+        const selectedDays = repeatText.replace('매주 ', '');
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+        const weekdayIndices = new Set<number>();
+        
+        selectedDays.split(',').forEach(dayName => {
+          const index = dayNames.indexOf(dayName.trim());
+          if (index !== -1) {
+            weekdayIndices.add(index);
+          }
+        });
+        
+        setSelectedWeekdays(weekdayIndices);
+      } else {
+        setShowWeekdaySelector(false);
+        setSelectedWeekdays(new Set());
+      }
+      
       setIsAddEventModalOpen(true);
       // body 스크롤은 이미 비활성화되어 있으므로 유지
     }
@@ -1861,10 +2118,26 @@ export default function SchedulePage() {
       console.log('[SCHEDULE] 캐시 키:', cacheKey);
       console.log('[SCHEDULE] 로드된 월들:', Array.from(loadedMonths));
       
-      // 이미 로드된 월인지 확인
-      if (loadedMonths.has(cacheKey)) {
-        console.log('[SCHEDULE] 캐시된 데이터 사용:', cacheKey);
-        const cachedData = monthlyCache.get(cacheKey) || [];
+      // 로컬 스토리지에서 캐시된 데이터 확인
+      let cachedData: ScheduleEvent[] | null = null;
+      
+      // 메모리 캐시 우선 확인
+      if (monthlyCache.has(cacheKey)) {
+        cachedData = monthlyCache.get(cacheKey) || [];
+        console.log('[SCHEDULE] 메모리 캐시에서 데이터 로드:', cacheKey);
+      } else if (loadedMonths.has(cacheKey)) {
+        // 로컬 스토리지에서 캐시 데이터 로드
+        cachedData = loadMonthCacheFromStorage(cacheKey);
+        if (cachedData) {
+          // 메모리 캐시에도 저장
+          setMonthlyCache(prev => new Map(prev).set(cacheKey, cachedData!));
+          console.log('[SCHEDULE] 로컬 스토리지에서 데이터 로드:', cacheKey);
+        }
+      }
+      
+      // 캐시된 데이터가 있는 경우
+      if (cachedData && cachedData.length >= 0) {
+        console.log('[SCHEDULE] 캐시된 데이터 사용:', cacheKey, `(${cachedData.length}개 이벤트)`);
         
         if (keepSelectedDate && selectedDay) {
           // 월 변경 시: 선택된 날짜의 기존 일정을 보존하면서 캐시된 데이터 병합
@@ -1875,10 +2148,10 @@ export default function SchedulePage() {
             const selectedDateEvents = prevEvents.filter(event => event.date === selectedDateString);
             
             // 캐시된 일정 중 선택된 날짜가 아닌 일정들
-            const otherEvents = cachedData.filter(event => event.date !== selectedDateString);
+            const otherEvents = cachedData!.filter(event => event.date !== selectedDateString);
             
             // 캐시된 일정 중 선택된 날짜의 일정들
-            const newSelectedDateEvents = cachedData.filter(event => event.date === selectedDateString);
+            const newSelectedDateEvents = cachedData!.filter(event => event.date === selectedDateString);
             
             console.log('[SCHEDULE] 캐시 병합 - 기존 선택된 날짜 일정:', selectedDateEvents);
             console.log('[SCHEDULE] 캐시 병합 - 새 선택된 날짜 일정:', newSelectedDateEvents);
@@ -1903,6 +2176,8 @@ export default function SchedulePage() {
         
         return; // 캐시된 데이터 사용 시 API 호출 생략
       }
+      
+      console.log('[SCHEDULE] 캐시된 데이터 없음, API 호출 시작');
       
       // 새로운 API 사용: 오너 그룹의 모든 멤버 스케줄을 월별로 조회
       const response = await scheduleService.getOwnerGroupsAllSchedules(year, month);
@@ -2168,8 +2443,11 @@ export default function SchedulePage() {
         }
         
         // 캐시에 저장
-        monthlyCache.set(cacheKey, allEvents);
-        loadedMonths.add(cacheKey);
+        setMonthlyCache(prev => new Map(prev).set(cacheKey, allEvents));
+        setLoadedMonths(prev => new Set(prev).add(cacheKey));
+        
+        // 로컬 스토리지에도 저장
+        saveCacheToStorage(cacheKey, allEvents);
         
       } else {
         console.log('[loadAllGroupSchedules] 오너 그룹 스케줄 조회 실패 또는 데이터 없음:', response);
@@ -2331,12 +2609,14 @@ export default function SchedulePage() {
   const executeEditAction = async (event: ScheduleEvent, option?: 'this' | 'future' | 'all') => {
     // 반복 패턴 역변환 함수
     const convertRepeatTextToSelect = (repeatText: string): string => {
-      console.log('[convertRepeatTextToSelect] 입력값:', repeatText);
       if (!repeatText || repeatText === '없음') return '안함';
       if (repeatText === '매일') return '매일';
       if (repeatText === '매월') return '매월';
       if (repeatText === '매년') return '매년';
-      if (repeatText.includes('매주')) return '매주';
+      if (repeatText.includes('매주')) {
+        // 다중 요일 선택된 경우 그대로 반환 (예: "매주 월,화,수")
+        return repeatText;
+      }
       return '안함';
     };
 
@@ -2448,6 +2728,28 @@ export default function SchedulePage() {
       memberPhoto: '', // 빈 문자열로 설정하여 로컬 이미지 사용
       editOption: option // 반복 일정 옵션 저장
     });
+    
+    // 매주 다중 요일 선택이 된 경우 요일 선택기 상태 설정
+    const repeatText = event.repeatText || '';
+    if (repeatText.includes('매주 ') && repeatText !== '매주') {
+      setShowWeekdaySelector(true);
+      const selectedDays = repeatText.replace('매주 ', '');
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      const weekdayIndices = new Set<number>();
+      
+      selectedDays.split(',').forEach(dayName => {
+        const index = dayNames.indexOf(dayName.trim());
+        if (index !== -1) {
+          weekdayIndices.add(index);
+        }
+      });
+      
+      setSelectedWeekdays(weekdayIndices);
+    } else {
+      setShowWeekdaySelector(false);
+      setSelectedWeekdays(new Set());
+    }
+    
     setIsScheduleActionModalOpen(false);
     setIsAddEventModalOpen(true);
     // body 스크롤은 이미 비활성화되어 있으므로 유지
@@ -2566,7 +2868,12 @@ export default function SchedulePage() {
           updatedData = cachedData;
       }
       
-      monthlyCache.set(cacheKey, updatedData);
+      // 메모리 캐시 업데이트
+      setMonthlyCache(prev => new Map(prev).set(cacheKey, updatedData));
+      
+      // 로컬 스토리지에도 저장
+      saveCacheToStorage(cacheKey, updatedData);
+      
       console.log(`[CACHE] ${action} 작업으로 캐시 업데이트:`, cacheKey);
     }
   };
@@ -2574,6 +2881,10 @@ export default function SchedulePage() {
   const clearCache = () => {
     setMonthlyCache(new Map());
     setLoadedMonths(new Set());
+    
+    // 로컬 스토리지 캐시도 초기화
+    clearCacheFromStorage();
+    
     console.log('[CACHE] 캐시 초기화 완료');
   };
 
@@ -2589,6 +2900,65 @@ export default function SchedulePage() {
     });
     
     return { loadedMonthsList, totalCachedEvents, cacheSize: monthlyCache.size };
+  };
+
+  // 반복 모달 열기 핸들러
+  const handleOpenRepeatModal = () => {
+    const currentRepeat = newEvent.repeat;
+    
+    // 기존 반복 설정이 "매주 금" 형태인지 확인
+    if (currentRepeat.includes('매주 ') && currentRepeat !== '매주') {
+      // 이미 요일이 설정된 경우
+      setShowWeekdaySelector(true);
+      const selectedDays = currentRepeat.replace('매주 ', '');
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      const weekdayIndices = new Set<number>();
+      
+      selectedDays.split(',').forEach(dayName => {
+        const index = dayNames.indexOf(dayName.trim());
+        if (index !== -1) {
+          weekdayIndices.add(index);
+        }
+      });
+      
+      setSelectedWeekdays(weekdayIndices);
+      // 원래 설정을 기억해두기 위해 상태 저장
+      setOriginalRepeatSetting(currentRepeat);
+      // 매주를 선택된 상태로 설정
+      setNewEvent({ ...newEvent, repeat: '매주' });
+    } else {
+      // 다른 반복 설정이거나 새로 설정하는 경우
+      setShowWeekdaySelector(false);
+      setSelectedWeekdays(new Set());
+      setOriginalRepeatSetting(currentRepeat);
+    }
+    
+    setIsRepeatModalOpen(true);
+  };
+
+  // 알림 모달 열기 핸들러 (스크롤 중앙 정렬 포함)
+  const handleOpenAlarmModal = () => {
+    setIsAlarmModalOpen(true);
+    
+    // 모달이 열린 후 선택된 항목으로 스크롤
+    setTimeout(() => {
+      const alarmContainer = document.querySelector('.alarm-scroll-container');
+      const selectedButton = document.querySelector('.alarm-selected-option');
+      
+      if (alarmContainer && selectedButton) {
+        const containerHeight = alarmContainer.clientHeight;
+        const buttonTop = (selectedButton as HTMLElement).offsetTop;
+        const buttonHeight = selectedButton.clientHeight;
+        
+        // 선택된 항목이 컨테이너 중앙에 오도록 스크롤 위치 계산
+        const scrollTop = buttonTop - (containerHeight / 2) + (buttonHeight / 2);
+        
+        alarmContainer.scrollTo({
+          top: Math.max(0, scrollTop),
+          behavior: 'smooth'
+        });
+      }
+    }, 100);
   };
 
   return (
@@ -2677,8 +3047,8 @@ export default function SchedulePage() {
               events={events}
               onMonthChange={(year, month) => {
                 console.log('[onMonthChange] 월 변경:', { year, month, selectedDay: selectedDay?.format('YYYY-MM-DD') });
-                // 월 변경 시에는 데이터를 즉시 로드하지 않음
-                // 사용자가 날짜를 클릭할 때 필요한 데이터만 로드
+                // 월 변경 시 캐싱 시스템을 사용하여 데이터 로드
+                loadAllGroupSchedules(year, month, true);
               }}
             />
           </motion.div>
@@ -3372,7 +3742,7 @@ export default function SchedulePage() {
                           <label className="block text-sm font-medium text-gray-700 mb-2">반복</label>
                           <button
                             type="button"
-                              onClick={() => setIsRepeatModalOpen(true)}
+                              onClick={() => handleOpenRepeatModal()}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left text-sm transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                           >
                             {newEvent.repeat}
@@ -3383,7 +3753,7 @@ export default function SchedulePage() {
                           <label className="block text-sm font-medium text-gray-700 mb-2">알림</label>
                           <button
                             type="button"
-                              onClick={() => setIsAlarmModalOpen(true)}
+                              onClick={() => handleOpenAlarmModal()}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left text-sm transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                           >
                             {newEvent.alarm}
@@ -3419,20 +3789,7 @@ export default function SchedulePage() {
                   </div>
 
                     {/* 액션 버튼 */}
-                    <div className="pt-2 space-y-3">
-                      <button
-                        type="submit"
-                        disabled={
-                          !newEvent.title || 
-                          !newEvent.date || 
-                          !!dateTimeError ||
-                          (!newEvent.allDay && (!newEvent.startTime || !newEvent.endTime))
-                        }
-                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl font-semibold mobile-button disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200"
-                      >
-                        {newEvent.id ? '일정 수정' : '일정 추가'}
-                      </button>
-                      
+                    <div className="space-y-3 mt-6">
                       <button
                         type="button"
                         onClick={closeAddModal}
@@ -3440,9 +3797,23 @@ export default function SchedulePage() {
                       >
                         취소
                       </button>
+                      
+                      <button
+                        type="submit"
+                        disabled={!newEvent.title.trim() || !!dateTimeError}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleSaveEvent();
+                        }}
+                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl font-semibold mobile-button disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200"
+                      >
+                        {newEvent.id ? '일정 수정' : '일정 추가'}
+                      </button>
                     </div>
                   </form>
                 </div>
+
+               
               </motion.div>
             </motion.div>
           )}
@@ -3477,8 +3848,23 @@ export default function SchedulePage() {
                       <button
                         key={option}
                         onClick={() => {
-                          setNewEvent({ ...newEvent, repeat: option });
-                          setIsRepeatModalOpen(false);
+                          if (option === '매주') {
+                            // 매주 선택 시 요일 선택기 표시
+                            setNewEvent({ ...newEvent, repeat: option });
+                            setShowWeekdaySelector(true);
+                            
+                            // 이미 선택된 요일이 있는지 확인하고, 없으면 현재 날짜의 요일을 기본 선택
+                            if (selectedWeekdays.size === 0) {
+                              const currentDay = dayjs(newEvent.date).day();
+                              setSelectedWeekdays(new Set([currentDay]));
+                            }
+                            // 이미 선택된 요일이 있으면 그대로 유지
+                          } else {
+                            setNewEvent({ ...newEvent, repeat: option });
+                            setIsRepeatModalOpen(false);
+                            setShowWeekdaySelector(false);
+                            setSelectedWeekdays(new Set());
+                          }
                         }}
                         className={`w-full px-4 py-3 text-left rounded-xl transition-all duration-200 mobile-button ${
                           newEvent.repeat === option
@@ -3496,15 +3882,97 @@ export default function SchedulePage() {
                     ))}
                   </div>
 
-                  <button
-                    onClick={() => {
-                      setIsRepeatModalOpen(false);
-                      // body 스크롤은 부모 모달이 열려있으므로 유지
-                    }}
-                    className="w-full mt-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                  >
-                    취소
-                  </button>
+                  {/* 요일 선택기 (매주 선택 시 표시) */}
+                  {showWeekdaySelector && newEvent.repeat === '매주' && (
+                    <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                      <h4 className="text-sm font-semibold text-blue-900 mb-3">반복할 요일 선택</h4>
+                      <div className="grid grid-cols-7 gap-2">
+                        {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
+                          <button
+                            key={index}
+                            onClick={() => {
+                              const newWeekdays = new Set(selectedWeekdays);
+                              if (newWeekdays.has(index)) {
+                                newWeekdays.delete(index);
+                              } else {
+                                newWeekdays.add(index);
+                              }
+                              setSelectedWeekdays(newWeekdays);
+                            }}
+                            className={`p-2 rounded-lg text-xs font-medium transition-all duration-200 mobile-button ${
+                              selectedWeekdays.has(index)
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white text-blue-600 border border-blue-300 hover:bg-blue-100'
+                            }`}
+                          >
+                            {day}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-blue-700 mt-2">
+                        선택하지 않으면 현재 날짜의 요일로 설정됩니다.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex space-x-3 mt-6">
+                    {showWeekdaySelector && newEvent.repeat === '매주' ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            // 원래 설정으로 복원
+                            setNewEvent({ ...newEvent, repeat: originalRepeatSetting });
+                            setShowWeekdaySelector(false);
+                            setSelectedWeekdays(new Set());
+                            setIsRepeatModalOpen(false);
+                          }}
+                          className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                        >
+                          취소
+                        </button>
+                        <button
+                          onClick={() => {
+                            // 선택된 요일들로 반복 설정 완료
+                            if (selectedWeekdays.size > 0) {
+                              const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+                              const selectedDayNames = Array.from(selectedWeekdays)
+                                .sort()
+                                .map(day => dayNames[day]);
+                              setNewEvent({ 
+                                ...newEvent, 
+                                repeat: `매주 ${selectedDayNames.join(',')}`
+                              });
+                            } else {
+                              // 선택된 요일이 없으면 현재 날짜의 요일로 설정
+                              const currentDay = dayjs(newEvent.date).day();
+                              const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+                              setNewEvent({ 
+                                ...newEvent, 
+                                repeat: `매주 ${dayNames[currentDay]}`
+                              });
+                            }
+                            setIsRepeatModalOpen(false);
+                            setShowWeekdaySelector(false);
+                          }}
+                          className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-medium mobile-button hover:bg-blue-700 transition-colors"
+                        >
+                          확인
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setIsRepeatModalOpen(false);
+                          setShowWeekdaySelector(false);
+                          setSelectedWeekdays(new Set());
+                          // body 스크롤은 부모 모달이 열려있으므로 유지
+                        }}
+                        className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                      >
+                        취소
+                      </button>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             </motion.div>
@@ -3535,7 +4003,7 @@ export default function SchedulePage() {
                 <div className="p-6">
                   <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">알림 설정</h3>
                   
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                  <div className="space-y-2 max-h-64 overflow-y-auto alarm-scroll-container">
                     {['없음', '정시', '5분 전', '10분 전', '15분 전', '30분 전', '1시간 전', '1일 전'].map((option) => (
                       <button
                         key={option}
@@ -3545,7 +4013,7 @@ export default function SchedulePage() {
                         }}
                         className={`w-full px-4 py-3 text-left rounded-xl transition-all duration-200 mobile-button ${
                           newEvent.alarm === option
-                            ? 'bg-amber-100 text-amber-800 font-semibold border-2 border-amber-300'
+                            ? 'bg-amber-100 text-amber-800 font-semibold border-2 border-amber-300 alarm-selected-option'
                             : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-transparent'
                         }`}
                       >
@@ -3710,6 +4178,15 @@ export default function SchedulePage() {
                         setIsDateTimeModalOpen(false);
                         // body 스크롤은 부모 모달이 열려있으므로 유지
                       }}
+                      className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsDateTimeModalOpen(false);
+                        // body 스크롤은 부모 모달이 열려있으므로 유지
+                      }}
                       disabled={!!dateTimeError}
                       className={`flex-1 py-3 rounded-xl font-medium mobile-button transition-colors ${
                         dateTimeError 
@@ -3718,15 +4195,6 @@ export default function SchedulePage() {
                       }`}
                     >
                       확인
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsDateTimeModalOpen(false);
-                        // body 스크롤은 부모 모달이 열려있으므로 유지
-                      }}
-                      className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                    >
-                      취소
                     </button>
                   </div>
                 </div>
@@ -4156,15 +4624,15 @@ export default function SchedulePage() {
                   <div className="flex space-x-3">
                     <button
                       onClick={handleCloseCalendarModal}
-                      className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
-                    >
-                      확인
-                    </button>
-                    <button
-                      onClick={handleCloseCalendarModal}
                       className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                     >
                       취소
+                    </button>
+                    <button
+                      onClick={handleCloseCalendarModal}
+                      className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
+                    >
+                      확인
                     </button>
                   </div>
                 </div>
@@ -4276,6 +4744,14 @@ export default function SchedulePage() {
                     {successModalContent.onConfirm ? (
                       <>
                         <motion.button
+                          onClick={closeSuccessModal}
+                          className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-medium transition-all duration-200"
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          취소
+                        </motion.button>
+                        <motion.button
                           onClick={() => {
                             successModalContent.onConfirm?.();
                             closeSuccessModal();
@@ -4289,14 +4765,6 @@ export default function SchedulePage() {
                           whileTap={{ scale: 0.98 }}
                         >
                           {successModalContent.type === 'info' ? '삭제하기' : '확인'}
-                        </motion.button>
-                        <motion.button
-                          onClick={closeSuccessModal}
-                          className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-medium transition-all duration-200"
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          취소
                         </motion.button>
                       </>
                     ) : (
