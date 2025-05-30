@@ -693,6 +693,13 @@ export default function SchedulePage() {
   const [repeatActionType, setRepeatActionType] = useState<'edit' | 'delete'>('edit');
   const [pendingRepeatEvent, setPendingRepeatEvent] = useState<ScheduleEvent | null>(null);
 
+  // 월 변경 로딩 상태 추가
+  const [isMonthChanging, setIsMonthChanging] = useState(false);
+
+  // 월별 데이터 캐시 시스템 추가
+  const [monthlyCache, setMonthlyCache] = useState<Map<string, ScheduleEvent[]>>(new Map());
+  const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
+
   // 컴포넌트 마운트 감지
   useEffect(() => {
     document.body.style.overflowX = 'hidden';
@@ -1356,6 +1363,9 @@ export default function SchedulePage() {
         setEvents(prev => prev.filter(event => event.id !== selectedEventDetails.id));
         setSelectedEventDetails(null);
         
+        // 캐시에서도 제거  
+        updateCacheForEvent(selectedEventDetails, 'delete');
+        
         // 스케줄 목록 새로 고침
         await loadAllGroupSchedules(undefined, undefined, true);
         
@@ -1844,6 +1854,56 @@ export default function SchedulePage() {
     try {
       console.log('[SCHEDULE] 스케줄 로드 시작:', { year, month, keepSelectedDate });
       
+      // 캐시 키 생성 (년-월 형태)
+      const cacheKey = year && month ? `${year}-${String(month).padStart(2, '0')}` : 
+                      `${dayjs().year()}-${String(dayjs().month() + 1).padStart(2, '0')}`;
+      
+      console.log('[SCHEDULE] 캐시 키:', cacheKey);
+      console.log('[SCHEDULE] 로드된 월들:', Array.from(loadedMonths));
+      
+      // 이미 로드된 월인지 확인
+      if (loadedMonths.has(cacheKey)) {
+        console.log('[SCHEDULE] 캐시된 데이터 사용:', cacheKey);
+        const cachedData = monthlyCache.get(cacheKey) || [];
+        
+        if (keepSelectedDate && selectedDay) {
+          // 월 변경 시: 선택된 날짜의 기존 일정을 보존하면서 캐시된 데이터 병합
+          const selectedDateString = selectedDay.format('YYYY-MM-DD');
+          
+          setEvents(prevEvents => {
+            // 기존 일정 중 선택된 날짜의 일정만 필터링
+            const selectedDateEvents = prevEvents.filter(event => event.date === selectedDateString);
+            
+            // 캐시된 일정 중 선택된 날짜가 아닌 일정들
+            const otherEvents = cachedData.filter(event => event.date !== selectedDateString);
+            
+            // 캐시된 일정 중 선택된 날짜의 일정들
+            const newSelectedDateEvents = cachedData.filter(event => event.date === selectedDateString);
+            
+            console.log('[SCHEDULE] 캐시 병합 - 기존 선택된 날짜 일정:', selectedDateEvents);
+            console.log('[SCHEDULE] 캐시 병합 - 새 선택된 날짜 일정:', newSelectedDateEvents);
+            
+            // 새 데이터가 있으면 새 데이터 사용, 없으면 기존 데이터 유지
+            const finalSelectedDateEvents = newSelectedDateEvents.length > 0 ? newSelectedDateEvents : selectedDateEvents;
+            
+            return [...otherEvents, ...finalSelectedDateEvents];
+          });
+        } else {
+          // 일반 로딩 시: 캐시된 데이터 사용
+          setEvents(cachedData);
+        }
+        
+        // 선택된 날짜 처리
+        if (!keepSelectedDate && !selectedDay) {
+          console.log('[SCHEDULE] 선택된 날짜를 오늘로 초기화');
+          setSelectedDay(dayjs());
+        } else {
+          console.log('[SCHEDULE] 선택된 날짜 유지:', selectedDay?.format('YYYY-MM-DD'));
+        }
+        
+        return; // 캐시된 데이터 사용 시 API 호출 생략
+      }
+      
       // 새로운 API 사용: 오너 그룹의 모든 멤버 스케줄을 월별로 조회
       const response = await scheduleService.getOwnerGroupsAllSchedules(year, month);
       
@@ -2072,7 +2132,32 @@ export default function SchedulePage() {
         console.log('[loadAllGroupSchedules] keepSelectedDate:', keepSelectedDate);
         console.log('[loadAllGroupSchedules] 현재 selectedDay:', selectedDay?.format('YYYY-MM-DD'));
         
-        setEvents(allEvents);
+        if (keepSelectedDate && selectedDay) {
+          // 월 변경 시: 선택된 날짜의 기존 일정을 보존하면서 새 데이터 병합
+          const selectedDateString = selectedDay.format('YYYY-MM-DD');
+          
+          setEvents(prevEvents => {
+            // 기존 일정 중 선택된 날짜의 일정만 필터링
+            const selectedDateEvents = prevEvents.filter(event => event.date === selectedDateString);
+            
+            // 새로운 일정 중 선택된 날짜가 아닌 일정들
+            const otherEvents = allEvents.filter(event => event.date !== selectedDateString);
+            
+            // 새로운 일정 중 선택된 날짜의 일정들 (업데이트된 데이터)
+            const newSelectedDateEvents = allEvents.filter(event => event.date === selectedDateString);
+            
+            console.log('[loadAllGroupSchedules] 월 변경 - 기존 선택된 날짜 일정:', selectedDateEvents);
+            console.log('[loadAllGroupSchedules] 월 변경 - 새 선택된 날짜 일정:', newSelectedDateEvents);
+            
+            // 새 데이터가 있으면 새 데이터 사용, 없으면 기존 데이터 유지
+            const finalSelectedDateEvents = newSelectedDateEvents.length > 0 ? newSelectedDateEvents : selectedDateEvents;
+            
+            return [...otherEvents, ...finalSelectedDateEvents];
+          });
+        } else {
+          // 일반 로딩 시: 전체 교체
+          setEvents(allEvents);
+        }
         
         // keepSelectedDate가 false이거나 undefined이고, selectedDay가 없는 경우에만 오늘로 초기화
         if (!keepSelectedDate && !selectedDay) {
@@ -2082,14 +2167,24 @@ export default function SchedulePage() {
           console.log('[loadAllGroupSchedules] 선택된 날짜 유지:', selectedDay?.format('YYYY-MM-DD'));
         }
         
+        // 캐시에 저장
+        monthlyCache.set(cacheKey, allEvents);
+        loadedMonths.add(cacheKey);
+        
       } else {
         console.log('[loadAllGroupSchedules] 오너 그룹 스케줄 조회 실패 또는 데이터 없음:', response);
-        setEvents([]);
+        // keepSelectedDate가 true인 경우(월 변경) 기존 events 유지, 아니면 빈 배열로 설정
+        if (!keepSelectedDate) {
+          setEvents([]);
+        }
       }
       
     } catch (error) {
       console.error('[loadAllGroupSchedules] 스케줄 로드 실패:', error);
-      setEvents([]);
+      // keepSelectedDate가 true인 경우(월 변경) 기존 events 유지, 아니면 빈 배열로 설정  
+      if (!keepSelectedDate) {
+        setEvents([]);
+      }
     }
   };
 
@@ -2446,6 +2541,56 @@ export default function SchedulePage() {
     return updatedSchedule;
   };
 
+  // 캐시 관리 함수들
+  const updateCacheForEvent = (event: ScheduleEvent, action: 'add' | 'update' | 'delete') => {
+    const eventDate = dayjs(event.date);
+    const cacheKey = `${eventDate.year()}-${String(eventDate.month() + 1).padStart(2, '0')}`;
+    
+    if (loadedMonths.has(cacheKey)) {
+      const cachedData = monthlyCache.get(cacheKey) || [];
+      let updatedData: ScheduleEvent[];
+      
+      switch (action) {
+        case 'add':
+          updatedData = [...cachedData, event];
+          break;
+        case 'update':
+          updatedData = cachedData.map(cachedEvent => 
+            cachedEvent.id === event.id ? event : cachedEvent
+          );
+          break;
+        case 'delete':
+          updatedData = cachedData.filter(cachedEvent => cachedEvent.id !== event.id);
+          break;
+        default:
+          updatedData = cachedData;
+      }
+      
+      monthlyCache.set(cacheKey, updatedData);
+      console.log(`[CACHE] ${action} 작업으로 캐시 업데이트:`, cacheKey);
+    }
+  };
+
+  const clearCache = () => {
+    setMonthlyCache(new Map());
+    setLoadedMonths(new Set());
+    console.log('[CACHE] 캐시 초기화 완료');
+  };
+
+  const getCacheStats = () => {
+    const loadedMonthsList = Array.from(loadedMonths);
+    const totalCachedEvents = Array.from(monthlyCache.values())
+      .reduce((total, events) => total + events.length, 0);
+    
+    console.log('[CACHE] 캐시 통계:', {
+      loadedMonths: loadedMonthsList,
+      totalCachedEvents,
+      cacheSize: monthlyCache.size
+    });
+    
+    return { loadedMonthsList, totalCachedEvents, cacheSize: monthlyCache.size };
+  };
+
   return (
     <>
       <style jsx global>{pageStyles}</style>
@@ -2506,9 +2651,35 @@ export default function SchedulePage() {
           >
             <MobileCalendar 
               selectedDay={selectedDay}
-              onDayClick={setSelectedDay}
+              onDayClick={(day) => {
+                console.log('[onDayClick] 날짜 클릭:', day.format('YYYY-MM-DD'));
+                setSelectedDay(day);
+                
+                // 클릭한 날짜의 월 캐시 키 생성
+                const clickedCacheKey = `${day.year()}-${String(day.month() + 1).padStart(2, '0')}`;
+                
+                // 해당 월 데이터가 캐시에 있는지 확인
+                if (loadedMonths.has(clickedCacheKey)) {
+                  console.log('[onDayClick] 캐시된 월 데이터 존재:', clickedCacheKey);
+                  const cachedData = monthlyCache.get(clickedCacheKey) || [];
+                  
+                  // 캐시된 데이터를 현재 events와 병합
+                  setEvents(prevEvents => {
+                    const existingDates = new Set(prevEvents.map(event => event.date));
+                    const newEvents = cachedData.filter(event => !existingDates.has(event.date));
+                    return [...prevEvents, ...newEvents];
+                  });
+                } else {
+                  console.log('[onDayClick] 해당 월 데이터 없음, 로드 시작:', clickedCacheKey);
+                  loadAllGroupSchedules(day.year(), day.month() + 1, true);
+                }
+              }}
               events={events}
-              onMonthChange={(year, month) => loadAllGroupSchedules(year, month, true)}
+              onMonthChange={(year, month) => {
+                console.log('[onMonthChange] 월 변경:', { year, month, selectedDay: selectedDay?.format('YYYY-MM-DD') });
+                // 월 변경 시에는 데이터를 즉시 로드하지 않음
+                // 사용자가 날짜를 클릭할 때 필요한 데이터만 로드
+              }}
             />
           </motion.div>
 
@@ -2529,7 +2700,7 @@ export default function SchedulePage() {
                         {format(selectedDay.toDate(), 'MM월 dd일 (E)', { locale: ko })}
                       </h3>
                       <p className="text-indigo-100 text-sm">
-                        {eventsForSelectedDay.length}개의 일정
+                        {isMonthChanging ? '일정 로딩 중...' : `${eventsForSelectedDay.length}개의 일정`}
                       </p>
                     </div>
                     <div className="flex items-center space-x-1 bg-white/20 px-3 py-1 rounded-full">
