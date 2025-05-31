@@ -6,11 +6,12 @@ import React, { useState, useEffect, Suspense, useMemo, useRef, useCallback } fr
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { motion } from 'framer-motion';
 import { PushLog, DeleteAllResponse } from '@/types/push';
 import { useToast } from '@/components/ui/use-toast';
 import notificationService from '@/services/notificationService';
 
-// 모바일 최적화된 CSS 애니메이션
+// glass-effect 및 모바일 최적화된 CSS 애니메이션
 const mobileAnimations = `
 @keyframes slideInFromBottom {
   from {
@@ -55,6 +56,15 @@ const mobileAnimations = `
 
 .animate-slideOutToRight {
   animation: slideOutToRight 0.3s ease-in forwards;
+}
+
+/* glass-effect 스타일 추가 */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
 }
 `;
 
@@ -102,9 +112,9 @@ function NoticeContent() {
   const handleScroll = useCallback(() => {
     if (sectionRefs.current.size === 0) return;
 
-    const headerHeight = 60; // 메인 헤더 높이
-    const stickyPosition = 80; // sticky header 위치 (top-20)
-    const triggerPoint = stickyPosition; // 80px
+    const headerHeight = 64; // 메인 헤더 높이 (h-16)
+    const stickyPosition = 96; // sticky header 위치 (top-24 = 96px)
+    const triggerPoint = stickyPosition; // 96px
 
     const sections = Array.from(sectionRefs.current.entries()).map(([date, element]) => {
       const rect = element.getBoundingClientRect();
@@ -354,35 +364,57 @@ function NoticeContent() {
 
   if (loading) {
     return (
-      <div className={`min-h-screen bg-indigo-50 ${
+      <div className={`min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 ${
         isExiting ? 'animate-slideOutToRight' : 
         isEntering ? 'animate-slideInFromRight' : ''
       }`}>
         <style jsx global>{mobileAnimations}</style>
-        {/* 앱 헤더 - 그룹 페이지 스타일 (고정) */}
-        <div className="sticky top-0 z-10 px-4 bg-white border-b border-gray-200">
-          <div className="flex items-center justify-between h-12">
-            <div className="flex items-center">
-              <button 
+        
+        {/* 개선된 헤더 - group/page.tsx 스타일 */}
+        <motion.header 
+          initial={{ y: -100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="fixed top-0 left-0 right-0 z-20 glass-effect"
+        >
+          <div className="flex items-center justify-between h-16 px-4">
+            <div className="flex items-center space-x-3">
+              <motion.button 
                 onClick={handleBackNavigation}
-                className="px-2 py-2 hover:bg-gray-100 transition-all duration-200 mr-2"
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-              </button>
-              <div className="flex items-center ml-1">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 8A6 6 0 0112 14c0 3.313-2.687 6-6 6S0 17.313 0 14c0-3.313 2.687-6 6-6a6 6 0 0112 0zM4 16h16" />
-                </svg>
-                <span className="text-lg font-semibold text-gray-900">알림</span>
+              </motion.button>
+              <div className="flex items-center space-x-3">
+                <motion.div
+                  initial={{ rotate: -180, scale: 0 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                  className="p-2 bg-indigo-600 rounded-xl"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </motion.div>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">알림</h1>
+                  <p className="text-xs text-gray-500">새로운 소식을 확인해보세요</p>
+                </div>
               </div>
             </div>
+            
+            <div className="flex items-center space-x-2">
+              {/* 필요시 추가 버튼들을 여기에 배치 */}
+            </div>
           </div>
-        </div>
+        </motion.header>
         
-        {/* 간단한 로딩 상태 */}
-        <div className="flex items-center justify-center min-h-[calc(100vh-3rem)]">
+        {/* 로딩 상태 - 패딩 조정 */}
+        <div className="flex items-center justify-center min-h-screen pt-20">
           <div className="flex items-center space-x-2 text-gray-500">
             <div className="w-4 h-4 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>
             <span className="text-sm">알림을 불러오는 중...</span>
@@ -393,47 +425,68 @@ function NoticeContent() {
   }
 
   return (
-    <div className={`min-h-screen bg-indigo-50 ${
+    <div className={`min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 ${
       isExiting ? 'animate-slideOutToRight' : 
       isEntering ? 'animate-slideInFromRight' : ''
     }`}>
       <style jsx global>{mobileAnimations}</style>
-      {/* 앱 헤더 - 그룹 페이지 스타일 (고정) */}
-      <div className="sticky top-0 z-10 px-4 bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between h-12">
-                      <div className="flex items-center">
-              <button 
-                onClick={handleBackNavigation}
-                className="px-2 py-2 hover:bg-gray-100 transition-all duration-200 mr-2"
+      
+      {/* 개선된 헤더 - group/page.tsx 스타일 */}
+      <motion.header 
+        initial={{ y: -100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="fixed top-0 left-0 right-0 z-20 glass-effect"
+      >
+        <div className="flex items-center justify-between h-16 px-4">
+          <div className="flex items-center space-x-3">
+            <motion.button 
+              onClick={handleBackNavigation}
+              className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </motion.button>
+            <div className="flex items-center space-x-3">
+              <motion.div
+                initial={{ rotate: -180, scale: 0 }}
+                animate={{ rotate: 0, scale: 1 }}
+                transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                className="p-2 bg-indigo-600 rounded-xl"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
-              </button>
-              <div className="flex items-center ml-1">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-indigo-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 8A6 6 0 0112 14c0 3.313-2.687 6-6 6S0 17.313 0 14c0-3.313 2.687-6 6-6a6 6 0 0112 0zM4 16h16" />
-                </svg>
-                <span className="text-lg font-semibold text-gray-900">알림</span>
+              </motion.div>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">알림</h1>
+                <p className="text-xs text-gray-500">새로운 소식을 확인해보세요</p>
               </div>
-              {/* <span className="ml-2 text-xs text-indigo-600 bg-indigo-100 px-2 py-1 rounded-full">최근 7일</span> */}
             </div>
-          <button
-            onClick={handleDeleteAll}
-            className="flex items-center text-xs text-red-500 hover:text-red-600 px-2 py-1 rounded transition-colors"
-            aria-label="전체 삭제"
-            disabled={notices.length === 0}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            전체삭제
-          </button>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <motion.button
+              onClick={handleDeleteAll}
+              disabled={notices.length === 0}
+              className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              전체삭제
+            </motion.button>
+          </div>
         </div>
-      </div>
+      </motion.header>
 
-      {/* 메인 컨텐츠 영역 */}
-      <main className="pb-8 bg-gradient-to-b from-indigo-50/30 to-white">
+      {/* 메인 컨텐츠 영역 - 패딩 조정 */}
+      <main className="pt-20 pb-8 bg-gradient-to-b from-indigo-50/30 to-white">
         <div className="px-4 pt-6 pb-16">
           {notices.length === 0 ? (
             <div className="fixed inset-0 bg-indigo-50 flex items-center justify-center z-[5]">
@@ -467,7 +520,7 @@ function NoticeContent() {
                    className="relative"
                  >
                    {/* 날짜 헤더 - 모바일 최적화 */}
-                   <div className="sticky top-16 z-[8] mb-3">
+                   <div className="sticky top-20 z-[8] mb-3">
                      <div className="bg-gray-900 backdrop-blur-md rounded-lg px-4 py-2 mx-2 shadow-sm border border-gray-800 text-white">
                        <div className="flex items-center justify-center space-x-2">
                          <div className="w-1.5 h-1.5 bg-pink-400 rounded-full"></div>

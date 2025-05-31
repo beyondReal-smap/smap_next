@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { format, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { motion } from 'framer-motion';
 import { PageContainer, Card, Button } from '../components/layout';
 import { Loader } from '@googlemaps/js-api-loader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -223,6 +224,15 @@ const modalAnimation = `
   animation: fadeIn 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+/* glass-effect 스타일 추가 */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+}
+
 /* 지도 화면 전체 차지하기 위한 스타일 */
 .full-map-container {
   position: fixed;
@@ -308,7 +318,7 @@ const modalAnimation = `
   left: 16px;
   right: auto;
   width: 60px;
-  z-index: 100;
+  z-index: 40; /* 메인 헤더(z-50)보다 낮게 설정 */
   background-color: rgba(0, 0, 0, 0.7); /* 어두운 배경색으로 변경 */
   color: white; /* 텍스트 색상을 흰색으로 변경 */
   padding: 6px 8px;
@@ -323,7 +333,7 @@ const modalAnimation = `
 .map-controls {
   position: fixed;
   right: 16px;
-  z-index: 100;
+  z-index: 40; /* 메인 헤더(z-50)보다 낮게 설정 */
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2073,28 +2083,261 @@ export default function HomePage() {
   return (
     <>
       <style jsx global>{modalAnimation}</style>
-      <PageContainer title="홈" showTitle={false} showBackButton={false} showHeader={false} className="p-0 m-0 w-full h-screen bg-indigo-50">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen relative overflow-hidden"
+      >
+        {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
+        {!(authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+          <motion.header 
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed top-0 left-0 right-0 z-50 glass-effect"
+          >
+            <div className="flex items-center justify-between h-16 px-4">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3">
+                  <motion.div
+                    initial={{ rotate: -180, scale: 0 }}
+                    animate={{ rotate: 0, scale: 1 }}
+                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                    className="p-2 bg-indigo-600 rounded-xl"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 text-white stroke-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                  </motion.div>
+                  <div>
+                    <h1 className="text-lg font-bold text-gray-900">홈</h1>
+                    <p className="text-xs text-gray-500">그룹 멤버들과 실시간으로 소통해보세요</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200 relative"
+                  onClick={() => router.push('/notice')}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                  {/* 알림 뱃지 (선택적) */}
+                  <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full">
+                  </div>
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200"
+                  onClick={() => router.push('/setting')}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </motion.button>
+              </div>
+            </div>
+          </motion.header>
+        )}
+
         {/* 지도 영역 (화면 100% 차지, fixed 포지션으로 고정) */}
-        <div className="full-map-container">
-          {/* 전체화면 로딩 - 지도 로딩, 그룹멤버 로딩, 첫번째 멤버 선택 완료까지 */}
+        <div 
+          className="full-map-container" 
+          style={{ 
+            paddingTop: (authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) 
+              ? '0px' 
+              : '64px' 
+          }}
+        >
+          {/* 전체화면 로딩 - 체크리스트 형태 */}
           {(authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
-            <LoadingSpinner 
-              message={
-                authLoading
-                  ? "로그인 정보를 확인하는 중입니다..."
-                  : isMapLoading 
-                    ? "지도를 불러오는 중입니다..." 
-                    : !dataFetchedRef.current.members 
-                      ? "데이터를 불러오는 중입니다..."
-                      : !dataFetchedRef.current.schedules
-                        ? "그룹 일정을 불러오는 중입니다..."
-                        : "첫번째 멤버 위치로 이동 중입니다..."
-              } 
-              fullScreen={true}
-              type="ripple"
-              size="md"
-              color="blue"
-            />
+            <div className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+              <div className="text-center max-w-sm mx-auto px-6">
+                {/* 상단 로고 및 제목 */}
+                <div className="mb-6">
+                  <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-8 w-8 text-white stroke-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-bold text-gray-900 mb-2">홈 화면을 준비하고 있습니다</h2>
+                  <p className="text-sm text-gray-600">잠시만 기다려주세요...</p>
+                </div>
+
+                {/* 로딩 체크리스트 - 컴팩트 버전 */}
+                <div className="space-y-1">
+                  {/* 1. 로그인 정보 확인 */}
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                      !authLoading 
+                        ? 'bg-green-500 border-green-500 scale-110' 
+                        : 'border-indigo-300 animate-pulse'
+                    }`}>
+                      {!authLoading ? (
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                      )}
+                    </div>
+                    <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                      !authLoading ? 'text-green-700' : 'text-gray-700'
+                    }`}>
+                      로그인 정보 확인
+                    </span>
+                  </div>
+
+                  {/* 2. 지도 로딩 */}
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                      !authLoading && !isMapLoading 
+                        ? 'bg-green-500 border-green-500 scale-110' 
+                        : authLoading 
+                          ? 'border-gray-300' 
+                          : 'border-indigo-300 animate-pulse'
+                    }`}>
+                      {!authLoading && !isMapLoading ? (
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : !authLoading ? (
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                      ) : (
+                        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                      )}
+                    </div>
+                    <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                      !authLoading && !isMapLoading ? 'text-green-700' : authLoading ? 'text-gray-400' : 'text-gray-700'
+                    }`}>
+                      지도 불러오기
+                    </span>
+                  </div>
+
+                  {/* 3. 그룹 멤버 데이터 */}
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                      !authLoading && !isMapLoading && dataFetchedRef.current.members 
+                        ? 'bg-green-500 border-green-500 scale-110' 
+                        : (authLoading || isMapLoading) 
+                          ? 'border-gray-300' 
+                          : 'border-indigo-300 animate-pulse'
+                    }`}>
+                      {!authLoading && !isMapLoading && dataFetchedRef.current.members ? (
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : !authLoading && !isMapLoading ? (
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                      ) : (
+                        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                      )}
+                    </div>
+                    <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                      !authLoading && !isMapLoading && dataFetchedRef.current.members ? 'text-green-700' : (authLoading || isMapLoading) ? 'text-gray-400' : 'text-gray-700'
+                    }`}>
+                      그룹 멤버 불러오기
+                    </span>
+                  </div>
+
+                  {/* 4. 일정 데이터 */}
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                      !authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules 
+                        ? 'bg-green-500 border-green-500 scale-110' 
+                        : (authLoading || isMapLoading || !dataFetchedRef.current.members) 
+                          ? 'border-gray-300' 
+                          : 'border-indigo-300 animate-pulse'
+                    }`}>
+                      {!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules ? (
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : !authLoading && !isMapLoading && dataFetchedRef.current.members ? (
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                      ) : (
+                        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                      )}
+                    </div>
+                    <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                      !authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules ? 'text-green-700' : (authLoading || isMapLoading || !dataFetchedRef.current.members) ? 'text-gray-400' : 'text-gray-700'
+                    }`}>
+                      일정 데이터 불러오기
+                    </span>
+                  </div>
+
+                  {/* 5. 첫번째 멤버 위치 이동 */}
+                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                      isFirstMemberSelectionComplete 
+                        ? 'bg-green-500 border-green-500 scale-110' 
+                        : (!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules)
+                          ? 'border-indigo-300 animate-pulse' 
+                          : 'border-gray-300'
+                    }`}>
+                      {isFirstMemberSelectionComplete ? (
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules) ? (
+                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                      ) : (
+                        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                      )}
+                    </div>
+                    <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                      isFirstMemberSelectionComplete ? 'text-green-700' : (!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules) ? 'text-gray-700' : 'text-gray-400'
+                    }`}>
+                      멤버 위치로 이동
+                    </span>
+                  </div>
+                </div>
+
+                {/* 진행률 표시 */}
+                <div className="mt-6">
+                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="h-2 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full transition-all duration-700 ease-out"
+                      style={{
+                        width: `${
+                          (!authLoading ? 20 : 0) +
+                          (!authLoading && !isMapLoading ? 20 : 0) +
+                          (!authLoading && !isMapLoading && dataFetchedRef.current.members ? 20 : 0) +
+                          (!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules ? 20 : 0) +
+                          (isFirstMemberSelectionComplete ? 20 : 0)
+                        }%`
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    {(!authLoading ? 1 : 0) +
+                     (!authLoading && !isMapLoading ? 1 : 0) +
+                     (!authLoading && !isMapLoading && dataFetchedRef.current.members ? 1 : 0) +
+                     (!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules ? 1 : 0) +
+                     (isFirstMemberSelectionComplete ? 1 : 0)}/5 단계 완료
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
           
           <div 
@@ -2471,7 +2714,7 @@ export default function HomePage() {
             </div>
           </div>
         )}
-      </PageContainer>
+      </motion.div>
     </>
   );
 } 

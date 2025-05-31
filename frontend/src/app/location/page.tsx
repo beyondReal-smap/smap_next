@@ -25,6 +25,7 @@ import {
 import { FaSearch as FaSearchSolid } from 'react-icons/fa';
 import dynamic from 'next/dynamic';
 import { FaTrash } from 'react-icons/fa';
+import LoadingSpinner from '../components/common/LoadingSpinner'; // LoadingSpinner 추가
 
 // 커스텀 알림 상태 추가 (react-toastify 관련 없음)
 interface CustomToast {
@@ -175,25 +176,22 @@ html, body {
 const pageVariants = {
   initial: { 
     opacity: 0, 
-    x: 100,
-    scale: 0.95
+    y: 20
   },
   in: { 
     opacity: 1, 
-    x: 0,
-    scale: 1,
+    y: 0,
     transition: {
-      duration: 0.4,
-      ease: [0.25, 0.46, 0.45, 0.94]
+      duration: 0.3,
+      ease: [0.22, 1, 0.36, 1]
     }
   },
   out: { 
     opacity: 0, 
-    x: -100,
-    scale: 0.95,
+    y: -20,
     transition: {
-      duration: 0.3,
-      ease: [0.55, 0.085, 0.68, 0.53]
+      duration: 0.2,
+      ease: [0.22, 1, 0.36, 1]
     }
   }
 };
@@ -207,53 +205,46 @@ const bottomSheetVariants = {
     y: 20,
     opacity: 1,
     transition: {
-      type: "spring",
-      damping: 25,
-      stiffness: 400,
-      duration: 0.2
+      duration: 0.3,
+      ease: [0.22, 1, 0.36, 1]
     }
   },
   peek: {
     y: '71%',
     opacity: 1,
     transition: {
-      type: "spring",
-      damping: 25,
-      stiffness: 400,
-      duration: 0.2
+      duration: 0.3,
+      ease: [0.22, 1, 0.36, 1]
     }
   }
 };
 
 const memberAvatarVariants = {
   initial: { 
-    scale: 0,
+    scale: 0.9,
     opacity: 0
   },
   animate: (index: number) => ({
     scale: 1,
     opacity: 1,
     transition: {
-      delay: index * 0.05,
-      type: "spring",
-      stiffness: 300,
-      damping: 15
+      delay: index * 0.04,
+      duration: 0.3,
+      ease: [0.22, 1, 0.36, 1]
     }
   }),
   hover: {
-    scale: 1.1,
+    scale: 1.02,
     transition: {
-      type: "spring",
-      stiffness: 500,
-      damping: 8
+      duration: 0.15,
+      ease: "easeOut"
     }
   },
   selected: {
-    scale: 1.05,
+    scale: 1.01,
     transition: {
-      type: "spring",
-      stiffness: 400,
-      damping: 12
+      duration: 0.15,
+      ease: "easeOut"
     }
   }
 };
@@ -261,8 +252,8 @@ const memberAvatarVariants = {
 const locationCardVariants = {
   hidden: { 
     opacity: 0, 
-    y: 20,
-    scale: 0.9
+    y: 15,
+    scale: 0.98
   },
   visible: (index: number) => ({
     opacity: 1,
@@ -271,34 +262,29 @@ const locationCardVariants = {
     transition: {
       delay: index * 0.04,
       duration: 0.3,
-      ease: [0.25, 0.46, 0.45, 0.94],
-      type: "spring",
-      stiffness: 300,
-      damping: 15
+      ease: [0.22, 1, 0.36, 1]
     }
   }),
   hover: {
-    y: -6,
-    scale: 1.03,
+    y: -2,
+    scale: 1.01,
     transition: {
-      type: "spring",
-      stiffness: 500,
-      damping: 12
+      duration: 0.15,
+      ease: "easeOut"
     }
   },
   selected: {
     scale: 1.01,
     y: -1,
     transition: {
-      type: "spring",
-      stiffness: 400,
-      damping: 15
+      duration: 0.15,
+      ease: "easeOut"
     }
   },
   tap: {
-    scale: 0.98,
+    scale: 0.99,
     transition: {
-      duration: 0.05
+      duration: 0.1
     }
   }
 };
@@ -315,26 +301,22 @@ const floatingButtonVariants = {
     y: 0,
     transition: {
       delay: 0.3,
-      type: "spring",
-      stiffness: 400,
-      damping: 15
+      duration: 0.3,
+      ease: [0.22, 1, 0.36, 1]
     }
   },
   hover: { 
-    scale: 1.1,
-    rotate: 90,
-    y: -3,
+    scale: 1.05,
+    y: -2,
     transition: {
-      type: "spring",
-      stiffness: 500,
-      damping: 10
+      duration: 0.15,
+      ease: "easeOut"
     }
   },
   tap: { 
     scale: 0.95,
-    rotate: 45,
     transition: {
-      duration: 0.05
+      duration: 0.1
     }
   }
 };
@@ -342,7 +324,7 @@ const floatingButtonVariants = {
 const modalVariants = {
   hidden: {
     opacity: 0,
-    scale: 0.9,
+    scale: 0.96,
     y: 30
   },
   visible: {
@@ -350,17 +332,17 @@ const modalVariants = {
     scale: 1,
     y: 0,
     transition: {
-      type: "spring",
-      stiffness: 400,
-      damping: 20
+      duration: 0.3,
+      ease: [0.22, 1, 0.36, 1]
     }
   },
   exit: {
     opacity: 0,
-    scale: 0.9,
+    scale: 0.96,
     y: 30,
     transition: {
-      duration: 0.15
+      duration: 0.2,
+      ease: [0.22, 1, 0.36, 1]
     }
   }
 };
@@ -370,7 +352,7 @@ const staggerContainer = {
   visible: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.05,
+      staggerChildren: 0.04,
       delayChildren: 0.1
     }
   }
@@ -385,9 +367,52 @@ const staggerItem = {
     opacity: 1,
     y: 0,
     transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 15
+      duration: 0.3,
+      ease: [0.22, 1, 0.36, 1]
+    }
+  }
+};
+
+// 로딩 애니메이션 variants 추가
+const loadingVariants = {
+  hidden: { 
+    opacity: 0,
+    scale: 0.9
+  },
+  visible: { 
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.3,
+      ease: [0.22, 1, 0.36, 1]
+    }
+  }
+};
+
+const spinnerVariants = {
+  animate: {
+    rotate: 360,
+    transition: {
+      duration: 1,
+      repeat: Infinity,
+      ease: "linear"
+    }
+  }
+};
+
+// 개선된 로딩 텍스트 애니메이션
+const loadingTextVariants = {
+  hidden: { 
+    y: 10, 
+    opacity: 0 
+  },
+  visible: { 
+    y: 0, 
+    opacity: 1,
+    transition: {
+      delay: 0.2,
+      duration: 0.3,
+      ease: [0.22, 1, 0.36, 1]
     }
   }
 };
@@ -523,6 +548,13 @@ export default function LocationPage() {
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isLoadingOtherLocations, setIsLoadingOtherLocations] = useState(false);
   
+  // 데이터 로딩 상태 추적을 위한 ref 추가
+  const dataFetchedRef = useRef({ 
+    groups: false, 
+    members: false, 
+    locations: false 
+  });
+  
   // 지도 관련 상태
   const [map, setMap] = useState<NaverMap | null>(null);
   const [markers, setMarkers] = useState<NaverMarker[]>([]);
@@ -545,7 +577,7 @@ export default function LocationPage() {
   const [selectedLocationIdRef, setSelectedLocationIdRef] = useState<React.MutableRefObject<string | null>>({ current: null });
   
   // UI 상태
-  const [bottomSheetState, setBottomSheetState] = useState<'hidden' | 'peek' | 'visible'>('visible');
+  const [bottomSheetState, setBottomSheetState] = useState<'hidden' | 'peek' | 'visible'>('peek');
   const [activeView, setActiveView] = useState<'selectedMemberPlaces' | 'otherMembersPlaces'>('selectedMemberPlaces');
   const [isLocationInfoPanelOpen, setIsLocationInfoPanelOpen] = useState(false);
   const [isEditingPanel, setIsEditingPanel] = useState(false);
@@ -1210,6 +1242,13 @@ export default function LocationPage() {
     setIsFirstMemberSelectionComplete(false);
     selectedMemberIdRef.current = null; // 선택된 멤버 ID도 초기화
     
+    // 데이터 로딩 상태 초기화
+    dataFetchedRef.current = { 
+      groups: dataFetchedRef.current.groups, // 그룹 데이터는 유지
+      members: false, 
+      locations: false 
+    };
+    
     // 선택된 장소 관련 상태도 초기화
     setSelectedLocationId(null);
     selectedLocationIdRef.current = null;
@@ -1276,6 +1315,9 @@ export default function LocationPage() {
           setGroupMembers(convertedMembers);
           console.log('[fetchGroupMembersData] 그룹멤버 설정 완료:', convertedMembers.length, '명');
           
+          // 멤버 데이터 로딩 완료 표시
+          dataFetchedRef.current.members = true;
+          
           // 첫 번째 멤버의 장소 데이터 즉시 로드
           if (convertedMembers.length > 0) {
             console.log('[fetchGroupMembersData] 첫 번째 멤버 장소 데이터 로드 시작:', convertedMembers[0].name);
@@ -1341,6 +1383,8 @@ export default function LocationPage() {
           setIsFirstMemberSelectionComplete(true);
           setIsFetchingGroupMembers(false);
           setIsLoading(false);
+          // 멤버 데이터가 없어도 로딩 완료로 표시
+          dataFetchedRef.current.members = true;
         }, remainingTime);
       }
     } catch (error) {
@@ -1356,6 +1400,8 @@ export default function LocationPage() {
         setIsFirstMemberSelectionComplete(true);
         setIsFetchingGroupMembers(false);
         setIsLoading(false);
+        // 오류 발생해도 로딩 완료로 표시하여 무한 로딩 방지
+        dataFetchedRef.current.members = true;
       }, remainingTime);
     }
     
@@ -1753,6 +1799,23 @@ export default function LocationPage() {
       fetchGroupMembersData();
     }
   }, [selectedGroupId]);
+  
+  // 첫번째 멤버 자동 선택 - 지도 준비되고 멤버가 있을 때
+  useEffect(() => {
+    if (groupMembers.length > 0 && 
+        !groupMembers.some(m => m.isSelected) && 
+        !isFirstMemberSelectionComplete && 
+        isMapReady && 
+        map &&
+        dataFetchedRef.current.members) {
+      console.log('[첫번째 멤버 자동 선택] 시작:', groupMembers[0].name);
+      
+      // 약간의 지연 후 첫번째 멤버 선택 (지도 렌더링 완료 대기)
+      setTimeout(() => {
+        handleMemberSelect(groupMembers[0].id);
+      }, 500);
+    }
+  }, [groupMembers.length, isFirstMemberSelectionComplete, isMapReady, map, dataFetchedRef.current.members]);
 
   // 페이지 로드 애니메이션
   useEffect(() => {
@@ -1860,9 +1923,14 @@ export default function LocationPage() {
         setSelectedGroupId(groups[0].sgt_idx);
         console.log('[fetchUserGroups] 첫 번째 그룹 자동 선택:', groups[0].sgt_title);
       }
+      
+      // 그룹 데이터 로딩 완료 표시
+      dataFetchedRef.current.groups = true;
     } catch (error) {
       console.error('[fetchUserGroups] 그룹 목록 조회 실패:', error);
       setUserGroups([]);
+      // 실패해도 로딩 완료로 표시하여 무한 로딩 방지
+      dataFetchedRef.current.groups = true;
     } finally {
       setIsLoadingGroups(false);
     }
@@ -2797,189 +2865,229 @@ export default function LocationPage() {
         variants={pageVariants}
         className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen relative overflow-hidden"
       >
-        {/* 개선된 헤더 */}
-        <motion.header 
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="fixed top-0 left-0 right-0 z-20 glass-effect"
-        >
-          <div className="flex items-center justify-between h-16 px-4">
-            <div className="flex items-center space-x-3">
-              {/* 뒤로가기 버튼 제거 */}
-              {/* <motion.button 
-                whileHover={{ scale: 1.05, rotate: -5 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleBack}
-                disabled={isExiting}
-                className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 mobile-button disabled:opacity-50"
-              >
-                <FiArrowLeft className="w-5 h-5 text-gray-700" />
-              </motion.button> */}
-              
+        {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
+        {!(isMapLoading || !dataFetchedRef.current.groups || !dataFetchedRef.current.members || !isFirstMemberSelectionComplete) && (
+          <motion.header 
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed top-0 left-0 right-0 z-20 glass-effect"
+          >
+            <div className="flex items-center justify-between h-16 px-4">
               <div className="flex items-center space-x-3">
-                <motion.div
-                  initial={{ rotate: -180, scale: 0 }}
-                  animate={{ rotate: 0, scale: 1 }}
-                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                  className="p-2 bg-indigo-600 rounded-xl"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-white stroke-2"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
+                <div className="flex items-center space-x-3">
+                  <motion.div
+                    initial={{ rotate: -180, scale: 0 }}
+                    animate={{ rotate: 0, scale: 1 }}
+                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                    className="p-2 bg-indigo-600 rounded-xl"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 text-white stroke-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    </svg>
+                  </motion.div>
+                  <div>
+                    <h1 className="text-lg font-bold text-gray-900">내 장소</h1>
+                    <p className="text-xs text-gray-500">그룹 멤버들과 장소를 공유해보세요</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 mobile-button"
+                  onClick={() => {
+                    setIsLocationInfoPanelOpen(true);
+                    setIsEditingPanel(false);
+                    // 바텀시트를 peek 상태로 변경 (핸들이 보이도록)
+                    setBottomSheetState('peek');
+                    // 새 장소 입력을 위한 기본값 설정
+                    setNewLocation({
+                      name: '',
+                      address: '',
+                      coordinates: [0, 0],
+                      category: '기타',
+                      memo: '',
+                      favorite: false,
+                      notifications: true
+                    });
+                  }}
+                >
+                  <FiSearch className="w-5 h-5 text-gray-600" />
+                </motion.button>
+              </div>
+            </div>
+          </motion.header>
+        )}
+        
+        {/* 전체화면 로딩 - 체크리스트 형태 */}
+        {(isMapLoading || !dataFetchedRef.current.groups || !dataFetchedRef.current.members || !isFirstMemberSelectionComplete) && (
+          <div className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+            <div className="text-center max-w-sm mx-auto px-6">
+              {/* 상단 로고 및 제목 */}
+              <div className="mb-6">
+                <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   </svg>
-                </motion.div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">내 장소</h1>
-                  <p className="text-xs text-gray-500">그룹 멤버들과 장소를 공유해보세요</p>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">내 장소를 준비하고 있습니다</h2>
+                <p className="text-sm text-gray-600">잠시만 기다려주세요...</p>
+              </div>
+
+              {/* 로딩 체크리스트 - 컴팩트 버전 */}
+              <div className="space-y-1">
+                {/* 1. 지도 로딩 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    !isMapLoading 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : 'border-indigo-300 animate-pulse'
+                  }`}>
+                    {!isMapLoading ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    )}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    !isMapLoading ? 'text-green-700' : 'text-gray-700'
+                  }`}>
+                    지도 불러오기
+                  </span>
+                </div>
+
+                {/* 2. 그룹 정보 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    !isMapLoading && dataFetchedRef.current.groups 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : isMapLoading 
+                        ? 'border-gray-300' 
+                        : 'border-indigo-300 animate-pulse'
+                  }`}>
+                    {!isMapLoading && dataFetchedRef.current.groups ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : !isMapLoading ? (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    ) : (
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    )}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    !isMapLoading && dataFetchedRef.current.groups ? 'text-green-700' : isMapLoading ? 'text-gray-400' : 'text-gray-700'
+                  }`}>
+                    그룹 정보 불러오기
+                  </span>
+                </div>
+
+                {/* 3. 그룹 멤버 데이터 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    !isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : (isMapLoading || !dataFetchedRef.current.groups) 
+                        ? 'border-gray-300' 
+                        : 'border-indigo-300 animate-pulse'
+                  }`}>
+                    {!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : !isMapLoading && dataFetchedRef.current.groups ? (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    ) : (
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    )}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    !isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members ? 'text-green-700' : (isMapLoading || !dataFetchedRef.current.groups) ? 'text-gray-400' : 'text-gray-700'
+                  }`}>
+                    그룹 멤버 불러오기
+                  </span>
+                </div>
+
+                {/* 4. 첫번째 멤버 위치 이동 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    isFirstMemberSelectionComplete 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : (!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members)
+                        ? 'border-indigo-300 animate-pulse' 
+                        : 'border-gray-300'
+                  }`}>
+                    {isFirstMemberSelectionComplete ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members) ? (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    ) : (
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    )}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    isFirstMemberSelectionComplete ? 'text-green-700' : (!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members) ? 'text-gray-700' : 'text-gray-400'
+                  }`}>
+                    멤버 위치로 이동
+                  </span>
+                </div>
+              </div>
+
+              {/* 진행률 표시 */}
+              <div className="mt-6">
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="h-2 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full transition-all duration-700 ease-out"
+                    style={{
+                      width: `${
+                        (!isMapLoading ? 25 : 0) +
+                        (!isMapLoading && dataFetchedRef.current.groups ? 25 : 0) +
+                        (!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members ? 25 : 0) +
+                        (isFirstMemberSelectionComplete ? 25 : 0)
+                      }%`
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {(!isMapLoading ? 1 : 0) +
+                   (!isMapLoading && dataFetchedRef.current.groups ? 1 : 0) +
+                   (!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members ? 1 : 0) +
+                   (isFirstMemberSelectionComplete ? 1 : 0)}/4 단계 완료
+                </p>
               </div>
             </div>
           </div>
-            
-            <div className="flex items-center space-x-2">
-              <motion.button
-                whileHover={{ scale: 1.05, rotate: 90 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 mobile-button"
-                onClick={() => {
-                  setIsLocationInfoPanelOpen(true);
-                  setIsEditingPanel(false);
-                  // 바텀시트를 peek 상태로 변경 (핸들이 보이도록)
-                  setBottomSheetState('peek');
-                  // 새 장소 입력을 위한 기본값 설정
-                  setNewLocation({
-                    name: '',
-                    address: '',
-                    coordinates: [0, 0],
-                    category: '기타',
-                    memo: '',
-                    favorite: false,
-                    notifications: true
-                  });
-                }}
-              >
-                <FiSearch className="w-5 h-5 text-gray-600" />
-              </motion.button>
-              
-              {/* 필터 버튼 제거 */}
-              {/* <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 mobile-button"
-              >
-                <FiFilter className="w-5 h-5 text-gray-600" />
-              </motion.button> */}
-              
-              {/* 점 세개 버튼 제거 */}
-              {/* <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 mobile-button"
-              >
-                <FiMoreVertical className="w-5 h-5 text-gray-600" />
-              </motion.button> */}
-        </div>
-          </div>
-        </motion.header>
-
-        {/* 전체화면 로딩 - 지도 로딩만 */}
-        <AnimatePresence>
-        {isMapLoading && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center"
-            >
-              <motion.div 
-                className="text-center"
-              >
-                {/* 배경 원형 파도 효과 */}
-                <div className="relative flex items-center justify-center mb-6">
-                  {[...Array(3)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className="absolute w-16 h-16 border border-indigo-200 rounded-full"
-                      animate={{
-                        scale: [1, 2, 1],
-                        opacity: [0.6, 0, 0.6],
-                      }}
-                      transition={{
-                        duration: 2.5,
-                        repeat: Infinity,
-                        delay: i * 0.8,
-                        ease: "easeInOut"
-                      }}
-                    />
-                  ))}
-                  
-                  {/* 중앙 지도 아이콘 */}
-                  <motion.div
-                    className="relative w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg"
-                    animate={{
-                      scale: [1, 1.1, 1]
-                    }}
-                    transition={{
-                      duration: 2,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                  >
-                    <FiMapPin className="w-8 h-8 text-white" />
-                  </motion.div>
-                </div>
-                
-                {/* 로딩 텍스트 */}
-                <motion.div 
-                  className="text-center"
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                >
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">지도를 불러오는 중입니다</h3>
-                  <p className="text-gray-600">잠시만 기다려주세요...</p>
-                </motion.div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        )}
         
         {/* 지도 컨테이너 */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.15, duration: 0.4 }}
-          className="map-container fixed top-16 left-0 right-0 bottom-0 w-full"
+          className={`map-container fixed left-0 right-0 bottom-0 w-full ${
+            (isMapLoading || !dataFetchedRef.current.groups || !dataFetchedRef.current.members || !isFirstMemberSelectionComplete) 
+              ? 'top-0' 
+              : 'top-16'
+          }`}
         >
           {/* 지도 컨테이너 - 항상 렌더링 */}
           <div 
             ref={mapContainer} 
             className="w-full h-full"
           />
-          
-          {/* 로딩 오버레이 */}
-          {(isMapLoading || !isMapReady) && (
-            <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center z-10">
-              <div className="text-center">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-16 h-16 mx-auto mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg"
-                >
-                  <FiLoader className="w-8 h-8 text-white" />
-                </motion.div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">지도를 준비하고 있습니다</h3>
-                <p className="text-sm text-gray-600">
-                  {isMapLoading ? '지도를 로딩 중...' : '지도를 초기화하는 중...'}
-                </p>
-              </div>
-            </div>
-          )}
         </motion.div>
 
         {/* 개선된 위치 정보 패널 */}
@@ -2987,10 +3095,10 @@ export default function LocationPage() {
         {isLocationInfoPanelOpen && (
             <motion.div 
             ref={infoPanelRef} 
-              initial={{ opacity: 0, y: -30, scale: 0.95 }}
+              initial={{ opacity: 0, y: -30, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -30, scale: 0.95 }}
-              transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+              exit={{ opacity: 0, y: -30, scale: 0.96 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               className="location-info-panel fixed top-20 left-4 right-4 z-30 rounded-2xl p-4 shadow-2xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -3015,8 +3123,8 @@ export default function LocationPage() {
                 <div className="flex items-center space-x-2">
                 {isEditingPanel && (
                     <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -3043,8 +3151,8 @@ export default function LocationPage() {
                   )}
                   
                   <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     onClick={() => {
                   setIsLocationInfoPanelOpen(false);
                   if (tempMarker.current) tempMarker.current.setMap(null);
@@ -3305,8 +3413,8 @@ export default function LocationPage() {
                         </div>
                         {isFetchingGroupMembers && (
                           <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            variants={spinnerVariants}
+                            animate="animate"
                           >
                             <FiLoader className="text-indigo-500" size={18}/>
                           </motion.div>
@@ -3342,15 +3450,15 @@ export default function LocationPage() {
                             <div className="ml-2 flex-shrink-0">
                                {isLoadingGroups ? (
                                 <motion.div
-                                  animate={{ rotate: 360 }}
-                                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                  variants={spinnerVariants}
+                                  animate="animate"
                                 >
                                   <FiLoader className="text-gray-400" size={14} />
                                 </motion.div>
                               ) : (
                                 <motion.div
                                   animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-                                  transition={{ duration: 0.2 }}
+                                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                                 >
                                   <FiChevronDown className="text-gray-400" size={14} />
                                 </motion.div>
@@ -3361,10 +3469,10 @@ export default function LocationPage() {
                           <AnimatePresence>
                            {isGroupSelectorOpen && userGroups.length > 0 && (
                               <motion.div
-                                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                initial={{ opacity: 0, y: -10, scale: 0.96 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                                transition={{ duration: 0.2 }}
+                                exit={{ opacity: 0, y: -10, scale: 0.96 }}
+                                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                                 className="absolute top-full right-0 z-50 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto min-w-[180px]"
                               >
                                 {userGroups.map((group) => (
@@ -3395,8 +3503,9 @@ export default function LocationPage() {
 
                    {isLoading ? (
                       <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
+                        variants={loadingVariants}
+                        initial="hidden"
+                        animate="visible"
                         className="flex flex-col items-center justify-center py-8"
                       >
                         {/* 배경 원형 파도 효과 */}
@@ -3406,14 +3515,14 @@ export default function LocationPage() {
                               key={i}
                               className="absolute w-12 h-12 border border-indigo-200 rounded-full"
                               animate={{
-                                scale: [1, 2, 1],
-                                opacity: [0.6, 0, 0.6],
+                                scale: [1, 1.8, 1],
+                                opacity: [0.4, 0, 0.4],
                               }}
                               transition={{
-                                duration: 2,
+                                duration: 1.5,
                                 repeat: Infinity,
-                                delay: i * 0.6,
-                                ease: "easeInOut"
+                                delay: i * 0.4,
+                                ease: [0.22, 1, 0.36, 1]
                               }}
                             />
                           ))}
@@ -3421,23 +3530,17 @@ export default function LocationPage() {
                           {/* 중앙 그룹 아이콘 */}
                           <motion.div
                             className="relative w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg"
-                            animate={{
-                              scale: [1, 1.1, 1]
-                            }}
-                            transition={{
-                              duration: 2,
-                              repeat: Infinity,
-                              ease: "easeInOut"
-                            }}
+                            variants={spinnerVariants}
+                            animate="animate"
                           >
                             <FiUser className="w-6 h-6 text-white" />
                           </motion.div>
                         </div>
                         
                         <motion.div
-                          initial={{ y: 10, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          transition={{ delay: 0.3 }}
+                          variants={loadingTextVariants}
+                          initial="hidden"
+                          animate="visible"
                         >
                           <p className="font-medium text-gray-900 mb-1">멤버 정보를 불러오는 중...</p>
                           <p className="text-sm text-gray-600">잠시만 기다려주세요</p>
@@ -3554,8 +3657,8 @@ export default function LocationPage() {
                         </div>
                         {isLoadingOtherLocations && (
                           <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            variants={spinnerVariants}
+                            animate="animate"
                           >
                             <FiLoader className="text-purple-500" size={18}/>
                           </motion.div>
@@ -3564,15 +3667,27 @@ export default function LocationPage() {
                     </div>
 
                   {isLoadingOtherLocations ? (
-                      <div className="text-center py-8 text-gray-500">
+                      <motion.div 
+                        variants={loadingVariants}
+                        initial="hidden"
+                        animate="visible"
+                        className="flex flex-col items-center justify-center py-8"
+                      >
                         <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-10 h-10 mx-auto mb-4 bg-gradient-to-r from-pink-600 to-pink-700 rounded-xl flex items-center justify-center">
+                          variants={spinnerVariants}
+                          animate="animate"
+                          className="w-10 h-10 mx-auto mb-4 bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl flex items-center justify-center">
                           <FiLoader className="w-5 h-5 text-white" />
                         </motion.div>
-                        <p className="font-medium">다른 멤버 장소 로딩 중...</p>
-                    </div>
+                        <motion.div
+                          variants={loadingTextVariants}
+                          initial="hidden"
+                          animate="visible"
+                        >
+                          <p className="font-medium text-gray-900 mb-1">장소 정보를 불러오는 중...</p>
+                          <p className="text-sm text-gray-600">잠시만 기다려주세요</p>
+                        </motion.div>
+                      </motion.div>
                   ) : otherMembersSavedLocations.length > 0 ? (
                       <motion.div 
                         variants={staggerContainer}

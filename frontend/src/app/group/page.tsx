@@ -314,6 +314,13 @@ function GroupPageContent() {
   const [membersLoading, setMembersLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
   
+  // 단계별 로딩 상태 추적
+  const [loadingSteps, setLoadingSteps] = useState({
+    groups: false,
+    members: false,
+    ui: false
+  });
+
   // 모달 상태
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -348,6 +355,9 @@ function GroupPageContent() {
       
       const data = await groupService.getCurrentUserGroups();
       setGroups(data);
+      
+      // 그룹 데이터 로딩 단계 완료
+      updateLoadingStep('groups', true);
 
       const memberCounts: {[key: number]: number} = {};
       for (const group of data) {
@@ -361,19 +371,26 @@ function GroupPageContent() {
       }
       setGroupMemberCounts(memberCounts);
       
+      // 멤버 수 계산 단계 완료
+      updateLoadingStep('members', true);
+      
       // 로딩 애니메이션을 최소 1.5초간 보여주기 위해 지연 처리
       const elapsedTime = Date.now() - startTime;
       const minLoadingTime = 1500;
       const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
       
       setTimeout(() => {
+        updateLoadingStep('ui', true);
         setLoading(false);
       }, remainingTime);
     } catch (error) {
       console.error('그룹 목록 조회 오류:', error);
       setGroups([]);
-      // 오류 시에도 최소 시간 보장
+      // 오류 시에도 모든 단계 완료
+      updateLoadingStep('groups', true);
+      updateLoadingStep('members', true);
       setTimeout(() => {
+        updateLoadingStep('ui', true);
         setLoading(false);
       }, 1500);
     }
@@ -778,559 +795,687 @@ function GroupPageContent() {
     }
   }, [isSuccessModalOpen]);
 
+  // 로딩 단계 업데이트 함수
+  const updateLoadingStep = (step: 'groups' | 'members' | 'ui', completed: boolean) => {
+    setLoadingSteps(prev => ({
+      ...prev,
+      [step]: completed
+    }));
+  };
+
+  // 전체 로딩 완료 체크
+  const isLoadingComplete = loadingSteps.groups && loadingSteps.members && loadingSteps.ui;
+
   return (
     <>
       <style jsx global>{floatingButtonStyles}</style>
-      <div className="min-h-screen bg-indigo-50">
-        {/* 개선된 헤더 */}
-        <motion.header 
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="fixed top-0 left-0 right-0 z-20 glass-effect"
-        >
-          <div className="flex items-center justify-between h-16 px-4">
-            {currentView === 'list' ? (
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-3">
-                  <motion.div
-                    initial={{ rotate: -180, scale: 0 }}
-                    animate={{ rotate: 0, scale: 1 }}
-                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                    className="p-2 bg-indigo-600 rounded-xl"
-                  >
-                    <FaUsers className="w-5 h-5 text-white" />
-                  </motion.div>
-                  <div>
-                    <h1 className="text-lg font-bold text-gray-900">그룹</h1>
-                    <p className="text-xs text-gray-500">나의 소중한 그룹을 관리해보세요</p>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+        
+        {/* 전체화면 로딩 - 체크리스트 형태 */}
+        {loading && (
+          <div className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+            <div className="text-center max-w-sm mx-auto px-6">
+              {/* 상단 로고 및 제목 */}
+              <div className="mb-6">
+                <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
+                  <FaUsers className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">그룹을 불러오고 있습니다</h2>
+                <p className="text-sm text-gray-600">잠시만 기다려주세요...</p>
+              </div>
+
+              {/* 로딩 체크리스트 - 컴팩트 버전 */}
+              <div className="space-y-1">
+                {/* 1. 그룹 목록 불러오기 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    loadingSteps.groups 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : 'border-indigo-300 animate-pulse'
+                  }`}>
+                    {loadingSteps.groups ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    )}
                   </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    loadingSteps.groups ? 'text-green-700' : 'text-gray-700'
+                  }`}>
+                    그룹 목록 불러오기
+                  </span>
+                </div>
+
+                {/* 2. 멤버 수 계산 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    loadingSteps.members 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : loadingSteps.groups
+                        ? 'border-indigo-300 animate-pulse'
+                        : 'border-gray-300'
+                  }`}>
+                    {loadingSteps.members ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : loadingSteps.groups ? (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    ) : null}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    loadingSteps.members ? 'text-green-700' : loadingSteps.groups ? 'text-gray-700' : 'text-gray-400'
+                  }`}>
+                    멤버 수 계산
+                  </span>
+                </div>
+
+                {/* 3. 화면 구성 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    loadingSteps.ui 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : loadingSteps.members
+                        ? 'border-indigo-300 animate-pulse'
+                        : 'border-gray-300'
+                  }`}>
+                    {loadingSteps.ui ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : loadingSteps.members ? (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    ) : null}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    loadingSteps.ui ? 'text-green-700' : loadingSteps.members ? 'text-gray-700' : 'text-gray-400'
+                  }`}>
+                    화면 구성
+                  </span>
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center space-x-3">
-                <motion.button 
-                  onClick={handleBackToList}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
-                </motion.button>
-                <div className="flex items-center space-x-3">
-                  <motion.div
-                    initial={{ rotate: -180, scale: 0 }}
-                    animate={{ rotate: 0, scale: 1 }}
-                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                    className="p-2 bg-indigo-600 rounded-xl"
-                  >
-                    <FaUsers className="w-5 h-5 text-white" />
-                  </motion.div>
-                  <div>
-                    <h1 className="text-lg font-bold text-gray-900">그룹 상세</h1>
-                    <p className="text-xs text-gray-500">멤버들과 함께하는 즐거운 공간</p>
-                  </div>
+
+              {/* 진행률 표시 */}
+              <div className="mt-6">
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="h-2 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full transition-all duration-700 ease-out"
+                    style={{ 
+                      width: `${
+                        ((loadingSteps.groups ? 1 : 0) + 
+                         (loadingSteps.members ? 1 : 0) + 
+                         (loadingSteps.ui ? 1 : 0)) / 3 * 100
+                      }%` 
+                    }}
+                  />
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {`${
+                    (loadingSteps.groups ? 1 : 0) + 
+                    (loadingSteps.members ? 1 : 0) + 
+                    (loadingSteps.ui ? 1 : 0)
+                  }/3 단계 ${isLoadingComplete ? '완료' : '진행 중...'}`}
+                </p>
               </div>
-            )}
-            
-            <div className="flex items-center space-x-2">
-              {/* 필요시 추가 버튼들을 여기에 배치 */}
             </div>
           </div>
-        </motion.header>
+        )}
 
-        {/* 메인 컨텐츠 - 애니메이션 제거 */}
-        <div className="pb-safe pt-20">
-          <AnimatePresence mode="wait">
-            {currentView === 'list' ? (
-              <motion.div
-                key="list"
-                initial={{ opacity: 0, x: -100 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -100 }}
-                transition={{ duration: 0.3 }}
-              >
-                {/* 검색 섹션 */}
-                <div className="px-4 pb-4">
-                  <motion.div 
-                    className="relative"
-                    whileFocus={{ scale: 1.02 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input
-                      type="text"
-                      placeholder="그룹 검색..."
-                      value={searchQuery}
-                      onChange={handleSearchChange}
-                      onFocus={() => setIsSearchFocused(true)}
-                      onBlur={() => setIsSearchFocused(false)}
-                      className="w-full pl-12 pr-4 py-4 bg-white border border-indigo-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
-                    />
-                  </motion.div>
-                </div>
-
-                {/* 통계 카드 */}
-                <div className="px-4 mb-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <motion.div 
-                      className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-lg"
-                      variants={cardVariants}
-                      initial="hidden"
-                      animate="visible"
-                      custom={0}
+        {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
+        {!loading && (
+          <motion.header 
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="fixed top-0 left-0 right-0 z-20 glass-effect"
+          >
+            <div className="flex items-center justify-between h-16 px-4">
+              {currentView === 'list' ? (
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-3">
+                    <motion.div
+                      initial={{ rotate: -180, scale: 0 }}
+                      animate={{ rotate: 0, scale: 1 }}
+                      transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                      className="p-2 bg-indigo-600 rounded-xl"
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-indigo-100 text-sm">총 그룹</p>
-                          <p className="text-2xl font-bold">{groups.length}개</p>
-                        </div>
-                        <FaLayerGroup className="w-8 h-8 text-indigo-200" />
-                      </div>
+                      <FaUsers className="w-5 h-5 text-white" />
                     </motion.div>
-                    <motion.div 
-                      className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg"
-                      variants={cardVariants}
-                      initial="hidden"
-                      animate="visible"
-                      custom={1}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-pink-100 text-sm">총 멤버</p>
-                          <p className="text-2xl font-bold">{Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}명</p>
-                        </div>
-                        <FaUsers className="w-8 h-8 text-pink-200" />
-                      </div>
-                    </motion.div>
+                    <div>
+                      <h1 className="text-lg font-bold text-gray-900">그룹</h1>
+                      <p className="text-xs text-gray-500">나의 소중한 그룹을 관리해보세요</p>
+                    </div>
                   </div>
                 </div>
-
-                {/* 그룹 목록 */}
-                <div className="px-4 space-y-3">
-                  {loading ? (
-                    <motion.div 
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="flex flex-col items-center justify-center py-12"
+              ) : (
+                <div className="flex items-center space-x-3">
+                  <motion.button 
+                    onClick={handleBackToList}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
+                  </motion.button>
+                  <div className="flex items-center space-x-3">
+                    <motion.div
+                      initial={{ rotate: -180, scale: 0 }}
+                      animate={{ rotate: 0, scale: 1 }}
+                      transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                      className="p-2 bg-indigo-600 rounded-xl"
                     >
-                      {/* 배경 원형 파도 효과 */}
-                      <div className="relative flex items-center justify-center mb-6">
-                        {[...Array(3)].map((_, i) => (
+                      <FaUsers className="w-5 h-5 text-white" />
+                    </motion.div>
+                    <div>
+                      <h1 className="text-lg font-bold text-gray-900">그룹 상세</h1>
+                      <p className="text-xs text-gray-500">멤버들과 함께하는 즐거운 공간</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex items-center space-x-2">
+                {/* 필요시 추가 버튼들을 여기에 배치 */}
+              </div>
+            </div>
+          </motion.header>
+        )}
+
+        {/* 메인 컨텐츠 - 로딩 상태일 때 숨김 및 패딩 조정 */}
+        {!loading && (
+          <div className="pb-safe pt-20">
+            <AnimatePresence mode="wait">
+              {currentView === 'list' ? (
+                <motion.div
+                  key="list"
+                  initial={{ opacity: 0, x: -100 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -100 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {/* 검색 섹션 */}
+                  <div className="px-4 pb-4">
+                    <motion.div 
+                      className="relative"
+                      whileFocus={{ scale: 1.02 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <input
+                        type="text"
+                        placeholder="그룹 검색..."
+                        value={searchQuery}
+                        onChange={handleSearchChange}
+                        onFocus={() => setIsSearchFocused(true)}
+                        onBlur={() => setIsSearchFocused(false)}
+                        className="w-full pl-12 pr-4 py-4 bg-white border border-indigo-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
+                      />
+                    </motion.div>
+                  </div>
+
+                  {/* 통계 카드 */}
+                  <div className="px-4 mb-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <motion.div 
+                        className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-lg"
+                        variants={cardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        custom={0}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-indigo-100 text-sm">총 그룹</p>
+                            <p className="text-2xl font-bold">{groups.length}개</p>
+                          </div>
+                          <FaLayerGroup className="w-8 h-8 text-indigo-200" />
+                        </div>
+                      </motion.div>
+                      <motion.div 
+                        className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg"
+                        variants={cardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        custom={1}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-pink-100 text-sm">총 멤버</p>
+                            <p className="text-2xl font-bold">{Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}명</p>
+                          </div>
+                          <FaUsers className="w-8 h-8 text-pink-200" />
+                        </div>
+                      </motion.div>
+                    </div>
+                  </div>
+
+                  {/* 그룹 목록 */}
+                  <div className="px-4 space-y-3">
+                    {loading ? (
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex flex-col items-center justify-center py-12"
+                      >
+                        {/* 배경 원형 파도 효과 */}
+                        <div className="relative flex items-center justify-center mb-6">
+                          {[...Array(3)].map((_, i) => (
+                            <motion.div
+                              key={i}
+                              className="absolute w-16 h-16 border border-indigo-200 rounded-full"
+                              animate={{
+                                scale: [1, 2, 1],
+                                opacity: [0.6, 0, 0.6],
+                              }}
+                              transition={{
+                                duration: 2,
+                                repeat: Infinity,
+                                delay: i * 0.6,
+                                ease: "easeInOut"
+                              }}
+                            />
+                          ))}
+                          
+                          {/* 중앙 그룹 아이콘 */}
                           <motion.div
-                            key={i}
-                            className="absolute w-16 h-16 border border-indigo-200 rounded-full"
+                            className="relative w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center"
                             animate={{
-                              scale: [1, 2, 1],
-                              opacity: [0.6, 0, 0.6],
+                              scale: [1, 1.1, 1]
                             }}
                             transition={{
                               duration: 2,
                               repeat: Infinity,
-                              delay: i * 0.6,
                               ease: "easeInOut"
                             }}
-                          />
-                        ))}
+                          >
+                            <FaUsers className="w-8 h-8 text-white" />
+                          </motion.div>
+                        </div>
                         
-                        {/* 중앙 그룹 아이콘 */}
-                        <motion.div
-                          className="relative w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center"
-                          animate={{
-                            scale: [1, 1.1, 1]
-                          }}
-                          transition={{
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                          }}
+                        {/* 로딩 텍스트 */}
+                        <motion.div 
+                          className="text-center"
+                          initial={{ y: 20, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          transition={{ delay: 0.5 }}
                         >
-                          <FaUsers className="w-8 h-8 text-white" />
+                          <h3 className="text-lg font-medium text-gray-900 mb-1">그룹을 불러오는 중...</h3>
+                          <p className="text-gray-500 text-sm">잠시만 기다려주세요</p>
                         </motion.div>
-                      </div>
-                      
-                      {/* 로딩 텍스트 */}
-                      <motion.div 
-                        className="text-center"
-                        initial={{ y: 20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: 0.5 }}
-                      >
-                        <h3 className="text-lg font-medium text-gray-900 mb-1">그룹을 불러오는 중...</h3>
-                        <p className="text-gray-500 text-sm">잠시만 기다려주세요</p>
                       </motion.div>
-                    </motion.div>
-                  ) : filteredGroups.length > 0 ? (
-                    <motion.div 
-                      className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
-                      variants={groupListContainerVariants}
-                      initial="hidden"
-                      animate="visible"
-                    >
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <h3 className="text-lg font-bold text-gray-900">내 그룹 목록</h3>
-                      </div>
-                      <div className="p-4 space-y-3">
-                        {filteredGroups.map((group, index) => {
-                          const memberCount = groupMemberCounts[group.sgt_idx] || 0;
-                          
-                          return (
-                            <motion.div
-                              key={group.sgt_idx}
-                              onClick={() => handleGroupSelect(group as ExtendedGroup)}
-                              className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-4 cursor-pointer"
-                              variants={groupCardVariants}
-                              initial="hidden"
-                              animate="visible"
-                              whileHover="hover"
-                              whileTap="tap"
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center flex-1 mr-3">
-                                  <div className="p-2 bg-white rounded-xl mr-4">
-                                    <img 
-                                      src={`/images/group${(index % 2) + 1}.webp`}
-                                      alt="그룹 아이콘"
-                                      className="w-12 h-12 object-cover"
-                                    />
-                                  </div>
-                                  <div className="flex-1">
-                                    <h4 className="font-normal text-lg text-gray-800 mb-1">
-                                      {group.sgt_title}
-                                    </h4>
-                                    <p className="text-gray-600 text-sm line-clamp-2 mb-2">
-                                      {group.sgt_memo || group.sgt_content || '그룹 설명이 없습니다'}
-                                    </p>
-                                    <div className="flex items-center space-x-4 text-xs text-indigo-500">
-                                      <span className="flex items-center">
-                                        <FaUsers className="w-3 h-3 mr-1" />
-                                        {memberCount}명
-                                      </span>
-                                      <span className="text-blue-500">
-                                        {new Date(group.sgt_wdate).toLocaleDateString()}
-                                      </span>
+                    ) : filteredGroups.length > 0 ? (
+                      <motion.div 
+                        className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+                        variants={groupListContainerVariants}
+                        initial="hidden"
+                        animate="visible"
+                      >
+                        <div className="px-4 py-3 border-b border-gray-100">
+                          <h3 className="text-lg font-bold text-gray-900">내 그룹 목록</h3>
+                        </div>
+                        <div className="p-4 space-y-3">
+                          {filteredGroups.map((group, index) => {
+                            const memberCount = groupMemberCounts[group.sgt_idx] || 0;
+                            
+                            return (
+                              <motion.div
+                                key={group.sgt_idx}
+                                onClick={() => handleGroupSelect(group as ExtendedGroup)}
+                                className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-4 cursor-pointer"
+                                variants={groupCardVariants}
+                                initial="hidden"
+                                animate="visible"
+                                whileHover="hover"
+                                whileTap="tap"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center flex-1 mr-3">
+                                    <div className="p-2 bg-white rounded-xl mr-4">
+                                      <img 
+                                        src={`/images/group${(index % 2) + 1}.webp`}
+                                        alt="그룹 아이콘"
+                                        className="w-12 h-12 object-cover"
+                                      />
+                                    </div>
+                                    <div className="flex-1">
+                                      <h4 className="font-normal text-lg text-gray-800 mb-1">
+                                        {group.sgt_title}
+                                      </h4>
+                                      <p className="text-gray-600 text-sm line-clamp-2 mb-2">
+                                        {group.sgt_memo || group.sgt_content || '그룹 설명이 없습니다'}
+                                      </p>
+                                      <div className="flex items-center space-x-4 text-xs text-indigo-500">
+                                        <span className="flex items-center">
+                                          <FaUsers className="w-3 h-3 mr-1" />
+                                          {memberCount}명
+                                        </span>
+                                        <span className="text-blue-500">
+                                          {new Date(group.sgt_wdate).toLocaleDateString()}
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
                                 </div>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                </svg>
-                              </div>
-                            </motion.div>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <motion.div 
-                      className="text-center py-12"
-                      variants={cardVariants}
-                      initial="hidden"
-                      animate="visible"
-                      custom={2}
-                    >
-                      <div className="p-6 bg-gray-100 rounded-full w-fit mx-auto mb-4">
-                        <FaSearch className="w-8 h-8 text-gray-400" />
-                      </div>
-                      <p className="text-gray-500 text-lg font-medium">검색 결과가 없습니다</p>
-                      <p className="text-gray-400 text-sm mt-1">다른 키워드로 검색해보세요</p>
-                    </motion.div>
-                  )}
-                </div>
-
-                {/* 플로팅 추가 버튼 */}
-                <motion.button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="floating-button w-14 h-14 rounded-full flex items-center justify-center text-white"
-                  variants={floatingButtonVariants}
-                  initial="initial"
-                  animate="animate"
-                  whileHover="hover"
-                  whileTap="tap"
-                >
-                  <FiPlus className="w-6 h-6 stroke-2" />
-                </motion.button>
-              </motion.div>
-            ) : selectedGroup ? (
-              <motion.div
-                key="detail"
-                initial={{ opacity: 0, x: 100, scale: 0.95 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: -100, scale: 0.95 }}
-                transition={{ 
-                  duration: 0.5,
-                  ease: [0.25, 0.46, 0.45, 0.94]
-                }}
-              >
-                {/* 그룹 헤더 카드 */}
-                <div className="mx-4 mt-4 mb-4">
-                  <motion.div 
-                    className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg relative"
-                    initial={{ y: 30, opacity: 0, scale: 0.9 }}
-                    animate={{ y: 0, opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-                  >
-                    {/* 그룹 액션 메뉴 버튼 */}
-                    <div className="absolute top-4 right-4">
-                      <motion.button
-                        onClick={() => setShowGroupActions(!showGroupActions)}
-                        className="p-2 bg-white/20 rounded-full hover:bg-white/30"
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div 
+                        className="text-center py-12"
+                        variants={cardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        custom={2}
                       >
-                        <HiEllipsisVertical className="w-4 h-4 text-white" />
-                      </motion.button>
-                      <AnimatePresence>
-                        {showGroupActions && (
-                          <>
-                            <div 
-                              className="fixed inset-0 z-[55]" 
-                              onClick={() => setShowGroupActions(false)}
-                            />
-                            <motion.div 
-                              className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-[60]"
-                              initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                              exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                              transition={{ duration: 0.15 }}
-                            >
-                              <button 
-                                onClick={() => {
-                                  setEditGroup({
-                                    name: selectedGroup.sgt_title,
-                                    description: selectedGroup.sgt_memo || selectedGroup.sgt_content || ''
-                                  });
-                                  setIsEditModalOpen(true);
-                                  setShowGroupActions(false);
-                                }}
-                                className="w-full px-4 py-3 text-left hover:bg-indigo-50 flex items-center text-gray-700"
-                              >
-                                <FaEdit className="w-4 h-4 mr-3" />
-                                그룹 수정
-                              </button>
-                              <hr className="my-1" />
-                              <button 
-                                onClick={() => {
-                                  setIsDeleteModalOpen(true);
-                                  setShowGroupActions(false);
-                                }}
-                                className="w-full px-4 py-3 text-left hover:bg-red-50 flex items-center text-red-600"
-                              >
-                                <FaTrash className="w-4 h-4 mr-3" />
-                                그룹 삭제
-                              </button>
-                            </motion.div>
-                          </>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                    
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center flex-1 pr-12">
-                        <div className="p-2 bg-white rounded-xl mr-4">
-                          <img 
-                            src={`/images/group${((groups.findIndex(g => g.sgt_idx === selectedGroup.sgt_idx) % 2) + 1)}.webp`}
-                            alt="그룹 아이콘"
-                            className="w-12 h-12 object-cover"
-                          />
+                        <div className="p-6 bg-gray-100 rounded-full w-fit mx-auto mb-4">
+                          <FaSearch className="w-8 h-8 text-gray-400" />
                         </div>
-                        <div className="flex-1">
-                          <h2 className="text-xl font-bold mb-1">{selectedGroup.sgt_title}</h2>
-                          <p className="text-indigo-100 text-sm">
-                            {selectedGroup.sgt_memo || selectedGroup.sgt_content || '그룹 설명이 없습니다'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-indigo-200">
-                      <span>코드: {selectedGroup.sgt_code || 'N/A'}</span>
-                      <span>생성일: {new Date(selectedGroup.sgt_wdate).toLocaleDateString()}</span>
-                    </div>
-                  </motion.div>
-                </div>
-
-                {/* 통계 카드들 */}
-                <div className="px-4 mb-4">
-                  <div className="grid grid-cols-3 gap-3">
-                    <motion.div 
-                      className="bg-gradient-to-r from-red-300 to-red-300 rounded-xl p-3 text-white text-center shadow-md"
-                      initial={{ y: 30, opacity: 0, scale: 0.8 }}
-                      animate={{ y: 0, opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.2, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-                    >
-                      <FaUsers className="w-6 h-6 text-red-800 mx-auto mb-1" />
-                      {membersLoading ? (
-                        <div className="flex items-center justify-center py-2">
-                          <div className="text-center">
-                            <div className="w-4 h-4 border-2 border-red-800 border-t-transparent rounded-full animate-spin mx-auto mb-1"></div>
-                            <div className="text-xs text-red-800">로딩중...</div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-lg font-bold">
-                          {groupStats?.member_count ?? groupMembers.length ?? 0}
-                        </div>
-                      )}
-                      <p className="text-red-800 text-xs">멤버</p>
-                    </motion.div>
-                    <motion.div 
-                      className="bg-gradient-to-r from-yellow-300 to-yellow-300 rounded-xl p-3 text-white text-center shadow-md"
-                      initial={{ y: 30, opacity: 0, scale: 0.8 }}
-                      animate={{ y: 0, opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.3, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-                    >
-                      <FaCalendarAlt className="w-6 h-6 text-yellow-800 mx-auto mb-1" />
-                      {statsLoading ? (
-                        <div className="flex items-center justify-center py-2">
-                          <div className="text-center">
-                            <div className="w-4 h-4 border-2 border-yellow-800 border-t-transparent rounded-full animate-spin mx-auto mb-1"></div>
-                            <div className="text-xs text-yellow-800">로딩중...</div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-lg font-bold">
-                          {groupStats?.weekly_schedules ?? 0}
-                        </div>
-                      )}
-                      <p className="text-yellow-800 text-xs">주간 일정</p>
-                    </motion.div>
-                    <motion.div 
-                      className="bg-gradient-to-r from-blue-300 to-blue-300 rounded-xl p-3 text-white text-center shadow-md"
-                      initial={{ y: 30, opacity: 0, scale: 0.8 }}
-                      animate={{ y: 0, opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.4, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-                    >
-                      <FaMapMarkerAlt className="w-6 h-6 text-blue-600 mx-auto mb-1" />
-                      {statsLoading ? (
-                        <div className="flex items-center justify-center py-2">
-                          <div className="text-center">
-                            <div className="w-4 h-4 border-2 border-blue-800 border-t-transparent rounded-full animate-spin mx-auto mb-1"></div>
-                            <div className="text-xs text-blue-800">로딩중...</div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-lg font-bold">
-                          {groupStats?.total_locations ?? 0}
-                        </div>
-                      )}
-                      <p className="text-blue-800 text-xs">총 위치</p>
-                    </motion.div>
+                        <p className="text-gray-500 text-lg font-medium">검색 결과가 없습니다</p>
+                        <p className="text-gray-400 text-sm mt-1">다른 키워드로 검색해보세요</p>
+                      </motion.div>
+                    )}
                   </div>
-                </div>
 
-                {/* 그룹 멤버 섹션 */}
-                <div className="px-4">
-                  <motion.div 
-                    className="bg-white rounded-2xl shadow-sm border border-indigo-100 overflow-hidden"
-                    initial={{ y: 30, opacity: 0, scale: 0.95 }}
-                    animate={{ y: 0, opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.5, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  {/* 플로팅 추가 버튼 */}
+                  <motion.button
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="floating-button w-14 h-14 rounded-full flex items-center justify-center text-white"
+                    variants={floatingButtonVariants}
+                    initial="initial"
+                    animate="animate"
+                    whileHover="hover"
+                    whileTap="tap"
                   >
-                    <div className="p-4 border-b border-indigo-100">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-normal text-gray-900">그룹 멤버</h3>
+                    <FiPlus className="w-6 h-6 stroke-2" />
+                  </motion.button>
+                </motion.div>
+              ) : selectedGroup ? (
+                <motion.div
+                  key="detail"
+                  initial={{ opacity: 0, x: 100, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -100, scale: 0.95 }}
+                  transition={{ 
+                    duration: 0.5,
+                    ease: [0.25, 0.46, 0.45, 0.94]
+                  }}
+                >
+                  {/* 그룹 헤더 카드 */}
+                  <div className="mx-4 mt-4 mb-4">
+                    <motion.div 
+                      className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg relative"
+                      initial={{ y: 30, opacity: 0, scale: 0.9 }}
+                      animate={{ y: 0, opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    >
+                      {/* 그룹 액션 메뉴 버튼 */}
+                      <div className="absolute top-4 right-4">
                         <motion.button
-                          onClick={() => setIsShareModalOpen(true)}
-                          className="px-3 py-2 bg-pink-500 text-white rounded-lg text-sm flex items-center space-x-1"
+                          onClick={() => setShowGroupActions(!showGroupActions)}
+                          className="p-2 bg-white/20 rounded-full hover:bg-white/30"
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                         >
-                          <MdGroupAdd className="w-4 h-4" />
-                          <span>초대</span>
+                          <HiEllipsisVertical className="w-4 h-4 text-white" />
                         </motion.button>
+                        <AnimatePresence>
+                          {showGroupActions && (
+                            <>
+                              <div 
+                                className="fixed inset-0 z-[55]" 
+                                onClick={() => setShowGroupActions(false)}
+                              />
+                              <motion.div 
+                                className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-[60]"
+                                initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                transition={{ duration: 0.15 }}
+                              >
+                                <button 
+                                  onClick={() => {
+                                    setEditGroup({
+                                      name: selectedGroup.sgt_title,
+                                      description: selectedGroup.sgt_memo || selectedGroup.sgt_content || ''
+                                    });
+                                    setIsEditModalOpen(true);
+                                    setShowGroupActions(false);
+                                  }}
+                                  className="w-full px-4 py-3 text-left hover:bg-indigo-50 flex items-center text-gray-700"
+                                >
+                                  <FaEdit className="w-4 h-4 mr-3" />
+                                  그룹 수정
+                                </button>
+                                <hr className="my-1" />
+                                <button 
+                                  onClick={() => {
+                                    setIsDeleteModalOpen(true);
+                                    setShowGroupActions(false);
+                                  }}
+                                  className="w-full px-4 py-3 text-left hover:bg-red-50 flex items-center text-red-600"
+                                >
+                                  <FaTrash className="w-4 h-4 mr-3" />
+                                  그룹 삭제
+                                </button>
+                              </motion.div>
+                            </>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    </div>
-                    
-                    <div className="p-4">
-                      {membersLoading ? (
-                        <div className="flex items-center justify-center py-8">
-                          <div className="text-center">
-                            <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                            <p className="text-sm text-gray-600">그룹원을 불러오는 중...</p>
+                      
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center flex-1 pr-12">
+                          <div className="p-2 bg-white rounded-xl mr-4">
+                            <img 
+                              src={`/images/group${((groups.findIndex(g => g.sgt_idx === selectedGroup.sgt_idx) % 2) + 1)}.webp`}
+                              alt="그룹 아이콘"
+                              className="w-12 h-12 object-cover"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <h2 className="text-xl font-bold mb-1">{selectedGroup.sgt_title}</h2>
+                            <p className="text-indigo-100 text-sm">
+                              {selectedGroup.sgt_memo || selectedGroup.sgt_content || '그룹 설명이 없습니다'}
+                            </p>
                           </div>
                         </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {groupMembers.length > 0 ? (
-                            groupMembers.map((member, index) => (
-                              <motion.div 
-                                key={member.mt_idx} 
-                                onClick={() => handleMemberClick(member)}
-                                className={`flex items-center p-3 bg-indigo-50 rounded-xl ${
-                                  isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' 
-                                    ? 'cursor-pointer hover:bg-indigo-100 hover:shadow-md' 
-                                    : ''
-                                }`}
-                                initial={{ x: -20, opacity: 0 }}
-                                animate={{ x: 0, opacity: 1 }}
-                                transition={{ delay: 0.6 + index * 0.1 }}
-                                whileHover={isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' ? { scale: 1.02 } : {}}
-                                whileTap={isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' ? { scale: 0.98 } : {}}
-                              >
-                                <div className="relative mr-3">
-                                  <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center border-3 border-indigo-200">
-                                    <img
-                                      src={getSafeImageUrl(member.photo || null, member.mt_gender, member.original_index)}
-                                      alt={member.mt_name}
-                                      className="w-full h-full object-cover"
-                                      onError={(e) => {
-                                        e.currentTarget.src = getDefaultImage(member.mt_gender, member.original_index);
-                                      }}
-                                    />
-                                  </div>
-                                  {member.sgdt_owner_chk === 'Y' && (
-                                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg">
-                                      <FaCrown className="w-2.5 h-2.5 text-white" />
-                                    </div>
-                                  )}
-                                  {member.sgdt_owner_chk !== 'Y' && member.sgdt_leader_chk === 'Y' && (
-                                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center shadow-lg">
-                                      <FaCrown className="w-2.5 h-2.5 text-white" />
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="font-normal text-gray-900">
-                                      {member.mt_nickname || member.mt_name || '이름 없음'}
-                                    </h4>
-                                    <div className="flex items-center space-x-2">
-                                      {member.sgdt_owner_chk === 'Y' && (
-                                        <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
-                                          그룹장
-                                        </span>
-                                      )}
-                                      {isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' && (
-                                        <FaCog className="w-4 h-4 text-gray-400" />
-                                      )}
-                                    </div>
-                                  </div>
-                                  <p className="text-sm text-indigo-600 mt-1">
-                                    {member.sgdt_owner_chk === 'Y' ? '그룹 관리자' : 
-                                     member.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
-                                  </p>
-                                </div>
-                              </motion.div>
-                            ))
-                          ) : (
-                            <div className="text-center py-8">
-                              <div className="p-4 bg-indigo-100 rounded-full w-fit mx-auto mb-3">
-                                <FaUsers className="w-6 h-6 text-indigo-400" />
-                              </div>
-                              <p className="text-gray-500 font-medium">그룹원이 없습니다</p>
-                              <p className="text-gray-400 text-sm mt-1">새로운 멤버를 초대해보세요</p>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-indigo-200">
+                        <span>코드: {selectedGroup.sgt_code || 'N/A'}</span>
+                        <span>생성일: {new Date(selectedGroup.sgt_wdate).toLocaleDateString()}</span>
+                      </div>
+                    </motion.div>
+                  </div>
+
+                  {/* 통계 카드들 */}
+                  <div className="px-4 mb-4">
+                    <div className="grid grid-cols-3 gap-3">
+                      <motion.div 
+                        className="bg-gradient-to-r from-red-300 to-red-300 rounded-xl p-3 text-white text-center shadow-md"
+                        initial={{ y: 30, opacity: 0, scale: 0.8 }}
+                        animate={{ y: 0, opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.2, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      >
+                        <FaUsers className="w-6 h-6 text-red-800 mx-auto mb-1" />
+                        {membersLoading ? (
+                          <div className="flex items-center justify-center py-2">
+                            <div className="text-center">
+                              <div className="w-4 h-4 border-2 border-red-800 border-t-transparent rounded-full animate-spin mx-auto mb-1"></div>
+                              <div className="text-xs text-red-800">로딩중...</div>
                             </div>
-                          )}
-                        </div>
-                      )}
+                          </div>
+                        ) : (
+                          <div className="text-lg font-bold">
+                            {groupStats?.member_count ?? groupMembers.length ?? 0}
+                          </div>
+                        )}
+                        <p className="text-red-800 text-xs">멤버</p>
+                      </motion.div>
+                      <motion.div 
+                        className="bg-gradient-to-r from-yellow-300 to-yellow-300 rounded-xl p-3 text-white text-center shadow-md"
+                        initial={{ y: 30, opacity: 0, scale: 0.8 }}
+                        animate={{ y: 0, opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.3, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      >
+                        <FaCalendarAlt className="w-6 h-6 text-yellow-800 mx-auto mb-1" />
+                        {statsLoading ? (
+                          <div className="flex items-center justify-center py-2">
+                            <div className="text-center">
+                              <div className="w-4 h-4 border-2 border-yellow-800 border-t-transparent rounded-full animate-spin mx-auto mb-1"></div>
+                              <div className="text-xs text-yellow-800">로딩중...</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-lg font-bold">
+                            {groupStats?.weekly_schedules ?? 0}
+                          </div>
+                        )}
+                        <p className="text-yellow-800 text-xs">주간 일정</p>
+                      </motion.div>
+                      <motion.div 
+                        className="bg-gradient-to-r from-blue-300 to-blue-300 rounded-xl p-3 text-white text-center shadow-md"
+                        initial={{ y: 30, opacity: 0, scale: 0.8 }}
+                        animate={{ y: 0, opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.4, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      >
+                        <FaMapMarkerAlt className="w-6 h-6 text-blue-600 mx-auto mb-1" />
+                        {statsLoading ? (
+                          <div className="flex items-center justify-center py-2">
+                            <div className="text-center">
+                              <div className="w-4 h-4 border-2 border-blue-800 border-t-transparent rounded-full animate-spin mx-auto mb-1"></div>
+                              <div className="text-xs text-blue-800">로딩중...</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-lg font-bold">
+                            {groupStats?.total_locations ?? 0}
+                          </div>
+                        )}
+                        <p className="text-blue-800 text-xs">총 위치</p>
+                      </motion.div>
                     </div>
-                  </motion.div>
-                </div>
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
-        </div>
+                  </div>
+
+                  {/* 그룹 멤버 섹션 */}
+                  <div className="px-4">
+                    <motion.div 
+                      className="bg-white rounded-2xl shadow-sm border border-indigo-100 overflow-hidden"
+                      initial={{ y: 30, opacity: 0, scale: 0.95 }}
+                      animate={{ y: 0, opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.5, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    >
+                      <div className="p-4 border-b border-indigo-100">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-normal text-gray-900">그룹 멤버</h3>
+                          <motion.button
+                            onClick={() => setIsShareModalOpen(true)}
+                            className="px-3 py-2 bg-pink-500 text-white rounded-lg text-sm flex items-center space-x-1"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <MdGroupAdd className="w-4 h-4" />
+                            <span>초대</span>
+                          </motion.button>
+                        </div>
+                      </div>
+                      
+                      <div className="p-4">
+                        {membersLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <div className="text-center">
+                              <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                              <p className="text-sm text-gray-600">그룹원을 불러오는 중...</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {groupMembers.length > 0 ? (
+                              groupMembers.map((member, index) => (
+                                <motion.div 
+                                  key={member.mt_idx} 
+                                  onClick={() => handleMemberClick(member)}
+                                  className={`flex items-center p-3 bg-indigo-50 rounded-xl ${
+                                    isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' 
+                                      ? 'cursor-pointer hover:bg-indigo-100 hover:shadow-md' 
+                                      : ''
+                                  }`}
+                                  initial={{ x: -20, opacity: 0 }}
+                                  animate={{ x: 0, opacity: 1 }}
+                                  transition={{ delay: 0.6 + index * 0.1 }}
+                                  whileHover={isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' ? { scale: 1.02 } : {}}
+                                  whileTap={isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' ? { scale: 0.98 } : {}}
+                                >
+                                  <div className="relative mr-3">
+                                    <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center border-3 border-indigo-200">
+                                      <img
+                                        src={getSafeImageUrl(member.photo || null, member.mt_gender, member.original_index)}
+                                        alt={member.mt_name}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.src = getDefaultImage(member.mt_gender, member.original_index);
+                                        }}
+                                      />
+                                    </div>
+                                    {member.sgdt_owner_chk === 'Y' && (
+                                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg">
+                                        <FaCrown className="w-2.5 h-2.5 text-white" />
+                                      </div>
+                                    )}
+                                    {member.sgdt_owner_chk !== 'Y' && member.sgdt_leader_chk === 'Y' && (
+                                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center shadow-lg">
+                                        <FaCrown className="w-2.5 h-2.5 text-white" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="font-normal text-gray-900">
+                                        {member.mt_nickname || member.mt_name || '이름 없음'}
+                                      </h4>
+                                      <div className="flex items-center space-x-2">
+                                        {member.sgdt_owner_chk === 'Y' && (
+                                          <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-full font-medium">
+                                            그룹장
+                                          </span>
+                                        )}
+                                        {isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' && (
+                                          <FaCog className="w-4 h-4 text-gray-400" />
+                                        )}
+                                      </div>
+                                    </div>
+                                    <p className="text-sm text-indigo-600 mt-1">
+                                      {member.sgdt_owner_chk === 'Y' ? '그룹 관리자' : 
+                                       member.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
+                                    </p>
+                                  </div>
+                                </motion.div>
+                              ))
+                            ) : (
+                              <div className="text-center py-8">
+                                <div className="p-4 bg-indigo-100 rounded-full w-fit mx-auto mb-3">
+                                  <FaUsers className="w-6 h-6 text-indigo-400" />
+                                </div>
+                                <p className="text-gray-500 font-medium">그룹원이 없습니다</p>
+                                <p className="text-gray-400 text-sm mt-1">새로운 멤버를 초대해보세요</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
+          </div>
+        )}
 
         {/* 모달들 */}
         <AnimatePresence>

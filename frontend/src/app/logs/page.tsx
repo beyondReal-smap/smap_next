@@ -683,8 +683,55 @@ export default function LogsPage() {
   return (
     <>
       <style jsx global>{pageStyles}</style>
+      
+      {/* 전체 화면 로딩 */}
+      {isMapLoading && (
+        <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center">
+          <div className="text-center">
+            {/* 배경 원형 파도 효과 */}
+            <div className="relative flex items-center justify-center mb-8">
+              {[...Array(4)].map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute w-20 h-20 border border-purple-200 rounded-full animate-ping"
+                  style={{
+                    animationDuration: '3s',
+                    animationDelay: `${i * 0.7}s`,
+                    opacity: 0.4
+                  }}
+                />
+              ))}
+              
+              {/* 중앙 로그 아이콘 */}
+              <div className="relative w-20 h-20 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                <svg width="40" height="40" fill="white" viewBox="0 0 24 24">
+                  <path d="M9 4l3 3h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5z"/>
+                </svg>
+              </div>
+            </div>
+            
+            {/* 로딩 텍스트 */}
+            <div className="text-center">
+              <h3 className="text-2xl font-bold text-gray-800 mb-3">로그 데이터를 불러오는 중</h3>
+              <p className="text-gray-600 mb-6">활동 로그와 지도를 준비하고 있습니다...</p>
+              
+              {/* 진행 상태 표시 */}
+              <div className="flex flex-col items-center space-y-3">
+                <div className="flex items-center space-x-4">
+                  <div className="w-3 h-3 rounded-full bg-purple-500 animate-pulse" />
+                  <span className="text-sm text-gray-500">지도 로딩 중</span>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <div className="w-3 h-3 rounded-full bg-gray-300 animate-pulse" style={{animationDelay: '0.2s'}} />
+                  <span className="text-sm text-gray-500">활동 데이터 준비</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <PageContainer title="활동 로그" showHeader={false} showBackButton={false} className="p-0 m-0 w-full h-screen overflow-hidden">
-        {isMapLoading && ( <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-50"> <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div> </div> )}
         <div className="full-map-container"><div ref={mapContainer} className="w-full h-full" /></div>
 
         <div 
