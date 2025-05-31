@@ -238,6 +238,36 @@ class AuthService {
       throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
     }
   }
+
+  /**
+   * 현재 로그인된 사용자의 최신 정보 조회
+   */
+  async getCurrentUserProfile(): Promise<UserProfile | null> {
+    try {
+      // 현재 저장된 사용자 정보 확인
+      const currentUser = this.getUserData();
+      if (!currentUser) {
+        console.log('[AUTH SERVICE] 저장된 사용자 정보 없음');
+        return null;
+      }
+
+      console.log('[AUTH SERVICE] 현재 사용자 최신 정보 조회 시작:', currentUser.mt_idx);
+
+      // 최신 사용자 정보 조회
+      const updatedProfile = await this.getUserProfile(currentUser.mt_idx);
+      
+      // 로컬 스토리지 업데이트
+      this.setUserData(updatedProfile);
+      
+      console.log('[AUTH SERVICE] 사용자 정보 업데이트 완료');
+      return updatedProfile;
+    } catch (error) {
+      console.error('[AUTH SERVICE] 현재 사용자 정보 조회 실패:', error);
+      
+      // 실패 시 저장된 정보 반환
+      return this.getUserData();
+    }
+  }
 }
 
 // 싱글톤 인스턴스 생성

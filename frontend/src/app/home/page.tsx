@@ -1,12 +1,15 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
+export const dynamic = 'force-dynamic';
+
+import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { useUser } from '@/contexts/UserContext';
 import axios from 'axios';
 import { format, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { motion } from 'framer-motion';
 import { PageContainer, Card, Button } from '../components/layout';
 import { Loader } from '@googlemaps/js-api-loader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
@@ -472,8 +475,6 @@ const modalAnimation = `
 }
 `;
 
-export const dynamic = 'force-dynamic';
-
 const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/'; // 실제 백엔드 이미지 저장 경로의 기본 URL (★ 반드시 실제 경로로 수정 필요)
 
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
@@ -649,6 +650,8 @@ export default function HomePage() {
   const router = useRouter();
   // 인증 관련 상태 추가
   const { user, isLoggedIn, loading: authLoading } = useAuth();
+  // UserContext 사용
+  const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData, getGroupMemberCount } = useUser();
   
   const [userName, setUserName] = useState('사용자');
   const [userLocation, setUserLocation] = useState<Location>({ lat: 37.5642, lng: 127.0016 }); // 기본: 서울
@@ -700,17 +703,15 @@ export default function HomePage() {
   // const [dataFetched, setDataFetched] = useState({ members: false, schedules: false }); // 삭제
   const [isFirstMemberSelectionComplete, setIsFirstMemberSelectionComplete] = useState(false); // 첫번째 멤버 선택 완료 상태 추가
 
-  // 그룹 관련 상태 추가
-  const [userGroups, setUserGroups] = useState<Group[]>([]);
+  // 그룹 관련 상태 - UserContext로 대체됨
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
-  const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
   const [firstMemberSelected, setFirstMemberSelected] = useState(false); // 첫번째 멤버 선택 완료 추적
 
   // Bottom Sheet 상태를 클래스 이름으로 변환
   const getBottomSheetClassName = () => {
     // 로딩 중일 때는 강제로 collapsed 상태로 유지
-    if (authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) {
+    if (authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) {
       return 'bottom-sheet-collapsed';
     }
     
@@ -969,9 +970,9 @@ export default function HomePage() {
   }, []);
 
   // 컴포넌트 마운트 시 그룹 목록 불러오기
-  useEffect(() => {
-    fetchUserGroups();
-  }, []);
+  // useEffect(() => {
+  //   fetchUserGroups();
+  // }, []); // UserContext로 대체되어 제거
 
   // 로그인 상태 확인 및 사용자 정보 초기화
   useEffect(() => {
@@ -1992,37 +1993,6 @@ export default function HomePage() {
   }, [initialWeatherLoaded]); // initialWeatherLoaded를 의존성에 넣어, true가 되면 더 이상 실행되지 않도록 함
                                  // 또는 [] 로 하고 내부에서 initialWeatherLoaded 체크
 
-  // 사용자 그룹 목록 불러오기
-  const fetchUserGroups = async () => {
-    setIsLoadingGroups(true);
-    try {
-      // 로그인된 사용자가 있는 경우 해당 사용자의 그룹 조회, 없으면 mt_idx 1186 사용
-      const currentUser = user || authService.getUserData();
-      const userMtIdx = currentUser?.mt_idx || 1186;
-      
-      console.log('[fetchUserGroups] 사용자 정보:', currentUser);
-      console.log('[fetchUserGroups] 사용자 그룹 조회 시작 - mt_idx:', userMtIdx);
-      
-      // 현재는 groupService.getCurrentUserGroups()가 토큰 기반으로 동작하므로
-      // 실제로는 백엔드에서 토큰의 사용자 정보를 통해 그룹을 조회합니다
-      const groups = await groupService.getCurrentUserGroups();
-      
-      console.log('[fetchUserGroups] 그룹 목록 조회:', groups);
-      setUserGroups(groups);
-      
-      // 첫 번째 그룹을 기본 선택
-      if (groups.length > 0 && !selectedGroupId) {
-        setSelectedGroupId(groups[0].sgt_idx);
-        console.log('[fetchUserGroups] 첫 번째 그룹 자동 선택:', groups[0].sgt_title);
-      }
-    } catch (error) {
-      console.error('[fetchUserGroups] 그룹 목록 조회 실패:', error);
-      setUserGroups([]);
-    } finally {
-      setIsLoadingGroups(false);
-    }
-  };
-
   // 그룹 선택 핸들러 - location/page.tsx와 동일한 패턴으로 수정
   const handleGroupSelect = async (groupId: number) => {
     console.log('[handleGroupSelect] 그룹 선택:', groupId);
@@ -2080,6 +2050,14 @@ export default function HomePage() {
     }
   }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members, dataFetchedRef.current.schedules]);
 
+  // UserContext 데이터가 로딩 완료되면 첫 번째 그룹을 자동 선택
+  useEffect(() => {
+    if (!isUserDataLoading && userGroups.length > 0 && !selectedGroupId) {
+      setSelectedGroupId(userGroups[0].sgt_idx);
+      console.log('[HOME] UserContext에서 첫 번째 그룹 자동 선택:', userGroups[0].sgt_title);
+    }
+  }, [isUserDataLoading, userGroups, selectedGroupId]);
+
   return (
     <>
       <style jsx global>{modalAnimation}</style>
@@ -2090,7 +2068,7 @@ export default function HomePage() {
         className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen relative overflow-hidden"
       >
         {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
-        {!(authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+        {!(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
           <motion.header 
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -2157,13 +2135,13 @@ export default function HomePage() {
         <div 
           className="full-map-container" 
           style={{ 
-            paddingTop: (authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) 
+            paddingTop: (authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) 
               ? '0px' 
               : '64px' 
           }}
         >
           {/* 전체화면 로딩 - 체크리스트 형태 */}
-          {(authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+          {(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
             <div className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
               <div className="text-center max-w-sm mx-auto px-6">
                 {/* 상단 로고 및 제목 */}
@@ -2353,7 +2331,7 @@ export default function HomePage() {
         </div>
 
         {/* 지도 헤더 - 바텀시트 상태에 따라 위치 변경 */}
-        {!(authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+        {!(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
           <div className={`map-header ${getHeaderClassName()}`}>
             {isLocationEnabled && (
               <span className="absolute top-1 right-1 inline-flex items-center justify-center w-2 h-2">
@@ -2370,7 +2348,7 @@ export default function HomePage() {
         )}
         
         {/* 지도 컨트롤 버튼들 - 바텀시트 상태에 따라 위치 변경 */}
-        {!(authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+        {!(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
           <div className={`map-controls ${getControlsClassName()}`}>
             <button 
               onClick={() => updateMapPosition()}
@@ -2386,7 +2364,7 @@ export default function HomePage() {
         )}
 
         {/* Bottom Sheet - 끌어올리거나 내릴 수 있는 패널 */}
-        {!(authLoading || isMapLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
+        {!(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
           <div 
             ref={bottomSheetRef}
             className={`bottom-sheet ${getBottomSheetClassName()}`}
@@ -2442,17 +2420,17 @@ export default function HomePage() {
                           setIsGroupSelectorOpen(!isGroupSelectorOpen);
                         }}
                         className="flex items-center justify-between px-2.5 py-1.5 bg-indigo-50 border border-gray-200 rounded text-xs hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
-                        disabled={isLoadingGroups}
+                        disabled={isUserDataLoading}
                         data-group-selector="true"
                       >
                         <span className="truncate text-gray-700">
-                          {isLoadingGroups 
+                          {isUserDataLoading 
                             ? '로딩 중...' 
                             : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
                           }
                         </span>
                         <div className="ml-1 flex-shrink-0">
-                          {isLoadingGroups ? (
+                          {isUserDataLoading ? (
                             <FiLoader className="animate-spin h-3 w-3 text-gray-400" />
                           ) : (
                             <FiChevronDown className={`text-gray-400 transition-transform duration-200 h-3 w-3 ${isGroupSelectorOpen ? 'rotate-180' : ''}`} />

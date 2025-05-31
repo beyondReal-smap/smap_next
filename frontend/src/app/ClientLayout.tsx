@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { BottomNavBar } from './components/layout';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { UserProvider } from '@/contexts/UserContext';
 
 export default function ClientLayout({
   children,
@@ -22,8 +23,10 @@ export default function ClientLayout({
 
   return (
     <AuthProvider>
-      {children}
-      <BottomNavBar />
+      <UserProvider>
+        {children}
+        <BottomNavBar />
+      </UserProvider>
     </AuthProvider>
   );
 } 

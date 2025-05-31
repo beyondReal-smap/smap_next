@@ -252,7 +252,7 @@ class GroupService {
   /**
    * 사용자의 그룹 목록 조회
    */
-  async getMyGroups(mt_idx: number | string = 1186): Promise<Group[]> {
+  async getMyGroups(mt_idx: number | string): Promise<Group[]> {
     try {
       const response = await apiClient.get(`/groups?mt_idx=${mt_idx}`);
       
