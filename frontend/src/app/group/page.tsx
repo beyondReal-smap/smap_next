@@ -181,6 +181,58 @@ const floatingButtonVariants = {
   tap: { scale: 0.9 }
 };
 
+// 그룹 목록 컨테이너 애니메이션
+const groupListContainerVariants = {
+  hidden: { 
+    opacity: 0,
+    scale: 0.95,
+    y: 30
+  },
+  visible: { 
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      duration: 0.4,
+      ease: [0.25, 0.46, 0.45, 0.94],
+      staggerChildren: 0.08,
+      delayChildren: 0.1
+    }
+  }
+};
+
+// 개별 그룹 카드 애니메이션
+const groupCardVariants = {
+  hidden: { 
+    opacity: 0, 
+    y: 30,
+    scale: 0.9
+  },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.4,
+      ease: [0.25, 0.46, 0.45, 0.94]
+    }
+  },
+  hover: {
+    scale: 1.02,
+    y: -4,
+    transition: {
+      duration: 0.2,
+      ease: "easeOut"
+    }
+  },
+  tap: {
+    scale: 0.98,
+    transition: {
+      duration: 0.1
+    }
+  }
+};
+
 // Group 인터페이스에 sgt_code 추가
 interface ExtendedGroup extends Group {
   sgt_code?: string;
@@ -912,10 +964,9 @@ function GroupPageContent() {
                   ) : filteredGroups.length > 0 ? (
                     <motion.div 
                       className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
-                      variants={cardVariants}
+                      variants={groupListContainerVariants}
                       initial="hidden"
                       animate="visible"
-                      custom={2}
                     >
                       <div className="px-4 py-3 border-b border-gray-100">
                         <h3 className="text-lg font-bold text-gray-900">내 그룹 목록</h3>
@@ -929,12 +980,11 @@ function GroupPageContent() {
                               key={group.sgt_idx}
                               onClick={() => handleGroupSelect(group as ExtendedGroup)}
                               className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-4 cursor-pointer"
-                              whileHover={{ 
-                                scale: 1.02,
-                                backgroundColor: "rgb(224 231 255)"
-                              }}
-                              whileTap={{ scale: 0.98 }}
-                              transition={{ duration: 0.2 }}
+                              variants={groupCardVariants}
+                              initial="hidden"
+                              animate="visible"
+                              whileHover="hover"
+                              whileTap="tap"
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center flex-1 mr-3">
@@ -1005,18 +1055,21 @@ function GroupPageContent() {
             ) : selectedGroup ? (
               <motion.div
                 key="detail"
-                initial={{ opacity: 0, x: 100 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 100 }}
-                transition={{ duration: 0.3 }}
+                initial={{ opacity: 0, x: 100, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -100, scale: 0.95 }}
+                transition={{ 
+                  duration: 0.5,
+                  ease: [0.25, 0.46, 0.45, 0.94]
+                }}
               >
                 {/* 그룹 헤더 카드 */}
                 <div className="mx-4 mt-4 mb-4">
                   <motion.div 
                     className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg relative"
-                    initial={{ y: -50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.1 }}
+                    initial={{ y: 30, opacity: 0, scale: 0.9 }}
+                    animate={{ y: 0, opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
                   >
                     {/* 그룹 액션 메뉴 버튼 */}
                     <div className="absolute top-4 right-4">
@@ -1102,9 +1155,9 @@ function GroupPageContent() {
                   <div className="grid grid-cols-3 gap-3">
                     <motion.div 
                       className="bg-gradient-to-r from-red-300 to-red-300 rounded-xl p-3 text-white text-center shadow-md"
-                      initial={{ y: 20, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: 0.2 }}
+                      initial={{ y: 30, opacity: 0, scale: 0.8 }}
+                      animate={{ y: 0, opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.2, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
                     >
                       <FaUsers className="w-6 h-6 text-red-800 mx-auto mb-1" />
                       {membersLoading ? (
@@ -1123,9 +1176,9 @@ function GroupPageContent() {
                     </motion.div>
                     <motion.div 
                       className="bg-gradient-to-r from-yellow-300 to-yellow-300 rounded-xl p-3 text-white text-center shadow-md"
-                      initial={{ y: 20, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: 0.3 }}
+                      initial={{ y: 30, opacity: 0, scale: 0.8 }}
+                      animate={{ y: 0, opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.3, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
                     >
                       <FaCalendarAlt className="w-6 h-6 text-yellow-800 mx-auto mb-1" />
                       {statsLoading ? (
@@ -1144,9 +1197,9 @@ function GroupPageContent() {
                     </motion.div>
                     <motion.div 
                       className="bg-gradient-to-r from-blue-300 to-blue-300 rounded-xl p-3 text-white text-center shadow-md"
-                      initial={{ y: 20, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: 0.4 }}
+                      initial={{ y: 30, opacity: 0, scale: 0.8 }}
+                      animate={{ y: 0, opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.4, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
                     >
                       <FaMapMarkerAlt className="w-6 h-6 text-blue-600 mx-auto mb-1" />
                       {statsLoading ? (
@@ -1170,9 +1223,9 @@ function GroupPageContent() {
                 <div className="px-4">
                   <motion.div 
                     className="bg-white rounded-2xl shadow-sm border border-indigo-100 overflow-hidden"
-                    initial={{ y: 30, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.5 }}
+                    initial={{ y: 30, opacity: 0, scale: 0.95 }}
+                    animate={{ y: 0, opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.5, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
                   >
                     <div className="p-4 border-b border-indigo-100">
                       <div className="flex items-center justify-between">
