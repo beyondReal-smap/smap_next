@@ -7,8 +7,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format, addDays, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { motion } from 'framer-motion';
 import { PageContainer, Button } from '../components/layout';
-import { FiPlus, FiTrendingUp, FiClock, FiZap, FiPlayCircle } from 'react-icons/fi';
+import { FiPlus, FiTrendingUp, FiClock, FiZap, FiPlayCircle, FiSettings } from 'react-icons/fi';
 import { API_KEYS, MAP_CONFIG } from '../../config'; 
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
@@ -178,6 +179,15 @@ const pageStyles = `
   animation: fadeIn 1s ease-out forwards;
 }
 
+/* glass-effect 스타일 추가 */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+}
+
 .full-map-container {
   position: fixed;
   top: 0;
@@ -324,6 +334,7 @@ export default function LogsPage() {
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true); 
   const [isMapInitializedLogs, setIsMapInitializedLogs] = useState(false); // Logs 페이지용 지도 초기화 상태
+  const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false); // 초기 데이터 로딩 상태 추가
 
   const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'expanded'>('collapsed');
   const bottomSheetRef = useRef<HTMLDivElement>(null);
@@ -337,6 +348,15 @@ export default function LogsPage() {
   const [locationSummary, setLocationSummary] = useState<LocationSummary>(MOCK_LOCATION_SUMMARY);
   const [sliderValue, setSliderValue] = useState(60); // 슬라이더 초기 값 (0-100)
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
+
+  // 초기 데이터 로딩 시뮬레이션
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialDataLoaded(true);
+    }, 1000); // 1초 후 초기 데이터 로딩 완료
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
@@ -684,212 +704,336 @@ export default function LogsPage() {
     <>
       <style jsx global>{pageStyles}</style>
       
-      {/* 전체 화면 로딩 */}
-      {isMapLoading && (
-        <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center">
-          <div className="text-center">
-            {/* 배경 원형 파도 효과 */}
-            <div className="relative flex items-center justify-center mb-8">
-              {[...Array(4)].map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute w-20 h-20 border border-purple-200 rounded-full animate-ping"
-                  style={{
-                    animationDuration: '3s',
-                    animationDelay: `${i * 0.7}s`,
-                    opacity: 0.4
-                  }}
-                />
-              ))}
-              
-              {/* 중앙 로그 아이콘 */}
-              <div className="relative w-20 h-20 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                <svg width="40" height="40" fill="white" viewBox="0 0 24 24">
-                  <path d="M9 4l3 3h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5z"/>
-                </svg>
-              </div>
-            </div>
-            
-            {/* 로딩 텍스트 */}
-            <div className="text-center">
-              <h3 className="text-2xl font-bold text-gray-800 mb-3">로그 데이터를 불러오는 중</h3>
-              <p className="text-gray-600 mb-6">활동 로그와 지도를 준비하고 있습니다...</p>
-              
-              {/* 진행 상태 표시 */}
-              <div className="flex flex-col items-center space-y-3">
-                <div className="flex items-center space-x-4">
-                  <div className="w-3 h-3 rounded-full bg-purple-500 animate-pulse" />
-                  <span className="text-sm text-gray-500">지도 로딩 중</span>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="w-3 h-3 rounded-full bg-gray-300 animate-pulse" style={{animationDelay: '0.2s'}} />
-                  <span className="text-sm text-gray-500">활동 데이터 준비</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <PageContainer title="활동 로그" showHeader={false} showBackButton={false} className="p-0 m-0 w-full h-screen overflow-hidden">
-        <div className="full-map-container"><div ref={mapContainer} className="w-full h-full" /></div>
-
-        <div 
-          ref={bottomSheetRef}
-          className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}
-          // style={{ background: 'linear-gradient(to bottom right, #e0e7ff, #faf5ff, #fdf2f8)' }}
-          onTouchStart={handleDragStart}
-          onTouchMove={handleDragMove}
-          onTouchEnd={handleDragEnd}
-          onMouseDown={handleDragStart}
-          onMouseMove={handleDragMove}
-          onMouseUp={handleDragEnd}
-          onMouseLeave={handleDragEnd}
-        >
-          <div className="bottom-sheet-handle"></div>
-          <div className="px-4 pb-4">
-            <div 
-              ref={logSwipeContainerRef}
-              className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar mb-2 gap-2 bg-white"
-              onScroll={handleLogSwipeScroll}
-            >
-              <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
-                <div className="content-section members-section min-h-[220px] max-h-[220px] overflow-y-auto">
-                  <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
-                    그룹 멤버
-                    <Link href="/group" className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                      <FiPlus className="h-3 w-3 mr-1" />그룹 관리
-                    </Link>
-                  </h2>
-                  {groupMembers.length > 0 ? (
-                    <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
-                      {groupMembers.map((member) => (
-                        <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
-                          <button 
-                            onClick={(e) => handleMemberSelect(member.id, e)}
-                            className={`flex flex-col items-center focus:outline-none`}
-                            style={{ touchAction: 'manipulation' }}
-                          >
-                            <div 
-                              className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
-                                member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
-                              }`}
-                            >
-                              <img 
-                                src={member.photo} 
-                                alt={member.name} 
-                                className="w-full h-full object-cover"
-                                draggable="false"
-                              />
-                            </div>
-                            <span 
-                              className={`block text-xs font-medium mt-1.5 ${
-                                member.isSelected ? 'text-indigo-700' : 'text-gray-700'
-                              }`}
-                            >
-                              {member.name}
-                            </span>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-3 text-gray-500"><p>그룹에 참여한 멤버가 없습니다</p></div>
-                  )}
-                  <div ref={dateScrollContainerRef} className="mt-2 mb-1 flex space-x-2 overflow-x-auto pb-1.5 hide-scrollbar"> {/* mt, mb, pb 조정 */}
-                    {getRecentDays().map((day, idx) => {
-                      let buttonClass = `px-2.5 py-1 rounded-lg flex-shrink-0 focus:outline-none transition-colors text-xs min-w-[75px] h-8 flex flex-col justify-center items-center `;
-                      const isSelected = selectedDate === day.value;
-
-                      if (isSelected) {
-                        buttonClass += 'bg-gray-900 text-white font-semibold shadow-md'; 
-                        if (!day.hasLogs) {
-                           buttonClass += ' line-through cursor-not-allowed'; // opacity-70 제거
-                        }
-                      } else if (day.hasLogs) {
-                        buttonClass += 'bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
-                      } else {
-                        buttonClass += 'bg-gray-100 text-gray-400 line-through cursor-not-allowed font-medium'; // opacity-70 제거, 배경색 조정
-                      }
-
-                      return (
-                        <button 
-                          key={idx} 
-                          onClick={() => day.hasLogs && handleDateSelect(day.value)}
-                          disabled={!day.hasLogs && !isSelected} // 선택된 날짜도 로그 없으면 클릭은 막되, 스타일은 isSelected에서 처리
-                          className={buttonClass}
-                        >
-                          <div className="text-center text-xs whitespace-nowrap">{day.display}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
-                <div className="content-section summary-section min-h-[220px] max-h-[220px] overflow-y-auto flex flex-col">
+      {/* 메인 컨테이너 */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+        className="bg-gradient-to-br from-purple-50 via-white to-pink-50 min-h-screen relative overflow-hidden"
+      >
+        {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
+        {!(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) && (
+          <motion.header 
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed top-0 left-0 right-0 z-20 glass-effect"
+          >
+            <div className="flex items-center justify-between h-16 px-4">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3">
+                  <motion.div
+                    initial={{ rotate: -180, scale: 0 }}
+                    animate={{ rotate: 0, scale: 1 }}
+                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                    className="p-2 bg-indigo-600 rounded-xl"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 text-white stroke-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </motion.div>
                   <div>
-                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-2">
-                      {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 위치기록 요약` : "위치기록 요약"}
+                    <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
+                    <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.header>
+        )}
+        
+        {/* 전체화면 로딩 - 체크리스트 형태 */}
+        {(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) && (
+          <div className="fixed inset-0 z-50 bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center">
+            <div className="text-center max-w-sm mx-auto px-6">
+              {/* 상단 로고 및 제목 */}
+              <div className="mb-6">
+                <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">활동 로그를 준비하고 있습니다</h2>
+                <p className="text-sm text-gray-600">잠시만 기다려주세요...</p>
+              </div>
+
+              {/* 로딩 체크리스트 - 컴팩트 버전 */}
+              <div className="space-y-1">
+                {/* 1. 지도 로딩 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    !isMapLoading 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : 'border-indigo-300 animate-pulse'
+                  }`}>
+                    {!isMapLoading ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    )}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    !isMapLoading ? 'text-green-700' : 'text-gray-700'
+                  }`}>
+                    지도 불러오기
+                  </span>
+                </div>
+
+                {/* 2. 지도 초기화 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    !isMapLoading && isMapInitializedLogs 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : isMapLoading 
+                        ? 'border-gray-300' 
+                        : 'border-purple-300 animate-pulse'
+                  }`}>
+                    {!isMapLoading && isMapInitializedLogs ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : !isMapLoading ? (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    ) : (
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    )}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    !isMapLoading && isMapInitializedLogs ? 'text-green-700' : isMapLoading ? 'text-gray-400' : 'text-gray-700'
+                  }`}>
+                    지도 초기화
+                  </span>
+                </div>
+
+                {/* 3. 활동 데이터 로딩 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    !isMapLoading && isMapInitializedLogs && isInitialDataLoaded 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : (!isMapLoading && isMapInitializedLogs)
+                        ? 'border-purple-300 animate-pulse'
+                        : 'border-gray-300'
+                  }`}>
+                    {!isMapLoading && isMapInitializedLogs && isInitialDataLoaded ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (!isMapLoading && isMapInitializedLogs) ? (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    ) : (
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    )}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    !isMapLoading && isMapInitializedLogs && isInitialDataLoaded ? 'text-green-700' : (!isMapLoading && isMapInitializedLogs) ? 'text-gray-700' : 'text-gray-400'
+                  }`}>
+                    활동 데이터 불러오기
+                  </span>
+                </div>
+              </div>
+
+              {/* 진행률 표시 */}
+              <div className="mt-6">
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="h-2 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full transition-all duration-700 ease-out"
+                    style={{
+                      width: `${
+                        (!isMapLoading ? 33 : 0) +
+                        (!isMapLoading && isMapInitializedLogs ? 34 : 0) +
+                        (!isMapLoading && isMapInitializedLogs && isInitialDataLoaded ? 33 : 0)
+                      }%`
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {(!isMapLoading ? 1 : 0) +
+                   (!isMapLoading && isMapInitializedLogs ? 1 : 0) +
+                   (!isMapLoading && isMapInitializedLogs && isInitialDataLoaded ? 1 : 0)}/3 단계 완료
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 지도 영역 */}
+        <div 
+          className="full-map-container" 
+          style={{ 
+            paddingTop: (isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) 
+              ? '0px' 
+              : '64px' 
+          }}
+        >
+          <div ref={mapContainer} className="w-full h-full" />
+        </div>
+
+        {/* Bottom Sheet */}
+        {!(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) && (
+          <div 
+            ref={bottomSheetRef}
+            className={`bottom-sheet ${getBottomSheetClassName()} hide-scrollbar`}
+            onTouchStart={handleDragStart}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+            onMouseDown={handleDragStart}
+            onMouseMove={handleDragMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
+          >
+            <div className="bottom-sheet-handle"></div>
+            <div className="px-4 pb-4">
+              <div 
+                ref={logSwipeContainerRef}
+                className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar mb-2 gap-2 bg-white"
+                onScroll={handleLogSwipeScroll}
+              >
+                <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
+                  <div className="content-section members-section min-h-[220px] max-h-[220px] overflow-y-auto">
+                    <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title">
+                      그룹 멤버
+                      <Link href="/group" className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        <FiPlus className="h-3 w-3 mr-1" />그룹 관리
+                      </Link>
                     </h2>
-                    <div className="mb-2 px-1 flex items-center">
-                      <FiPlayCircle className="w-6 h-6 text-amber-500 mr-2" />
-                      <h4 className="text-sm font-medium text-gray-700">경로 따라가기</h4>
+                    {groupMembers.length > 0 ? (
+                      <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
+                        {groupMembers.map((member) => (
+                          <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
+                            <button 
+                              onClick={(e) => handleMemberSelect(member.id, e)}
+                              className={`flex flex-col items-center focus:outline-none`}
+                              style={{ touchAction: 'manipulation' }}
+                            >
+                              <div 
+                                className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
+                                  member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
+                                }`}
+                              >
+                                <img 
+                                  src={member.photo} 
+                                  alt={member.name} 
+                                  className="w-full h-full object-cover"
+                                  draggable="false"
+                                />
+                              </div>
+                              <span 
+                                className={`block text-xs font-medium mt-1.5 ${
+                                  member.isSelected ? 'text-indigo-700' : 'text-gray-700'
+                                }`}
+                              >
+                                {member.name}
+                              </span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-3 text-gray-500"><p>그룹에 참여한 멤버가 없습니다</p></div>
+                    )}
+                    <div ref={dateScrollContainerRef} className="mt-2 mb-1 flex space-x-2 overflow-x-auto pb-1.5 hide-scrollbar"> {/* mt, mb, pb 조정 */}
+                      {getRecentDays().map((day, idx) => {
+                        let buttonClass = `px-2.5 py-1 rounded-lg flex-shrink-0 focus:outline-none transition-colors text-xs min-w-[75px] h-8 flex flex-col justify-center items-center `;
+                        const isSelected = selectedDate === day.value;
+
+                        if (isSelected) {
+                          buttonClass += 'bg-gray-900 text-white font-semibold shadow-md'; 
+                          if (!day.hasLogs) {
+                             buttonClass += ' line-through cursor-not-allowed'; // opacity-70 제거
+                          }
+                        } else if (day.hasLogs) {
+                          buttonClass += 'bg-gray-100 text-gray-700 hover:bg-gray-200 font-medium';
+                        } else {
+                          buttonClass += 'bg-gray-100 text-gray-400 line-through cursor-not-allowed font-medium'; // opacity-70 제거, 배경색 조정
+                        }
+
+                        return (
+                          <button 
+                            key={idx} 
+                            onClick={() => day.hasLogs && handleDateSelect(day.value)}
+                            disabled={!day.hasLogs && !isSelected} // 선택된 날짜도 로그 없으면 클릭은 막되, 스타일은 isSelected에서 처리
+                            className={buttonClass}
+                          >
+                            <div className="text-center text-xs whitespace-nowrap">{day.display}</div>
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="px-2 pt-2 mb-6">
-                      <div className="relative w-full h-1.5 bg-gray-200 rounded-full">
-                        <div 
-                          className="absolute top-0 left-0 h-1.5 bg-indigo-600 rounded-full transition-all duration-300 ease-out"
-                          style={{ width: `${sliderValue}%` }} 
-                        ></div>
-                        <div 
-                          className="absolute top-1/2 w-4 h-4 bg-indigo-600 rounded-full border-2 border-white shadow transform -translate-y-1/2 transition-all duration-300 ease-out"
-                          style={{ left: `calc(${sliderValue}% - 8px)` }}
-                        ></div>
+                  </div>
+                </div>
+
+                <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
+                  <div className="content-section summary-section min-h-[220px] max-h-[220px] overflow-y-auto flex flex-col">
+                    <div>
+                      <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-2">
+                        {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 위치기록 요약` : "위치기록 요약"}
+                      </h2>
+                      <div className="mb-2 px-1 flex items-center">
+                        <FiPlayCircle className="w-6 h-6 text-amber-500 mr-2" />
+                        <h4 className="text-sm font-medium text-gray-700">경로 따라가기</h4>
                       </div>
-                    </div>
-                    <div className="flex justify-around text-center px-1">
-                      <div className="flex flex-col items-center">
-                        <FiTrendingUp className="w-6 h-6 text-amber-500 mb-1" />
-                        <p className="text-xs text-gray-500">이동거리</p>
-                        <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.distance}</p>
+                      <div className="px-2 pt-2 mb-6">
+                        <div className="relative w-full h-1.5 bg-gray-200 rounded-full">
+                          <div 
+                            className="absolute top-0 left-0 h-1.5 bg-indigo-600 rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${sliderValue}%` }} 
+                          ></div>
+                          <div 
+                            className="absolute top-1/2 w-4 h-4 bg-indigo-600 rounded-full border-2 border-white shadow transform -translate-y-1/2 transition-all duration-300 ease-out"
+                            style={{ left: `calc(${sliderValue}% - 8px)` }}
+                          ></div>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-center">
-                        <FiClock className="w-6 h-6 text-amber-500 mb-1" />
-                        <p className="text-xs text-gray-500">이동시간</p>
-                        <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.time}</p>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <FiZap className="w-6 h-6 text-amber-500 mb-1" />
-                        <p className="text-xs text-gray-500">걸음 수</p>
-                        <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.steps}</p>
+                      <div className="flex justify-around text-center px-1">
+                        <div className="flex flex-col items-center">
+                          <FiTrendingUp className="w-6 h-6 text-amber-500 mb-1" />
+                          <p className="text-xs text-gray-500">이동거리</p>
+                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.distance}</p>
+                        </div>
+                        <div className="flex flex-col items-center">
+                          <FiClock className="w-6 h-6 text-amber-500 mb-1" />
+                          <p className="text-xs text-gray-500">이동시간</p>
+                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.time}</p>
+                        </div>
+                        <div className="flex flex-col items-center">
+                          <FiZap className="w-6 h-6 text-amber-500 mb-1" />
+                          <p className="text-xs text-gray-500">걸음 수</p>
+                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.steps}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex justify-center items-center pb-2">
-              <button
-                onClick={() => setActiveLogView('members')}
-                className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
-                  activeLogView === 'members' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
-                } transition-all duration-300`}
-                aria-label="멤버 뷰로 전환"
-              />
-              <button
-                onClick={() => setActiveLogView('summary')}
-                className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
-                  activeLogView === 'summary' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
-                } transition-all duration-300`}
-                aria-label="요약 뷰로 전환"
-              />
+              <div className="flex justify-center items-center pb-2">
+                <button
+                  onClick={() => setActiveLogView('members')}
+                  className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
+                    activeLogView === 'members' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
+                  } transition-all duration-300`}
+                  aria-label="멤버 뷰로 전환"
+                />
+                <button
+                  onClick={() => setActiveLogView('summary')}
+                  className={`w-2.5 h-2.5 rounded-full mx-1.5 focus:outline-none ${
+                    activeLogView === 'summary' ? 'bg-indigo-600 scale-110' : 'bg-gray-300'
+                  } transition-all duration-300`}
+                  aria-label="요약 뷰로 전환"
+                />
+              </div>
             </div>
           </div>
-        </div>
-      </PageContainer>
+        )}
+      </motion.div>
     </>
   );
 } 
