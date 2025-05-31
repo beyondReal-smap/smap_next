@@ -1225,130 +1225,141 @@ export default function LocationPage() {
   };
 
   const fetchGroupMembersData = async () => {
-    if (isFetchingGroupMembers) {
-      console.log('[fetchGroupMembersData] 이미 로딩 중입니다. 중복 실행 방지.');
+    if (!selectedGroupId) {
+      console.error('[fetchGroupMembersData] 선택된 그룹이 없습니다.');
       return;
     }
-    
-    setIsFetchingGroupMembers(true);
-    console.log('[fetchGroupMembersData] 시작');
-    
-    try {
-      // 선택된 그룹이 있으면 해당 그룹의 멤버를 불러오고, 없으면 기본 그룹 사용
-      const groupIdToUse = selectedGroupId ? selectedGroupId.toString() : '641';
-      console.log('[fetchGroupMembersData] 사용할 그룹 ID:', groupIdToUse);
-      
-      const memberData = await memberService.getGroupMembers(groupIdToUse);
-      console.log('[fetchGroupMembersData] API 응답:', memberData);
 
-      if (memberData && memberData.length > 0) {
-        // 첫 번째 멤버를 자동으로 선택된 상태로 설정
-        const convertedMembers: GroupMember[] = memberData.map((member: any, index: number) => {
-          return {
+    setIsFetchingGroupMembers(true);
+    setIsFirstMemberSelectionComplete(false);
+    const startTime = Date.now();
+
+    try {
+      console.log('[fetchGroupMembersData] 시작, 그룹ID:', selectedGroupId);
+      const membersData = await memberService.getGroupMembers(selectedGroupId.toString());
+      console.log('[fetchGroupMembersData] 멤버 데이터 조회 완료:', membersData);
+
+      if (membersData && membersData.length > 0) {
+        // 최소 로딩 시간을 보장하면서 데이터 처리
+        const elapsedTime = Date.now() - startTime;
+        const minLoadingTime = 1500;
+        const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
+
+        setTimeout(async () => {
+          const convertedMembers = membersData.map((member: any, index: number) => ({
             id: member.mt_idx.toString(),
-            name: member.mt_name || `멤버 ${index + 1}`,
-            photo: null, // 항상 null로 설정하여 로컬 이미지 사용
-            isSelected: index === 0, // 첫 번째 멤버를 기본 선택
-            location: { 
-              // 최신 위치 정보가 있으면 사용, 없으면 기본 위치 사용
-              lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
-                ? parseFloat(member.mlt_lat.toString()) 
-                : parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
-              lng: member.mlt_long !== null && member.mlt_long !== undefined 
-                ? parseFloat(member.mlt_long.toString()) 
-                : parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
+            name: member.mt_name || member.mt_nickname || '이름 없음',
+            photo: member.mt_file1,
+            isSelected: index === 0,
+            location: {
+              lat: parseFloat(String(member.mlt_lat || '37.5665')) || 37.5665,
+              lng: parseFloat(String(member.mlt_long || '126.9780')) || 126.9780
             },
-            schedules: [], 
+            schedules: [],
             savedLocations: [],
-            mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
+            mt_gender: member.mt_gender,
             original_index: index,
-            
-            // 새로 추가된 위치 정보
             mlt_lat: member.mlt_lat,
             mlt_long: member.mlt_long,
             mlt_speed: member.mlt_speed,
             mlt_battery: member.mlt_battery,
             mlt_gps_time: member.mlt_gps_time,
-            
-            // 그룹 권한 정보
             sgdt_owner_chk: member.sgdt_owner_chk,
-            sgdt_leader_chk: member.sgdt_leader_chk
-          };
-        });
+            sgdt_leader_chk: member.sgdt_leader_chk,
+          }));
 
-        // 첫 번째 멤버를 선택된 멤버로 설정
-        if (convertedMembers.length > 0) {
-          selectedMemberIdRef.current = convertedMembers[0].id;
-          console.log('[fetchGroupMembersData] 첫 번째 멤버 선택 상태 설정:', convertedMembers[0].name, convertedMembers[0].id);
-        }
+          // selectedMemberIdRef 업데이트
+          if (convertedMembers.length > 0) {
+            setSelectedMemberIdRef({ current: convertedMembers[0].id });
+          }
 
-        setGroupMembers(convertedMembers);
-        setIsFirstMemberSelectionComplete(true);
-        console.log('[fetchGroupMembersData] 그룹멤버 설정 완료:', convertedMembers.length, '명');
-        
-        // 첫 번째 멤버의 장소 데이터 즉시 로드
-        if (convertedMembers.length > 0) {
-          console.log('[fetchGroupMembersData] 첫 번째 멤버 장소 데이터 로드 시작:', convertedMembers[0].name);
-          setTimeout(async () => {
-            try {
-              setIsLoadingOtherLocations(true);
-              const memberLocationsRaw = await locationService.getOtherMembersLocations(convertedMembers[0].id);
-              console.log("[fetchGroupMembersData] 첫 번째 멤버 장소 조회 완료:", memberLocationsRaw.length, '개');
-              
-              // LocationData 형식으로 변환
-              const convertedLocations = memberLocationsRaw.map(loc => ({
-                id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
-                name: loc.name || loc.slt_title || '제목 없음',
-                address: loc.address || loc.slt_add || '주소 정보 없음',
-                coordinates: [
-                  parseFloat(String(loc.slt_long || '0')) || 0,
-                  parseFloat(String(loc.slt_lat || '0')) || 0
-                ] as [number, number],
-                category: loc.category || '기타',
-                memo: loc.memo || '',
-                favorite: loc.favorite || false,
-                notifications: loc.notifications !== undefined ? loc.notifications : ((loc as any).slt_enter_alarm === 'Y' || (loc as any).slt_enter_alarm === undefined)
-              }));
-              
-              // 상태 업데이트
-              setSelectedMemberSavedLocations(convertedLocations);
-              setOtherMembersSavedLocations(memberLocationsRaw);
-              setActiveView('selectedMemberPlaces');
-              
-              // 그룹멤버 상태에도 저장
-              setGroupMembers(prevMembers => 
-                prevMembers.map((member, index) => 
-                  index === 0 
-                    ? { ...member, savedLocations: convertedLocations }
-                    : member
-                )
-              );
-              
-            } catch (error) {
-              console.error('[fetchGroupMembersData] 첫 번째 멤버 장소 로드 실패:', error);
-              setSelectedMemberSavedLocations([]);
-              setOtherMembersSavedLocations([]);
-            } finally {
-              setIsLoadingOtherLocations(false);
-            }
-          }, 100); // 약간의 지연을 두어 상태 업데이트 완료 후 실행
-        }
-    } else {
+          setGroupMembers(convertedMembers);
+          console.log('[fetchGroupMembersData] 그룹멤버 설정 완료:', convertedMembers.length, '명');
+          
+          // 첫 번째 멤버의 장소 데이터 즉시 로드
+          if (convertedMembers.length > 0) {
+            console.log('[fetchGroupMembersData] 첫 번째 멤버 장소 데이터 로드 시작:', convertedMembers[0].name);
+            setTimeout(async () => {
+              try {
+                setIsLoadingOtherLocations(true);
+                const memberLocationsRaw = await locationService.getOtherMembersLocations(convertedMembers[0].id);
+                console.log("[fetchGroupMembersData] 첫 번째 멤버 장소 조회 완료:", memberLocationsRaw.length, '개');
+                
+                // LocationData 형식으로 변환
+                const convertedLocations = memberLocationsRaw.map(loc => ({
+                  id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
+                  name: loc.name || loc.slt_title || '제목 없음',
+                  address: loc.address || loc.slt_add || '주소 정보 없음',
+                  coordinates: [
+                    parseFloat(String(loc.slt_long || '0')) || 0,
+                    parseFloat(String(loc.slt_lat || '0')) || 0
+                  ] as [number, number],
+                  category: loc.category || '기타',
+                  memo: loc.memo || '',
+                  favorite: loc.favorite || false,
+                  notifications: loc.notifications !== undefined ? loc.notifications : ((loc as any).slt_enter_alarm === 'Y' || (loc as any).slt_enter_alarm === undefined)
+                }));
+                
+                // 상태 업데이트
+                setSelectedMemberSavedLocations(convertedLocations);
+                setOtherMembersSavedLocations(memberLocationsRaw);
+                setActiveView('selectedMemberPlaces');
+                
+                // 그룹멤버 상태에도 저장
+                setGroupMembers(prevMembers => 
+                  prevMembers.map((member, index) => 
+                    index === 0 
+                      ? { ...member, savedLocations: convertedLocations }
+                      : member
+                  )
+                );
+                
+              } catch (error) {
+                console.error('[fetchGroupMembersData] 첫 번째 멤버 장소 로드 실패:', error);
+                setSelectedMemberSavedLocations([]);
+                setOtherMembersSavedLocations([]);
+              } finally {
+                setIsLoadingOtherLocations(false);
+              }
+            }, 100); // 약간의 지연을 두어 상태 업데이트 완료 후 실행
+          }
+
+          setIsFirstMemberSelectionComplete(true);
+          setIsFetchingGroupMembers(false);
+          setIsLoading(false);
+        }, remainingTime);
+      } else {
         console.warn('[fetchGroupMembersData] 그룹멤버 데이터가 없거나 비어있습니다.');
-        setGroupMembers([]); 
-        // 그룹멤버가 없으면 첫번째 멤버 선택 완료 상태를 true로 설정
-        setIsFirstMemberSelectionComplete(true);
+        
+        // 로딩 시간 보장
+        const elapsedTime = Date.now() - startTime;
+        const minLoadingTime = 1500;
+        const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
+
+        setTimeout(() => {
+          setGroupMembers([]); 
+          setIsFirstMemberSelectionComplete(true);
+          setIsFetchingGroupMembers(false);
+          setIsLoading(false);
+        }, remainingTime);
       }
-      } catch (error) {
+    } catch (error) {
       console.error('[fetchGroupMembersData] 오류:', error);
-      setGroupMembers([]); 
-      // 오류 시에도 첫번째 멤버 선택 완료 상태를 true로 설정
-      setIsFirstMemberSelectionComplete(true);
-    } finally {
-      setIsFetchingGroupMembers(false);
-      setIsLoading(false); // 그룹멤버 렌더링을 위해 isLoading도 false로 설정
-      console.log('[fetchGroupMembersData] 완료');
+      
+      // 오류 시에도 로딩 시간 보장
+      const elapsedTime = Date.now() - startTime;
+      const minLoadingTime = 1500;
+      const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
+
+      setTimeout(() => {
+        setGroupMembers([]); 
+        setIsFirstMemberSelectionComplete(true);
+        setIsFetchingGroupMembers(false);
+        setIsLoading(false);
+      }, remainingTime);
     }
+    
+    console.log('[fetchGroupMembersData] 완료');
   };
 
   // 멤버 선택 핸들러
@@ -2876,9 +2887,9 @@ export default function LocationPage() {
           </div>
         </motion.header>
 
-        {/* 전체화면 로딩 */}
-        {/* <AnimatePresence>
-        {(isMapLoading || isFetchingGroupMembers || !isFirstMemberSelectionComplete) && (
+        {/* 전체화면 로딩 - 지도 로딩만 */}
+        <AnimatePresence>
+        {isMapLoading && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2886,34 +2897,57 @@ export default function LocationPage() {
               className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center"
             >
               <motion.div 
-                variants={staggerContainer}
-                initial="hidden"
-                animate="visible"
                 className="text-center"
               >
-                <motion.div
-                  variants={staggerItem}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                  className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl flex items-center justify-center">
-                  <FiMapPin className="w-full h-full text-white" />
-                </motion.div>
+                {/* 배경 원형 파도 효과 */}
+                <div className="relative flex items-center justify-center mb-6">
+                  {[...Array(3)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="absolute w-16 h-16 border border-indigo-200 rounded-full"
+                      animate={{
+                        scale: [1, 2, 1],
+                        opacity: [0.6, 0, 0.6],
+                      }}
+                      transition={{
+                        duration: 2.5,
+                        repeat: Infinity,
+                        delay: i * 0.8,
+                        ease: "easeInOut"
+                      }}
+                    />
+                  ))}
+                  
+                  {/* 중앙 지도 아이콘 */}
+                  <motion.div
+                    className="relative w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg"
+                    animate={{
+                      scale: [1, 1.1, 1]
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    <FiMapPin className="w-8 h-8 text-white" />
+                  </motion.div>
+                </div>
                 
-                <motion.div variants={staggerItem}>
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">
-                    {isMapLoading 
-                      ? "지도를 불러오는 중입니다" 
-                : isFetchingGroupMembers 
-                        ? "데이터를 불러오는 중입니다"
-                        : "첫번째 멤버 위치로 이동 중입니다"
-                    }
-                  </h3>
+                {/* 로딩 텍스트 */}
+                <motion.div 
+                  className="text-center"
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  <h3 className="text-xl font-bold text-gray-800 mb-2">지도를 불러오는 중입니다</h3>
                   <p className="text-gray-600">잠시만 기다려주세요...</p>
                 </motion.div>
               </motion.div>
             </motion.div>
           )}
-        </AnimatePresence> */}
+        </AnimatePresence>
         
         {/* 지도 컨테이너 */}
         <motion.div 
@@ -3360,15 +3394,55 @@ export default function LocationPage() {
                   </div>
 
                    {isLoading ? (
-                      <div className="text-center py-8 text-gray-500">
+                      <motion.div 
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex flex-col items-center justify-center py-8"
+                      >
+                        {/* 배경 원형 파도 효과 */}
+                        <div className="relative flex items-center justify-center mb-4">
+                          {[...Array(3)].map((_, i) => (
+                            <motion.div
+                              key={i}
+                              className="absolute w-12 h-12 border border-indigo-200 rounded-full"
+                              animate={{
+                                scale: [1, 2, 1],
+                                opacity: [0.6, 0, 0.6],
+                              }}
+                              transition={{
+                                duration: 2,
+                                repeat: Infinity,
+                                delay: i * 0.6,
+                                ease: "easeInOut"
+                              }}
+                            />
+                          ))}
+                          
+                          {/* 중앙 그룹 아이콘 */}
+                          <motion.div
+                            className="relative w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg"
+                            animate={{
+                              scale: [1, 1.1, 1]
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              ease: "easeInOut"
+                            }}
+                          >
+                            <FiUser className="w-6 h-6 text-white" />
+                          </motion.div>
+                        </div>
+                        
                         <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-10 h-10 mx-auto mb-4 bg-gradient-to-r from-pink-600 to-pink-700 rounded-xl flex items-center justify-center">
-                          <FiLoader className="w-5 h-5 text-white" />
+                          initial={{ y: 10, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          transition={{ delay: 0.3 }}
+                        >
+                          <p className="font-medium text-gray-900 mb-1">멤버 정보를 불러오는 중...</p>
+                          <p className="text-sm text-gray-600">잠시만 기다려주세요</p>
                         </motion.div>
-                        <p className="font-medium">멤버 정보를 불러오는 중...</p>
-                    </div>
+                      </motion.div>
                    ) : groupMembers.length > 0 ? (
                       <motion.div 
                         variants={staggerContainer}

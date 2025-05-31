@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, getCurrentUserId } from '@/lib/auth';
 
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;
@@ -10,8 +11,15 @@ try {
 
 export async function GET(request: NextRequest) {
   try {
+    // 인증 확인
+    const { user, unauthorized } = requireAuth(request);
+    if (unauthorized) {
+      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    }
+    
     const searchParams = request.nextUrl.searchParams;
-    const mt_idx = searchParams.get('mt_idx') || '1186'; // 기본값 1186
+    // mt_idx는 인증된 사용자 ID 사용 (현재는 하드코딩된 1186)
+    const mt_idx = getCurrentUserId(request)?.toString() || '1186';
 
     console.log('[Groups API] 그룹 목록 조회 요청:', { mt_idx });
 
@@ -115,6 +123,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // 인증 확인
+    const { user, unauthorized } = requireAuth(request);
+    if (unauthorized) {
+      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    }
+    
     const body = await request.json();
     console.log('[Groups API] 그룹 생성 요청:', body);
 

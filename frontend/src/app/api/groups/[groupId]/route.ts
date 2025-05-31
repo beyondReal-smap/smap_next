@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, getCurrentUserId } from '@/lib/auth';
 
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;
 try {
   nodeFetch = require('node-fetch');
 } catch (e) {
-  console.log('[Group Update API] node-fetch 패키지를 찾을 수 없음');
+  console.log('[Group API] node-fetch 패키지를 찾을 수 없음');
 }
 
 async function fetchWithFallback(url: string, options: RequestInit): Promise<any> {
@@ -59,6 +60,12 @@ export async function PUT(
   const { groupId } = await params;
   
   try {
+    // 인증 확인
+    const { user, unauthorized } = requireAuth(request);
+    if (unauthorized) {
+      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    }
+    
     const body = await request.json();
     console.log('[Group Update API] 그룹 업데이트 요청:', { groupId, body });
 
@@ -119,6 +126,12 @@ export async function DELETE(
   const { groupId } = await params;
   
   try {
+    // 인증 확인
+    const { user, unauthorized } = requireAuth(request);
+    if (unauthorized) {
+      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    }
+    
     console.log('[Group Delete API] 그룹 소프트 삭제 요청:', { groupId });
     console.log('[Group Delete API] ⚠️ 중요: 실제 삭제가 아닌 sgt_show=N 업데이트 실행');
 

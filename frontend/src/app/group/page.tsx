@@ -292,6 +292,8 @@ function GroupPageContent() {
   const fetchGroups = async () => {
     try {
       setLoading(true);
+      const startTime = Date.now();
+      
       const data = await groupService.getCurrentUserGroups();
       setGroups(data);
 
@@ -306,11 +308,22 @@ function GroupPageContent() {
         }
       }
       setGroupMemberCounts(memberCounts);
+      
+      // 로딩 애니메이션을 최소 1.5초간 보여주기 위해 지연 처리
+      const elapsedTime = Date.now() - startTime;
+      const minLoadingTime = 1500;
+      const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
+      
+      setTimeout(() => {
+        setLoading(false);
+      }, remainingTime);
     } catch (error) {
       console.error('그룹 목록 조회 오류:', error);
       setGroups([]);
-    } finally {
-      setLoading(false);
+      // 오류 시에도 최소 시간 보장
+      setTimeout(() => {
+        setLoading(false);
+      }, 1500);
     }
   };
 
@@ -844,7 +857,59 @@ function GroupPageContent() {
 
                 {/* 그룹 목록 */}
                 <div className="px-4 space-y-3">
-                  {filteredGroups.length > 0 ? (
+                  {loading ? (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex flex-col items-center justify-center py-12"
+                    >
+                      {/* 배경 원형 파도 효과 */}
+                      <div className="relative flex items-center justify-center mb-6">
+                        {[...Array(3)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            className="absolute w-16 h-16 border border-indigo-200 rounded-full"
+                            animate={{
+                              scale: [1, 2, 1],
+                              opacity: [0.6, 0, 0.6],
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              delay: i * 0.6,
+                              ease: "easeInOut"
+                            }}
+                          />
+                        ))}
+                        
+                        {/* 중앙 그룹 아이콘 */}
+                        <motion.div
+                          className="relative w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center"
+                          animate={{
+                            scale: [1, 1.1, 1]
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                        >
+                          <FaUsers className="w-8 h-8 text-white" />
+                        </motion.div>
+                      </div>
+                      
+                      {/* 로딩 텍스트 */}
+                      <motion.div 
+                        className="text-center"
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.5 }}
+                      >
+                        <h3 className="text-lg font-medium text-gray-900 mb-1">그룹을 불러오는 중...</h3>
+                        <p className="text-gray-500 text-sm">잠시만 기다려주세요</p>
+                      </motion.div>
+                    </motion.div>
+                  ) : filteredGroups.length > 0 ? (
                     <motion.div 
                       className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
                       variants={cardVariants}
@@ -853,7 +918,7 @@ function GroupPageContent() {
                       custom={2}
                     >
                       <div className="px-4 py-3 border-b border-gray-100">
-                        <h3 className="text-lg font-medium text-gray-900">내 그룹 목록</h3>
+                        <h3 className="text-lg font-bold text-gray-900">내 그룹 목록</h3>
                       </div>
                       <div className="p-4 space-y-3">
                         {filteredGroups.map((group, index) => {

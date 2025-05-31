@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, getCurrentUserId } from '@/lib/auth';
 
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;
@@ -13,8 +14,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  
   try {
-    const backendUrl = `https://118.67.130.71:8000/api/v1/groups/member/${id}`;
+    // 인증 확인
+    const { user, unauthorized } = requireAuth(request);
+    if (unauthorized) {
+      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    }
+    
+    // id는 인증된 사용자 ID 사용 (현재는 하드코딩된 1186)
+    const userId = getCurrentUserId(request)?.toString() || id;
+    
+    console.log('[API PROXY] 그룹 멤버 조회 요청:', { originalId: id, userId });
+    
+    const backendUrl = `https://118.67.130.71:8000/api/v1/groups/member/${userId}`;
     
     console.log('[API PROXY] 백엔드 호출:', backendUrl);
     

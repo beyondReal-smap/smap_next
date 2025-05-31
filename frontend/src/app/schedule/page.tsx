@@ -32,7 +32,7 @@ import {
   FiXCircle,
   FiInfo
 } from 'react-icons/fi';
-import { HiSparkles } from 'react-icons/hi2';
+import { HiSparkles, HiCalendarDays, HiArrowPath, HiBell, HiUserGroup } from 'react-icons/hi2';
 import { FaTrash, FaCrown } from 'react-icons/fa';
 import Image from 'next/image';
 import memberService from '@/services/memberService';
@@ -700,6 +700,10 @@ export default function SchedulePage() {
   const [monthlyCache, setMonthlyCache] = useState<Map<string, ScheduleEvent[]>>(new Map());
   const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
 
+  // 초기 로딩 상태 추가
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [hasInitialDataLoaded, setHasInitialDataLoaded] = useState(false);
+
   // 로컬 스토리지 키 상수
   const CACHE_PREFIX = 'schedule_cache_';
   const LOADED_MONTHS_KEY = 'schedule_loaded_months';
@@ -848,13 +852,34 @@ export default function SchedulePage() {
 
   // 컴포넌트 마운트 감지
   useEffect(() => {
-    document.body.style.overflowX = 'hidden';
-    document.documentElement.style.overflowX = 'hidden';
+    console.log('[useEffect] 스케줄 페이지 초기화 시작');
     
-    // 로컬 스토리지에서 캐시 데이터 로드
+    // 개발 환경에서 페이지 로드 시 캐시 초기화
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[useEffect] 🔧 개발 환경 감지 - 캐시 초기화 실행');
+      clearCacheFromStorage();
+      setMonthlyCache(new Map());
+      setLoadedMonths(new Set());
+      console.log('[useEffect] 🗑️ 개발 환경에서 모든 캐시 초기화 완료');
+    } else {
+      // 프로덕션 환경에서는 버전 체크를 통한 캐시 무효화
+      const currentVersion = '1.0.0'; // 앱 버전
+      const storedVersion = localStorage.getItem('scheduleAppVersion');
+      
+      if (storedVersion !== currentVersion) {
+        console.log('[useEffect] 🔄 앱 버전 변경 감지 - 캐시 초기화');
+        clearCacheFromStorage();
+        setMonthlyCache(new Map());
+        setLoadedMonths(new Set());
+        localStorage.setItem('scheduleAppVersion', currentVersion);
+        console.log('[useEffect] 🗑️ 버전 업데이트로 인한 캐시 초기화 완료');
+      }
+    }
+    
+    // 로컬 스토리지에서 캐시 로드
     loadCacheFromStorage();
     
-    // 개발자 도구에서 캐시 상태 확인을 위한 디버그 함수 추가
+    // 디버그 함수를 window 객체에 추가
     if (typeof window !== 'undefined') {
       (window as any).scheduleCache = {
         getStats: getCacheStats,
@@ -862,22 +887,47 @@ export default function SchedulePage() {
         clearOldCache: clearOldCacheFromStorage,
         getLoadedMonths: () => Array.from(loadedMonths),
         getCacheSize: () => monthlyCache.size,
-        getCacheData: (monthKey: string) => monthlyCache.get(monthKey) || null
+        forceLoad: (year: number, month: number) => loadAllGroupSchedules(year, month)
       };
     }
-    
-    // 그룹 데이터 로드 (스케줄 로드는 별도 useEffect에서 처리)
+
     const loadData = async () => {
       await fetchUserGroups();
     };
     
     loadData();
     
+    // 페이지 가시성 변경 감지 (탭 전환 등)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('[visibilityChange] 페이지가 다시 활성화됨');
+        // 개발 환경에서는 페이지 활성화 시에도 캐시 체크
+        if (process.env.NODE_ENV === 'development') {
+          const lastUpdate = localStorage.getItem('scheduleLastUpdate');
+          const now = Date.now().toString();
+          
+          // 마지막 업데이트 후 1분이 지났으면 캐시 초기화
+          if (!lastUpdate || (Date.now() - parseInt(lastUpdate)) > 60000) {
+            console.log('[visibilityChange] 🔄 개발 환경에서 캐시 갱신');
+            clearCacheFromStorage();
+            setMonthlyCache(new Map());
+            setLoadedMonths(new Set());
+            localStorage.setItem('scheduleLastUpdate', now);
+          }
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
     return () => {
       document.body.style.overflowX = '';
       document.documentElement.style.overflowX = '';
       // 컴포넌트 언마운트 시 body 스크롤 복원
       document.body.style.overflow = '';
+      
+      // 이벤트 리스너 정리
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       
       // 디버그 함수 정리
       if (typeof window !== 'undefined') {
@@ -2181,14 +2231,24 @@ export default function SchedulePage() {
           console.log('[SCHEDULE] 선택된 날짜 유지:', selectedDay?.format('YYYY-MM-DD'));
         }
         
-        return; // 캐시된 데이터 사용 시 API 호출 생략
+        // 초기 로딩 완료 처리
+        if (!hasInitialDataLoaded) {
+          setHasInitialDataLoaded(true);
+          // 로딩 애니메이션을 최소 1.5초간 보여주기 위해 지연 처리
+          setTimeout(() => {
+            setIsInitialLoading(false);
+          }, 1500);
+        }
+        
+        return; // 캐시된 데이터 사용 시 API 호출 없이 종료
       }
-      
+
       console.log('[SCHEDULE] 캐시된 데이터 없음, API 호출 시작');
       
       // 새로운 API 사용: 오너 그룹의 모든 멤버 스케줄을 월별로 조회
       const response = await scheduleService.getOwnerGroupsAllSchedules(year, month);
-      
+      console.log('[SCHEDULE] API 응답:', response);
+
       if (response.success && response.data?.schedules) {
         console.log('[SCHEDULE] 조회 성공:', {
           totalSchedules: response.data.totalSchedules,
@@ -2456,11 +2516,29 @@ export default function SchedulePage() {
         // 로컬 스토리지에도 저장
         saveCacheToStorage(cacheKey, allEvents);
         
+        // 초기 로딩 완료 처리
+        if (!hasInitialDataLoaded) {
+          setHasInitialDataLoaded(true);
+          // 로딩 애니메이션을 최소 1.5초간 보여주기 위해 지연 처리
+          setTimeout(() => {
+            setIsInitialLoading(false);
+          }, 1500);
+        }
+        
       } else {
         console.log('[loadAllGroupSchedules] 오너 그룹 스케줄 조회 실패 또는 데이터 없음:', response);
         // keepSelectedDate가 true인 경우(월 변경) 기존 events 유지, 아니면 빈 배열로 설정
         if (!keepSelectedDate) {
           setEvents([]);
+        }
+        
+        // 초기 로딩 완료 처리 (데이터가 없어도 로딩은 완료)
+        if (!hasInitialDataLoaded) {
+          setHasInitialDataLoaded(true);
+          // 로딩 애니메이션을 최소 1.5초간 보여주기 위해 지연 처리
+          setTimeout(() => {
+            setIsInitialLoading(false);
+          }, 1500);
         }
       }
       
@@ -2469,6 +2547,15 @@ export default function SchedulePage() {
       // keepSelectedDate가 true인 경우(월 변경) 기존 events 유지, 아니면 빈 배열로 설정  
       if (!keepSelectedDate) {
         setEvents([]);
+      }
+      
+      // 초기 로딩 완료 처리 (에러가 발생해도 로딩은 완료)
+      if (!hasInitialDataLoaded) {
+        setHasInitialDataLoaded(true);
+        // 로딩 애니메이션을 최소 1.5초간 보여주기 위해 지연 처리
+        setTimeout(() => {
+          setIsInitialLoading(false);
+        }, 1500);
       }
     }
   };
@@ -3198,7 +3285,7 @@ export default function SchedulePage() {
 
                               {/* 제목 */}
                               <div className="mb-4">
-                                <h3 className="pl-2 text-2xl font-bold text-gray-900 leading-tight" style={{ wordBreak: 'keep-all' }}>
+                                <h3 className="pl-2 text-lg font-normal text-gray-900 leading-tight" style={{ wordBreak: 'keep-all' }}>
                                   {event.title}
                                 </h3>
                                 {event.content && (
@@ -3212,9 +3299,9 @@ export default function SchedulePage() {
                               {event.locationName && (
                                 <div className="mb-4 bg-blue-50 rounded-xl p-4 pl-0 pr-4">
                                   <div className="space-y-1 pl-4">
-                                    <h4 className="text-lg font-bold text-blue-900" style={{ wordBreak: 'keep-all' }}>
+                                    <div className="text-base font-bold text-blue-900" style={{ wordBreak: 'keep-all' }}>
                                       {event.locationName}
-                                    </h4>
+                                    </div>
                                     {event.locationAddress && (
                                       <p className="text-sm text-blue-700" style={{ wordBreak: 'keep-all' }}>
                                         {event.locationAddress}
@@ -3341,11 +3428,75 @@ export default function SchedulePage() {
                     </motion.div>
                   ) : (
                     <div className="text-center py-12">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <FiCalendar className="w-8 h-8 text-gray-400" />
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-1">일정이 없습니다</h3>
-                      <p className="text-gray-500 text-sm">새로운 일정을 추가해보세요</p>
+                      {isInitialLoading ? (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="relative"
+                        >
+                          {/* 배경 원형 파도 효과 */}
+                          <div className="relative flex items-center justify-center mb-6">
+                            {[...Array(3)].map((_, i) => (
+                              <motion.div
+                                key={i}
+                                className="absolute w-16 h-16 border border-indigo-200 rounded-full"
+                                animate={{
+                                  scale: [1, 2, 1],
+                                  opacity: [0.6, 0, 0.6],
+                                }}
+                                transition={{
+                                  duration: 2,
+                                  repeat: Infinity,
+                                  delay: i * 0.6,
+                                  ease: "easeInOut"
+                                }}
+                              />
+                            ))}
+                            
+                            {/* 중앙 캘린더 아이콘 */}
+                            <motion.div
+                              className="relative w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center"
+                              animate={{
+                                scale: [1, 1.1, 1]
+                              }}
+                              transition={{
+                                duration: 2,
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                              }}
+                            >
+                              <FiCalendar className="w-8 h-8 text-white" />
+                            </motion.div>
+                          </div>
+                          
+                          {/* 로딩 텍스트 */}
+                          <motion.div 
+                            className="text-center"
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            transition={{ delay: 0.5 }}
+                          >
+                            <h3 className="text-lg font-medium text-gray-900 mb-1">일정을 불러오는 중...</h3>
+                            <p className="text-gray-500 text-sm">잠시만 기다려주세요</p>
+                          </motion.div>
+                        </motion.div>
+                      ) : (
+                        <>
+                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <FiCalendar className="w-8 h-8 text-gray-400" />
+                          </div>
+                          <h3 className="text-lg font-medium text-gray-900 mb-1">일정이 없습니다</h3>
+                          <p className="text-gray-500 text-sm">새로운 일정을 추가해보세요</p>
+                          <motion.button
+                            onClick={handleOpenAddEventModal}
+                            className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            새 일정 추가
+                          </motion.button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -3373,15 +3524,15 @@ export default function SchedulePage() {
         {/* 일정 추가/수정 모달 */}
         <AnimatePresence>
           {isAddEventModalOpen && (
-            <motion.div 
+                        <motion.div
               className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
               onClick={closeAddModal}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-            >
-              <motion.div 
+                        >
+                              <motion.div
                 className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col"
                 onClick={e => e.stopPropagation()}
                 onWheel={e => e.stopPropagation()}
@@ -3805,7 +3956,7 @@ export default function SchedulePage() {
         {/* 반복 설정 모달 */}
         <AnimatePresence>
           {isRepeatModalOpen && (
-            <motion.div 
+                              <motion.div
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
               onClick={() => setIsRepeatModalOpen(false)}
               initial={{ opacity: 0 }}
@@ -3955,15 +4106,15 @@ export default function SchedulePage() {
                     )}
                   </div>
                 </div>
-              </motion.div>
+                              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
-
+                              
         {/* 알림 설정 모달 */}
         <AnimatePresence>
           {isAlarmModalOpen && (
-            <motion.div 
+                              <motion.div
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
               onClick={() => setIsAlarmModalOpen(false)}
               initial={{ opacity: 0 }}
@@ -4018,15 +4169,15 @@ export default function SchedulePage() {
                     취소
                   </button>
                 </div>
-              </motion.div>
+                              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
-
+                              
         {/* 날짜 및 시간 설정 모달 */}
         <AnimatePresence>
           {isDateTimeModalOpen && (
-            <motion.div 
+                              <motion.div
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
               onClick={() => setIsDateTimeModalOpen(false)}
               initial={{ opacity: 0 }}
@@ -4179,7 +4330,7 @@ export default function SchedulePage() {
                     </button>
                   </div>
                 </div>
-              </motion.div>
+                              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -4223,9 +4374,9 @@ export default function SchedulePage() {
                     </div>
                     <div className="text-sm text-green-600 mt-1">
                       {selectedHour < 12 ? '오전' : '오후'} {selectedHour === 0 ? 12 : selectedHour > 12 ? (selectedHour - 12).toString().padStart(2, '0') : selectedHour.toString().padStart(2, '0')}시 {selectedMinute.toString().padStart(2, '0')}분
-                    </div>
-                  </div>
-
+                            </div>
+                          </div>
+                          
                   {/* 시간 선택 영역 */}
                   <div className="grid grid-cols-2 gap-4 mb-6">
                     {/* 시간 선택 */}
@@ -4327,7 +4478,7 @@ export default function SchedulePage() {
         {/* 장소 검색 모달 */}
         <AnimatePresence>
           {isLocationSearchModalOpen && (
-            <motion.div 
+                          <motion.div 
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
               onClick={() => setIsLocationSearchModalOpen(false)}
               initial={{ opacity: 0 }}
@@ -4887,7 +5038,7 @@ export default function SchedulePage() {
         {/* 반복 일정 처리 모달 */}
         <AnimatePresence>
           {isRepeatActionModalOpen && (
-            <motion.div 
+                                <motion.div
               className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
               onClick={() => {
                 setIsRepeatActionModalOpen(false);

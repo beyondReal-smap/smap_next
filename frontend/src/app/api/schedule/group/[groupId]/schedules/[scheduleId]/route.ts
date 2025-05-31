@@ -1,4 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, getCurrentUserId } from '@/lib/auth';
+
+// JWT 토큰 검증을 위한 임포트 추가
+function verifyJWT(token: string) {
+  try {
+    const jwt = require('jsonwebtoken');
+    return jwt.verify(token, process.env.JWT_SECRET || 'default-secret');
+  } catch (e) {
+    return null;
+  }
+}
 
 interface UpdateScheduleRequest {
   sst_title?: string;
@@ -123,13 +134,20 @@ export async function PUT(
   console.log('[SCHEDULE API] 파라미터:', { groupId, scheduleId });
   
   try {
+    // 인증 확인
+    const { user, unauthorized } = requireAuth(request);
+    if (unauthorized) {
+      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    }
+    
     const body: UpdateScheduleRequest = await request.json();
     console.log('[SCHEDULE API] 수정 요청 데이터:', body);
     
     const { editOption, targetMemberId, ...scheduleData } = body;
     
-    // current_user_id 결정: targetMemberId가 있으면 사용, 없으면 기본값 1186
-    const currentUserId = targetMemberId || 1186;
+    // current_user_id는 인증된 사용자 ID (현재는 하드코딩된 1186)
+    const currentUserId = getCurrentUserId(request);
+    console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
     
     // 백엔드 API URL 구성
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
@@ -200,6 +218,12 @@ export async function DELETE(
   console.log('[SCHEDULE API] 파라미터:', { groupId, scheduleId });
   
   try {
+    // 인증 확인
+    const { user, unauthorized } = requireAuth(request);
+    if (unauthorized) {
+      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    }
+    
     // 요청 본문에서 삭제 옵션 추출 (선택사항)
     let deleteOption: string | undefined;
     let sst_pidx: number | null = null;
@@ -220,8 +244,9 @@ export async function DELETE(
       console.log('[SCHEDULE API] 삭제 옵션 없음, 기본 삭제 진행');
     }
     
-    // current_user_id 결정: targetMemberId가 있으면 사용, 없으면 기본값 1186
-    const currentUserId = targetMemberId || 1186;
+    // current_user_id는 인증된 사용자 ID (현재는 하드코딩된 1186)
+    const currentUserId = getCurrentUserId(request);
+    console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
     
     // 백엔드 API URL 구성
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
@@ -306,12 +331,19 @@ export async function GET(
   console.log('[SCHEDULE API] 파라미터:', { groupId, scheduleId });
   
   try {
+    // 인증 확인
+    const { user, unauthorized } = requireAuth(request);
+    if (unauthorized) {
+      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    }
+    
     // 쿼리 파라미터에서 targetMemberId 추출
     const { searchParams } = new URL(request.url);
     const targetMemberId = searchParams.get('targetMemberId') ? parseInt(searchParams.get('targetMemberId')!) : undefined;
     
-    // current_user_id 결정: targetMemberId가 있으면 사용, 없으면 기본값 1186
-    const currentUserId = targetMemberId || 1186;
+    // current_user_id는 인증된 사용자 ID (현재는 하드코딩된 1186)
+    const currentUserId = getCurrentUserId(request);
+    console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
     
     // 백엔드 API URL 구성
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';

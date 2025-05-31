@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, getCurrentUserId } from '@/lib/auth';
 
 interface CreateScheduleRequest {
   sst_title?: string;
@@ -117,12 +118,22 @@ export async function POST(
   console.log('[SCHEDULE API] 파라미터:', { groupId });
   
   try {
+    // 인증 확인
+    const { user, unauthorized } = requireAuth(request);
+    if (unauthorized) {
+      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    }
+    
     const body: CreateScheduleRequest = await request.json();
     console.log('[SCHEDULE API] 생성 요청 데이터:', body);
     
+    // current_user_id는 인증된 사용자 ID (현재는 하드코딩된 1186)
+    const currentUserId = getCurrentUserId(request);
+    console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
+    
     // 백엔드 API URL 구성
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
-    const apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules?current_user_id=1186`;
+    const apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules?current_user_id=${currentUserId}`;
     
     console.log('[SCHEDULE API] 백엔드 요청 URL:', apiUrl);
     
@@ -194,6 +205,12 @@ export async function GET(
   console.log('[SCHEDULE API] 파라미터:', { groupId });
   
   try {
+    // 인증 확인
+    const { user, unauthorized } = requireAuth(request);
+    if (unauthorized) {
+      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    }
+    
     // URL 파라미터 추출
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('start_date');
@@ -203,9 +220,13 @@ export async function GET(
     
     console.log('[SCHEDULE API] 쿼리 파라미터:', { startDate, endDate, days, memberId });
     
+    // current_user_id는 인증된 사용자 ID (현재는 하드코딩된 1186)
+    const currentUserId = getCurrentUserId(request);
+    console.log('[SCHEDULE API] 현재 사용자 ID:', currentUserId);
+    
     // 백엔드 API URL 구성
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
-    let apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules?current_user_id=1186`;
+    let apiUrl = `${backendUrl}/api/v1/schedule/group/${groupId}/schedules?current_user_id=${currentUserId}`;
     
     // 쿼리 파라미터 추가
     if (startDate) apiUrl += `&start_date=${startDate}`;

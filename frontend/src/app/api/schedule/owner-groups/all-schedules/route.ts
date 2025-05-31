@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAuth, getCurrentUserId } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   console.log('[API PROXY] ⭐ Owner Groups All Schedules GET 요청 시작 ⭐');
   console.log('[API PROXY] 요청 URL:', request.url);
   
   try {
+    // 인증 확인
+    const { user, unauthorized } = requireAuth(request);
+    if (unauthorized) {
+      return NextResponse.json({ error: unauthorized.error }, { status: unauthorized.status });
+    }
+    
     const { searchParams } = new URL(request.url);
-    const currentUserId = searchParams.get('current_user_id') || '1186'; // 기본값
+    // current_user_id는 인증된 사용자 ID 사용 (현재는 하드코딩된 1186)
+    const currentUserId = getCurrentUserId(request)?.toString() || '1186';
     const days = searchParams.get('days') || '7'; // 기본 7일
     const year = searchParams.get('year'); // 년도 파라미터
     const month = searchParams.get('month'); // 월 파라미터
