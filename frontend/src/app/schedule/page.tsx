@@ -3674,7 +3674,7 @@ export default function SchedulePage() {
                             <p className="text-xs text-gray-600 mb-5 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
                               매주 반복할 요일을 선택하세요. 여러 요일을 선택할 수 있습니다.
                             </p>
-                            <div className="grid grid-cols-7 gap-2.5">
+                            <div className="grid grid-cols-7 gap-2.5 p-2">
                               {[
                                 { day: 1, label: '월', color: 'from-red-400 to-red-500' },
                                 { day: 2, label: '화', color: 'from-orange-400 to-orange-500' },
@@ -3707,30 +3707,28 @@ export default function SchedulePage() {
                                       }
                                       setSelectedWeekdays(newSelectedWeekdays);
                                     }}
-                                    className={`aspect-square rounded-xl text-sm font-bold transition-all duration-300 transform overflow-hidden w-full ${
+                                    className={`aspect-square rounded-xl text-sm font-bold transition-all duration-300 transform overflow-visible w-full relative ${
                                       selectedWeekdays.has(weekday.day)
                                         ? `bg-gradient-to-br ${weekday.color} text-white shadow-lg border-2 border-white`
                                         : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
                                     }`}
                                   >
                                     <span>{weekday.label}</span>
-                                  </motion.button>
-                                  
-                                  {/* 체크박스를 요일 버튼의 오른쪽 위에 위치 */}
-                                  {selectedWeekdays.has(weekday.day) && (
-                                    <motion.div
-                                      className="absolute -top-1 -right-1"
-                                      initial={{ opacity: 0, scale: 0, rotate: -180 }}
-                                      animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                                      transition={{ duration: 0.3, delay: index * 0.08 + 0.2 }}
-                                    >
-                                      <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                                        <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                    
+                                    {/* 체크박스를 요일 버튼 오른쪽 위에 위치 */}
+                                    {selectedWeekdays.has(weekday.day) && (
+                                      <motion.div
+                                        className="absolute -top-2 -right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white z-10"
+                                        initial={{ scale: 0, rotate: -180 }}
+                                        animate={{ scale: 1, rotate: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                      >
+                                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
                                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                                         </svg>
-                                      </div>
-                                    </motion.div>
-                                  )}
+                                      </motion.div>
+                                    )}
+                                  </motion.button>
                                 </motion.div>
                               ))}
                             </div>
