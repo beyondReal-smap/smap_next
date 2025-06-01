@@ -1432,7 +1432,7 @@ export default function SchedulePage() {
         sst_supplies: '', // 준비물 (향후 추가 가능)
         sst_place: newEvent.locationName || '', // 장소명
         // 알림 관련 필드들 - sst_alarm_t에 선택한 알림 시간 저장
-        sst_alram_t: newEvent.alarm === '없음' ? '' : newEvent.alarm,
+        sst_alarm_t: newEvent.alarm === '없음' ? '' : newEvent.alarm,
         sst_pick_type: alarmPickType,
         sst_pick_result: alarmPickResult,
         // 다른 멤버의 스케줄 생성 시
@@ -3601,11 +3601,282 @@ export default function SchedulePage() {
               </motion.div>
             )}
 
+                        {/* 반복 설정 모달 */}
+                        <AnimatePresence>
+                {isRepeatModalOpen && (
+                  <motion.div 
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                    onClick={() => setIsRepeatModalOpen(false)}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <motion.div 
+                      className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+                      onClick={e => e.stopPropagation()}
+                      onWheel={e => e.stopPropagation()}
+                      onTouchMove={e => e.stopPropagation()}
+                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="p-6">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">반복 설정</h3>
+                        
+                        <div className="space-y-2">
+                          {['안함', '매일', '매주', '매월', '매년'].map((option) => (
+                            <button
+                              key={option}
+                              onClick={() => {
+                                setNewEvent({ ...newEvent, repeat: option });
+                                if (option === '매주') {
+                                  setShowWeekdaySelector(true);
+                                } else {
+                                  setShowWeekdaySelector(false);
+                                  setSelectedWeekdays(new Set());
+                                  setIsRepeatModalOpen(false);
+                                }
+                              }}
+                              className={`w-full px-4 py-3 text-left rounded-xl transition-all duration-200 mobile-button ${
+                                newEvent.repeat === option
+                                  ? 'bg-amber-100 text-amber-800 font-semibold border-2 border-amber-300'
+                                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-transparent'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span>{option}</span>
+                                {newEvent.repeat === option && (
+                                  <span className="text-amber-600">✓</span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* 매주 선택 시 요일 선택 UI */}
+                        {showWeekdaySelector && newEvent.repeat === '매주' && (
+                          <motion.div 
+                            className="mt-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 shadow-sm"
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                          >
+                            <div className="flex items-center space-x-2 mb-3">
+                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <h4 className="text-sm font-semibold text-gray-900">반복할 요일 선택</h4>
+                            </div>
+                            <p className="text-xs text-gray-600 mb-5 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+                              매주 반복할 요일을 선택하세요. 여러 요일을 선택할 수 있습니다.
+                            </p>
+                            <div className="grid grid-cols-7 gap-2.5">
+                              {[
+                                { day: 1, label: '월', color: 'from-red-400 to-red-500' },
+                                { day: 2, label: '화', color: 'from-orange-400 to-orange-500' },
+                                { day: 3, label: '수', color: 'from-yellow-400 to-yellow-500' },
+                                { day: 4, label: '목', color: 'from-green-400 to-green-500' },
+                                { day: 5, label: '금', color: 'from-blue-400 to-blue-500' },
+                                { day: 6, label: '토', color: 'from-indigo-400 to-indigo-500' },
+                                { day: 0, label: '일', color: 'from-purple-400 to-purple-500' }
+                              ].map((weekday, index) => (
+                                <motion.div
+                                  key={weekday.day}
+                                  className="relative flex flex-col items-center"
+                                  initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  transition={{ 
+                                    duration: 0.4, 
+                                    delay: index * 0.08,
+                                    ease: "easeOut"
+                                  }}
+                                >
+                                  <motion.button
+                                    whileTap={{ scale: 0.92 }}
+                                    whileHover={{ scale: 1.05 }}
+                                    onClick={() => {
+                                      const newSelectedWeekdays = new Set(selectedWeekdays);
+                                      if (newSelectedWeekdays.has(weekday.day)) {
+                                        newSelectedWeekdays.delete(weekday.day);
+                                      } else {
+                                        newSelectedWeekdays.add(weekday.day);
+                                      }
+                                      setSelectedWeekdays(newSelectedWeekdays);
+                                    }}
+                                    className={`aspect-square rounded-xl text-sm font-bold transition-all duration-300 transform overflow-hidden w-full ${
+                                      selectedWeekdays.has(weekday.day)
+                                        ? `bg-gradient-to-br ${weekday.color} text-white shadow-lg border-2 border-white`
+                                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
+                                    }`}
+                                  >
+                                    <span>{weekday.label}</span>
+                                  </motion.button>
+                                  
+                                  {/* 체크박스를 요일 버튼의 오른쪽 위에 위치 */}
+                                  {selectedWeekdays.has(weekday.day) && (
+                                    <motion.div
+                                      className="absolute -top-1 -right-1"
+                                      initial={{ opacity: 0, scale: 0, rotate: -180 }}
+                                      animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                                      transition={{ duration: 0.3, delay: index * 0.08 + 0.2 }}
+                                    >
+                                      <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                        <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </motion.div>
+                              ))}
+                            </div>
+                            {selectedWeekdays.size === 0 && (
+                              <motion.div 
+                                className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.6 }}
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                  <p className="text-xs text-red-600 font-medium">
+                                    최소 1개의 요일을 선택해주세요.
+                                  </p>
+                                </div>
+                              </motion.div>
+                            )}
+                            {selectedWeekdays.size > 0 && (
+                              <motion.div 
+                                className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.3 }}
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                  <p className="text-xs text-green-600 font-medium">
+                                    {selectedWeekdays.size}개 요일이 선택되었습니다.
+                                  </p>
+                                </div>
+                              </motion.div>
+                            )}
+                          </motion.div>
+                        )}
+
+                        {!showWeekdaySelector ? (
+                          <button
+                            onClick={() => setIsRepeatModalOpen(false)}
+                            className="w-full mt-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                          >
+                            취소
+                          </button>
+                        ) : (
+                          <div className="mt-4 space-y-2">
+                            <button
+                              onClick={() => {
+                                // 매주 선택이고 요일이 선택되지 않은 경우 경고
+                                if (newEvent.repeat === '매주' && selectedWeekdays.size === 0) {
+                                  alert('매주 반복을 선택한 경우 최소 1개의 요일을 선택해주세요.');
+                                  return;
+                                }
+                                setIsRepeatModalOpen(false);
+                              }}
+                              className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium mobile-button hover:bg-blue-700 transition-colors"
+                            >
+                              확인
+                            </button>
+                            <button
+                              onClick={() => {
+                                setIsRepeatModalOpen(false);
+                                setShowWeekdaySelector(false);
+                                setSelectedWeekdays(new Set());
+                                setNewEvent({ ...newEvent, repeat: '안함' });
+                              }}
+                              className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                            >
+                              취소
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* 알림 설정 모달 */}
+            <AnimatePresence>
+                {isAlarmModalOpen && (
+                  <motion.div 
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                    onClick={() => setIsAlarmModalOpen(false)}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <motion.div 
+                      className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+                      onClick={e => e.stopPropagation()}
+                      onWheel={e => e.stopPropagation()}
+                      onTouchMove={e => e.stopPropagation()}
+                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="p-6">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">알림 설정</h3>
+                        
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {['없음', '정시', '5분 전', '10분 전', '15분 전', '30분 전', '1시간 전', '1일 전'].map((option) => (
+                            <button
+                              key={option}
+                                  onClick={() => {
+                                setNewEvent({ ...newEvent, alarm: option });
+                                setIsAlarmModalOpen(false);
+                              }}
+                              className={`w-full px-4 py-3 text-left rounded-xl transition-all duration-200 mobile-button ${
+                                newEvent.alarm === option
+                                  ? 'bg-amber-100 text-amber-800 font-semibold border-2 border-amber-300'
+                                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-transparent'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span>{option}</span>
+                                {newEvent.alarm === option && (
+                                  <span className="text-amber-600">✓</span>
+                                )}
+                              </div>
+                                </button>
+                              ))}
+                            </div>
+
+                        <button
+                          onClick={() => setIsAlarmModalOpen(false)}
+                          className="w-full mt-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                        >
+                          취소
+                        </button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* 날짜 및 시간 설정 모달 */}
             <AnimatePresence>
                 {isDateTimeModalOpen && (
                 <motion.div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
                     onClick={() => setIsDateTimeModalOpen(false)}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -3706,8 +3977,8 @@ export default function SchedulePage() {
                                   </span>
                                 </p>
                               </div>
-                            </div>
-                          )}
+                          </div>
+                        )}
 
                           {/* 하루 종일일 때 미리보기 */}
                           {newEvent.allDay && (
@@ -3741,8 +4012,8 @@ export default function SchedulePage() {
                           >
                             취소
                           </button>
-                          <button
-                            onClick={() => {
+                            <button
+                              onClick={() => {
                               setIsDateTimeModalOpen(false);
                               // body 스크롤은 부모 모달이 열려있으므로 유지
                             }}
@@ -3752,9 +4023,9 @@ export default function SchedulePage() {
                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
                                 : 'bg-green-600 text-white hover:bg-green-700'
                             }`}
-                          >
-                            확인
-                          </button>
+                            >
+                              확인
+                            </button>
                         </div>
                       </div>
                                 </motion.div>
@@ -3766,7 +4037,7 @@ export default function SchedulePage() {
             <AnimatePresence>
               {isTimeModalOpen && (
                 <motion.div 
-                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                  className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
                   onClick={handleCloseTimeModal}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -3883,17 +4154,11 @@ export default function SchedulePage() {
 
                       {/* 액션 버튼 */}
                       <div className="flex space-x-3">
-                        <button
+                                <button
                           onClick={handleTimeConfirm}
-                          className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
+                          className="w-full py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
                         >
                           확인
-                        </button>
-                        <button
-                          onClick={handleCloseTimeModal}
-                          className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                        >
-                          취소
                         </button>
                       </div>
                     </div>
@@ -3906,7 +4171,7 @@ export default function SchedulePage() {
             <AnimatePresence>
               {isLocationSearchModalOpen && (
                 <motion.div 
-                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                  className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
                   onClick={() => setIsLocationSearchModalOpen(false)}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -4044,7 +4309,7 @@ export default function SchedulePage() {
                     <div className="px-6 pb-6 flex-shrink-0">
                       <button
                         onClick={handleCloseLocationSearchModal}
-                        className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                              className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                       >
                         닫기
                       </button>
@@ -4058,7 +4323,7 @@ export default function SchedulePage() {
             <AnimatePresence>
               {isCalendarModalOpen && (
                 <motion.div 
-                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                  className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
                   onClick={handleCloseCalendarModal}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -4176,16 +4441,16 @@ export default function SchedulePage() {
                         <button
                           onClick={handleCloseCalendarModal}
                           className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                        >
-                          취소
-                        </button>
+                            >
+                              취소
+                            </button>
                         <button
                           onClick={handleCloseCalendarModal}
                           className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
                         >
                           확인
                         </button>
-                      </div>
+                          </div>
                     </div>
                   </motion.div>
                 </motion.div>
@@ -4303,7 +4568,7 @@ export default function SchedulePage() {
                               취소
                             </motion.button>
                             <motion.button
-                              onClick={() => {
+                                  onClick={() => {
                                 successModalContent.onConfirm?.();
                                 closeSuccessModal();
                               }}
@@ -4333,10 +4598,10 @@ export default function SchedulePage() {
                           </motion.button>
                         )}
                       </div>
-                    </div>
+                      </div>
+                    </motion.div>
                   </motion.div>
-                </motion.div>
-              )}
+                )}
             </AnimatePresence>
 
             {/* 스케줄 액션 선택 모달 */}
@@ -4419,7 +4684,7 @@ export default function SchedulePage() {
                             if (selectedEventForAction?.repeatText && selectedEventForAction.repeatText !== '없음') {
                               // 반복 일정인 경우 바로 handleDeleteAction 호출
                               handleDeleteAction(selectedEventForAction);
-                            } else {
+                                    } else {
                               // 일반 일정인 경우 삭제 확인 모달 표시
                               const eventTitle = selectedEventForAction?.title || '일정';
                               const confirmMessage = `일정 "${eventTitle}"\n정말 삭제하시겠습니까?`;
@@ -4457,8 +4722,8 @@ export default function SchedulePage() {
             {/* 반복 일정 처리 모달 */}
             <AnimatePresence>
               {isRepeatActionModalOpen && (
-                <motion.div
-                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                  <motion.div 
+                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
                   onClick={() => {
                     setIsRepeatActionModalOpen(false);
                     setSelectedEventForAction(null);
@@ -4466,26 +4731,26 @@ export default function SchedulePage() {
                     // body 스크롤 복원
                     document.body.style.overflow = '';
                   }}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <motion.div 
-                    className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
-                    onClick={e => e.stopPropagation()}
-                    onWheel={e => e.stopPropagation()}
-                    onTouchMove={e => e.stopPropagation()}
-                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                    transition={{ duration: 0.3 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
                   >
-                    <div className="p-6">
+                    <motion.div 
+                      className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+                      onClick={e => e.stopPropagation()}
+                      onWheel={e => e.stopPropagation()}
+                      onTouchMove={e => e.stopPropagation()}
+                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="p-6">
                       <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">반복 일정 {repeatActionType === 'edit' ? '수정' : '삭제'}</h3>
-                      
+                        
                       <div className="space-y-3">
-                        <button
+                            <button
                           onClick={() => handleRepeatOption('this')}
                           className="w-full px-4 py-4 text-left rounded-xl transition-all duration-200 mobile-button bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-transparent hover:border-gray-300"
                         >
@@ -4519,11 +4784,11 @@ export default function SchedulePage() {
                               과거를 포함한 모든 반복 일정을 처리합니다
                             </div>
                           </div>
-                        </button>
+                                </button>
                       </div>
 
                       <button
-                        onClick={() => {
+                              onClick={() => {
                           setIsRepeatActionModalOpen(false);
                           setSelectedEventForAction(null);
                           setPendingRepeatEvent(null);
@@ -4712,7 +4977,7 @@ export default function SchedulePage() {
                             </motion.div>
                           )}
                         </AnimatePresence>
-                      </div>
+                              </div>
                     </div>
 
                     {/* 멤버 선택 */}
@@ -4763,10 +5028,10 @@ export default function SchedulePage() {
                                   }`}>
                                     {member.name}
                                   </span>
-                                </button>
+                            </button>
                               </motion.div>
-                          ))}
-                        </div>
+                              ))}
+                            </div>
                         ) : (
                           <div className="text-center py-6 text-gray-500">
                             <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
@@ -4774,10 +5039,10 @@ export default function SchedulePage() {
                             </div>
                             <p className="text-sm">그룹에 참여한 멤버가 없습니다</p>
                       </div>
-                    )}
-                  </div>
-                    )}
-                </div>
+                            )}
+                          </div>
+                        )}
+                        </div>
 
                   {/* 2. 일정 제목 및 내용 */}
                   <div className="bg-blue-50 rounded-xl p-4">
@@ -4836,7 +5101,7 @@ export default function SchedulePage() {
                   </div>
 
                     {/* 날짜와 시간 정보 카드 */}
-                    <button
+                          <button
                       type="button"
                       onClick={() => setIsDateTimeModalOpen(true)}
                       className="w-full bg-white rounded-xl p-4 mb-4 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 mobile-button"
@@ -4948,9 +5213,9 @@ export default function SchedulePage() {
                       type="button"
                       onClick={closeAddModal}
                       className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                    >
-                      취소
-                    </button>
+                          >
+                            취소
+                          </button>
                   </div>
                 </form>
               </div>
@@ -4963,7 +5228,7 @@ export default function SchedulePage() {
       <AnimatePresence>
         {isTimeModalOpen && (
           <motion.div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
             onClick={handleCloseTimeModal}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -5064,7 +5329,7 @@ export default function SchedulePage() {
                     ].map((preset) => (
                       <motion.button
                         key={preset.label}
-                        onClick={() => {
+                          onClick={() => {
                           setSelectedHour(preset.hour);
                           setSelectedMinute(preset.minute);
                         }}
@@ -5080,17 +5345,17 @@ export default function SchedulePage() {
 
                 {/* 액션 버튼 */}
                 <div className="flex space-x-3">
+                <button
+                    onClick={handleCloseTimeModal}
+                    className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                  >
+                    취소
+                  </button>
                   <button
                     onClick={handleTimeConfirm}
                     className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
                   >
                     확인
-                  </button>
-                  <button
-                    onClick={handleCloseTimeModal}
-                    className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                  >
-                    취소
                   </button>
                 </div>
               </div>
@@ -5103,7 +5368,7 @@ export default function SchedulePage() {
       <AnimatePresence>
         {isLocationSearchModalOpen && (
           <motion.div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
             onClick={() => setIsLocationSearchModalOpen(false)}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -5247,7 +5512,7 @@ export default function SchedulePage() {
 
               {/* 닫기 버튼 */}
               <div className="px-6 pb-6 flex-shrink-0">
-                <button
+                            <button
                   onClick={handleCloseLocationSearchModal}
                   className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                 >
@@ -5263,7 +5528,7 @@ export default function SchedulePage() {
       <AnimatePresence>
         {isCalendarModalOpen && (
           <motion.div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
             onClick={handleCloseCalendarModal}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -5387,9 +5652,9 @@ export default function SchedulePage() {
                   <button
                     onClick={handleCloseCalendarModal}
                     className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
-                  >
-                    확인
-                  </button>
+                        >
+                          확인
+                        </button>
                 </div>
               </div>
             </motion.div>
@@ -5508,7 +5773,7 @@ export default function SchedulePage() {
                         취소
                       </motion.button>
                       <motion.button
-                        onClick={() => {
+                              onClick={() => {
                           successModalContent.onConfirm?.();
                           closeSuccessModal();
                         }}
@@ -5645,13 +5910,13 @@ export default function SchedulePage() {
                     <FaTrash className="w-5 h-5" />
                     <span>삭제하기</span>
                   </motion.button>
-                  
-                  <button
+
+                        <button
                     onClick={closeScheduleActionModal}
                     className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                   >
                     취소
-                  </button>
+                            </button>
                 </div>
               </div>
             </motion.div>
@@ -5663,8 +5928,8 @@ export default function SchedulePage() {
       <AnimatePresence>
         {isRepeatActionModalOpen && (
           <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
-            onClick={() => {
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                          onClick={() => {
               setIsRepeatActionModalOpen(false);
               setSelectedEventForAction(null);
               setPendingRepeatEvent(null);
@@ -5727,23 +5992,23 @@ export default function SchedulePage() {
                   </button>
                 </div>
 
-                <button
-                  onClick={() => {
+                            <button
+                              onClick={() => {
                     setIsRepeatActionModalOpen(false);
                     setSelectedEventForAction(null);
                     setPendingRepeatEvent(null);
                     // body 스크롤 복원
                     document.body.style.overflow = '';
                   }}
-                  className="w-full mt-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                >
-                  취소
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                          className="w-full mt-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                        >
+                          취소
+                        </button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+            </AnimatePresence>
     </>
   );
 }
