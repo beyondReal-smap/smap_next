@@ -656,6 +656,22 @@ export default function SchedulePage() {
   // 날짜 및 시간 모달 상태
   const [isDateTimeModalOpen, setIsDateTimeModalOpen] = useState(false);
   
+  // 날짜/시간 모달용 임시 상태 추가
+  const [tempDateTime, setTempDateTime] = useState({
+    date: '',
+    startTime: '',
+    endTime: '',
+    allDay: false
+  });
+  
+  // 날짜/시간 백업 상태 (취소 시 복원용)
+  const [backupDateTime, setBackupDateTime] = useState({
+    date: '',
+    startTime: '',
+    endTime: '',
+    allDay: false
+  });
+  
   // 커스텀 캘린더 모달 상태 추가
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [calendarCurrentMonth, setCalendarCurrentMonth] = useState(dayjs());
@@ -1014,6 +1030,18 @@ export default function SchedulePage() {
 
   const [newEvent, setNewEvent] = useState<NewEvent>(initialNewEventState);
   
+  // tempDateTime을 newEvent와 동기화
+  useEffect(() => {
+    if (!isDateTimeModalOpen) {
+      setTempDateTime({
+        date: newEvent.date,
+        startTime: newEvent.startTime,
+        endTime: newEvent.endTime,
+        allDay: newEvent.allDay
+      });
+    }
+  }, [newEvent.date, newEvent.startTime, newEvent.endTime, newEvent.allDay, isDateTimeModalOpen]);
+
   useEffect(() => {
       setNewEvent(prev => ({
         ...prev,
@@ -1021,10 +1049,101 @@ export default function SchedulePage() {
       }));
   }, [selectedDay]);
 
-  // 날짜/시간 유효성 검사
+  // 날짜/시간 유효성 검사 - tempDateTime 기반으로 수정
   useEffect(() => {
+    // 날짜/시간 모달이 열려있지 않으면 검사하지 않음
+    if (!isDateTimeModalOpen) {
+      setDateTimeError(null);
+      return;
+    }
+
     let hasError = false;
     let focusTarget: string | null = null;
+
+    // 현재 시간
+    const now = dayjs();
+    
+    // 기본 필수 필드 검사
+    if (!tempDateTime.date) {
+      setDateTimeError(null);
+      return;
+    }
+
+    // 날짜 형식 유효성 검사
+    const eventDate = dayjs(tempDateTime.date);
+    if (!eventDate.isValid()) {
+      setDateTimeError('날짜 형식이 올바르지 않습니다.');
+      return;
+    }
+
+    // 너무 먼 미래 날짜 검사 (10년 후까지만 허용)
+    if (eventDate.isAfter(now.add(10, 'year'))) {
+      setDateTimeError('10년 이후의 날짜는 설정할 수 없습니다.');
+      hasError = true;
+    }
+
+    // 하루 종일이 아닌 경우 시간 검사
+    if (!tempDateTime.allDay) {
+      if (!tempDateTime.startTime) {
+        setDateTimeError('시작 시간을 설정해주세요.');
+        hasError = true;
+      } else if (!tempDateTime.endTime) {
+        setDateTimeError('종료 시간을 설정해주세요.');
+        hasError = true;
+      } else {
+        // 시간 형식 유효성 검사
+        const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+        if (!timeRegex.test(tempDateTime.startTime)) {
+          setDateTimeError('시작 시간 형식이 올바르지 않습니다. (HH:MM)');
+          hasError = true;
+        } else if (!timeRegex.test(tempDateTime.endTime)) {
+          setDateTimeError('종료 시간 형식이 올바르지 않습니다. (HH:MM)');
+          hasError = true;
+        } else {
+          const startDateTime = dayjs(`${tempDateTime.date}T${tempDateTime.startTime}`);
+          const endDateTime = dayjs(`${tempDateTime.date}T${tempDateTime.endTime}`);
+
+          if (startDateTime.isValid() && endDateTime.isValid()) {
+            // 종료 시간이 시작 시간보다 빠른 경우
+            if (endDateTime.isBefore(startDateTime)) {
+              setDateTimeError('종료 시간은 시작 시간보다 빠를 수 없습니다.');
+              hasError = true;
+            }
+            // 시작 시간과 종료 시간이 같은 경우
+            else if (tempDateTime.startTime === tempDateTime.endTime) {
+              setDateTimeError('시작 시간과 종료 시간이 같을 수 없습니다.');
+              hasError = true;
+            }
+            // 너무 짧은 일정 (5분 미만)
+            else if (endDateTime.diff(startDateTime, 'minute') < 5) {
+              setDateTimeError('일정은 최소 5분 이상이어야 합니다.');
+              hasError = true;
+            }
+            // 너무 긴 일정 (24시간 초과)
+            else if (endDateTime.diff(startDateTime, 'hour') > 24) {
+              setDateTimeError('일정은 24시간을 초과할 수 없습니다.');
+              hasError = true;
+            }
+          }
+        }
+      }
+    }
+
+    // 오류가 없으면 에러 상태 초기화
+    if (!hasError) {
+        setDateTimeError(null);
+      }
+
+  }, [tempDateTime.date, tempDateTime.startTime, tempDateTime.endTime, tempDateTime.allDay, isDateTimeModalOpen]);
+
+  // 일반적인 경우(모달이 열려있지 않을 때)의 날짜/시간 유효성 검사
+  useEffect(() => {
+    // 날짜/시간 모달이 열려있으면 검사하지 않음
+    if (isDateTimeModalOpen) {
+      return;
+    }
+
+    let hasError = false;
 
     // 현재 시간
     const now = dayjs();
@@ -1100,7 +1219,7 @@ export default function SchedulePage() {
         setDateTimeError(null);
       }
 
-  }, [newEvent.date, newEvent.startTime, newEvent.endTime, newEvent.allDay]);
+  }, [newEvent.date, newEvent.startTime, newEvent.endTime, newEvent.allDay, isDateTimeModalOpen]);
 
   // 시간 모달 스크롤 자동 조정
   useEffect(() => {
@@ -2110,7 +2229,9 @@ export default function SchedulePage() {
 
   // 커스텀 캘린더 관련 함수들
   const handleOpenCalendarModal = () => {
-    setCalendarCurrentMonth(dayjs(newEvent.date));
+    // 날짜/시간 모달이 열려있을 때만 임시 상태에서 날짜를 가져옴
+    const currentDate = isDateTimeModalOpen ? tempDateTime.date : newEvent.date;
+    setSelectedDay(dayjs(currentDate));
     setIsCalendarModalOpen(true);
   };
 
@@ -2119,10 +2240,16 @@ export default function SchedulePage() {
   };
 
   const handleCalendarDateSelect = (date: Dayjs) => {
-    setNewEvent(prev => ({
-      ...prev,
-      date: date.format('YYYY-MM-DD')
-    }));
+    const formattedDate = date.format('YYYY-MM-DD');
+    
+    // 날짜/시간 모달이 열려있으면 임시 상태 업데이트, 아니면 실제 상태 업데이트
+    if (isDateTimeModalOpen) {
+      setTempDateTime(prev => ({ ...prev, date: formattedDate }));
+    } else {
+      setNewEvent(prev => ({ ...prev, date: formattedDate }));
+    }
+    
+    setSelectedDay(date);
     setIsCalendarModalOpen(false);
   };
 
@@ -2147,7 +2274,12 @@ export default function SchedulePage() {
   // 커스텀 시간 선택 모달 관련 함수들
   const handleOpenTimeModal = (type: 'start' | 'end') => {
     setTimeModalType(type);
-    const currentTime = type === 'start' ? newEvent.startTime : newEvent.endTime;
+    
+    // 날짜/시간 모달이 열려있으면 임시 상태에서, 아니면 실제 상태에서 시간 가져오기
+    const currentTime = isDateTimeModalOpen 
+      ? (type === 'start' ? tempDateTime.startTime : tempDateTime.endTime)
+      : (type === 'start' ? newEvent.startTime : newEvent.endTime);
+      
     const [hour, minute] = currentTime.split(':').map(Number);
     setSelectedHour(hour);
     setSelectedMinute(minute);
@@ -2161,16 +2293,19 @@ export default function SchedulePage() {
   const handleTimeConfirm = () => {
     const timeString = `${selectedHour.toString().padStart(2, '0')}:${selectedMinute.toString().padStart(2, '0')}`;
     
-    if (timeModalType === 'start') {
-      setNewEvent(prev => ({
-        ...prev,
-        startTime: timeString
-      }));
+    // 날짜/시간 모달이 열려있으면 임시 상태 업데이트, 아니면 실제 상태 업데이트
+    if (isDateTimeModalOpen) {
+      if (timeModalType === 'start') {
+        setTempDateTime(prev => ({ ...prev, startTime: timeString }));
+      } else {
+        setTempDateTime(prev => ({ ...prev, endTime: timeString }));
+      }
     } else {
-      setNewEvent(prev => ({
-        ...prev,
-        endTime: timeString
-      }));
+      if (timeModalType === 'start') {
+        setNewEvent(prev => ({ ...prev, startTime: timeString }));
+      } else {
+        setNewEvent(prev => ({ ...prev, endTime: timeString }));
+      }
     }
     
     setIsTimeModalOpen(false);
@@ -2182,6 +2317,47 @@ export default function SchedulePage() {
 
   const handleMinuteChange = (minute: number) => {
     setSelectedMinute(minute);
+  };
+
+  // 날짜/시간 모달 열기 함수 추가
+  const handleOpenDateTimeModal = () => {
+    // 현재 상태를 백업하고 임시 상태에 복사
+    const backup = {
+      date: newEvent.date,
+      startTime: newEvent.startTime,
+      endTime: newEvent.endTime,
+      allDay: newEvent.allDay
+    };
+    
+    setBackupDateTime(backup);
+    setTempDateTime(backup);
+    setIsDateTimeModalOpen(true);
+    
+    // body 스크롤 비활성화
+    document.body.style.overflow = 'hidden';
+  };
+
+  // 날짜/시간 모달 취소 함수 추가
+  const handleCancelDateTimeModal = () => {
+    // 백업된 상태로 복원하지 않고 단순히 모달만 닫기
+    // (실제 newEvent는 변경되지 않았으므로)
+    setIsDateTimeModalOpen(false);
+    // body 스크롤은 부모 모달이 열려있으므로 유지
+  };
+
+  // 날짜/시간 모달 확인 함수 추가
+  const handleConfirmDateTimeModal = () => {
+    // 임시 상태를 실제 상태에 반영
+    setNewEvent(prev => ({
+      ...prev,
+      date: tempDateTime.date,
+      startTime: tempDateTime.startTime,
+      endTime: tempDateTime.endTime,
+      allDay: tempDateTime.allDay
+    }));
+    
+    setIsDateTimeModalOpen(false);
+    // body 스크롤은 부모 모달이 열려있으므로 유지
   };
 
   // 모든 그룹의 스케줄 로드 - 실제 백엔드 API 사용
@@ -3903,13 +4079,13 @@ export default function SchedulePage() {
                             </div>
                             <button
                               type="button"
-                              onClick={() => setNewEvent({ ...newEvent, allDay: !newEvent.allDay })}
-                              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${newEvent.allDay ? 'bg-green-600' : 'bg-gray-200'}`}
+                              onClick={() => setTempDateTime(prev => ({ ...prev, allDay: !prev.allDay }))}
+                              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${tempDateTime.allDay ? 'bg-green-600' : 'bg-gray-200'}`}
                               role="switch"
-                              aria-checked={newEvent.allDay}
+                              aria-checked={tempDateTime.allDay}
                             >
                               <span
-                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${newEvent.allDay ? 'translate-x-5' : 'translate-x-0'}`}
+                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${tempDateTime.allDay ? 'translate-x-5' : 'translate-x-0'}`}
                               />
                             </button>
                           </div>
@@ -3925,14 +4101,14 @@ export default function SchedulePage() {
                               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-base bg-white text-left flex items-center justify-between hover:bg-gray-50"
                             >
                               <span className="text-gray-900 font-medium">
-                                {dayjs(newEvent.date).format('YYYY년 MM월 DD일 (ddd)')}
+                                {dayjs(tempDateTime.date).format('YYYY년 MM월 DD일 (ddd)')}
                               </span>
                               <FiCalendar className="w-5 h-5 text-gray-400" />
                             </button>
                           </div>
 
                           {/* 시간 선택 (하루종일이 아닐 때만) */}
-                          {!newEvent.allDay && (
+                          {!tempDateTime.allDay && (
                             <div className="space-y-4">
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -3943,7 +4119,7 @@ export default function SchedulePage() {
                                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-base bg-white text-left flex items-center justify-between hover:bg-gray-50"
                                   >
                                     <span className="text-gray-900 font-medium">
-                                      {newEvent.startTime}
+                                      {tempDateTime.startTime}
                                     </span>
                                     <FiClock className="w-5 h-5 text-gray-400" />
                                   </button>
@@ -3956,7 +4132,7 @@ export default function SchedulePage() {
                                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-base bg-white text-left flex items-center justify-between hover:bg-gray-50"
                                   >
                                     <span className="text-gray-900 font-medium">
-                                      {newEvent.endTime}
+                                      {tempDateTime.endTime}
                                     </span>
                                     <FiClock className="w-5 h-5 text-gray-400" />
                                   </button>
@@ -3967,11 +4143,11 @@ export default function SchedulePage() {
                               <div className="p-3 bg-gray-50 rounded-lg">
                                 <p className="text-sm text-gray-600 text-center">
                                   <span className="font-medium text-gray-900">
-                                    {dayjs(newEvent.date).format('YYYY년 MM월 DD일')}
+                                    {dayjs(tempDateTime.date).format('YYYY년 MM월 DD일')}
                                   </span>
                                   <br />
                                   <span className="text-green-600 font-medium">
-                                    {newEvent.startTime} ~ {newEvent.endTime}
+                                    {tempDateTime.startTime} ~ {tempDateTime.endTime}
                                   </span>
                                 </p>
                               </div>
@@ -3979,11 +4155,11 @@ export default function SchedulePage() {
                         )}
 
                           {/* 하루 종일일 때 미리보기 */}
-                          {newEvent.allDay && (
+                          {tempDateTime.allDay && (
                             <div className="p-3 bg-gray-50 rounded-lg">
                               <p className="text-sm text-gray-600 text-center">
                                 <span className="font-medium text-gray-900">
-                                  {dayjs(newEvent.date).format('YYYY년 MM월 DD일')}
+                                  {dayjs(tempDateTime.date).format('YYYY년 MM월 DD일')}
                                 </span>
                                 <br />
                                 <span className="text-green-600 font-medium">하루 종일</span>
@@ -4002,25 +4178,19 @@ export default function SchedulePage() {
 
                         <div className="flex space-x-3 mt-6">
                           <button
-                            onClick={() => {
-                              setIsDateTimeModalOpen(false);
-                              // body 스크롤은 부모 모달이 열려있으므로 유지
-                            }}
+                            onClick={handleCancelDateTimeModal}
                             className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                           >
                             취소
                           </button>
                             <button
-                              onClick={() => {
-                              setIsDateTimeModalOpen(false);
-                              // body 스크롤은 부모 모달이 열려있으므로 유지
-                            }}
-                            disabled={!!dateTimeError}
-                            className={`flex-1 py-3 rounded-xl font-medium mobile-button transition-colors ${
-                              dateTimeError 
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                                : 'bg-green-600 text-white hover:bg-green-700'
-                            }`}
+                              onClick={handleConfirmDateTimeModal}
+                              disabled={!!dateTimeError}
+                              className={`flex-1 py-3 rounded-xl font-medium mobile-button transition-colors ${
+                                dateTimeError 
+                                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                  : 'bg-green-600 text-white hover:bg-green-700'
+                              }`}
                             >
                               확인
                             </button>
@@ -5101,26 +5271,26 @@ export default function SchedulePage() {
                     {/* 날짜와 시간 정보 카드 */}
                           <button
                       type="button"
-                      onClick={() => setIsDateTimeModalOpen(true)}
+                      onClick={handleOpenDateTimeModal}
                       className="w-full bg-white rounded-xl p-4 mb-4 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 mobile-button"
                     >
                       <div className="space-y-3">
                         <div className="flex justify-between items-center">
                           <span className="text-gray-700 text-sm font-medium">날짜</span>
                           <span className="text-gray-500 text-sm font-normal">
-                            {dayjs(newEvent.date).format('YYYY년 MM월 DD일')}
+                            {dayjs(tempDateTime.date).format('YYYY년 MM월 DD일')}
                       </span>
                   </div>
                         <div className="flex justify-between items-center">
                           <span className="text-gray-700 text-sm font-medium">시간</span>
                           <span className="text-gray-500 text-sm font-normal">
-                            {newEvent.allDay ? '하루 종일' : `${newEvent.startTime} ~ ${newEvent.endTime}`}
+                            {tempDateTime.allDay ? '하루 종일' : `${tempDateTime.startTime} ~ ${tempDateTime.endTime}`}
                             </span>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-gray-700 text-sm font-medium">하루 종일</span>
                           <span className="text-gray-500 text-sm font-normal">
-                            {newEvent.allDay ? 'ON' : 'OFF'}
+                            {tempDateTime.allDay ? 'ON' : 'OFF'}
                             </span>
                         </div>
                       </div>
