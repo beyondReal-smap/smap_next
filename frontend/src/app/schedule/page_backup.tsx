@@ -172,13 +172,13 @@ const pageVariants = {
 };
 
 const modalVariants = {
-  hidden: { 
-    opacity: 0, 
+  hidden: {
+    opacity: 0,
     y: 100,
     scale: 0.95
   },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     y: 0,
     scale: 1,
     transition: {
@@ -186,8 +186,8 @@ const modalVariants = {
       ease: [0.25, 0.46, 0.45, 0.94]
     }
   },
-  exit: { 
-    opacity: 0, 
+  exit: {
+    opacity: 0,
     y: 100,
     scale: 0.95,
     transition: {
@@ -257,6 +257,7 @@ interface ScheduleGroupMember {
   mt_file1?: string;
   sgdt_owner_chk?: string;
   sgdt_leader_chk?: string;
+  sgdt_idx?: number; // sgdt_idx 필드 추가
 }
 
 // ScheduleEvent 인터페이스 정의
@@ -292,6 +293,13 @@ interface ScheduleEvent {
   repeatJsonV?: string; // 반복 JSON 버전
   tgtSgdtOwnerChk?: string; // 타겟 멤버의 오너 권한
   tgtSgdtLeaderChk?: string; // 타겟 멤버의 리더 권한
+  tgtSgdtIdx?: number; // 타겟 멤버의 그룹 상세 인덱스
+  sst_pidx?: number; // 반복 일정 인덱스
+  memberNickname?: string; // nickname 추가
+  memberCurrentLat?: number | null; // current latitude 추가
+  memberCurrentLng?: number | null; // current longitude 추가
+  memberBattery?: number | null; // battery 추가
+  memberGpsTime?: string | null; // gps time 추가
 }
 
 // 모의 일정 데이터
@@ -662,23 +670,263 @@ export default function SchedulePage() {
     onConfirm?: () => void;
   } | null>(null);
 
+  // 스케줄 액션 선택 모달 상태
+  const [isScheduleActionModalOpen, setIsScheduleActionModalOpen] = useState(false);
+  const [selectedEventForAction, setSelectedEventForAction] = useState<ScheduleEvent | null>(null);
+
+  // 반복 일정 처리 모달 상태
+  const [isRepeatActionModalOpen, setIsRepeatActionModalOpen] = useState(false);
+  const [repeatActionType, setRepeatActionType] = useState<'edit' | 'delete'>('edit');
+  const [pendingRepeatEvent, setPendingRepeatEvent] = useState<ScheduleEvent | null>(null);
+
+  // 월 변경 로딩 상태 추가
+  const [isMonthChanging, setIsMonthChanging] = useState(false);
+
+  // 월별 데이터 캐시 시스템 추가 (로컬 스토리지 기반)
+  const [monthlyCache, setMonthlyCache] = useState<Map<string, ScheduleEvent[]>>(new Map());
+  const [loadedMonths, setLoadedMonths] = useState<Set<string>>(new Set());
+
+  // 초기 로딩 상태 추가
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [hasInitialDataLoaded, setHasInitialDataLoaded] = useState(false);
+
+  // 단계별 로딩 상태 추적
+  const [loadingSteps, setLoadingSteps] = useState({
+    groups: false,
+    schedules: false,
+    calendar: false,
+    ui: false
+  });
+
+  // 로컬 스토리지 키 상수
+  const CACHE_PREFIX = 'schedule_cache_';
+  const LOADED_MONTHS_KEY = 'schedule_loaded_months';
+
+  // 매주 반복 시 요일 선택 상태
+  const [selectedWeekdays, setSelectedWeekdays] = useState<Set<number>>(new Set());
+  const [showWeekdaySelector, setShowWeekdaySelector] = useState(false);
+
+  // 로컬 스토리지에서 캐시 데이터 로드
+  const loadCacheFromStorage = () => {
+    try {
+      // 로드된 월 목록 복원
+      const savedLoadedMonths = localStorage.getItem(LOADED_MONTHS_KEY);
+      if (savedLoadedMonths) {
+        const monthsArray = JSON.parse(savedLoadedMonths);
+        setLoadedMonths(new Set(monthsArray));
+        
+        // 각 월의 캐시 데이터 복원
+        const newCache = new Map<string, ScheduleEvent[]>();
+        monthsArray.forEach((monthKey: string) => {
+          const cacheData = localStorage.getItem(CACHE_PREFIX + monthKey);
+          if (cacheData) {
+            try {
+              const events = JSON.parse(cacheData);
+              newCache.set(monthKey, events);
+            } catch (error) {
+              console.error(`[CACHE] 월 ${monthKey} 캐시 데이터 파싱 실패:`, error);
+              // 손상된 캐시 데이터 제거
+              localStorage.removeItem(CACHE_PREFIX + monthKey);
+            }
+          }
+        });
+        setMonthlyCache(newCache);
+        console.log('[CACHE] 로컬 스토리지에서 캐시 복원 완료:', Array.from(newCache.keys()));
+      }
+    } catch (error) {
+      console.error('[CACHE] 로컬 스토리지 캐시 로드 실패:', error);
+      // 캐시 초기화
+      clearCacheFromStorage();
+    }
+  };
+
+  // 로컬 스토리지에 캐시 데이터 저장
+  const saveCacheToStorage = (monthKey: string, events: ScheduleEvent[]) => {
+    try {
+      // 월별 데이터 저장
+      localStorage.setItem(CACHE_PREFIX + monthKey, JSON.stringify(events));
+      
+      // 로드된 월 목록 업데이트
+      const currentLoadedMonths = Array.from(loadedMonths);
+      if (!currentLoadedMonths.includes(monthKey)) {
+        currentLoadedMonths.push(monthKey);
+        localStorage.setItem(LOADED_MONTHS_KEY, JSON.stringify(currentLoadedMonths));
+      }
+      
+      console.log(`[CACHE] 월 ${monthKey} 데이터 로컬 스토리지에 저장 완료 (${events.length}개 이벤트)`);
+    } catch (error) {
+      console.error(`[CACHE] 월 ${monthKey} 데이터 저장 실패:`, error);
+      // 스토리지 용량 부족 등의 경우 오래된 캐시 정리
+      if (error instanceof DOMException && error.code === 22) {
+        console.log('[CACHE] 스토리지 용량 부족, 오래된 캐시 정리 시도');
+        clearOldCacheFromStorage();
+        // 정리 후 다시 시도
+        try {
+          localStorage.setItem(CACHE_PREFIX + monthKey, JSON.stringify(events));
+        } catch (retryError) {
+          console.error('[CACHE] 캐시 정리 후에도 저장 실패:', retryError);
+        }
+      }
+    }
+  };
+
+  // 로컬 스토리지에서 특정 월 캐시 데이터 로드
+  const loadMonthCacheFromStorage = (monthKey: string): ScheduleEvent[] | null => {
+    try {
+      const cacheData = localStorage.getItem(CACHE_PREFIX + monthKey);
+      if (cacheData) {
+        return JSON.parse(cacheData);
+      }
+    } catch (error) {
+      console.error(`[CACHE] 월 ${monthKey} 캐시 로드 실패:`, error);
+      // 손상된 캐시 데이터 제거
+      localStorage.removeItem(CACHE_PREFIX + monthKey);
+    }
+    return null;
+  };
+
+  // 오래된 캐시 정리 (최근 6개월만 유지)
+  const clearOldCacheFromStorage = () => {
+    try {
+      const savedLoadedMonths = localStorage.getItem(LOADED_MONTHS_KEY);
+      if (savedLoadedMonths) {
+        const monthsArray = JSON.parse(savedLoadedMonths);
+        const currentMonth = dayjs();
+        const validMonths: string[] = [];
+        
+        monthsArray.forEach((monthKey: string) => {
+          const [year, month] = monthKey.split('-').map(Number);
+          const monthDate = dayjs().year(year).month(month - 1);
+          
+          // 현재 월 기준 6개월 이내의 데이터만 유지
+          if (Math.abs(monthDate.diff(currentMonth, 'month')) <= 6) {
+            validMonths.push(monthKey);
+          } else {
+            // 오래된 캐시 삭제
+            localStorage.removeItem(CACHE_PREFIX + monthKey);
+            console.log(`[CACHE] 오래된 캐시 삭제: ${monthKey}`);
+          }
+        });
+        
+        // 유효한 월 목록 업데이트
+        localStorage.setItem(LOADED_MONTHS_KEY, JSON.stringify(validMonths));
+        setLoadedMonths(new Set(validMonths));
+        
+        console.log(`[CACHE] 오래된 캐시 정리 완료. 유지된 월: ${validMonths.length}개`);
+      }
+    } catch (error) {
+      console.error('[CACHE] 오래된 캐시 정리 실패:', error);
+    }
+  };
+
+  // 전체 캐시 초기화
+  const clearCacheFromStorage = () => {
+    try {
+      // 로드된 월 목록 가져오기
+      const savedLoadedMonths = localStorage.getItem(LOADED_MONTHS_KEY);
+      if (savedLoadedMonths) {
+        const monthsArray = JSON.parse(savedLoadedMonths);
+        monthsArray.forEach((monthKey: string) => {
+          localStorage.removeItem(CACHE_PREFIX + monthKey);
+        });
+      }
+      
+      // 메타데이터 삭제
+      localStorage.removeItem(LOADED_MONTHS_KEY);
+      
+      // 상태 초기화
+      setMonthlyCache(new Map());
+      setLoadedMonths(new Set());
+      
+      console.log('[CACHE] 전체 캐시 초기화 완료');
+    } catch (error) {
+      console.error('[CACHE] 캐시 초기화 실패:', error);
+    }
+  };
+
   // 컴포넌트 마운트 감지
   useEffect(() => {
-    document.body.style.overflowX = 'hidden';
-    document.documentElement.style.overflowX = 'hidden';
+    console.log('[useEffect] 스케줄 페이지 초기화 시작');
     
-    // 그룹 데이터 로드 (스케줄 로드는 별도 useEffect에서 처리)
+    // 개발 환경에서 페이지 로드 시 캐시 초기화
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[useEffect] 🔧 개발 환경 감지 - 캐시 초기화 실행');
+      clearCacheFromStorage();
+      setMonthlyCache(new Map());
+      setLoadedMonths(new Set());
+      console.log('[useEffect] 🗑️ 개발 환경에서 모든 캐시 초기화 완료');
+    } else {
+      // 프로덕션 환경에서는 버전 체크를 통한 캐시 무효화
+      const currentVersion = '1.0.0'; // 앱 버전
+      const storedVersion = localStorage.getItem('scheduleAppVersion');
+      
+      if (storedVersion !== currentVersion) {
+        console.log('[useEffect] 🔄 앱 버전 변경 감지 - 캐시 초기화');
+        clearCacheFromStorage();
+        setMonthlyCache(new Map());
+        setLoadedMonths(new Set());
+        localStorage.setItem('scheduleAppVersion', currentVersion);
+        console.log('[useEffect] 🗑️ 버전 업데이트로 인한 캐시 초기화 완료');
+      }
+    }
+    
+    // 로컬 스토리지에서 캐시 로드
+    loadCacheFromStorage();
+    
+    // 디버그 함수를 window 객체에 추가
+    if (typeof window !== 'undefined') {
+      (window as any).scheduleCache = {
+        getStats: getCacheStats,
+        clearCache: clearCache,
+        clearOldCache: clearOldCacheFromStorage,
+        getLoadedMonths: () => Array.from(loadedMonths),
+        getCacheSize: () => monthlyCache.size,
+        forceLoad: (year: number, month: number) => loadAllGroupSchedules(year, month)
+      };
+    }
+
     const loadData = async () => {
       await fetchUserGroups();
     };
     
     loadData();
     
+    // 페이지 가시성 변경 감지 (탭 전환 등)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('[visibilityChange] 페이지가 다시 활성화됨');
+        // 개발 환경에서는 페이지 활성화 시에도 캐시 체크
+        if (process.env.NODE_ENV === 'development') {
+          const lastUpdate = localStorage.getItem('scheduleLastUpdate');
+          const now = Date.now().toString();
+          
+          // 마지막 업데이트 후 1분이 지났으면 캐시 초기화
+          if (!lastUpdate || (Date.now() - parseInt(lastUpdate)) > 60000) {
+            console.log('[visibilityChange] 🔄 개발 환경에서 캐시 갱신');
+            clearCacheFromStorage();
+            setMonthlyCache(new Map());
+            setLoadedMonths(new Set());
+            localStorage.setItem('scheduleLastUpdate', now);
+          }
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
     return () => {
       document.body.style.overflowX = '';
       document.documentElement.style.overflowX = '';
       // 컴포넌트 언마운트 시 body 스크롤 복원
       document.body.style.overflow = '';
+      
+      // 이벤트 리스너 정리
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      
+      // 디버그 함수 정리
+      if (typeof window !== 'undefined') {
+        delete (window as any).scheduleCache;
+      }
     };
   }, []);
 
@@ -907,21 +1155,21 @@ export default function SchedulePage() {
       return;
     }
 
-    // 현재 사용자의 권한 확인
-    const currentMember = scheduleGroupMembers.find(member => member.isSelected);
-    const isOwnerOrLeader = currentMember && 
-      (currentMember.sgdt_owner_chk === 'Y' || currentMember.sgdt_leader_chk === 'Y');
+    // 현재 사용자의 권한 확인 (로그인한 사용자)
+    const currentUser = scheduleGroupMembers.find(member => member.isSelected);
+    const isOwnerOrLeader = currentUser && 
+      (currentUser.sgdt_owner_chk === 'Y' || currentUser.sgdt_leader_chk === 'Y');
 
     console.log('[handleSaveEvent] 👤 권한 정보:', {
-      currentMember: currentMember?.name,
+      currentUser: currentUser?.name,
       selectedMemberId,
       isOwnerOrLeader,
-      sgdt_owner_chk: currentMember?.sgdt_owner_chk,
-      sgdt_leader_chk: currentMember?.sgdt_leader_chk
+      sgdt_owner_chk: currentUser?.sgdt_owner_chk,
+      sgdt_leader_chk: currentUser?.sgdt_leader_chk
     });
 
     // 다른 멤버의 스케줄을 생성/수정하려는 경우 권한 확인
-    if (selectedMemberId && selectedMemberId !== currentMember?.id && !isOwnerOrLeader) {
+    if (selectedMemberId && selectedMemberId !== currentUser?.id && !isOwnerOrLeader) {
       console.log('[handleSaveEvent] ❌ 권한 없음: 다른 멤버 스케줄 관리 권한 없음');
       openSuccessModal('권한 오류', '다른 멤버의 스케줄을 관리할 권한이 없습니다.', 'error');
       return;
@@ -968,6 +1216,34 @@ export default function SchedulePage() {
             const weekDays = dayOfWeek === 0 ? '7' : dayOfWeek.toString(); // 일요일을 7로 변환
             console.log('[getRepeatJson] 🔄 매주 반복 설정:', { dayOfWeek, weekDays });
             return { sst_repeat_json: `{"r1":"3","r2":"${weekDays}"}`, sst_repeat_json_v: `1주마다 ${['일', '월', '화', '수', '목', '금', '토'][dayOfWeek]}` };
+          default:
+            // 매주 다중 요일 선택 처리
+            if (repeat.startsWith('매주 ')) {
+              const selectedDays = repeat.replace('매주 ', '');
+              const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+              const selectedWeekdayIndices: string[] = [];
+              
+              selectedDays.split(',').forEach(dayName => {
+                const index = dayNames.indexOf(dayName.trim());
+                if (index !== -1) {
+                  // 일요일(0)을 7로 변환, 나머지는 그대로
+                  selectedWeekdayIndices.push(index === 0 ? '7' : index.toString());
+                }
+              });
+              
+              const weekdaysString = selectedWeekdayIndices.join(',');
+              console.log('[getRepeatJson] 🔄 매주 다중 요일 반복 설정:', { 
+                selectedDays, 
+                selectedWeekdayIndices, 
+                weekdaysString 
+              });
+              
+              return { 
+                sst_repeat_json: `{"r1":"3","r2":"${weekdaysString}"}`, 
+                sst_repeat_json_v: `1주마다 ${selectedDays}` 
+              };
+            }
+            
           case '매월':
             console.log('[getRepeatJson] 🔄 매월 반복 설정');
             return { sst_repeat_json: '{"r1":"4","r2":""}', sst_repeat_json_v: '매월' };
@@ -1001,15 +1277,115 @@ export default function SchedulePage() {
         return result;
       }
 
+      // 알림 시간 계산 함수 (sst_sdate에서 알림 시간만큼 빼기)
+      function calculateAlarmTime(startDateTime: string, alarm: string): string {
+        console.log('[calculateAlarmTime] 🔔 알림 시간 계산 시작:', { startDateTime, alarm });
+        
+        if (alarm === '없음' || alarm === '정시') {
+          console.log('[calculateAlarmTime] 🔔 알림 없음 또는 정시');
+          return startDateTime;
+        }
+
+        const startTime = dayjs(startDateTime);
+        let alarmTime = startTime;
+
+        if (alarm.includes('분 전')) {
+          const minutes = parseInt(alarm.match(/(\d+)/)?.[1] || '0');
+          alarmTime = startTime.subtract(minutes, 'minute');
+          console.log('[calculateAlarmTime] 🔔 분 단위 알림:', { minutes, alarmTime: alarmTime.format() });
+        } else if (alarm.includes('시간 전')) {
+          const hours = parseInt(alarm.match(/(\d+)/)?.[1] || '0');
+          alarmTime = startTime.subtract(hours, 'hour');
+          console.log('[calculateAlarmTime] 🔔 시간 단위 알림:', { hours, alarmTime: alarmTime.format() });
+        } else if (alarm.includes('일 전')) {
+          const days = parseInt(alarm.match(/(\d+)/)?.[1] || '0');
+          alarmTime = startTime.subtract(days, 'day');
+          console.log('[calculateAlarmTime] 🔔 일 단위 알림:', { days, alarmTime: alarmTime.format() });
+        }
+
+        const result = alarmTime.format('YYYY-MM-DD HH:mm:ss');
+        console.log('[calculateAlarmTime] 🔔 최종 알림 시간:', result);
+        return result;
+      }
+
       const alarmPickType = newEvent.alarm === '없음' ? '' : getAlarmPickType(newEvent.alarm);
       const alarmPickResult = newEvent.alarm === '없음' ? '' : getAlarmPickResult(newEvent.alarm);
+      const calculatedAlarmTime = calculateAlarmTime(startDateTime, newEvent.alarm);
       
       console.log('[handleSaveEvent] 🔔 알림 설정 처리:', {
         원본_알림: newEvent.alarm,
         알림_여부: newEvent.alarm === '없음' ? 'N' : 'Y',
         알림_시간: newEvent.alarm === '없음' ? '' : newEvent.alarm,
         알림_타입: alarmPickType,
-        알림_값: alarmPickResult
+        알림_값: alarmPickResult,
+        계산된_알림시간: calculatedAlarmTime,
+        스케줄_체크: 'Y'
+      });
+
+      // 선택된 멤버 정보 찾기
+      let selectedMember: ScheduleGroupMember | undefined;
+      
+      if (selectedMemberId) {
+        // selectedMemberId가 있으면 해당 멤버만 찾기
+        selectedMember = scheduleGroupMembers.find(member => member.id === selectedMemberId);
+        console.log('[handleSaveEvent] 🎯 selectedMemberId로 멤버 찾기:', {
+          selectedMemberId,
+          foundMember: selectedMember ? {
+            id: selectedMember.id,
+            name: selectedMember.name,
+            mt_idx: selectedMember.mt_idx,
+            sgdt_idx: selectedMember.sgdt_idx
+          } : null
+        });
+      } else {
+        // selectedMemberId가 없으면 기본 선택된 멤버 사용
+        selectedMember = scheduleGroupMembers.find(member => member.isSelected);
+        console.log('[handleSaveEvent] 🎯 기본 선택된 멤버 사용:', {
+          foundMember: selectedMember ? {
+            id: selectedMember.id,
+            name: selectedMember.name,
+            mt_idx: selectedMember.mt_idx,
+            sgdt_idx: selectedMember.sgdt_idx
+          } : null
+        });
+      }
+      
+      // 멤버를 찾지 못한 경우에만 첫 번째 멤버 사용
+      if (!selectedMember && scheduleGroupMembers.length > 0) {
+        selectedMember = scheduleGroupMembers[0];
+        console.log('[handleSaveEvent] 🎯 첫 번째 멤버 사용:', {
+          foundMember: {
+            id: selectedMember.id,
+            name: selectedMember.name,
+            mt_idx: selectedMember.mt_idx,
+            sgdt_idx: selectedMember.sgdt_idx
+          }
+        });
+      }
+
+      console.log('[handleSaveEvent] 🔍 멤버 선택 디버깅:', {
+        selectedMemberId,
+        scheduleGroupMembersCount: scheduleGroupMembers.length,
+        scheduleGroupMembers: scheduleGroupMembers.map(m => ({
+          id: m.id,
+          name: m.name,
+          mt_idx: m.mt_idx,
+          sgdt_idx: m.sgdt_idx,
+          isSelected: m.isSelected
+        })),
+        currentMember: currentUser ? {
+          id: currentUser.id,
+          name: currentUser.name,
+          mt_idx: currentUser.mt_idx,
+          sgdt_idx: currentUser.sgdt_idx
+        } : null
+      });
+
+      console.log('[handleSaveEvent] 👤 선택된 멤버 정보:', {
+        selectedMemberId,
+        selectedMember: selectedMember?.name,
+        mt_idx: selectedMember?.mt_idx,
+        sgdt_idx: selectedMember?.sgdt_idx // 실제 sgdt_idx 필드 사용
       });
 
       // PHP 로직 기반 요청 데이터 구성
@@ -1020,10 +1396,14 @@ export default function SchedulePage() {
         sst_all_day: (newEvent.allDay ? 'Y' : 'N') as 'Y' | 'N',
         sst_location_title: newEvent.locationName || undefined,
         sst_location_add: newEvent.locationAddress || undefined,
+        sst_location_lat: newEvent.locationLat, // 위도 추가
+        sst_location_long: newEvent.locationLng, // 경도 추가
         sst_memo: newEvent.content || undefined,
         sst_content: newEvent.content || undefined, // PHP에서 memo와 content 둘 다 사용
         sst_alram: newEvent.alarm === '없음' ? 'N' : 'Y',
         sst_schedule_alarm_chk: newEvent.alarm === '없음' ? 'N' : 'Y',
+        sst_schedule_chk: 'Y', // 항상 'Y'로 설정
+        sst_schedule_alarm: calculatedAlarmTime, // 계산된 알림 시간
         sst_repeat_json: repeatData.sst_repeat_json,
         sst_repeat_json_v: repeatData.sst_repeat_json_v,
         sst_update_chk: 'Y',
@@ -1035,9 +1415,8 @@ export default function SchedulePage() {
         sst_pick_type: alarmPickType,
         sst_pick_result: alarmPickResult,
         // 다른 멤버의 스케줄 생성 시
-        targetMemberId: selectedMemberId && selectedMemberId !== currentMember?.id 
-          ? parseInt(selectedMemberId) 
-          : undefined,
+        targetMemberId: selectedMember?.mt_idx || undefined,
+        sgdt_idx: selectedMember?.sgdt_idx || undefined, // 실제 sgdt_idx 필드 사용
       };
 
       console.log('[handleSaveEvent] 📦 최종 요청 데이터:', requestData);
@@ -1063,16 +1442,36 @@ export default function SchedulePage() {
           sst_repeat_json_v: repeatData.sst_repeat_json_v,
           sst_alram_t: newEvent.alarm === '없음' ? '' : newEvent.alarm,
           sst_schedule_alarm_chk: (newEvent.alarm === '없음' ? 'N' : 'Y') as 'Y' | 'N',
+          sst_schedule_chk: 'Y', // 항상 'Y'로 설정
+          sst_schedule_alarm: calculatedAlarmTime, // 계산된 알림 시간
           sst_pick_type: alarmPickType,
           sst_pick_result: alarmPickResult,
+          // 반복 일정 처리 옵션 추가
+          editOption: newEvent.editOption,
+          // 선택된 멤버 정보 추가
+          targetMemberId: selectedMember?.mt_idx || undefined,
+          sgdt_idx: selectedMember?.sgdt_idx || undefined, // 실제 sgdt_idx 필드 사용
         };
 
         console.log('[handleSaveEvent] 🔄 수정 요청 데이터:', updateData);
-        const response = await scheduleService.updateSchedule(updateData);
+        
+        let response;
+        if (newEvent.editOption && newEvent.editOption !== 'this') {
+          // 반복 일정 처리 옵션이 있는 경우
+          response = await scheduleService.updateScheduleWithRepeatOption(updateData);
+        } else {
+          // 일반 수정
+          response = await scheduleService.updateSchedule(updateData);
+        }
+        
         console.log('[handleSaveEvent] 🔄 수정 응답:', response);
 
         if (response.success) {
           console.log('[handleSaveEvent] ✅ 스케줄 수정 성공');
+          
+          // 수정 성공 시 로컬 스토리지 캐시 완전 초기화
+          clearCacheFromStorage();
+          console.log('[handleSaveEvent] 🗑️ 수정 후 로컬 스토리지 캐시 완전 초기화');
           
           // 성공적으로 완료되었을 때만 모달 닫기
           setIsAddEventModalOpen(false);
@@ -1081,10 +1480,16 @@ export default function SchedulePage() {
           setDateTimeError(null);
           
           // 스케줄 목록 새로 고침
-          await loadAllGroupSchedules();
+          await loadAllGroupSchedules(undefined, undefined, true);
           
           // 성공 모달 표시 (3초 후 자동 닫기)
-          openSuccessModal('일정 수정 완료', '일정이 성공적으로 수정되었습니다.', 'success', undefined, true);
+          const updateMessage = newEvent.editOption === 'all' 
+            ? '모든 반복 일정이 성공적으로 수정되었습니다.'
+            : newEvent.editOption === 'future'
+            ? '현재 이후의 반복 일정이 성공적으로 수정되었습니다.'
+            : '일정이 성공적으로 수정되었습니다.';
+          
+          openSuccessModal('일정 수정 완료', updateMessage, 'success', undefined, true);
         } else {
           console.log('[handleSaveEvent] ❌ 스케줄 수정 실패:', response.error);
           openSuccessModal('일정 수정 실패', response.error || '일정 수정에 실패했습니다.', 'error');
@@ -1095,9 +1500,8 @@ export default function SchedulePage() {
         // 추가
         const createData = {
           groupId: selectedGroupId,
-          targetMemberId: selectedMemberId && selectedMemberId !== currentMember?.id 
-            ? parseInt(selectedMemberId) 
-            : undefined,
+          targetMemberId: selectedMember?.mt_idx || undefined,
+          sgdt_idx: selectedMember?.sgdt_idx || undefined, // 타겟 멤버의 그룹 상세 인덱스
           sst_title: newEvent.title,
           sst_sdate: startDateTime,
           sst_edate: endDateTime,
@@ -1113,6 +1517,7 @@ export default function SchedulePage() {
           sst_repeat_json_v: repeatData.sst_repeat_json_v,
           sst_alram_t: newEvent.alarm === '없음' ? '' : newEvent.alarm,
           sst_schedule_alarm_chk: (newEvent.alarm === '없음' ? 'N' : 'Y') as 'Y' | 'N',
+          sst_schedule_alarm: calculatedAlarmTime, // 계산된 알림 시간 추가
           sst_pick_type: alarmPickType,
           sst_pick_result: alarmPickResult,
         };
@@ -1129,6 +1534,44 @@ export default function SchedulePage() {
           setNewEvent(initialNewEventState);
           setSelectedEventDetails(null);
           setDateTimeError(null);
+          
+          // 새로 생성된 이벤트를 캐시에 추가
+          const newEventForCache: ScheduleEvent = {
+            id: response.data.sst_idx?.toString() || `temp-${Date.now()}`,
+            sst_idx: response.data.sst_idx,
+            date: newEvent.date,
+            startTime: newEvent.startTime,
+            endTime: newEvent.endTime,
+            title: newEvent.title,
+            content: newEvent.content,
+            groupId: selectedGroupId,
+            groupName: newEvent.groupName,
+            groupColor: newEvent.groupColor,
+            memberName: selectedMember?.name || '',
+            memberPhoto: selectedMember?.photo || '',
+            memberGender: selectedMember?.mt_gender || null,
+            memberIdx: selectedMember?.mt_idx || 0,
+            canEdit: true,
+            canDelete: true,
+            locationName: newEvent.locationName,
+            locationAddress: newEvent.locationAddress,
+            locationLat: newEvent.locationLat,
+            locationLng: newEvent.locationLng,
+            hasAlarm: newEvent.alarm !== '없음',
+            alarmText: newEvent.alarm !== '없음' ? `알림 ${newEvent.alarm}` : '알림 OFF',
+            alarmTime: newEvent.alarm !== '없음' ? newEvent.alarm : '',
+            repeatText: newEvent.repeat === '안함' ? '없음' : newEvent.repeat,
+            isAllDay: newEvent.allDay,
+            tgtMtIdx: selectedMember?.mt_idx || null,
+            repeatJsonV: repeatData.sst_repeat_json_v,
+            tgtSgdtOwnerChk: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_owner_chk || 'N', // 타겟 멤버의 오너 권한
+            tgtSgdtLeaderChk: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_leader_chk || 'N', // 타겟 멤버의 리더 권한
+            tgtSgdtIdx: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_idx, // 타겟 멤버의 그룹 상세 인덱스
+            sst_pidx: undefined
+          };
+          
+          // 캐시에 새 이벤트 추가
+          updateCacheForEvent(newEventForCache, 'add');
           
           // 스케줄 목록 새로 고침
           await loadAllGroupSchedules();
@@ -1196,13 +1639,20 @@ export default function SchedulePage() {
       if (response.success) {
         console.log('[handleDeleteEvent] 스케줄 삭제 성공');
         
+        // 삭제 성공 시 로컬 스토리지 캐시 완전 초기화
+        clearCacheFromStorage();
+        console.log('[handleDeleteEvent] 🗑️ 삭제 후 로컬 스토리지 캐시 완전 초기화');
+        
         // 로컬 상태에서도 제거
         setEvents(prev => prev.filter(event => event.id !== selectedEventDetails.id));
         setIsModalOpen(false);
         setSelectedEventDetails(null);
         
+        // 캐시에서도 제거  
+        updateCacheForEvent(selectedEventDetails, 'delete');
+        
         // 스케줄 목록 새로 고침
-        await loadAllGroupSchedules();
+        await loadAllGroupSchedules(undefined, undefined, true);
         
         // 성공 모달 표시 (3초 후 자동 닫기)
         openSuccessModal('일정 삭제 완료', '일정이 성공적으로 삭제되었습니다.', 'success', undefined, true);
@@ -1224,7 +1674,10 @@ export default function SchedulePage() {
         if (repeatText === '매일') return '매일';
         if (repeatText === '매월') return '매월';
         if (repeatText === '매년') return '매년';
-        if (repeatText.includes('매주')) return '매주';
+        if (repeatText.includes('매주')) {
+          // 다중 요일 선택된 경우 그대로 반환 (예: "매주 월,화,수")
+          return repeatText;
+        }
         return '안함';
       };
 
@@ -1253,16 +1706,37 @@ export default function SchedulePage() {
         memberName: selectedEventDetails.memberName || '',
         memberPhoto: '', // 빈 문자열로 설정하여 로컬 이미지 사용
       });
-      setIsModalOpen(false);
+      
+      // 매주 다중 요일 선택이 된 경우 요일 선택기 상태 설정
+      const repeatText = selectedEventDetails.repeatText || '';
+      if (repeatText.includes('매주 ') && repeatText !== '매주') {
+        setShowWeekdaySelector(true);
+        const selectedDays = repeatText.replace('매주 ', '');
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+        const weekdayIndices = new Set<number>();
+        
+        selectedDays.split(',').forEach(dayName => {
+          const index = dayNames.indexOf(dayName.trim());
+          if (index !== -1) {
+            weekdayIndices.add(index);
+          }
+        });
+        
+        setSelectedWeekdays(weekdayIndices);
+      } else {
+        setShowWeekdaySelector(false);
+        setSelectedWeekdays(new Set());
+      }
+      
       setIsAddEventModalOpen(true);
       // body 스크롤은 이미 비활성화되어 있으므로 유지
     }
   };
 
-  // 일정 클릭 핸들러
+  // 일정 클릭 핸들러 - 바로 액션 선택 모달 표시
   const handleEventItemClick = (event: ScheduleEvent) => {
-    setSelectedEventDetails(event);
-    setIsModalOpen(true);
+    setSelectedEventForAction(event);
+    setIsScheduleActionModalOpen(true);
     // body 스크롤 비활성화
     document.body.style.overflow = 'hidden';
   };
@@ -1292,35 +1766,41 @@ export default function SchedulePage() {
   const fetchUserGroups = async () => {
     setIsLoadingGroups(true);
     try {
-      console.log('[fetchUserGroups] 현재 사용자의 그룹 목록 조회 시작');
+      console.log('[fetchUserGroups] 그룹 목록 조회 시작');
+      const data = await groupService.getCurrentUserGroups();
+      setUserGroups(data);
+      console.log('[fetchUserGroups] 그룹 목록 조회 완료:', data.length, '개 그룹');
       
-      // scheduleService의 getCurrentUserGroups 메서드 사용
-      const response = await scheduleService.getCurrentUserGroups();
-      console.log('[fetchUserGroups] API 응답:', response);
+      // 그룹 로딩 단계 완료
+      updateLoadingStep('groups', true);
       
-      if (response.success && response.data?.groups) {
-        const groups = response.data.groups.map(group => ({
-          sgt_idx: group.sgt_idx,
-          sgt_title: group.sgt_title
-        }));
+      // 첫 번째 그룹 선택
+      if (data.length > 0) {
+        const firstGroup = data[0];
+        setSelectedGroupId(firstGroup.sgt_idx);
+        console.log('[fetchUserGroups] 첫 번째 그룹 선택:', firstGroup.sgt_title);
         
-        console.log('[fetchUserGroups] 변환된 그룹 목록:', groups);
-        setUserGroups(groups);
+        // 그룹 멤버 데이터 로드
+        await fetchGroupMembers(firstGroup.sgt_idx);
         
-        // 첫 번째 그룹을 기본 선택
-        if (groups.length > 0 && !selectedGroupId) {
-          setSelectedGroupId(groups[0].sgt_idx);
-          console.log('[fetchUserGroups] 첫 번째 그룹 자동 선택:', groups[0].sgt_title);
-        }
+        // 현재 월 데이터 로드
+        const currentYear = dayjs().year();
+        const currentMonth = dayjs().month() + 1;
+        await loadAllGroupSchedules(currentYear, currentMonth);
       } else {
-        console.warn('[fetchUserGroups] 그룹 데이터가 없거나 API 실패');
-        setUserGroups([]);
+        console.log('[fetchUserGroups] 그룹이 없습니다');
+        updateLoadingStep('schedules', true);
+        updateLoadingStep('calendar', true);
+        updateLoadingStep('ui', true);
+        setIsInitialLoading(false);
       }
     } catch (error) {
-      console.error('[fetchUserGroups] 그룹 목록 조회 실패:', error);
-      setUserGroups([]);
-    } finally {
-      setIsLoadingGroups(false);
+      console.error('[fetchUserGroups] 그룹 목록 조회 오류:', error);
+      updateLoadingStep('groups', true); // 오류 시에도 다음 단계로 진행
+      updateLoadingStep('schedules', true);
+      updateLoadingStep('calendar', true);
+      updateLoadingStep('ui', true);
+      setIsInitialLoading(false);
     }
   };
 
@@ -1347,7 +1827,16 @@ export default function SchedulePage() {
             mt_file1: member.mt_file1,
             // 권한 정보 추가
             sgdt_owner_chk: member.sgdt_owner_chk || 'N',
-            sgdt_leader_chk: member.sgdt_leader_chk || 'N'
+            sgdt_leader_chk: member.sgdt_leader_chk || 'N',
+            // 그룹 상세 인덱스 추가
+            sgdt_idx: member.sgdt_idx,
+            
+            // 새로 추가된 위치 정보
+            mlt_lat: member.mlt_lat,
+            mlt_long: member.mlt_long,
+            mlt_speed: member.mlt_speed,
+            mlt_battery: member.mlt_battery,
+            mlt_gps_time: member.mlt_gps_time,
           };
         });
 
@@ -1374,6 +1863,12 @@ export default function SchedulePage() {
 
   // 그룹 선택 핸들러
   const handleGroupSelect = async (groupId: number) => {
+    // 일정 수정 모드일 때는 그룹 선택 불가
+    if (newEvent.id) {
+      console.log('[handleGroupSelect] 일정 수정 모드에서는 그룹 변경 불가');
+      return;
+    }
+    
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
     await fetchGroupMembers(groupId);
@@ -1389,7 +1884,20 @@ export default function SchedulePage() {
 
   // 멤버 선택 핸들러
   const handleScheduleMemberSelect = (memberId: string) => {
+    // 일정 수정 모드일 때는 멤버 선택 불가
+    if (newEvent.id) {
+      console.log('[handleScheduleMemberSelect] 일정 수정 모드에서는 멤버 변경 불가');
+      return;
+    }
+    
+    console.log('[handleScheduleMemberSelect] 멤버 선택:', {
+      selectedMemberId: memberId,
+      previousSelectedMemberId: selectedMemberId
+    });
+    
     setSelectedMemberId(memberId);
+    
+    // scheduleGroupMembers의 isSelected 상태 업데이트
     setScheduleGroupMembers(prev => prev.map(member => ({
       ...member,
       isSelected: member.id === memberId
@@ -1398,6 +1906,15 @@ export default function SchedulePage() {
     // 선택된 멤버 정보를 newEvent에 반영
     const selectedMember = scheduleGroupMembers.find(m => m.id === memberId);
     const selectedGroup = userGroups.find(g => g.sgt_idx === selectedGroupId);
+    
+    console.log('[handleScheduleMemberSelect] 선택된 멤버 정보:', {
+      selectedMember: selectedMember ? {
+        id: selectedMember.id,
+        name: selectedMember.name,
+        mt_idx: selectedMember.mt_idx,
+        sgdt_idx: selectedMember.sgdt_idx
+      } : null
+    });
     
     if (selectedMember && selectedGroup && selectedGroupId !== null) {
       // 그룹별 색상 배열 (다양한 색상 제공)
@@ -1650,13 +2167,95 @@ export default function SchedulePage() {
   };
 
   // 모든 그룹의 스케줄 로드 - 실제 백엔드 API 사용
-  const loadAllGroupSchedules = async (year?: number, month?: number) => {
+  const loadAllGroupSchedules = async (year?: number, month?: number, keepSelectedDate?: boolean) => {
     try {
-      console.log('[SCHEDULE] 스케줄 로드 시작:', { year, month });
+      console.log('[SCHEDULE] 스케줄 로드 시작:', { year, month, keepSelectedDate });
+      
+      // 캐시 키 생성 (년-월 형태)
+      const cacheKey = year && month ? `${year}-${String(month).padStart(2, '0')}` : 
+                      `${dayjs().year()}-${String(dayjs().month() + 1).padStart(2, '0')}`;
+      
+      console.log('[SCHEDULE] 캐시 키:', cacheKey);
+      console.log('[SCHEDULE] 로드된 월들:', Array.from(loadedMonths));
+      
+      // 로컬 스토리지에서 캐시된 데이터 확인
+      let cachedData: ScheduleEvent[] | null = null;
+      
+      // 메모리 캐시 우선 확인
+      if (monthlyCache.has(cacheKey)) {
+        cachedData = monthlyCache.get(cacheKey) || [];
+        console.log('[SCHEDULE] 메모리 캐시에서 데이터 로드:', cacheKey);
+      } else if (loadedMonths.has(cacheKey)) {
+        // 로컬 스토리지에서 캐시 데이터 로드
+        cachedData = loadMonthCacheFromStorage(cacheKey);
+        if (cachedData) {
+          // 메모리 캐시에도 저장
+          setMonthlyCache(prev => new Map(prev).set(cacheKey, cachedData!));
+          console.log('[SCHEDULE] 로컬 스토리지에서 데이터 로드:', cacheKey);
+        }
+      }
+      
+      // 캐시된 데이터가 있는 경우
+      if (cachedData && cachedData.length >= 0) {
+        console.log('[SCHEDULE] 캐시된 데이터 사용:', cacheKey, `(${cachedData.length}개 이벤트)`);
+        
+        if (keepSelectedDate && selectedDay) {
+          // 월 변경 시: 선택된 날짜의 기존 일정을 보존하면서 캐시된 데이터 병합
+          const selectedDateString = selectedDay.format('YYYY-MM-DD');
+          
+          setEvents(prevEvents => {
+            // 기존 일정 중 선택된 날짜의 일정만 필터링
+            const selectedDateEvents = prevEvents.filter(event => event.date === selectedDateString);
+            
+            // 캐시된 일정 중 선택된 날짜가 아닌 일정들
+            const otherEvents = cachedData!.filter(event => event.date !== selectedDateString);
+            
+            // 캐시된 일정 중 선택된 날짜의 일정들
+            const newSelectedDateEvents = cachedData!.filter(event => event.date === selectedDateString);
+            
+            console.log('[SCHEDULE] 캐시 병합 - 기존 선택된 날짜 일정:', selectedDateEvents);
+            console.log('[SCHEDULE] 캐시 병합 - 새 선택된 날짜 일정:', newSelectedDateEvents);
+            
+            // 새 데이터가 있으면 새 데이터 사용, 없으면 기존 데이터 유지
+            const finalSelectedDateEvents = newSelectedDateEvents.length > 0 ? newSelectedDateEvents : selectedDateEvents;
+            
+            return [...otherEvents, ...finalSelectedDateEvents];
+          });
+        } else {
+          // 일반 로딩 시: 캐시된 데이터 사용
+          setEvents(cachedData);
+        }
+        
+        // 선택된 날짜 처리
+        if (!keepSelectedDate && !selectedDay) {
+          console.log('[SCHEDULE] 선택된 날짜를 오늘로 초기화');
+          setSelectedDay(dayjs());
+        } else {
+          console.log('[SCHEDULE] 선택된 날짜 유지:', selectedDay?.format('YYYY-MM-DD'));
+        }
+        
+        // 초기 로딩 완료 처리
+        if (!hasInitialDataLoaded) {
+          setHasInitialDataLoaded(true);
+          // 일정 데이터 및 캘린더 단계 완료
+          updateLoadingStep('schedules', true);
+          updateLoadingStep('calendar', true);
+          // UI 단계도 완료하고 로딩 완료
+          setTimeout(() => {
+            updateLoadingStep('ui', true);
+            setIsInitialLoading(false);
+          }, 1500);
+        }
+        
+        return; // 캐시된 데이터 사용 시 API 호출 없이 종료
+      }
+
+      console.log('[SCHEDULE] 캐시된 데이터 없음, API 호출 시작');
       
       // 새로운 API 사용: 오너 그룹의 모든 멤버 스케줄을 월별로 조회
       const response = await scheduleService.getOwnerGroupsAllSchedules(year, month);
-      
+      console.log('[SCHEDULE] API 응답:', response);
+
       if (response.success && response.data?.schedules) {
         console.log('[SCHEDULE] 조회 성공:', {
           totalSchedules: response.data.totalSchedules,
@@ -1717,9 +2316,18 @@ export default function SchedulePage() {
         };
         
         // 백엔드에서 받은 스케줄 데이터를 프론트엔드 형식으로 변환
-        response.data.schedules.forEach((schedule: any, index) => {
+        response.data.schedules.forEach((schedule: any, index: number) => {
           try {
-            // sst_sdate와 sst_edate를 사용하여 날짜 파싱
+            // 백엔드 원본 데이터 로깅 (반복 일정인 경우만)
+            // if (schedule.sst_repeat_json || schedule.sst_pidx) {
+            //   console.log(`[DEBUG] 백엔드 원본 데이터 - 스케줄 ${schedule.sst_idx}:`, {
+            //     sst_pidx: schedule.sst_pidx,
+            //     sst_repeat_json: schedule.sst_repeat_json,
+            //     sst_title: schedule.sst_title
+            //   });
+            // }
+            
+            // 시작/종료 시간 파싱
             let startDate: Date;
             let endDate: Date;
             
@@ -1741,69 +2349,127 @@ export default function SchedulePage() {
               'bg-gray-500';
 
             // 알림 여부 및 시간 확인
-            const hasAlarm = schedule.sst_alram && schedule.sst_alram !== 0 && schedule.sst_alram !== '0';
-            const alarmTime = schedule.sst_alram_t || '';
+            const hasAlarm = schedule.sst_schedule_alarm_chk === 'Y';
             
+            // 백엔드의 sst_pick_type과 sst_pick_result를 사용하여 알림 시간 계산
+            let alarmTime = '';
+            if (hasAlarm && schedule.sst_pick_type && schedule.sst_pick_result) {
+              const pickType = schedule.sst_pick_type;
+              const pickResult = parseInt(schedule.sst_pick_result) || 0;
+              
+              // console.log('[loadAllGroupSchedules] 알림 계산:', {
+              //   pickType,
+              //   pickResult,
+              //   sst_alram_t: schedule.sst_alram_t
+              // });
+              
+              if (pickResult === 0) {
+                alarmTime = '정시';
+              } else if (pickType === 'minute') {
+                alarmTime = `${pickResult}분 전`;
+              } else if (pickType === 'hour') {
+                alarmTime = `${pickResult}시간 전`;
+              } else if (pickType === 'day') {
+                alarmTime = `${pickResult}일 전`;
+              } else {
+                // 기본값으로 sst_alram_t 사용
+                alarmTime = schedule.sst_alram_t || '';
+              }
+            } else if (hasAlarm && schedule.sst_alram_t) {
+              // sst_pick_type이 없는 경우 sst_alram_t 사용
+              alarmTime = schedule.sst_alram_t;
+            }
+            
+            // console.log('[loadAllGroupSchedules] 최종 알림 시간:', {
+            //   hasAlarm,
+            //   alarmTime,
+            //   pickType: schedule.sst_pick_type,
+            //   pickResult: schedule.sst_pick_result
+            // });
+
             // 하루 종일 여부 확인
             const isAllDay = schedule.sst_all_day === 'Y';
 
-            // tgt_mt_idx와 일치하는 멤버 정보 찾기
+            // 타겟 멤버 정보 설정 (실제 스케줄 대상자 기준)
             let targetMemberName = schedule.member_name || '';
-            let targetMemberPhoto = ''; // 기본값
-            let targetMemberGender: number | null = null;
-            let targetMemberIdx = 0;
+            let targetMemberPhoto = schedule.member_photo || '';
+            let targetMemberGender = schedule.mt_gender || null;
+            let targetMemberIdx = schedule.tgt_mt_idx || schedule.mt_idx || 0; // 타겟 멤버 ID 우선, 없으면 생성자 ID
             
-            if (schedule.tgt_mt_idx && schedule.sgt_idx && allGroupMembers[schedule.sgt_idx]) {
+            // 실제 타겟 멤버 정보를 그룹 멤버 리스트에서 찾기
+            const targetMtIdx = schedule.tgt_mt_idx || schedule.mt_idx; // 타겟 멤버 ID 우선
+            
+            // 디버깅 로그 추가
+            // if (schedule.tgt_mt_idx && schedule.tgt_mt_idx !== schedule.mt_idx) {
+            //   console.log(`[DEBUG] 타겟 멤버 불일치 - 스케줄 ${schedule.sst_idx}: tgt_mt_idx=${schedule.tgt_mt_idx}, mt_idx=${schedule.mt_idx}, 사용할 ID=${targetMtIdx}`);
+            // }
+            
+            if (targetMtIdx && schedule.sgt_idx && allGroupMembers[schedule.sgt_idx]) {
               const targetMember = allGroupMembers[schedule.sgt_idx].find(
-                (member: any) => member.mt_idx === schedule.tgt_mt_idx
+                (member: any) => member.mt_idx === targetMtIdx
               );
               
               if (targetMember) {
-                targetMemberName = targetMember.mt_name || targetMember.name || '';
-                // 서버 이미지가 있으면 사용, 없으면 기본 이미지 사용
-                targetMemberPhoto = targetMember.mt_file1 || getDefaultImage(targetMember.mt_gender, targetMember.mt_idx || 0);
+                targetMemberName = targetMember.mt_name || targetMember.name || targetMemberName;
+                targetMemberPhoto = targetMember.mt_file1 || targetMemberPhoto;
                 targetMemberGender = targetMember.mt_gender || null;
-                targetMemberIdx = targetMember.mt_idx || 0;
+                targetMemberIdx = targetMember.mt_idx;
+                
+                console.log(`[DEBUG] 타겟 멤버 찾음 - ID: ${targetMtIdx}, 이름: ${targetMemberName}`);
+              } else {
+                console.log(`[DEBUG] 타겟 멤버 못 찾음 - ID: ${targetMtIdx}, 그룹: ${schedule.sgt_idx}`);
               }
+            } else if (!targetMtIdx) {
+              // tgt_mt_idx가 없으면 기본 멤버 정보 사용 (생성자 정보)
+              console.log(`[DEBUG] 타겟 멤버 ID 없음, 생성자 정보 사용 - 생성자: ${schedule.mt_idx}, 이름: ${targetMemberName}`);
             }
-            
+
             const event: ScheduleEvent = {
-              id: schedule.sst_idx?.toString() || schedule.id || `temp-${Date.now()}-${index}`,
-              sst_idx: schedule.sst_idx || undefined,
-              date: dayjs(startDate).format('YYYY-MM-DD'),
-              startTime: dayjs(startDate).format('HH:mm'),
-              endTime: dayjs(endDate).format('HH:mm'),
-              title: schedule.sst_title || schedule.title || '제목 없음',
+              id: schedule.sst_idx?.toString() || `temp-${index}`,
+              sst_idx: schedule.sst_idx,
+              date: schedule.sst_sdate ? schedule.sst_sdate.split(' ')[0] : '',
+              startTime: schedule.sst_sdate ? schedule.sst_sdate.split(' ')[1]?.substring(0, 5) || '00:00' : '00:00',
+              endTime: schedule.sst_edate ? schedule.sst_edate.split(' ')[1]?.substring(0, 5) || '23:59' : '23:59',
+              title: schedule.sst_title || '제목 없음',
               content: schedule.sst_memo || '',
-              groupId: schedule.sgt_idx || undefined,
+              groupId: schedule.sgt_idx,
               groupName: schedule.group_title || '',
-              groupColor: groupColor,
-              memberName: targetMemberName, // tgt_mt_idx에 해당하는 멤버 이름 사용
-              memberPhoto: targetMemberPhoto, // tgt_mt_idx에 해당하는 멤버 사진 사용
-              memberGender: targetMemberGender, // 멤버 성별 정보 추가
-              memberIdx: targetMemberIdx, // 멤버 인덱스 추가
-              canEdit: response.data.userPermission.canManage,
-              canDelete: response.data.userPermission.canManage,
-              // 추가 표시 정보
+              groupColor: getGroupColor(schedule.sgt_idx || 0),
+              memberName: targetMemberName,
+              memberPhoto: targetMemberPhoto,
+              memberGender: targetMemberGender,
+              memberIdx: targetMemberIdx,
+              canEdit: true,
+              canDelete: true,
               locationName: schedule.sst_location_title || '',
-              locationAddress: schedule.sst_location_add || '', // 백엔드 원본 주소 사용
-              locationLat: schedule.sst_location_lat || undefined, // 위도 추가
-              locationLng: schedule.sst_location_long || undefined, // 경도 추가
+              locationAddress: schedule.sst_location_add || '',
+              locationLat: schedule.sst_location_lat || undefined,
+              locationLng: schedule.sst_location_long || undefined,
               hasAlarm: hasAlarm,
               alarmText: hasAlarm ? (alarmTime ? `알림 ${alarmTime}` : '알림 ON') : '알림 OFF',
               alarmTime: alarmTime, // 알림 시간 추가
               repeatText: getRepeatText(schedule.sst_repeat_json),
               distance: schedule.sch_calc_dist || null,
               distanceText: schedule.sch_calc_dist ? `${schedule.sch_calc_dist}km` : '',
-              // 타겟 멤버 정보
-              tgtMtIdx: schedule.tgt_mt_idx || null,
+              // 타겟 멤버 정보 (수정 시 사용)
+              tgtMtIdx: schedule.tgt_mt_idx || null, // DB의 실제 타겟 멤버 ID 사용
               isAllDay: isAllDay, // 하루 종일 여부
               repeatJsonV: schedule.sst_repeat_json_v || '', // 반복 JSON 버전
-              tgtSgdtOwnerChk: schedule.tgt_sgdt_owner_chk || 'N', // 타겟 멤버의 오너 권한
-              tgtSgdtLeaderChk: schedule.tgt_sgdt_leader_chk || 'N' // 타겟 멤버의 리더 권한
+              tgtSgdtOwnerChk: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_owner_chk || 'N', // 타겟 멤버의 오너 권한
+              tgtSgdtLeaderChk: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_leader_chk || 'N', // 타겟 멤버의 리더 권한
+              tgtSgdtIdx: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_idx, // 타겟 멤버의 그룹 상세 인덱스
+              sst_pidx: undefined
             }
             
-            allEvents.push(event);
+            // sst_pidx 디버깅 로그 추가
+            // if (schedule.sst_repeat_json || schedule.sst_pidx) {
+            //   console.log(`[DEBUG] 스케줄 ${schedule.sst_idx} - sst_pidx: ${schedule.sst_pidx}, repeat_json: ${schedule.sst_repeat_json}, 최종 sst_pidx: ${event.sst_pidx}`);
+            // }
+            
+            // 멤버 위치 정보 매핑 및 거리 계산
+            const eventWithLocation = mapMemberLocationToSchedule(event, allGroupMembers[schedule.sgt_idx] || []);
+            
+            allEvents.push(eventWithLocation);
             
           } catch (parseError) {
             console.error(`[loadAllGroupSchedules] 스케줄 ${index} 파싱 실패:`, parseError);
@@ -1812,17 +2478,102 @@ export default function SchedulePage() {
         
         console.log('[loadAllGroupSchedules] 모든 변환된 이벤트:', allEvents);
         console.log('[loadAllGroupSchedules] 총 이벤트 수:', allEvents.length);
+        console.log('[loadAllGroupSchedules] keepSelectedDate:', keepSelectedDate);
+        console.log('[loadAllGroupSchedules] 현재 selectedDay:', selectedDay?.format('YYYY-MM-DD'));
         
-        setEvents(allEvents);
+        if (keepSelectedDate && selectedDay) {
+          // 월 변경 시: 선택된 날짜의 기존 일정을 보존하면서 새 데이터 병합
+          const selectedDateString = selectedDay.format('YYYY-MM-DD');
+          
+          setEvents(prevEvents => {
+            // 기존 일정 중 선택된 날짜의 일정만 필터링
+            const selectedDateEvents = prevEvents.filter(event => event.date === selectedDateString);
+            
+            // 새로운 일정 중 선택된 날짜가 아닌 일정들
+            const otherEvents = allEvents.filter(event => event.date !== selectedDateString);
+            
+            // 새로운 일정 중 선택된 날짜의 일정들 (업데이트된 데이터)
+            const newSelectedDateEvents = allEvents.filter(event => event.date === selectedDateString);
+            
+            console.log('[loadAllGroupSchedules] 월 변경 - 기존 선택된 날짜 일정:', selectedDateEvents);
+            console.log('[loadAllGroupSchedules] 월 변경 - 새 선택된 날짜 일정:', newSelectedDateEvents);
+            
+            // 새 데이터가 있으면 새 데이터 사용, 없으면 기존 데이터 유지
+            const finalSelectedDateEvents = newSelectedDateEvents.length > 0 ? newSelectedDateEvents : selectedDateEvents;
+            
+            return [...otherEvents, ...finalSelectedDateEvents];
+          });
+        } else {
+          // 일반 로딩 시: 전체 교체
+          setEvents(allEvents);
+        }
+        
+        // keepSelectedDate가 false이거나 undefined이고, selectedDay가 없는 경우에만 오늘로 초기화
+        if (!keepSelectedDate && !selectedDay) {
+          console.log('[loadAllGroupSchedules] 선택된 날짜를 오늘로 초기화');
+          setSelectedDay(dayjs());
+        } else {
+          console.log('[loadAllGroupSchedules] 선택된 날짜 유지:', selectedDay?.format('YYYY-MM-DD'));
+        }
+        
+        // 캐시에 저장
+        setMonthlyCache(prev => new Map(prev).set(cacheKey, allEvents));
+        setLoadedMonths(prev => new Set(prev).add(cacheKey));
+        
+        // 로컬 스토리지에도 저장
+        saveCacheToStorage(cacheKey, allEvents);
+        
+        // 초기 로딩 완료 처리
+        if (!hasInitialDataLoaded) {
+          setHasInitialDataLoaded(true);
+          // 일정 데이터 및 캘린더 단계 완료
+          updateLoadingStep('schedules', true);
+          updateLoadingStep('calendar', true);
+          // UI 단계도 완료하고 로딩 완료
+          setTimeout(() => {
+            updateLoadingStep('ui', true);
+            setIsInitialLoading(false);
+          }, 1500);
+        }
         
       } else {
         console.log('[loadAllGroupSchedules] 오너 그룹 스케줄 조회 실패 또는 데이터 없음:', response);
-        setEvents([]);
+        // keepSelectedDate가 true인 경우(월 변경) 기존 events 유지, 아니면 빈 배열로 설정
+        if (!keepSelectedDate) {
+          setEvents([]);
+        }
+        
+        // 초기 로딩 완료 처리 (데이터가 없어도 로딩은 완료)
+        if (!hasInitialDataLoaded) {
+          setHasInitialDataLoaded(true);
+          // 오류 시에도 모든 단계 완료
+          updateLoadingStep('schedules', true);
+          updateLoadingStep('calendar', true);
+          setTimeout(() => {
+            updateLoadingStep('ui', true);
+            setIsInitialLoading(false);
+          }, 1500);
+        }
       }
       
     } catch (error) {
       console.error('[loadAllGroupSchedules] 스케줄 로드 실패:', error);
-      setEvents([]);
+      // keepSelectedDate가 true인 경우(월 변경) 기존 events 유지, 아니면 빈 배열로 설정  
+      if (!keepSelectedDate) {
+        setEvents([]);
+      }
+      
+      // 초기 로딩 완료 처리 (에러가 발생해도 로딩은 완료)
+      if (!hasInitialDataLoaded) {
+        setHasInitialDataLoaded(true);
+        // 오류 시에도 모든 단계 완료
+        updateLoadingStep('schedules', true);
+        updateLoadingStep('calendar', true);
+        setTimeout(() => {
+          updateLoadingStep('ui', true);
+          setIsInitialLoading(false);
+        }, 1500);
+      }
     }
   };
 
@@ -1860,325 +2611,956 @@ export default function SchedulePage() {
     setSuccessModalContent(null);
   };
 
+  // 스케줄 액션 선택 모달 닫기
+  const closeScheduleActionModal = () => {
+    setIsScheduleActionModalOpen(false);
+    setSelectedEventForAction(null);
+    // body 스크롤 복원
+    document.body.style.overflow = '';
+  };
+
+  // 수정 액션 핸들러
+  const handleEditAction = async (event: ScheduleEvent) => {
+    // 반복 일정인지 확인 (sst_repeat_json이 있는 경우)
+    if (event.repeatText && event.repeatText !== '없음') {
+      // 반복 일정인 경우 선택 모달 표시
+      setPendingRepeatEvent(event);
+      setRepeatActionType('edit');
+      setIsScheduleActionModalOpen(false);
+      setIsRepeatActionModalOpen(true);
+      return;
+    }
+
+    // 일반 일정 수정 처리
+    await executeEditAction(event);
+  };
+
+  // 반복 일정 옵션 선택 핸들러
+  const handleRepeatOption = async (option: 'this' | 'future' | 'all') => {
+    if (!pendingRepeatEvent) return;
+
+    setIsRepeatActionModalOpen(false);
+
+    if (repeatActionType === 'delete') {
+      await executeDeleteAction(pendingRepeatEvent, option);
+    } else if (repeatActionType === 'edit') {
+      await executeEditAction(pendingRepeatEvent, option);
+    }
+
+    setPendingRepeatEvent(null);
+  };
+
+  // 실제 삭제 실행
+  const executeDeleteAction = async (event: ScheduleEvent, option: 'single' | 'this' | 'future' | 'all') => {
+    if (!selectedGroupId) {
+      openSuccessModal('그룹 오류', '그룹 정보가 없습니다.', 'error');
+      return;
+    }
+
+    try {
+      console.log('[executeDeleteAction] 스케줄 삭제 시작:', {
+        sst_idx: event.sst_idx,
+        sst_pidx: event.sst_pidx || null, // undefined인 경우 null로 설정
+        groupId: selectedGroupId,
+        option
+      });
+
+      let response;
+      
+      if (option === 'single' || option === 'this') {
+        // 일반 삭제 또는 이것만 삭제
+        response = await scheduleService.deleteSchedule(
+          event.sst_idx!,
+          selectedGroupId
+        );
+      } else {
+        // 반복 일정 처리 옵션이 있는 삭제
+        response = await scheduleService.deleteScheduleWithRepeatOption({
+          sst_idx: event.sst_idx!,
+          sst_pidx: event.sst_pidx || null, // undefined인 경우 null로 설정
+          sgdt_idx: event.tgtSgdtIdx || null, // undefined인 경우 null로 설정
+          groupId: selectedGroupId,
+          deleteOption: option as 'this' | 'future' | 'all'
+        });
+      }
+
+      if (response.success) {
+        console.log('[executeDeleteAction] 스케줄 삭제 성공');
+        
+        // 삭제 성공 시 로컬 스토리지 캐시 완전 초기화
+        clearCacheFromStorage();
+        console.log('[executeDeleteAction] 🗑️ 삭제 후 로컬 스토리지 캐시 완전 초기화');
+        
+        // 모든 관련 모달 상태 초기화
+        setIsScheduleActionModalOpen(false);
+        setIsRepeatActionModalOpen(false);
+        setSelectedEventForAction(null);
+        setPendingRepeatEvent(null);
+        
+        // 로컬 상태에서도 제거
+        setEvents(prev => prev.filter(e => e.id !== event.id));
+        
+        // 스케줄 목록 새로 고침
+        await loadAllGroupSchedules(undefined, undefined, true);
+        
+        // 성공 모달 표시 (3초 후 자동 닫기)
+        const deleteMessage = option === 'single' || option === 'this' 
+          ? '일정이 성공적으로 삭제되었습니다.' 
+          : option === 'future'
+          ? '현재 이후의 반복 일정이 성공적으로 삭제되었습니다.'
+          : '모든 반복 일정이 성공적으로 삭제되었습니다.';
+        
+        openSuccessModal('일정 삭제 완료', deleteMessage, 'success', undefined, true);
+      } else {
+        openSuccessModal('일정 삭제 실패', response.error || '일정 삭제에 실패했습니다.', 'error');
+      }
+    } catch (error) {
+      console.error('[executeDeleteAction] 스케줄 삭제 실패:', error);
+      openSuccessModal('일정 삭제 실패', '일정 삭제 중 오류가 발생했습니다.', 'error');
+    }
+  };
+
+  // 실제 수정 실행
+  const executeEditAction = async (event: ScheduleEvent, option?: 'this' | 'future' | 'all') => {
+    // 반복 패턴 역변환 함수
+    const convertRepeatTextToSelect = (repeatText: string): string => {
+      if (!repeatText || repeatText === '없음') return '안함';
+      if (repeatText === '매일') return '매일';
+      if (repeatText === '매월') return '매월';
+      if (repeatText === '매년') return '매년';
+      if (repeatText.includes('매주')) {
+        // 다중 요일 선택된 경우 그대로 반환 (예: "매주 월,화,수")
+        return repeatText;
+      }
+      return '안함';
+    };
+
+    // 알림 텍스트 역변환 함수 - 백엔드 데이터 구조에 맞게 개선
+    const convertAlarmTextToSelect = (alarmTime: string, hasAlarm: boolean): string => {
+      console.log('[convertAlarmTextToSelect] 입력값:', { alarmTime, hasAlarm });
+      
+      if (!hasAlarm || !alarmTime) {
+        console.log('[convertAlarmTextToSelect] 알림 없음');
+        return '없음';
+      }
+      
+      // 백엔드에서 받은 알림 시간이 이미 올바른 형식인지 확인
+      const validAlarmOptions = ['없음', '정시', '5분 전', '10분 전', '15분 전', '30분 전', '1시간 전', '1일 전'];
+      if (validAlarmOptions.includes(alarmTime)) {
+        console.log('[convertAlarmTextToSelect] 유효한 알림 옵션:', alarmTime);
+        return alarmTime;
+      }
+      
+      // 알림 시간 텍스트에서 숫자와 단위 추출하여 변환
+      if (alarmTime.includes('분 전')) {
+        const match = alarmTime.match(/(\d+)분 전/);
+        if (match) {
+          const minutes = match[1];
+          console.log('[convertAlarmTextToSelect] 분 단위 알림:', minutes);
+          return `${minutes}분 전`;
+        }
+      } else if (alarmTime.includes('시간 전')) {
+        const match = alarmTime.match(/(\d+)시간 전/);
+        if (match) {
+          const hours = match[1];
+          console.log('[convertAlarmTextToSelect] 시간 단위 알림:', hours);
+          return `${hours}시간 전`;
+        }
+      } else if (alarmTime.includes('일 전')) {
+        const match = alarmTime.match(/(\d+)일 전/);
+        if (match) {
+          const days = match[1];
+          console.log('[convertAlarmTextToSelect] 일 단위 알림:', days);
+          return `${days}일 전`;
+        }
+      } else if (alarmTime === '정시' || alarmTime.includes('정시')) {
+        console.log('[convertAlarmTextToSelect] 정시 알림');
+        return '정시';
+      }
+      
+      // 기본값으로 받은 알림 시간 그대로 반환
+      console.log('[convertAlarmTextToSelect] 기본값 반환:', alarmTime);
+      return alarmTime;
+    };
+
+    // 먼저 해당 일정의 그룹 정보 설정
+    if (event.groupId) {
+      console.log('[executeEditAction] 그룹 설정:', event.groupId, '멤버:', event.tgtMtIdx);
+      setSelectedGroupId(event.groupId);
+      
+      // 그룹 멤버 정보 로드 및 대기
+      await fetchGroupMembers(event.groupId);
+      
+      // 멤버 정보가 로드된 후 잠시 기다렸다가 멤버 선택
+      await new Promise(resolve => {
+        setTimeout(() => {
+          if (event.tgtMtIdx) {
+            console.log('[executeEditAction] 멤버 선택 실행:', event.tgtMtIdx);
+            setSelectedMemberId(event.tgtMtIdx.toString());
+            setScheduleGroupMembers(prev => {
+              const updated = prev.map(member => ({
+                ...member,
+                isSelected: member.mt_idx === event.tgtMtIdx
+              }));
+              console.log('[executeEditAction] 멤버 업데이트 결과:', updated.filter(m => m.isSelected));
+              return updated;
+            });
+          }
+          resolve(true);
+        }, 200);
+      });
+    }
+
+    // 변환된 값들 로깅
+    const convertedRepeat = convertRepeatTextToSelect(event.repeatText || '');
+    const convertedAlarm = convertAlarmTextToSelect(event.alarmTime || '', event.hasAlarm || false);
+    
+    console.log('[executeEditAction] 변환 결과:', {
+      원본_반복: event.repeatText,
+      변환된_반복: convertedRepeat,
+      원본_알림: event.alarmTime,
+      알림_여부: event.hasAlarm,
+      변환된_알림: convertedAlarm
+    });
+
+    setNewEvent({
+      id: event.id,
+      title: event.title,
+      date: event.date,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      allDay: event.isAllDay || false, // 하루종일 설정 로드
+      repeat: convertedRepeat, // 반복 설정 역변환
+      alarm: convertedAlarm, // 알림 설정 역변환
+      locationName: event.locationName || '',
+      locationAddress: event.locationAddress || '',
+      locationLat: event.locationLat, // 위도 로드
+      locationLng: event.locationLng, // 경도 로드
+      content: event.content || '',
+      groupName: event.groupName || '',
+      groupColor: event.groupColor || '',
+      memberName: event.memberName || '',
+      memberPhoto: '', // 빈 문자열로 설정하여 로컬 이미지 사용
+      editOption: option // 반복 일정 옵션 저장
+    });
+    
+    // 매주 다중 요일 선택이 된 경우 요일 선택기 상태 설정
+    const repeatText = event.repeatText || '';
+    if (repeatText.includes('매주 ') && repeatText !== '매주') {
+      setShowWeekdaySelector(true);
+      const selectedDays = repeatText.replace('매주 ', '');
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      const weekdayIndices = new Set<number>();
+      
+      selectedDays.split(',').forEach(dayName => {
+        const index = dayNames.indexOf(dayName.trim());
+        if (index !== -1) {
+          weekdayIndices.add(index);
+        }
+      });
+      
+      setSelectedWeekdays(weekdayIndices);
+    } else {
+      setShowWeekdaySelector(false);
+      setSelectedWeekdays(new Set());
+    }
+    
+    setIsScheduleActionModalOpen(false);
+    setIsAddEventModalOpen(true);
+    // body 스크롤은 이미 비활성화되어 있으므로 유지
+  };
+
+  // 삭제 액션 핸들러
+  const handleDeleteAction = async (event: ScheduleEvent) => {
+    if (!event.sst_idx) {
+      openSuccessModal('삭제 오류', '삭제할 수 없는 스케줄입니다.', 'error');
+      return;
+    }
+
+    // 반복 일정인지 확인 (sst_repeat_json이 있는 경우)
+    if (event.repeatText && event.repeatText !== '없음') {
+      // 반복 일정인 경우 선택 모달 표시
+      setPendingRepeatEvent(event);
+      setRepeatActionType('delete');
+      setIsScheduleActionModalOpen(false);
+      setIsRepeatActionModalOpen(true);
+      return;
+    }
+
+    // 일반 일정 삭제 처리 - 액션 모달 먼저 닫기
+    setIsScheduleActionModalOpen(false);
+    await executeDeleteAction(event, 'single');
+  };
+
+  // 거리 계산 함수 (Haversine formula)
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371; // 지구 반지름 (km)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    return distance;
+  };
+
+  // 거리 텍스트 포맷팅 함수
+  const formatDistance = (distance: number): string => {
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)}m`;
+    } else {
+      return `${distance.toFixed(1)}km`;
+    }
+  };
+
+  // 멤버 위치 정보를 스케줄에 매핑하는 함수
+  const mapMemberLocationToSchedule = (
+    schedule: ScheduleEvent, 
+    groupMembers: any[] // 실제 백엔드 그룹 멤버 데이터
+  ): ScheduleEvent => {
+    // tgtSgdtIdx와 일치하는 멤버 찾기
+    const targetMember = groupMembers.find(member => 
+      member.sgdt_idx === schedule.tgtSgdtIdx
+    );
+    
+    if (!targetMember) {
+      return schedule;
+    }
+    
+    // 스케줄에 멤버 정보 추가
+    const updatedSchedule = {
+      ...schedule,
+      memberNickname: targetMember.mt_nickname || targetMember.mt_name, // nickname 우선, 없으면 name
+      memberCurrentLat: targetMember.mlt_lat,
+      memberCurrentLng: targetMember.mlt_long,
+      memberBattery: targetMember.mlt_battery,
+      memberGpsTime: targetMember.mlt_gps_time,
+    };
+    
+    // 거리 계산 (스케줄 위치와 멤버 현재 위치)
+    if (schedule.locationLat && schedule.locationLng && 
+        targetMember.mlt_lat && targetMember.mlt_long) {
+      const distance = calculateDistance(
+        schedule.locationLat,
+        schedule.locationLng,
+        targetMember.mlt_lat,
+        targetMember.mlt_long
+      );
+      
+      updatedSchedule.distance = distance;
+      updatedSchedule.distanceText = formatDistance(distance);
+      
+      console.log(`[DISTANCE] 스케줄 "${schedule.title}" - 멤버 "${targetMember.mt_name}": ${formatDistance(distance)}`);
+    }
+    
+    return updatedSchedule;
+  };
+
+  // 캐시 관리 함수들
+  const updateCacheForEvent = (event: ScheduleEvent, action: 'add' | 'update' | 'delete') => {
+    const eventDate = dayjs(event.date);
+    const cacheKey = `${eventDate.year()}-${String(eventDate.month() + 1).padStart(2, '0')}`;
+    
+    if (loadedMonths.has(cacheKey)) {
+      const cachedData = monthlyCache.get(cacheKey) || [];
+      let updatedData: ScheduleEvent[];
+      
+      switch (action) {
+        case 'add':
+          updatedData = [...cachedData, event];
+          break;
+        case 'update':
+          updatedData = cachedData.map(cachedEvent => 
+            cachedEvent.id === event.id ? event : cachedEvent
+          );
+          break;
+        case 'delete':
+          updatedData = cachedData.filter(cachedEvent => cachedEvent.id !== event.id);
+          break;
+        default:
+          updatedData = cachedData;
+      }
+      
+      // 메모리 캐시 업데이트
+      setMonthlyCache(prev => new Map(prev).set(cacheKey, updatedData));
+      
+      // 로컬 스토리지에도 저장
+      saveCacheToStorage(cacheKey, updatedData);
+      
+      console.log(`[CACHE] ${action} 작업으로 캐시 업데이트:`, cacheKey);
+    }
+  };
+
+  const clearCache = () => {
+    setMonthlyCache(new Map());
+    setLoadedMonths(new Set());
+    
+    // 로컬 스토리지 캐시도 초기화
+    clearCacheFromStorage();
+    
+    console.log('[CACHE] 캐시 초기화 완료');
+  };
+
+  const getCacheStats = () => {
+    const loadedMonthsList = Array.from(loadedMonths);
+    const totalCachedEvents = Array.from(monthlyCache.values())
+      .reduce((total, events) => total + events.length, 0);
+    
+    console.log('[CACHE] 캐시 통계:', {
+      loadedMonths: loadedMonthsList,
+      totalCachedEvents,
+      cacheSize: monthlyCache.size
+    });
+    
+    return { loadedMonthsList, totalCachedEvents, cacheSize: monthlyCache.size };
+  };
+
+  // 반복 모달 열기 핸들러
+  const handleOpenRepeatModal = () => {
+    setIsRepeatModalOpen(true);
+  };
+
+  // 전체 로딩 완료 체크
+  const isLoadingComplete = loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar && loadingSteps.ui;
+
+  // 로딩 단계 업데이트 함수
+  const updateLoadingStep = (step: 'groups' | 'schedules' | 'calendar' | 'ui', completed: boolean) => {
+    setLoadingSteps(prev => ({
+      ...prev,
+      [step]: completed
+    }));
+  };
+
   return (
     <>
       <style jsx global>{pageStyles}</style>
-      <div className="bg-indigo-50 min-h-screen pb-20">
-        {/* 개선된 헤더 */}
-        <motion.header 
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="fixed top-0 left-0 right-0 z-20 glass-effect"
-        >
-          <div className="flex items-center justify-between h-16 px-4">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-3">
-                <motion.div
-                  initial={{ rotate: -180, scale: 0 }}
-                  animate={{ rotate: 0, scale: 1 }}
-                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                  className="p-2 bg-indigo-600 rounded-xl"
-                >
+      <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-20">
+        
+        {/* 전체화면 로딩 - 체크리스트 형태 */}
+        {isInitialLoading && (
+          <div className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
+            <div className="text-center max-w-sm mx-auto px-6">
+              {/* 상단 로고 및 제목 */}
+              <div className="mb-6">
+                <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5 text-white stroke-2"
+                    className="h-8 w-8 text-white stroke-2"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                </motion.div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">일정</h1>
-                  <p className="text-xs text-gray-500">그룹 멤버들과 일정을 공유해보세요</p>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">일정을 불러오고 있습니다</h2>
+                <p className="text-sm text-gray-600">잠시만 기다려주세요...</p>
+              </div>
+
+              {/* 로딩 체크리스트 - 컴팩트 버전 */}
+              <div className="space-y-1">
+                {/* 1. 그룹 목록 불러오기 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    loadingSteps.groups 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : 'border-indigo-300 animate-pulse'
+                  }`}>
+                    {loadingSteps.groups ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    )}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    loadingSteps.groups ? 'text-green-700' : 'text-gray-700'
+                  }`}>
+                    그룹 목록 불러오기
+                  </span>
+                </div>
+
+                {/* 2. 일정 데이터 로드 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    loadingSteps.groups && loadingSteps.schedules 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : loadingSteps.groups 
+                        ? 'border-indigo-300 animate-pulse'
+                        : 'border-gray-300'
+                  }`}>
+                    {loadingSteps.groups && loadingSteps.schedules ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : loadingSteps.groups ? (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    ) : (
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    )}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    loadingSteps.groups && loadingSteps.schedules ? 'text-green-700' : loadingSteps.groups ? 'text-gray-700' : 'text-gray-400'
+                  }`}>
+                    일정 데이터 로드
+                  </span>
+                </div>
+
+                {/* 3. 캘린더 초기화 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : (loadingSteps.groups && loadingSteps.schedules)
+                        ? 'border-indigo-300 animate-pulse'
+                        : 'border-gray-300'
+                  }`}>
+                    {loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (loadingSteps.groups && loadingSteps.schedules) ? (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    ) : (
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    )}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar ? 'text-green-700' : (loadingSteps.groups && loadingSteps.schedules) ? 'text-gray-700' : 'text-gray-400'
+                  }`}>
+                    캘린더 초기화
+                  </span>
+                </div>
+
+                {/* 4. 화면 구성 */}
+                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
+                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
+                    isLoadingComplete 
+                      ? 'bg-green-500 border-green-500 scale-110' 
+                      : (loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar)
+                        ? 'border-indigo-300 animate-pulse'
+                        : 'border-gray-300'
+                  }`}>
+                    {isLoadingComplete ? (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar) ? (
+                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
+                    ) : (
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                    )}
+                  </div>
+                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
+                    isLoadingComplete ? 'text-green-700' : (loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar) ? 'text-gray-700' : 'text-gray-400'
+                  }`}>
+                    화면 구성
+                  </span>
                 </div>
               </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              {/* 필요시 추가 버튼들을 여기에 배치 */}
+
+              {/* 진행률 표시 */}
+              <div className="mt-6">
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="h-2 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full transition-all duration-700 ease-out"
+                    style={{
+                      width: `${
+                        (loadingSteps.groups ? 25 : 0) +
+                        (loadingSteps.schedules ? 25 : 0) +
+                        (loadingSteps.calendar ? 25 : 0) +
+                        (loadingSteps.ui ? 25 : 0)
+                      }%`
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {(loadingSteps.groups ? 1 : 0) +
+                   (loadingSteps.schedules ? 1 : 0) +
+                   (loadingSteps.calendar ? 1 : 0) +
+                   (loadingSteps.ui ? 1 : 0)}/4 단계 완료
+                </p>
+              </div>
             </div>
           </div>
-        </motion.header>
+        )}
 
-        {/* 메인 컨텐츠 - 애니메이션 적용 */}
-        <motion.div
-          initial="initial"
-          animate="in"
-          exit="out"
-          variants={pageVariants}
-          className="px-4 pt-20 space-y-6"
-        >
-          {/* 캘린더 섹션 */}
-          <motion.div
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            custom={0}
+        {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
+        {!isInitialLoading && (
+          <motion.header 
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="fixed top-0 left-0 right-0 z-20 glass-effect"
           >
-            <MobileCalendar 
-              selectedDay={selectedDay}
-              onDayClick={setSelectedDay}
-              events={events}
-              onMonthChange={loadAllGroupSchedules}
-            />
-          </motion.div>
+            <div className="flex items-center justify-between h-16 px-4">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3">
+                  <motion.div
+                    initial={{ rotate: -180, scale: 0 }}
+                    animate={{ rotate: 0, scale: 1 }}
+                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                    className="p-2 bg-indigo-600 rounded-xl"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 text-white stroke-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </motion.div>
+                  <div>
+                    <h1 className="text-lg font-bold text-gray-900">일정</h1>
+                    <p className="text-xs text-gray-500">그룹 멤버들과 일정을 공유해보세요</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                {/* 필요시 추가 버튼들을 여기에 배치 */}
+              </div>
+            </div>
+          </motion.header>
 
-          {/* 선택된 날짜의 일정 목록 */}
-          {selectedDay && (
+        {/* 메인 컨텐츠 - 로딩 상태일 때 숨김 및 패딩 조정 */}
+        {!isInitialLoading && (
+          <motion.div
+            initial="initial"
+            animate="in"
+            exit="out"
+            variants={pageVariants}
+            className="px-4 pt-20 pb-24 space-y-6 min-h-screen overflow-y-auto"
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
+            }}
+          >
+            {/* 캘린더 섹션 */}
             <motion.div
               variants={cardVariants}
               initial="hidden"
               animate="visible"
-              custom={1}
+              custom={0}
             >
-              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                {/* 헤더 */}
-                <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-bold">
-                        {format(selectedDay.toDate(), 'MM월 dd일 (E)', { locale: ko })}
-                      </h3>
-                      <p className="text-indigo-100 text-sm">
-                        {eventsForSelectedDay.length}개의 일정
-                      </p>
+              {/* 캘린더 컴포넌트 */}
+              <motion.div
+                variants={cardVariants}
+                initial="hidden"
+                animate="visible"
+                custom={0}
+              >
+                <MobileCalendar 
+                  selectedDay={selectedDay} 
+                  onDayClick={(day: Dayjs) => {
+                    console.log('[onDayClick] 날짜 선택:', day.format('YYYY-MM-DD'));
+                    setSelectedDay(day);
+                    
+                    // 클릭된 날짜의 월이 현재 로드된 월과 다른 경우 해당 월 데이터 로드
+                    const clickedMonth = day.month() + 1;
+                    const clickedYear = day.year();
+                    const clickedCacheKey = `${clickedYear}-${clickedMonth.toString().padStart(2, '0')}`;
+                    
+                    // 해당 월 데이터가 캐시에 있는지 확인
+                    if (loadedMonths.has(clickedCacheKey)) {
+                      console.log('[onDayClick] 캐시된 월 데이터 존재:', clickedCacheKey);
+                      const cachedData = monthlyCache.get(clickedCacheKey) || [];
+                      
+                      // 캐시된 데이터를 현재 events와 병합
+                      setEvents(prevEvents => {
+                        const existingDates = new Set(prevEvents.map(event => event.date));
+                        const newEvents = cachedData.filter(event => !existingDates.has(event.date));
+                        return [...prevEvents, ...newEvents];
+                      });
+                    } else {
+                      console.log('[onDayClick] 해당 월 데이터 없음, 로드 시작:', clickedCacheKey);
+                      loadAllGroupSchedules(day.year(), day.month() + 1, true);
+                    }
+                  }}
+                  events={events}
+                  onMonthChange={(year, month) => {
+                    console.log('[onMonthChange] 월 변경:', { year, month, selectedDay: selectedDay?.format('YYYY-MM-DD') });
+                    // 월 변경 시 캐싱 시스템을 사용하여 데이터 로드
+                    loadAllGroupSchedules(year, month, true);
+                  }}
+                />
+              </motion.div>
+            </motion.div>
+
+            {/* 선택된 날짜의 일정 목록 */}
+            {selectedDay && (
+              <motion.div
+                variants={cardVariants}
+                initial="hidden"
+                animate="visible"
+                custom={1}
+              >
+                <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                  {/* 헤더 */}
+                  <motion.div 
+                    className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white"
+                    initial={{ y: -20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold">
+                          {format(selectedDay.toDate(), 'MM월 dd일 (E)', { locale: ko })}
+                        </h3>
+                        <p className="text-indigo-100 text-sm">
+                          {isMonthChanging ? '일정 로딩 중...' : `${eventsForSelectedDay.length}개의 일정`}
+                        </p>
+                      </div>
+                      <motion.div 
+                        className="flex items-center space-x-1 bg-white/20 px-3 py-1 rounded-full"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+                      >
+                        <HiSparkles className="w-4 h-4 text-yellow-400" />
+                        <span className="text-sm font-medium">일정</span>
+                      </motion.div>
                     </div>
-                    <div className="flex items-center space-x-1 bg-white/20 px-3 py-1 rounded-full">
-                      <HiSparkles className="w-4 h-4" />
-                      <span className="text-sm font-medium">일정</span>
-                    </div>
-                  </div>
-                </div>
+                  </motion.div>
 
-                {/* 일정 목록 */}
-                <div className="p-4">
-                  {eventsForSelectedDay.length > 0 ? (
-                    <motion.div 
-                      className="space-y-3"
-                      initial="hidden"
-                      animate="visible"
-                      variants={{
-                        hidden: {},
-                        visible: {
-                          transition: {
-                            staggerChildren: 0.1
-                          }
-                        }
-                      }}
-                    >
-                      {eventsForSelectedDay.map((event, index) => {
-                        const status = getEventStatus(event);
-                        
-                        // 소요 시간 계산
-                        const startTime = dayjs(`${event.date} ${event.startTime}`);
-                        const endTime = dayjs(`${event.date} ${event.endTime}`);
-                        const durationMinutes = endTime.diff(startTime, 'minute');
-                        const durationHours = Math.floor(durationMinutes / 60);
-                        const remainingMinutes = durationMinutes % 60;
-                        const durationText = durationHours > 0 
-                          ? `${durationHours}시간 ${remainingMinutes}분`
-                          : `${remainingMinutes}분`;
+                  {/* 일정 목록 */}
+                  <div className="p-4">
+                    <AnimatePresence mode="wait">
+                      {eventsForSelectedDay.length > 0 ? (
+                        <motion.div 
+                          key={selectedDay.format('YYYY-MM-DD')}
+                          className="space-y-3 max-h-[400px] overflow-y-auto"
+                          style={{ 
+                            WebkitOverflowScrolling: 'touch',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none'
+                          }}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ 
+                            duration: 0.3, 
+                            ease: [0.25, 0.46, 0.45, 0.94]
+                          }}
+                        >
+                          {eventsForSelectedDay.map((event, index) => {
+                            const status = getEventStatus(event);
+                            
+                            // 소요 시간 계산
+                            const startTime = dayjs(`${event.date} ${event.startTime}`);
+                            const endTime = dayjs(`${event.date} ${event.endTime}`);
+                            const durationMinutes = endTime.diff(startTime, 'minute');
+                            const durationHours = Math.floor(durationMinutes / 60);
+                            const remainingMinutes = durationMinutes % 60;
+                            const durationText = durationHours > 0 
+                              ? `${durationHours}시간 ${remainingMinutes}분`
+                              : `${remainingMinutes}분`;
 
-                        // 상태별 색상 설정
-                        const getStatusColor = (statusText: string) => {
-                          switch (statusText) {
-                            case '완료':
-                              return {
-                                color: 'text-green-700',
-                                bgColor: 'bg-green-100',
-                                dotColor: 'bg-green-500'
-                              };
-                            case '진행중':
-                              return {
-                                color: 'text-orange-700',
-                                bgColor: 'bg-orange-100',
-                                dotColor: 'bg-orange-500'
-                              };
-                            case '예정':
-                              return {
-                                color: 'text-blue-700',
-                                bgColor: 'bg-blue-100',
-                                dotColor: 'bg-blue-500'
-                              };
-                            default:
-                              return {
-                                color: 'text-gray-700',
-                                bgColor: 'bg-gray-100',
-                                dotColor: 'bg-gray-500'
-                              };
-                          }
-                        };
-
-                        const statusColors = getStatusColor(status.text);
-
-                        return (
-                          <motion.div
-                            key={event.id}
-                            onClick={() => handleEventItemClick(event)}
-                            className="relative group cursor-pointer"
-                            variants={{
-                              hidden: { opacity: 0, y: 20 },
-                              visible: { 
-                                opacity: 1, 
-                                y: 0,
-                                transition: {
-                                  duration: 0.4,
-                                  ease: [0.25, 0.46, 0.45, 0.94]
-                                }
+                            // 상태별 색상 설정
+                            const getStatusColor = (statusText: string) => {
+                              switch (statusText) {
+                                case '완료':
+                                  return {
+                                    color: 'text-green-700',
+                                    bgColor: 'bg-green-100',
+                                    dotColor: 'bg-green-500'
+                                  };
+                                case '진행중':
+                                  return {
+                                    color: 'text-orange-700',
+                                    bgColor: 'bg-orange-100',
+                                    dotColor: 'bg-orange-500'
+                                  };
+                                case '예정':
+                                  return {
+                                    color: 'text-blue-700',
+                                    bgColor: 'bg-blue-100',
+                                    dotColor: 'bg-blue-500'
+                                  };
+                                default:
+                                  return {
+                                    color: 'text-gray-700',
+                                    bgColor: 'bg-gray-100',
+                                    dotColor: 'bg-gray-500'
+                                  };
                               }
-                            }}
-                            whileHover={{ 
-                              y: -2,
-                              transition: { duration: 0.2 }
-                            }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            {/* 메인 카드 - 컴팩트 버전 */}
-                            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-300 group-hover:shadow-md group-hover:border-gray-200 transition-all duration-200">
-                              
-                              {/* 상단: 시간 정보와 상태 배지 */}
-                              <div className="flex items-start justify-between mb-3">
-                                {/* 왼쪽: 시간 아이콘과 시간 */}
-                                <div className="flex items-center space-x-3">
-                                  <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                                    <FiClock className="w-5 h-5 text-pink-600" />
-                                  </div>
-                                  <div>
-                                    {event.isAllDay ? (
-                                      <div>
-                                        <div className="text-xl font-bold text-gray-900">하루종일</div>
-                                        <div className="text-xs text-gray-500">{durationText}</div>
-                                      </div>
-                                    ) : (
-                                      <div>
-                                        <div className="flex items-baseline space-x-1">
-                                          <span className="text-xl font-bold text-gray-900">{event.startTime}</span>
-                                          <span className="text-sm text-gray-400">~</span>
-                                          <span className="text-sm font-medium text-gray-500">{event.endTime}</span>
-                                        </div>
-                                        <div className="text-xs text-gray-500">{durationText}</div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {/* 오른쪽: 상태 배지와 반복 정보 */}
-                                <div className="flex flex-col items-end space-y-1">
-                                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${statusColors.color} ${statusColors.bgColor}`}>
-                                    <div className={`w-2 h-2 rounded-full mr-1.5 ${statusColors.dotColor} ${
-                                      status.text === '진행중' ? 'animate-pulse' : ''
-                                    }`}></div>
-                                    {status.text}
-                                  </div>
+                            };
 
-                                  {/* 반복 정보 */}
-                                  {event.repeatText && event.repeatText !== '없음' && (
-                                    <div className="flex items-center space-x-1 bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs font-medium">
-                                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                      </svg>
-                                      <span>{event.repeatText}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                            const statusColors = getStatusColor(status.text);
 
-                              {/* 제목 */}
-                              <div className="mb-4">
-                                <h3 className="pl-2 text-2xl font-bold text-gray-900 leading-tight" style={{ wordBreak: 'keep-all' }}>
-                                  {event.title}
-                                </h3>
-                                {event.content && (
-                                  <p className="pl-4 text-gray-500 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-                                    {event.content}
-                                  </p>
-                                )}
-                              </div>
-
-                              {/* 장소 정보 */}
-                              {event.locationName && (
-                                <div className="mb-4 bg-blue-50 rounded-xl p-4 pl-0 pr-4">
-                                  <div className="space-y-1 pl-4">
-                                    <h4 className="text-lg font-bold text-blue-900" style={{ wordBreak: 'keep-all' }}>
-                                      {event.locationName}
-                                    </h4>
-                                    {event.locationAddress && (
-                                      <p className="text-sm text-blue-700" style={{ wordBreak: 'keep-all' }}>
-                                        {event.locationAddress}
-                                      </p>
-                                    )}
-                                    {event.distanceText && (
-                                      <div className="flex items-center mt-3">
-                                        <div className="flex items-center space-x-1 bg-blue-200 px-3 py-1 rounded-full">
-                                          <svg className="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                          </svg>
-                                          <span className="text-sm font-semibold text-blue-700">{event.distanceText}</span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* 하단: 그룹과 멤버 정보 */}
-                              <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                                <div className="flex items-center space-x-4">
-                                  {/* 그룹 정보 */}
-                                  {event.groupName && (
-                                    <div className="flex items-center space-x-2">
-                                      <div className={`w-4 h-4 rounded-full ${event.groupColor || 'bg-gray-400'} border-2 border-white shadow-sm`}></div>
-                                      <span className="text-sm font-medium text-gray-700">{event.groupName}</span>
-                                    </div>
-                                  )}
+                            return (
+                              <motion.div
+                                key={event.id}
+                                onClick={() => handleEventItemClick(event)}
+                                className="relative group cursor-pointer"
+                                initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                                animate={{ 
+                                  opacity: 1, 
+                                  y: 0,
+                                  scale: 1,
+                                  transition: {
+                                    duration: 0.3,
+                                    delay: index * 0.05,
+                                    ease: [0.25, 0.46, 0.45, 0.94]
+                                  }
+                                }}
+                                whileHover={{ 
+                                  scale: 1.02,
+                                  y: -4,
+                                  transition: { duration: 0.2, ease: "easeOut" }
+                                }}
+                                whileTap={{ scale: 0.98 }}
+                              >
+                                {/* 메인 카드 - 컴팩트 버전 */}
+                                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-300 group-hover:shadow-md group-hover:border-gray-200 transition-all duration-200">
                                   
-                                  {/* 멤버 정보 */}
-                                  {event.memberName && (
-                                    <div className="flex items-center space-x-2">
-                                      {event.memberPhoto ? (
-                                        <img
-                                          src={getSafeImageUrl(event.memberPhoto, event.memberGender, event.memberIdx || 0)}
-                                          alt={event.memberName}
-                                          className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm"
-                                          onError={(e) => {
-                                            const target = e.target as HTMLImageElement;
-                                            const fallbackSrc = getDefaultImage(event.memberGender, event.memberIdx || 0);
-                                            console.log(`[이벤트 이미지 오류] ${event.memberName}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
-                                            target.src = fallbackSrc;
-                                            target.onerror = null;
-                                          }}
-                                        />
-                                      ) : (
-                                        <div className="w-8 h-8 bg-gradient-to-br from-gray-200 to-gray-300 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                                          <FiUser className="w-4 h-4 text-gray-500" />
+                                  {/* 상단: 시간 정보와 상태 배지 */}
+                                  <div className="flex items-start justify-between mb-3">
+                                    {/* 왼쪽: 시간 아이콘과 시간 */}
+                                    <div className="flex items-center space-x-3">
+                                      <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                        <FiClock className="w-5 h-5 text-pink-600" />
+                                      </div>
+                                      <div>
+                                        {event.isAllDay ? (
+                                          <div>
+                                            <div className="text-xl font-bold text-gray-900">하루종일</div>
+                                            <div className="text-xs text-gray-500">{durationText}</div>
+                                          </div>
+                                        ) : (
+                                          <div>
+                                            <div className="flex items-baseline space-x-1">
+                                              <span className="text-xl font-bold text-gray-900">{event.startTime}</span>
+                                              <span className="text-sm text-gray-400">~</span>
+                                              <span className="text-sm font-medium text-gray-500">{event.endTime}</span>
+                                            </div>
+                                            <div className="text-xs text-gray-500">{durationText}</div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    {/* 오른쪽: 상태 배지와 반복 정보 */}
+                                    <div className="flex flex-col items-end space-y-1">
+                                      <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold ${statusColors.color} ${statusColors.bgColor}`}>
+                                        <div className={`w-2 h-2 rounded-full mr-1.5 ${statusColors.dotColor} ${
+                                          status.text === '진행중' ? 'animate-pulse' : ''
+                                        }`}></div>
+                                        {status.text}
+                                      </div>
+
+                                      {/* 반복 정보 */}
+                                      {event.repeatText && event.repeatText !== '없음' && (
+                                        <div className="flex items-center space-x-1 bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs font-medium">
+                                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                          </svg>
+                                          <span>{event.repeatText}</span>
                                         </div>
                                       )}
-                                      <span className="text-sm font-medium text-gray-700" style={{ wordBreak: 'keep-all' }}>
-                                        {event.memberName}
-                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* 제목 */}
+                                  <div className="mb-4">
+                                    <h3 className="pl-2 text-lg font-normal text-gray-900 leading-tight" style={{ wordBreak: 'keep-all' }}>
+                                      {event.title}
+                                    </h3>
+                                    {event.content && (
+                                      <p className="pl-3 text-gray-500 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+                                        {event.content}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  {/* 장소 정보 */}
+                                  {event.locationName && (
+                                    <div className="mb-4 bg-blue-50 rounded-xl p-4 pl-0 pr-4">
+                                      <div className="space-y-1 pl-4">
+                                        <div className="text-base font-bold text-blue-900" style={{ wordBreak: 'keep-all' }}>
+                                          {event.locationName}
+                                        </div>
+                                        {event.locationAddress && (
+                                          <p className="text-sm text-blue-700" style={{ wordBreak: 'keep-all' }}>
+                                            {event.locationAddress}
+                                          </p>
+                                        )}
+                                        
+                                        {/* 거리와 GPS 시간 정보 */}
+                                        {(event.distanceText || event.memberGpsTime) && (
+                                          <div className="flex items-center space-x-4 mt-3">
+                                            {/* 거리 정보 */}
+                                            {event.distanceText && (
+                                              <div className="flex items-center space-x-1 bg-blue-200 px-3 py-1 rounded-full">
+                                                <svg className="w-4 h-4 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                </svg>
+                                                <span className="text-xs font-medium text-blue-700">{event.distanceText}</span>
+                                              </div>
+                                            )}
+
+                                            {/* GPS 시간 정보 */}
+                                            {event.memberGpsTime && (
+                                              <div className="flex items-center space-x-1 bg-green-200 px-3 py-1 rounded-full">
+                                                <svg className="w-4 h-4 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                <span className="text-xs font-medium text-green-700">
+                                                  {dayjs(event.memberGpsTime).format('HH:mm')}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
                                   )}
-                                </div>
 
-                                {/* 알림 정보 */}
-                                {event.hasAlarm && (
-                                  <div className="flex items-center space-x-1 bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full text-xs font-medium">
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM9 12l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    <span>{event.alarmTime || '알림'}</span>
+                                  {/* 하단: 그룹 및 멤버 정보 */}
+                                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                                    {/* 왼쪽: 그룹 정보 */}
+                                    <div className="flex items-center space-x-2">
+                                      {event.groupName && (
+                                        <>
+                                          <span className="text-xs font-medium text-gray-500">그룹:</span>
+                                          <span className="text-xs font-semibold text-indigo-600">{event.groupName}</span>
+                                        </>
+                                      )}
+                                    </div>
+
+                                    {/* 오른쪽: 멤버 정보 */}
+                                    {event.memberName && (
+                                      <div className="flex items-center space-x-2">
+                                        <div className="w-6 h-6 rounded-full overflow-hidden">
+                                          <img
+                                            src={getSafeImageUrl(event.memberPhoto || null, event.memberGender, index)}
+                                            alt={event.memberName}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                              e.currentTarget.src = getDefaultImage(event.memberGender, index);
+                                            }}
+                                          />
+                                        </div>
+                                        <span className="text-xs font-medium text-gray-700">
+                                          {event.memberNickname || event.memberName}
+                                        </span>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </motion.div>
-                  ) : (
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </motion.div>
+                      ) : (
                     <div className="text-center py-12">
                       <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <FiCalendar className="w-8 h-8 text-gray-400" />
@@ -2209,180 +3591,10 @@ export default function SchedulePage() {
           <FiPlus className="w-6 h-6 stroke-2" />
         </motion.button>
 
-        {/* 일정 상세 모달 */}
-        <AnimatePresence>
-          {isModalOpen && selectedEventDetails && (
-            <motion.div 
-              className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
-              onClick={closeModal}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <motion.div 
-                className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl"
-                onClick={e => e.stopPropagation()}
-                onWheel={e => e.stopPropagation()}
-                onTouchMove={e => e.stopPropagation()}
-                variants={modalVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                drag="y"
-                dragElastic={0.1}
-                dragMomentum={false}
-                onDrag={(event, info) => {
-                  // 드래그 중 실시간 피드백
-                  if (info.offset.y > 20) {
-                    const target = event.currentTarget as HTMLElement;
-                    if (target) {
-                      target.style.opacity = String(Math.max(0.5, 1 - info.offset.y / 150));
-                    }
-                  }
-                }}
-                onDragEnd={(event, info) => {
-                  // 매우 민감한 조건으로 설정
-                  if (info.offset.y > 25 || info.velocity.y > 150) {
-                    closeModal();
-                  } else {
-                    // 원래 위치로 복귀
-                    const target = event.currentTarget as HTMLElement;
-                    if (target) {
-                      target.style.opacity = '1';
-                    }
-                  }
-                }}
-                whileDrag={{ 
-                  scale: 0.99,
-                  transition: { duration: 0.05 }
-                }}
-              >
-                {/* 모달 핸들 */}
-                <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-6"></div>
-                
-                {/* 모달 헤더 */}
-                <div className="px-6 pb-4 border-b border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-bold text-gray-900">일정 상세</h3>
-                    <button
-                      onClick={closeModal}
-                      className="p-2 hover:bg-gray-100 rounded-full mobile-button"
-                    >
-                      <FiX className="w-5 h-5 text-gray-500" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* 모달 내용 */}
-                <div className="px-6 py-6 space-y-6">
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-2">
-                      {selectedEventDetails.title}
-                    </h4>
-                    {selectedEventDetails.content && (
-                      <p className="text-gray-600" style={{ wordBreak: 'keep-all' }}>{selectedEventDetails.content}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                        <FiClock className="w-5 h-5 text-indigo-600" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">
-                          {dayjs(selectedEventDetails.date).format('YYYY년 MM월 DD일')}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {selectedEventDetails.startTime} ~ {selectedEventDetails.endTime}
-                        </p>
-                      </div>
-                    </div>
-
-                    {selectedEventDetails.groupName && (
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                          <FiUsers className="w-5 h-5 text-purple-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">그룹</p>
-                          <div className="flex items-center space-x-2">
-                            <div className={`w-3 h-3 rounded-full ${selectedEventDetails.groupColor || 'bg-gray-400'}`}></div>
-                            <span className="text-sm text-gray-600">{selectedEventDetails.groupName}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedEventDetails.memberName && (
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                          <FiUser className="w-5 h-5 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">담당자</p>
-                          <div className="flex items-center space-x-2">
-                            {selectedEventDetails.memberPhoto ? (
-                              <img
-                                src={getSafeImageUrl(selectedEventDetails.memberPhoto, selectedEventDetails.memberGender, selectedEventDetails.memberIdx || 0)}
-                                alt={selectedEventDetails.memberName}
-                                className="w-5 h-5 rounded-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  const fallbackSrc = getDefaultImage(selectedEventDetails.memberGender, selectedEventDetails.memberIdx || 0);
-                                  console.log(`[모달 이미지 오류] ${selectedEventDetails.memberName}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
-                                  target.src = fallbackSrc;
-                                  target.onerror = null;
-                                }}
-                              />
-                            ) : (
-                              <div className="w-5 h-5 bg-gray-300 rounded-full"></div>
-                            )}
-                            <span className="text-sm text-gray-600">{selectedEventDetails.memberName}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 모달 액션 버튼 */}
-                <div className="px-6 py-4 bg-gray-50 rounded-t-3xl space-y-3">
-                  <button
-                    onClick={handleOpenEditModal}
-                    className="w-full py-3 bg-indigo-600 text-white rounded-2xl font-medium mobile-button flex items-center justify-center space-x-2"
-                  >
-                    <FiEdit3 className="w-4 h-4" />
-                    <span>수정하기</span>
-                  </button>
-                  
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={handleDeleteEvent}
-                      className="flex-1 py-3 bg-red-500 text-white rounded-2xl font-medium mobile-button flex items-center justify-center space-x-2"
-                    >
-                      <FiTrash2 className="w-4 h-4" />
-                      <span>삭제</span>
-                    </button>
-                    
-                    <button
-                      onClick={closeModal}
-                      className="flex-1 py-3 bg-gray-200 text-gray-700 rounded-2xl font-medium mobile-button"
-                    >
-                      닫기
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* 일정 추가/수정 모달 */}
         <AnimatePresence>
           {isAddEventModalOpen && (
-            <motion.div 
+                        <motion.div 
               className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
               onClick={closeAddModal}
               initial={{ opacity: 0 }}
@@ -2532,8 +3744,8 @@ export default function SchedulePage() {
                               {scheduleGroupMembers.map((member, index) => (
                                 <motion.div 
                                 key={member.id}
-                                  initial={{ opacity: 0, y: 20 }}
-                                  animate={{ opacity: 1, y: 0 }}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
                                   transition={{ delay: index * 0.1 }}
                                   className="flex flex-col items-center flex-shrink-0"
                                 >
@@ -2560,7 +3772,7 @@ export default function SchedulePage() {
                                           console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
                                         }}
                                       />
-                                </div>
+                          </div>
                                     <span className={`block text-xs font-medium mt-2 transition-colors duration-200 ${
                                       member.isSelected ? 'text-indigo-700' : 'text-gray-700'
                                     }`}>
@@ -2758,9 +3970,9 @@ export default function SchedulePage() {
                   </form>
                 </div>
               </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
         {/* 반복 설정 모달 */}
         <AnimatePresence>
@@ -2805,7 +4017,7 @@ export default function SchedulePage() {
                           {newEvent.repeat === option && (
                             <span className="text-amber-600">✓</span>
                           )}
-                        </div>
+                  </div>
                       </button>
                     ))}
                   </div>
@@ -2821,8 +4033,8 @@ export default function SchedulePage() {
                   </button>
                 </div>
               </motion.div>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
         </AnimatePresence>
 
         {/* 알림 설정 모달 */}
@@ -2888,696 +4100,963 @@ export default function SchedulePage() {
           )}
         </AnimatePresence>
 
-        {/* 날짜 및 시간 설정 모달 */}
-        <AnimatePresence>
-          {isDateTimeModalOpen && (
-            <motion.div 
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
-              onClick={() => setIsDateTimeModalOpen(false)}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <motion.div 
-                className="w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4"
-                onClick={e => e.stopPropagation()}
-                onWheel={e => e.stopPropagation()}
-                onTouchMove={e => e.stopPropagation()}
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-6 text-center">날짜 및 시간 설정</h3>
-                  
-                  <div className="space-y-6">
-                    {/* 하루 종일 토글 */}
-                    <div className="flex justify-between items-center p-4 bg-green-50 rounded-xl border border-green-100">
-                      <div>
-                        <label className="text-sm font-medium text-gray-900">하루 종일</label>
-                        <p className="text-xs text-gray-600 mt-1">시간을 설정하지 않고 하루 전체로 설정</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setNewEvent({ ...newEvent, allDay: !newEvent.allDay })}
-                        className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${newEvent.allDay ? 'bg-green-600' : 'bg-gray-200'}`}
-                        role="switch"
-                        aria-checked={newEvent.allDay}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${newEvent.allDay ? 'translate-x-5' : 'translate-x-0'}`}
-                        />
-                      </button>
-                    </div>
-
-                    {/* 날짜 선택 */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">
-                        날짜 <span className="text-red-500">*</span>
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleOpenCalendarModal}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-base bg-white text-left flex items-center justify-between hover:bg-gray-50"
-                      >
-                        <span className="text-gray-900 font-medium">
-                          {dayjs(newEvent.date).format('YYYY년 MM월 DD일 (ddd)')}
-                        </span>
-                        <FiCalendar className="w-5 h-5 text-gray-400" />
-                      </button>
-                    </div>
-
-                    {/* 시간 선택 (하루종일이 아닐 때만) */}
-                    {!newEvent.allDay && (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-3">시작 시간</label>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenTimeModal('start')}
-                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-base bg-white text-left flex items-center justify-between hover:bg-gray-50"
-                            >
-                              <span className="text-gray-900 font-medium">
-                                {newEvent.startTime}
-                              </span>
-                              <FiClock className="w-5 h-5 text-gray-400" />
-                            </button>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-3">종료 시간</label>
-                            <button
-                              type="button"
-                              onClick={() => handleOpenTimeModal('end')}
-                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-base bg-white text-left flex items-center justify-between hover:bg-gray-50"
-                            >
-                              <span className="text-gray-900 font-medium">
-                                {newEvent.endTime}
-                              </span>
-                              <FiClock className="w-5 h-5 text-gray-400" />
-                            </button>
-                          </div>
-                        </div>
-                        
-                        {/* 시간 미리보기 */}
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <p className="text-sm text-gray-600 text-center">
-                            <span className="font-medium text-gray-900">
-                              {dayjs(newEvent.date).format('YYYY년 MM월 DD일')}
-                            </span>
-                            <br />
-                            <span className="text-green-600 font-medium">
-                              {newEvent.startTime} ~ {newEvent.endTime}
-                            </span>
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 하루 종일일 때 미리보기 */}
-                    {newEvent.allDay && (
-                      <div className="p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm text-gray-600 text-center">
-                          <span className="font-medium text-gray-900">
-                            {dayjs(newEvent.date).format('YYYY년 MM월 DD일')}
-                          </span>
-                          <br />
-                          <span className="text-green-600 font-medium">하루 종일</span>
-                        </p>
-                      </div>
-                    )}
-
-                    {/* 오류 메시지 표시 영역 */}
-                    {dateTimeError && (
-                      <div className="mt-2 flex items-center text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
-                        <FiAlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
-                        <span>{dateTimeError}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex space-x-3 mt-6">
-                    <button
-                      onClick={() => {
-                        setIsDateTimeModalOpen(false);
-                        // body 스크롤은 부모 모달이 열려있으므로 유지
-                      }}
-                      disabled={!!dateTimeError}
-                      className={`flex-1 py-3 rounded-xl font-medium mobile-button transition-colors ${
-                        dateTimeError 
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                          : 'bg-green-600 text-white hover:bg-green-700'
-                      }`}
-                    >
-                      확인
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsDateTimeModalOpen(false);
-                        // body 스크롤은 부모 모달이 열려있으므로 유지
-                      }}
-                      className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                    >
-                      취소
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 커스텀 시간 선택 모달 */}
-        <AnimatePresence>
-          {isTimeModalOpen && (
-            <motion.div 
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
-              onClick={handleCloseTimeModal}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <motion.div 
-                className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
-                onClick={e => e.stopPropagation()}
-                onWheel={e => e.stopPropagation()}
-                onTouchMove={e => e.stopPropagation()}
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="p-6">
-                  {/* 시간 선택 헤더 */}
-                  <div className="text-center mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">
-                      {timeModalType === 'start' ? '시작 시간' : '종료 시간'} 선택
-                    </h3>
-                    <p className="text-sm text-gray-600 mt-1">
-                      원하는 시간을 선택해주세요
-                    </p>
-                  </div>
-
-                  {/* 현재 선택된 시간 표시 */}
-                  <div className="text-center mb-6 p-4 bg-green-50 rounded-xl border border-green-100">
-                    <div className="text-2xl font-bold text-green-700">
-                      {selectedHour.toString().padStart(2, '0')}:{selectedMinute.toString().padStart(2, '0')}
-                    </div>
-                    <div className="text-sm text-green-600 mt-1">
-                      {selectedHour < 12 ? '오전' : '오후'} {selectedHour === 0 ? 12 : selectedHour > 12 ? (selectedHour - 12).toString().padStart(2, '0') : selectedHour.toString().padStart(2, '0')}시 {selectedMinute.toString().padStart(2, '0')}분
-                    </div>
-                  </div>
-
-                  {/* 시간 선택 영역 */}
-                  <div className="grid grid-cols-2 gap-4 mb-6">
-                    {/* 시간 선택 */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3 text-center">시간</label>
-                      <div ref={hourScrollRef} className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
-                        {Array.from({ length: 24 }, (_, i) => (
-                          <motion.button
-                            key={i}
-                            onClick={() => handleHourChange(i)}
-                            className={`w-full px-3 py-2 text-sm transition-all duration-200 mobile-button ${
-                              selectedHour === i
-                                ? 'bg-green-600 text-white font-semibold'
-                                : 'hover:bg-gray-100 text-gray-700'
-                            }`}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            {i.toString().padStart(2, '0')}시
-                          </motion.button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 분 선택 */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3 text-center">분</label>
-                      <div ref={minuteScrollRef} className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
-                        {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
-                          <motion.button
-                            key={minute}
-                            onClick={() => handleMinuteChange(minute)}
-                            className={`w-full px-3 py-2 text-sm transition-all duration-200 mobile-button ${
-                              selectedMinute === minute
-                                ? 'bg-green-600 text-white font-semibold'
-                                : 'hover:bg-gray-100 text-gray-700'
-                            }`}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                          >
-                            {minute.toString().padStart(2, '0')}분
-                          </motion.button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 빠른 선택 버튼들 */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-3 text-center">빠른 선택</label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {[
-                        { label: '9:00', hour: 9, minute: 0 },
-                        { label: '12:00', hour: 12, minute: 0 },
-                        { label: '14:00', hour: 14, minute: 0 },
-                        { label: '18:00', hour: 18, minute: 0 },
-                        { label: '9:30', hour: 9, minute: 30 },
-                        { label: '12:30', hour: 12, minute: 30 },
-                        { label: '14:30', hour: 14, minute: 30 },
-                        { label: '18:30', hour: 18, minute: 30 },
-                      ].map((preset) => (
-                        <motion.button
-                          key={preset.label}
-                          onClick={() => {
-                            setSelectedHour(preset.hour);
-                            setSelectedMinute(preset.minute);
-                          }}
-                          className="px-2 py-2 text-xs bg-gray-100 hover:bg-green-100 text-gray-700 hover:text-green-700 rounded-lg font-medium mobile-button transition-colors"
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                        >
-                          {preset.label}
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 액션 버튼 */}
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={handleTimeConfirm}
-                      className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
-                    >
-                      확인
-                    </button>
-                    <button
-                      onClick={handleCloseTimeModal}
-                      className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                    >
-                      취소
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 장소 검색 모달 */}
-        <AnimatePresence>
-          {isLocationSearchModalOpen && (
-            <motion.div 
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
-              onClick={() => setIsLocationSearchModalOpen(false)}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <motion.div 
-                className="w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4 max-h-[80vh] flex flex-col"
-                onClick={e => e.stopPropagation()}
-                onWheel={e => e.stopPropagation()}
-                onTouchMove={e => e.stopPropagation()}
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="p-6 flex-shrink-0">
-                  <div className="flex items-center space-x-2 mb-6">
-                    <h3 className="text-lg font-bold text-gray-900">장소 검색</h3>
-                  </div>
-                  
-                  {/* 장소 검색 입력 */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">장소명 또는 주소 입력</label>
-                    <input
-                      type="text"
-                      value={locationSearchQuery}
-                      onChange={(e) => setLocationSearchQuery(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleSearchLocation();
-                        }
-                      }}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors"
-                      placeholder="장소명 또는 주소를 입력하세요"
-                      autoFocus
-                    />
-                    <p className="text-xs text-gray-500 mt-2">엔터키를 누르거나 검색 버튼을 클릭하세요</p>
-                  </div>
-
-                  {/* 검색 버튼 */}
-                    <button
-                    onClick={() => handleSearchLocation()}
-                    disabled={!locationSearchQuery.trim() || isSearchingLocation}
-                    className="w-full py-3 bg-amber-600 text-white rounded-xl font-medium mobile-button hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+            {/* 날짜 및 시간 설정 모달 */}
+            <AnimatePresence>
+                {isDateTimeModalOpen && (
+                <motion.div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                    onClick={() => setIsDateTimeModalOpen(false)}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
                   >
-                    {isSearchingLocation ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>검색 중...</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <span>검색</span>
-                      </>
-                    )}
-                  </button>
-                </div>
+                    <motion.div 
+                      className="w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4"
+                      onClick={e => e.stopPropagation()}
+                      onWheel={e => e.stopPropagation()}
+                      onTouchMove={e => e.stopPropagation()}
+                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <div className="p-6">
+                        <h3 className="text-lg font-bold text-gray-900 mb-6 text-center">날짜 및 시간 설정</h3>
+                        
+                        <div className="space-y-6">
+                          {/* 하루 종일 토글 */}
+                          <div className="flex justify-between items-center p-4 bg-green-50 rounded-xl border border-green-100">
+                            <div>
+                              <label className="text-sm font-medium text-gray-900">하루 종일</label>
+                              <p className="text-xs text-gray-600 mt-1">시간을 설정하지 않고 하루 전체로 설정</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setNewEvent({ ...newEvent, allDay: !newEvent.allDay })}
+                              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${newEvent.allDay ? 'bg-green-600' : 'bg-gray-200'}`}
+                              role="switch"
+                              aria-checked={newEvent.allDay}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${newEvent.allDay ? 'translate-x-5' : 'translate-x-0'}`}
+                              />
+                            </button>
+                          </div>
 
-                {/* 구분선 */}
-                <div className="border-t border-gray-200"></div>
+                          {/* 날짜 선택 */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-3">
+                              날짜 <span className="text-red-500">*</span>
+                            </label>
+                            <button
+                              type="button"
+                              onClick={handleOpenCalendarModal}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-base bg-white text-left flex items-center justify-between hover:bg-gray-50"
+                            >
+                              <span className="text-gray-900 font-medium">
+                                {dayjs(newEvent.date).format('YYYY년 MM월 DD일 (ddd)')}
+                              </span>
+                              <FiCalendar className="w-5 h-5 text-gray-400" />
+                            </button>
+                          </div>
 
-                {/* 검색 결과 헤더 - 고정 */}
-                {locationSearchResults.length > 0 && !isSearchingLocation && (
-                  <div className="px-6 py-4 flex-shrink-0 bg-gray-50">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-xs text-green-600">✓</span>
-                      </div>
-                      <h4 className="text-sm font-semibold text-gray-900">검색 결과 ({locationSearchResults.length}개)</h4>
-                    </div>
-                  </div>
-                )}
-
-                {/* 검색 결과 영역 - 스크롤 가능 */}
-                <div className="flex-1 overflow-y-auto">
-                  {isSearchingLocation ? (
-                    <div className="text-center py-8 px-6">
-                      <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg className="animate-spin h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                      <p className="text-gray-600 font-medium">장소를 검색하는 중입니다...</p>
-                      <p className="text-xs text-gray-500 mt-1">잠시만 기다려주세요</p>
-                    </div>
-                  ) : locationSearchResults.length > 0 ? (
-                    <div className="px-6 py-4 space-y-3">
-                      {locationSearchResults.map((place, index) => (
-                        <motion.button
-                          key={place.temp_id}
-                          onClick={() => handleSelectLocation(place)}
-                          className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 rounded-xl p-4 text-left transition-all duration-200 mobile-button"
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.1 }}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          <div className="flex items-start space-x-3">
-                            <div className="flex-1 min-w-0">
-                              <h5 className="font-semibold text-gray-900 mb-1 truncate">{place.place_name}</h5>
-                              <p className="text-sm text-gray-600 line-clamp-2" style={{ wordBreak: 'keep-all' }}>
-                                {place.road_address_name || place.address_name}
-                              </p>
-                              <div className="flex items-center mt-2 space-x-2">
-                                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium">
-                                  선택하기
-                                </span>
+                          {/* 시간 선택 (하루종일이 아닐 때만) */}
+                          {!newEvent.allDay && (
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-3">시작 시간</label>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenTimeModal('start')}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-base bg-white text-left flex items-center justify-between hover:bg-gray-50"
+                                  >
+                                    <span className="text-gray-900 font-medium">
+                                      {newEvent.startTime}
+                                    </span>
+                                    <FiClock className="w-5 h-5 text-gray-400" />
+                                  </button>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-3">종료 시간</label>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenTimeModal('end')}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors text-base bg-white text-left flex items-center justify-between hover:bg-gray-50"
+                                  >
+                                    <span className="text-gray-900 font-medium">
+                                      {newEvent.endTime}
+                                    </span>
+                                    <FiClock className="w-5 h-5 text-gray-400" />
+                                  </button>
+                                </div>
+                              </div>
+                              
+                              {/* 시간 미리보기 */}
+                              <div className="p-3 bg-gray-50 rounded-lg">
+                                <p className="text-sm text-gray-600 text-center">
+                                  <span className="font-medium text-gray-900">
+                                    {dayjs(newEvent.date).format('YYYY년 MM월 DD일')}
+                                  </span>
+                                  <br />
+                                  <span className="text-green-600 font-medium">
+                                    {newEvent.startTime} ~ {newEvent.endTime}
+                                  </span>
+                                </p>
                               </div>
                             </div>
+                          )}
+
+                          {/* 하루 종일일 때 미리보기 */}
+                          {newEvent.allDay && (
+                            <div className="p-3 bg-gray-50 rounded-lg">
+                              <p className="text-sm text-gray-600 text-center">
+                                <span className="font-medium text-gray-900">
+                                  {dayjs(newEvent.date).format('YYYY년 MM월 DD일')}
+                                </span>
+                                <br />
+                                <span className="text-green-600 font-medium">하루 종일</span>
+                              </p>
+                            </div>
+                          )}
+
+                          {/* 오류 메시지 표시 영역 */}
+                          {dateTimeError && (
+                            <div className="mt-2 flex items-center text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
+                              <FiAlertTriangle className="w-4 h-4 mr-2 flex-shrink-0" />
+                              <span>{dateTimeError}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex space-x-3 mt-6">
+                          <button
+                            onClick={() => {
+                              setIsDateTimeModalOpen(false);
+                              // body 스크롤은 부모 모달이 열려있으므로 유지
+                            }}
+                            className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                          >
+                            취소
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsDateTimeModalOpen(false);
+                              // body 스크롤은 부모 모달이 열려있으므로 유지
+                            }}
+                            disabled={!!dateTimeError}
+                            className={`flex-1 py-3 rounded-xl font-medium mobile-button transition-colors ${
+                              dateTimeError 
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                : 'bg-green-600 text-white hover:bg-green-700'
+                            }`}
+                          >
+                            확인
+                          </button>
+                    <button
+                      onClick={() => {
+                        setIsDateTimeModalOpen(false);
+                        // body 스크롤은 부모 모달이 열려있으므로 유지
+                      }}
+                      className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                    >
+                      취소
+                    </button>
+                        </div>
+                      </div>
+                                </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* 커스텀 시간 선택 모달 */}
+            <AnimatePresence>
+              {isTimeModalOpen && (
+                <motion.div 
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                  onClick={handleCloseTimeModal}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <motion.div 
+                    className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+                    onClick={e => e.stopPropagation()}
+                    onWheel={e => e.stopPropagation()}
+                    onTouchMove={e => e.stopPropagation()}
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="p-6">
+                      {/* 시간 선택 헤더 */}
+                      <div className="text-center mb-6">
+                        <h3 className="text-lg font-bold text-gray-900">
+                          {timeModalType === 'start' ? '시작 시간' : '종료 시간'} 선택
+                        </h3>
+                        <p className="text-sm text-gray-600 mt-1">
+                          원하는 시간을 선택해주세요
+                        </p>
+                      </div>
+
+                      {/* 현재 선택된 시간 표시 */}
+                      <div className="text-center mb-6 p-4 bg-green-50 rounded-xl border border-green-100">
+                        <div className="text-2xl font-bold text-green-700">
+                          {selectedHour.toString().padStart(2, '0')}:{selectedMinute.toString().padStart(2, '0')}
+                        </div>
+                        <div className="text-sm text-green-600 mt-1">
+                          {selectedHour < 12 ? '오전' : '오후'} {selectedHour === 0 ? 12 : selectedHour > 12 ? (selectedHour - 12).toString().padStart(2, '0') : selectedHour.toString().padStart(2, '0')}시 {selectedMinute.toString().padStart(2, '0')}분
+                                </div>
+                              </div>
+                              
+                      {/* 시간 선택 영역 */}
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        {/* 시간 선택 */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-3 text-center">시간</label>
+                          <div ref={hourScrollRef} className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
+                            {Array.from({ length: 24 }, (_, i) => (
+                              <motion.button
+                                key={i}
+                                onClick={() => handleHourChange(i)}
+                                className={`w-full px-3 py-2 text-sm transition-all duration-200 mobile-button ${
+                                  selectedHour === i
+                                    ? 'bg-green-600 text-white font-semibold'
+                                    : 'hover:bg-gray-100 text-gray-700'
+                                }`}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                              >
+                                {i.toString().padStart(2, '0')}시
+                              </motion.button>
+                            ))}
                           </div>
-                        </motion.button>
-                      ))}
+                        </div>
+
+                        {/* 분 선택 */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-3 text-center">분</label>
+                          <div ref={minuteScrollRef} className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
+                            {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
+                              <motion.button
+                                key={minute}
+                                onClick={() => handleMinuteChange(minute)}
+                                className={`w-full px-3 py-2 text-sm transition-all duration-200 mobile-button ${
+                                  selectedMinute === minute
+                                    ? 'bg-green-600 text-white font-semibold'
+                                    : 'hover:bg-gray-100 text-gray-700'
+                                }`}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                              >
+                                {minute.toString().padStart(2, '0')}분
+                              </motion.button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 빠른 선택 버튼들 */}
+                      <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-3 text-center">빠른 선택</label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[
+                            { label: '9:00', hour: 9, minute: 0 },
+                            { label: '12:00', hour: 12, minute: 0 },
+                            { label: '14:00', hour: 14, minute: 0 },
+                            { label: '18:00', hour: 18, minute: 0 },
+                            { label: '9:30', hour: 9, minute: 30 },
+                            { label: '12:30', hour: 12, minute: 30 },
+                            { label: '14:30', hour: 14, minute: 30 },
+                            { label: '18:30', hour: 18, minute: 30 },
+                          ].map((preset) => (
+                            <motion.button
+                              key={preset.label}
+                              onClick={() => {
+                                setSelectedHour(preset.hour);
+                                setSelectedMinute(preset.minute);
+                              }}
+                              className="px-2 py-2 text-xs bg-gray-100 hover:bg-green-100 text-gray-700 hover:text-green-700 rounded-lg font-medium mobile-button transition-colors"
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              {preset.label}
+                            </motion.button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 액션 버튼 */}
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={handleTimeConfirm}
+                          className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
+                        >
+                          확인
+                        </button>
+                        <button
+                          onClick={handleCloseTimeModal}
+                          className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                        >
+                          취소
+                        </button>
+                      </div>
                     </div>
-                  ) : hasSearched && !isSearchingLocation ? (
-                    <div className="text-center py-8 px-6">
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* 장소 검색 모달 */}
+            <AnimatePresence>
+              {isLocationSearchModalOpen && (
+                <motion.div 
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                  onClick={() => setIsLocationSearchModalOpen(false)}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <motion.div 
+                    className="w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4 max-h-[80vh] flex flex-col"
+                    onClick={e => e.stopPropagation()}
+                    onWheel={e => e.stopPropagation()}
+                    onTouchMove={e => e.stopPropagation()}
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="p-6 flex-shrink-0">
+                      <div className="flex items-center space-x-2 mb-6">
+                        <h3 className="text-lg font-bold text-gray-900">장소 검색</h3>
+                      </div>
+                      
+                      {/* 장소 검색 입력 */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">장소명 또는 주소 입력</label>
+                        <input
+                          type="text"
+                          value={locationSearchQuery}
+                          onChange={(e) => setLocationSearchQuery(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSearchLocation();
+                            }
+                          }}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors"
+                          placeholder="장소명 또는 주소를 입력하세요"
+                          autoFocus
+                        />
+                        <p className="text-xs text-gray-500 mt-2">엔터키를 누르거나 검색 버튼을 클릭하세요</p>
+                      </div>
+
+                      {/* 검색 버튼 */}
+                      <button
+                        onClick={() => handleSearchLocation()}
+                        disabled={!locationSearchQuery.trim() || isSearchingLocation}
+                        className="w-full py-3 bg-amber-600 text-white rounded-xl font-medium mobile-button hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                      >
+                        {isSearchingLocation ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>검색 중...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <span>검색</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {/* 구분선 */}
+                    <div className="border-t border-gray-200"></div>
+
+                    {/* 검색 결과 헤더 - 고정 */}
+                    {locationSearchResults.length > 0 && !isSearchingLocation && (
+                      <div className="px-6 py-4 flex-shrink-0 bg-gray-50">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                            <span className="text-xs text-green-600">✓</span>
+                          </div>
+                          <h4 className="text-sm font-semibold text-gray-900">검색 결과 ({locationSearchResults.length}개)</h4>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 검색 결과 영역 - 스크롤 가능 */}
+                    <div className="flex-1 overflow-y-auto">
+                      {isSearchingLocation ? (
+                        <div className="text-center py-8 px-6">
+                          <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="animate-spin h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          </div>
+                          <p className="text-gray-600 font-medium">장소를 검색하는 중입니다...</p>
+                          <p className="text-xs text-gray-500 mt-1">잠시만 기다려주세요</p>
+                        </div>
+                      ) : locationSearchResults.length > 0 ? (
+                        <div className="px-6 py-4 space-y-3">
+                          {locationSearchResults.map((place, index) => (
+                            <motion.button
+                              key={place.temp_id}
+                              onClick={() => handleSelectLocation(place)}
+                              className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 rounded-xl p-4 text-left transition-all duration-200 mobile-button"
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.1 }}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                            >
+                              <div className="flex items-start space-x-3">
+                                <div className="flex-1 min-w-0">
+                                  <h5 className="font-semibold text-gray-900 mb-1 truncate">{place.place_name}</h5>
+                                  <p className="text-sm text-gray-600 line-clamp-2" style={{ wordBreak: 'keep-all' }}>
+                                    {place.road_address_name || place.address_name}
+                                  </p>
+                                  <div className="flex items-center mt-2 space-x-2">
+                                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium">
+                                      선택하기
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </motion.button>
+                          ))}
+                        </div>
+                      ) : hasSearched && !isSearchingLocation ? (
+                        <div className="text-center py-8 px-6">
                       {/* <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
                       </div> */}
-                      <p className="text-gray-600 font-medium">검색 결과가 없습니다</p>
-                      <p className="text-xs text-gray-500 mt-1">다른 검색어를 입력해보세요</p>
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 px-6">
+                          <p className="text-gray-600 font-medium">검색 결과가 없습니다</p>
+                          <p className="text-xs text-gray-500 mt-1">다른 검색어를 입력해보세요</p>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 px-6">
                       {/* <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <span className="text-xl">🔍</span>
                       </div> */}
-                      <p className="text-gray-600 font-medium">장소를 검색해보세요</p>
-                      <p className="text-xs text-gray-500 mt-1">카페, 음식점, 회사명 등을 입력하세요</p>
+                          <p className="text-gray-600 font-medium">장소를 검색해보세요</p>
+                          <p className="text-xs text-gray-500 mt-1">카페, 음식점, 회사명 등을 입력하세요</p>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                {/* 닫기 버튼 */}
-                <div className="px-6 pb-6 flex-shrink-0">
-                  <button
-                    onClick={handleCloseLocationSearchModal}
-                    className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                  >
-                    닫기
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 커스텀 캘린더 모달 */}
-        <AnimatePresence>
-          {isCalendarModalOpen && (
-            <motion.div 
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
-              onClick={handleCloseCalendarModal}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <motion.div 
-                className="w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4"
-                onClick={e => e.stopPropagation()}
-                onWheel={e => e.stopPropagation()}
-                onTouchMove={e => e.stopPropagation()}
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="p-6">
-                  {/* 캘린더 헤더 */}
-                  <div className="flex items-center justify-between mb-6">
-                    <motion.button
-                      onClick={handleCalendarPrevMonth}
-                      className="p-2 hover:bg-gray-100 rounded-full mobile-button"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      <FiChevronLeft className="w-5 h-5 text-gray-600" />
-                    </motion.button>
-                    
-                    <div className="text-center">
-                      <h3 className="text-lg font-bold text-gray-900">
-                        {calendarCurrentMonth.format('YYYY년 MM월')}
-                      </h3>
+                    {/* 닫기 버튼 */}
+                    <div className="px-6 pb-6 flex-shrink-0">
                       <button
-                        onClick={handleCalendarToday}
-                        className="text-sm text-green-600 hover:text-green-700 mobile-button mt-1"
+                        onClick={handleCloseLocationSearchModal}
+                        className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                       >
-                        오늘로 이동
+                        닫기
                       </button>
                     </div>
-                    
-                    <motion.button
-                      onClick={handleCalendarNextMonth}
-                      className="p-2 hover:bg-gray-100 rounded-full mobile-button"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      <FiChevronRight className="w-5 h-5 text-gray-600" />
-                    </motion.button>
-                  </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-                  {/* 요일 헤더 */}
-                  <div className="grid grid-cols-7 gap-1 mb-3">
-                    {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
-                      <div key={day} className={`h-8 flex items-center justify-center text-xs font-bold ${
-                        index === 0 ? 'text-red-600' : index === 6 ? 'text-blue-600' : 'text-gray-700'
-                      }`}>
-                        {day}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* 캘린더 그리드 */}
-                  <div className="grid grid-cols-7 gap-1 mb-6">
-                    {(() => {
-                      const days = [];
-                      const daysInMonth = calendarCurrentMonth.daysInMonth();
-                      const firstDayOfMonth = calendarCurrentMonth.startOf('month').day();
-                      const today = dayjs();
-                      const selectedDate = dayjs(newEvent.date);
-                      
-                      // 빈 칸 추가 (이전 달 마지막 날들)
-                      for (let i = 0; i < firstDayOfMonth; i++) {
-                        days.push(<div key={`empty-${i}`} className="h-10"></div>);
-                      }
-                      
-                      // 현재 달의 날짜들
-                      for (let day = 1; day <= daysInMonth; day++) {
-                        const currentDate = calendarCurrentMonth.date(day);
-                        const isSelected = selectedDate.isSame(currentDate, 'day');
-                        const isToday = today.isSame(currentDate, 'day');
-                        const isPast = currentDate.isBefore(today, 'day');
+            {/* 커스텀 캘린더 모달 */}
+            <AnimatePresence>
+              {isCalendarModalOpen && (
+                <motion.div 
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                  onClick={handleCloseCalendarModal}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <motion.div 
+                    className="w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4"
+                    onClick={e => e.stopPropagation()}
+                    onWheel={e => e.stopPropagation()}
+                    onTouchMove={e => e.stopPropagation()}
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="p-6">
+                      {/* 캘린더 헤더 */}
+                      <div className="flex items-center justify-between mb-6">
+                        <motion.button
+                          onClick={handleCalendarPrevMonth}
+                          className="p-2 hover:bg-gray-100 rounded-full mobile-button"
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                        >
+                          <FiChevronLeft className="w-5 h-5 text-gray-600" />
+                        </motion.button>
                         
-                        days.push(
+                        <div className="text-center">
+                          <h3 className="text-lg font-bold text-gray-900">
+                            {calendarCurrentMonth.format('YYYY년 MM월')}
+                          </h3>
                           <button
-                            key={day}
-                            onClick={() => handleCalendarDateSelect(currentDate)}
-                            disabled={isPast}
-                            className={`
-                              h-10 w-full rounded-lg flex items-center justify-center text-sm font-medium mobile-button transition-all duration-200
-                              ${isSelected ? 'bg-green-600 text-white font-semibold shadow-lg' : ''}
-                              ${isToday && !isSelected ? 'bg-green-100 text-green-800 font-semibold' : ''}
-                              ${!isSelected && !isToday && !isPast ? 'hover:bg-gray-100 text-gray-800' : ''}
-                              ${isPast ? 'text-gray-300 cursor-not-allowed' : ''}
-                            `}
+                            onClick={handleCalendarToday}
+                            className="text-sm text-green-600 hover:text-green-700 mobile-button mt-1"
                           >
-                            {day}
+                            오늘로 이동
                           </button>
-                        );
+                        </div>
+                        
+                        <motion.button
+                          onClick={handleCalendarNextMonth}
+                          className="p-2 hover:bg-gray-100 rounded-full mobile-button"
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                        >
+                          <FiChevronRight className="w-5 h-5 text-gray-600" />
+                        </motion.button>
+                      </div>
+
+                      {/* 요일 헤더 */}
+                      <div className="grid grid-cols-7 gap-1 mb-3">
+                        {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
+                          <div key={day} className={`h-8 flex items-center justify-center text-xs font-bold ${
+                            index === 0 ? 'text-red-600' : index === 6 ? 'text-blue-600' : 'text-gray-700'
+                          }`}>
+                            {day}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 캘린더 그리드 */}
+                      <div className="grid grid-cols-7 gap-1 mb-6">
+                        {(() => {
+                          const days = [];
+                          const daysInMonth = calendarCurrentMonth.daysInMonth();
+                          const firstDayOfMonth = calendarCurrentMonth.startOf('month').day();
+                          const today = dayjs();
+                          const selectedDate = dayjs(newEvent.date);
+                          
+                          // 빈 칸 추가 (이전 달 마지막 날들)
+                          for (let i = 0; i < firstDayOfMonth; i++) {
+                            days.push(<div key={`empty-${i}`} className="h-10"></div>);
+                          }
+                          
+                          // 현재 달의 날짜들
+                          for (let day = 1; day <= daysInMonth; day++) {
+                            const currentDate = calendarCurrentMonth.date(day);
+                            const isSelected = selectedDate.isSame(currentDate, 'day');
+                            const isToday = today.isSame(currentDate, 'day');
+                            const isPast = currentDate.isBefore(today, 'day');
+                            
+                            days.push(
+                              <button
+                                key={day}
+                                onClick={() => handleCalendarDateSelect(currentDate)}
+                                disabled={isPast}
+                                className={`
+                                  h-10 w-full rounded-lg flex items-center justify-center text-sm font-medium mobile-button transition-all duration-200
+                                  ${isSelected ? 'bg-green-600 text-white font-semibold shadow-lg' : ''}
+                                  ${isToday && !isSelected ? 'bg-green-100 text-green-800 font-semibold' : ''}
+                                  ${!isSelected && !isToday && !isPast ? 'hover:bg-gray-100 text-gray-800' : ''}
+                                  ${isPast ? 'text-gray-300 cursor-not-allowed' : ''}
+                                `}
+                              >
+                                {day}
+                              </button>
+                            );
+                          }
+                          
+                          return days;
+                        })()}
+                      </div>
+
+                      {/* 선택된 날짜 표시 */}
+                      <div className="text-center mb-6 p-4 bg-green-50 rounded-xl border border-green-100">
+                        <p className="text-sm text-gray-600">선택된 날짜</p>
+                        <p className="text-lg font-bold text-green-700">
+                          {dayjs(newEvent.date).format('YYYY년 MM월 DD일 (ddd)')}
+                        </p>
+                      </div>
+
+                      {/* 액션 버튼 */}
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={handleCloseCalendarModal}
+                          className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                        >
+                          취소
+                        </button>
+                        <button
+                          onClick={handleCloseCalendarModal}
+                          className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
+                        >
+                          확인
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* 저장 완료 모달 */}
+            <AnimatePresence>
+              {isSuccessModalOpen && successModalContent && (
+                <motion.div 
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md" 
+                  onClick={closeSuccessModal}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <motion.div 
+                    className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+                    onClick={e => e.stopPropagation()}
+                    variants={{
+                      hidden: { 
+                        opacity: 0, 
+                        y: 100,
+                        scale: 0.95
+                      },
+                      visible: { 
+                        opacity: 1, 
+                        y: 0,
+                        scale: 1,
+                        transition: {
+                          duration: 0.3,
+                          ease: [0.25, 0.46, 0.45, 0.94]
+                        }
+                      },
+                      exit: { 
+                        opacity: 0, 
+                        y: 100,
+                        scale: 0.95,
+                        transition: {
+                          duration: 0.2,
+                          ease: [0.55, 0.06, 0.68, 0.19]
+                        }
                       }
-                      
-                      return days;
-                    })()}
-                  </div>
+                    }}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                  >
+                    <div className="p-6 pb-8">
+                      <div className="text-center mb-6">
+                        {/* 아이콘 */}
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                          successModalContent.type === 'success' ? 'bg-green-100' : 
+                          successModalContent.type === 'error' ? 'bg-red-100' : 
+                          successModalContent.type === 'info' ? 'bg-red-100' : 'bg-blue-100'
+                        }`}>
+                          {successModalContent.type === 'success' && <FiCheckCircle className="w-8 h-8 text-green-500" />}
+                          {successModalContent.type === 'error' && <FiXCircle className="w-8 h-8 text-red-500" />}
+                          {successModalContent.type === 'info' && <FaTrash className="w-8 h-8 text-red-500" />}
+                        </div>
 
-                  {/* 선택된 날짜 표시 */}
-                  <div className="text-center mb-6 p-4 bg-green-50 rounded-xl border border-green-100">
-                    <p className="text-sm text-gray-600">선택된 날짜</p>
-                    <p className="text-lg font-bold text-green-700">
-                      {dayjs(newEvent.date).format('YYYY년 MM월 DD일 (ddd)')}
-                    </p>
-                  </div>
-
-                  {/* 액션 버튼 */}
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={handleCloseCalendarModal}
-                      className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
-                    >
-                      확인
-                    </button>
-                    <button
-                      onClick={handleCloseCalendarModal}
-                      className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                    >
-                      취소
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 저장 완료 모달 */}
-        <AnimatePresence>
-          {isSuccessModalOpen && successModalContent && (
-            <motion.div 
-              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
-              onClick={closeSuccessModal}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <motion.div 
-                className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
-                onClick={e => e.stopPropagation()}
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <div className="p-6 text-center">
-                  {/* 아이콘 */}
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center">
-                    {successModalContent.type === 'success' && (
-                      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                        <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    )}
-                    {successModalContent.type === 'error' && (
-                      <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
-                        <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </div>
-                    )}
-                    {successModalContent.type === 'info' && (
-                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-                        <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 제목 */}
+                        {/* 제목 */}
                   <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    {successModalContent.title}
-                  </h3>
+                          {successModalContent.title}
+                        </h3>
 
-                  {/* 메시지 */}
-                  <p className="text-gray-600 mb-6 leading-relaxed">
-                    {successModalContent.message}
-                  </p>
+                        {/* 메시지 */}
+                        <div className="text-gray-600 mb-4 leading-relaxed" style={{ wordBreak: 'break-all' }}>
+                          {successModalContent.message.split('\\n').map((line, index) => (
+                            <div key={index}>
+                              {line.includes('"') ? (
+                                line.split('"').map((part, partIndex) => (
+                                  partIndex % 2 === 1 ? (
+                                    <span key={partIndex} className="font-bold text-red-600" style={{ wordBreak: 'break-all' }}>
+                                      "{part}"
+                                    </span>
+                                  ) : (
+                                    <span key={partIndex}>{part}</span>
+                                  )
+                                ))
+                              ) : (
+                                <span>{line}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
 
-                  {/* 버튼 */}
-                  {successModalContent.onConfirm ? (
-                    <div className="flex space-x-3">
+                        {/* 자동 닫기 진행 바 (자동 닫기인 경우) */}
+                        {!successModalContent.onConfirm && successModalContent.type === 'success' && (
+                          <>
+                            <div className="w-full bg-gray-200 rounded-full h-1 mb-3">
+                              <motion.div 
+                                className="bg-green-500 h-1 rounded-full"
+                                initial={{ width: "0%" }}
+                                animate={{ width: "100%" }}
+                                transition={{ duration: 3, ease: "linear" }}
+                              />
+                            </div>
+                            <p className="text-sm text-gray-500 mb-2">3초 후 자동으로 닫힙니다</p>
+                          </>
+                        )}
+                      </div>
+
+                      {/* 버튼 영역 */}
+                      <div className="flex flex-col gap-3">
+                        {successModalContent.onConfirm ? (
+                          <>
+                            <motion.button
+                              onClick={closeSuccessModal}
+                              className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-medium transition-all duration-200"
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                            >
+                              취소
+                            </motion.button>
+                            <motion.button
+                              onClick={() => {
+                                successModalContent.onConfirm?.();
+                                closeSuccessModal();
+                              }}
+                              className={`w-full py-4 rounded-2xl font-medium flex items-center justify-center transition-all duration-200 ${
+                                successModalContent.type === 'info' 
+                                  ? 'bg-red-500 hover:bg-red-600 text-white' 
+                                  : 'bg-green-500 hover:bg-green-600 text-white'
+                              }`}
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                            >
+                              {successModalContent.type === 'info' ? '삭제하기' : '확인'}
+                            </motion.button>
+                          </>
+                        ) : (
+                          <motion.button
+                            onClick={closeSuccessModal}
+                            className={`w-full py-4 rounded-2xl font-medium flex items-center justify-center transition-all duration-200 ${
+                              successModalContent.type === 'success' ? 'bg-green-500 hover:bg-green-600 text-white' :
+                              successModalContent.type === 'error' ? 'bg-red-500 hover:bg-red-600 text-white' :
+                              'bg-blue-500 hover:bg-blue-600 text-white'
+                            }`}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            확인
+                          </motion.button>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* 스케줄 액션 선택 모달 */}
+            <AnimatePresence>
+              {isScheduleActionModalOpen && selectedEventForAction && (
+                <motion.div 
+                  className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={closeScheduleActionModal}
+                >
+                  <motion.div 
+                    className="bg-white rounded-3xl w-full max-w-md mx-auto"
+                    variants={{
+                      hidden: { 
+                        opacity: 0, 
+                        y: 100,
+                        scale: 0.95
+                      },
+                      visible: { 
+                        opacity: 1, 
+                        y: 0,
+                        scale: 1,
+                        transition: {
+                          duration: 0.3,
+                          ease: [0.25, 0.46, 0.45, 0.94]
+                        }
+                      },
+                      exit: { 
+                        opacity: 0, 
+                        y: 100,
+                        scale: 0.95,
+                        transition: {
+                          duration: 0.2,
+                          ease: [0.55, 0.06, 0.68, 0.19]
+                        }
+                      }
+                    }}
+                    initial="hidden"
+                    animate="visible"
+                    exit="exit"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="p-6 pb-8">
+                      {/* 스케줄 정보 미리보기 */}
+                      <div className="text-center mb-6">
+                        <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <FiClock className="w-8 h-8 text-indigo-600" />
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900">{selectedEventForAction.title}</h3>
+                        <p className="text-gray-500 font-bold">
+                          {dayjs(selectedEventForAction.date).format('MM월 DD일')} {selectedEventForAction.startTime} - {selectedEventForAction.endTime}
+                        </p>
+                        
+                        {/* 반복 일정 배지 */}
+                        {selectedEventForAction.repeatText && selectedEventForAction.repeatText !== '없음' && (
+                          <div className="inline-flex items-center space-x-1 bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium mt-2 mb-2">
+                            <FiRotateCcw className="w-4 h-4" />
+                            <span>반복 일정 ({selectedEventForAction.repeatText})</span>
+                          </div>
+                        )}
+                        
+                        <p className="text-sm text-gray-400">선택한 일정에 대해 수정하거나 삭제할 수 있습니다.</p>
+                      </div>
+
+                      {/* 액션 버튼들 */}
+                      <div className="space-y-3">
+                        <motion.button
+                          onClick={() => handleEditAction(selectedEventForAction!)}
+                          className="w-full flex items-center justify-center space-x-3 py-4 bg-blue-50 text-blue-700 rounded-xl font-semibold mobile-button hover:bg-blue-100 transition-colors"
+                        >
+                          <FiEdit3 className="w-5 h-5" />
+                          <span>수정하기</span>
+                        </motion.button>
+                        
+                        <motion.button
+                          onClick={() => {
+                            // 반복 일정인지 확인하여 처리 방식 결정
+                            if (selectedEventForAction?.repeatText && selectedEventForAction.repeatText !== '없음') {
+                              // 반복 일정인 경우 바로 handleDeleteAction 호출
+                              handleDeleteAction(selectedEventForAction);
+                            } else {
+                              // 일반 일정인 경우 삭제 확인 모달 표시
+                              const eventTitle = selectedEventForAction?.title || '일정';
+                              const confirmMessage = `일정 "${eventTitle}"\n정말 삭제하시겠습니까?`;
+                              
+                              // 먼저 액션 모달을 닫고 삭제 확인 모달을 열기
+                              setIsScheduleActionModalOpen(false);
+                              
+                              openSuccessModal(
+                                '일정 삭제 확인', 
+                                confirmMessage, 
+                                'info', 
+                                () => handleDeleteAction(selectedEventForAction!)
+                              );
+                            }
+                          }}
+                          className="w-full flex items-center justify-center space-x-3 py-4 bg-red-50 text-red-700 rounded-xl font-semibold mobile-button hover:bg-red-100 transition-colors"
+                        >
+                          <FaTrash className="w-5 h-5" />
+                          <span>삭제하기</span>
+                        </motion.button>
+                        
+                        <button
+                          onClick={closeScheduleActionModal}
+                          className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                        >
+                          취소
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* 반복 일정 처리 모달 */}
+            <AnimatePresence>
+              {isRepeatActionModalOpen && (
+                <motion.div
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                  onClick={() => {
+                    setIsRepeatActionModalOpen(false);
+                    setSelectedEventForAction(null);
+                    setPendingRepeatEvent(null);
+                    // body 스크롤 복원
+                    document.body.style.overflow = '';
+                  }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <motion.div 
+                    className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+                    onClick={e => e.stopPropagation()}
+                    onWheel={e => e.stopPropagation()}
+                    onTouchMove={e => e.stopPropagation()}
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <div className="p-6">
+                      <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">반복 일정 {repeatActionType === 'edit' ? '수정' : '삭제'}</h3>
+                      
+                      <div className="space-y-3">
+                        <button
+                          onClick={() => handleRepeatOption('this')}
+                          className="w-full px-4 py-4 text-left rounded-xl transition-all duration-200 mobile-button bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-transparent hover:border-gray-300"
+                        >
+                          <div className="space-y-1">
+                            <div className="font-semibold">이것만 {repeatActionType === 'edit' ? '수정' : '삭제'}</div>
+                            <div className="text-sm text-gray-500">선택한 일정만 처리합니다</div>
+                          </div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleRepeatOption('future')}
+                          className="w-full px-4 py-4 text-left rounded-xl transition-all duration-200 mobile-button bg-blue-50 text-blue-700 hover:bg-blue-100 border-2 border-transparent hover:border-blue-300"
+                        >
+                          <div className="space-y-1">
+                            <div className="font-semibold">현재 이후 {repeatActionType === 'edit' ? '수정' : '삭제'}</div>
+                            <div className="text-sm text-blue-500">이 일정부터 앞으로의 모든 반복 일정을 처리합니다</div>
+                          </div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleRepeatOption('all')}
+                          className={`w-full px-4 py-4 text-left rounded-xl transition-all duration-200 mobile-button border-2 border-transparent ${
+                            repeatActionType === 'edit' 
+                              ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300' 
+                              : 'bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300'
+                          }`}
+                        >
+                          <div className="space-y-1">
+                            <div className="font-semibold">모든 반복 {repeatActionType === 'edit' ? '수정' : '삭제'}</div>
+                            <div className={`text-sm ${repeatActionType === 'edit' ? 'text-amber-500' : 'text-red-500'}`}>
+                              과거를 포함한 모든 반복 일정을 처리합니다
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+
                       <button
                         onClick={() => {
-                          successModalContent.onConfirm?.();
-                          closeSuccessModal();
+                          setIsRepeatActionModalOpen(false);
+                          setSelectedEventForAction(null);
+                          setPendingRepeatEvent(null);
+                          // body 스크롤 복원
+                          document.body.style.overflow = '';
                         }}
-                        className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
-                      >
-                        확인
-                      </button>
-                      <button
-                        onClick={closeSuccessModal}
-                        className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                        className="w-full mt-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                       >
                         취소
                       </button>
                     </div>
-                  ) : (
-                    <button
-                      onClick={closeSuccessModal}
-                      className={`w-full py-3 text-white rounded-xl font-medium mobile-button transition-colors ${
-                        successModalContent.type === 'success' ? 'bg-green-600 hover:bg-green-700' :
-                        successModalContent.type === 'error' ? 'bg-red-600 hover:bg-red-700' :
-                        'bg-blue-600 hover:bg-blue-700'
-                      }`}
-                    >
-                      확인
-                    </button>
-                  )}
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
       </div>
     </>
   );

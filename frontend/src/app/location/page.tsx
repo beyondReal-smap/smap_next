@@ -196,25 +196,39 @@ const pageVariants = {
   }
 };
 
+// 개선된 바텀시트 애니메이션 variants - 더 부드러운 스프링 애니메이션
 const bottomSheetVariants = {
   hidden: { 
     y: '100%',
-    opacity: 0
+    opacity: 0,
+    transition: {
+      type: "spring",
+      stiffness: 400,
+      damping: 40,
+      mass: 0.8,
+      duration: 0.4
+    }
   },
   visible: { 
     y: 20,
     opacity: 1,
     transition: {
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
+      type: "spring",
+      stiffness: 400,
+      damping: 35,
+      mass: 0.7,
+      duration: 0.5
     }
   },
   peek: {
-    y: '71%',
+    y: '72%',
     opacity: 1,
     transition: {
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
+      type: "spring",
+      stiffness: 400,
+      damping: 35,
+      mass: 0.7,
+      duration: 0.5
     }
   }
 };
@@ -229,22 +243,28 @@ const memberAvatarVariants = {
     opacity: 1,
     transition: {
       delay: index * 0.04,
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
+      type: "spring",
+      stiffness: 300,
+      damping: 25,
+      duration: 0.4
     }
   }),
   hover: {
     scale: 1.02,
     transition: {
-      duration: 0.15,
-      ease: "easeOut"
+      type: "spring",
+      stiffness: 400,
+      damping: 20,
+      duration: 0.15
     }
   },
   selected: {
     scale: 1.01,
     transition: {
-      duration: 0.15,
-      ease: "easeOut"
+      type: "spring",
+      stiffness: 400,
+      damping: 20,
+      duration: 0.15
     }
   }
 };
@@ -261,29 +281,38 @@ const locationCardVariants = {
     scale: 1,
     transition: {
       delay: index * 0.04,
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
+      type: "spring",
+      stiffness: 300,
+      damping: 25,
+      duration: 0.4
     }
   }),
   hover: {
     y: -2,
     scale: 1.01,
     transition: {
-      duration: 0.15,
-      ease: "easeOut"
+      type: "spring",
+      stiffness: 400,
+      damping: 20,
+      duration: 0.15
     }
   },
   selected: {
     scale: 1.01,
     y: -1,
     transition: {
-      duration: 0.15,
-      ease: "easeOut"
+      type: "spring",
+      stiffness: 400,
+      damping: 20,
+      duration: 0.15
     }
   },
   tap: {
     scale: 0.99,
     transition: {
+      type: "spring",
+      stiffness: 500,
+      damping: 25,
       duration: 0.1
     }
   }
@@ -301,21 +330,28 @@ const floatingButtonVariants = {
     y: 0,
     transition: {
       delay: 0.3,
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
+      type: "spring",
+      stiffness: 300,
+      damping: 25,
+      duration: 0.5
     }
   },
   hover: { 
     scale: 1.05,
     y: -2,
     transition: {
-      duration: 0.15,
-      ease: "easeOut"
+      type: "spring",
+      stiffness: 400,
+      damping: 20,
+      duration: 0.15
     }
   },
   tap: { 
     scale: 0.95,
     transition: {
+      type: "spring",
+      stiffness: 500,
+      damping: 25,
       duration: 0.1
     }
   }
@@ -332,8 +368,10 @@ const modalVariants = {
     scale: 1,
     y: 0,
     transition: {
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
+      type: "spring",
+      stiffness: 300,
+      damping: 25,
+      duration: 0.4
     }
   },
   exit: {
@@ -367,8 +405,10 @@ const staggerItem = {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
+      type: "spring",
+      stiffness: 300,
+      damping: 25,
+      duration: 0.4
     }
   }
 };
@@ -383,8 +423,10 @@ const loadingVariants = {
     opacity: 1,
     scale: 1,
     transition: {
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
+      type: "spring",
+      stiffness: 300,
+      damping: 25,
+      duration: 0.4
     }
   }
 };
@@ -411,8 +453,10 @@ const loadingTextVariants = {
     opacity: 1,
     transition: {
       delay: 0.2,
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
+      type: "spring",
+      stiffness: 300,
+      damping: 25,
+      duration: 0.4
     }
   }
 };
@@ -1087,8 +1131,8 @@ export default function LocationPage() {
     setSwipeStartX(clientX);
     setIsHorizontalSwipe(false); // 드래그 시작 시점에 방향 초기화 (아직 미정 상태)
     
-    // 드래그 시작 시간 기록 (속도 계산용)
-    (e.target as any)._startedAt = e.timeStamp;
+    // 드래그 시작 시간 기록 (속도 계산용) - 더 정확한 시간 측정
+    (e.target as any)._startedAt = performance.now();
   };
 
   const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
@@ -1101,7 +1145,7 @@ export default function LocationPage() {
     const deltaY = clientY - dragStartY; // y 이동량 (방향 포함)
     const absDeltaX = Math.abs(deltaX);
     const absDeltaY = Math.abs(deltaY);
-    const directionThreshold = 10; // 방향 감지 최소 임계값
+    const directionThreshold = 8; // 방향 감지 최소 임계값 (더 민감하게)
 
     // 방향이 아직 결정되지 않았다면 결정 시도
     if (isHorizontalSwipe === false && absDeltaX > directionThreshold && absDeltaX > absDeltaY) {
@@ -1130,13 +1174,13 @@ export default function LocationPage() {
     const swipeDeltaX = clientX - swipeStartX; // 최종 X 이동량
     const dragDeltaY = clientY - dragStartY; // 최종 Y 이동량
 
-    const swipeThresholdEnd = 80; // 스와이프 완료 임계값 (더 크게 설정하여 의도적인 스와이프만 인식)
-    const dragThresholdEnd = 25; // 드래그 완료 임계값 - 더 민감하게 조정
-    const velocityThreshold = 0.3; // 속도 임계값 - 더 민감하게 조정
+    const swipeThresholdEnd = 60; // 스와이프 완료 임계값 (더 민감하게)
+    const dragThresholdEnd = 15; // 드래그 완료 임계값 - 더욱 민감하게 조정
+    const velocityThreshold = 0.2; // 속도 임계값 - 더욱 민감하게 조정
 
-    // 최종 움직임 속도 계산 (대략적)
-    const startTime = (e.target as any)._startedAt || Date.now() - 200; // 기본값 설정
-    const duration = e.timeStamp - startTime;
+    // 최종 움직임 속도 계산 (더 정확한 계산)
+    const startTime = (e.target as any)._startedAt || performance.now() - 200; // 기본값 설정
+    const duration = performance.now() - startTime;
     const velocityX = duration > 0 ? Math.abs(swipeDeltaX) / duration : 0;
     const velocityY = duration > 0 ? Math.abs(dragDeltaY) / duration : 0;
 
@@ -1156,10 +1200,10 @@ export default function LocationPage() {
                 console.log('[DragEnd] 왼쪽 스와이프 감지 -> otherMembersPlaces');
                 handleViewChange('otherMembersPlaces');
             }
-             // 햅틱 피드백
+             // 햅틱 피드백 (더 부드러운 진동)
             try {
               if ('vibrate' in navigator) { 
-                navigator.vibrate(100); 
+                navigator.vibrate([50, 10, 30]); // 패턴으로 더 부드러운 피드백
               }
             } catch (error) {
               console.debug('햅틱 피드백이 차단되었습니다:', error);
@@ -1171,10 +1215,10 @@ export default function LocationPage() {
         }
     } else { // 세로 드래그 완료 처리 (isHorizontalSwipe === false)
         console.log('[DragEnd] 세로 드래그 처리');
-    const triggerHaptic = () => {
+        const triggerHaptic = () => {
           try {
-      if ('vibrate' in navigator) {
-        navigator.vibrate(30);
+            if ('vibrate' in navigator) {
+              navigator.vibrate([20, 5, 15]); // 더 부드러운 햅틱 패턴
             }
           } catch (error) {
             // 햅틱 피드백이 차단되어도 조용히 무시
@@ -1185,22 +1229,22 @@ export default function LocationPage() {
         // 간소화된 바텀시트 상태 결정 로직 (DOM 계산 제거)
         let nextState: 'hidden' | 'peek' | 'visible' = bottomSheetState;
 
-        // 위로 드래그 (Y 감소) - 더 민감하게 반응
+        // 위로 드래그 (Y 감소) - 더욱 민감하게 반응
         if (dragDeltaY < 0) {
              if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
                  nextState = 'visible';
                  console.log('[DragEnd] 위로 드래그 감지 (peek -> visible)');
-        triggerHaptic();
+                 triggerHaptic();
              }
         } 
-        // 아래로 드래그 (Y 증가) - 더 민감하게 반응
+        // 아래로 드래그 (Y 증가) - 더욱 민감하게 반응
         else if (dragDeltaY > 0) {
             if (bottomSheetState === 'visible' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
                 nextState = 'peek';
                 console.log('[DragEnd] 아래로 드래그 감지 (visible -> peek)');
-        triggerHaptic();
-      }
-    }
+                triggerHaptic();
+            }
+        }
 
         // 즉시 상태 업데이트 (무거운 계산 제거)
         if (nextState !== bottomSheetState) {
@@ -3407,7 +3451,7 @@ export default function LocationPage() {
                   >
                     <div className="flex justify-between items-center mb-2">
                        <div className="flex items-center space-x-3">
-                        <div>
+                        <div>                                                                                                               
                           <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
                           <p className="text-sm text-gray-600">멤버들의 장소를 확인하세요</p>
                         </div>

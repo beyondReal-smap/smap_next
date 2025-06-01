@@ -135,13 +135,24 @@ html, body {
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 }
 
+/* Floating button styles from group/page.tsx */
 .floating-button {
   position: fixed;
-  bottom: 96px;
-  right: 24px;
+  bottom: 80px; /* Adjusted from 96px to match group/page.tsx more closely */
+  right: 20px; /* Adjusted from 24px */
   z-index: 40;
-  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+  background: #4f46e5; /* Solid color like group/page.tsx */
   box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  user-select: none;
+  /* Ensure it's a circle */
+  width: 56px; /* Example size, adjust as needed */
+  height: 56px; /* Example size, adjust as needed */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .floating-button:hover {
@@ -218,32 +229,29 @@ const cardVariants = {
 };
 
 const floatingButtonVariants = {
-  initial: { scale: 0, rotate: -180, opacity: 0 },
+  initial: { scale: 0, rotate: -180, opacity: 0 }, // Added opacity
   animate: { 
     scale: 1, 
     rotate: 0,
-    opacity: 1,
+    opacity: 1, // Added opacity
     transition: {
-      delay: 0.3,
+      delay: 0.5, // Sync with group/page.tsx
       type: "spring",
-      stiffness: 400,
-      damping: 25,
-      mass: 0.8,
-      duration: 0.6
+      stiffness: 260, // Sync with group/page.tsx
+      damping: 20, // Sync with group/page.tsx
+      mass: 0.8, // Kept from schedule/page.tsx as it\'s reasonable
+      duration: 0.6 // Kept from schedule/page.tsx
     }
   },
   hover: { 
-    scale: 1.05,
+    scale: 1.1, // Sync with group/page.tsx
     transition: { 
-      type: "spring",
-      stiffness: 400,
-      damping: 15,
-      duration: 0.15
+      duration: 0.2 // Sync with group/page.tsx
     }
   },
   tap: { 
-    scale: 0.95,
-    transition: { duration: 0.1 }
+    scale: 0.9, // Sync with group/page.tsx
+    transition: { duration: 0.1 } 
   }
 };
 
@@ -932,7 +940,7 @@ export default function SchedulePage() {
       document.body.style.overflowX = '';
       document.documentElement.style.overflowX = '';
       // 컴포넌트 언마운트 시 body 스크롤 복원
-      document.body.style.overflow = '';
+        document.body.style.overflow = '';
       
       // 이벤트 리스너 정리
       document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -1007,10 +1015,10 @@ export default function SchedulePage() {
   const [newEvent, setNewEvent] = useState<NewEvent>(initialNewEventState);
   
   useEffect(() => {
-    setNewEvent(prev => ({
-      ...prev,
+      setNewEvent(prev => ({
+        ...prev,
       date: selectedDay ? selectedDay.format('YYYY-MM-DD') : TODAY,
-    }));
+      }));
   }, [selectedDay]);
 
   // 날짜/시간 유효성 검사
@@ -1089,8 +1097,8 @@ export default function SchedulePage() {
 
     // 오류가 없으면 에러 상태 초기화
     if (!hasError) {
-      setDateTimeError(null);
-    }
+        setDateTimeError(null);
+      }
 
   }, [newEvent.date, newEvent.startTime, newEvent.endTime, newEvent.allDay]);
 
@@ -1125,13 +1133,13 @@ export default function SchedulePage() {
       if (isGroupSelectorOpen) {
         const target = event.target as HTMLElement;
         if (!target.closest('.group-selector-container')) {
-          setIsGroupSelectorOpen(false);
-        }
+        setIsGroupSelectorOpen(false);
       }
+    }
     };
 
     if (isGroupSelectorOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
@@ -1148,8 +1156,8 @@ export default function SchedulePage() {
     if (!newEvent.title || !newEvent.date) {
       console.log('[handleSaveEvent] ❌ 유효성 검사 실패: 제목 또는 날짜 없음');
       openSuccessModal('입력 오류', '제목과 날짜는 필수 입력 항목입니다.', 'error');
-      return;
-    }
+            return;
+        }
 
     if (dateTimeError) {
       console.log('[handleSaveEvent] ❌ 날짜/시간 오류:', dateTimeError);
@@ -1252,7 +1260,7 @@ export default function SchedulePage() {
                 weekdaysString 
               });
               
-              return { 
+          return {
                 sst_repeat_json: `{"r1":"3","r2":"${weekdaysString}"}`, 
                 sst_repeat_json_v: `1주마다 ${selectedDays}` 
               };
@@ -1439,7 +1447,7 @@ export default function SchedulePage() {
         // 수정
         const updateData = {
           sst_idx: parseInt(newEvent.id!),
-          groupId: selectedGroupId,
+            groupId: selectedGroupId,
           sst_title: newEvent.title,
           sst_sdate: startDateTime,
           sst_edate: endDateTime,
@@ -2550,7 +2558,7 @@ export default function SchedulePage() {
         console.log('[loadAllGroupSchedules] 오너 그룹 스케줄 조회 실패 또는 데이터 없음:', response);
         // keepSelectedDate가 true인 경우(월 변경) 기존 events 유지, 아니면 빈 배열로 설정
         if (!keepSelectedDate) {
-          setEvents([]);
+        setEvents([]); 
         }
         
         // 초기 로딩 완료 처리 (데이터가 없어도 로딩은 완료)
@@ -2570,12 +2578,12 @@ export default function SchedulePage() {
       console.error('[loadAllGroupSchedules] 스케줄 로드 실패:', error);
       // keepSelectedDate가 true인 경우(월 변경) 기존 events 유지, 아니면 빈 배열로 설정  
       if (!keepSelectedDate) {
-        setEvents([]);
+      setEvents([]);
       }
       
       // 초기 로딩 완료 처리 (에러가 발생해도 로딩은 완료)
-      if (!hasInitialDataLoaded) {
-        setHasInitialDataLoaded(true);
+    if (!hasInitialDataLoaded) {
+      setHasInitialDataLoaded(true);
         // 오류 시에도 모든 단계 완료
         updateLoadingStep('schedules', true);
         updateLoadingStep('calendar', true);
@@ -3246,7 +3254,12 @@ export default function SchedulePage() {
             animate="in"
             exit="out"
             variants={pageVariants}
-            className="px-4 pt-20 space-y-6"
+            className="px-4 pt-20 pb-24 space-y-6 min-h-screen overflow-y-auto"
+            style={{ 
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none'
+            }}
           >
             {/* 캘린더 섹션 */}
             <motion.div
@@ -3342,7 +3355,12 @@ export default function SchedulePage() {
                       {eventsForSelectedDay.length > 0 ? (
                         <motion.div 
                           key={selectedDay.format('YYYY-MM-DD')}
-                          className="space-y-3"
+                          className="space-y-3 max-h-[400px] overflow-y-auto"
+                          style={{ 
+                            WebkitOverflowScrolling: 'touch',
+                            scrollbarWidth: 'none',
+                            msOverflowStyle: 'none'
+                          }}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -20 }}
@@ -4524,6 +4542,1208 @@ export default function SchedulePage() {
           </motion.div>
         )}
       </div>
+
+      {/* 플로팅 버튼 - 일정 추가 */}
+      {!isInitialLoading && (
+        <motion.button
+          onClick={handleOpenAddEventModal}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl active:shadow-lg text-white rounded-full flex items-center justify-center mobile-button z-40 transition-all duration-200 ease-out"
+          style={{
+            boxShadow: '0 10px 25px rgba(34, 197, 94, 0.2), 0 4px 10px rgba(0, 0, 0, 0.1)',
+          }}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          transition={{ 
+            delay: 0.5, 
+            type: "spring", 
+            stiffness: 200, 
+            damping: 20 
+          }}
+          whileHover={{ 
+            scale: 1.1,
+            y: -2,
+            transition: { duration: 0.2 }
+          }}
+          whileTap={{ 
+            scale: 0.95,
+            transition: { duration: 0.1 }
+          }}
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+        </motion.button>
+      )}
+
+      {/* 일정 추가/수정 모달 */}
+      <AnimatePresence>
+        {isAddEventModalOpen && (
+                      <motion.div 
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
+            onClick={closeAddModal}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div 
+              className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+              onWheel={e => e.stopPropagation()}
+              onTouchMove={e => e.stopPropagation()}
+              variants={modalVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              drag="y"
+              dragElastic={0.1}
+              dragMomentum={false}
+              onDrag={(event, info) => {
+                // 드래그 중 실시간 피드백
+                if (info.offset.y > 20) {
+                  const target = event.currentTarget as HTMLElement;
+                  if (target) {
+                    target.style.opacity = String(Math.max(0.5, 1 - info.offset.y / 150));
+                  }
+                }
+              }}
+              onDragEnd={(event, info) => {
+                // 매우 민감한 조건으로 설정
+                if (info.offset.y > 25 || info.velocity.y > 150) {
+                  closeAddModal();
+                } else {
+                  // 원래 위치로 복귀
+                  const target = event.currentTarget as HTMLElement;
+                  if (target) {
+                    target.style.opacity = '1';
+                  }
+                }
+              }}
+              whileDrag={{ 
+                scale: 0.99,
+                transition: { duration: 0.05 }
+              }}
+            >
+              {/* 모달 핸들 - 고정 영역 */}
+              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-6 flex-shrink-0"></div>
+              
+              {/* 모달 헤더 - 고정 영역 */}
+              <div className="px-6 pb-4 border-b border-gray-100 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-gray-900">
+                    {newEvent.id ? '일정 수정' : '새 일정 추가'}
+                  </h3>
+                  <button
+                    onClick={closeAddModal}
+                    className="p-2 hover:bg-gray-100 rounded-full mobile-button"
+                  >
+                    <FiX className="w-5 h-5 text-gray-500" />
+                  </button>
+                </div>
+              </div>
+
+              {/* 스크롤 가능한 폼 영역 */}
+              <div className="flex-1 overflow-y-auto">
+                <form 
+                  className="px-6 py-6 space-y-6" 
+                  onSubmit={(e) => { e.preventDefault(); handleSaveEvent(); }}
+                >
+                  {/* 1. 그룹 및 멤버 선택 */}
+                  <div className="bg-indigo-50 rounded-xl p-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                      <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">1</span>
+                    </div>
+                      <h4 className="font-semibold text-gray-900">그룹 및 멤버 선택</h4>
+                  </div>
+
+                    {/* 그룹 선택 */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">그룹 선택</label>
+                      <div className="relative group-selector-container">
+                        <button
+                          type="button"
+                          onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
+                          className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 flex items-center justify-between"
+                        >
+                          <span className="text-gray-900">
+                            {selectedGroupId 
+                              ? userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹을 선택하세요'
+                              : '그룹을 선택하세요'
+                            }
+                          </span>
+                          <FiChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isGroupSelectorOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        
+                        {/* 그룹 드롭다운 */}
+                        <AnimatePresence>
+                          {isGroupSelectorOpen && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              transition={{ duration: 0.2 }}
+                              className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto"
+                            >
+                              {isLoadingGroups ? (
+                                <div className="p-4 text-center text-gray-500">
+                                  <div className="animate-spin w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                                  그룹 목록을 불러오는 중...
+                                </div>
+                              ) : userGroups.length > 0 ? (
+                                userGroups.map((group) => (
+                                <button
+                                  key={group.sgt_idx}
+                                  type="button"
+                                  onClick={() => handleGroupSelect(group.sgt_idx)}
+                                    className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
+                                      selectedGroupId === group.sgt_idx ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'
+                                    }`}
+                                  >
+                                    {group.sgt_title}
+                                </button>
+                                ))
+                              ) : (
+                                <div className="p-4 text-center text-gray-500">
+                                  참여 중인 그룹이 없습니다
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+
+                    {/* 멤버 선택 */}
+                    {selectedGroupId && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-3">멤버 선택</label>
+                        {isFetchingMembers ? (
+                          <div className="text-center py-6 text-gray-500">
+                            <div className="animate-spin w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                            멤버 목록을 불러오는 중...
+                          </div>
+                        ) : scheduleGroupMembers.length > 0 ? (
+                          <div className="flex overflow-x-auto space-x-4 pt-2 pb-2 px-3 -mx-1">
+                            {scheduleGroupMembers.map((member, index) => (
+                              <motion.div 
+                              key={member.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: index * 0.1 }}
+                                className="flex flex-col items-center flex-shrink-0"
+                              >
+                                <button
+                              type="button"
+                              onClick={() => handleScheduleMemberSelect(member.id)}
+                                  className="flex flex-col items-center focus:outline-none mobile-button"
+                                >
+                                  <div className={`w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
+                                    member.isSelected ? 'ring-4 ring-indigo-500 ring-offset-2' : ''
+                                  }`}>
+                                    <img 
+                                      src={getSafeImageUrl(member.photo, member.mt_gender, member.mt_idx || 0)}
+                                      alt={member.name}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        const fallbackSrc = getDefaultImage(member.mt_gender, member.mt_idx || 0);
+                                        console.log(`[이미지 오류] ${member.name}의 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
+                                        target.src = fallbackSrc;
+                                        target.onerror = null; // 무한 루프 방지
+                                      }}
+                                      onLoad={() => {
+                                        console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
+                                      }}
+                                    />
+                        </div>
+                                  <span className={`block text-xs font-medium mt-2 transition-colors duration-200 ${
+                                    member.isSelected ? 'text-indigo-700' : 'text-gray-700'
+                                  }`}>
+                                    {member.name}
+                                  </span>
+                                </button>
+                              </motion.div>
+                          ))}
+                        </div>
+                        ) : (
+                          <div className="text-center py-6 text-gray-500">
+                            <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
+                              <FiUsers className="w-6 h-6 text-gray-300" />
+                            </div>
+                            <p className="text-sm">그룹에 참여한 멤버가 없습니다</p>
+                      </div>
+                    )}
+                  </div>
+                    )}
+                </div>
+
+                  {/* 2. 일정 제목 및 내용 */}
+                  <div className="bg-blue-50 rounded-xl p-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                      <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">2</span>
+                    </div>
+                      <h4 className="font-semibold text-gray-900">일정 제목 및 내용</h4>
+                  </div>
+
+                  {/* 제목 입력 */}
+                    <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      일정 제목 <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newEvent.title}
+                      onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                      placeholder="일정 제목을 입력하세요"
+                      required
+                        maxLength={100}
+                      />
+                      <div className="flex justify-between mt-2">
+                        <p className="text-xs text-gray-500">예) 팀 회의, 프로젝트 미팅 등</p>
+                        <p className="text-xs text-gray-500">({newEvent.title.length}/100)</p>
+                    </div>
+                  </div>
+
+                    {/* 내용 입력 */}
+                  <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">일정 내용 (선택)</label>
+                    <textarea
+                      value={newEvent.content || ''}
+                      onChange={(e) => setNewEvent({ ...newEvent, content: e.target.value })}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors resize-none"
+                      placeholder="일정에 대한 상세 내용을 입력하세요"
+                        rows={3}
+                        maxLength={500}
+                    />
+                      <div className="flex justify-between mt-2">
+                      <p className="text-xs text-gray-500">예) 회의 안건, 준비물, 참고사항 등</p>
+                        <p className="text-xs text-gray-500">({(newEvent.content || '').length}/500)</p>
+                    </div>
+                  </div>
+                </div>
+
+                  {/* 3. 날짜 및 시간 */}
+                  <div className="bg-green-50 rounded-xl p-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                      <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">3</span>
+                    </div>
+                    <h4 className="font-semibold text-gray-900">날짜 및 시간</h4>
+                  </div>
+
+                    {/* 날짜와 시간 정보 카드 */}
+                    <button
+                      type="button"
+                      onClick={() => setIsDateTimeModalOpen(true)}
+                      className="w-full bg-white rounded-xl p-4 mb-4 border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-all duration-200 mobile-button"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700 text-sm font-medium">날짜</span>
+                          <span className="text-gray-500 text-sm font-normal">
+                            {dayjs(newEvent.date).format('YYYY년 MM월 DD일')}
+                      </span>
+                  </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700 text-sm font-medium">시간</span>
+                          <span className="text-gray-500 text-sm font-normal">
+                            {newEvent.allDay ? '하루 종일' : `${newEvent.startTime} ~ ${newEvent.endTime}`}
+                            </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-gray-700 text-sm font-medium">하루 종일</span>
+                          <span className="text-gray-500 text-sm font-normal">
+                            {newEvent.allDay ? 'ON' : 'OFF'}
+                            </span>
+                        </div>
+                      </div>
+                    </button>
+
+                    {/* 설정 안내 텍스트 */}
+                    <p className="text-xs text-gray-500 text-center">위 카드를 클릭하여 날짜와 시간을 설정하세요</p>
+                      </div>
+
+                  {/* 4. 추가 설정 */}
+                  <div className="bg-amber-50 rounded-xl p-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                      <div className="w-6 h-6 bg-amber-600 rounded-full flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">4</span>
+                    </div>
+                    <h4 className="font-semibold text-gray-900">추가 설정</h4>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* 반복 및 알림 설정 */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">반복</label>
+                        <button
+                          type="button"
+                            onClick={() => setIsRepeatModalOpen(true)}
+                            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left text-sm transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                        >
+                          {newEvent.repeat}
+                        </button>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">알림</label>
+                        <button
+                          type="button"
+                            onClick={() => setIsAlarmModalOpen(true)}
+                            className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left text-sm transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                        >
+                          {newEvent.alarm}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 장소 정보 */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">장소 정보 (선택)</label>
+                      <button
+                        type="button"
+                        onClick={handleOpenLocationSearchModal}
+                          className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                      >
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-gray-700">장소명</span>
+                            <span className="text-sm text-gray-500">
+                              {newEvent.locationName || '장소를 검색하세요'}
+                            </span>
+                          </div>
+                          {newEvent.locationAddress && (
+                            <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+                              <span className="text-sm font-medium text-gray-700">주소</span>
+                              <span className="text-sm text-gray-500 truncate max-w-48">
+                                {newEvent.locationAddress}
+                              </span>
+                            </div>
+                          )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                  {/* 액션 버튼 */}
+                  <div className="pt-2 space-y-3">
+                    <button
+                      type="submit"
+                      disabled={
+                        !newEvent.title || 
+                        !newEvent.date || 
+                        !!dateTimeError ||
+                        (!newEvent.allDay && (!newEvent.startTime || !newEvent.endTime))
+                      }
+                      className="w-full py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-xl font-semibold mobile-button disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200"
+                    >
+                      {newEvent.id ? '일정 수정' : '일정 추가'}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={closeAddModal}
+                      className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                    >
+                      취소
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+      {/* 커스텀 시간 선택 모달 */}
+      <AnimatePresence>
+        {isTimeModalOpen && (
+          <motion.div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+            onClick={handleCloseTimeModal}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div 
+              className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+              onClick={e => e.stopPropagation()}
+              onWheel={e => e.stopPropagation()}
+              onTouchMove={e => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="p-6">
+                {/* 시간 선택 헤더 */}
+                <div className="text-center mb-6">
+                  <h3 className="text-lg font-bold text-gray-900">
+                    {timeModalType === 'start' ? '시작 시간' : '종료 시간'} 선택
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    원하는 시간을 선택해주세요
+                  </p>
+                </div>
+
+                {/* 현재 선택된 시간 표시 */}
+                <div className="text-center mb-6 p-4 bg-green-50 rounded-xl border border-green-100">
+                  <div className="text-2xl font-bold text-green-700">
+                    {selectedHour.toString().padStart(2, '0')}:{selectedMinute.toString().padStart(2, '0')}
+                  </div>
+                  <div className="text-sm text-green-600 mt-1">
+                    {selectedHour < 12 ? '오전' : '오후'} {selectedHour === 0 ? 12 : selectedHour > 12 ? (selectedHour - 12).toString().padStart(2, '0') : selectedHour.toString().padStart(2, '0')}시 {selectedMinute.toString().padStart(2, '0')}분
+                          </div>
+                        </div>
+                        
+                {/* 시간 선택 영역 */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  {/* 시간 선택 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3 text-center">시간</label>
+                    <div ref={hourScrollRef} className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <motion.button
+                          key={i}
+                          onClick={() => handleHourChange(i)}
+                          className={`w-full px-3 py-2 text-sm transition-all duration-200 mobile-button ${
+                            selectedHour === i
+                              ? 'bg-green-600 text-white font-semibold'
+                              : 'hover:bg-gray-100 text-gray-700'
+                          }`}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          {i.toString().padStart(2, '0')}시
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 분 선택 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3 text-center">분</label>
+                    <div ref={minuteScrollRef} className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
+                      {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
+                        <motion.button
+                          key={minute}
+                          onClick={() => handleMinuteChange(minute)}
+                          className={`w-full px-3 py-2 text-sm transition-all duration-200 mobile-button ${
+                            selectedMinute === minute
+                              ? 'bg-green-600 text-white font-semibold'
+                              : 'hover:bg-gray-100 text-gray-700'
+                          }`}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                        >
+                          {minute.toString().padStart(2, '0')}분
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 빠른 선택 버튼들 */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-3 text-center">빠른 선택</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { label: '9:00', hour: 9, minute: 0 },
+                      { label: '12:00', hour: 12, minute: 0 },
+                      { label: '14:00', hour: 14, minute: 0 },
+                      { label: '18:00', hour: 18, minute: 0 },
+                      { label: '9:30', hour: 9, minute: 30 },
+                      { label: '12:30', hour: 12, minute: 30 },
+                      { label: '14:30', hour: 14, minute: 30 },
+                      { label: '18:30', hour: 18, minute: 30 },
+                    ].map((preset) => (
+                      <motion.button
+                        key={preset.label}
+                        onClick={() => {
+                          setSelectedHour(preset.hour);
+                          setSelectedMinute(preset.minute);
+                        }}
+                        className="px-2 py-2 text-xs bg-gray-100 hover:bg-green-100 text-gray-700 hover:text-green-700 rounded-lg font-medium mobile-button transition-colors"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        {preset.label}
+                      </motion.button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 액션 버튼 */}
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleTimeConfirm}
+                    className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
+                  >
+                    확인
+                  </button>
+                  <button
+                    onClick={handleCloseTimeModal}
+                    className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 장소 검색 모달 */}
+      <AnimatePresence>
+        {isLocationSearchModalOpen && (
+          <motion.div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+            onClick={() => setIsLocationSearchModalOpen(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div 
+              className="w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4 max-h-[80vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+              onWheel={e => e.stopPropagation()}
+              onTouchMove={e => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="p-6 flex-shrink-0">
+                <div className="flex items-center space-x-2 mb-6">
+                  <h3 className="text-lg font-bold text-gray-900">장소 검색</h3>
+                </div>
+                
+                {/* 장소 검색 입력 */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">장소명 또는 주소 입력</label>
+                  <input
+                    type="text"
+                    value={locationSearchQuery}
+                    onChange={(e) => setLocationSearchQuery(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSearchLocation();
+                      }
+                    }}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors"
+                    placeholder="장소명 또는 주소를 입력하세요"
+                    autoFocus
+                  />
+                  <p className="text-xs text-gray-500 mt-2">엔터키를 누르거나 검색 버튼을 클릭하세요</p>
+                </div>
+
+                {/* 검색 버튼 */}
+                <button
+                  onClick={() => handleSearchLocation()}
+                  disabled={!locationSearchQuery.trim() || isSearchingLocation}
+                  className="w-full py-3 bg-amber-600 text-white rounded-xl font-medium mobile-button hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  {isSearchingLocation ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>검색 중...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <span>검색</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* 구분선 */}
+              <div className="border-t border-gray-200"></div>
+
+              {/* 검색 결과 헤더 - 고정 */}
+              {locationSearchResults.length > 0 && !isSearchingLocation && (
+                <div className="px-6 py-4 flex-shrink-0 bg-gray-50">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                      <span className="text-xs text-green-600">✓</span>
+                    </div>
+                    <h4 className="text-sm font-semibold text-gray-900">검색 결과 ({locationSearchResults.length}개)</h4>
+                  </div>
+                </div>
+              )}
+
+              {/* 검색 결과 영역 - 스크롤 가능 */}
+              <div className="flex-1 overflow-y-auto">
+                {isSearchingLocation ? (
+                  <div className="text-center py-8 px-6">
+                    <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="animate-spin h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </div>
+                    <p className="text-gray-600 font-medium">장소를 검색하는 중입니다...</p>
+                    <p className="text-xs text-gray-500 mt-1">잠시만 기다려주세요</p>
+                  </div>
+                ) : locationSearchResults.length > 0 ? (
+                  <div className="px-6 py-4 space-y-3">
+                    {locationSearchResults.map((place, index) => (
+                      <motion.button
+                        key={place.temp_id}
+                        onClick={() => handleSelectLocation(place)}
+                        className="w-full bg-amber-50 hover:bg-amber-100 border border-amber-200 hover:border-amber-300 rounded-xl p-4 text-left transition-all duration-200 mobile-button"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className="flex-1 min-w-0">
+                            <h5 className="font-semibold text-gray-900 mb-1 truncate">{place.place_name}</h5>
+                            <p className="text-sm text-gray-600 line-clamp-2" style={{ wordBreak: 'keep-all' }}>
+                              {place.road_address_name || place.address_name}
+                            </p>
+                            <div className="flex items-center mt-2 space-x-2">
+                              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-medium">
+                                선택하기
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.button>
+                    ))}
+                  </div>
+                ) : hasSearched && !isSearchingLocation ? (
+                  <div className="text-center py-8 px-6">
+                {/* <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                </div> */}
+                    <p className="text-gray-600 font-medium">검색 결과가 없습니다</p>
+                    <p className="text-xs text-gray-500 mt-1">다른 검색어를 입력해보세요</p>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 px-6">
+                {/* <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-xl">🔍</span>
+                </div> */}
+                    <p className="text-gray-600 font-medium">장소를 검색해보세요</p>
+                    <p className="text-xs text-gray-500 mt-1">카페, 음식점, 회사명 등을 입력하세요</p>
+                  </div>
+                )}
+              </div>
+
+              {/* 닫기 버튼 */}
+              <div className="px-6 pb-6 flex-shrink-0">
+                <button
+                  onClick={handleCloseLocationSearchModal}
+                  className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                >
+                  닫기
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 커스텀 캘린더 모달 */}
+      <AnimatePresence>
+        {isCalendarModalOpen && (
+          <motion.div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+            onClick={handleCloseCalendarModal}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div 
+              className="w-full max-w-md bg-white rounded-3xl shadow-2xl mx-4"
+              onClick={e => e.stopPropagation()}
+              onWheel={e => e.stopPropagation()}
+              onTouchMove={e => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="p-6">
+                {/* 캘린더 헤더 */}
+                <div className="flex items-center justify-between mb-6">
+                  <motion.button
+                    onClick={handleCalendarPrevMonth}
+                    className="p-2 hover:bg-gray-100 rounded-full mobile-button"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <FiChevronLeft className="w-5 h-5 text-gray-600" />
+                  </motion.button>
+                  
+                  <div className="text-center">
+                    <h3 className="text-lg font-bold text-gray-900">
+                      {calendarCurrentMonth.format('YYYY년 MM월')}
+                    </h3>
+                    <button
+                      onClick={handleCalendarToday}
+                      className="text-sm text-green-600 hover:text-green-700 mobile-button mt-1"
+                    >
+                      오늘로 이동
+                    </button>
+                  </div>
+                  
+                  <motion.button
+                    onClick={handleCalendarNextMonth}
+                    className="p-2 hover:bg-gray-100 rounded-full mobile-button"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <FiChevronRight className="w-5 h-5 text-gray-600" />
+                  </motion.button>
+                </div>
+
+                {/* 요일 헤더 */}
+                <div className="grid grid-cols-7 gap-1 mb-3">
+                  {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
+                    <div key={day} className={`h-8 flex items-center justify-center text-xs font-bold ${
+                      index === 0 ? 'text-red-600' : index === 6 ? 'text-blue-600' : 'text-gray-700'
+                    }`}>
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* 캘린더 그리드 */}
+                <div className="grid grid-cols-7 gap-1 mb-6">
+                  {(() => {
+                    const days = [];
+                    const daysInMonth = calendarCurrentMonth.daysInMonth();
+                    const firstDayOfMonth = calendarCurrentMonth.startOf('month').day();
+                    const today = dayjs();
+                    const selectedDate = dayjs(newEvent.date);
+                    
+                    // 빈 칸 추가 (이전 달 마지막 날들)
+                    for (let i = 0; i < firstDayOfMonth; i++) {
+                      days.push(<div key={`empty-${i}`} className="h-10"></div>);
+                    }
+                    
+                    // 현재 달의 날짜들
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      const currentDate = calendarCurrentMonth.date(day);
+                      const isSelected = selectedDate.isSame(currentDate, 'day');
+                      const isToday = today.isSame(currentDate, 'day');
+                      const isPast = currentDate.isBefore(today, 'day');
+                      
+                      days.push(
+                        <button
+                          key={day}
+                          onClick={() => handleCalendarDateSelect(currentDate)}
+                          disabled={isPast}
+                          className={`
+                            h-10 w-full rounded-lg flex items-center justify-center text-sm font-medium mobile-button transition-all duration-200
+                            ${isSelected ? 'bg-green-600 text-white font-semibold shadow-lg' : ''}
+                            ${isToday && !isSelected ? 'bg-green-100 text-green-800 font-semibold' : ''}
+                            ${!isSelected && !isToday && !isPast ? 'hover:bg-gray-100 text-gray-800' : ''}
+                            ${isPast ? 'text-gray-300 cursor-not-allowed' : ''}
+                          `}
+                        >
+                          {day}
+                        </button>
+                      );
+                    }
+                    
+                    return days;
+                  })()}
+                </div>
+
+                {/* 선택된 날짜 표시 */}
+                <div className="text-center mb-6 p-4 bg-green-50 rounded-xl border border-green-100">
+                  <p className="text-sm text-gray-600">선택된 날짜</p>
+                  <p className="text-lg font-bold text-green-700">
+                    {dayjs(newEvent.date).format('YYYY년 MM월 DD일 (ddd)')}
+                  </p>
+                </div>
+
+                {/* 액션 버튼 */}
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleCloseCalendarModal}
+                    className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleCloseCalendarModal}
+                    className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
+                  >
+                    확인
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 저장 완료 모달 */}
+      <AnimatePresence>
+        {isSuccessModalOpen && successModalContent && (
+          <motion.div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md" 
+            onClick={closeSuccessModal}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div 
+              className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+              onClick={e => e.stopPropagation()}
+              variants={{
+                hidden: { 
+                  opacity: 0, 
+                  y: 100,
+                  scale: 0.95
+                },
+                visible: { 
+                  opacity: 1, 
+                  y: 0,
+                  scale: 1,
+                  transition: {
+                    duration: 0.3,
+                    ease: [0.25, 0.46, 0.45, 0.94]
+                  }
+                },
+                exit: { 
+                  opacity: 0, 
+                  y: 100,
+                  scale: 0.95,
+                  transition: {
+                    duration: 0.2,
+                    ease: [0.55, 0.06, 0.68, 0.19]
+                  }
+                }
+              }}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <div className="p-6 pb-8">
+                <div className="text-center mb-6">
+                  {/* 아이콘 */}
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${
+                    successModalContent.type === 'success' ? 'bg-green-100' : 
+                    successModalContent.type === 'error' ? 'bg-red-100' : 
+                    successModalContent.type === 'info' ? 'bg-red-100' : 'bg-blue-100'
+                  }`}>
+                    {successModalContent.type === 'success' && <FiCheckCircle className="w-8 h-8 text-green-500" />}
+                    {successModalContent.type === 'error' && <FiXCircle className="w-8 h-8 text-red-500" />}
+                    {successModalContent.type === 'info' && <FaTrash className="w-8 h-8 text-red-500" />}
+                  </div>
+
+                  {/* 제목 */}
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    {successModalContent.title}
+                  </h3>
+
+                  {/* 메시지 */}
+                  <div className="text-gray-600 mb-4 leading-relaxed" style={{ wordBreak: 'break-all' }}>
+                    {successModalContent.message.split('\\n').map((line, index) => (
+                      <div key={index}>
+                        {line.includes('"') ? (
+                          line.split('"').map((part, partIndex) => (
+                            partIndex % 2 === 1 ? (
+                              <span key={partIndex} className="font-bold text-red-600" style={{ wordBreak: 'break-all' }}>
+                                "{part}"
+                              </span>
+                            ) : (
+                              <span key={partIndex}>{part}</span>
+                            )
+                          ))
+                        ) : (
+                          <span>{line}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 자동 닫기 진행 바 (자동 닫기인 경우) */}
+                  {!successModalContent.onConfirm && successModalContent.type === 'success' && (
+                    <>
+                      <div className="w-full bg-gray-200 rounded-full h-1 mb-3">
+                        <motion.div 
+                          className="bg-green-500 h-1 rounded-full"
+                          initial={{ width: "0%" }}
+                          animate={{ width: "100%" }}
+                          transition={{ duration: 3, ease: "linear" }}
+                        />
+                      </div>
+                      <p className="text-sm text-gray-500 mb-2">3초 후 자동으로 닫힙니다</p>
+                    </>
+                  )}
+                </div>
+
+                {/* 버튼 영역 */}
+                <div className="flex flex-col gap-3">
+                  {successModalContent.onConfirm ? (
+                    <>
+                      <motion.button
+                        onClick={closeSuccessModal}
+                        className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-medium transition-all duration-200"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        취소
+                      </motion.button>
+                      <motion.button
+                        onClick={() => {
+                          successModalContent.onConfirm?.();
+                          closeSuccessModal();
+                        }}
+                        className={`w-full py-4 rounded-2xl font-medium flex items-center justify-center transition-all duration-200 ${
+                          successModalContent.type === 'info' 
+                            ? 'bg-red-500 hover:bg-red-600 text-white' 
+                            : 'bg-green-500 hover:bg-green-600 text-white'
+                        }`}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {successModalContent.type === 'info' ? '삭제하기' : '확인'}
+                      </motion.button>
+                    </>
+                  ) : (
+                    <motion.button
+                      onClick={closeSuccessModal}
+                      className={`w-full py-4 rounded-2xl font-medium flex items-center justify-center transition-all duration-200 ${
+                        successModalContent.type === 'success' ? 'bg-green-500 hover:bg-green-600 text-white' :
+                        successModalContent.type === 'error' ? 'bg-red-500 hover:bg-red-600 text-white' :
+                        'bg-blue-500 hover:bg-blue-600 text-white'
+                      }`}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      확인
+                    </motion.button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 스케줄 액션 선택 모달 */}
+      <AnimatePresence>
+        {isScheduleActionModalOpen && selectedEventForAction && (
+          <motion.div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeScheduleActionModal}
+          >
+            <motion.div 
+              className="bg-white rounded-3xl w-full max-w-md mx-auto"
+              variants={{
+                hidden: { 
+                  opacity: 0, 
+                  y: 100,
+                  scale: 0.95
+                },
+                visible: { 
+                  opacity: 1, 
+                  y: 0,
+                  scale: 1,
+                  transition: {
+                    duration: 0.3,
+                    ease: [0.25, 0.46, 0.45, 0.94]
+                  }
+                },
+                exit: { 
+                  opacity: 0, 
+                  y: 100,
+                  scale: 0.95,
+                  transition: {
+                    duration: 0.2,
+                    ease: [0.55, 0.06, 0.68, 0.19]
+                  }
+                }
+              }}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 pb-8">
+                {/* 스케줄 정보 미리보기 */}
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FiClock className="w-8 h-8 text-indigo-600" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900">{selectedEventForAction.title}</h3>
+                  <p className="text-gray-500 font-bold">
+                    {dayjs(selectedEventForAction.date).format('MM월 DD일')} {selectedEventForAction.startTime} - {selectedEventForAction.endTime}
+                  </p>
+                  
+                  {/* 반복 일정 배지 */}
+                  {selectedEventForAction.repeatText && selectedEventForAction.repeatText !== '없음' && (
+                    <div className="inline-flex items-center space-x-1 bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-sm font-medium mt-2 mb-2">
+                      <FiRotateCcw className="w-4 h-4" />
+                      <span>반복 일정 ({selectedEventForAction.repeatText})</span>
+                    </div>
+                  )}
+                  
+                  <p className="text-sm text-gray-400">선택한 일정에 대해 수정하거나 삭제할 수 있습니다.</p>
+                </div>
+
+                {/* 액션 버튼들 */}
+                <div className="space-y-3">
+                  <motion.button
+                    onClick={() => handleEditAction(selectedEventForAction!)}
+                    className="w-full flex items-center justify-center space-x-3 py-4 bg-blue-50 text-blue-700 rounded-xl font-semibold mobile-button hover:bg-blue-100 transition-colors"
+                  >
+                    <FiEdit3 className="w-5 h-5" />
+                    <span>수정하기</span>
+                  </motion.button>
+                  
+                  <motion.button
+                    onClick={() => {
+                      // 반복 일정인지 확인하여 처리 방식 결정
+                      if (selectedEventForAction?.repeatText && selectedEventForAction.repeatText !== '없음') {
+                        // 반복 일정인 경우 바로 handleDeleteAction 호출
+                        handleDeleteAction(selectedEventForAction);
+                      } else {
+                        // 일반 일정인 경우 삭제 확인 모달 표시
+                        const eventTitle = selectedEventForAction?.title || '일정';
+                        const confirmMessage = `일정 "${eventTitle}"\n정말 삭제하시겠습니까?`;
+                        
+                        // 먼저 액션 모달을 닫고 삭제 확인 모달을 열기
+                        setIsScheduleActionModalOpen(false);
+                        
+                        openSuccessModal(
+                          '일정 삭제 확인', 
+                          confirmMessage, 
+                          'info', 
+                          () => handleDeleteAction(selectedEventForAction!)
+                        );
+                      }
+                    }}
+                    className="w-full flex items-center justify-center space-x-3 py-4 bg-red-50 text-red-700 rounded-xl font-semibold mobile-button hover:bg-red-100 transition-colors"
+                  >
+                    <FaTrash className="w-5 h-5" />
+                    <span>삭제하기</span>
+                  </motion.button>
+                  
+                  <button
+                    onClick={closeScheduleActionModal}
+                    className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 반복 일정 처리 모달 */}
+      <AnimatePresence>
+        {isRepeatActionModalOpen && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+            onClick={() => {
+              setIsRepeatActionModalOpen(false);
+              setSelectedEventForAction(null);
+              setPendingRepeatEvent(null);
+              // body 스크롤 복원
+              document.body.style.overflow = '';
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div 
+              className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+              onClick={e => e.stopPropagation()}
+              onWheel={e => e.stopPropagation()}
+              onTouchMove={e => e.stopPropagation()}
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">반복 일정 {repeatActionType === 'edit' ? '수정' : '삭제'}</h3>
+                
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handleRepeatOption('this')}
+                    className="w-full px-4 py-4 text-left rounded-xl transition-all duration-200 mobile-button bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-transparent hover:border-gray-300"
+                  >
+                    <div className="space-y-1">
+                      <div className="font-semibold">이것만 {repeatActionType === 'edit' ? '수정' : '삭제'}</div>
+                      <div className="text-sm text-gray-500">선택한 일정만 처리합니다</div>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleRepeatOption('future')}
+                    className="w-full px-4 py-4 text-left rounded-xl transition-all duration-200 mobile-button bg-blue-50 text-blue-700 hover:bg-blue-100 border-2 border-transparent hover:border-blue-300"
+                  >
+                    <div className="space-y-1">
+                      <div className="font-semibold">현재 이후 {repeatActionType === 'edit' ? '수정' : '삭제'}</div>
+                      <div className="text-sm text-blue-500">이 일정부터 앞으로의 모든 반복 일정을 처리합니다</div>
+                    </div>
+                  </button>
+                  
+                  <button
+                    onClick={() => handleRepeatOption('all')}
+                    className={`w-full px-4 py-4 text-left rounded-xl transition-all duration-200 mobile-button border-2 border-transparent ${
+                      repeatActionType === 'edit' 
+                        ? 'bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300' 
+                        : 'bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="font-semibold">모든 반복 {repeatActionType === 'edit' ? '수정' : '삭제'}</div>
+                      <div className={`text-sm ${repeatActionType === 'edit' ? 'text-amber-500' : 'text-red-500'}`}>
+                        과거를 포함한 모든 반복 일정을 처리합니다
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setIsRepeatActionModalOpen(false);
+                    setSelectedEventForAction(null);
+                    setPendingRepeatEvent(null);
+                    // body 스크롤 복원
+                    document.body.style.overflow = '';
+                  }}
+                  className="w-full mt-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                >
+                  취소
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

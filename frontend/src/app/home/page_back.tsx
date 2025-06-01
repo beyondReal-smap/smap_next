@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion, useMotionValue } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useUser } from '@/contexts/UserContext';
 import axios from 'axios';
 import { format, addDays } from 'date-fns';
@@ -13,7 +13,8 @@ import { ko } from 'date-fns/locale';
 import { PageContainer, Card, Button } from '../components/layout';
 import { Loader } from '@googlemaps/js-api-loader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { FiLoader, FiChevronDown, FiUser } from 'react-icons/fi';
+import { FiLoader, FiChevronDown } from 'react-icons/fi'; // 필요한 아이콘들 추가
+// 공통 설정 및 서비스 임포트
 import config, { API_KEYS, detectLanguage, MAP_CONFIG } from '../../config';
 import mapService, { 
   MapType as MapTypeService, 
@@ -22,15 +23,17 @@ import mapService, {
   cleanupGoogleMap, 
   cleanupNaverMap 
 } from '../../services/mapService';
-import memberService from '@/services/memberService';
-import scheduleService from '../../services/scheduleService';
-import groupService, { Group } from '@/services/groupService';
+import memberService from '@/services/memberService'; // 멤버 서비스 추가
+import scheduleService from '../../services/scheduleService'; // scheduleService 임포트
+import groupService, { Group } from '@/services/groupService'; // 그룹 서비스 추가
+// 인증 관련 임포트 추가
 import { useAuth } from '@/contexts/AuthContext';
 import authService from '@/services/authService';
 import { 
     AllDayCheckEnum, ShowEnum, ScheduleAlarmCheckEnum, InCheckEnum, ScheduleCheckEnum 
-} from '../../types/enums';
+} from '../../types/enums'; // 생성한 Enum 타입 임포트
 
+// window 전역 객체에 naver 및 google 프로퍼티 타입 선언
 declare global {
   interface Window {
     naver: any;
@@ -38,252 +41,166 @@ declare global {
   }
 }
 
+// 지도 API 키 설정 (공통 설정 파일에서 가져옴)
 const GOOGLE_MAPS_API_KEY = MAP_API_KEYS.GOOGLE;
 const NAVER_MAPS_CLIENT_ID = MAP_API_KEYS.NAVER_CLIENT_ID;
 
+// 바텀시트 위치 상수 정의 (3단계)
 const BOTTOM_SHEET_POSITIONS = {
-  COLLAPSED_HEIGHT: 100,
-  MIDDLE_PERCENTAGE: 0.68,
-  EXPANDED_PERCENTAGE: 0.15,
+  COLLAPSED_HEIGHT: 100, // 접혔을 때 하단에서 올라온 높이
+  MIDDLE_PERCENTAGE: 0.68, // 중간 상태: translateY(68%)
+  EXPANDED_PERCENTAGE: 0.15, // 펼쳤을 때: translateY(15%) = 85% 화면 높이
   TRANSITION_DURATION: '0.5s',
   TRANSITION_TIMING: 'cubic-bezier(0.4, 0, 0.2, 1)',
-  MIN_DRAG_DISTANCE: 80
+  MIN_DRAG_DISTANCE: 80 // 상태 전환을 위한 최소 드래그 거리
 };
 
+// 추천 장소 더미 데이터
 const RECOMMENDED_PLACES = [
-  { id: '1', title: '스타벅스 강남점', distance: 0.3, address: '서울시 강남구 역삼동 123-45', tel: '02-1234-5678', url: 'https://www.starbucks.co.kr' },
-  { id: '2', title: '투썸플레이스 서초점', distance: 0.5, address: '서울시 서초구 서초동 456-78', tel: '02-2345-6789', url: 'https://www.twosome.co.kr' }
+  { 
+    id: '1', 
+    title: '스타벅스 강남점', 
+    distance: 0.3, 
+    address: '서울시 강남구 역삼동 123-45',
+    tel: '02-1234-5678',
+    url: 'https://www.starbucks.co.kr'
+  },
+  { 
+    id: '2', 
+    title: '투썸플레이스 서초점', 
+    distance: 0.5, 
+    address: '서울시 서초구 서초동 456-78',
+    tel: '02-2345-6789',
+    url: 'https://www.twosome.co.kr'
+  }
 ];
 
+// 그룹멤버 더미 데이터 - 위치 정보 추가
+const MOCK_GROUP_MEMBERS: GroupMember[] = [
+  { 
+    id: '1', name: '김철수', photo: '/images/avatar3.png', isSelected: false,
+    location: { lat: 37.5642 + 0.005, lng: 127.0016 + 0.002 },
+    schedules: [
+      { id: 'm1-1', title: '팀 회의', date: '오늘 14:00', location: '강남 사무실' },
+      { id: 'm1-2', title: '저녁 약속', date: '오늘 19:00', location: '이탈리안 레스토랑' }
+    ],
+    original_index: 0, mt_gender: 1, 
+    mt_weather_sky: '8', mt_weather_tmx: 25 // 예시 날씨 정보
+  },
+  { 
+    id: '2', name: '이영희', photo: '/images/avatar1.png', isSelected: false,
+    location: { lat: 37.5642 - 0.003, lng: 127.0016 - 0.005 },
+    schedules: [
+      { id: 'm2-1', title: '프로젝트 발표', date: '내일 10:00', location: '회의실 A' }
+    ],
+    original_index: 1, mt_gender: 2,
+    mt_weather_sky: '1', mt_weather_tmx: 22 // 예시 날씨 정보
+  },
+  { 
+    id: '3', name: '박민수', photo: '/images/avatar2.png', isSelected: false,
+    location: { lat: 37.5642 + 0.002, lng: 127.0016 - 0.003 },
+    schedules: [
+      { id: 'm3-1', title: '주간 회의', date: '수요일 11:00', location: '본사 대회의실' },
+      { id: 'm3-2', title: '고객 미팅', date: '목요일 15:00', location: '강남 오피스' }
+    ],
+    original_index: 2, mt_gender: 1,
+    mt_weather_sky: '4', mt_weather_tmx: 18 // 예시 날씨 정보
+  }
+];
+
+// 지도 타입 정의 (기존 타입 정의 제거 및 서비스의 타입 사용)
 type MapType = MapTypeService;
 
+// 그룹멤버 타입 정의
 interface GroupMember {
-  id: string; name: string; photo: string | null; isSelected: boolean; location: Location;
-  schedules: Schedule[]; mt_gender?: number | null; original_index: number;
-  mt_weather_sky?: string | number | null; mt_weather_tmx?: string | number | null;
-  mlt_lat?: number | null; mlt_long?: number | null; mlt_speed?: number | null;
-  mlt_battery?: number | null; mlt_gps_time?: string | null;
-  sgdt_owner_chk?: string; sgdt_leader_chk?: string;
-  sgdt_idx?: number; // 그룹 상세 인덱스 추가
+  id: string;
+  name: string;
+  photo: string | null;
+  isSelected: boolean;
+  location: Location;
+  schedules: Schedule[]; // Schedule 타입은 이 파일 내의 것을 사용
+  mt_gender?: number | null;
+  original_index: number;
+  mt_weather_sky?: string | number | null;
+  mt_weather_tmx?: string | number | null;
+  
+  // 새로 추가된 위치 정보
+  mlt_lat?: number | null;
+  mlt_long?: number | null;
+  mlt_speed?: number | null;
+  mlt_battery?: number | null;
+  mlt_gps_time?: string | null;
+  
+  // 그룹 권한 정보
+  sgdt_owner_chk?: string;
+  sgdt_leader_chk?: string;
 }
 
+// 일정 타입 정의
 interface Schedule {
-  id: string; sst_pidx?: number | null; memberId?: string | null; mt_schedule_idx?: number | null;
-  title?: string | null; date?: string | null; sst_edate?: string | null; sst_sedate?: string | null;
-  sst_all_day?: AllDayCheckEnum | null; sst_repeat_json?: string | null; sst_repeat_json_v?: string | null;
-  sgt_idx?: number | null; sgdt_idx?: number | null; sgdt_idx_t?: string | null;
-  sst_alram?: number | null; sst_alram_t?: string | null; sst_adate?: string | null;
-  slt_idx?: number | null; slt_idx_t?: string | null; location?: string | null;
-  sst_location_add?: string | null; sst_location_lat?: number | null; sst_location_long?: number | null;
-  sst_supplies?: string | null; sst_memo?: string | null; sst_show?: ShowEnum | null;
-  sst_location_alarm?: number | null; sst_schedule_alarm_chk?: ScheduleAlarmCheckEnum | null;
-  sst_pick_type?: string | null; sst_pick_result?: number | null; sst_schedule_alarm?: string | null;
-  sst_update_chk?: string | null; sst_wdate?: string | null; sst_udate?: string | null;
-  sst_ddate?: string | null; sst_in_chk?: InCheckEnum | null; sst_schedule_chk?: ScheduleCheckEnum | null;
-  sst_entry_cnt?: number | null; sst_exit_cnt?: number | null;
-  statusDetail?: { name: 'completed' | 'ongoing' | 'upcoming' | 'default'; text: string; color: string; bgColor: string; };
+  id: string; // sst_idx (Primary Key)
+  sst_pidx?: number | null;
+  memberId?: string | null; // mt_idx (프론트엔드에서 편의상 memberId로 사용)
+  mt_schedule_idx?: number | null; // 새로 추가된 필드
+  title?: string | null;    // sst_title
+  date?: string | null;     // sst_sdate (datetime string)
+  sst_edate?: string | null;  // (datetime string)
+  sst_sedate?: string | null;
+  sst_all_day?: AllDayCheckEnum | null;
+  sst_repeat_json?: string | null;
+  sst_repeat_json_v?: string | null;
+  sgt_idx?: number | null;
+  sgdt_idx?: number | null;
+  sgdt_idx_t?: string | null;
+  sst_alram?: number | null; // 실제 값에 따라 Enum 또는 number 타입 지정 가능
+  sst_alram_t?: string | null;
+  sst_adate?: string | null;   // (datetime string)
+  slt_idx?: number | null;
+  slt_idx_t?: string | null;
+  location?: string | null; // sst_location_title (프론트엔드에서 편의상 location으로 사용)
+  sst_location_add?: string | null;
+  sst_location_lat?: number | null;  // Decimal이지만 프론트에서 number로 처리
+  sst_location_long?: number | null; // Decimal이지만 프론트에서 number로 처리
+  sst_supplies?: string | null;
+  sst_memo?: string | null;
+  sst_show?: ShowEnum | null;
+  sst_location_alarm?: number | null; // 실제 값에 따라 Enum 또는 number 타입 지정 가능
+  sst_schedule_alarm_chk?: ScheduleAlarmCheckEnum | null;
+  sst_pick_type?: string | null;
+  sst_pick_result?: number | null;
+  sst_schedule_alarm?: string | null; // (datetime string)
+  sst_update_chk?: string | null;
+  sst_wdate?: string | null; // (datetime string)
+  sst_udate?: string | null; // (datetime string)
+  sst_ddate?: string | null; // (datetime string)
+  sst_in_chk?: InCheckEnum | null;
+  sst_schedule_chk?: ScheduleCheckEnum | null;
+  sst_entry_cnt?: number | null;
+  sst_exit_cnt?: number | null;
+  statusDetail?: { // 스케줄 상태 상세 정보
+    name: 'completed' | 'ongoing' | 'upcoming' | 'default';
+    text: string;
+    color: string;
+    bgColor: string;
+  };
 }
 
+// 전역 로더 인스턴스 생성 (싱글톤 패턴)
 const googleMapsLoader = new Loader({
-  apiKey: GOOGLE_MAPS_API_KEY, version: 'weekly', libraries: ['places'], id: 'google-maps-script'
+  apiKey: GOOGLE_MAPS_API_KEY,
+  version: 'weekly',
+  libraries: ['places'],
+  id: 'google-maps-script'
 });
 
-const apiLoadStatus = { google: false, naver: false };
+// API 로드 상태 추적을 위한 전역 객체
+const apiLoadStatus = {
+  google: false,
+  naver: false
+};
 
-const mobileStyles = `
-html, body {
-  width: 100%;
-  overflow-x: hidden;
-  position: relative;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.glass-effect {
-  backdrop-filter: blur(20px);
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-}
-
-.gradient-bg {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.member-avatar {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.member-avatar.selected {
-  box-shadow: 0 0 0 3px #6366f1, 0 0 20px rgba(99, 102, 241, 0.4);
-}
-
-.mobile-button {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  touch-action: manipulation;
-  user-select: none;
-}
-
-.mobile-button:active {
-  transform: scale(0.98);
-}
-
-.group-selector {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border: 1px solid rgba(99, 102, 241, 0.2);
-}
-
-.group-selector:hover {
-  border-color: #6366f1;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
-}
-
-/* w-13 h-13 클래스 정의 (52px) */
-.w-13 {
-  width: 3.25rem; /* 52px */
-}
-
-.h-13 {
-  height: 3.25rem; /* 52px */
-}
-
-@media (max-width: 640px) {
-  .member-avatar {
-    width: 52px; 
-    height: 52px; 
-  }
-}
-
-/* glass-effect 스타일 추가 */
-.glass-effect {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-}
-
-/* 지도 화면 전체 차지하기 위한 스타일 */
-.full-map-container {
-  position: fixed;
-  top: 0; /* 헤더 아래부터 시작하지 않고 화면 최상단부터 시작 */
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-/* 지도 헤더 스타일 */
-.map-header {
-  position: fixed;
-  top: 20px;
-  left: 20px;
-  z-index: 10;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  border-radius: 16px;
-  padding: 12px;
-  min-width: 80px;
-  text-align: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-/* 지도 컨트롤 버튼들 스타일 */
-.map-controls {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.map-control-button {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 10px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  color: #374151;
-}
-
-.map-control-button:hover {
-  background: rgba(255, 255, 255, 0.95);
-  transform: translateY(-1px);
-  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
-}
-
-/* 바텀시트 스타일 - location/page.tsx 패턴 적용 */
-.bottom-sheet {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 20;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border-top-left-radius: 24px;
-  border-top-right-radius: 24px;
-  border-top: 1px solid rgba(99, 102, 241, 0.1);
-  transition-property: transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  touch-action: none;
-  user-select: none;
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.1);
-}
-
-.bottom-sheet-handle {
-  width: 40px;
-  height: 4px;
-  background: #d1d5db;
-  border-radius: 2px;
-  margin: 12px auto 8px;
-  cursor: grab;
-  transition: background-color 0.2s;
-}
-
-.bottom-sheet-handle:active {
-  cursor: grabbing;
-}
-
-.bottom-sheet-handle:hover {
-  background: #9ca3af;
-}
-
-/* 바텀시트 상태별 위치 - framer-motion으로 제어되므로 제거 */
-/* location/page.tsx에서는 framer-motion variants로 처리 */
-
-/* 콘텐츠 섹션 스타일 */
-.content-section {
-  margin-bottom: 20px;
-}
-
-.content-section.members-section {
-  margin-bottom: 12px;
-}
-
-.section-title {
-  font-weight: 600;
-  margin-bottom: 12px;
-}
-
-/* 애니메이션 키프레임 */
+// CSS 애니메이션 키프레임 스타일 (최상단에 추가)
+const modalAnimation = `
 @keyframes slideUp {
   from {
     transform: translateY(100%);
@@ -309,145 +226,266 @@ html, body {
 .animate-fadeIn {
   animation: fadeIn 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
+
+/* glass-effect 스타일 추가 */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* 지도 화면 전체 차지하기 위한 스타일 */
+.full-map-container {
+  position: fixed;
+  top: 0; /* 헤더 아래부터 시작하지 않고 화면 최상단부터 시작 */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  z-index: 5;
+}
+
+.map-wrapper {
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 60px; /* 헤더 높이만큼 아래에서 시작 */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* Bottom Sheet 스타일 */
+.bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: white;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+              bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* 0.4s와 0.2s delay → 0.5s로 변경하여 바텀시트와 동일하게 */
+  z-index: 40;
+  max-height: 90vh;
+  /* overflow-y: auto; */ /* 제거 - 내부 컨텐츠 래퍼가 담당 */
+  touch-action: pan-y; /* 시트 자체 드래그를 위함 */
+  /* padding-bottom: 20px; */ /* 제거 - 내부 컨텐츠 래퍼가 담당 */
+  will-change: transform;
+}
+
+.bottom-sheet-handle {
+  width: 40px;
+  height: 5px;
+  background-color: #e2e8f0;
+  border-radius: 3px;
+  margin: 8px auto;
+  cursor: grab;
+}
+
+.bottom-sheet-handle:active {
+  cursor: grabbing;
+}
+
+.bottom-sheet-collapsed {
+  transform: translateY(calc(100% - 100px));
+  min-height: 100vh;
+}
+
+.bottom-sheet-middle {
+  transform: translateY(68%);
+  min-height: 100vh;
+}
+
+.bottom-sheet-expanded {
+  transform: translateY(0%);
+  height: 85vh; /* 고정 높이 추가 조정 (88vh -> 85vh) */
+  overflow-y: hidden !important; /* 중요: 시트 자체는 스크롤되지 않음 */
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* 맵 헤더 스타일 - 바텀시트 위치에 따라 이동하도록 수정 */
+.map-header {
+  position: fixed;
+  left: 16px;
+  right: auto;
+  width: 60px;
+  z-index: 40; /* 메인 헤더(z-50)보다 낮게 설정 */
+  background-color: rgba(0, 0, 0, 0.7); /* 어두운 배경색으로 변경 */
+  color: white; /* 텍스트 색상을 흰색으로 변경 */
+  padding: 6px 8px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+              bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* opacity delay 제거, bottom과 동일 시간 */
+  max-width: 60px;
+}
+
+.map-controls {
+  position: fixed;
+  right: 16px;
+  z-index: 40; /* 메인 헤더(z-50)보다 낮게 설정 */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), 
+              bottom 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1); /* visibility 제외하여 즉시 처리 */
+}
+
+/* 바텀시트 상태에 따른 헤더 위치 */
+.header-collapsed {
+  bottom: 120px; /* 바텀시트 높이(150px) + 간격(15px) */
+  top: auto;
+  opacity: 1;
+  visibility: visible;
+}
+
+.header-middle {
+  bottom: calc(33vh + 10px); 
+  top: auto;
+  opacity: 1;
+  visibility: visible;
+}
+
+.header-expanded {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* 컨트롤 버튼 위치 별도 관리 */
+.controls-collapsed {
+  bottom: 120px; /* 바텀시트 높이(150px) + 간격(15px) - 헤더와 동일한 위치 */
+  top: auto;
+  opacity: 1;
+  visibility: visible;
+}
+
+.controls-middle {
+  bottom: calc(33vh + 10px); /* 바텀시트 중간 높이 + 간격(15px) - 헤더와 동일한 위치 */
+  top: auto;
+  opacity: 1;
+  visibility: visible;
+}
+
+.controls-expanded {
+  bottom: calc(33vh + 10px); /* middle 상태와 동일한 위치 유지 */
+  opacity: 0;
+  visibility: hidden;
+  transition: none; /* 즉시 사라지도록 transition 제거 */
+}
+
+.map-control-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.7);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #EEF2FF;
+  transition: all 0.2s;
+}
+
+.map-control-button:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.15);
+}
+
+/* 섹션 구분선 스타일 추가 */
+.section-divider {
+  height: 1px;
+  background: #f2f2f2;
+  margin: 16px 0;
+  width: 100%;
+}
+
+.section-title {
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  color: #424242;
+  font-weight: normal;
+}
+
+.content-section {
+  padding: 16px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.content-section::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.members-section {
+  background: linear-gradient(to right, rgba(22, 163, 74, 0.03), transparent); /* Indigo to Green gradient */
+}
+
+.members-section::before {
+  background-color: #16A34A; /* Indigo (#4F46E5) to Green-600 (#16A34A) */
+}
+
+.schedule-section {
+  background: linear-gradient(to right, rgba(236, 72, 153, 0.03), transparent);
+}
+
+.schedule-section::before {
+  background-color: #EC4899; /* 핑크 색상 */
+}
+
+.places-section {
+  background: linear-gradient(to right, rgba(234, 179, 8, 0.03), transparent);
+}
+
+.places-section::before {
+  background-color: #EAB308; /* 노란색 색상 */
+}
+
+/* 스크롤바 숨김 스타일 */
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
 `;
 
-const pageVariants = {
-  initial: { 
-    opacity: 0, 
-    y: 20
-  },
-  in: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
-    }
-  },
-  out: { 
-    opacity: 0, 
-    y: -20,
-    transition: {
-      duration: 0.2,
-      ease: [0.22, 1, 0.36, 1]
-    }
-  }
-};
-
-const memberAvatarVariants = {
-  initial: { 
-    scale: 0.9,
-    opacity: 0
-  },
-  animate: (index: number) => ({
-    scale: 1,
-    opacity: 1,
-    transition: {
-      delay: index * 0.04,
-      type: "spring",
-      stiffness: 300,
-      damping: 25,
-      duration: 0.4
-    }
-  }),
-  hover: {
-    scale: 1.02,
-    transition: {
-      type: "spring",
-      stiffness: 400,
-      damping: 20,
-      duration: 0.15
-    }
-  },
-  selected: {
-    scale: 1.01,
-    transition: {
-      type: "spring",
-      stiffness: 400,
-      damping: 20,
-      duration: 0.15
-    }
-  }
-};
-
-const staggerContainer = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.04,
-      delayChildren: 0.1
-    }
-  }
-};
-
-const staggerItem = {
-  hidden: { 
-    opacity: 0,
-    y: 15
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 25
-    }
-  }
-};
-
-const spinnerVariants = {
-  animate: {
-    rotate: 360,
-    transition: {
-      duration: 1,
-      repeat: Infinity,
-      ease: "linear"
-    }
-  }
-};
-
-const loadingVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2
-    }
-  }
-};
-
-const loadingTextVariants = {
-  hidden: { 
-    opacity: 0,
-    y: 10
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 25
-    }
-  }
-};
-
-// ... existing code ...
-
-// Helper 함수들 추가
-const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/';
+const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/'; // 실제 백엔드 이미지 저장 경로의 기본 URL (★ 반드시 실제 경로로 수정 필요)
 
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png', '/images/male_4.png'];
-  const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png', '/images/female_4.png'];
-  const defaultImages = ['/images/avatar1.png', '/images/avatar2.png', '/images/avatar3.png', '/images/avatar4.png'];
-  
-  if (gender === 1) return maleImages[index % maleImages.length];
-  if (gender === 2) return femaleImages[index % femaleImages.length];
-  return defaultImages[index % defaultImages.length];
+  const imageNumber = (index % 4) + 1; // index 기반으로 1~4 숫자 결정 (랜덤 대신)
+  if (gender === 1) {
+    return `/images/male_${imageNumber}.png`;
+  } else if (gender === 2) {
+    return `/images/female_${imageNumber}.png`;
+  }
+  // mt_gender가 없거나 1, 2가 아닐 때, avatar 이미지도 index 기반으로 일관성 유지
+  return `/images/avatar${(index % 3) + 1}.png`; 
 };
 
 // SSL 인증서 오류가 있는 URL인지 확인하는 함수
@@ -650,8 +688,8 @@ export default function HomePage() {
     naver: false
   });
 
-  // Bottom Sheet 상태 관리 추가 - 3단계로 확장 (접힘, 중간, 펼쳐짐) - location/page.tsx 패턴 적용
-  const [bottomSheetState, setBottomSheetState] = useState<'hidden' | 'peek' | 'visible'>('peek');
+  // Bottom Sheet 상태 관리 추가 - 3단계로 확장 (접힘, 중간, 펼쳐짐)
+  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'middle' | 'expanded'>('collapsed');
   const bottomSheetRef = useRef<HTMLDivElement>(null);
   const startDragY = useRef<number | null>(null);
   const dragStartTime = useRef<number | null>(null);
@@ -670,163 +708,119 @@ export default function HomePage() {
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
   const [firstMemberSelected, setFirstMemberSelected] = useState(false); // 첫번째 멤버 선택 완료 추적
 
-  // 달력 스와이프 관련 상태 - calendarBaseDate 제거, x만 유지
-  const x = useMotionValue(0); // 드래그 위치를 위한 motionValue
-
-  // calendarBaseDate 관련 useEffect 제거 - 8일 고정이므로 불필요
-
-  // useEffect를 사용하여 클라이언트 사이드에서 날짜 관련 상태 초기화
-  useEffect(() => {
-    const today = new Date();
-    setSelectedDate(format(today, 'yyyy-MM-dd'));
-    setDaysForCalendar(getNext7Days());
-  }, []); // 빈 배열로 전달하여 마운트 시 1회 실행
-
   // Bottom Sheet 상태를 클래스 이름으로 변환
   const getBottomSheetClassName = () => {
-    // 로딩 중일 때는 강제로 hidden 상태로 유지
+    // 로딩 중일 때는 강제로 collapsed 상태로 유지
     if (authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) {
-      return 'bottom-sheet-hidden';
+      return 'bottom-sheet-collapsed';
     }
     
     switch (bottomSheetState) {
-      case 'hidden': return 'bottom-sheet-hidden';
-      case 'peek': return 'bottom-sheet-peek';
-      case 'visible': return 'bottom-sheet-visible';
-      default: return 'bottom-sheet-hidden';
+      case 'collapsed': return 'bottom-sheet-collapsed';
+      case 'middle': return 'bottom-sheet-middle';
+      case 'expanded': return 'bottom-sheet-expanded';
+      default: return 'bottom-sheet-collapsed';
     }
   };
 
-  // Bottom Sheet 드래그 핸들러 수정 - 핸들 영역에서만 드래그 가능
+  // Bottom Sheet 드래그 핸들러 수정 - 단순화된 로직
   const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    // 멤버 선택 버튼이나 기타 인터랙티브 요소에서 시작된 이벤트는 무시
     const target = e.target as HTMLElement;
-    
-    // 스케줄 스크롤 영역 체크
-    const isInScheduleArea = target.closest('[data-schedule-scroll="true"]') || 
-                            target.closest('[data-schedule-item="true"]') ||
-                            target.closest('[data-calendar-swipe="true"]');
-    
-    if (isInScheduleArea) {
-      console.log('[BottomSheet] 스케줄 영역에서의 터치 - 바텀시트 드래그 비활성화');
-      return; // 스케줄 영역에서는 바텀시트 드래그 비활성화
+    if (target.closest('button') || target.closest('a')) {
+      return;
     }
     
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     startDragY.current = clientY;
-    dragStartTime.current = performance.now();
     isDraggingRef.current = true;
-    
-    // 로그 메시지를 변경하여 현재 어떤 handleDragStart가 실행되는지 명확히 함
-    console.log('[BottomSheet Handle DragStart] 핸들에서 드래그 시작됨:', clientY);
+    dragStartTime.current = Date.now();
+
+    if (bottomSheetRef.current) {
+      bottomSheetRef.current.style.transition = 'none';
+    }
+
+    // 핸들 영역에서 시작된 드래그인지 확인하여 로그 출력
+    const isHandleDrag = target.classList.contains('bottom-sheet-handle');
+    if (isHandleDrag) {
+      console.log('[BOTTOM_SHEET] 핸들에서 드래그 시작');
+    }
   };
 
   const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!isDraggingRef.current || !startDragY.current) return;
+    if (!isDraggingRef.current || startDragY.current === null) return;
     
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const target = e.target as HTMLElement;
+    const deltaY = clientY - startDragY.current;
     
-    // 스케줄 스크롤 영역 체크
-    const isInScheduleArea = target.closest('[data-schedule-scroll="true"]') || 
-                            target.closest('[data-schedule-item="true"]') ||
-                            target.closest('[data-calendar-swipe="true"]');
+    // 최소 드래그 거리 체크 (30px 이상 움직여야 함)
+    const minDragDistance = 30;
+    if (Math.abs(deltaY) < minDragDistance) return;
+
+    // 드래그 방향에 따라 다음 상태 결정
+    let nextState: 'collapsed' | 'middle' | 'expanded' = bottomSheetState;
     
-    if (isInScheduleArea) {
-      // 스케줄 영역에서는 바텀시트 드래그 중단
-      isDraggingRef.current = false;
-      startDragY.current = null;
-      return;
+    if (deltaY < 0) { // 위로 드래그 (음수)
+      if (bottomSheetState === 'collapsed') {
+        nextState = 'middle';
+      } else if (bottomSheetState === 'middle') {
+        nextState = 'expanded';
+      }
+      // expanded에서 위로 드래그하면 그대로 유지
+    } else { // 아래로 드래그 (양수)
+      if (bottomSheetState === 'expanded') {
+        nextState = 'middle';
+      } else if (bottomSheetState === 'middle') {
+        nextState = 'collapsed';
+      }
+      // collapsed에서 아래로 드래그하면 그대로 유지
     }
-    
-    // 부드러운 실시간 반응을 위해 필요시 여기서 추가 처리 가능
-    // console.log('[DragMove] 드래그 중:', clientY - startDragY.current);
+
+    // 상태가 변경되면 즉시 적용하고 드래그 종료
+    if (nextState !== bottomSheetState) {
+      console.log('[BOTTOM_SHEET] 드래그로 상태 변경:', bottomSheetState, '→', nextState);
+      setBottomSheetState(nextState);
+      
+      // 드래그 종료 처리
+      if (bottomSheetRef.current) {
+        bottomSheetRef.current.style.transition = `transform ${BOTTOM_SHEET_POSITIONS.TRANSITION_DURATION} ${BOTTOM_SHEET_POSITIONS.TRANSITION_TIMING}`;
+      }
+      
+      startDragY.current = null;
+      isDraggingRef.current = false;
+      dragStartTime.current = null;
+    }
   };
 
   const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
-    if (!isDraggingRef.current || !startDragY.current) {
-      isDraggingRef.current = false;
-      return;
-    }
-    
-    const clientY = 'touches' in e ? e.changedTouches[0].clientY : e.clientY;
+    // 멤버 선택 버튼이나 기타 인터랙티브 요소에서 시작된 이벤트는 무시
     const target = e.target as HTMLElement;
-    
-    // 스케줄 스크롤 영역 체크
-    const isInScheduleArea = target.closest('[data-schedule-scroll="true"]') || 
-                            target.closest('[data-schedule-item="true"]') ||
-                            target.closest('[data-calendar-swipe="true"]');
-    
-    if (isInScheduleArea) {
-      // 스케줄 영역에서는 바텀시트 드래그 종료
-      isDraggingRef.current = false;
-      startDragY.current = null;
+    if (target.closest('button') || target.closest('a')) {
       return;
     }
     
-    const dragDeltaY = clientY - startDragY.current;
-    const duration = performance.now() - (dragStartTime.current || 0);
-    const velocityY = duration > 0 ? Math.abs(dragDeltaY) / duration : 0;
+    if (!isDraggingRef.current || startDragY.current === null) return;
+
+    const clientY = 'changedTouches' in e ? e.changedTouches[0].clientY : e.clientY;
+    const deltaY = clientY - startDragY.current;
+    const deltaTime = dragStartTime.current ? Date.now() - dragStartTime.current : 0;
     
-    const dragThreshold = 30; // 드래그 임계값
-    const velocityThreshold = 0.3; // 속도 임계값
-    
-    console.log('[DragEnd] 드래그 종료 - deltaY:', dragDeltaY, 'velocity:', velocityY);
-    
-    let nextState: 'hidden' | 'peek' | 'visible' = bottomSheetState;
-    
-    // 햅틱 피드백 함수
-    const triggerHaptic = () => {
-      try {
-        if ('vibrate' in navigator) {
-          navigator.vibrate([20, 5, 15]);
-        }
-      } catch (error) {
-        console.debug('햅틱 피드백이 차단되었습니다:', error);
-      }
-    };
-    
-    // 위로 드래그 (Y 감소) - 상태 확장
-    if (dragDeltaY < 0 && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-      if (bottomSheetState === 'hidden') {
-        nextState = 'peek';
-        console.log('[DragEnd] hidden -> peek');
-        triggerHaptic();
-      } else if (bottomSheetState === 'peek') {
-        nextState = 'visible';
-        console.log('[DragEnd] peek -> visible');
-        triggerHaptic();
-      }
+    // 탭 동작 완전 비활성화 - 드래그만 허용
+    console.log('[BOTTOM_SHEET] 드래그 종료 - 탭 동작 비활성화됨 (deltaY:', deltaY, ', deltaTime:', deltaTime, ')');
+
+    // 스타일 복원
+    if (bottomSheetRef.current) {
+      bottomSheetRef.current.style.transition = `transform ${BOTTOM_SHEET_POSITIONS.TRANSITION_DURATION} ${BOTTOM_SHEET_POSITIONS.TRANSITION_TIMING}`;
     }
-    // 아래로 드래그 (Y 증가) - 상태 축소
-    else if (dragDeltaY > 0 && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-      if (bottomSheetState === 'visible') {
-        nextState = 'peek';
-        console.log('[DragEnd] visible -> peek');
-        triggerHaptic();
-      } else if (bottomSheetState === 'peek') {
-        nextState = 'hidden';
-        console.log('[DragEnd] peek -> hidden');
-        triggerHaptic();
-      }
-    }
-    
-    // 상태 업데이트
-    if (nextState !== bottomSheetState) {
-      setBottomSheetState(nextState);
-      console.log('[DragEnd] 상태 변경:', bottomSheetState, '->', nextState);
-    } else {
-      console.log('[DragEnd] 임계값 미달, 현재 상태 유지:', bottomSheetState);
-    }
-    
-    // 초기화
-    isDraggingRef.current = false;
+
     startDragY.current = null;
+    isDraggingRef.current = false;
     dragStartTime.current = null;
   };
 
   const toggleBottomSheet = () => {
     setBottomSheetState(prev => {
-      const next = prev === 'hidden' ? 'peek' : prev === 'peek' ? 'visible' : 'hidden';
+      const next = prev === 'collapsed' ? 'middle' : prev === 'middle' ? 'expanded' : 'collapsed';
       console.log('[BOTTOM_SHEET] toggleBottomSheet 상태 변경:', prev, '→', next);
       return next;
     });
@@ -909,8 +903,7 @@ export default function HomePage() {
                 
                 // 그룹 권한 정보
                 sgdt_owner_chk: member.sgdt_owner_chk,
-                sgdt_leader_chk: member.sgdt_leader_chk,
-                sgdt_idx: member.sgdt_idx
+                sgdt_leader_chk: member.sgdt_leader_chk
               }));
             } else {
               console.warn('No member data from API, or API call failed.');
@@ -926,58 +919,22 @@ export default function HomePage() {
           if (isMounted) {
             const rawSchedules = scheduleResponse.data.schedules;
             if (rawSchedules && rawSchedules.length > 0) {
-              console.log('[fetchAllGroupData] 원본 스케줄 데이터:', rawSchedules.map(s => ({
-                id: s.id,
-                title: s.title,
-                date: s.date,
-                sst_location_lat: s.sst_location_lat,
-                sst_location_long: s.sst_location_long,
-                location: s.location,
-                sst_location_add: s.sst_location_add,
-                mt_schedule_idx: s.mt_schedule_idx,
-                sgdt_idx: s.sgdt_idx
-              })));
-
               setGroupSchedules(rawSchedules); 
               setGroupMembers(prevMembers =>
-                prevMembers.map(member => {
-                  const memberSchedules = rawSchedules
+                prevMembers.map(member => ({
+                  ...member,
+                  schedules: rawSchedules
                     .filter((schedule: Schedule) => 
-                      schedule.sgdt_idx !== null && 
-                      schedule.sgdt_idx !== undefined && 
-                      Number(schedule.sgdt_idx) === Number(member.sgdt_idx)
-                    );
-                  
-                  console.log(`[fetchAllGroupData] 멤버 ${member.name}의 스케줄:`, {
-                    memberId: member.id,
-                    memberSgdtIdx: member.sgdt_idx,
-                    totalSchedules: memberSchedules.length,
-                    schedulesWithLocation: memberSchedules.filter(s => s.sst_location_lat && s.sst_location_long).length,
-                    scheduleDetails: memberSchedules.map(s => ({
-                      id: s.id,
-                      title: s.title,
-                      date: s.date,
-                      sgdt_idx: s.sgdt_idx,
-                      sst_location_lat: s.sst_location_lat,
-                      sst_location_long: s.sst_location_long,
-                      hasLocation: !!(s.sst_location_lat && s.sst_location_long)
-                    }))
-                  });
-
-                  return {
-                    ...member,
-                    schedules: memberSchedules
-                  };
-                })
+                      schedule.mt_schedule_idx !== null && 
+                      schedule.mt_schedule_idx !== undefined && 
+                      String(schedule.mt_schedule_idx) === member.id
+                    ) 
+                }))
               );
               const todayStr = format(new Date(), 'yyyy-MM-dd');
-              const todaySchedules = rawSchedules.filter((s: Schedule) => s.date && s.date.startsWith(todayStr));
-              console.log('[fetchAllGroupData] 오늘의 스케줄:', {
-                todayStr,
-                totalTodaySchedules: todaySchedules.length,
-                schedulesWithLocation: todaySchedules.filter(s => s.sst_location_lat && s.sst_location_long).length
-              });
-              setFilteredSchedules(todaySchedules);
+              setFilteredSchedules(
+                rawSchedules.filter((s: Schedule) => s.date && s.date.startsWith(todayStr))
+              );
             } else {
               console.warn('No schedule data from API for the group, or API call failed.');
               setGroupSchedules([]);
@@ -1631,16 +1588,8 @@ export default function HomePage() {
 
   // 스케줄 마커 업데이트 함수 - createMarker 사용하도록 수정
   const updateScheduleMarkers = (schedules: Schedule[]) => {
-    console.log('[updateScheduleMarkers] 스케줄 마커 업데이트 시작:', {
-      schedulesCount: schedules.length,
-      mapType,
-      naverMapReady: !!(mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps),
-      googleMapReady: !!(mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)
-    });
-
     // 기존 스케줄 마커 삭제
     if (scheduleMarkersRef.current.length > 0) {
-      console.log('[updateScheduleMarkers] 기존 마커 삭제:', scheduleMarkersRef.current.length, '개');
       scheduleMarkersRef.current.forEach(marker => {
         if (marker && marker.setMap) { // Naver, Google 마커 모두 setMap 메소드를 가짐
           marker.setMap(null);
@@ -1649,30 +1598,9 @@ export default function HomePage() {
       scheduleMarkersRef.current = [];
     }
 
-    // 스케줄 데이터 상세 로그
-    schedules.forEach((schedule, index) => {
-      console.log(`[updateScheduleMarkers] 스케줄 ${index + 1}:`, {
-        id: schedule.id,
-        title: schedule.title,
-        date: schedule.date,
-        sst_location_lat: schedule.sst_location_lat,
-        sst_location_long: schedule.sst_location_long,
-        location: schedule.location,
-        sst_location_add: schedule.sst_location_add,
-        hasLocationData: !!(schedule.sst_location_lat && schedule.sst_location_long)
-      });
-    });
-
     // 새 스케줄 마커 추가 - createMarker 함수 사용
-    let markersCreated = 0;
     schedules.forEach((schedule, index) => {
       if (schedule.sst_location_lat && schedule.sst_location_long) {
-        console.log(`[updateScheduleMarkers] 마커 생성 시도 - 스케줄 ${index + 1}:`, {
-          title: schedule.title,
-          lat: schedule.sst_location_lat,
-          lng: schedule.sst_location_long
-        });
-
         const newMarker = createMarker(
           null, // location 객체는 사용하지 않음
           index,
@@ -1684,21 +1612,9 @@ export default function HomePage() {
         
         if (newMarker) {
           scheduleMarkersRef.current.push(newMarker);
-          markersCreated++;
-          console.log(`[updateScheduleMarkers] 마커 생성 성공 - 스케줄: ${schedule.title}`);
-        } else {
-          console.warn(`[updateScheduleMarkers] 마커 생성 실패 - 스케줄: ${schedule.title}`);
         }
-      } else {
-        console.log(`[updateScheduleMarkers] 위치 정보 없음 - 스케줄 ${index + 1}:`, {
-          title: schedule.title,
-          sst_location_lat: schedule.sst_location_lat,
-          sst_location_long: schedule.sst_location_long
-        });
       }
     });
-
-    console.log(`[updateScheduleMarkers] 마커 업데이트 완료: ${markersCreated}개 생성됨`);
   };
 
   // filteredSchedules 또는 mapType 변경 시 스케줄 마커 업데이트
@@ -1723,13 +1639,6 @@ export default function HomePage() {
     setGroupMembers(updatedMembers);
     const selectedMember = updatedMembers.find(member => member.isSelected);
     
-    console.log('[handleMemberSelect] 멤버 선택:', {
-      selectedMemberId: id,
-      selectedMemberName: selectedMember?.name,
-      selectedDate,
-      totalGroupSchedules: groupSchedules.length
-    });
-    
     // 첫번째 멤버 선택 완료 상태 설정
     if (!isFirstMemberSelectionComplete && selectedMember) {
       setIsFirstMemberSelectionComplete(true);
@@ -1738,80 +1647,34 @@ export default function HomePage() {
     
     if (selectedMember) {
       setTodayWeather(getWeatherDisplayData(String(selectedMember.mt_weather_sky ?? 'default'), selectedMember.mt_weather_tmx));
-      
-      const memberSchedules = selectedMember.schedules.filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(selectedDate));
-      console.log('[handleMemberSelect] 선택된 멤버의 스케줄:', {
-        memberName: selectedMember.name,
-        totalMemberSchedules: selectedMember.schedules.length,
-        filteredSchedules: memberSchedules.length,
-        selectedDate,
-        memberSchedulesDetail: selectedMember.schedules.map(s => ({
-          id: s.id,
-          title: s.title,
-          date: s.date,
-          hasLocation: !!(s.sst_location_lat && s.sst_location_long)
-        }))
-      });
-      
-      setFilteredSchedules(memberSchedules);
+      setFilteredSchedules(
+        selectedMember.schedules.filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(selectedDate))
+      );
     } else {
       if (initialWeatherDataRef.current) setTodayWeather(initialWeatherDataRef.current);
-      
-      const allSchedules = groupSchedules
-        .filter(s => typeof s.date === 'string' && s.date!.startsWith(selectedDate))
-        .map(({memberId, ...rest}) => rest);
-      
-      console.log('[handleMemberSelect] 멤버 선택 해제 - 전체 스케줄:', {
-        totalGroupSchedules: groupSchedules.length,
-        filteredSchedules: allSchedules.length,
-        selectedDate
-      });
-      
-      setFilteredSchedules(allSchedules);
+      setFilteredSchedules(
+        groupSchedules
+          .filter(s => typeof s.date === 'string' && s.date!.startsWith(selectedDate))
+          .map(({memberId, ...rest}) => rest)
+      );
     }
     updateMemberMarkers(updatedMembers);
   };
 
   // 선택된 날짜 변경 핸들러 (filteredSchedules 업데이트)
   const handleDateSelect = (dateValue: string) => {
-    console.log('[handleDateSelect] 날짜 선택:', {
-      previousDate: selectedDate,
-      newDate: dateValue
-    });
-    
     setSelectedDate(dateValue);
     const selectedMember = groupMembers.find(member => member.isSelected);
-    
     if (selectedMember) {
-      const memberSchedules = selectedMember.schedules.filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(dateValue));
-      console.log('[handleDateSelect] 선택된 멤버의 날짜별 스케줄:', {
-        memberName: selectedMember.name,
-        selectedDate: dateValue,
-        filteredSchedules: memberSchedules.length,
-        schedulesDetail: memberSchedules.map(s => ({
-          id: s.id,
-          title: s.title,
-          date: s.date,
-          hasLocation: !!(s.sst_location_lat && s.sst_location_long)
-        }))
-      });
-      setFilteredSchedules(memberSchedules);
+      setFilteredSchedules(
+        selectedMember.schedules.filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(dateValue))
+      );
     } else {
-      const allSchedules = groupSchedules
-        .filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(dateValue))
-        .map(({memberId, ...rest}) => rest);
-      
-      console.log('[handleDateSelect] 전체 그룹의 날짜별 스케줄:', {
-        selectedDate: dateValue,
-        filteredSchedules: allSchedules.length,
-        schedulesDetail: allSchedules.map(s => ({
-          id: s.id,
-          title: s.title,
-          date: s.date,
-          hasLocation: !!(s.sst_location_lat && s.sst_location_long)
-        }))
-      });
-      setFilteredSchedules(allSchedules);
+      setFilteredSchedules(
+        groupSchedules
+          .filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(dateValue))
+          .map(({memberId, ...rest}) => rest)
+      );
     }
   };
 
@@ -2032,27 +1895,23 @@ export default function HomePage() {
     }
   };
 
-  // 오늘부터 6일 후까지 가져오기 (총 7일)
-  const getNext7Days = () => {
-    const today = new Date();
-    return Array.from({ length: 7 }, (_, i) => {
-      const date = addDays(today, i);
-      const isToday = i === 0;
-      const isTomorrow = i === 1;
-      
-      let displayText = '';
-      if (isToday) {
-        displayText = '오늘';
-      } else {
-        displayText = format(date, 'MM.dd(E)', { locale: ko });
-      }
-      
+  // 다음 7일 가져오기 (수정됨 - baseDate 인자 추가)
+  const getNext7Days = (baseDate: Date) => {
+    return Array.from({ length: 7 }, (_, i) => { // length를 7로 수정
+      const date = addDays(baseDate, i);
       return {
         value: format(date, 'yyyy-MM-dd'),
-        display: displayText
+        display: i === 0 ? '오늘' : format(date, 'MM.dd (E)', { locale: ko })
       };
     });
   };
+
+  // useEffect를 사용하여 클라이언트 사이드에서 날짜 관련 상태 초기화
+  useEffect(() => {
+    const today = new Date();
+    setSelectedDate(format(today, 'yyyy-MM-dd'));
+    setDaysForCalendar(getNext7Days(today));
+  }, []); // 빈 배열로 전달하여 마운트 시 1회 실행
 
   // 거리 포맷팅 함수
   const formatDistance = (km: number) => {
@@ -2062,20 +1921,20 @@ export default function HomePage() {
   // 헤더와 컨트롤 버튼의 클래스를 상태에 따라 결정하는 함수 수정
   const getHeaderClassName = () => {
     switch (bottomSheetState) {
-      case 'hidden': return 'header-hidden';
-      case 'peek': return 'header-peek';
-      case 'visible': return 'header-visible';
-      default: return 'header-hidden';
+      case 'collapsed': return 'header-collapsed';
+      case 'middle': return 'header-middle';
+      case 'expanded': return 'header-expanded';
+      default: return 'header-collapsed';
     }
   };
 
   // 컨트롤 버튼 클래스 별도 관리
   const getControlsClassName = () => {
     switch (bottomSheetState) {
-      case 'hidden': return 'controls-hidden';
-      case 'peek': return 'controls-peek';
-      case 'visible': return 'controls-visible';
-      default: return 'controls-hidden';
+      case 'collapsed': return 'controls-collapsed';
+      case 'middle': return 'controls-middle';
+      case 'expanded': return 'controls-expanded';
+      default: return 'controls-collapsed';
     }
   };
 
@@ -2140,8 +1999,8 @@ export default function HomePage() {
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
     
-    // 바텀시트를 peek 상태로 변경
-    setBottomSheetState('peek');
+    // 바텀시트를 collapsed 상태로 변경
+    setBottomSheetState('collapsed');
     
     // 기존 데이터 초기화 - location/page.tsx와 동일한 패턴
     setGroupMembers([]);
@@ -2199,49 +2058,9 @@ export default function HomePage() {
     }
   }, [isUserDataLoading, userGroups, selectedGroupId]);
 
-  // 개선된 바텀시트 애니메이션 variants - location/page.tsx에서 가져옴
-  const bottomSheetVariants = {
-    hidden: { 
-      top: '90vh', // y 대신 top 사용
-      bottom: '0px', // 높이 고정을 위해 bottom 추가
-      opacity: 1,
-      transition: {
-        type: "spring",
-        stiffness: 400,
-        damping: 30,
-        mass: 0.6,
-        duration: 0.5
-      }
-    },
-    peek: {
-      top: '67vh', // y 대신 top 사용 (vh 단위로 변경)
-      bottom: '0px', // 높이 고정을 위해 bottom 추가
-      opacity: 1,
-      transition: {
-        type: "spring",
-        stiffness: 400,
-        damping: 30,
-        mass: 0.6,
-        duration: 0.5
-      }
-    },
-    visible: { 
-      top: '25vh', // y 대신 top 사용 (vh 단위로 변경)
-      bottom: '0px', // 높이 고정을 위해 bottom 추가
-      opacity: 1,
-      transition: {
-        type: "spring",
-        stiffness: 400,
-        damping: 30,
-        mass: 0.6,
-        duration: 0.5
-      }
-    }
-  };
-
   return (
     <>
-      <style jsx global>{mobileStyles}</style>
+      <style jsx global>{modalAnimation}</style>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -2546,263 +2365,181 @@ export default function HomePage() {
 
         {/* Bottom Sheet - 끌어올리거나 내릴 수 있는 패널 */}
         {!(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
-          <motion.div 
+          <div 
             ref={bottomSheetRef}
-            variants={bottomSheetVariants}
-            animate={bottomSheetState}
-            className="fixed left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
+            className={`bottom-sheet ${getBottomSheetClassName()}`}
+            style={{ touchAction: 'pan-x' }} // 좌우 스와이프만 허용
+            onTouchStart={handleDragStart}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+            onMouseDown={handleDragStart}
+            onMouseMove={handleDragMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
           >
-            {/* 바텀시트 핸들 - location/page.tsx와 동일한 스타일 */}
-            <motion.div 
-              className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-3 cursor-grab active:cursor-grabbing"
-              whileHover={{ scale: 1.2, backgroundColor: '#6366f1' }}
-              transition={{ duration: 0.2 }}
-              onTouchStart={handleDragStart}
-              onTouchMove={handleDragMove}
-              onTouchEnd={handleDragEnd}
-              onMouseDown={handleDragStart}
-              onMouseMove={handleDragMove}
-              onMouseUp={handleDragEnd}
-              onMouseLeave={handleDragEnd}
-            />
+            <div className="bottom-sheet-handle"></div>
 
-            {/* 바텀시트 내용 */}
-            <div className="w-full h-full flex flex-col">
-              {/* 그룹 멤버 (항상 상단에 고정) */}
-              <div className="flex-shrink-0 px-6 pb-4">
-                <motion.div 
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.6 }}
-                  className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="flex items-center space-x-3">
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
-                        <p className="text-sm text-gray-600">멤버들의 위치를 확인하세요</p>
-                      </div>
-                      {(isUserDataLoading || !dataFetchedRef.current.members) && (
-                        <motion.div
-                          variants={spinnerVariants}
-                          animate="animate"
-                        >
-                          <FiLoader className="text-indigo-500" size={18}/>
-                        </motion.div>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center space-x-3">
-                      {/* 그룹 선택 드롭다운 - location/page.tsx 스타일 적용 */}
-                      <div className="relative">
-                        <motion.button
-                          whileHover={{ 
-                            scale: 1.02, 
-                            y: -2,
-                            borderColor: "#6366f1",
-                            boxShadow: "0 4px 12px rgba(99, 102, 241, 0.15)",
-                            transition: { duration: 0.2, ease: "easeOut" }
-                          }}
-                          whileTap={{ 
-                            scale: 0.98,
-                            transition: { duration: 0.1, ease: "easeInOut" }
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsGroupSelectorOpen(!isGroupSelectorOpen);
-                          }}
-                          className="group-selector flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium min-w-[140px] mobile-button"
-                          disabled={isUserDataLoading}
-                          data-group-selector="true"
-                        >
-                          <span className="truncate text-gray-700">
-                            {isUserDataLoading 
-                              ? '로딩 중...' 
-                              : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
-                            }
-                          </span>
-                          <div className="ml-2 flex-shrink-0">
-                            {isUserDataLoading ? (
-                              <motion.div
-                                variants={spinnerVariants}
-                                animate="animate"
-                              >
-                                <FiLoader className="text-gray-400" size={14} />
-                              </motion.div>
-                            ) : (
-                              <motion.div
-                                animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-                                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                              >
-                                <FiChevronDown className="text-gray-400" size={14} />
-                              </motion.div>
-                            )}
-                          </div>
-                        </motion.button>
-                      </div>
-                    </div>
+            {/* 메인 컨텐츠 래퍼: 상태에 따라 패딩 및 스크롤 동작 변경 */}
+            <div 
+              className={`
+                w-full
+                ${bottomSheetState === 'expanded' 
+                  ? 'flex flex-col flex-grow min-h-0'  // expanded: flex 레이아웃, 내부 스크롤 준비
+                  : 'px-4 pb-8 overflow-y-auto h-full' // non-expanded: 자체 스크롤, 기존 패딩
+                }
+              `}
+              style={bottomSheetState !== 'expanded' 
+                ? { WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } // non-expanded: 터치 스크롤 활성화
+                : {}
+              }
+            >
+              {/* 그룹 멤버 (최상단으로 이동) */}
+              <div className={`
+                content-section members-section 
+                min-h-[180px] max-h-[180px] overflow-y-auto /* 자체 콘텐츠가 많을 경우 스크롤 */
+                ${bottomSheetState === 'expanded' 
+                  ? 'flex-shrink-0 mx-4 mt-2 mb-3' // expanded: flex 아이템으로 동작, 위아래 마진
+                  : 'mb-3 sm:mb-0' // non-expanded: 일반 블록 요소, 하단 마진 (좌우 패딩은 부모에서)
+                }
+              `}
+              // non-expanded 상태에서 멤버 섹션 내부 스크롤을 원활하게 하기 위함
+              style={bottomSheetState !== 'expanded' ? { touchAction: 'auto' } : {}} 
+              onClick={bottomSheetState !== 'expanded' ? (e) => e.stopPropagation() : undefined}
+              >
+                <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
+                  <div className="flex items-center space-x-3">
+                    <span>그룹 멤버</span>
                   </div>
-
-                  {/* 로딩 상태 - location/page.tsx의 파도 효과 적용 */}
-                  {(isUserDataLoading || !dataFetchedRef.current.members) ? (
-                    <motion.div 
-                      variants={loadingVariants}
-                      initial="hidden"
-                      animate="visible"
-                      className="flex flex-col items-center justify-center py-8"
-                    >
-                      {/* 배경 원형 파도 효과 */}
-                      <div className="relative flex items-center justify-center mb-4">
-                        {[...Array(3)].map((_, i) => (
-                          <motion.div
-                            key={i}
-                            className="absolute w-12 h-12 border border-indigo-200 rounded-full"
-                            animate={{
-                              scale: [1, 1.8, 1],
-                              opacity: [0.4, 0, 0.4],
-                            }}
-                            transition={{
-                              duration: 1.5,
-                              repeat: Infinity,
-                              delay: i * 0.4,
-                              ease: [0.22, 1, 0.36, 1]
-                            }}
-                          />
-                        ))}
-                        
-                        {/* 중앙 그룹 아이콘 */}
-                        <motion.div
-                          className="relative w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg"
-                          variants={spinnerVariants}
-                          animate="animate"
-                        >
-                          <FiUser className="w-6 h-6 text-white" />
-                        </motion.div>
-                      </div>
-                      
-                      <motion.div
-                        variants={loadingTextVariants}
-                        initial="hidden"
-                        animate="visible"
+                  
+                  <div className="flex items-center space-x-2">
+                    {/* 그룹 선택 드롭다운 */}
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsGroupSelectorOpen(!isGroupSelectorOpen);
+                        }}
+                        className="flex items-center justify-between px-2.5 py-1.5 bg-indigo-50 border border-gray-200 rounded text-xs hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 min-w-[120px]"
+                        disabled={isUserDataLoading}
+                        data-group-selector="true"
                       >
-                        <p className="font-medium text-gray-900 mb-1">멤버 정보를 불러오는 중...</p>
-                        <p className="text-sm text-gray-600">잠시만 기다려주세요</p>
-                      </motion.div>
-                    </motion.div>
-                  ) : groupMembers.length > 0 ? (
-                    <motion.div 
-                      variants={staggerContainer}
-                      initial="hidden"
-                      animate="visible"
-                      className="flex flex-row flex-nowrap justify-start items-center gap-x-6 overflow-x-auto hide-scrollbar px-2 py-2"
-                    >
-                      {(() => {
-                        // 선택된 멤버가 없으면 첫 번째 멤버를 자동 선택하는 안전장치
-                        const hasSelectedMember = groupMembers.some(member => member.isSelected);
-                        if (!hasSelectedMember && groupMembers.length > 0 && dataFetchedRef.current.members) {
-                          console.log('[멤버 렌더링] 선택된 멤버가 없음, 첫 번째 멤버 자동 선택:', groupMembers[0].name);
-                          setTimeout(() => {
-                            handleMemberSelect(groupMembers[0].id);
-                          }, 50);
-                        }
-                        return null;
-                      })()}
-                      {groupMembers.map((member, index) => {
-                        const fallbackImage = getDefaultImage(member.mt_gender, member.original_index);
-                        
-                        return (
-                          <motion.div 
-                            key={member.id} 
-                            custom={index}
-                            variants={memberAvatarVariants}
-                            initial="initial"
-                            animate="animate"
-                            whileHover="hover"
-                            className="flex flex-col items-center p-0 flex-shrink-0"
-                          >
-                            <motion.button
+                        <span className="truncate text-gray-700">
+                          {isUserDataLoading 
+                            ? '로딩 중...' 
+                            : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
+                          }
+                        </span>
+                        <div className="ml-1 flex-shrink-0">
+                          {isUserDataLoading ? (
+                            <FiLoader className="animate-spin h-3 w-3 text-gray-400" />
+                          ) : (
+                            <FiChevronDown className={`text-gray-400 transition-transform duration-200 h-3 w-3 ${isGroupSelectorOpen ? 'rotate-180' : ''}`} />
+                          )}
+                        </div>
+                      </button>
+
+                      {isGroupSelectorOpen && userGroups.length > 0 && (
+                        <div className="absolute top-full right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto min-w-[160px]">
+                          {userGroups.map((group) => (
+                            <button
+                              key={group.sgt_idx}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleMemberSelect(member.id);
+                                handleGroupSelect(group.sgt_idx);
                               }}
-                              onTouchStart={(e) => e.stopPropagation()}
-                              onTouchMove={(e) => e.stopPropagation()}
-                              onTouchEnd={(e) => e.stopPropagation()}
-                              className="flex flex-col items-center focus:outline-none mobile-button"
-                              animate={member.isSelected ? "selected" : "animate"}
+                              className={`w-full px-3 py-2 text-left text-sm hover:bg-indigo-50 focus:outline-none focus:bg-indigo-50 ${
+                                selectedGroupId === group.sgt_idx 
+                                  ? 'bg-indigo-50 text-indigo-700 font-medium' 
+                                  : 'text-gray-900'
+                              }`}
                             >
-                              <motion.div
-                                className={`member-avatar w-13 h-13 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
-                                  member.isSelected ? 'selected' : ''
-                                }`}
-                                animate={member.isSelected ? "selected" : undefined}
-                              >
-                                <img 
-                                  src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
-                                  alt={member.name} 
-                                  className="w-full h-full object-cover rounded-xl" 
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
-                                    console.log(`[이미지 오류] ${member.name}의 이미지 로딩 실패, 기본 이미지로 대체:`, defaultImg);
-                                    target.src = defaultImg;
-                                    target.onerror = () => {}; // 무한 루프 방지
-                                  }}
-                                  onLoad={() => {
-                                    console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
-                                  }}
-                                />
-                              </motion.div>
-                              <span className={`block text-sm font-semibold mt-3 transition-colors duration-200 ${
-                                member.isSelected ? 'text-indigo-700' : 'text-gray-700'
-                              }`}>
-                                {member.name}
-                              </span>
-                            </motion.button>
-                          </motion.div>
-                        );
-                      })}
-                    </motion.div>
-                  ) : (
-                    <div className="text-center py-6 text-gray-500">
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 200 }}
-                        className="w-16 h-16 mx-auto mb-3 bg-gray-100 rounded-2xl flex items-center justify-center"
-                      >
-                        <FiUser className="w-8 h-8 text-gray-300" />
-                      </motion.div>
-                      <p className="font-medium">그룹에 참여한 멤버가 없습니다</p>
-                      <p className="text-sm mt-1">그룹에 멤버를 초대해보세요</p>
+                              <div className="flex items-center justify-between">
+                                <span className="truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</span>
+                                {selectedGroupId === group.sgt_idx && (
+                                  <span className="text-indigo-500 ml-2">✓</span>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </motion.div>
+
+                    <Link 
+                      href="/group" 
+                      className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-50 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                      </svg>
+                      그룹 관리
+                    </Link>
+                  </div>
+                </h2>
+                {groupMembers.length > 0 ? (
+                  <div className="flex flex-row flex-nowrap justify-start items-center gap-x-4 mb-2 overflow-x-auto hide-scrollbar px-2 py-2">
+                    {groupMembers.map((member, index) => ( // 이 index는 groupMembers 배열 내에서의 index임
+                      <div key={member.id} className="flex flex-col items-center p-0 flex-shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMemberSelect(member.id);
+                          }}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
+                          onTouchEnd={(e) => e.stopPropagation()}
+                          className={`flex flex-col items-center`}
+                        >
+                          <div className={`w-12 h-12 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden border-2 transition-all duration-200 transform hover:scale-105 ${
+                            member.isSelected ? 'border-indigo-500 ring-2 ring-indigo-300 scale-110' : 'border-transparent'
+                          }`}>
+                            <img 
+                              src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)} // original_index 사용
+                              alt={member.name} 
+                              className="w-full h-full object-cover" 
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = getDefaultImage(member.mt_gender, member.original_index); // original_index 사용
+                                target.onerror = null; // 무한 루프 방지
+                              }}
+                            />
+                          </div>
+                          <span className={`block text-xs font-medium mt-1 ${
+                            member.isSelected ? 'text-indigo-700' : 'text-gray-900'
+                          }`}>
+                            {member.name}
+                          </span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-3 text-gray-500">
+                    <p>그룹에 참여한 멤버가 없습니다</p>
+                  </div>
+                )}
               </div>
 
               {/* 스크롤 가능한 콘텐츠 영역 (오늘의 일정, 추천 장소) */}
-              <div className="flex-grow min-h-0 overflow-y-auto hide-scrollbar px-6 pb-16"
-                style={{ WebkitOverflowScrolling: 'touch', touchAction: 'auto' }}
+              <div className={`
+                ${bottomSheetState === 'expanded' 
+                  ? 'flex-grow min-h-0 overflow-y-auto hide-scrollbar px-4 pb-16' // expanded: 남은 공간 채우고 내부 스크롤, pb-4 -> pb-16
+                  : '' // non-expanded: 일반 플로우 (부모 div가 스크롤 담당)
+                }
+              `}
+              style={bottomSheetState === 'expanded' 
+                ? { WebkitOverflowScrolling: 'touch', touchAction: 'auto' } // expanded: 터치 스크롤 활성화
+                : {}
+              }
+              onClick={bottomSheetState === 'expanded' ? (e) => e.stopPropagation() : undefined}
               >
                 {/* 오늘의 일정 - 선택된 멤버의 일정을 표시 */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5, duration: 0.6 }}
-                  className={`content-section ${bottomSheetState !== 'visible' ? 'mb-6' : 'mt-0 mb-4'}`}
-                >
-                  <div className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl p-4 px-6 border border-pink-100">
-                    <div className="flex justify-between items-center mb-3">
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-900">
-                          {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
-                        </h2>
-                        <p className="text-sm text-gray-600">예정된 일정을 확인하세요</p>
-                      </div>
-                      {groupMembers.some(m => m.isSelected) ? (
-                        <motion.button
-                          whileHover={{ scale: 1.02, y: -1 }}
-                          whileTap={{ scale: 0.98 }}
+                <div className={`content-section schedule-section ${bottomSheetState !== 'expanded' ? '' : 'mt-0'}`}>
+                  <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
+                    {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
+                    {
+                      groupMembers.some(m => m.isSelected) ? (
+                        <button 
                           onClick={(e) => {
                             e.stopPropagation();
                             const selectedMember = groupMembers.find(m => m.isSelected);
@@ -2810,256 +2547,150 @@ export default function HomePage() {
                               router.push(`/schedule/add?memberId=${selectedMember.id}&memberName=${selectedMember.name}&from=home`);
                             }
                           }}
-                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-xl text-pink-700 bg-pink-50 hover:bg-pink-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 mobile-button"
+                          className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-50 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
                           </svg>
                           일정 추가
-                        </motion.button>
+                        </button>
                       ) : (
-                        <Link href="/schedule" className="text-sm font-medium text-pink-600 hover:text-pink-800 flex items-center mobile-button">
+                        <Link href="/schedule" className="text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center">
                           더보기
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                           </svg>
                         </Link>
-                      )}
+                      )
+                    }
+                  </h2>
+                  <div className="mb-3 overflow-x-auto pb-2 hide-scrollbar">
+                    <div className="flex space-x-2">
+                      {daysForCalendar.map((day, idx) => (
+                        <button
+                          key={idx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDateSelect(day.value);
+                          }}
+                          className={`px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none transition-colors ${
+                            selectedDate === day.value
+                              ? 'bg-gray-900 text-white font-medium shadow-sm'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <div className="text-xs">{day.display}</div>
+                          </div>
+                        </button>
+                      ))}
                     </div>
-
-                    {/* 날짜 선택 */}
-                    <div className="mb-1 overflow-hidden" data-calendar-swipe="true">
-                      {/* 날짜 버튼들 - 클릭 및 연속 스와이프 */}
-                      <div className="mb-1 relative min-h-[50px] overflow-x-hidden"> 
-                          <motion.div
-                            className="flex space-x-2 pb-2 cursor-grab active:cursor-grabbing"
-                            style={{ x }} 
-                            drag="x"
-                            dragConstraints={{ left: -280, right: 8 }} // maxScroll과 minScroll에 맞게 조정 (88 * 3.5 = 308)
-                            data-calendar-swipe="true"
-                            onDragStart={() => {
-                              isDraggingRef.current = true;
-                              console.log('📅 [Calendar] Drag Start');
-                            }}
-                            onDragEnd={(e, info) => {
-                              console.log('📅 [Calendar] Drag End - offset:', info.offset.x, 'velocity:', info.velocity.x);
-                              setTimeout(() => { isDraggingRef.current = false; }, 50);
-
-                              // 7일 고정이므로 날짜 변경이 아닌 x 위치만 제어
-                              // 각 날짜 버튼의 대략적인 너비를 88px로 가정 (min-w-[80px] + 여백)
-                              const buttonWidth = 88;
-                              const maxScroll = -(buttonWidth * 3); // 7일째 날이 완전히 보이도록 더 많이 스크롤
-                              const minScroll = 10; // 오늘이 적절한 시작 위치에서 멈추도록 (약간의 여백)
-
-                              const swipeThreshold = 50;
-                              const velocityThreshold = 200;
-                              const currentX = x.get(); // 현재 x 위치
-                              let targetX = currentX; // 기본값은 현재 위치
-
-                              // 스와이프 방향 감지
-                              if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
-                                // 왼쪽으로 스와이프 (다음 날짜들 보기)
-                                targetX = currentX - buttonWidth;
-                              } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
-                                // 오른쪽으로 스와이프 (이전 날짜들 보기)
-                                targetX = currentX + buttonWidth;
-                              } else {
-                                // 스와이프가 약하면 현재 위치에서 가장 가까운 버튼 위치로 스냅
-                                const snapPosition = Math.round(currentX / buttonWidth) * buttonWidth;
-                                targetX = snapPosition;
-                              }
-
-                              // 최종 위치 제한
-                              targetX = Math.max(maxScroll, Math.min(minScroll, targetX));
-                              
-                              console.log('📅 [Calendar] 목표 위치:', targetX, '(범위:', maxScroll, '~', minScroll, ')');
-                              x.set(targetX);
-                              
-                              try { 
-                                if ('vibrate' in navigator) navigator.vibrate([15]); 
-                              } catch (err) { 
-                                console.debug('햅틱 차단'); 
-                              }
-                            }}
-                          >
-                            {daysForCalendar.map((day, idx) => (
-                              <motion.button
-                                key={day.value} // calendarBaseDate 제거, day.value만 사용
-                                onClick={() => {
-                                  if (!isDraggingRef.current) {
-                                    handleDateSelect(day.value);
-                                  }
-                                }}
-                                whileTap={{ scale: 0.95 }}
-                                data-calendar-swipe="true"
-                                className={`px-2 py-2 rounded-lg flex-shrink-0 text-center transition-colors duration-150 min-h-[20px] min-w-[80px] focus:outline-none ${
-                                  selectedDate === day.value
-                                    ? 'bg-pink-600 text-white font-semibold shadow-md'
-                                    : 'bg-white text-gray-700 hover:bg-pink-50 border border-pink-100'
-                                }`}
-                              >
-                                <div className="text-sm font-medium leading-tight" data-calendar-swipe="true">{day.display}</div>
-                              </motion.button>
-                            ))}
-                          </motion.div>
-                      </div>
-                    </div>
-                    
-                    {/* 일정 목록 */}
-                    {filteredSchedules.length > 0 ? (
-                      <motion.div 
-                        className="space-y-3 max-h-[300px] overflow-y-auto hide-scrollbar pr-1"
-                        style={{ 
-                          WebkitOverflowScrolling: 'touch', 
-                          touchAction: 'pan-y',
-                          scrollbarWidth: 'none',
-                          msOverflowStyle: 'none'
-                        }}
-                        variants={staggerContainer}
-                        initial="hidden"
-                        animate="visible"
-                        onTouchStart={(e) => {
-                          e.stopPropagation();
-                          // 터치 시작 시 바텀시트 드래그 비활성화
-                          isDraggingRef.current = false;
-                          startDragY.current = null;
-                        }}
-                        onTouchMove={(e) => {
-                          e.stopPropagation();
-                          // 터치 이동 중 바텀시트 드래그 비활성화 유지
-                          isDraggingRef.current = false;
-                        }}
-                        onTouchEnd={(e) => {
-                          e.stopPropagation();
-                          // 터치 종료 시에도 바텀시트 드래그 비활성화 유지
-                          isDraggingRef.current = false;
-                        }}
-                        onMouseDown={(e) => {
-                          e.stopPropagation();
-                          // 마우스 드래그 시 바텀시트 드래그 비활성화
-                          isDraggingRef.current = false;
-                          startDragY.current = null;
-                        }}
-                        onMouseMove={(e) => {
-                          e.stopPropagation();
-                        }}
-                        onMouseUp={(e) => {
-                          e.stopPropagation();
-                        }}
-                        data-schedule-scroll="true"
-                      >
-                        {filteredSchedules.map((schedule, index) => {
-                          // 시간 포맷팅 (12시간제, 오전/오후)
-                          let formattedTime = '시간 정보 없음';
-                          if (schedule.date) {
-                            try {
-                              const dateObj = new Date(schedule.date);
-                              if (!isNaN(dateObj.getTime())) {
-                                formattedTime = format(dateObj, 'a h:mm', { locale: ko });
-                              }
-                            } catch (e) {
-                              console.error("Error formatting schedule date:", e);
+                  </div>
+                  
+                  {filteredSchedules.length > 0 ? (
+                    <ul className="space-y-3">
+                      {filteredSchedules.map((schedule) => {
+                        // 시간 포맷팅 (12시간제, 오전/오후)
+                        let formattedTime = '시간 정보 없음';
+                        if (schedule.date) {
+                          try {
+                            const dateObj = new Date(schedule.date);
+                            if (!isNaN(dateObj.getTime())) {
+                              formattedTime = format(dateObj, 'a h:mm', { locale: ko });
                             }
+                          } catch (e) {
+                            console.error("Error formatting schedule date:", e);
                           }
+                        }
 
-                          const displayLocation = schedule.location || schedule.slt_idx_t;
-                          const statusData = getScheduleStatus(schedule);
+                        const displayLocation = schedule.location || schedule.slt_idx_t;
 
-                          return (
-                            <motion.div
-                              key={schedule.id}
-                              custom={index}
-                              variants={staggerItem}
-                              whileHover={{ scale: 1.01, y: -2 }}
-                              whileTap={{ scale: 0.99 }}
-                              className="relative"
-                              onTouchStart={(e) => {
-                                e.stopPropagation();
-                                isDraggingRef.current = false;
-                              }}
-                              onTouchMove={(e) => {
-                                e.stopPropagation();
-                                isDraggingRef.current = false;
-                              }}
-                              onTouchEnd={(e) => {
-                                e.stopPropagation();
-                                isDraggingRef.current = false;
-                              }}
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                                isDraggingRef.current = false;
-                              }}
-                              data-schedule-item="true"
-                            >
-                              <Link href={`/schedule/${schedule.id}`} className="block">
-                                <div className="p-4 rounded-xl bg-white border border-pink-100 hover:border-pink-200 hover:shadow-md transition-all duration-200">
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <h3 className="font-semibold text-gray-900 text-base mb-2">{schedule.title}</h3>
-                                      
-                                      <div className="flex items-center text-sm text-gray-600 mb-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-pink-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span className="font-medium">{formattedTime}</span>
-                                      </div>
+                        return (
+                          <li key={schedule.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors relative"> {/* relative 추가 */}
+                            <Link href={`/schedule/${schedule.id}`} className="block"> 
+                              <h3 className="font-medium text-pink-700 text-base mb-1">{schedule.title}</h3> 
+                              
+                              <div className="flex items-center text-sm text-gray-800 mb-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                <span className="text-gray-700">{formattedTime}</span> {/* 시간 텍스트 색상 변경 */}
+                              </div>
 
-                                      {displayLocation && (
-                                        <div className="flex items-center text-sm text-gray-500 mb-3">
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-pink-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                          </svg>
-                                          <span>{displayLocation}</span>
-                                        </div>
-                                      )}
+                              {displayLocation && (
+                                <div className="text-sm flex items-center">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  </svg>
+                                  <span className="text-gray-500">{displayLocation}</span> {/* 장소 텍스트 색상 변경 */}
+                              </div>
+                              )}
+                              
+                              {/* 오른쪽 화살표 아이콘 */}
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                              </div>
+                          </Link>
+                        </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500 bg-gray-50 rounded-lg">
+                      <p>{groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}</p>
+                    </div>
+                  )}
+                </div>
 
-                                      {/* 상태 뱃지 */}
-                                      <div 
-                                        className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
-                                        style={{ 
-                                          backgroundColor: statusData.bgColor, 
-                                          color: statusData.color 
-                                        }}
-                                      >
-                                        {statusData.text}
-                                      </div>
-                                    </div>
-                                    
-                                    {/* 오른쪽 화살표 */}
-                                    <div className="ml-4 flex-shrink-0 self-center">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                      </svg>
-                                    </div>
-                                  </div>
-                                </div>
-                              </Link>
-                            </motion.div>
-                          );
-                        })}
-                      </motion.div>
-                    ) : (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="text-center py-8 bg-white rounded-xl border border-pink-100"
+                {/* 확장됐을 때만 표시되는 나머지 내용 */}
+                <div className={`transition-all duration-300 ${bottomSheetState === 'expanded' ? 'opacity-100' : 'opacity-0 hidden'}`}>
+                  {/* 추천 장소 */}
+                  <div className={`content-section places-section ${bottomSheetState === 'expanded' ? 'mt-3 mb-2' : 'mb-12'}`}>
+                    <h2 className="text-lg text-gray-900 flex justify-between items-center section-title">
+                      내 주변 장소
+                      <Link 
+                        href="/location/nearby" 
+                        className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-50 hover:bg-indigo-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
-                        <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        </div>
-                        <p className="text-gray-500 font-medium mb-1">
-                          {groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}
-                        </p>
-                        <p className="text-gray-400 text-sm">새로운 일정을 추가해보세요</p>
-                      </motion.div>
+                        더보기
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </Link>
+                    </h2>
+                    {recommendedPlaces.length > 0 ? (
+                      <ul className="space-y-3">
+                        {recommendedPlaces.map((place) => (
+                          <li key={place.id} className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <Link href={`/location/place/${place.id}`} className="block">
+                              <div className="flex justify-between">
+                                <h3 className="font-medium text-yellow-700">{place.title}</h3>
+                                <span className="text-sm text-indigo-600 font-medium">
+                                  {formatDistance(place.distance)}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                <div className="inline-flex items-center">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  </svg>
+                                  {place.address}
+                                </div>
+                              </div>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="text-center py-3 text-gray-500">주변 장소가 없습니다</div>
                     )}
                   </div>
-                </motion.div>
+                </div>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
       </motion.div>
     </>
