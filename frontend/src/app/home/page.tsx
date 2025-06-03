@@ -697,7 +697,7 @@ export default function HomePage() {
     }
   };
 
-  // Bottom Sheet 드래그 핸들러 수정 - 핸들 영역에서만 드래그 가능
+  // Bottom Sheet 드래그 핸들러 수정 - location/page.tsx와 동일한 로직 적용
   const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const target = e.target as HTMLElement;
@@ -716,8 +716,10 @@ export default function HomePage() {
     dragStartTime.current = performance.now();
     isDraggingRef.current = true;
     
-    // 로그 메시지를 변경하여 현재 어떤 handleDragStart가 실행되는지 명확히 함
-    console.log('[BottomSheet Handle DragStart] 핸들에서 드래그 시작됨:', clientY);
+    // 시작 시간 저장 (정확한 속도 계산용)
+    (e.target as any)._startedAt = performance.now();
+    
+    console.log('[BottomSheet] 드래그 시작:', clientY);
   };
 
   const handleDragMove = (e: React.TouchEvent | React.MouseEvent) => {
@@ -738,8 +740,9 @@ export default function HomePage() {
       return;
     }
     
-    // 부드러운 실시간 반응을 위해 필요시 여기서 추가 처리 가능
-    // console.log('[DragMove] 드래그 중:', clientY - startDragY.current);
+    // Y 좌표 업데이트 (실시간 반응)
+    const deltaY = clientY - startDragY.current;
+    console.log('[DragMove] 드래그 중:', deltaY);
   };
 
   const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
@@ -764,11 +767,14 @@ export default function HomePage() {
     }
     
     const dragDeltaY = clientY - startDragY.current;
-    const duration = performance.now() - (dragStartTime.current || 0);
+    
+    // 정확한 속도 계산
+    const startTime = (e.target as any)._startedAt || performance.now() - 200;
+    const duration = performance.now() - startTime;
     const velocityY = duration > 0 ? Math.abs(dragDeltaY) / duration : 0;
     
-    const dragThreshold = 30; // 드래그 임계값
-    const velocityThreshold = 0.3; // 속도 임계값
+    const dragThreshold = 15; // 더 민감한 임계값
+    const velocityThreshold = 0.2; // 더 민감한 속도 임계값
     
     console.log('[DragEnd] 드래그 종료 - deltaY:', dragDeltaY, 'velocity:', velocityY);
     
@@ -786,26 +792,18 @@ export default function HomePage() {
     };
     
     // 위로 드래그 (Y 감소) - 상태 확장
-    if (dragDeltaY < 0 && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-      if (bottomSheetState === 'hidden') {
-        nextState = 'peek';
-        console.log('[DragEnd] hidden -> peek');
-        triggerHaptic();
-      } else if (bottomSheetState === 'peek') {
+    if (dragDeltaY < 0) {
+      if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
         nextState = 'visible';
-        console.log('[DragEnd] peek -> visible');
+        console.log('[DragEnd] 위로 드래그 감지 (peek -> visible)');
         triggerHaptic();
       }
     }
-    // 아래로 드래그 (Y 증가) - 상태 축소
-    else if (dragDeltaY > 0 && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-      if (bottomSheetState === 'visible') {
+    // 아래로 드래그 (Y 증가) - 상태 축소  
+    else if (dragDeltaY > 0) {
+      if (bottomSheetState === 'visible' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
         nextState = 'peek';
-        console.log('[DragEnd] visible -> peek');
-        triggerHaptic();
-      } else if (bottomSheetState === 'peek') {
-        nextState = 'hidden';
-        console.log('[DragEnd] peek -> hidden');
+        console.log('[DragEnd] 아래로 드래그 감지 (visible -> peek)');
         triggerHaptic();
       }
     }
@@ -822,6 +820,7 @@ export default function HomePage() {
     isDraggingRef.current = false;
     startDragY.current = null;
     dragStartTime.current = null;
+    (e.target as any)._startedAt = 0;
   };
 
   const toggleBottomSheet = () => {
@@ -2551,19 +2550,20 @@ export default function HomePage() {
             variants={bottomSheetVariants}
             animate={bottomSheetState}
             className="fixed left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
+            style={{ touchAction: 'pan-y' }}
+            onTouchStart={handleDragStart}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+            onMouseDown={handleDragStart}
+            onMouseMove={handleDragMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
           >
             {/* 바텀시트 핸들 - location/page.tsx와 동일한 스타일 */}
             <motion.div 
               className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-3 cursor-grab active:cursor-grabbing"
               whileHover={{ scale: 1.2, backgroundColor: '#6366f1' }}
               transition={{ duration: 0.2 }}
-              onTouchStart={handleDragStart}
-              onTouchMove={handleDragMove}
-              onTouchEnd={handleDragEnd}
-              onMouseDown={handleDragStart}
-              onMouseMove={handleDragMove}
-              onMouseUp={handleDragEnd}
-              onMouseLeave={handleDragEnd}
             />
 
             {/* 바텀시트 내용 */}

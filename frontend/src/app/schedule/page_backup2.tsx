@@ -1531,85 +1531,42 @@ export default function SchedulePage() {
       // 선택된 멤버 정보 찾기
       let selectedMember: ScheduleGroupMember | undefined;
       
-      // 수정 모드인지 확인
-      const isEditMode = newEvent.id && selectedEventDetails;
-      
-      if (isEditMode) {
-        // 수정 모드: 원래 일정의 담당자 정보 유지
-        console.log('[handleSaveEvent] ✏️ 수정 모드 - 원래 담당자 정보 유지');
-        console.log('[handleSaveEvent] 🎯 원래 일정 정보:', {
-          memberIdx: selectedEventDetails.memberIdx,
-          tgtMtIdx: selectedEventDetails.tgtMtIdx,
-          tgtSgdtIdx: selectedEventDetails.tgtSgdtIdx,
-          memberName: selectedEventDetails.memberName
-        });
-        
-        // 원래 일정의 담당자 정보로 selectedMember 구성
-        const originalMemberInfo = {
-          id: selectedEventDetails.tgtMtIdx?.toString() || selectedEventDetails.memberIdx?.toString() || '',
-          name: selectedEventDetails.memberName || '',
-          photo: selectedEventDetails.memberPhoto || null,
-          isSelected: false,
-          mt_gender: selectedEventDetails.memberGender || null,
-          mt_idx: selectedEventDetails.tgtMtIdx || selectedEventDetails.memberIdx || 0,
-          mt_name: selectedEventDetails.memberName || '',
-          sgdt_idx: selectedEventDetails.tgtSgdtIdx,
-          sgdt_owner_chk: selectedEventDetails.tgtSgdtOwnerChk || 'N',
-          sgdt_leader_chk: selectedEventDetails.tgtSgdtLeaderChk || 'N',
-          mlt_lat: null,
-          mlt_long: null,
-          mlt_speed: null,
-          mlt_battery: null,
-          mlt_gps_time: null
-        };
-        
-        selectedMember = originalMemberInfo;
-        console.log('[handleSaveEvent] 🎯 원래 담당자 정보 사용:', {
-          mt_idx: selectedMember.mt_idx,
-          sgdt_idx: selectedMember.sgdt_idx,
-          name: selectedMember.name
+      if (selectedMemberId) {
+        // selectedMemberId가 있으면 해당 멤버만 찾기
+        selectedMember = scheduleGroupMembers.find(member => member.id === selectedMemberId);
+        console.log('[handleSaveEvent] 🎯 selectedMemberId로 멤버 찾기:', {
+          selectedMemberId,
+          foundMember: selectedMember ? {
+            id: selectedMember.id,
+            name: selectedMember.name,
+            mt_idx: selectedMember.mt_idx,
+            sgdt_idx: selectedMember.sgdt_idx
+          } : null
         });
       } else {
-        // 신규 생성 모드: 현재 선택된 멤버 사용
-        console.log('[handleSaveEvent] ➕ 신규 생성 모드 - 선택된 멤버 사용');
-        
-        if (selectedMemberId) {
-          // selectedMemberId가 있으면 해당 멤버만 찾기
-          selectedMember = scheduleGroupMembers.find(member => member.id === selectedMemberId);
-          console.log('[handleSaveEvent] 🎯 selectedMemberId로 멤버 찾기:', {
-            selectedMemberId,
-            foundMember: selectedMember ? {
-              id: selectedMember.id,
-              name: selectedMember.name,
-              mt_idx: selectedMember.mt_idx,
-              sgdt_idx: selectedMember.sgdt_idx
-            } : null
-          });
-        } else {
-          // selectedMemberId가 없으면 기본 선택된 멤버 사용
-          selectedMember = scheduleGroupMembers.find(member => member.isSelected);
-          console.log('[handleSaveEvent] 🎯 기본 선택된 멤버 사용:', {
-            foundMember: selectedMember ? {
-              id: selectedMember.id,
-              name: selectedMember.name,
-              mt_idx: selectedMember.mt_idx,
-              sgdt_idx: selectedMember.sgdt_idx
-            } : null
-          });
-        }
-        
-        // 멤버를 찾지 못한 경우에만 첫 번째 멤버 사용
-        if (!selectedMember && scheduleGroupMembers.length > 0) {
-          selectedMember = scheduleGroupMembers[0];
-          console.log('[handleSaveEvent] 🎯 첫 번째 멤버 사용:', {
-            foundMember: {
-              id: selectedMember.id,
-              name: selectedMember.name,
-              mt_idx: selectedMember.mt_idx,
-              sgdt_idx: selectedMember.sgdt_idx
-            }
-          });
-        }
+        // selectedMemberId가 없으면 기본 선택된 멤버 사용
+        selectedMember = scheduleGroupMembers.find(member => member.isSelected);
+        console.log('[handleSaveEvent] 🎯 기본 선택된 멤버 사용:', {
+          foundMember: selectedMember ? {
+            id: selectedMember.id,
+            name: selectedMember.name,
+            mt_idx: selectedMember.mt_idx,
+            sgdt_idx: selectedMember.sgdt_idx
+          } : null
+        });
+      }
+      
+      // 멤버를 찾지 못한 경우에만 첫 번째 멤버 사용
+      if (!selectedMember && scheduleGroupMembers.length > 0) {
+        selectedMember = scheduleGroupMembers[0];
+        console.log('[handleSaveEvent] 🎯 첫 번째 멤버 사용:', {
+          foundMember: {
+            id: selectedMember.id,
+            name: selectedMember.name,
+            mt_idx: selectedMember.mt_idx,
+            sgdt_idx: selectedMember.sgdt_idx
+          }
+        });
       }
 
       console.log('[handleSaveEvent] 🔍 멤버 선택 디버깅:', {

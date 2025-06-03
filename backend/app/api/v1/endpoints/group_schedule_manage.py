@@ -119,8 +119,8 @@ def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params
         db: 데이터베이스 세션
         parent_schedule_id: 부모 스케줄 ID (sst_pidx로 사용)
         base_params: 기본 스케줄 파라미터
-        repeat_json: 반복 설정 JSON (예: {"r1":"3","r2":"4"})
-        repeat_json_v: 반복 설정 텍스트 (예: "1주마다 목")
+        repeat_json: 반복 설정 JSON (예: {"r1":"3","r2":"4"} 또는 {"r1":"3","r2":"1,2,3,4,5"})
+        repeat_json_v: 반복 설정 텍스트 (예: "1주마다 목" 또는 "1주마다 월,화,수,목,금")
     
     Returns:
         생성된 반복 일정 개수
@@ -152,12 +152,144 @@ def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params
         logger.info(f"🔄 [RECURRING] 기간 설정 - 시작: {base_start}, 종료: {end_date}")
         
         created_count = 0
+        
+        # 매주 다중 요일 처리
+        if r1 == "3" and r2 and "," in str(r2):  # 매주 다중 요일
+            logger.info(f"🔄 [RECURRING] 매주 다중 요일 처리 시작 - r2: {r2}")
+            
+            # 요일 목록 파싱 (예: "1,2,3,4,5" -> [1,2,3,4,5])
+            target_weekdays = [int(x.strip()) for x in str(r2).split(",") if x.strip().isdigit()]
+            logger.info(f"🔄 [RECURRING] 대상 요일들: {target_weekdays}")
+            
+            # Python weekday 변환 (1=월요일 -> 0, 7=일요일 -> 6)
+            python_weekdays = []
+            for wd in target_weekdays:
+                if wd == 7:  # 일요일
+                    python_weekdays.append(6)
+                else:  # 월요일(1) ~ 토요일(6)
+                    python_weekdays.append(wd - 1)
+            
+            python_weekdays.sort()  # 요일 순서 정렬
+            logger.info(f"🔄 [RECURRING] Python 요일들: {python_weekdays}")
+            
+            # 현재 날짜의 요일
+            base_weekday = base_start.weekday()
+            logger.info(f"🔄 [RECURRING] 기준 날짜 요일: {base_weekday} ({['월','화','수','목','금','토','일'][base_weekday]})")
+            
+            current_week_start = base_start - timedelta(days=base_weekday)  # 해당 주의 월요일
+            logger.info(f"🔄 [RECURRING] 현재 주 시작(월요일): {current_week_start}")
+            
+            # 현재 주에서 기준 날짜 이후의 요일들부터 생성
+            week_offset = 0
+            while current_week_start + timedelta(weeks=week_offset) < end_date:
+                week_monday = current_week_start + timedelta(weeks=week_offset)
+                
+                for python_weekday in python_weekdays:
+                    schedule_date = week_monday + timedelta(days=python_weekday)
+                    
+                    # 첫 번째 주에서는 기준 날짜 이후의 요일만 생성
+                    if week_offset == 0 and schedule_date <= base_start:
+                        continue
+                    
+                    if schedule_date >= end_date:
+                        break
+                    
+                    # 시간 정보 유지하면서 날짜만 변경
+                    schedule_start = schedule_date.replace(
+                        hour=base_start.hour,
+                        minute=base_start.minute,
+                        second=base_start.second
+                    )
+                    
+                    # 종료시간 계산
+                    duration = base_end - base_start
+                    schedule_end = schedule_start + duration
+                    
+                    # 알림시간 계산
+                    alarm_time = None
+                    if base_params.get("sst_schedule_alarm_chk") == "Y":
+                        try:
+                            pick_type = base_params.get("sst_pick_type")
+                            pick_result = base_params.get("sst_pick_result")
+                            
+                            if pick_type and pick_result:
+                                pick_result_int = int(pick_result)
+                                
+                                if pick_type == 'minute':
+                                    alarm_time = schedule_start - timedelta(minutes=pick_result_int)
+                                elif pick_type == 'hour':
+                                    alarm_time = schedule_start - timedelta(hours=pick_result_int)
+                                elif pick_type == 'day':
+                                    alarm_time = schedule_start - timedelta(days=pick_result_int)
+                                
+                                logger.info(f"🔔 [RECURRING] 반복 일정 알림 시간 계산 - pick_type: {pick_type}, pick_result: {pick_result}, alarm_time: {alarm_time}")
+                        except Exception as recalc_error:
+                            logger.warning(f"⚠️ [RECURRING] 알림 시간 계산 실패: {recalc_error}")
+                            alarm_time = None
+                    
+                    # 새로운 반복 일정 파라미터 구성
+                    recurring_params = base_params.copy()
+                    recurring_params.update({
+                        "sst_pidx": parent_schedule_id,  # 부모 스케줄 ID
+                        "sst_sdate": schedule_start.strftime('%Y-%m-%d %H:%M:%S'),
+                        "sst_edate": schedule_end.strftime('%Y-%m-%d %H:%M:%S'),
+                        "sst_sedate": f"{schedule_start.strftime('%Y-%m-%d %H:%M:%S')} ~ {schedule_end.strftime('%Y-%m-%d %H:%M:%S')}",
+                        "sst_schedule_alarm": alarm_time.strftime('%Y-%m-%d %H:%M:%S') if alarm_time else None
+                    })
+                    
+                    # 반복 일정 삽입
+                    insert_query = text("""
+                        INSERT INTO smap_schedule_t (
+                            sst_pidx, mt_idx, sst_title, sst_sdate, sst_edate, sst_sedate, sst_all_day,
+                            sgt_idx, sgdt_idx, sgdt_idx_t,
+                            sst_location_title, sst_location_add, sst_location_lat, sst_location_long,
+                            sst_location_alarm,
+                            sst_memo, sst_supplies,
+                            sst_alram, sst_alram_t, sst_schedule_alarm_chk, 
+                            sst_pick_type, sst_pick_result, sst_schedule_alarm,
+                            sst_repeat_json, sst_repeat_json_v,
+                            slt_idx, slt_idx_t, sst_update_chk,
+                            sst_show, sst_wdate, sst_adate
+                        ) VALUES (
+                            :sst_pidx, :mt_idx, :sst_title, :sst_sdate, :sst_edate, :sst_sedate, :sst_all_day,
+                            :sgt_idx, :sgdt_idx, :sgdt_idx_t,
+                            :sst_location_title, :sst_location_add, :sst_location_lat, :sst_location_long,
+                            :sst_location_alarm,
+                            :sst_memo, :sst_supplies,
+                            :sst_alram, :sst_alram_t, :sst_schedule_alarm_chk,
+                            :sst_pick_type, :sst_pick_result, :sst_schedule_alarm,
+                            :sst_repeat_json, :sst_repeat_json_v,
+                            :slt_idx, :slt_idx_t, :sst_update_chk,
+                            'Y', NOW(), :sst_adate
+                        )
+                    """)
+                    
+                    db.execute(insert_query, recurring_params)
+                    created_count += 1
+                    
+                    logger.info(f"✅ [RECURRING] 반복 일정 생성: {schedule_start.strftime('%Y-%m-%d (%a)')} - {created_count}번째")
+                    
+                    # 너무 많은 일정 생성 방지 (최대 500개)
+                    if created_count >= 500:
+                        logger.warning(f"⚠️ [RECURRING] 최대 생성 개수 제한에 도달: {created_count}")
+                        break
+                
+                if created_count >= 500:
+                    break
+                    
+                week_offset += 1
+            
+            db.commit()
+            logger.info(f"✅ [RECURRING] 매주 다중 요일 반복 일정 생성 완료 - 총 {created_count}개 생성")
+            return created_count
+        
+        # 기존 단일 요일 및 기타 반복 처리
         current_date = base_start
         
         # 반복 주기별 처리
         if r1 == "2":  # 매일
             delta = timedelta(days=1)
-        elif r1 == "3":  # 매주
+        elif r1 == "3":  # 매주 (단일 요일)
             delta = timedelta(weeks=1)
         elif r1 == "4":  # 매월
             # 월간 반복은 특별 처리 필요 (dateutil 사용)
@@ -168,16 +300,16 @@ def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params
             logger.warning(f"⚠️ [RECURRING] 지원하지 않는 반복 주기: {r1}")
             return 0
         
-        # 반복 일정 생성
+        # 반복 일정 생성 (기존 로직)
         while current_date < end_date:
             # 첫 번째 반복 일정은 다음 주기부터 생성
             if r1 == "2":  # 매일
                 current_date += timedelta(days=1)
-            elif r1 == "3":  # 매주
+            elif r1 == "3":  # 매주 (단일 요일)
                 current_date += timedelta(weeks=1)
                 
                 # 특정 요일이 지정된 경우 해당 요일로 조정
-                if r2 and r2.isdigit():
+                if r2 and str(r2).isdigit():
                     target_weekday = int(r2)
                     # r2 값: 1=월요일, 2=화요일, 3=수요일, 4=목요일, 5=금요일, 6=토요일, 7=일요일
                     # Python weekday(): 월요일=0, 화요일=1, 수요일=2, 목요일=3, 금요일=4, 토요일=5, 일요일=6
@@ -226,8 +358,8 @@ def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params
                     base_alarm_str = base_params["sst_schedule_alarm"]
                     if isinstance(base_alarm_str, str):
                         base_alarm = datetime.strptime(base_alarm_str, '%Y-%m-%d %H:%M:%S')
-                alarm_duration = base_start - base_alarm
-                alarm_time = current_date - alarm_duration
+                        alarm_duration = base_start - base_alarm
+                        alarm_time = current_date - alarm_duration
                         logger.info(f"🔔 [RECURRING] 반복 일정 알림 시간 계산 - base_alarm: {base_alarm}, alarm_time: {alarm_time}")
                     else:
                         logger.warning(f"⚠️ [RECURRING] base_params의 sst_schedule_alarm이 문자열이 아님: {type(base_alarm_str)}")
