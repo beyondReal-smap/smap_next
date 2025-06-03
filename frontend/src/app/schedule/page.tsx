@@ -711,6 +711,9 @@ export default function SchedulePage() {
     lng: undefined as number | undefined
   });
 
+  // 추가 임시 상태 변수
+  const [tempShowWeekdaySelector, setTempShowWeekdaySelector] = useState(false);
+
   // 저장 완료 모달 상태
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
   const [successModalContent, setSuccessModalContent] = useState<{
@@ -1588,6 +1591,7 @@ export default function SchedulePage() {
           sst_location_lat: newEvent.locationLat, // 위도 추가
           sst_location_long: newEvent.locationLng, // 경도 추가
           sst_memo: newEvent.content || undefined,
+          sst_content: newEvent.content || undefined, // PHP에서 memo와 content 둘 다 사용
           sst_alram: 0, // 기존 인터페이스 유지
           // 새로운 필드들 추가
           sst_repeat_json: repeatData.sst_repeat_json,
@@ -1819,32 +1823,6 @@ export default function SchedulePage() {
   // 일정 수정 모달 열기
   const handleOpenEditModal = () => {
     if (selectedEventDetails) {
-      // 반복 패턴 역변환 함수
-      const convertRepeatTextToSelect = (repeatText: string): string => {
-        console.log('[convertRepeatTextToSelect] 변환할 반복 텍스트:', repeatText);
-        
-        if (!repeatText || repeatText === '반복 없음') return 'none';
-        if (repeatText === '매일') return 'daily';
-        if (repeatText === '매주') return 'weekly';
-        if (repeatText === '매월') return 'monthly';
-        if (repeatText === '매년') return 'yearly';
-        
-        // "매주 월,화,수,목,금" 패턴 체크 (정확한 매칭)
-        if (repeatText === '매주 월,화,수,목,금') {
-          console.log('[convertRepeatTextToSelect] 평일 반복 패턴 인식');
-          return 'weekdays';
-        }
-        
-        // 매주 + 특정 요일들 조합인 경우
-        if (repeatText.includes('매주') && repeatText.includes(',')) {
-          console.log('[convertRepeatTextToSelect] 커스텀 요일 패턴 인식');
-          return 'custom';
-        }
-        
-        console.log('[convertRepeatTextToSelect] 기본값 반환 (none)');
-        return 'none';
-      };
-
       // 알림 텍스트 역변환 함수
       const convertAlarmTextToSelect = (alarmTime: string, hasAlarm: boolean): string => {
         if (!hasAlarm || !alarmTime) return '없음';
@@ -1858,7 +1836,7 @@ export default function SchedulePage() {
         startTime: selectedEventDetails.startTime,
         endTime: selectedEventDetails.endTime,
         allDay: selectedEventDetails.isAllDay || false, // 하루종일 설정 로드
-        repeat: convertRepeatTextToSelect(selectedEventDetails.repeatText || ''), // 반복 설정 역변환
+        repeat: selectedEventDetails.repeatText || '', // 반복 설정 역변환
         alarm: convertAlarmTextToSelect(selectedEventDetails.alarmTime || '', selectedEventDetails.hasAlarm || false), // 알림 설정 역변환
         locationName: selectedEventDetails.locationName || '',
         locationAddress: selectedEventDetails.locationAddress || '',
@@ -2947,32 +2925,6 @@ export default function SchedulePage() {
 
   // 실제 수정 실행
   const executeEditAction = async (event: ScheduleEvent, option?: 'this' | 'future' | 'all') => {
-    // 반복 패턴 역변환 함수
-    const convertRepeatTextToSelect = (repeatText: string): string => {
-      console.log('[executeEditAction] 변환할 반복 텍스트:', repeatText);
-      
-      if (!repeatText || repeatText === '반복 없음') return 'none';
-      if (repeatText === '매일') return 'daily';
-      if (repeatText === '매주') return 'weekly';
-      if (repeatText === '매월') return 'monthly';
-      if (repeatText === '매년') return 'yearly';
-      
-      // "매주 월,화,수,목,금" 패턴 체크 (정확한 매칭)
-      if (repeatText === '매주 월,화,수,목,금') {
-        console.log('[executeEditAction] 평일 반복 패턴 인식');
-        return 'weekdays';
-      }
-      
-      // 매주 + 특정 요일들 조합인 경우
-      if (repeatText.includes('매주') && repeatText.includes(',')) {
-        console.log('[executeEditAction] 커스텀 요일 패턴 인식');
-        return 'custom';
-      }
-      
-      console.log('[executeEditAction] 기본값 반환 (none)');
-      return 'none';
-    };
-
     // 알림 텍스트 역변환 함수 - 백엔드 데이터 구조에 맞게 개선
     const convertAlarmTextToSelect = (alarmTime: string, hasAlarm: boolean): string => {
       console.log('[convertAlarmTextToSelect] 입력값:', { alarmTime, hasAlarm });
@@ -3050,7 +3002,7 @@ export default function SchedulePage() {
     }
 
     // 변환된 값들 로깅
-    const convertedRepeat = convertRepeatTextToSelect(event.repeatText || '');
+    const convertedRepeat = event.repeatText || '';
     const convertedAlarm = convertAlarmTextToSelect(event.alarmTime || '', event.hasAlarm || false);
     
     console.log('[executeEditAction] 변환 결과:', {
@@ -3224,7 +3176,7 @@ export default function SchedulePage() {
       // 메모리 캐시 업데이트
       setMonthlyCache(prev => new Map(prev).set(cacheKey, updatedData));
       
-      // 로컬 스토리지에도 저장
+      // 로컬 스토리지 캐시에도 저장
       saveCacheToStorage(cacheKey, updatedData);
       
       console.log(`[CACHE] ${action} 작업으로 캐시 업데이트:`, cacheKey);
@@ -3259,18 +3211,51 @@ export default function SchedulePage() {
   const handleOpenRepeatModal = () => {
     // 현재 반복 설정을 임시 변수에 저장
     setTempRepeatValue(newEvent.repeat);
+    setTempSelectedWeekdays(new Set(selectedWeekdays));
+    setTempShowWeekdaySelector(showWeekdaySelector);
     
-    // "weekdays" 값을 "매주"로 변환하고 요일 선택기 표시
-    if (newEvent.repeat === 'weekdays') {
+    console.log('[handleOpenRepeatModal] 현재 반복 설정:', newEvent.repeat);
+    
+    // 기존 반복 설정에 따라 모달 상태 설정
+    const currentRepeat = newEvent.repeat;
+    
+    if (currentRepeat === '매주 월,화,수,목,금') {
+      // 평일 반복인 경우 매주로 설정하고 월~금 선택
       setNewEvent(prev => ({ ...prev, repeat: '매주' }));
       setShowWeekdaySelector(true);
       setSelectedWeekdays(new Set([1, 2, 3, 4, 5])); // 월~금 선택
+    } else if (currentRepeat.startsWith('매주 ') && currentRepeat.includes(',')) {
+      // 매주 + 특정 요일들인 경우
+      setNewEvent(prev => ({ ...prev, repeat: '매주' }));
+      setShowWeekdaySelector(true);
+      
+      // 선택된 요일들 파싱
+      const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      const selectedDays = currentRepeat.replace('매주 ', '');
+      const weekdayIndices = new Set<number>();
+      
+      selectedDays.split(',').forEach(dayName => {
+        const index = dayNames.indexOf(dayName.trim());
+        if (index !== -1) {
+          weekdayIndices.add(index);
+        }
+      });
+      
+      setSelectedWeekdays(weekdayIndices);
+    } else if (currentRepeat === '매주') {
+      // 단순 매주인 경우
+      setShowWeekdaySelector(true);
+      setSelectedWeekdays(new Set()); // 요일 선택 없음
+    } else {
+      // 다른 반복 설정들 (매일, 매월, 매년, 안함 등)
+      setShowWeekdaySelector(false);
+      setSelectedWeekdays(new Set());
     }
     
     setIsRepeatModalOpen(true);
   };
 
-  // 라인 3262-3264 수정
+  // 반복 모달 취소 핸들러
   const handleCancelRepeatModal = () => {
     // 임시 설정을 원래 값으로 되돌림
     setNewEvent(prev => ({ ...prev, repeat: tempRepeatValue }));
@@ -3884,7 +3869,6 @@ export default function SchedulePage() {
                                 } else {
                                   setShowWeekdaySelector(false);
                                   setSelectedWeekdays(new Set());
-                                  setIsRepeatModalOpen(false);
                                 }
                               }}
                               className={`w-full px-4 py-3 text-left rounded-xl transition-all duration-200 mobile-button ${
@@ -3966,7 +3950,7 @@ export default function SchedulePage() {
                                     {/* 체크박스를 요일 버튼 오른쪽 위에 위치 */}
                                     {selectedWeekdays.has(weekday.day) && (
                                       <motion.div
-                                        className="absolute -top-2 -right-2 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white z-10"
+                                        className="absolute -top-3 -right-3 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white z-10"
                                         initial={{ scale: 0, rotate: -180 }}
                                         animate={{ scale: 1, rotate: 0 }}
                                         transition={{ duration: 0.3 }}
@@ -4027,7 +4011,6 @@ export default function SchedulePage() {
                         ) : (
                           <div className="mt-4 space-y-2">
                             <button
-                              // 라인 4006-4012 수정
                               onClick={() => {
                                 // 매주 선택이고 요일이 선택되지 않은 경우 경고
                                 if (newEvent.repeat === '매주' && selectedWeekdays.size === 0) {
@@ -4040,7 +4023,7 @@ export default function SchedulePage() {
                                     selectedWeekdays.has(1) && selectedWeekdays.has(2) && 
                                     selectedWeekdays.has(3) && selectedWeekdays.has(4) && 
                                     selectedWeekdays.has(5) && selectedWeekdays.size === 5) {
-                                  setNewEvent(prev => ({ ...prev, repeat: 'weekdays' }));
+                                  setNewEvent(prev => ({ ...prev, repeat: '매주 월,화,수,목,금' }));
                                 }
                                 
                                 setIsRepeatModalOpen(false);
@@ -4050,6 +4033,11 @@ export default function SchedulePage() {
                               확인
                             </button>
                             <button
+                              onClick={() => {
+                                setIsRepeatModalOpen(false);
+                                setShowWeekdaySelector(false);
+                                setSelectedWeekdays(new Set());
+                                setNewEvent({ ...newEvent, repeat: '안함' });
                               }}
                               className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                             >
