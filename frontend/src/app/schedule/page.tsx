@@ -3224,7 +3224,7 @@ export default function SchedulePage() {
       // 메모리 캐시 업데이트
       setMonthlyCache(prev => new Map(prev).set(cacheKey, updatedData));
       
-      // 로컬 스토리지 캐시에도 저장
+      // 로컬 스토리지에도 저장
       saveCacheToStorage(cacheKey, updatedData);
       
       console.log(`[CACHE] ${action} 작업으로 캐시 업데이트:`, cacheKey);
@@ -3260,7 +3260,7 @@ export default function SchedulePage() {
     // 현재 반복 설정을 임시 변수에 저장
     setTempRepeatValue(newEvent.repeat);
     
-    // weekdays인 경우 "매주"로 변환하고 요일 선택기 표시
+    // "weekdays" 값을 "매주"로 변환하고 요일 선택기 표시
     if (newEvent.repeat === 'weekdays') {
       setNewEvent(prev => ({ ...prev, repeat: '매주' }));
       setShowWeekdaySelector(true);
@@ -3270,7 +3270,7 @@ export default function SchedulePage() {
     setIsRepeatModalOpen(true);
   };
 
-  // 반복 모달 취소 핸들러
+  // 라인 3262-3264 수정
   const handleCancelRepeatModal = () => {
     // 임시 설정을 원래 값으로 되돌림
     setNewEvent(prev => ({ ...prev, repeat: tempRepeatValue }));
@@ -4027,6 +4027,7 @@ export default function SchedulePage() {
                         ) : (
                           <div className="mt-4 space-y-2">
                             <button
+                              // 라인 4006-4012 수정
                               onClick={() => {
                                 // 매주 선택이고 요일이 선택되지 않은 경우 경고
                                 if (newEvent.repeat === '매주' && selectedWeekdays.size === 0) {
@@ -4034,12 +4035,12 @@ export default function SchedulePage() {
                                   return;
                                 }
                                 
-                                // 월~금이 모두 선택된 경우 "매주 월,화,수,목,금"으로 저장
+                                // 월~금이 모두 선택된 경우 weekdays로 변환
                                 if (newEvent.repeat === '매주' && 
                                     selectedWeekdays.has(1) && selectedWeekdays.has(2) && 
                                     selectedWeekdays.has(3) && selectedWeekdays.has(4) && 
                                     selectedWeekdays.has(5) && selectedWeekdays.size === 5) {
-                                  setNewEvent(prev => ({ ...prev, repeat: '매주 월,화,수,목,금' }));
+                                  setNewEvent(prev => ({ ...prev, repeat: 'weekdays' }));
                                 }
                                 
                                 setIsRepeatModalOpen(false);
@@ -4049,12 +4050,6 @@ export default function SchedulePage() {
                               확인
                             </button>
                             <button
-                              onClick={handleCancelRepeatModal}
-                              onClick={() => {
-                                setIsRepeatModalOpen(false);
-                                setShowWeekdaySelector(false);
-                                setSelectedWeekdays(new Set());
-                                setNewEvent({ ...newEvent, repeat: '안함' });
                               }}
                               className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                             >
