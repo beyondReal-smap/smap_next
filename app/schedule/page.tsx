@@ -36,10 +36,26 @@ dayjs.locale('ko');
 
 // 모바일 최적화된 CSS 스타일
 const pageStyles = `
-html, body {
+html {
   width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  width: 100%;
+  min-height: 100vh !important;
   overflow-x: hidden;
   position: relative;
+}
+
+#__next {
+  min-height: 100vh !important;
+}
+
+.schedule-container {
+  padding-bottom: 200px !important;
+  margin-bottom: 100px !important;
 }
 
 .mobile-button {
@@ -1023,7 +1039,7 @@ export default function SchedulePage() {
   return (
     <>
       <style jsx global>{pageStyles}</style>
-      <div className="bg-indigo-50 min-h-screen pb-20">
+      <div className="bg-indigo-50 min-h-screen schedule-container" style={{ paddingBottom: '120px' }}>
         {/* 개선된 헤더 */}
         <motion.header 
           initial={{ y: -100, opacity: 0 }}
@@ -1070,6 +1086,7 @@ export default function SchedulePage() {
           exit="out"
           variants={pageVariants}
           className="px-4 pt-20 space-y-6"
+          style={{ paddingBottom: '140px' }}
         >
           {/* 캘린더 섹션 */}
           <motion.div
@@ -1093,7 +1110,7 @@ export default function SchedulePage() {
               animate="visible"
               custom={1}
             >
-              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-white rounded-3xl shadow-sm border border-gray-100">
                 {/* 헤더 */}
                 <div className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white">
                   <div className="flex items-center justify-between">
@@ -1113,7 +1130,7 @@ export default function SchedulePage() {
                 </div>
 
                 {/* 일정 목록 */}
-                <div className="p-4">
+                <div className="p-4" style={{ paddingBottom: '80px' }}>
                   {eventsForSelectedDay.length > 0 ? (
                     <motion.div 
                       className="space-y-3"
@@ -1217,6 +1234,8 @@ export default function SchedulePage() {
                           </motion.div>
                         );
                       })}
+                      {/* 하단 여백 확보용 */}
+                      <div style={{ height: '120px', width: '100%' }}></div>
                     </motion.div>
                   ) : (
                     <div className="text-center py-12">
@@ -1240,7 +1259,7 @@ export default function SchedulePage() {
             // body 스크롤 비활성화
             document.body.style.overflow = 'hidden';
           }}
-          className="fixed bottom-24 right-6 z-40 w-14 h-14 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-full flex items-center justify-center text-white shadow-lg mobile-button disabled:opacity-50"
+          className="fixed bottom-40 right-6 z-40 w-14 h-14 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-full flex items-center justify-center text-white shadow-lg mobile-button disabled:opacity-50"
           variants={floatingButtonVariants}
           initial="initial"
           animate="animate"

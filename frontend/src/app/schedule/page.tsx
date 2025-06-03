@@ -138,10 +138,10 @@ html, body {
 /* Floating button styles from group/page.tsx */
 .floating-button {
   position: fixed;
-  bottom: 80px; /* Adjusted from 96px to match group/page.tsx more closely */
-  right: 20px; /* Adjusted from 24px */
+  bottom: 80px;
+  right: 20px;
   z-index: 40;
-  background: #4f46e5; /* Solid color like group/page.tsx */
+  background: #4f46e5;
   box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
   transition: all 0.2s ease;
   touch-action: manipulation;
@@ -3430,7 +3430,7 @@ export default function SchedulePage() {
             animate="in"
             exit="out"
             variants={pageVariants}
-            className="px-4 pt-20 pb-24 space-y-6 min-h-screen overflow-y-auto"
+            className="px-4 pt-20 space-y-6 min-h-screen overflow-y-auto"
             style={{ 
               WebkitOverflowScrolling: 'touch',
               scrollbarWidth: 'none',
@@ -3531,11 +3531,9 @@ export default function SchedulePage() {
                       {eventsForSelectedDay.length > 0 ? (
                         <motion.div 
                           key={selectedDay.format('YYYY-MM-DD')}
-                          className="space-y-3 max-h-[400px] overflow-y-auto"
+                          className="space-y-3"
                           style={{ 
-                            WebkitOverflowScrolling: 'touch',
-                            scrollbarWidth: 'none',
-                            msOverflowStyle: 'none'
+                            WebkitOverflowScrolling: 'touch'
                           }}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -4151,8 +4149,8 @@ export default function SchedulePage() {
                                   </span>
                                 </p>
                               </div>
-                          </div>
-                        )}
+                            </div>
+                          )}
 
                           {/* 하루 종일일 때 미리보기 */}
                           {tempDateTime.allDay && (
@@ -4980,32 +4978,32 @@ export default function SchedulePage() {
       {!isInitialLoading && (
         <motion.button
           onClick={handleOpenAddEventModal}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-green-600 hover:bg-green-700 shadow-lg hover:shadow-xl active:shadow-lg text-white rounded-full flex items-center justify-center mobile-button z-40 transition-all duration-200 ease-out"
+          className="floating-button w-14 h-14 rounded-full flex items-center justify-center text-white"
           style={{
-            boxShadow: '0 10px 25px rgba(34, 197, 94, 0.2), 0 4px 10px rgba(0, 0, 0, 0.1)',
+            boxShadow: '0 10px 25px rgba(79, 70, 229, 0.3), 0 4px 10px rgba(0, 0, 0, 0.1)',
           }}
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ 
+            scale: 1, 
+            rotate: 0,
+            transition: {
+              delay: 0.5,
+              type: "spring",
+              stiffness: 260,
+              damping: 20
+            }
+          }}
           exit={{ scale: 0, opacity: 0 }}
-          transition={{ 
-            delay: 0.5, 
-            type: "spring", 
-            stiffness: 200, 
-            damping: 20 
-          }}
           whileHover={{ 
             scale: 1.1,
-            y: -2,
             transition: { duration: 0.2 }
           }}
           whileTap={{ 
-            scale: 0.95,
+            scale: 0.9,
             transition: { duration: 0.1 }
           }}
         >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
+          <FiPlus className="w-6 h-6" />
         </motion.button>
       )}
 
