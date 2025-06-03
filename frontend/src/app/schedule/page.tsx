@@ -5086,65 +5086,79 @@ export default function SchedulePage() {
                       <div className="w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center">
                         <span className="text-xs font-bold text-white">1</span>
                     </div>
-                      <h4 className="font-semibold text-gray-900">그룹 및 멤버 선택</h4>
+                    <h4 className="font-semibold text-gray-900">그룹 및 멤버 선택</h4>
                   </div>
 
-                    {/* 그룹 선택 */}
+                  {newEvent.id && (
+                      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm text-yellow-700 flex items-center">
+                          <span className="mr-2">⚠️</span>
+                          일정 수정 시에는 그룹과 멤버를 변경할 수 없습니다
+                        </p>
+                      </div>
+                    )}
+
+                        {/* 그룹 선택 */}
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">그룹 선택</label>
-                      <div className="relative group-selector-container">
-                        <button
-                          type="button"
-                          onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
-                          className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 flex items-center justify-between"
-                        >
-                          <span className="text-gray-900">
-                            {selectedGroupId 
-                              ? userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹을 선택하세요'
-                              : '그룹을 선택하세요'
-                            }
-                          </span>
-                          <FiChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isGroupSelectorOpen ? 'rotate-180' : ''}`} />
-                        </button>
-                        
-                        {/* 그룹 드롭다운 */}
-                        <AnimatePresence>
-                          {isGroupSelectorOpen && (
-                            <motion.div
-                              initial={{ opacity: 0, y: -10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: -10 }}
-                              transition={{ duration: 0.2 }}
-                              className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto"
-                            >
-                              {isLoadingGroups ? (
-                                <div className="p-4 text-center text-gray-500">
-                                  <div className="animate-spin w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto mb-2"></div>
-                                  그룹 목록을 불러오는 중...
-                                </div>
-                              ) : userGroups.length > 0 ? (
-                                userGroups.map((group) => (
-                                <button
-                                  key={group.sgt_idx}
-                                  type="button"
-                                  onClick={() => handleGroupSelect(group.sgt_idx)}
-                                    className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
-                                      selectedGroupId === group.sgt_idx ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'
-                                    }`}
-                                  >
-                                    {group.sgt_title}
-                                </button>
-                                ))
-                              ) : (
-                                <div className="p-4 text-center text-gray-500">
-                                  참여 중인 그룹이 없습니다
-                                </div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">그룹 선택</label>
+                          <div className="relative group-selector-container">
+                          <button
+                            type="button"
+                            onClick={() => !newEvent.id && setIsGroupSelectorOpen(!isGroupSelectorOpen)} // newEvent.id가 있으면 클릭 비활성화
+                            disabled={!!newEvent.id} // 수정 모드일 때 비활성화
+                            className={`w-full px-4 py-3 border border-gray-300 rounded-xl text-left transition-colors flex items-center justify-between ${
+                              newEvent.id 
+                                ? 'bg-gray-100 text-gray-500 cursor-not-allowed' // 수정 모드 스타일
+                                : 'bg-white hover:bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500'
+                            }`}
+                          >
+                              <span className="text-gray-900">
+                                {selectedGroupId 
+                                  ? userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹을 선택하세요'
+                                  : '그룹을 선택하세요'
+                                }
+                              </span>
+                              <FiChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isGroupSelectorOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            
+                            {/* 그룹 드롭다운 */}
+                            <AnimatePresence>
+                              {isGroupSelectorOpen && !newEvent.id && ( // newEvent.id가 있으면 드롭다운 숨김
+                                <motion.div
+                                  initial={{ opacity: 0, y: -10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  exit={{ opacity: 0, y: -10 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto"
+                                >
+                                  {isLoadingGroups ? (
+                                    <div className="p-4 text-center text-gray-500">
+                                      <div className="animate-spin w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                                      그룹 목록을 불러오는 중...
+                                    </div>
+                                  ) : userGroups.length > 0 ? (
+                                    userGroups.map((group) => (
+                                    <button
+                                      key={group.sgt_idx}
+                                      type="button"
+                                      onClick={() => handleGroupSelect(group.sgt_idx)}
+                                        className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
+                                          selectedGroupId === group.sgt_idx ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'
+                                        }`}
+                                      >
+                                        {group.sgt_title}
+                                    </button>
+                                    ))
+                                  ) : (
+                                    <div className="p-4 text-center text-gray-500">
+                                      참여 중인 그룹이 없습니다
+                                    </div>
+                                  )}
+                                </motion.div>
                               )}
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                              </div>
-                    </div>
+                            </AnimatePresence>
+                          </div>
+                        </div>
 
                     {/* 멤버 선택 */}
                     {selectedGroupId && (
@@ -5165,10 +5179,13 @@ export default function SchedulePage() {
                                 transition={{ delay: index * 0.1 }}
                                 className="flex flex-col items-center flex-shrink-0"
                               >
-                                <button
-                              type="button"
-                              onClick={() => handleScheduleMemberSelect(member.id)}
-                                  className="flex flex-col items-center focus:outline-none mobile-button"
+                              <button
+                                  type="button"
+                                  onClick={() => !newEvent.id && handleScheduleMemberSelect(member.id)} // newEvent.id가 있으면 클릭 비활성화
+                                  disabled={!!newEvent.id} // 수정 모드일 때 비활성화
+                                  className={`flex flex-col items-center focus:outline-none mobile-button ${
+                                    newEvent.id ? 'cursor-not-allowed opacity-50' : '' // 수정 모드 스타일
+                                  }`}
                                 >
                                   <div className={`w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                                     member.isSelected ? 'ring-4 ring-indigo-500 ring-offset-2' : ''
@@ -5430,8 +5447,8 @@ export default function SchedulePage() {
                   <div className="text-sm text-green-600 mt-1">
                     {selectedHour < 12 ? '오전' : '오후'} {selectedHour === 0 ? 12 : selectedHour > 12 ? (selectedHour - 12).toString().padStart(2, '0') : selectedHour.toString().padStart(2, '0')}시 {selectedMinute.toString().padStart(2, '0')}분
                           </div>
-                        </div>
-                        
+                </div>
+
                 {/* 시간 선택 영역 */}
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   {/* 시간 선택 */}
@@ -5453,11 +5470,11 @@ export default function SchedulePage() {
                           {i.toString().padStart(2, '0')}시
                         </motion.button>
                       ))}
-                    </div>
+                      </div>
                   </div>
 
                   {/* 분 선택 */}
-                  <div>
+                      <div>
                     <label className="block text-sm font-medium text-gray-700 mb-3 text-center">분</label>
                     <div ref={minuteScrollRef} className="max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
                       {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
@@ -5475,7 +5492,7 @@ export default function SchedulePage() {
                           {minute.toString().padStart(2, '0')}분
                         </motion.button>
                       ))}
-                    </div>
+                      </div>
                   </div>
                 </div>
 
@@ -5511,7 +5528,7 @@ export default function SchedulePage() {
 
                 {/* 액션 버튼 */}
                 <div className="flex space-x-3">
-                <button
+                  <button
                     onClick={handleCloseTimeModal}
                     className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                   >
@@ -5555,7 +5572,7 @@ export default function SchedulePage() {
                 <div className="flex items-center space-x-2 mb-6">
                   <h3 className="text-lg font-bold text-gray-900">장소 검색</h3>
                 </div>
-                
+
                 {/* 장소 검색 입력 */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">장소명 또는 주소 입력</label>
@@ -5577,7 +5594,7 @@ export default function SchedulePage() {
                 </div>
 
                 {/* 검색 버튼 */}
-                <button
+                      <button
                   onClick={() => handleSearchLocation()}
                   disabled={!locationSearchQuery.trim() || isSearchingLocation}
                   className="w-full py-3 bg-amber-600 text-white rounded-xl font-medium mobile-button hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
@@ -5595,8 +5612,8 @@ export default function SchedulePage() {
                       <span>검색</span>
                     </>
                   )}
-                </button>
-              </div>
+                      </button>
+                  </div>
 
               {/* 구분선 */}
               <div className="border-t border-gray-200"></div>
@@ -5607,7 +5624,7 @@ export default function SchedulePage() {
                   <div className="flex items-center space-x-2">
                     <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
                       <span className="text-xs text-green-600">✓</span>
-                    </div>
+                </div>
                     <h4 className="text-sm font-semibold text-gray-900">검색 결과 ({locationSearchResults.length}개)</h4>
                   </div>
                 </div>
@@ -5653,8 +5670,8 @@ export default function SchedulePage() {
                           </div>
                         </div>
                       </motion.button>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
                 ) : hasSearched && !isSearchingLocation ? (
                   <div className="text-center py-8 px-6">
                 {/* <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -5678,12 +5695,12 @@ export default function SchedulePage() {
 
               {/* 닫기 버튼 */}
               <div className="px-6 pb-6 flex-shrink-0">
-                            <button
+                  <button
                   onClick={handleCloseLocationSearchModal}
                   className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
                 >
                   닫기
-                </button>
+                  </button>
               </div>
             </motion.div>
           </motion.div>
@@ -5724,17 +5741,17 @@ export default function SchedulePage() {
                   </motion.button>
                   
                   <div className="text-center">
-                    <h3 className="text-lg font-bold text-gray-900">
+                  <h3 className="text-lg font-bold text-gray-900">
                       {calendarCurrentMonth.format('YYYY년 MM월')}
-                    </h3>
+                  </h3>
                     <button
                       onClick={handleCalendarToday}
                       className="text-sm text-green-600 hover:text-green-700 mobile-button mt-1"
                     >
                       오늘로 이동
                     </button>
-                  </div>
-                  
+                </div>
+
                   <motion.button
                     onClick={handleCalendarNextMonth}
                     className="p-2 hover:bg-gray-100 rounded-full mobile-button"
@@ -5778,7 +5795,7 @@ export default function SchedulePage() {
                       const isPast = currentDate.isBefore(today, 'day');
                       
                       days.push(
-                        <button
+                      <button
                           key={day}
                           onClick={() => handleCalendarDateSelect(currentDate)}
                           disabled={isPast}
@@ -5791,13 +5808,13 @@ export default function SchedulePage() {
                           `}
                         >
                           {day}
-                        </button>
+                      </button>
                       );
                     }
                     
                     return days;
                   })()}
-                </div>
+                  </div>
 
                 {/* 선택된 날짜 표시 */}
                 <div className="text-center mb-6 p-4 bg-green-50 rounded-xl border border-green-100">
@@ -5818,9 +5835,9 @@ export default function SchedulePage() {
                   <button
                     onClick={handleCloseCalendarModal}
                     className="flex-1 py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
-                        >
-                          확인
-                        </button>
+                  >
+                    확인
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -5930,7 +5947,7 @@ export default function SchedulePage() {
                 <div className="flex flex-col gap-3">
                   {successModalContent.onConfirm ? (
                     <>
-                      <motion.button
+      <motion.button
                         onClick={closeSuccessModal}
                         className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl font-medium transition-all duration-200"
                         whileHover={{ scale: 1.02 }}
@@ -5968,7 +5985,7 @@ export default function SchedulePage() {
                       확인
                     </motion.button>
                   )}
-                </div>
+        </div>
               </div>
             </motion.div>
           </motion.div>

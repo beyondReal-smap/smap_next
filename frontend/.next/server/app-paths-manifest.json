@@ -1,3 +1,11 @@
 {
-  "/schedule/page": "app/schedule/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/groups/current-user/route": "app/api/groups/current-user/route.js",
+  "/api/group-members/member/[groupId]/route": "app/api/group-members/member/[groupId]/route.js",
+  "/api/schedule/owner-groups/all-schedules/route": "app/api/schedule/owner-groups/all-schedules/route.js",
+  "/notice/page": "app/notice/page.js",
+  "/schedule/page": "app/schedule/page.js",
+  "/group/page": "app/group/page.js",
+  "/home/page": "app/home/page.js",
+  "/location/page": "app/location/page.js"
 }
