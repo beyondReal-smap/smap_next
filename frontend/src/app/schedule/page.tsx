@@ -759,6 +759,11 @@ export default function SchedulePage() {
   const [selectedWeekdays, setSelectedWeekdays] = useState<Set<number>>(new Set());
   const [showWeekdaySelector, setShowWeekdaySelector] = useState(false);
 
+  // 반복 모달 전용 임시 상태 변수들
+  const [tempModalRepeatValue, setTempModalRepeatValue] = useState('');
+  const [tempModalSelectedWeekdays, setTempModalSelectedWeekdays] = useState<Set<number>>(new Set());
+  const [tempModalShowWeekdaySelector, setTempModalShowWeekdaySelector] = useState(false);
+
   // 로컬 스토리지에서 캐시 데이터 로드
   const loadCacheFromStorage = () => {
     try {
@@ -3209,69 +3214,96 @@ export default function SchedulePage() {
 
   // 반복 모달 열기 핸들러
   const handleOpenRepeatModal = () => {
-    // 현재 반복 설정을 임시 변수에 저장
+    // 현재 반복 설정을 임시 변수에 저장 (복원용)
     setTempRepeatValue(newEvent.repeat);
     setTempSelectedWeekdays(new Set(selectedWeekdays));
     setTempShowWeekdaySelector(showWeekdaySelector);
     
-    console.log('[handleOpenRepeatModal] 현재 반복 설정:', newEvent.repeat);
-    
-    // 기존 반복 설정에 따라 모달 상태 설정
+    // 모달 임시 상태 초기화 - 현재 설정값으로 세팅
     const currentRepeat = newEvent.repeat;
-    
+    let modalRepeatValue = currentRepeat;
+    let modalShowWeekdaySelector = false;
+    let modalSelectedWeekdays = new Set<number>();
+
     if (currentRepeat === '매주 월,화,수,목,금') {
-      // 평일 반복인 경우 매주로 설정하고 월~금 선택
-      setNewEvent(prev => ({ ...prev, repeat: '매주' }));
-      setShowWeekdaySelector(true);
-      setSelectedWeekdays(new Set([1, 2, 3, 4, 5])); // 월~금 선택
+      modalRepeatValue = '매주';
+      modalShowWeekdaySelector = true;
+      modalSelectedWeekdays = new Set([1, 2, 3, 4, 5]);
     } else if (currentRepeat.startsWith('매주 ') && currentRepeat.includes(',')) {
-      // 매주 + 특정 요일들인 경우
-      setNewEvent(prev => ({ ...prev, repeat: '매주' }));
-      setShowWeekdaySelector(true);
-      
-      // 선택된 요일들 파싱
+      modalRepeatValue = '매주';
+      modalShowWeekdaySelector = true;
       const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
       const selectedDays = currentRepeat.replace('매주 ', '');
-      const weekdayIndices = new Set<number>();
-      
       selectedDays.split(',').forEach(dayName => {
         const index = dayNames.indexOf(dayName.trim());
         if (index !== -1) {
-          weekdayIndices.add(index);
+          modalSelectedWeekdays.add(index);
         }
       });
-      
-      setSelectedWeekdays(weekdayIndices);
     } else if (currentRepeat === '매주') {
-      // 단순 매주인 경우
-      setShowWeekdaySelector(true);
-      setSelectedWeekdays(new Set()); // 요일 선택 없음
+      modalRepeatValue = '매주';
+      modalShowWeekdaySelector = true;
+      modalSelectedWeekdays = new Set(selectedWeekdays);
     } else {
-      // 다른 반복 설정들 (매일, 매월, 매년, 안함 등)
-      setShowWeekdaySelector(false);
-      setSelectedWeekdays(new Set());
+      modalRepeatValue = currentRepeat;
+      modalShowWeekdaySelector = false;
+      modalSelectedWeekdays = new Set();
     }
+
+    setTempModalRepeatValue(modalRepeatValue);
+    setTempModalShowWeekdaySelector(modalShowWeekdaySelector);
+    setTempModalSelectedWeekdays(modalSelectedWeekdays);
+    
+    console.log('[handleOpenRepeatModal] 모달 초기화:', {
+      modalRepeatValue,
+      modalShowWeekdaySelector,
+      modalSelectedWeekdays: Array.from(modalSelectedWeekdays)
+    });
     
     setIsRepeatModalOpen(true);
   };
 
-  // 반복 모달 취소 핸들러
-  const handleCancelRepeatModal = () => {
-    // 임시 설정을 원래 값으로 되돌림
-    setNewEvent(prev => ({ ...prev, repeat: tempRepeatValue }));
-    
-    // 요일 선택 상태도 복원
-    if (tempRepeatValue === 'weekdays') {
-      setShowWeekdaySelector(true);
-      setSelectedWeekdays(new Set([1, 2, 3, 4, 5])); // 월~금
-    } else if (tempRepeatValue === '매주') {
-      setShowWeekdaySelector(true);
-      // 기존에 선택되어 있던 요일들 복원 (별도 상태 필요)
-    } else {
-      setShowWeekdaySelector(false);
-      setSelectedWeekdays(new Set());
+  // 반복 모달 확인 핸들러
+  const handleConfirmRepeatModal = () => {
+    // 매주 선택이고 요일이 선택되지 않은 경우 경고
+    if (tempModalRepeatValue === '매주' && tempModalSelectedWeekdays.size === 0) {
+      alert('매주 반복을 선택한 경우 최소 1개의 요일을 선택해주세요.');
+      return;
     }
     
+    // 임시 모달 상태를 실제 상태에 반영
+    let finalRepeatValue = tempModalRepeatValue;
+    
+    // 월~금이 모두 선택된 경우 특별 처리
+    if (tempModalRepeatValue === '매주' && 
+        tempModalSelectedWeekdays.has(1) && tempModalSelectedWeekdays.has(2) && 
+        tempModalSelectedWeekdays.has(3) && tempModalSelectedWeekdays.has(4) && 
+        tempModalSelectedWeekdays.has(5) && tempModalSelectedWeekdays.size === 5) {
+      finalRepeatValue = '매주 월,화,수,목,금';
+    }
+    
+    setNewEvent(prev => ({ ...prev, repeat: finalRepeatValue }));
+    setSelectedWeekdays(new Set(tempModalSelectedWeekdays));
+    setShowWeekdaySelector(tempModalShowWeekdaySelector);
+    
+    console.log('[handleConfirmRepeatModal] 최종 반영:', {
+      finalRepeatValue,
+      selectedWeekdays: Array.from(tempModalSelectedWeekdays),
+      showWeekdaySelector: tempModalShowWeekdaySelector
+    });
+    
+    setIsRepeatModalOpen(false);
+  };
+
+  // 반복 모달 취소 핸들러
+  const handleCancelRepeatModal = () => {
+    // 임시 설정을 원래 값으로 되돌림 (실제 상태는 변경하지 않음)
+    console.log('[handleCancelRepeatModal] 취소 - 원래 상태 유지:', {
+      originalRepeat: tempRepeatValue,
+      originalSelectedWeekdays: Array.from(tempSelectedWeekdays),
+      originalShowWeekdaySelector: tempShowWeekdaySelector
+    });
+
     setIsRepeatModalOpen(false);
   };
 
@@ -3834,221 +3866,191 @@ export default function SchedulePage() {
               </motion.div>
             )}
 
-                        {/* 반복 설정 모달 */}
-                        <AnimatePresence>
-                {isRepeatModalOpen && (
+            {/* 반복 설정 모달 */}
+            <AnimatePresence>
+              {isRepeatModalOpen && (
+                <motion.div 
+                  className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
+                  onClick={() => handleCancelRepeatModal()}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
                   <motion.div 
-                    className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm" 
-                    onClick={() => setIsRepeatModalOpen(false)}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
+                    className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
+                    onClick={e => e.stopPropagation()}
+                    onWheel={e => e.stopPropagation()}
+                    onTouchMove={e => e.stopPropagation()}
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                    transition={{ duration: 0.3 }}
                   >
-                    <motion.div 
-                      className="w-full max-w-sm bg-white rounded-3xl shadow-2xl mx-4"
-                      onClick={e => e.stopPropagation()}
-                      onWheel={e => e.stopPropagation()}
-                      onTouchMove={e => e.stopPropagation()}
-                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div className="p-6">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">반복 설정</h3>
-                        
-                        <div className="space-y-2">
-                          {['안함', '매일', '매주', '매월', '매년'].map((option) => (
-                            <button
-                              key={option}
-                              onClick={() => {
-                                setNewEvent({ ...newEvent, repeat: option });
-                                if (option === '매주') {
-                                  setShowWeekdaySelector(true);
-                                } else {
-                                  setShowWeekdaySelector(false);
-                                  setSelectedWeekdays(new Set());
-                                }
-                              }}
-                              className={`w-full px-4 py-3 text-left rounded-xl transition-all duration-200 mobile-button ${
-                                newEvent.repeat === option
-                                  ? 'bg-amber-100 text-amber-800 font-semibold border-2 border-amber-300'
-                                  : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-transparent'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span>{option}</span>
-                                {newEvent.repeat === option && (
-                                  <span className="text-amber-600">✓</span>
-                                )}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* 매주 선택 시 요일 선택 UI */}
-                        {showWeekdaySelector && newEvent.repeat === '매주' && (
-                          <motion.div 
-                            className="mt-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 shadow-sm"
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3, ease: "easeOut" }}
+                    <div className="p-6">
+                      <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">반복 설정</h3>
+                      
+                      <div className="space-y-2">
+                        {['안함', '매일', '매주', '매월', '매년'].map((option) => (
+                          <button
+                            key={option}
+                            onClick={() => {
+                              setTempModalRepeatValue(option);
+                              if (option === '매주') {
+                                setTempModalShowWeekdaySelector(true);
+                              } else {
+                                setTempModalShowWeekdaySelector(false);
+                                setTempModalSelectedWeekdays(new Set());
+                              }
+                            }}
+                            className={`w-full px-4 py-3 text-left rounded-xl transition-all duration-200 mobile-button ${
+                              tempModalRepeatValue === option
+                                ? 'bg-amber-100 text-amber-800 font-semibold border-2 border-amber-300'
+                                : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-2 border-transparent'
+                            }`}
                           >
-                            <div className="flex items-center space-x-2 mb-3">
-                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <div className="flex items-center justify-between">
+                              <span>{option}</span>
+                              {tempModalRepeatValue === option && (
+                                <span className="text-amber-600">✓</span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* 매주 선택 시 요일 선택 UI */}
+                      {tempModalShowWeekdaySelector && tempModalRepeatValue === '매주' && (
+                        <motion.div 
+                          className="mt-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-200 shadow-sm"
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3, ease: "easeOut" }}
+                        >
+                          <div className="flex items-center space-x-2 mb-3">
+                            <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                              <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                            <h4 className="text-sm font-semibold text-gray-900">반복할 요일 선택</h4>
+                          </div>
+                          <p className="text-xs text-gray-600 mb-5 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+                            매주 반복할 요일을 선택하세요. 여러 요일을 선택할 수 있습니다.
+                          </p>
+                          <div className="grid grid-cols-7 gap-2.5 p-2">
+                            {[
+                              { day: 1, label: '월', color: 'from-red-400 to-red-500' },
+                              { day: 2, label: '화', color: 'from-orange-400 to-orange-500' },
+                              { day: 3, label: '수', color: 'from-yellow-400 to-yellow-500' },
+                              { day: 4, label: '목', color: 'from-green-400 to-green-500' },
+                              { day: 5, label: '금', color: 'from-blue-400 to-blue-500' },
+                              { day: 6, label: '토', color: 'from-indigo-400 to-indigo-500' },
+                              { day: 0, label: '일', color: 'from-purple-400 to-purple-500' }
+                            ].map((weekday, index) => (
+                              <motion.div
+                                key={weekday.day}
+                                className="relative flex flex-col items-center"
+                                initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                transition={{ 
+                                  duration: 0.4, 
+                                  delay: index * 0.08,
+                                  ease: "easeOut"
+                                }}
+                              >
+                                <motion.button
+                                  whileTap={{ scale: 0.92 }}
+                                  whileHover={{ scale: 1.05 }}
+                                  onClick={() => {
+                                    const newSelectedWeekdays = new Set(tempModalSelectedWeekdays);
+                                    if (newSelectedWeekdays.has(weekday.day)) {
+                                      newSelectedWeekdays.delete(weekday.day);
+                                    } else {
+                                      newSelectedWeekdays.add(weekday.day);
+                                    }
+                                    setTempModalSelectedWeekdays(newSelectedWeekdays);
+                                  }}
+                                  className={`aspect-square rounded-xl text-sm font-bold transition-all duration-300 transform overflow-visible w-full relative ${
+                                    tempModalSelectedWeekdays.has(weekday.day)
+                                      ? `bg-gradient-to-br ${weekday.color} text-white shadow-lg border-2 border-white`
+                                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
+                                  }`}
+                                >
+                                  <span>{weekday.label}</span>
+                                  
+                                  {/* 체크박스를 요일 버튼 오른쪽 위에 위치 */}
+                                  {tempModalSelectedWeekdays.has(weekday.day) && (
+                                    <motion.div
+                                      className="absolute -top-3 -right-3 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white z-10"
+                                      initial={{ scale: 0, rotate: -180 }}
+                                      animate={{ scale: 1, rotate: 0 }}
+                                      transition={{ duration: 0.3 }}
+                                    >
+                                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                      </svg>
+                                    </motion.div>
+                                  )}
+                                </motion.button>
+                              </motion.div>
+                            ))}
+                          </div>
+                          {tempModalSelectedWeekdays.size === 0 && (
+                            <motion.div 
+                              className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl"
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.6 }}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                <p className="text-xs text-red-600 font-medium">
+                                  최소 1개의 요일을 선택해주세요.
+                                </p>
+                              </div>
+                            </motion.div>
+                          )}
+                          {tempModalSelectedWeekdays.size > 0 && (
+                            <motion.div 
+                              className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl"
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: 0.3 }}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                 </svg>
+                                <p className="text-xs text-green-600 font-medium">
+                                  {tempModalSelectedWeekdays.size}개 요일이 선택되었습니다.
+                                </p>
                               </div>
-                              <h4 className="text-sm font-semibold text-gray-900">반복할 요일 선택</h4>
-                            </div>
-                            <p className="text-xs text-gray-600 mb-5 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-                              매주 반복할 요일을 선택하세요. 여러 요일을 선택할 수 있습니다.
-                            </p>
-                            <div className="grid grid-cols-7 gap-2.5 p-2">
-                              {[
-                                { day: 1, label: '월', color: 'from-red-400 to-red-500' },
-                                { day: 2, label: '화', color: 'from-orange-400 to-orange-500' },
-                                { day: 3, label: '수', color: 'from-yellow-400 to-yellow-500' },
-                                { day: 4, label: '목', color: 'from-green-400 to-green-500' },
-                                { day: 5, label: '금', color: 'from-blue-400 to-blue-500' },
-                                { day: 6, label: '토', color: 'from-indigo-400 to-indigo-500' },
-                                { day: 0, label: '일', color: 'from-purple-400 to-purple-500' }
-                              ].map((weekday, index) => (
-                                <motion.div
-                                  key={weekday.day}
-                                  className="relative flex flex-col items-center"
-                                  initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                                  transition={{ 
-                                    duration: 0.4, 
-                                    delay: index * 0.08,
-                                    ease: "easeOut"
-                                  }}
-                                >
-                                  <motion.button
-                                    whileTap={{ scale: 0.92 }}
-                                    whileHover={{ scale: 1.05 }}
-                                    onClick={() => {
-                                      const newSelectedWeekdays = new Set(selectedWeekdays);
-                                      if (newSelectedWeekdays.has(weekday.day)) {
-                                        newSelectedWeekdays.delete(weekday.day);
-                                      } else {
-                                        newSelectedWeekdays.add(weekday.day);
-                                      }
-                                      setSelectedWeekdays(newSelectedWeekdays);
-                                    }}
-                                    className={`aspect-square rounded-xl text-sm font-bold transition-all duration-300 transform overflow-visible w-full relative ${
-                                      selectedWeekdays.has(weekday.day)
-                                        ? `bg-gradient-to-br ${weekday.color} text-white shadow-lg border-2 border-white`
-                                        : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
-                                    }`}
-                                  >
-                                    <span>{weekday.label}</span>
-                                    
-                                    {/* 체크박스를 요일 버튼 오른쪽 위에 위치 */}
-                                    {selectedWeekdays.has(weekday.day) && (
-                                      <motion.div
-                                        className="absolute -top-3 -right-3 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center border-2 border-white z-10"
-                                        initial={{ scale: 0, rotate: -180 }}
-                                        animate={{ scale: 1, rotate: 0 }}
-                                        transition={{ duration: 0.3 }}
-                                      >
-                                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                      </motion.div>
-                                    )}
-                                  </motion.button>
-                                </motion.div>
-                              ))}
-                            </div>
-                            {selectedWeekdays.size === 0 && (
-                              <motion.div 
-                                className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.6 }}
-                              >
-                                <div className="flex items-center space-x-2">
-                                  <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                  </svg>
-                                  <p className="text-xs text-red-600 font-medium">
-                                    최소 1개의 요일을 선택해주세요.
-                                  </p>
-                                </div>
-                              </motion.div>
-                            )}
-                            {selectedWeekdays.size > 0 && (
-                              <motion.div 
-                                className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.3 }}
-                              >
-                                <div className="flex items-center space-x-2">
-                                  <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                  </svg>
-                                  <p className="text-xs text-green-600 font-medium">
-                                    {selectedWeekdays.size}개 요일이 선택되었습니다.
-                                  </p>
-                                </div>
-                              </motion.div>
-                            )}
-                          </motion.div>
-                        )}
+                            </motion.div>
+                          )}
+                        </motion.div>
+                      )}
 
-                        {!showWeekdaySelector ? (
-                          <button
-                            onClick={() => setIsRepeatModalOpen(false)}
-                            className="w-full mt-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                          >
-                            취소
-                          </button>
-                        ) : (
-                          <div className="mt-4 space-y-2">
-                            <button
-                              onClick={() => {
-                                // 매주 선택이고 요일이 선택되지 않은 경우 경고
-                                if (newEvent.repeat === '매주' && selectedWeekdays.size === 0) {
-                                  alert('매주 반복을 선택한 경우 최소 1개의 요일을 선택해주세요.');
-                                  return;
-                                }
-                                
-                                // 월~금이 모두 선택된 경우 weekdays로 변환
-                                if (newEvent.repeat === '매주' && 
-                                    selectedWeekdays.has(1) && selectedWeekdays.has(2) && 
-                                    selectedWeekdays.has(3) && selectedWeekdays.has(4) && 
-                                    selectedWeekdays.has(5) && selectedWeekdays.size === 5) {
-                                  setNewEvent(prev => ({ ...prev, repeat: '매주 월,화,수,목,금' }));
-                                }
-                                
-                                setIsRepeatModalOpen(false);
-                              }}
-                              className="w-full py-3 bg-blue-600 text-white rounded-xl font-medium mobile-button hover:bg-blue-700 transition-colors"
-                            >
-                              확인
-                            </button>
-                            <button
-                              onClick={() => {
-                                setIsRepeatModalOpen(false);
-                                setShowWeekdaySelector(false);
-                                setSelectedWeekdays(new Set());
-                                setNewEvent({ ...newEvent, repeat: '안함' });
-                              }}
-                              className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
-                            >
-                              취소
-                            </button>
-                          </div>
-                        )}
+                      <div className="mt-4 space-y-2">
+                        <button
+                          onClick={() => handleConfirmRepeatModal()}
+                          className="w-full py-3 bg-green-600 text-white rounded-xl font-medium mobile-button hover:bg-green-700 transition-colors"
+                        >
+                          확인
+                        </button>
+                        <button
+                          onClick={() => handleCancelRepeatModal()}
+                          className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-medium mobile-button hover:bg-gray-200 transition-colors"
+                        >
+                          취소
+                        </button>
                       </div>
-                    </motion.div>
+                    </div>
                   </motion.div>
-                )}
+                </motion.div>
+              )}
             </AnimatePresence>
 
             {/* 알림 설정 모달 */}
