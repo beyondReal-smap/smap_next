@@ -699,6 +699,15 @@ export default function SchedulePage() {
   // 로드된 년월 추적 (중복 API 호출 방지)
   const [loadedYearMonth, setLoadedYearMonth] = useState<string | null>(null);
 
+  // 임시 상태 저장용 변수들 추가
+  const [tempRepeatValue, setTempRepeatValue] = useState('');
+  const [tempLocationData, setTempLocationData] = useState({
+    name: '',
+    address: '',
+    lat: undefined as number | undefined,
+    lng: undefined as number | undefined
+  });
+
   // 저장 완료 모달 상태
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState<boolean>(false);
   const [successModalContent, setSuccessModalContent] = useState<{
@@ -1809,15 +1818,28 @@ export default function SchedulePage() {
     if (selectedEventDetails) {
       // 반복 패턴 역변환 함수
       const convertRepeatTextToSelect = (repeatText: string): string => {
-        if (!repeatText || repeatText === '없음') return '안함';
-        if (repeatText === '매일') return '매일';
-        if (repeatText === '매월') return '매월';
-        if (repeatText === '매년') return '매년';
-        if (repeatText.includes('매주')) {
-          // 다중 요일 선택된 경우 그대로 반환 (예: "매주 월,화,수")
-          return repeatText;
+        console.log('[convertRepeatTextToSelect] 변환할 반복 텍스트:', repeatText);
+        
+        if (!repeatText || repeatText === '반복 없음') return 'none';
+        if (repeatText === '매일') return 'daily';
+        if (repeatText === '매주') return 'weekly';
+        if (repeatText === '매월') return 'monthly';
+        if (repeatText === '매년') return 'yearly';
+        
+        // "매주 월,화,수,목,금" 패턴 체크 (정확한 매칭)
+        if (repeatText === '매주 월,화,수,목,금') {
+          console.log('[convertRepeatTextToSelect] 평일 반복 패턴 인식');
+          return 'weekdays';
         }
-        return '안함';
+        
+        // 매주 + 특정 요일들 조합인 경우
+        if (repeatText.includes('매주') && repeatText.includes(',')) {
+          console.log('[convertRepeatTextToSelect] 커스텀 요일 패턴 인식');
+          return 'custom';
+        }
+        
+        console.log('[convertRepeatTextToSelect] 기본값 반환 (none)');
+        return 'none';
       };
 
       // 알림 텍스트 역변환 함수
@@ -2084,27 +2106,33 @@ export default function SchedulePage() {
 
   // 장소 검색 모달 열기
   const handleOpenLocationSearchModal = () => {
-    const currentName = newEvent.locationName;
+    // 현재 장소 정보를 임시 변수에 저장
+    setTempLocationData({
+      name: newEvent.locationName,
+      address: newEvent.locationAddress,
+      lat: newEvent.locationLat,
+      lng: newEvent.locationLng
+    });
+    setIsLocationSearchModalOpen(true);
+    setLocationSearchQuery('');
     setLocationSearchResults([]);
     setHasSearched(false);
-
-    const currentNameString = String(currentName || '');
-
-    if (currentNameString.trim()) {
-      setLocationSearchQuery(currentNameString);
-      handleSearchLocation(currentNameString);
-    } else {
-      setLocationSearchQuery('');
-    }
-
-    setIsLocationSearchModalOpen(true);
-    // body 스크롤은 이미 비활성화되어 있으므로 유지
   };
 
   // 장소 검색 모달 닫기
   const handleCloseLocationSearchModal = () => {
+    // 임시 장소 데이터를 원래 값으로 되돌림
+    setNewEvent(prev => ({
+      ...prev,
+      locationName: tempLocationData.name,
+      locationAddress: tempLocationData.address,
+      locationLat: tempLocationData.lat,
+      locationLng: tempLocationData.lng
+    }));
     setIsLocationSearchModalOpen(false);
-    // body 스크롤은 부모 모달이 열려있으므로 유지
+    setLocationSearchQuery('');
+    setLocationSearchResults([]);
+    setHasSearched(false);
   };
 
   // 장소 검색 실행
@@ -2918,15 +2946,28 @@ export default function SchedulePage() {
   const executeEditAction = async (event: ScheduleEvent, option?: 'this' | 'future' | 'all') => {
     // 반복 패턴 역변환 함수
     const convertRepeatTextToSelect = (repeatText: string): string => {
-      if (!repeatText || repeatText === '없음') return '안함';
-      if (repeatText === '매일') return '매일';
-      if (repeatText === '매월') return '매월';
-      if (repeatText === '매년') return '매년';
-      if (repeatText.includes('매주')) {
-        // 다중 요일 선택된 경우 그대로 반환 (예: "매주 월,화,수")
-        return repeatText;
+      console.log('[executeEditAction] 변환할 반복 텍스트:', repeatText);
+      
+      if (!repeatText || repeatText === '반복 없음') return 'none';
+      if (repeatText === '매일') return 'daily';
+      if (repeatText === '매주') return 'weekly';
+      if (repeatText === '매월') return 'monthly';
+      if (repeatText === '매년') return 'yearly';
+      
+      // "매주 월,화,수,목,금" 패턴 체크 (정확한 매칭)
+      if (repeatText === '매주 월,화,수,목,금') {
+        console.log('[executeEditAction] 평일 반복 패턴 인식');
+        return 'weekdays';
       }
-      return '안함';
+      
+      // 매주 + 특정 요일들 조합인 경우
+      if (repeatText.includes('매주') && repeatText.includes(',')) {
+        console.log('[executeEditAction] 커스텀 요일 패턴 인식');
+        return 'custom';
+      }
+      
+      console.log('[executeEditAction] 기본값 반환 (none)');
+      return 'none';
     };
 
     // 알림 텍스트 역변환 함수 - 백엔드 데이터 구조에 맞게 개선
@@ -3213,7 +3254,15 @@ export default function SchedulePage() {
 
   // 반복 모달 열기 핸들러
   const handleOpenRepeatModal = () => {
+    // 현재 반복 설정을 임시 변수에 저장
+    setTempRepeatValue(newEvent.repeat);
     setIsRepeatModalOpen(true);
+  };
+
+  const handleCancelRepeatModal = () => {
+    // 임시 설정을 원래 값으로 되돌림
+    setNewEvent(prev => ({ ...prev, repeat: tempRepeatValue }));
+    setIsRepeatModalOpen(false);
   };
 
   // 전체 로딩 완료 체크
