@@ -3214,6 +3214,10 @@ export default function SchedulePage() {
 
   // 반복 모달 열기 핸들러
   const handleOpenRepeatModal = () => {
+    console.log('[handleOpenRepeatModal] 시작 - 현재 newEvent.repeat:', newEvent.repeat);
+    console.log('[handleOpenRepeatModal] 현재 selectedWeekdays:', Array.from(selectedWeekdays));
+    console.log('[handleOpenRepeatModal] 현재 showWeekdaySelector:', showWeekdaySelector);
+    
     // 현재 반복 설정을 임시 변수에 저장 (복원용)
     setTempRepeatValue(newEvent.repeat);
     setTempSelectedWeekdays(new Set(selectedWeekdays));
@@ -3221,44 +3225,62 @@ export default function SchedulePage() {
     
     // 모달 임시 상태 초기화 - 현재 설정값으로 세팅
     const currentRepeat = newEvent.repeat;
-    let modalRepeatValue = currentRepeat;
+    let modalRepeatValue = '안함'; // 기본값을 명시적으로 설정
     let modalShowWeekdaySelector = false;
     let modalSelectedWeekdays = new Set<number>();
 
+    console.log('[handleOpenRepeatModal] currentRepeat 분석:', currentRepeat);
+
     if (currentRepeat === '매주 월,화,수,목,금') {
+      console.log('[handleOpenRepeatModal] 매주 월,화,수,목,금 패턴 매치');
       modalRepeatValue = '매주';
       modalShowWeekdaySelector = true;
       modalSelectedWeekdays = new Set([1, 2, 3, 4, 5]);
     } else if (currentRepeat.startsWith('매주 ') && currentRepeat.includes(',')) {
+      console.log('[handleOpenRepeatModal] 매주 + 요일들 패턴 매치');
       modalRepeatValue = '매주';
       modalShowWeekdaySelector = true;
       const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
       const selectedDays = currentRepeat.replace('매주 ', '');
+      console.log('[handleOpenRepeatModal] 파싱할 요일들:', selectedDays);
       selectedDays.split(',').forEach(dayName => {
-        const index = dayNames.indexOf(dayName.trim());
+        const trimmedDayName = dayName.trim();
+        const index = dayNames.indexOf(trimmedDayName);
+        console.log('[handleOpenRepeatModal] 요일 매칭:', trimmedDayName, '-> 인덱스:', index);
         if (index !== -1) {
           modalSelectedWeekdays.add(index);
         }
       });
     } else if (currentRepeat === '매주') {
+      console.log('[handleOpenRepeatModal] 매주 패턴 매치');
       modalRepeatValue = '매주';
       modalShowWeekdaySelector = true;
       modalSelectedWeekdays = new Set(selectedWeekdays);
-    } else {
+    } else if (['안함', '매일', '매월', '매년'].includes(currentRepeat)) {
+      console.log('[handleOpenRepeatModal] 기본 반복 패턴 매치:', currentRepeat);
       modalRepeatValue = currentRepeat;
+      modalShowWeekdaySelector = false;
+      modalSelectedWeekdays = new Set();
+    } else {
+      console.log('[handleOpenRepeatModal] 알 수 없는 패턴, 기본값 사용');
+      modalRepeatValue = '안함';
       modalShowWeekdaySelector = false;
       modalSelectedWeekdays = new Set();
     }
 
-    setTempModalRepeatValue(modalRepeatValue);
-    setTempModalShowWeekdaySelector(modalShowWeekdaySelector);
-    setTempModalSelectedWeekdays(modalSelectedWeekdays);
-    
-    console.log('[handleOpenRepeatModal] 모달 초기화:', {
+    console.log('[handleOpenRepeatModal] 계산된 모달 상태:', {
       modalRepeatValue,
       modalShowWeekdaySelector,
       modalSelectedWeekdays: Array.from(modalSelectedWeekdays)
     });
+
+    // 상태 설정
+    setTempModalRepeatValue(modalRepeatValue);
+    setTempModalShowWeekdaySelector(modalShowWeekdaySelector);
+    setTempModalSelectedWeekdays(modalSelectedWeekdays);
+    
+    // 상태 설정 후 로그
+    console.log('[handleOpenRepeatModal] 상태 설정 완료');
     
     setIsRepeatModalOpen(true);
   };
@@ -3274,12 +3296,27 @@ export default function SchedulePage() {
     // 임시 모달 상태를 실제 상태에 반영
     let finalRepeatValue = tempModalRepeatValue;
     
-    // 월~금이 모두 선택된 경우 특별 처리
-    if (tempModalRepeatValue === '매주' && 
-        tempModalSelectedWeekdays.has(1) && tempModalSelectedWeekdays.has(2) && 
-        tempModalSelectedWeekdays.has(3) && tempModalSelectedWeekdays.has(4) && 
-        tempModalSelectedWeekdays.has(5) && tempModalSelectedWeekdays.size === 5) {
-      finalRepeatValue = '매주 월,화,수,목,금';
+    // 매주가 선택된 경우 요일 처리
+    if (tempModalRepeatValue === '매주' && tempModalSelectedWeekdays.size > 0) {
+      // 월~금이 모두 선택된 경우 특별 처리
+      if (tempModalSelectedWeekdays.has(1) && tempModalSelectedWeekdays.has(2) && 
+          tempModalSelectedWeekdays.has(3) && tempModalSelectedWeekdays.has(4) && 
+          tempModalSelectedWeekdays.has(5) && tempModalSelectedWeekdays.size === 5) {
+        finalRepeatValue = '매주 월,화,수,목,금';
+      } else {
+        // 선택된 요일들을 텍스트로 변환
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+        const selectedDayNames: string[] = [];
+        
+        // 요일 순서대로 정렬하여 추가 (일요일=0, 월요일=1, ...)
+        for (let i = 0; i <= 6; i++) {
+          if (tempModalSelectedWeekdays.has(i)) {
+            selectedDayNames.push(dayNames[i]);
+          }
+        }
+        
+        finalRepeatValue = `매주 ${selectedDayNames.join(',')}`;
+      }
     }
     
     setNewEvent(prev => ({ ...prev, repeat: finalRepeatValue }));
@@ -5400,7 +5437,7 @@ export default function SchedulePage() {
                         <label className="block text-sm font-medium text-gray-700 mb-2">반복</label>
                         <button
                           type="button"
-                            onClick={() => setIsRepeatModalOpen(true)}
+                            onClick={() => handleOpenRepeatModal()}
                             className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-left text-sm transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
                         >
                           {newEvent.repeat}
