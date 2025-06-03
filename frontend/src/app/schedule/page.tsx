@@ -686,6 +686,9 @@ export default function SchedulePage() {
   const hourScrollRef = useRef<HTMLDivElement>(null);
   const minuteScrollRef = useRef<HTMLDivElement>(null);
   
+  // 알림 모달 스크롤 ref 추가
+  const alarmScrollRef = useRef<HTMLDivElement>(null);
+  
   // 장소 검색 모달 상태
   const [isLocationSearchModalOpen, setIsLocationSearchModalOpen] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
@@ -1266,6 +1269,30 @@ export default function SchedulePage() {
     }
   }, [isTimeModalOpen, selectedHour, selectedMinute]);
 
+  // 알림 모달 스크롤 자동 조정
+  useEffect(() => {
+    if (isAlarmModalOpen && alarmScrollRef.current) {
+      // 약간의 지연을 두고 스크롤 (모달 애니메이션 완료 후)
+      setTimeout(() => {
+        if (alarmScrollRef.current) {
+          const alarmOptions = ['없음', '정시', '5분 전', '10분 전', '15분 전', '30분 전', '1시간 전', '1일 전'];
+          const selectedIndex = alarmOptions.indexOf(newEvent.alarm);
+          
+          if (selectedIndex >= 0) {
+            // 각 알림 버튼 높이 약 56px (py-3 + 패딩)
+            const itemHeight = 56;
+            const scrollTop = selectedIndex * itemHeight - 100; // 100px = 컨테이너 높이의 절반 정도
+            
+            alarmScrollRef.current.scrollTo({
+              top: Math.max(0, scrollTop),
+              behavior: 'smooth'
+            });
+          }
+        }
+      }, 300);
+    }
+  }, [isAlarmModalOpen, newEvent.alarm]);
+
   // 그룹 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -1285,6 +1312,25 @@ export default function SchedulePage() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isGroupSelectorOpen]);
+
+  // newEvent 장소 정보 상태 변화 모니터링
+  useEffect(() => {
+    console.log("[newEvent 상태 변화] 📍 장소 정보 업데이트:", {
+      locationName: newEvent.locationName,
+      locationAddress: newEvent.locationAddress,
+      locationLat: newEvent.locationLat,
+      locationLng: newEvent.locationLng
+    });
+  }, [newEvent.locationName, newEvent.locationAddress, newEvent.locationLat, newEvent.locationLng]);
+  // locationSearchResults 상태 변화 모니터링
+  useEffect(() => {
+    console.log('[locationSearchResults 상태 변화] 🔍 검색 결과 업데이트:', {
+      length: locationSearchResults.length,
+      results: locationSearchResults
+    });
+  }, [locationSearchResults]);
+
+
 
   // 일정 저장 - 실제 백엔드 API 사용
   const handleSaveEvent = async () => {
@@ -2167,6 +2213,7 @@ export default function SchedulePage() {
           ...doc,
           temp_id: `${doc.x}-${doc.y}-${index}`
         }));
+        console.log("[handleSearchLocation] 🔧 setLocationSearchResults 호출 전:", resultsWithIds);
         setLocationSearchResults(resultsWithIds);
       } else {
         console.log('[handleSearchLocation] 검색 결과가 없어 목업 데이터 제공');
@@ -2225,20 +2272,47 @@ export default function SchedulePage() {
   const handleSelectLocation = (place: any) => {
     console.log('[handleSelectLocation] 📍 선택된 장소:', place);
     
-    setNewEvent(prev => ({
-      ...prev,
-      locationName: place.place_name || '',
-      locationAddress: place.road_address_name || place.address_name || '',
-      locationLat: place.y ? parseFloat(place.y) : undefined, // 위도 (카카오 API에서는 y가 위도)
-      locationLng: place.x ? parseFloat(place.x) : undefined, // 경도 (카카오 API에서는 x가 경도)
-    }));
-    
+    setNewEvent(prev => {
+      console.log('[handleSelectLocation] 🔧 이전 상태:', {
+        locationName: prev.locationName,
+        locationAddress: prev.locationAddress
+      });
+      
+      const newLocationName = place.place_name || '';
+      const newLocationAddress = place.road_address_name || place.address_name || '';
+      
+      console.log('[handleSelectLocation] 🔧 설정할 값들:', {
+        locationName: newLocationName,
+        locationAddress: newLocationAddress
+      });
+      
+      const updatedEvent = {
+        ...prev,
+        locationName: newLocationName,
+        locationAddress: newLocationAddress,
+        locationLat: place.y ? parseFloat(place.y) : undefined,
+        locationLng: place.x ? parseFloat(place.x) : undefined,
+      };
+      
+      console.log('[handleSelectLocation] 🔄 업데이트된 상태:', {
+        locationName: updatedEvent.locationName,
+        locationAddress: updatedEvent.locationAddress,
+        locationLat: updatedEvent.locationLat,
+        locationLng: updatedEvent.locationLng
+      });
+      
+      return updatedEvent;
+    });     
     console.log('[handleSelectLocation] 💾 저장된 좌표:', {
       lat: place.y ? parseFloat(place.y) : undefined,
       lng: place.x ? parseFloat(place.x) : undefined
     });
     
-    handleCloseLocationSearchModal();
+    // tempLocationData를 되돌리지 않고 직접 모달 닫기
+    setIsLocationSearchModalOpen(false);
+    setLocationSearchQuery("");
+    setLocationSearchResults([]);
+    setHasSearched(false);
   };
 
   // 커스텀 캘린더 관련 함수들
@@ -3027,8 +3101,8 @@ export default function SchedulePage() {
       allDay: event.isAllDay || false, // 하루종일 설정 로드
       repeat: convertedRepeat, // 반복 설정 역변환
       alarm: convertedAlarm, // 알림 설정 역변환
-      locationName: event.locationName || '',
-      locationAddress: event.locationAddress || '',
+       locationName: (event.locationName && event.locationName.trim()) || '',
+       locationAddress: (event.locationAddress && event.locationAddress.trim()) || '',
       locationLat: event.locationLat, // 위도 로드
       locationLng: event.locationLng, // 경도 로드
       content: event.content || '',
@@ -4114,7 +4188,7 @@ export default function SchedulePage() {
                       <div className="p-6">
                         <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">알림 설정</h3>
                         
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                        <div ref={alarmScrollRef} className="space-y-2 max-h-64 overflow-y-auto">
                           {['없음', '정시', '5분 전', '10분 전', '15분 전', '30분 전', '1시간 전', '1일 전'].map((option) => (
                             <button
                               key={option}
@@ -5467,10 +5541,10 @@ export default function SchedulePage() {
                           <div className="flex justify-between items-center">
                             <span className="text-sm font-medium text-gray-700">장소명</span>
                             <span className="text-sm text-gray-500">
-                              {newEvent.locationName || '장소를 검색하세요'}
+                              {(newEvent.locationName && newEvent.locationName.trim()) || '장소를 검색하세요'}
                             </span>
                           </div>
-                          {newEvent.locationAddress && (
+                          {newEvent.locationAddress && newEvent.locationAddress.trim() && (
                             <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
                               <span className="text-sm font-medium text-gray-700">주소</span>
                               <span className="text-sm text-gray-500 truncate max-w-48">
