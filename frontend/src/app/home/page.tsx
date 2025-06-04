@@ -1851,7 +1851,7 @@ export default function HomePage() {
                 box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
                 overflow: hidden;
               ">
-              <button onclick="this.closest('.infowindow').style.display='none'; event.stopPropagation();" style="
+              <button onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
                 position: absolute;
                 top: 8px;
                 right: 8px;
@@ -2013,7 +2013,7 @@ export default function HomePage() {
                 box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
                 overflow: hidden;
               ">
-              <button onclick="this.closest('.gm-style-iw').style.display='none'; event.stopPropagation();" style="
+              <button onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
                 position: absolute;
                 top: 8px;
                 right: 8px;
