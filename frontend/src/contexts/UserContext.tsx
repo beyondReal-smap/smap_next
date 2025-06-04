@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import groupService, { Group } from '@/services/groupService';
-import memberService from '@/services/memberService';
 import { useAuth } from '@/contexts/AuthContext';
 
 // 사용자 기본 정보 타입
@@ -34,9 +33,6 @@ interface UserContextType {
   
   // 데이터 새로고침 함수
   refreshUserData: () => Promise<void>;
-  
-  // 특정 그룹의 멤버 수 조회
-  getGroupMemberCount: (groupId: number) => Promise<number>;
   
   // 선택된 그룹
   selectedGroupId: number | null;
@@ -128,17 +124,6 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [isLoggedIn, user]);
 
-  // 특정 그룹의 멤버 수 조회
-  const getGroupMemberCount = useCallback(async (groupId: number): Promise<number> => {
-    try {
-      const members = await memberService.getGroupMembers(groupId.toString());
-      return members.length;
-    } catch (error) {
-      console.error(`[UserContext] 그룹 ${groupId} 멤버 수 조회 실패:`, error);
-      return 0;
-    }
-  }, []);
-
   // AuthContext 상태 변경 시 데이터 새로고침
   useEffect(() => {
     // AuthContext 로딩이 완료된 후 실행
@@ -167,8 +152,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsUserDataLoading,
     userDataError,
     setUserDataError,
-    refreshUserData,
-    getGroupMemberCount
+    refreshUserData
   };
 
   return (

@@ -605,7 +605,7 @@ export default function HomePage() {
   // 인증 관련 상태 추가
   const { user, isLoggedIn, loading: authLoading } = useAuth();
   // UserContext 사용
-  const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData, getGroupMemberCount, selectedGroupId, setSelectedGroupId } = useUser();
+  const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData } = useUser();
   
   const [userName, setUserName] = useState('사용자');
   const [userLocation, setUserLocation] = useState<Location>({ lat: 37.5642, lng: 127.0016 }); // 기본: 서울
@@ -663,6 +663,7 @@ export default function HomePage() {
   // 그룹 관련 상태 - UserContext로 대체됨
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
   const [firstMemberSelected, setFirstMemberSelected] = useState(false); // 첫번째 멤버 선택 완료 추적
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
 
   // 그룹 드롭다운 ref 추가
   const groupDropdownRef = useRef<HTMLDivElement>(null);
@@ -670,14 +671,20 @@ export default function HomePage() {
   // 달력 스와이프 관련 상태 - calendarBaseDate 제거, x만 유지
   const x = useMotionValue(0); // 드래그 위치를 위한 motionValue
 
-  // calendarBaseDate 관련 useEffect 제거 - 8일 고정이므로 불필요
-
   // useEffect를 사용하여 클라이언트 사이드에서 날짜 관련 상태 초기화
   useEffect(() => {
     const today = new Date();
     setSelectedDate(format(today, 'yyyy-MM-dd'));
     setDaysForCalendar(getNext7Days());
   }, []); // 빈 배열로 전달하여 마운트 시 1회 실행
+
+  // UserContext 데이터가 로딩 완료되면 첫 번째 그룹을 자동 선택
+  useEffect(() => {
+    if (!isUserDataLoading && userGroups.length > 0 && !selectedGroupId) {
+      setSelectedGroupId(userGroups[0].sgt_idx);
+      console.log('[HOME] UserContext에서 첫 번째 그룹 자동 선택:', userGroups[0].sgt_title);
+    }
+  }, [isUserDataLoading, userGroups, selectedGroupId]);
 
   // Bottom Sheet 상태를 클래스 이름으로 변환
   const getBottomSheetClassName = () => {
@@ -2393,7 +2400,18 @@ export default function HomePage() {
     };
 
     fetchGroupMemberCounts();
-  }, [userGroups, getGroupMemberCount]);
+  }, [userGroups]);
+
+  // 그룹 멤버 수를 가져오는 함수
+  const getGroupMemberCount = async (groupId: number): Promise<number> => {
+    try {
+      const memberData = await memberService.getGroupMembers(groupId.toString());
+      return memberData ? memberData.length : 0;
+    } catch (error) {
+      console.error(`그룹 ${groupId} 멤버 수 조회 실패:`, error);
+      return 0;
+    }
+  };
 
   return (
     <>

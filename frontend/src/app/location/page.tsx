@@ -39,7 +39,6 @@ import ReactDOM from 'react-dom';
 import memberService from '@/services/memberService';
 import locationService, { OtherMemberLocationRaw } from '@/services/locationService';
 import groupService, { Group } from '@/services/groupService';
-import { useUser } from '@/contexts/UserContext';
 
 // 모바일 최적화된 CSS 스타일
 const mobileStyles = `
@@ -572,9 +571,6 @@ const useImageWithFallback = (src: string | null, fallbackSrc: string) => {
 export default function LocationPage() {
   const router = useRouter();
   
-  // UserContext 사용 추가
-  const { getGroupMemberCount } = useUser();
-  
   // 상태 관리
   const [isExiting, setIsExiting] = useState(false);
   const [shouldAnimate, setShouldAnimate] = useState(true);
@@ -587,9 +583,6 @@ export default function LocationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isLoadingOtherLocations, setIsLoadingOtherLocations] = useState(false);
-  
-  // 그룹별 멤버 수 상태 추가
-  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
   
   // 데이터 로딩 상태 추적을 위한 ref 추가
   const dataFetchedRef = useRef({ 
@@ -2942,34 +2935,6 @@ export default function LocationPage() {
     }
   }, [isGroupSelectorOpen]);
 
-  // 그룹별 멤버 수 조회 (userGroups가 변경될 때만)
-  useEffect(() => {
-    const fetchGroupMemberCounts = async () => {
-      if (!userGroups || userGroups.length === 0) return;
-
-      console.log('[LOCATION] 그룹 멤버 수 조회 시작:', userGroups.length, '개 그룹');
-      
-      const counts: Record<number, number> = {};
-      
-      // 모든 그룹의 멤버 수를 병렬로 조회
-      await Promise.all(userGroups.map(async (group) => {
-        try {
-          const count = await getGroupMemberCount(group.sgt_idx);
-          counts[group.sgt_idx] = count;
-          console.log(`[LOCATION] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수:`, count);
-        } catch (error) {
-          console.error(`[LOCATION] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
-          counts[group.sgt_idx] = 0;
-        }
-      }));
-      
-      setGroupMemberCounts(counts);
-      console.log('[LOCATION] 그룹 멤버 수 조회 완료:', counts);
-    };
-
-    fetchGroupMemberCounts();
-  }, [userGroups, getGroupMemberCount]);
-
   return (
     <>
       <style jsx global>{mobileStyles}</style>
@@ -3590,9 +3555,6 @@ export default function LocationPage() {
                                      {selectedGroupId === group.sgt_idx && (
                                         <span className="text-indigo-500 ml-2">✓</span>
                                      )}
-                                   </div>
-                                   <div className="text-xs text-gray-500 mt-0.5">
-                                     멤버 {groupMemberCounts[group.sgt_idx] || 0}명
                                    </div>
                                   </button>
                                ))}
