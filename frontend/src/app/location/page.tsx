@@ -1223,17 +1223,25 @@ export default function LocationPage() {
 
         // 위로 드래그 (Y 감소) - 더욱 민감하게 반응
         if (dragDeltaY < 0) {
-             if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
-                 nextState = 'visible';
-                 console.log('[DragEnd] 위로 드래그 감지 (peek -> visible)');
-                 triggerHaptic();
-             }
+            if (bottomSheetState === 'hidden' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
+                nextState = 'peek';
+                console.log('[DragEnd] 위로 드래그 감지 (hidden -> peek)');
+                triggerHaptic();
+            } else if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
+                nextState = 'visible';
+                console.log('[DragEnd] 위로 드래그 감지 (peek -> visible)');
+                triggerHaptic();
+            }
         } 
         // 아래로 드래그 (Y 증가) - 더욱 민감하게 반응
         else if (dragDeltaY > 0) {
             if (bottomSheetState === 'visible' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
                 nextState = 'peek';
                 console.log('[DragEnd] 아래로 드래그 감지 (visible -> peek)');
+                triggerHaptic();
+            } else if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
+                nextState = 'hidden';
+                console.log('[DragEnd] 아래로 드래그 감지 (peek -> hidden)');
                 triggerHaptic();
             }
         }
@@ -1741,6 +1749,20 @@ export default function LocationPage() {
 
       // 지도 클릭 이벤트
       window.naver.maps.Event.addListener(newMap, 'click', (e: any) => {
+        // 열려있는 InfoWindow가 있으면 닫기
+        if (infoWindow) {
+          console.log('[지도 클릭] InfoWindow 닫기');
+          try {
+            infoWindow.close();
+            setInfoWindow(null);
+            console.log('[지도 클릭] InfoWindow 닫기 성공');
+          } catch (error) {
+            console.error('[지도 클릭] InfoWindow 닫기 실패:', error);
+            // 강제로 상태만 초기화
+            setInfoWindow(null);
+          }
+        }
+        
         const coord = e.coord;
         const coordinates: [number, number] = [coord.lng(), coord.lat()];
         
@@ -2720,7 +2742,7 @@ export default function LocationPage() {
 
   // 통일된 정보창 생성 함수
   const createLocationInfoWindow = (locationName: string, locationAddress: string) => {
-    return new window.naver.maps.InfoWindow({
+    const newInfoWindow = new window.naver.maps.InfoWindow({
       content: `
         <div style="
           padding: 8px 12px;
@@ -2746,8 +2768,18 @@ export default function LocationPage() {
       borderWidth: 0,
       backgroundColor: 'transparent',
       disableAnchor: true,
-      pixelOffset: new window.naver.maps.Point(100, -5)
+      pixelOffset: new window.naver.maps.Point(100, -5),
+      closeButton: true, // 기본 닫기 버튼 활성화
+      removable: true // 클릭으로 닫을 수 있도록 설정
     });
+    
+    // InfoWindow가 닫힐 때 상태 업데이트
+    window.naver.maps.Event.addListener(newInfoWindow, 'close', () => {
+      console.log('[InfoWindow] 닫힘 이벤트 발생');
+      setInfoWindow(null);
+    });
+    
+    return newInfoWindow;
   };
 
   // 장소 카드 클릭 핸들러
@@ -2934,6 +2966,61 @@ export default function LocationPage() {
       };
     }
   }, [isGroupSelectorOpen]);
+
+  // InfoWindow 외부 클릭 감지
+  useEffect(() => {
+    if (!infoWindow) return;
+
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      
+      console.log('[InfoWindow 외부 클릭] 클릭 감지:', target.tagName);
+      
+      // 간단한 방식: InfoWindow가 열려있으면 무조건 닫기 (InfoWindow 내부 요소가 아닌 경우)
+      const isInfoWindowOrMarker = target.closest('.iw_container') || 
+                                   target.closest('.iw_content') ||
+                                   target.parentElement?.classList.contains('iw_container') ||
+                                   target.classList.contains('iw_container');
+      
+      if (!isInfoWindowOrMarker && infoWindow) {
+        console.log('[InfoWindow 외부 클릭] InfoWindow 닫기 시도');
+        if (infoWindow.close) {
+          infoWindow.close();
+        }
+        setInfoWindow(null);
+      }
+    };
+
+    // 즉시 이벤트 리스너 등록 (지연 없음)
+    console.log('[InfoWindow useEffect] 외부 클릭 리스너 등록');
+    document.addEventListener('click', handleDocumentClick, true); // capture 단계에서 처리
+      document.addEventListener('mousedown', handleDocumentClick);
+
+    return () => {
+      console.log('[InfoWindow useEffect] 외부 클릭 리스너 제거');
+      console.log('[InfoWindow useEffect] 외부 클릭 리스너 제거');
+      document.removeEventListener('click', handleDocumentClick, true);
+      document.removeEventListener('mousedown', handleDocumentClick);
+    };
+  }, [infoWindow]);
+
+  // ESC 키로 InfoWindow 닫기
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && infoWindow && infoWindow.getMap && infoWindow.getMap()) {
+        console.log('[ESC] InfoWindow 닫기');
+        infoWindow.close();
+        setInfoWindow(null);
+      }
+    };
+
+    if (infoWindow) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [infoWindow]);
 
   return (
     <>

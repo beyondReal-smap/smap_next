@@ -636,6 +636,9 @@ export default function HomePage() {
   const memberMarkers = useRef<any[]>([]);
   const scheduleMarkersRef = useRef<any[]>([]); // 스케줄 마커를 위한 ref 추가
   
+  // InfoWindow 참조 관리를 위한 ref 추가
+  const currentInfoWindowRef = useRef<any>(null);
+  
   // 스크립트 로드 및 지도 초기화 상태 추적
   const [mapsInitialized, setMapsInitialized] = useState({
     google: false,
@@ -928,41 +931,41 @@ export default function HomePage() {
       const velocityThreshold = 0.3;
       
       let nextState: 'hidden' | 'peek' = bottomSheetState;
-      
-      // 햅틱 피드백 함수
-      const triggerHaptic = () => {
-        try {
-          if ('vibrate' in navigator) {
-            navigator.vibrate([20, 5, 15]);
-          }
-        } catch (error) {
-          console.debug('햅틱 피드백이 차단되었습니다:', error);
+    
+    // 햅틱 피드백 함수
+    const triggerHaptic = () => {
+      try {
+        if ('vibrate' in navigator) {
+          navigator.vibrate([20, 5, 15]);
         }
-      };
-      
-      // 위로 드래그 (Y 감소) - 상태 확장
+      } catch (error) {
+        console.debug('햅틱 피드백이 차단되었습니다:', error);
+      }
+    };
+    
+    // 위로 드래그 (Y 감소) - 상태 확장
       if (dragDeltaY < 0) {
         if (bottomSheetState === 'hidden' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-          nextState = 'peek';
+        nextState = 'peek';
           console.log('[DragEnd] 위로 드래그 감지 (hidden -> peek)');
-          triggerHaptic();
-        }
+        triggerHaptic();
       }
-      // 아래로 드래그 (Y 증가) - 상태 축소  
+    }
+    // 아래로 드래그 (Y 증가) - 상태 축소
       else if (dragDeltaY > 0) {
         if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-          nextState = 'hidden';
+        nextState = 'hidden';
           console.log('[DragEnd] 아래로 드래그 감지 (peek -> hidden)');
-          triggerHaptic();
-        }
+        triggerHaptic();
       }
-      
-      // 상태 업데이트
-      if (nextState !== bottomSheetState) {
-        setBottomSheetState(nextState);
-        console.log('[DragEnd] 상태 변경:', bottomSheetState, '->', nextState);
-      } else {
-        console.log('[DragEnd] 임계값 미달, 현재 상태 유지:', bottomSheetState);
+    }
+    
+    // 상태 업데이트
+    if (nextState !== bottomSheetState) {
+      setBottomSheetState(nextState);
+      console.log('[DragEnd] 상태 변경:', bottomSheetState, '->', nextState);
+    } else {
+      console.log('[DragEnd] 임계값 미달, 현재 상태 유지:', bottomSheetState);
       }
     }
     
@@ -1650,7 +1653,7 @@ export default function HomePage() {
           } catch (e) { console.error("Error formatting end date:", e); }
         }
 
-        const timeRange = (startTime && endTime) ? `${startTime} - ${endTime}` : (startTime || '시간 정보 없음');
+        const timeRange = (startTime && endTime) ? `${startTime} ~ ${endTime}` : (startTime || '시간 정보 없음');
         
         // 통일된 색상 체계
         const titleTextColor = '#FFFFFF';
@@ -1683,18 +1686,89 @@ export default function HomePage() {
           }
         });
 
-        // InfoWindow 추가
+        // InfoWindow 추가 - 일정 리스트와 동일한 스타일 사용
         if (window.naver.maps.InfoWindow) {
           const infoWindow = new window.naver.maps.InfoWindow({
-            content: `<div style="padding:8px;font-size:13px;min-width:120px;text-align:left;line-height:1.5;"><strong>${scheduleTitle}</strong><br><span style="font-size:11px; color:#555;">시간: ${timeRange}</span><br><span style="font-size:11px; color:${statusDetail.color};">상태: ${statusDetail.text}</span></div>`,
-            disableAnchor: true
+            content: `
+              <div style="
+                padding: 12px 16px;
+                min-width: 200px;
+                max-width: 200px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+                border-radius: 12px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                border: 1px solid rgba(99, 102, 241, 0.1);
+                position: relative;
+              ">
+                <button onclick="this.parentElement.parentElement.parentElement.remove(); event.stopPropagation();" style="
+                  position: absolute;
+                  top: 8px;
+                  right: 8px;
+                  background: rgba(0, 0, 0, 0.1);
+                  border: none;
+                  border-radius: 50%;
+                  width: 20px;
+                  height: 20px;
+                  font-size: 12px;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: #666;
+                  hover: background-color: rgba(0, 0, 0, 0.2);
+                ">×</button>
+                
+                <div style="margin-bottom: 8px; padding-right: 20px;">
+                  <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: #111827; line-height: 1;">${scheduleTitle}</h3>
+                </div>
+                
+                <div style="margin-bottom: 6px;">
+                  <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
+                    <span style="margin-right: 6px;">🕒</span>
+                    <span>${timeRange}</span>
+                  </p>
+                </div>
+                
+                <div style="margin-bottom: 6px;">
+                  <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
+                    <span style="margin-right: 6px;">📍</span>
+                    <span style="word-break: keep-all; line-height: 1;">${scheduleData.sst_location_add || '위치 정보 없음'}</span>
+                  </p>
+                </div>
+                
+                <div>
+                  <span style="
+                    font-size: 11px; 
+                    color: ${statusDetail.color}; 
+                    background: ${statusDetail.bgColor}; 
+                    padding: 2px 8px; 
+                    border-radius: 12px; 
+                    font-weight: 500;
+                    border: 1px solid ${statusDetail.color}20;
+                  ">${statusDetail.text}</span>
+                </div>
+              </div>
+            `,
+            borderWidth: 0,
+            backgroundColor: 'transparent',
+            disableAnchor: true,
+            pixelOffset: new window.naver.maps.Point(0, -10)
           });
-          window.naver.maps.Event.addListener(newMarker, 'click', () => {
-            if (infoWindow.getMap()) {
-              infoWindow.close();
-            } else {
-              infoWindow.open(naverMap.current, newMarker);
+
+          newMarker.addListener('click', () => {
+            // 기존 InfoWindow 닫기
+            if (currentInfoWindowRef.current) {
+              try {
+                currentInfoWindowRef.current.close();
+              } catch (e) {
+                console.warn('[createMarker] 기존 InfoWindow 닫기 실패:', e);
+              }
             }
+            
+            // 새 InfoWindow 참조 저장 및 열기
+            currentInfoWindowRef.current = infoWindow;
+            infoWindow.open(naverMap.current, newMarker);
           });
         }
 
@@ -1743,7 +1817,7 @@ export default function HomePage() {
           } catch (e) { console.error("Error formatting end date:", e); }
         }
 
-        const timeRange = (startTime && endTime) ? `${startTime} - ${endTime}` : (startTime || '시간 정보 없음');
+        const timeRange = (startTime && endTime) ? `${startTime} ~ ${endTime}` : (startTime || '시간 정보 없음');
 
         const newMarker = new window.google.maps.Marker({
           position: { lat: validLat, lng: validLng },
@@ -1759,18 +1833,96 @@ export default function HomePage() {
           }
         });
 
-        // InfoWindow 추가
+        // InfoWindow 추가 - 일정 리스트와 동일한 스타일 사용
         if (window.google.maps.InfoWindow) {
-          const infoWindow = new window.google.maps.InfoWindow({
-            content: `<div style="font-size:13px;line-height:1.5;"><strong>${scheduleTitle}</strong><br><span style="font-size:11px;color:#555;">시간: ${timeRange}</span><br><span style="font-size:11px;color:${statusDetail.color};">상태: ${statusDetail.text}</span></div>`
+          const googleInfoWindow = new window.google.maps.InfoWindow({
+            content: `
+              <div style="
+                padding: 9px 12px;
+                min-width: 200px;
+                max-width: 280px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                position: relative;
+              ">
+                <button onclick="this.closest('.gm-style-iw').style.display='none'; event.stopPropagation();" style="
+                  position: absolute;
+                  top: 8px;
+                  right: 8px;
+                  background: rgba(0, 0, 0, 0.1);
+                  border: none;
+                  border-radius: 50%;
+                  width: 20px;
+                  height: 20px;
+                  font-size: 12px;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: #666;
+                  hover: background-color: rgba(0, 0, 0, 0.2);
+                ">×</button>
+                
+                <div style="margin-bottom: 8px; padding-right: 20px;">
+                  <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: #111827; line-height: 1;">${scheduleData.title || '제목 없음'}</h3>
+                </div>
+                
+                <div style="margin-bottom: 6px;">
+                  <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
+                    <span style="margin-right: 6px;">🕒</span>
+                    <span>${timeRange}</span>
+                  </p>
+                </div>
+                
+                <div style="margin-bottom: 6px;">
+                  <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
+                    <span style="margin-right: 6px;">📍</span>
+                    <span style="word-break: keep-all; line-height: 1;">${scheduleData.sst_location_add || '위치 정보 없음'}</span>
+                  </p>
+                </div>
+                
+                <div>
+                  <span style="
+                    font-size: 11px; 
+                    color: ${statusDetail.color}; 
+                    background: ${statusDetail.bgColor}; 
+                    padding: 2px 8px; 
+                    border-radius: 12px; 
+                    font-weight: 500;
+                    border: 1px solid ${statusDetail.color}20;
+                  ">${statusDetail.text}</span>
+                </div>
+              </div>
+            `
           });
-          newMarker.addListener('click', () => {
-            infoWindow.open({
-              anchor: newMarker,
+          
+          // InfoWindow를 지도에 표시 - 마커 위치를 찾아서 표시
+          const targetMarker = scheduleMarkersRef.current.find((marker, index) => {
+            const markerLat = parseCoordinate(filteredSchedules[index]?.sst_location_lat);
+            const markerLng = parseCoordinate(filteredSchedules[index]?.sst_location_long);
+            return markerLat === lat && markerLng === lng;
+          });
+          
+          // 기존 InfoWindow 닫기
+          if (currentInfoWindowRef.current) {
+            try {
+              currentInfoWindowRef.current.close();
+            } catch (e) {
+              console.warn('[createMarker] 기존 InfoWindow 닫기 실패:', e);
+            }
+          }
+          
+          // 새 InfoWindow 참조 저장
+          currentInfoWindowRef.current = googleInfoWindow;
+          
+          if (targetMarker) {
+            googleInfoWindow.open({
+              anchor: targetMarker,
               map: map.current,
               shouldFocus: false,
             });
-          });
+          } else {
+            googleInfoWindow.open(map.current);
+          }
         }
 
         return newMarker;
@@ -1868,6 +2020,127 @@ export default function HomePage() {
     startDragY.current = null;
     dragStartTime.current = null;
     
+    // 현재 열려있는 InfoWindow가 있으면 먼저 닫기
+    if (currentInfoWindowRef.current) {
+      try {
+        currentInfoWindowRef.current.close();
+        currentInfoWindowRef.current = null;
+        console.log('[handleMemberSelect] 현재 InfoWindow 닫기 완료');
+      } catch (e) {
+        console.warn('[handleMemberSelect] 현재 InfoWindow 닫기 실패:', e);
+        currentInfoWindowRef.current = null;
+      }
+    }
+    
+    // 멤버 선택 시 모든 InfoWindow 닫기
+    console.log('[handleMemberSelect] InfoWindow 닫기 시작');
+    
+    if (mapType === 'naver' && window.naver?.maps) {
+      // 네이버 지도의 모든 InfoWindow 닫기
+      const naverSelectors = [
+        '.iw_container',
+        '.iw_content', 
+        '.iw_inner',
+        '[class*="iw_"]',
+        '.infoWindow',
+        '.info-window'
+      ];
+      
+      let closedCount = 0;
+      naverSelectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+          try {
+            if (element.parentElement) {
+              element.parentElement.remove();
+              closedCount++;
+            } else {
+              element.remove();
+              closedCount++;
+            }
+          } catch (e) {
+            console.warn('[handleMemberSelect] InfoWindow 제거 실패:', e);
+          }
+        });
+      });
+      
+      // 추가적으로 visibility hidden 처리
+      const allInfoElements = document.querySelectorAll('[class*="info"], [class*="iw"], [id*="info"]');
+      allInfoElements.forEach(element => {
+        if (element instanceof HTMLElement) {
+          element.style.display = 'none';
+          element.style.visibility = 'hidden';
+          element.style.opacity = '0';
+        }
+      });
+      
+      console.log(`[handleMemberSelect] 네이버 지도 InfoWindow ${closedCount}개 닫음`);
+      
+    } else if (mapType === 'google' && window.google?.maps) {
+      // 구글 지도의 모든 InfoWindow 닫기
+      const googleSelectors = [
+        '.gm-style-iw',
+        '.gm-style-iw-c',
+        '.gm-style-iw-d',
+        '.gm-style-iw-t',
+        '[class*="gm-style-iw"]',
+        '.infoWindow',
+        '.info-window'
+      ];
+      
+      let closedCount = 0;
+      googleSelectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+          try {
+            (element as HTMLElement).style.display = 'none';
+            (element as HTMLElement).style.visibility = 'hidden';
+            (element as HTMLElement).style.opacity = '0';
+            closedCount++;
+          } catch (e) {
+            console.warn('[handleMemberSelect] 구글 InfoWindow 닫기 실패:', e);
+          }
+        });
+      });
+      
+      // 구글 지도 InfoWindow 완전 제거 시도
+      const iwContainers = document.querySelectorAll('.gm-style-iw-chr');
+      iwContainers.forEach(container => {
+        try {
+          if (container.parentElement) {
+            container.parentElement.remove();
+          }
+        } catch (e) {
+          console.warn('[handleMemberSelect] 구글 InfoWindow 컨테이너 제거 실패:', e);
+        }
+      });
+      
+      console.log(`[handleMemberSelect] 구글 지도 InfoWindow ${closedCount}개 닫음`);
+    }
+    
+    // 전역적으로 모든 InfoWindow 관련 요소 숨기기
+    setTimeout(() => {
+      const allPossibleInfoWindows = document.querySelectorAll(`
+        [class*="info"], 
+        [class*="Info"], 
+        [class*="iw"], 
+        [class*="gm-style-iw"], 
+        [id*="info"], 
+        [id*="Info"]
+      `);
+      
+      allPossibleInfoWindows.forEach(element => {
+        if (element instanceof HTMLElement) {
+          element.style.display = 'none';
+          element.style.visibility = 'hidden';
+          element.style.opacity = '0';
+          element.style.pointerEvents = 'none';
+        }
+      });
+      
+      console.log(`[handleMemberSelect] 전역 InfoWindow 정리 완료: ${allPossibleInfoWindows.length}개 요소`);
+    }, 50);
+    
     const updatedMembers = groupMembers.map(member => 
       member.id === id ? { ...member, isSelected: !member.isSelected } : { ...member, isSelected: false }
     );
@@ -1890,16 +2163,25 @@ export default function HomePage() {
     if (selectedMember) {
       setTodayWeather(getWeatherDisplayData(String(selectedMember.mt_weather_sky ?? 'default'), selectedMember.mt_weather_tmx));
       
-      const memberSchedules = selectedMember.schedules.filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(selectedDate));
+      // sgdt_idx를 기준으로 그룹 스케줄에서 해당 멤버의 스케줄 필터링
+      const memberSchedules = groupSchedules.filter(schedule => 
+        schedule.sgdt_idx !== null && 
+        schedule.sgdt_idx !== undefined && 
+        Number(schedule.sgdt_idx) === Number(selectedMember.sgdt_idx) &&
+        typeof schedule.date === 'string' && 
+        schedule.date!.startsWith(selectedDate)
+      );
       console.log('[handleMemberSelect] 선택된 멤버의 스케줄:', {
         memberName: selectedMember.name,
-        totalMemberSchedules: selectedMember.schedules.length,
+        memberSgdtIdx: selectedMember.sgdt_idx,
+        totalMemberSchedules: groupSchedules.filter(s => s.sgdt_idx === selectedMember.sgdt_idx).length,
         filteredSchedules: memberSchedules.length,
         selectedDate,
-        memberSchedulesDetail: selectedMember.schedules.map(s => ({
+        memberSchedulesDetail: memberSchedules.map(s => ({
           id: s.id,
           title: s.title,
           date: s.date,
+          sgdt_idx: s.sgdt_idx,
           hasLocation: !!(s.sst_location_lat && s.sst_location_long)
         }))
       });
@@ -1930,19 +2212,150 @@ export default function HomePage() {
       newDate: dateValue
     });
     
+    // 현재 열려있는 InfoWindow가 있으면 먼저 닫기
+    if (currentInfoWindowRef.current) {
+      try {
+        currentInfoWindowRef.current.close();
+        currentInfoWindowRef.current = null;
+        console.log('[handleDateSelect] 현재 InfoWindow 닫기 완료');
+      } catch (e) {
+        console.warn('[handleDateSelect] 현재 InfoWindow 닫기 실패:', e);
+        currentInfoWindowRef.current = null;
+      }
+    }
+    
+    // 날짜 변경 시 모든 InfoWindow 닫기 - 여러 방법 시도
+    console.log('[handleDateSelect] InfoWindow 닫기 시작');
+    
+    if (mapType === 'naver' && window.naver?.maps) {
+      // 네이버 지도의 모든 InfoWindow 닫기 - 다양한 선택자 시도
+      const naverSelectors = [
+        '.iw_container',
+        '.iw_content', 
+        '.iw_inner',
+        '[class*="iw_"]',
+        '.infoWindow',
+        '.info-window'
+      ];
+      
+      let closedCount = 0;
+      naverSelectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+          try {
+            // 여러 방법으로 제거 시도
+            if (element.parentElement) {
+              element.parentElement.remove();
+              closedCount++;
+            } else {
+              element.remove();
+              closedCount++;
+            }
+          } catch (e) {
+            console.warn('[handleDateSelect] InfoWindow 제거 실패:', e);
+          }
+        });
+      });
+      
+      // 추가적으로 visibility hidden 처리
+      const allInfoElements = document.querySelectorAll('[class*="info"], [class*="iw"], [id*="info"]');
+      allInfoElements.forEach(element => {
+        if (element instanceof HTMLElement) {
+          element.style.display = 'none';
+          element.style.visibility = 'hidden';
+          element.style.opacity = '0';
+        }
+      });
+      
+      console.log(`[handleDateSelect] 네이버 지도 InfoWindow ${closedCount}개 닫음`);
+      
+    } else if (mapType === 'google' && window.google?.maps) {
+      // 구글 지도의 모든 InfoWindow 닫기 - 다양한 선택자 시도
+      const googleSelectors = [
+        '.gm-style-iw',
+        '.gm-style-iw-c',
+        '.gm-style-iw-d',
+        '.gm-style-iw-t',
+        '[class*="gm-style-iw"]',
+        '.infoWindow',
+        '.info-window'
+      ];
+      
+      let closedCount = 0;
+      googleSelectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+          try {
+            (element as HTMLElement).style.display = 'none';
+            (element as HTMLElement).style.visibility = 'hidden';
+            (element as HTMLElement).style.opacity = '0';
+            closedCount++;
+          } catch (e) {
+            console.warn('[handleDateSelect] 구글 InfoWindow 닫기 실패:', e);
+          }
+        });
+      });
+      
+      // 구글 지도 InfoWindow 완전 제거 시도
+      const iwContainers = document.querySelectorAll('.gm-style-iw-chr');
+      iwContainers.forEach(container => {
+        try {
+          if (container.parentElement) {
+            container.parentElement.remove();
+          }
+        } catch (e) {
+          console.warn('[handleDateSelect] 구글 InfoWindow 컨테이너 제거 실패:', e);
+        }
+      });
+      
+      console.log(`[handleDateSelect] 구글 지도 InfoWindow ${closedCount}개 닫음`);
+    }
+    
+    // 전역적으로 모든 InfoWindow 관련 요소 숨기기
+    setTimeout(() => {
+      const allPossibleInfoWindows = document.querySelectorAll(`
+        [class*="info"], 
+        [class*="Info"], 
+        [class*="iw"], 
+        [class*="gm-style-iw"], 
+        [id*="info"], 
+        [id*="Info"]
+      `);
+      
+      allPossibleInfoWindows.forEach(element => {
+        if (element instanceof HTMLElement) {
+          element.style.display = 'none';
+          element.style.visibility = 'hidden';
+          element.style.opacity = '0';
+          element.style.pointerEvents = 'none';
+        }
+      });
+      
+      console.log(`[handleDateSelect] 전역 InfoWindow 정리 완료: ${allPossibleInfoWindows.length}개 요소`);
+    }, 50);
+    
     setSelectedDate(dateValue);
     const selectedMember = groupMembers.find(member => member.isSelected);
     
     if (selectedMember) {
-      const memberSchedules = selectedMember.schedules.filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(dateValue));
+      // sgdt_idx를 기준으로 그룹 스케줄에서 해당 멤버의 스케줄 필터링
+      const memberSchedules = groupSchedules.filter(schedule => 
+        schedule.sgdt_idx !== null && 
+        schedule.sgdt_idx !== undefined && 
+        Number(schedule.sgdt_idx) === Number(selectedMember.sgdt_idx) &&
+        typeof schedule.date === 'string' && 
+        schedule.date!.startsWith(dateValue)
+      );
       console.log('[handleDateSelect] 선택된 멤버의 날짜별 스케줄:', {
         memberName: selectedMember.name,
+        memberSgdtIdx: selectedMember.sgdt_idx,
         selectedDate: dateValue,
         filteredSchedules: memberSchedules.length,
         schedulesDetail: memberSchedules.map(s => ({
           id: s.id,
           title: s.title,
           date: s.date,
+          sgdt_idx: s.sgdt_idx,
           hasLocation: !!(s.sst_location_lat && s.sst_location_long)
         }))
       });
@@ -2413,6 +2826,114 @@ export default function HomePage() {
     }
   };
 
+  // filteredSchedules 상태 디버깅
+  useEffect(() => {
+    console.log('[RENDER] 일정 리스트 상태 변경:', {
+      filteredSchedulesLength: filteredSchedules.length,
+      currentTab,
+      selectedMember: groupMembers.find(m => m.isSelected)?.name,
+      selectedMemberSgdtIdx: groupMembers.find(m => m.isSelected)?.sgdt_idx,
+      selectedDate,
+      schedules: filteredSchedules.map(s => ({
+        id: s.id,
+        title: s.title,
+        date: s.date,
+        sgdt_idx: s.sgdt_idx
+      }))
+    });
+  }, [filteredSchedules, currentTab, groupMembers, selectedDate]);
+
+  // 일정 선택 핸들러 - 해당 일정 위치로 지도 이동
+  const handleScheduleSelect = (schedule: Schedule) => {
+    console.log('[handleScheduleSelect] 일정 선택:', {
+      id: schedule.id,
+      title: schedule.title,
+      lat: schedule.sst_location_lat,
+      lng: schedule.sst_location_long
+    });
+
+    // 일정에 위치 정보가 있는지 확인
+    const lat = parseCoordinate(schedule.sst_location_lat);
+    const lng = parseCoordinate(schedule.sst_location_long);
+
+    if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+      if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
+        // 네이버 지도 이동
+        const naverLatLng = new window.naver.maps.LatLng(lat, lng);
+        naverMap.current.setCenter(naverLatLng);
+        naverMap.current.setZoom(17); // 상세한 줌 레벨로 설정
+        console.log('[handleScheduleSelect] 네이버 지도 이동 완료:', { lat, lng });
+        
+        // 해당 마커 찾아서 클릭 이벤트 트리거
+        setTimeout(() => {
+          const targetMarker = scheduleMarkersRef.current.find((marker, index) => {
+            const markerLat = parseCoordinate(filteredSchedules[index]?.sst_location_lat);
+            const markerLng = parseCoordinate(filteredSchedules[index]?.sst_location_long);
+            return markerLat === lat && markerLng === lng;
+          });
+          
+          if (targetMarker) {
+            // 네이버 지도 마커 클릭 이벤트 트리거
+            window.naver.maps.Event.trigger(targetMarker, 'click');
+            console.log('[handleScheduleSelect] 마커 클릭 이벤트 트리거 완료');
+          }
+        }, 200);
+        
+        // 햅틱 피드백
+        try {
+          if ('vibrate' in navigator) {
+            navigator.vibrate([30, 10, 30]);
+          }
+        } catch (error) {
+          console.debug('햅틱 피드백이 차단되었습니다:', error);
+        }
+      } else if (mapType === 'google' && map.current && googleMapsLoaded) {
+        // 구글 지도 이동
+        map.current.panTo({ lat, lng });
+        map.current.setZoom(17); // 상세한 줌 레벨로 설정
+        console.log('[handleScheduleSelect] 구글 지도 이동 완료:', { lat, lng });
+        
+        // 해당 마커 찾아서 클릭 이벤트 트리거
+        setTimeout(() => {
+          const targetMarker = scheduleMarkersRef.current.find((marker, index) => {
+            const markerLat = parseCoordinate(filteredSchedules[index]?.sst_location_lat);
+            const markerLng = parseCoordinate(filteredSchedules[index]?.sst_location_long);
+            return markerLat === lat && markerLng === lng;
+          });
+          
+          if (targetMarker) {
+            // 구글 지도 마커 클릭 이벤트 트리거
+            window.google.maps.event.trigger(targetMarker, 'click');
+            console.log('[handleScheduleSelect] 구글 마커 클릭 이벤트 트리거 완료');
+          }
+        }, 200);
+        
+        // 햅틱 피드백
+        try {
+          if ('vibrate' in navigator) {
+            navigator.vibrate([30, 10, 30]);
+          }
+        } catch (error) {
+          console.debug('햅틱 피드백이 차단되었습니다:', error);
+        }
+      }
+    } else {
+      console.warn('[handleScheduleSelect] 일정에 유효한 위치 정보가 없습니다:', {
+        lat: schedule.sst_location_lat,
+        lng: schedule.sst_location_long
+      });
+      
+      // 위치 정보가 없을 때도 부드러운 피드백 제공
+      try {
+        if ('vibrate' in navigator) {
+          navigator.vibrate([100]); // 짧고 강한 진동으로 "불가능" 표시
+        }
+      } catch (error) {
+        console.debug('햅틱 피드백이 차단되었습니다:', error);
+      }
+    }
+  };
+
   return (
     <>
       <style jsx global>{mobileStyles}</style>
@@ -2762,76 +3283,76 @@ export default function HomePage() {
                 >
                   {/* 그룹 멤버 탭 */}
                   <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
-                    <motion.div 
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3, duration: 0.6 }}
+                <motion.div 
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.6 }}
                       className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100 hide-scrollbar flex-1"
-                    >
-                      <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center space-x-3">
-                          <div>
-                            <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
-                            <p className="text-sm text-gray-600">멤버들의 위치를 확인하세요</p>
-                          </div>
-                          {(isUserDataLoading || !dataFetchedRef.current.members) && (
-                            <motion.div
-                              variants={spinnerVariants}
-                              animate="animate"
-                            >
-                              <FiLoader className="text-indigo-500" size={18}/>
-                            </motion.div>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center space-x-3">
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center space-x-3">
+                      <div>
+                        <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
+                        <p className="text-sm text-gray-600">멤버들의 위치를 확인하세요</p>
+                      </div>
+                      {(isUserDataLoading || !dataFetchedRef.current.members) && (
+                        <motion.div
+                          variants={spinnerVariants}
+                          animate="animate"
+                        >
+                          <FiLoader className="text-indigo-500" size={18}/>
+                        </motion.div>
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center space-x-3">
                           {/* 그룹 선택 드롭다운 */}
                           <div className="relative" ref={groupDropdownRef}>
-                            <motion.button
-                              whileHover={{ 
-                                scale: 1.02, 
-                                y: -2,
-                                borderColor: "#6366f1",
-                                boxShadow: "0 4px 12px rgba(99, 102, 241, 0.15)",
-                                transition: { duration: 0.2, ease: "easeOut" }
-                              }}
-                              whileTap={{ 
-                                scale: 0.98,
-                                transition: { duration: 0.1, ease: "easeInOut" }
-                              }}
-                              onClick={(e) => {
-                                e.stopPropagation();
+                        <motion.button
+                          whileHover={{ 
+                            scale: 1.02, 
+                            y: -2,
+                            borderColor: "#6366f1",
+                            boxShadow: "0 4px 12px rgba(99, 102, 241, 0.15)",
+                            transition: { duration: 0.2, ease: "easeOut" }
+                          }}
+                          whileTap={{ 
+                            scale: 0.98,
+                            transition: { duration: 0.1, ease: "easeInOut" }
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
                                 console.log('[그룹 드롭다운] 버튼 클릭, 현재 상태:', isGroupSelectorOpen);
-                                setIsGroupSelectorOpen(!isGroupSelectorOpen);
-                              }}
-                              className="group-selector flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium min-w-[140px] mobile-button"
-                              disabled={isUserDataLoading}
-                              data-group-selector="true"
-                            >
-                              <span className="truncate text-gray-700">
-                                {isUserDataLoading 
-                                  ? '로딩 중...' 
-                                  : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
-                                }
-                              </span>
-                              <div className="ml-2 flex-shrink-0">
-                                {isUserDataLoading ? (
-                                  <motion.div
-                                    variants={spinnerVariants}
-                                    animate="animate"
-                                  >
-                                    <FiLoader className="text-gray-400" size={14} />
-                                  </motion.div>
-                                ) : (
-                                  <motion.div
-                                    animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-                                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                                  >
-                                    <FiChevronDown className="text-gray-400" size={14} />
-                                  </motion.div>
-                                )}
-                              </div>
-                            </motion.button>
+                            setIsGroupSelectorOpen(!isGroupSelectorOpen);
+                          }}
+                          className="group-selector flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium min-w-[140px] mobile-button"
+                          disabled={isUserDataLoading}
+                          data-group-selector="true"
+                        >
+                          <span className="truncate text-gray-700">
+                            {isUserDataLoading 
+                              ? '로딩 중...' 
+                              : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
+                            }
+                          </span>
+                          <div className="ml-2 flex-shrink-0">
+                            {isUserDataLoading ? (
+                              <motion.div
+                                variants={spinnerVariants}
+                                animate="animate"
+                              >
+                                <FiLoader className="text-gray-400" size={14} />
+                              </motion.div>
+                            ) : (
+                              <motion.div
+                                animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
+                                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                              >
+                                <FiChevronDown className="text-gray-400" size={14} />
+                              </motion.div>
+                            )}
+                          </div>
+                        </motion.button>
 
                             {/* 그룹 선택 드롭다운 메뉴 */}
                             {isGroupSelectorOpen && (
@@ -2910,396 +3431,376 @@ export default function HomePage() {
                                 </div>
                               </motion.div>
                             )}
-                          </div>
-                        </div>
                       </div>
+                    </div>
+                  </div>
 
                       {/* 멤버 목록 내용 */}
-                      {(isUserDataLoading || !dataFetchedRef.current.members) ? (
-                        <motion.div 
-                          variants={loadingVariants}
-                          initial="hidden"
-                          animate="visible"
-                          className="flex flex-col items-center justify-center py-8"
-                        >
-                          <div className="relative flex items-center justify-center mb-4">
-                            {[...Array(3)].map((_, i) => (
-                              <motion.div
-                                key={i}
-                                className="absolute w-12 h-12 border border-indigo-200 rounded-full"
-                                animate={{
-                                  scale: [1, 1.8, 1],
-                                  opacity: [0.4, 0, 0.4],
-                                }}
-                                transition={{
-                                  duration: 1.5,
-                                  repeat: Infinity,
-                                  delay: i * 0.4,
-                                  ease: [0.22, 1, 0.36, 1]
-                                }}
-                              />
-                            ))}
-                            
-                            <motion.div
-                              className="relative w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg"
-                              variants={spinnerVariants}
-                              animate="animate"
-                            >
-                              <FiUser className="w-6 h-6 text-white" />
-                            </motion.div>
-                          </div>
-                          
+                  {(isUserDataLoading || !dataFetchedRef.current.members) ? (
+                    <motion.div 
+                      variants={loadingVariants}
+                      initial="hidden"
+                      animate="visible"
+                      className="flex flex-col items-center justify-center py-8"
+                    >
+                      <div className="relative flex items-center justify-center mb-4">
+                        {[...Array(3)].map((_, i) => (
                           <motion.div
-                            variants={loadingTextVariants}
-                            initial="hidden"
-                            animate="visible"
-                          >
-                            <p className="font-medium text-gray-900 mb-1">멤버 정보를 불러오는 중...</p>
-                            <p className="text-sm text-gray-600">잠시만 기다려주세요</p>
-                          </motion.div>
-                        </motion.div>
-                      ) : groupMembers.length > 0 ? (
-                        <motion.div 
-                          variants={staggerContainer}
-                          initial="hidden"
-                          animate="visible"
-                          className="flex flex-row flex-nowrap justify-start items-center gap-x-6 overflow-x-auto hide-scrollbar px-2 py-2"
+                            key={i}
+                            className="absolute w-12 h-12 border border-indigo-200 rounded-full"
+                            animate={{
+                              scale: [1, 1.8, 1],
+                              opacity: [0.4, 0, 0.4],
+                            }}
+                            transition={{
+                              duration: 1.5,
+                              repeat: Infinity,
+                              delay: i * 0.4,
+                              ease: [0.22, 1, 0.36, 1]
+                            }}
+                          />
+                        ))}
+                        
+                        <motion.div
+                          className="relative w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg"
+                          variants={spinnerVariants}
+                          animate="animate"
                         >
-                          {(() => {
-                            const hasSelectedMember = groupMembers.some(member => member.isSelected);
-                            if (!hasSelectedMember && groupMembers.length > 0 && dataFetchedRef.current.members) {
-                              console.log('[멤버 렌더링] 선택된 멤버가 없음, 첫 번째 멤버 자동 선택:', groupMembers[0].name);
-                              setTimeout(() => {
-                                handleMemberSelect(groupMembers[0].id);
-                              }, 50);
-                            }
-                            return null;
-                          })()}
-                          {groupMembers.map((member, index) => {
-                            return (
-                              <motion.div 
-                                key={member.id} 
-                                custom={index}
-                                variants={memberAvatarVariants}
-                                initial="initial"
-                                animate="animate"
-                                whileHover="hover"
-                                className="flex flex-col items-center p-0 flex-shrink-0"
-                              >
-                                <motion.button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleMemberSelect(member.id);
-                                  }}
-                                  onTouchStart={(e) => e.stopPropagation()}
-                                  onTouchMove={(e) => e.stopPropagation()}
-                                  onTouchEnd={(e) => e.stopPropagation()}
-                                  className="flex flex-col items-center focus:outline-none mobile-button"
-                                  animate={member.isSelected ? "selected" : "animate"}
-                                >
-                                  <motion.div
-                                    className={`member-avatar w-13 h-13 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
-                                      member.isSelected ? 'selected' : ''
-                                    }`}
-                                    animate={member.isSelected ? "selected" : undefined}
-                                  >
-                                    <img 
-                                      src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
-                                      alt={member.name} 
-                                      className="w-full h-full object-cover rounded-xl" 
-                                      onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
-                                        console.log(`[이미지 오류] ${member.name}의 이미지 로딩 실패, 기본 이미지로 대체:`, defaultImg);
-                                        target.src = defaultImg;
-                                        target.onerror = () => {};
-                                      }}
-                                    />
-                                  </motion.div>
-                                  <span className={`block text-sm font-semibold mt-3 transition-colors duration-200 ${
-                                    member.isSelected ? 'text-indigo-700' : 'text-gray-700'
-                                  }`}>
-                                    {member.name}
-                                  </span>
-                                </motion.button>
-                              </motion.div>
-                            );
-                          })}
+                          <FiUser className="w-6 h-6 text-white" />
                         </motion.div>
-                      ) : (
-                        <div className="text-center py-6 text-gray-500">
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: "spring", stiffness: 200 }}
-                            className="w-16 h-16 mx-auto mb-3 bg-gray-100 rounded-2xl flex items-center justify-center"
-                          >
-                            <FiUser className="w-8 h-8 text-gray-300" />
-                          </motion.div>
-                          <p className="font-medium">그룹에 참여한 멤버가 없습니다</p>
-                          <p className="text-sm mt-1">그룹에 멤버를 초대해보세요</p>
-                        </div>
-                      )}
+                      </div>
+                      
+                      <motion.div
+                        variants={loadingTextVariants}
+                        initial="hidden"
+                        animate="visible"
+                      >
+                        <p className="font-medium text-gray-900 mb-1">멤버 정보를 불러오는 중...</p>
+                        <p className="text-sm text-gray-600">잠시만 기다려주세요</p>
+                      </motion.div>
                     </motion.div>
-                  </div>
+                  ) : groupMembers.length > 0 ? (
+                    <motion.div 
+                      variants={staggerContainer}
+                      initial="hidden"
+                      animate="visible"
+                      className="flex flex-row flex-nowrap justify-start items-center gap-x-6 overflow-x-auto hide-scrollbar px-2 py-2"
+                    >
+                      {(() => {
+                        const hasSelectedMember = groupMembers.some(member => member.isSelected);
+                        if (!hasSelectedMember && groupMembers.length > 0 && dataFetchedRef.current.members) {
+                          console.log('[멤버 렌더링] 선택된 멤버가 없음, 첫 번째 멤버 자동 선택:', groupMembers[0].name);
+                          setTimeout(() => {
+                            handleMemberSelect(groupMembers[0].id);
+                          }, 50);
+                        }
+                        return null;
+                      })()}
+                      {groupMembers.map((member, index) => {
+                        return (
+                          <motion.div 
+                            key={member.id} 
+                            custom={index}
+                            variants={memberAvatarVariants}
+                            initial="initial"
+                            animate="animate"
+                            whileHover="hover"
+                            className="flex flex-col items-center p-0 flex-shrink-0"
+                          >
+                            <motion.button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMemberSelect(member.id);
+                              }}
+                              onTouchStart={(e) => e.stopPropagation()}
+                              onTouchMove={(e) => e.stopPropagation()}
+                              onTouchEnd={(e) => e.stopPropagation()}
+                              className="flex flex-col items-center focus:outline-none mobile-button"
+                              animate={member.isSelected ? "selected" : "animate"}
+                            >
+                              <motion.div
+                                className={`member-avatar w-13 h-13 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
+                                  member.isSelected ? 'selected' : ''
+                                }`}
+                                animate={member.isSelected ? "selected" : undefined}
+                              >
+                                <img 
+                                  src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
+                                  alt={member.name} 
+                                  className="w-full h-full object-cover rounded-xl" 
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
+                                    console.log(`[이미지 오류] ${member.name}의 이미지 로딩 실패, 기본 이미지로 대체:`, defaultImg);
+                                    target.src = defaultImg;
+                                        target.onerror = () => {};
+                                  }}
+                                />
+                              </motion.div>
+                              <span className={`block text-sm font-semibold mt-3 transition-colors duration-200 ${
+                                member.isSelected ? 'text-indigo-700' : 'text-gray-700'
+                              }`}>
+                                {member.name}
+                              </span>
+                            </motion.button>
+                          </motion.div>
+                        );
+                      })}
+                    </motion.div>
+                  ) : (
+                    <div className="text-center py-6 text-gray-500">
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 200 }}
+                        className="w-16 h-16 mx-auto mb-3 bg-gray-100 rounded-2xl flex items-center justify-center"
+                      >
+                        <FiUser className="w-8 h-8 text-gray-300" />
+                      </motion.div>
+                      <p className="font-medium">그룹에 참여한 멤버가 없습니다</p>
+                      <p className="text-sm mt-1">그룹에 멤버를 초대해보세요</p>
+                    </div>
+                  )}
+                </motion.div>
+              </div>
 
                   {/* 멤버 일정 탭 */}
                   <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
-                    <motion.div 
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.5, duration: 0.6 }}
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5, duration: 0.6 }}
                       className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl border border-pink-100 flex-1"
-                    >
+                >
                       {/* 고정 헤더 부분 */}
                       <div className="sticky top-0 z-20 bg-gradient-to-r from-pink-50 to-rose-50 rounded-t-2xl pt-4 px-6 border-b border-pink-100/50 backdrop-blur-sm">
-                        <div className="flex justify-between items-center mb-3">
-                          <div>
-                            <h2 className="text-lg font-bold text-gray-900">
-                              {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
-                            </h2>
-                            <p className="text-sm text-gray-600">예정된 일정을 확인하세요</p>
-                          </div>
-                          {groupMembers.some(m => m.isSelected) ? (
-                            <motion.button
-                              whileHover={{ scale: 1.02, y: -1 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const selectedMember = groupMembers.find(m => m.isSelected);
-                                if (selectedMember) {
-                                  router.push(`/schedule/add?memberId=${selectedMember.id}&memberName=${selectedMember.name}&from=home`);
-                                }
-                              }}
-                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-xl text-pink-700 bg-pink-50 hover:bg-pink-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 mobile-button"
-                            >
-                            </motion.button>
-                          ) : (
-                            <Link href="/schedule" className="text-sm font-medium text-pink-600 hover:text-pink-800 flex items-center mobile-button">
-                              더보기
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                              </svg>
-                            </Link>
-                          )}
-                        </div>
+                    <div className="flex justify-between items-center mb-3">
+                      <div>
+                        <h2 className="text-lg font-bold text-gray-900">
+                          {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
+                        </h2>
+                        <p className="text-sm text-gray-600">예정된 일정을 확인하세요</p>
+                      </div>
+                      {groupMembers.some(m => m.isSelected) ? (
+                        <motion.button
+                          whileHover={{ scale: 1.02, y: -1 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const selectedMember = groupMembers.find(m => m.isSelected);
+                            if (selectedMember) {
+                              router.push(`/schedule/add?memberId=${selectedMember.id}&memberName=${selectedMember.name}&from=home`);
+                            }
+                          }}
+                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-xl text-pink-700 bg-pink-50 hover:bg-pink-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 mobile-button"
+                        >
+                        </motion.button>
+                      ) : (
+                        <Link href="/schedule" className="text-sm font-medium text-pink-600 hover:text-pink-800 flex items-center mobile-button">
+                          더보기
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </Link>
+                      )}
+                    </div>
 
-                        {/* 날짜 선택 */}
-                        <div className="mb-1 overflow-hidden" data-calendar-swipe="true">
+                    {/* 날짜 선택 */}
+                    <div className="mb-1 overflow-hidden" data-calendar-swipe="true">
                           <div className="mb-1 relative min-h-[30px] overflow-x-hidden"> 
-                              <motion.div
-                                className="flex space-x-2 pb-2 cursor-grab active:cursor-grabbing"
-                                style={{ x }} 
-                                drag="x"
+                          <motion.div
+                            className="flex space-x-2 pb-2 cursor-grab active:cursor-grabbing"
+                            style={{ x }} 
+                            drag="x"
                                 dragConstraints={{ left: -280, right: 8 }}
-                                data-calendar-swipe="true"
-                                onDragStart={() => {
-                                  isDraggingRef.current = true;
-                                  console.log('📅 [Calendar] Drag Start');
-                                }}
-                                onDragEnd={(e, info) => {
-                                  console.log('📅 [Calendar] Drag End - offset:', info.offset.x, 'velocity:', info.velocity.x);
-                                  setTimeout(() => { isDraggingRef.current = false; }, 50);
+                            data-calendar-swipe="true"
+                            onDragStart={() => {
+                              isDraggingRef.current = true;
+                              console.log('📅 [Calendar] Drag Start');
+                            }}
+                            onDragEnd={(e, info) => {
+                              console.log('📅 [Calendar] Drag End - offset:', info.offset.x, 'velocity:', info.velocity.x);
+                              setTimeout(() => { isDraggingRef.current = false; }, 50);
 
-                                  const buttonWidth = 88;
+                              const buttonWidth = 88;
                                   const maxScroll = -(buttonWidth * 3);
                                   const minScroll = 10;
 
-                                  const swipeThreshold = 50;
-                                  const velocityThreshold = 200;
+                              const swipeThreshold = 50;
+                              const velocityThreshold = 200;
                                   const currentX = x.get();
                                   let targetX = currentX;
 
-                                  if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
-                                    targetX = currentX - buttonWidth;
-                                  } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
-                                    targetX = currentX + buttonWidth;
-                                  } else {
-                                    const snapPosition = Math.round(currentX / buttonWidth) * buttonWidth;
-                                    targetX = snapPosition;
-                                  }
-
-                                  targetX = Math.max(maxScroll, Math.min(minScroll, targetX));
-                                  
-                                  console.log('📅 [Calendar] 목표 위치:', targetX, '(범위:', maxScroll, '~', minScroll, ')');
-                                  x.set(targetX);
-                                  
-                                  try { 
-                                    if ('vibrate' in navigator) navigator.vibrate([15]); 
-                                  } catch (err) { 
-                                    console.debug('햅틱 차단'); 
-                                  }
-                                }}
-                              >
-                                {daysForCalendar.map((day, idx) => (
-                                  <motion.button
-                                    key={day.value}
-                                    onClick={() => {
-                                      if (!isDraggingRef.current) {
-                                        handleDateSelect(day.value);
-                                      }
-                                    }}
-                                    whileTap={{ scale: 0.95 }}
-                                    data-calendar-swipe="true"
-                                    className={`px-2 py-2 rounded-lg flex-shrink-0 text-center transition-colors duration-150 min-h-[20px] min-w-[80px] focus:outline-none ${
-                                      selectedDate === day.value
-                                        ? 'bg-pink-600 text-white font-semibold shadow-md'
-                                        : 'bg-white text-gray-700 hover:bg-pink-50 border border-pink-100'
-                                    }`}
-                                  >
-                                    <div className="text-sm font-medium leading-tight" data-calendar-swipe="true">{day.display}</div>
-                                  </motion.button>
-                                ))}
-                              </motion.div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* 스크롤 가능한 일정 목록 */}
-                      <div className="px-6">
-                        {filteredSchedules.length > 0 ? (
-                          <motion.div 
-                            className="space-y-3 max-h-[300px] overflow-y-auto hide-scrollbar pr-1"
-                            style={{ 
-                              WebkitOverflowScrolling: 'touch', 
-                              touchAction: 'pan-y',
-                              scrollbarWidth: 'none',
-                              msOverflowStyle: 'none'
-                            }}
-                            variants={staggerContainer}
-                            initial="hidden"
-                            animate="visible"
-                            onTouchStart={(e) => {
-                              e.stopPropagation();
-                              isDraggingRef.current = false;
-                              startDragY.current = null;
-                            }}
-                            onTouchMove={(e) => {
-                              e.stopPropagation();
-                              isDraggingRef.current = false;
-                            }}
-                            onTouchEnd={(e) => {
-                              e.stopPropagation();
-                              isDraggingRef.current = false;
-                            }}
-                            onMouseDown={(e) => {
-                              e.stopPropagation();
-                              isDraggingRef.current = false;
-                              startDragY.current = null;
-                            }}
-                            onMouseMove={(e) => {
-                              e.stopPropagation();
-                            }}
-                            onMouseUp={(e) => {
-                              e.stopPropagation();
-                            }}
-                            data-schedule-scroll="true"
-                          >
-                            {filteredSchedules.map((schedule, index) => {
-                              let formattedTime = '시간 정보 없음';
-                              if (schedule.date) {
-                                try {
-                                  const dateObj = new Date(schedule.date);
-                                  if (!isNaN(dateObj.getTime())) {
-                                    formattedTime = format(dateObj, 'a h:mm', { locale: ko });
-                                  }
-                                } catch (e) {
-                                  console.error("Error formatting schedule date:", e);
-                                }
+                              if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
+                                targetX = currentX - buttonWidth;
+                              } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
+                                targetX = currentX + buttonWidth;
+                              } else {
+                                const snapPosition = Math.round(currentX / buttonWidth) * buttonWidth;
+                                targetX = snapPosition;
                               }
 
-                              const displayLocation = schedule.location || schedule.slt_idx_t;
-                              const statusData = getScheduleStatus(schedule);
+                              targetX = Math.max(maxScroll, Math.min(minScroll, targetX));
+                              
+                              console.log('📅 [Calendar] 목표 위치:', targetX, '(범위:', maxScroll, '~', minScroll, ')');
+                              x.set(targetX);
+                              
+                              try { 
+                                if ('vibrate' in navigator) navigator.vibrate([15]); 
+                              } catch (err) { 
+                                console.debug('햅틱 차단'); 
+                              }
+                            }}
+                          >
+                            {daysForCalendar.map((day, idx) => (
+                              <motion.button
+                                    key={day.value}
+                                onClick={() => {
+                                  if (!isDraggingRef.current) {
+                                    handleDateSelect(day.value);
+                                  }
+                                }}
+                                whileTap={{ scale: 0.95 }}
+                                data-calendar-swipe="true"
+                                className={`px-2 py-2 rounded-lg flex-shrink-0 text-center transition-colors duration-150 min-h-[20px] min-w-[80px] focus:outline-none ${
+                                  selectedDate === day.value
+                                    ? 'bg-pink-600 text-white font-semibold shadow-md'
+                                    : 'bg-white text-gray-700 hover:bg-pink-50 border border-pink-100'
+                                }`}
+                              >
+                                <div className="text-sm font-medium leading-tight" data-calendar-swipe="true">{day.display}</div>
+                              </motion.button>
+                            ))}
+                          </motion.div>
+                          </div>
+                      </div>
+                    </div>
+                    
+                      {/* 스크롤 가능한 일정 목록 */}
+                      <div className="px-6">
+                    {filteredSchedules.length > 0 ? (
+                          <div className="overflow-x-auto hide-scrollbar">
+                      <motion.div 
+                              className="flex space-x-3 pb-2"
+                        style={{ 
+                                width: `${filteredSchedules.length * 220}px`,
+                                touchAction: 'pan-x'
+                              }}
+                              drag="x"
+                              dragConstraints={{ left: -(filteredSchedules.length * 220 - 220), right: 0 }}
+                              onDragStart={() => {
+                                isDraggingRef.current = true;
+                              }}
+                              onDragEnd={() => {
+                                setTimeout(() => { isDraggingRef.current = false; }, 50);
+                              }}
+                            >
+                              {filteredSchedules
+                                .sort((a, b) => {
+                                  // 시간 순으로 정렬
+                                  const dateA = new Date(a.date || '');
+                                  const dateB = new Date(b.date || '');
+                                  return dateA.getTime() - dateB.getTime();
+                                })
+                                .map((schedule, index) => {
+                                  let startTime = '';
+                                  let endTime = '';
+                          if (schedule.date) {
+                            try {
+                              const dateObj = new Date(schedule.date);
+                              if (!isNaN(dateObj.getTime())) {
+                                        startTime = format(dateObj, 'HH:mm', { locale: ko });
+                              }
+                            } catch (e) {
+                              console.error("Error formatting schedule date:", e);
+                            }
+                          }
+                                  if (schedule.sst_edate) {
+                                    try {
+                                      const endDateObj = new Date(schedule.sst_edate);
+                                      if (!isNaN(endDateObj.getTime())) {
+                                        endTime = format(endDateObj, 'HH:mm', { locale: ko });
+                                      }
+                                    } catch (e) {
+                                      console.error("Error formatting end date:", e);
+                                    }
+                                  }
 
-                              return (
-                                <motion.div
-                                  key={schedule.id}
-                                  custom={index}
-                                  variants={staggerItem}
-                                  whileHover={{ scale: 1.01, y: -2 }}
-                                  whileTap={{ scale: 0.99 }}
-                                  className="relative"
-                                  onTouchStart={(e) => {
-                                    e.stopPropagation();
-                                    isDraggingRef.current = false;
-                                  }}
-                                  onTouchMove={(e) => {
-                                    e.stopPropagation();
-                                    isDraggingRef.current = false;
-                                  }}
-                                  onTouchEnd={(e) => {
-                                    e.stopPropagation();
-                                    isDraggingRef.current = false;
-                                  }}
-                                  onMouseDown={(e) => {
-                                    e.stopPropagation();
-                                    isDraggingRef.current = false;
-                                  }}
-                                  data-schedule-item="true"
-                                >
-                                  <Link href={`/schedule/${schedule.id}`} className="block">
-                                    <div className="p-4 rounded-xl bg-white border border-pink-100 hover:border-pink-200 hover:shadow-md transition-all duration-200">
-                                      <div className="flex items-start justify-between">
-                                        <div className="flex-1">
-                                          <h3 className="font-semibold text-gray-900 text-base mb-2">{schedule.title}</h3>
+                          return (
+                                    <div
+                              key={schedule.id}
+                                      className="flex-shrink-0 w-[210px]"
+                              onTouchStart={(e) => {
+                                e.stopPropagation();
+                              }}
+                              onTouchMove={(e) => {
+                                e.stopPropagation();
+                              }}
+                              onTouchEnd={(e) => {
+                                e.stopPropagation();
+                              }}
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                      }}
+                                    >
+                                      <div 
+                                        className="block cursor-pointer"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
                                           
-                                          <div className="flex items-center text-sm text-gray-600 mb-2">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-pink-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            <span className="font-medium">{formattedTime}</span>
-                                          </div>
+                                          // 드래그 중이 아닐 때만 처리
+                                          if (!isDraggingRef.current) {
+                                            handleScheduleSelect(schedule);
+                                          }
+                                        }}
+                                      >
+                                        <div className="h-[50px] rounded-xl bg-white border border-pink-100 hover:border-pink-200 hover:shadow-md transition-all duration-200 flex items-center px-2">
+                                          <div className="flex items-center space-x-2 w-full">
+                                            {/* 순서 번호 */}
+                                            <div className="w-5 h-5 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ backgroundColor: '#22C55E' }}>
+                                              {index + 1}
+                                      </div>
 
-                                          {displayLocation && (
-                                            <div className="flex items-center text-sm text-gray-500 mb-3">
-                                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-pink-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                              </svg>
-                                              <span>{displayLocation}</span>
-                                            </div>
-                                          )}
-
-                                          <div 
-                                            className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
-                                            style={{ 
-                                              backgroundColor: statusData.bgColor, 
-                                              color: statusData.color 
-                                            }}
-                                          >
-                                            {statusData.text}
-                                          </div>
+                                            {/* 스케줄명 */}
+                                            <div className="flex-1 min-w-0">
+                                              <h3 className="font-medium text-xs truncate text-gray-900">{schedule.title}</h3>
                                         </div>
-                                        
-                                        <div className="ml-4 flex-shrink-0 self-center">
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                          </svg>
-                                        </div>
+                                            
+                                            {/* 시간 정보 */}
+                                            <div className="flex items-center space-x-1 text-xs flex-shrink-0 text-right text-gray-400">
+                                              <span className="font-medium">{startTime || '--:--'}</span>
+                                              <span>~</span>
+                                              <span className="font-medium">{endTime || '--:--'}</span>
                                       </div>
                                     </div>
-                                  </Link>
-                                </motion.div>
-                              );
-                            })}
-                          </motion.div>
-                        ) : (
-                          <motion.div 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
+                                    </div>
+                                  </div>
+                                </div>
+                          );
+                        })}
+                      </motion.div>
+                          </div>
+                    ) : (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
                             className="text-center py-2 bg-white rounded-xl border border-pink-100 h-[50px] flex flex-row items-center justify-center"
-                          >
+                      >
                             <div className="w-8 h-8 bg-pink-50 rounded-full flex items-center justify-center mr-3">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                            <div className="text-left">
+                              <p className="text-gray-500 font-medium text-sm">
+                          {groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}
+                        </p>
                             </div>
-                            <p className="text-gray-500 font-medium text-sm">
-                              {groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}
-                            </p>
-                          </motion.div>
-                        )}
-                      </div>
-                    </motion.div>
+                      </motion.div>
+                    )}
+                  </div>
+                </motion.div>
 
                     {/* 그룹 멤버 점 인디케이터 */}
                     {/* 잘못된 위치의 점 인디케이터 - 제거됨
@@ -3321,23 +3822,23 @@ export default function HomePage() {
                   </div>
                 </motion.div>
 
-                {/* 좌우 스와이프 힌트 */}
-                {currentTab === 'members' && (
-                  <motion.div
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 0.6, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none"
-                  >
-                    <div className="flex items-center text-gray-400">
-                      <span className="text-xs mr-1">일정</span>
-                      <svg className="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </div>
-                  </motion.div>
-                )}
-                {currentTab === 'schedules' && (
+                {/* 좌우 스와이프 힌트
+                // {currentTab === 'members' && (
+                //   <motion.div
+                //     initial={{ opacity: 0, x: 10 }}
+                //     animate={{ opacity: 0.6, x: 0 }}
+                //     exit={{ opacity: 0, x: 10 }}
+                //     className="absolute right-2 top-2/3 transform -translate-y-1/2 pointer-events-none"
+                //   >
+                //     <div className="flex items-center text-gray-400">
+                //       <span className="text-xs mr-1">일정</span>
+                //       <svg className="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                //         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                //       </svg>
+                //     </div>
+                //   </motion.div>
+                // )} */}
+                {/* {currentTab === 'schedules' && (
                   <motion.div
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 0.6, x: 0 }}
@@ -3351,14 +3852,14 @@ export default function HomePage() {
                       <span className="text-xs ml-1">멤버</span>
                     </div>
                   </motion.div>
-                )}
+                )} */}
               </div>
 
               {/* 점 인디케이터 - 바텀시트 하단에 고정 */}
-              <div className="flex-shrink-0 py-3 bg-white">
+              <div className="flex-shrink-0 pb-3 pt-2 bg-white">
                 <div className="flex justify-center items-center space-x-2 mb-2">
                   <motion.div
-                    className={`rounded-full transition-all duration-300 shadow-md ${
+                    className={`rounded-full transition-all duration-300 ${
                       currentTab === 'members' ? 'bg-indigo-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
                     }`}
                     initial={{ scale: 0.8 }}
@@ -3366,7 +3867,7 @@ export default function HomePage() {
                     transition={{ duration: 0.3 }}
                   />
                   <motion.div
-                    className={`rounded-full transition-all duration-300 shadow-md ${
+                    className={`rounded-full transition-all duration-300 ${
                       currentTab === 'schedules' ? 'bg-pink-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
                     }`}
                     initial={{ scale: 0.8 }}
