@@ -2995,22 +2995,6 @@ export default function HomePage() {
                         </div>
                       )}
                     </motion.div>
-
-                    {/* 멤버 일정 점 인디케이터 */}
-                    <div className="flex justify-center items-center space-x-2 mt-2.5 mb-2">
-                      <motion.div
-                        className="bg-indigo-600 w-6 h-2 rounded-full"
-                        initial={{ scale: 0.8 }}
-                        animate={{ scale: 1 }}
-                        transition={{ duration: 0.3 }}
-                      />
-                      <motion.div
-                        className="bg-gray-300 w-2 h-2 rounded-full"
-                        initial={{ scale: 0.8 }}
-                        animate={{ scale: 1 }}
-                        transition={{ duration: 0.3, delay: 0.1 }}
-                      />
-                    </div>
                   </div>
 
                   {/* 멤버 일정 탭 */}
@@ -3019,7 +3003,7 @@ export default function HomePage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.5, duration: 0.6 }}
-                      className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl border border-pink-100 h-[200px]"
+                      className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl border border-pink-100 flex-grow"
                     >
                       {/* 고정 헤더 부분 */}
                       <div className="sticky top-0 z-20 bg-gradient-to-r from-pink-50 to-rose-50 rounded-t-2xl pt-4 px-6 border-b border-pink-100/50 backdrop-blur-sm">
@@ -3056,9 +3040,9 @@ export default function HomePage() {
 
                         {/* 날짜 선택 */}
                         <div className="mb-1 overflow-hidden" data-calendar-swipe="true">
-                          <div className="mb-1 relative min-h-[40px] overflow-x-hidden"> 
+                          <div className="mb-1 relative min-h-[50px] overflow-x-hidden"> 
                               <motion.div
-                                className="flex space-x-2 cursor-grab active:cursor-grabbing"
+                                className="flex space-x-2 pb-2 cursor-grab active:cursor-grabbing"
                                 style={{ x }} 
                                 drag="x"
                                 dragConstraints={{ left: -280, right: 8 }}
@@ -3256,27 +3240,24 @@ export default function HomePage() {
                           <motion.div 
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="text-center flex items-center justify-center bg-white rounded-xl border border-pink-100 h-[50px]"
+                            className="text-center py-8 bg-white rounded-xl border border-pink-100"
                           >
-                            <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 bg-pink-50 rounded-full flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                              </div>
-                              <div>
-                                <p className="text-gray-500 font-medium text-sm">
-                                  {groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}
-                                </p>
-                              </div>
+                            <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
                             </div>
+                            <p className="text-gray-500 font-medium mb-1">
+                              {groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}
+                            </p>
+                            <p className="text-gray-400 text-sm">새로운 일정을 추가해보세요</p>
                           </motion.div>
                         )}
                       </div>
                     </motion.div>
 
-                    {/* 멤버 일정 점 인디케이터 */}
-                    <div className="flex justify-center items-center space-x-2 mt-2.5 mb-2">
+                    {/* 그룹 멤버 점 인디케이터 */}
+                    <div className="flex justify-center items-center space-x-2 mt-4 mb-2">
                       <motion.div
                         className="bg-gray-300 w-2 h-2 rounded-full"
                         initial={{ scale: 0.8 }}

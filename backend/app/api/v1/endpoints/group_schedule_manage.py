@@ -358,8 +358,8 @@ def create_recurring_schedules(db: Session, parent_schedule_id: int, base_params
                     base_alarm_str = base_params["sst_schedule_alarm"]
                     if isinstance(base_alarm_str, str):
                         base_alarm = datetime.strptime(base_alarm_str, '%Y-%m-%d %H:%M:%S')
-                        alarm_duration = base_start - base_alarm
-                        alarm_time = current_date - alarm_duration
+                alarm_duration = base_start - base_alarm
+                alarm_time = current_date - alarm_duration
                         logger.info(f"🔔 [RECURRING] 반복 일정 알림 시간 계산 - base_alarm: {base_alarm}, alarm_time: {alarm_time}")
                     else:
                         logger.warning(f"⚠️ [RECURRING] base_params의 sst_schedule_alarm이 문자열이 아님: {type(base_alarm_str)}")

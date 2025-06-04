@@ -398,8 +398,8 @@ const staggerContainer = {
 
 const staggerItem = {
   hidden: { 
-    opacity: 0, 
-    y: 15 
+    opacity: 0,
+    y: 15
   },
   visible: {
     opacity: 1,
@@ -407,26 +407,7 @@ const staggerItem = {
     transition: {
       type: "spring",
       stiffness: 300,
-      damping: 25,
-      duration: 0.4
-    }
-  }
-};
-
-// 로딩 애니메이션 variants 추가
-const loadingVariants = {
-  hidden: { 
-    opacity: 0,
-    scale: 0.9
-  },
-  visible: { 
-    opacity: 1,
-    scale: 1,
-    transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 25,
-      duration: 0.4
+      damping: 25
     }
   }
 };
@@ -442,21 +423,29 @@ const spinnerVariants = {
   }
 };
 
-// 개선된 로딩 텍스트 애니메이션
-const loadingTextVariants = {
-  hidden: { 
-    y: 10, 
-    opacity: 0 
-  },
-  visible: { 
-    y: 0, 
+const loadingVariants = {
+  hidden: { opacity: 0 },
+  visible: {
     opacity: 1,
     transition: {
-      delay: 0.2,
+      staggerChildren: 0.1,
+      delayChildren: 0.2
+    }
+  }
+};
+
+const loadingTextVariants = {
+  hidden: { 
+    opacity: 0,
+    y: 10
+  },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
       type: "spring",
       stiffness: 300,
-      damping: 25,
-      duration: 0.4
+      damping: 25
     }
   }
 };
@@ -3686,7 +3675,7 @@ export default function LocationPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1, duration: 0.3 }}
-                    className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
+                    className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl p-4 border border-pink-100 h-[200px] overflow-y-auto hide-scrollbar"
                   >
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center space-x-3">
