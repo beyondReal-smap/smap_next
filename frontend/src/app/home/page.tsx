@@ -2885,6 +2885,15 @@ export default function HomePage() {
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           console.log('[그룹 드롭다운] 그룹 선택:', group.sgt_title);
+                                          
+                                          // 현재 선택된 그룹을 다시 클릭한 경우 드롭다운만 닫기
+                                          if (selectedGroupId === group.sgt_idx) {
+                                            console.log('[그룹 드롭다운] 현재 선택된 그룹 재클릭 - 드롭다운 닫기');
+                                            setIsGroupSelectorOpen(false);
+                                            return;
+                                          }
+                                          
+                                          // 다른 그룹을 선택한 경우에만 handleGroupSelect 호출
                                           handleGroupSelect(group.sgt_idx);
                                         }}
                                         className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 flex items-center justify-between ${
