@@ -2743,25 +2743,8 @@ export default function HomePage() {
               transition={{ duration: 0.2 }}
             />
 
-            {/* 점 인디케이터 */}
-            {/* 
-            <div className="flex justify-center items-center space-x-2 mb-4">
-              <motion.div
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  currentTab === 'members' ? 'bg-indigo-600 w-6' : 'bg-gray-300'
-                }`}
-                layoutId="tab-indicator"
-              />
-              <motion.div
-                className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                  currentTab === 'schedules' ? 'bg-pink-600 w-6' : 'bg-gray-300'
-                }`}
-                layoutId="tab-indicator"
-              />
-            </div>
-
             {/* 바텀시트 내용 */}
-            <div className="w-full h-full flex flex-col overflow-hidden">
+            <div className="px-6 pb-2 overflow-y-auto max-h-full">
               {/* 스와이프 가능한 콘텐츠 컨테이너 */}
               <div className="flex-grow min-h-0 relative overflow-hidden">
                 <motion.div
@@ -2778,12 +2761,12 @@ export default function HomePage() {
                   style={{ touchAction: 'pan-x' }}
                 >
                   {/* 그룹 멤버 탭 */}
-                  <div className="w-1/2 h-full px-6 pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
                     <motion.div 
                       initial={{ opacity: 0, y: 30 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.3, duration: 0.6 }}
-                      className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100 hide-scrollbar h-[200px]"
+                      className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100 hide-scrollbar flex-1"
                     >
                       <div className="flex justify-between items-center mb-2">
                         <div className="flex items-center space-x-3">
@@ -3061,12 +3044,12 @@ export default function HomePage() {
                   </div>
 
                   {/* 멤버 일정 탭 */}
-                  <div className="w-1/2 h-full px-6 pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
                     <motion.div 
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.5, duration: 0.6 }}
-                      className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl border border-pink-100 flex-grow"
+                      className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl border border-pink-100 flex-1"
                     >
                       {/* 고정 헤더 부분 */}
                       <div className="sticky top-0 z-20 bg-gradient-to-r from-pink-50 to-rose-50 rounded-t-2xl pt-4 px-6 border-b border-pink-100/50 backdrop-blur-sm">
@@ -3103,7 +3086,7 @@ export default function HomePage() {
 
                         {/* 날짜 선택 */}
                         <div className="mb-1 overflow-hidden" data-calendar-swipe="true">
-                          <div className="mb-1 relative min-h-[50px] overflow-x-hidden"> 
+                          <div className="mb-1 relative min-h-[30px] overflow-x-hidden"> 
                               <motion.div
                                 className="flex space-x-2 pb-2 cursor-grab active:cursor-grabbing"
                                 style={{ x }} 
@@ -3173,7 +3156,7 @@ export default function HomePage() {
                       </div>
                       
                       {/* 스크롤 가능한 일정 목록 */}
-                      <div className="px-6 pb-4">
+                      <div className="px-6">
                         {filteredSchedules.length > 0 ? (
                           <motion.div 
                             className="space-y-3 max-h-[300px] overflow-y-auto hide-scrollbar pr-1"
@@ -3303,23 +3286,23 @@ export default function HomePage() {
                           <motion.div 
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="text-center py-8 bg-white rounded-xl border border-pink-100"
+                            className="text-center py-2 bg-white rounded-xl border border-pink-100 h-[50px] flex flex-row items-center justify-center"
                           >
-                            <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-3">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <div className="w-8 h-8 bg-pink-50 rounded-full flex items-center justify-center mr-3">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
                             </div>
-                            <p className="text-gray-500 font-medium mb-1">
+                            <p className="text-gray-500 font-medium text-sm">
                               {groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}
                             </p>
-                            <p className="text-gray-400 text-sm">새로운 일정을 추가해보세요</p>
                           </motion.div>
                         )}
                       </div>
                     </motion.div>
 
                     {/* 그룹 멤버 점 인디케이터 */}
+                    {/* 잘못된 위치의 점 인디케이터 - 제거됨
                     <div className="flex justify-center items-center space-x-2 mt-4 mb-2">
                       <motion.div
                         className="bg-gray-300 w-2 h-2 rounded-full"
@@ -3334,6 +3317,7 @@ export default function HomePage() {
                         transition={{ duration: 0.3, delay: 0.1 }}
                       />
                     </div>
+                    */}
                   </div>
                 </motion.div>
 
@@ -3368,6 +3352,38 @@ export default function HomePage() {
                     </div>
                   </motion.div>
                 )}
+              </div>
+
+              {/* 점 인디케이터 - 바텀시트 하단에 고정 */}
+              <div className="flex-shrink-0 py-3 bg-white">
+                <div className="flex justify-center items-center space-x-2 mb-2">
+                  <motion.div
+                    className={`rounded-full transition-all duration-300 shadow-md ${
+                      currentTab === 'members' ? 'bg-indigo-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
+                    }`}
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.3 }}
+                  />
+                  <motion.div
+                    className={`rounded-full transition-all duration-300 shadow-md ${
+                      currentTab === 'schedules' ? 'bg-pink-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
+                    }`}
+                    initial={{ scale: 0.8 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.3, delay: 0.1 }}
+                  />
+                </div>
+
+                {/* 스와이프 힌트 */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.7 }}
+                  transition={{ delay: 0.8 }}
+                  className="text-center"
+                >
+                  <span className="text-xs text-gray-400 font-medium">← 좌우로 스와이프 →</span>
+                </motion.div>
               </div>
             </div>
           </motion.div>
