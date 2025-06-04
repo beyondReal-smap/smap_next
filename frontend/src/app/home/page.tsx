@@ -61,6 +61,7 @@ interface GroupMember {
   id: string; name: string; photo: string | null; isSelected: boolean; location: Location;
   schedules: Schedule[]; mt_gender?: number | null; original_index: number;
   mt_weather_sky?: string | number | null; mt_weather_tmx?: string | number | null;
+  mt_weather_tmn?: string | number | null; mt_weather_date?: string | null;
   mlt_lat?: number | null; mlt_long?: number | null; mlt_speed?: number | null;
   mlt_battery?: number | null; mlt_gps_time?: string | null;
   sgdt_owner_chk?: string; sgdt_leader_chk?: string;
@@ -196,6 +197,83 @@ html, body {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* 구글맵 InfoWindow 기본 스타일 숨기기 */
+.gm-style .gm-style-iw-c {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+.gm-style .gm-style-iw-d {
+  overflow: visible !important;
+}
+
+.gm-style .gm-style-iw-t::after {
+  display: none !important;
+}
+
+.gm-style .gm-style-iw-t {
+  display: none !important;
+}
+
+/* 네이버맵 InfoWindow 기본 스타일 숨기기 */
+.infowindow {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.infowindow .infowindow-content {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* 네이버맵 InfoWindow 화살표/꼬리 숨기기 */
+.infowindow .infowindow-tail {
+  display: none !important;
+}
+
+.infowindow::before,
+.infowindow::after {
+  display: none !important;
+}
+
+/* 네이버맵 InfoWindow 추가 스타일 숨기기 */
+.naver-infowindow,
+.naver-infowindow-content,
+.naver-infowindow-wrapper {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* 모든 네이버맵 관련 InfoWindow 요소 숨기기 */
+[class*="infowindow"] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+[class*="InfoWindow"] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* 네이버맵 말풍선 스타일 완전 제거 */
+.naver-maps-infowindow,
+.naver-maps-infowindow-content,
+.naver-maps-infowindow-container {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 /* 지도 컨트롤 버튼들 스타일 */
@@ -466,6 +544,8 @@ const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefi
 // 날씨 정보 타입 정의
 interface WeatherInfo {
   temp: string; 
+  tempMin?: number | null; // 최저기온 (숫자)
+  tempMax?: number | null; // 최고기온 (숫자)
   condition: string;
   icon: string;
   skyStatus?: string; // 백엔드 sky 코드 (선택적)
@@ -481,6 +561,7 @@ const weatherIconMap: { [key: string]: string } = {
   '6': '❄️', // 눈
   '7': '💨', // 눈날림 (바람으로 표현)
   '8': '☀️', // 맑음
+  'no-data': '❓', // 날씨 정보 없음
   'default': '🌡️' // 기본값
 };
 
@@ -493,27 +574,90 @@ const weatherConditionMap: { [key: string]: string } = {
   '6': '눈',
   '7': '눈날림',
   '8': '맑음',
+  'no-data': '정보없음',
   'default': '날씨 정보 없음'
 };
 
-const getWeatherDisplayData = (skyStatus: string | undefined | null, tempMax: number | string | undefined | null): WeatherInfo => {
+const getWeatherDisplayData = (
+  skyStatus: string | undefined | null, 
+  tempMax: number | string | undefined | null,
+  tempMin?: number | string | undefined | null,
+  weatherDate?: string | null
+): WeatherInfo => {
+  // 날씨 등록일 검증 - 오늘 날짜가 아니면 기본값 반환
+  if (weatherDate) {
+    try {
+      const weatherDateObj = new Date(weatherDate);
+      const today = new Date();
+      
+      // 날짜만 비교 (시간 제외)
+      const weatherDateStr = weatherDateObj.toISOString().split('T')[0];
+      const todayStr = today.toISOString().split('T')[0];
+      
+      if (weatherDateStr !== todayStr) {
+        console.log('[getWeatherDisplayData] 날씨 정보가 오늘 날짜가 아님:', weatherDateStr, 'vs', todayStr);
+        return {
+          temp: '-°C',
+          condition: '날씨 정보 없음',
+          icon: '🌡️',
+          skyStatus: 'no-data'
+        };
+      }
+    } catch (e) {
+      console.warn('[getWeatherDisplayData] 날씨 날짜 파싱 오류:', e);
+      return {
+        temp: '-°C',
+        condition: '날씨 정보 없음',
+        icon: '🌡️',
+        skyStatus: 'no-data'
+      };
+    }
+  } else {
+    // 날씨 등록일이 없으면 날씨 정보 없음으로 처리
+    return {
+      temp: '-°C',
+      condition: '날씨 정보 없음',
+      icon: '🌡️',
+      skyStatus: 'no-data'
+    };
+  }
+  
   const statusStr = String(skyStatus || 'default');
   const icon = weatherIconMap[statusStr] || weatherIconMap['default'];
   const condition = weatherConditionMap[statusStr] || weatherConditionMap['default'];
   
-  let tempStr = '--°C';
+  // 최고/최저 온도 처리
+  let tempStr = '-°C';
+  let maxTemp: number | null = null;
+  let minTemp: number | null = null;
+  
+  // 최고기온 처리
   if (typeof tempMax === 'number') {
-    tempStr = `${Math.round(tempMax)}°C`;
+    maxTemp = Math.round(tempMax);
   } else if (typeof tempMax === 'string' && !isNaN(parseFloat(tempMax))) {
-    tempStr = `${Math.round(parseFloat(tempMax))}°C`;
-  } else if (tempMax === null || tempMax === undefined) {
-    // 온도가 null 이나 undefined면 기본값 유지
-  } else {
-    tempStr = String(tempMax); // 숫자로 변환 불가능한 문자열이면 그대로 표시 (예: API가 가끔 문자열 온도를 줄 경우)
+    maxTemp = Math.round(parseFloat(tempMax));
+  }
+  
+  // 최저기온 처리
+  if (typeof tempMin === 'number') {
+    minTemp = Math.round(tempMin);
+  } else if (typeof tempMin === 'string' && !isNaN(parseFloat(tempMin))) {
+    minTemp = Math.round(parseFloat(tempMin));
+  }
+  
+  // 온도 표시 형식 결정
+  if (maxTemp !== null && minTemp !== null) {
+    tempStr = `${minTemp}° / ${maxTemp}°`;
+  } else if (maxTemp !== null) {
+    tempStr = `${maxTemp}°C`;
+  } else if (minTemp !== null) {
+    tempStr = `${minTemp}°C`;
   }
 
   return {
     temp: tempStr,
+    tempMin: minTemp,
+    tempMax: maxTemp,
     condition: condition,
     icon: icon,
     skyStatus: statusStr
@@ -1053,6 +1197,8 @@ export default function HomePage() {
                 original_index: index,
                 mt_weather_sky: member.mt_weather_sky,
                 mt_weather_tmx: member.mt_weather_tmx,
+                mt_weather_tmn: member.mt_weather_tmn,
+                mt_weather_date: member.mt_weather_date,
                 
                 // 새로 추가된 위치 정보
                 mlt_lat: member.mlt_lat,
@@ -1688,73 +1834,88 @@ export default function HomePage() {
 
         // InfoWindow 추가 - 일정 리스트와 동일한 스타일 사용
         if (window.naver.maps.InfoWindow) {
+          // 반복일정 정보 가져오기
+          const repeatIcon = getRepeatIcon(scheduleData);
+          const repeatText = getRepeatDisplayText(scheduleData.sst_repeat_json);
+          
           const infoWindow = new window.naver.maps.InfoWindow({
             content: `
               <div style="
                 padding: 12px 16px;
                 min-width: 200px;
-                max-width: 200px;
+                max-width: 280px;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-                border-radius: 12px;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-                border: 1px solid rgba(99, 102, 241, 0.1);
                 position: relative;
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+                overflow: hidden;
               ">
-                <button onclick="this.parentElement.parentElement.parentElement.remove(); event.stopPropagation();" style="
-                  position: absolute;
-                  top: 8px;
-                  right: 8px;
-                  background: rgba(0, 0, 0, 0.1);
-                  border: none;
-                  border-radius: 50%;
-                  width: 20px;
-                  height: 20px;
-                  font-size: 12px;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  color: #666;
-                  hover: background-color: rgba(0, 0, 0, 0.2);
-                ">×</button>
-                
-                <div style="margin-bottom: 8px; padding-right: 20px;">
-                  <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: #111827; line-height: 1;">${scheduleTitle}</h3>
-                </div>
-                
-                <div style="margin-bottom: 6px;">
-                  <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
-                    <span style="margin-right: 6px;">🕒</span>
-                    <span>${timeRange}</span>
-                  </p>
-                </div>
-                
-                <div style="margin-bottom: 6px;">
-                  <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
-                    <span style="margin-right: 6px;">📍</span>
-                    <span style="word-break: keep-all; line-height: 1;">${scheduleData.sst_location_add || '위치 정보 없음'}</span>
-                  </p>
-                </div>
-                
-                <div>
-                  <span style="
-                    font-size: 11px; 
-                    color: ${statusDetail.color}; 
-                    background: ${statusDetail.bgColor}; 
-                    padding: 2px 8px; 
-                    border-radius: 12px; 
-                    font-weight: 500;
-                    border: 1px solid ${statusDetail.color}20;
-                  ">${statusDetail.text}</span>
-                </div>
+              <button onclick="this.closest('.infowindow').style.display='none'; event.stopPropagation();" style="
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background: rgba(0, 0, 0, 0.1);
+                border: none;
+                border-radius: 50%;
+                width: 22px;
+                height: 22px;
+                font-size: 14px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #666;
+                hover: background-color: rgba(0, 0, 0, 0.2);
+              ">×</button>
+              
+              <div style="margin-bottom: 8px; padding-right: 25px;">
+                <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: #111827; line-height: 1.2;">
+                  ${scheduleData.title || '제목 없음'}
+                </h3>
               </div>
-            `,
-            borderWidth: 0,
-            backgroundColor: 'transparent',
-            disableAnchor: true,
-            pixelOffset: new window.naver.maps.Point(0, -10)
-          });
+              
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
+                  <span style="margin-right: 6px;">🕒</span>
+                  <span>${timeRange}</span>
+                </p>
+              </div>
+              
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
+                  <span style="margin-right: 6px;">📍</span>
+                  <span style="word-break: keep-all; line-height: 1.3;">${scheduleData.sst_location_add || '위치 정보 없음'}</span>
+                </p>
+              </div>
+              
+              ${repeatText !== '없음' ? `
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 11px; color: #4f46e5; display: flex; align-items: center;">
+                  <span style="margin-right: 6px;">🔄</span>
+                  <span>${repeatText}</span>
+                </p>
+              </div>
+              ` : ''}
+              
+              <div>
+                <span style="
+                  font-size: 11px; 
+                  color: ${statusDetail.color}; 
+                  background: ${statusDetail.bgColor}; 
+                  padding: 3px 10px; 
+                  border-radius: 12px; 
+                  font-weight: 500;
+                  border: 1px solid ${statusDetail.color}20;
+                ">${statusDetail.text}</span>
+              </div>
+            </div>
+          `,
+          borderWidth: 0,
+          backgroundColor: 'transparent',
+          disableAnchor: true,
+          pixelOffset: new window.naver.maps.Point(0, -10)
+        });
 
           newMarker.addListener('click', () => {
             // 기존 InfoWindow 닫기
@@ -1835,63 +1996,82 @@ export default function HomePage() {
 
         // InfoWindow 추가 - 일정 리스트와 동일한 스타일 사용
         if (window.google.maps.InfoWindow) {
+          // 반복일정 정보 가져오기
+          const repeatIcon = getRepeatIcon(scheduleData);
+          const repeatText = getRepeatDisplayText(scheduleData.sst_repeat_json);
+          
           const googleInfoWindow = new window.google.maps.InfoWindow({
             content: `
               <div style="
-                padding: 9px 12px;
+                padding: 12px 16px;
                 min-width: 200px;
                 max-width: 280px;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 position: relative;
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+                overflow: hidden;
               ">
-                <button onclick="this.closest('.gm-style-iw').style.display='none'; event.stopPropagation();" style="
-                  position: absolute;
-                  top: 8px;
-                  right: 8px;
-                  background: rgba(0, 0, 0, 0.1);
-                  border: none;
-                  border-radius: 50%;
-                  width: 20px;
-                  height: 20px;
-                  font-size: 12px;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  color: #666;
-                  hover: background-color: rgba(0, 0, 0, 0.2);
-                ">×</button>
-                
-                <div style="margin-bottom: 8px; padding-right: 20px;">
-                  <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: #111827; line-height: 1;">${scheduleData.title || '제목 없음'}</h3>
-                </div>
-                
-                <div style="margin-bottom: 6px;">
-                  <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
-                    <span style="margin-right: 6px;">🕒</span>
-                    <span>${timeRange}</span>
-                  </p>
-                </div>
-                
-                <div style="margin-bottom: 6px;">
-                  <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
-                    <span style="margin-right: 6px;">📍</span>
-                    <span style="word-break: keep-all; line-height: 1;">${scheduleData.sst_location_add || '위치 정보 없음'}</span>
-                  </p>
-                </div>
-                
-                <div>
-                  <span style="
-                    font-size: 11px; 
-                    color: ${statusDetail.color}; 
-                    background: ${statusDetail.bgColor}; 
-                    padding: 2px 8px; 
-                    border-radius: 12px; 
-                    font-weight: 500;
-                    border: 1px solid ${statusDetail.color}20;
-                  ">${statusDetail.text}</span>
-                </div>
+              <button onclick="this.closest('.gm-style-iw').style.display='none'; event.stopPropagation();" style="
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background: rgba(0, 0, 0, 0.1);
+                border: none;
+                border-radius: 50%;
+                width: 22px;
+                height: 22px;
+                font-size: 14px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #666;
+                hover: background-color: rgba(0, 0, 0, 0.2);
+              ">×</button>
+              
+              <div style="margin-bottom: 8px; padding-right: 25px;">
+                <h3 style="margin: 0; font-size: 15px; font-weight: 600; color: #111827; line-height: 1.2;">
+                  ${repeatIcon} ${scheduleData.title || '제목 없음'}
+                </h3>
               </div>
+              
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
+                  <span style="margin-right: 6px;">🕒</span>
+                  <span>${timeRange}</span>
+                </p>
+              </div>
+              
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #4b5563; display: flex; align-items: center;">
+                  <span style="margin-right: 6px;">📍</span>
+                  <span style="word-break: keep-all; line-height: 1.3;">${scheduleData.sst_location_add || '위치 정보 없음'}</span>
+                </p>
+              </div>
+              
+              ${repeatText !== '없음' ? `
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 11px; color: #4f46e5; display: flex; align-items: center;">
+                  <span style="margin-right: 6px;">🔄</span>
+                  <span>${repeatText}</span>
+                </p>
+              </div>
+              ` : ''}
+              
+              <div>
+                <span style="
+                  font-size: 11px; 
+                  color: ${statusDetail.color}; 
+                  background: ${statusDetail.bgColor}; 
+                  padding: 3px 10px; 
+                  border-radius: 12px; 
+                  font-weight: 500;
+                  border: 1px solid ${statusDetail.color}20;
+                ">${statusDetail.text}</span>
+              </div>
+            </div>
             `
           });
           
@@ -2161,7 +2341,12 @@ export default function HomePage() {
     }
     
     if (selectedMember) {
-      setTodayWeather(getWeatherDisplayData(String(selectedMember.mt_weather_sky ?? 'default'), selectedMember.mt_weather_tmx));
+      setTodayWeather(getWeatherDisplayData(
+        String(selectedMember.mt_weather_sky ?? 'default'), 
+        selectedMember.mt_weather_tmx,
+        selectedMember.mt_weather_tmn,
+        selectedMember.mt_weather_date
+      ));
       
       // sgdt_idx를 기준으로 그룹 스케줄에서 해당 멤버의 스케줄 필터링
       const memberSchedules = groupSchedules.filter(schedule => 
@@ -2647,7 +2832,7 @@ export default function HomePage() {
     const fetchWeatherData = async () => {
       try {
         // 실제 API 호출로 변경 필요: 예시 memberService.getCurrentWeather()
-        // 이 API는 { sky: "8", temp_max: 25, ... } 형태의 객체를 반환한다고 가정합니다.
+        // 이 API는 { sky: "8", temp_max: 25, weather_date: "2024-01-01T12:00:00Z", ... } 형태의 객체를 반환한다고 가정합니다.
         // 지금은 PHP 로직을 참고하여 임시 데이터를 사용합니다.
         // 예시: const weatherDataFromApi = await memberService.getWeatherData();
         
@@ -2655,13 +2840,20 @@ export default function HomePage() {
         // 실제로는 API 호출 후 그 결과를 사용해야 합니다.
         const exampleSkyFromApi = '8'; // PHP의 $get_weather_status 값 예시
         const exampleTempMaxFromApi = 28; // PHP의 $get_weather_max 값 예시
+        const exampleTempMinFromApi = 18; // PHP의 $get_weather_min 값 예시
+        const exampleWeatherDateFromApi = new Date().toISOString(); // 오늘 날짜
 
-        console.log('[HOME PAGE] Fetched Weather Data (Example): ', { sky: exampleSkyFromApi, temp_max: exampleTempMaxFromApi });
-        setTodayWeather(getWeatherDisplayData(exampleSkyFromApi, exampleTempMaxFromApi));
+        console.log('[HOME PAGE] Fetched Weather Data (Example): ', { 
+          sky: exampleSkyFromApi, 
+          temp_max: exampleTempMaxFromApi,
+          temp_min: exampleTempMinFromApi,
+          weather_date: exampleWeatherDateFromApi
+        });
+        setTodayWeather(getWeatherDisplayData(exampleSkyFromApi, exampleTempMaxFromApi, exampleTempMinFromApi, exampleWeatherDateFromApi));
 
       } catch (error) {
         console.error('[HOME PAGE] 날씨 정보 조회 오류:', error);
-        setTodayWeather(getWeatherDisplayData('default', null)); // 오류 시 기본값
+        setTodayWeather(getWeatherDisplayData('default', null, null, null)); // 오류 시 기본값
       }
     };
 
@@ -2680,12 +2872,14 @@ export default function HomePage() {
         // TODO: 실제 API 호출 (예: 사용자 위치 기반 날씨)
         const exampleSkyFromApi = '8'; 
         const exampleTempMaxFromApi = 25; 
-        const initialWeather = getWeatherDisplayData(exampleSkyFromApi, exampleTempMaxFromApi);
+        const exampleTempMinFromApi = 15; 
+        const exampleWeatherDateFromApi = new Date().toISOString(); // 오늘 날짜
+        const initialWeather = getWeatherDisplayData(exampleSkyFromApi, exampleTempMaxFromApi, exampleTempMinFromApi, exampleWeatherDateFromApi);
         setTodayWeather(initialWeather);
         initialWeatherDataRef.current = initialWeather;
       } catch (error) {
         console.error('[HOME PAGE] 초기 날씨 정보 조회 오류:', error);
-        const defaultWeather = getWeatherDisplayData('default', null);
+        const defaultWeather = getWeatherDisplayData('default', null, null, null);
         setTodayWeather(defaultWeather);
         initialWeatherDataRef.current = defaultWeather;
       } finally {
@@ -2845,93 +3039,110 @@ export default function HomePage() {
 
   // 일정 선택 핸들러 - 해당 일정 위치로 지도 이동
   const handleScheduleSelect = (schedule: Schedule) => {
-    console.log('[handleScheduleSelect] 일정 선택:', {
+    console.log('[handleScheduleSelect] 스케줄 선택:', {
       id: schedule.id,
       title: schedule.title,
-      lat: schedule.sst_location_lat,
-      lng: schedule.sst_location_long
+      date: schedule.date,
+      location: schedule.location,
+      isRepeating: isRepeatingSchedule(schedule),
+      repeatJson: schedule.sst_repeat_json,
+      repeatText: getRepeatDisplayText(schedule.sst_repeat_json),
+      sst_pidx: schedule.sst_pidx,
+      sst_location_lat: schedule.sst_location_lat,
+      sst_location_long: schedule.sst_location_long
     });
-
-    // 일정에 위치 정보가 있는지 확인
+    
+    // 스케줄에 위치 정보가 있는지 확인
     const lat = parseCoordinate(schedule.sst_location_lat);
     const lng = parseCoordinate(schedule.sst_location_long);
-
-    if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
-      if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
-        // 네이버 지도 이동
-        const naverLatLng = new window.naver.maps.LatLng(lat, lng);
-        naverMap.current.setCenter(naverLatLng);
-        naverMap.current.setZoom(17); // 상세한 줌 레벨로 설정
-        console.log('[handleScheduleSelect] 네이버 지도 이동 완료:', { lat, lng });
-        
-        // 해당 마커 찾아서 클릭 이벤트 트리거
-        setTimeout(() => {
-          const targetMarker = scheduleMarkersRef.current.find((marker, index) => {
-            const markerLat = parseCoordinate(filteredSchedules[index]?.sst_location_lat);
-            const markerLng = parseCoordinate(filteredSchedules[index]?.sst_location_long);
-            return markerLat === lat && markerLng === lng;
-          });
-          
-          if (targetMarker) {
-            // 네이버 지도 마커 클릭 이벤트 트리거
-            window.naver.maps.Event.trigger(targetMarker, 'click');
-            console.log('[handleScheduleSelect] 마커 클릭 이벤트 트리거 완료');
-          }
-        }, 200);
-        
-        // 햅틱 피드백
-        try {
-          if ('vibrate' in navigator) {
-            navigator.vibrate([30, 10, 30]);
-          }
-        } catch (error) {
-          console.debug('햅틱 피드백이 차단되었습니다:', error);
-        }
-      } else if (mapType === 'google' && map.current && googleMapsLoaded) {
-        // 구글 지도 이동
-        map.current.panTo({ lat, lng });
-        map.current.setZoom(17); // 상세한 줌 레벨로 설정
-        console.log('[handleScheduleSelect] 구글 지도 이동 완료:', { lat, lng });
-        
-        // 해당 마커 찾아서 클릭 이벤트 트리거
-        setTimeout(() => {
-          const targetMarker = scheduleMarkersRef.current.find((marker, index) => {
-            const markerLat = parseCoordinate(filteredSchedules[index]?.sst_location_lat);
-            const markerLng = parseCoordinate(filteredSchedules[index]?.sst_location_long);
-            return markerLat === lat && markerLng === lng;
-          });
-          
-          if (targetMarker) {
-            // 구글 지도 마커 클릭 이벤트 트리거
-            window.google.maps.event.trigger(targetMarker, 'click');
-            console.log('[handleScheduleSelect] 구글 마커 클릭 이벤트 트리거 완료');
-          }
-        }, 200);
-        
-        // 햅틱 피드백
-        try {
-          if ('vibrate' in navigator) {
-            navigator.vibrate([30, 10, 30]);
-          }
-        } catch (error) {
-          console.debug('햅틱 피드백이 차단되었습니다:', error);
-        }
-      }
-    } else {
-      console.warn('[handleScheduleSelect] 일정에 유효한 위치 정보가 없습니다:', {
-        lat: schedule.sst_location_lat,
-        lng: schedule.sst_location_long
-      });
-      
-      // 위치 정보가 없을 때도 부드러운 피드백 제공
+    
+    if (!lat || !lng) {
+      console.warn('[handleScheduleSelect] 스케줄 위치 정보가 없습니다:', schedule.title);
+      return;
+    }
+    
+    // 기존 InfoWindow 닫기
+    if (currentInfoWindowRef.current) {
       try {
-        if ('vibrate' in navigator) {
-          navigator.vibrate([100]); // 짧고 강한 진동으로 "불가능" 표시
-        }
-      } catch (error) {
-        console.debug('햅틱 피드백이 차단되었습니다:', error);
+        currentInfoWindowRef.current.close();
+        currentInfoWindowRef.current = null;
+      } catch (e) {
+        console.warn('[handleScheduleSelect] 기존 InfoWindow 닫기 실패:', e);
       }
     }
+    
+    // 해당 스케줄의 마커 찾기
+    const scheduleIndex = filteredSchedules.findIndex(s => s.id === schedule.id);
+    
+    // 지도 타입에 따른 포커스 이동
+    if (mapType === 'naver' && naverMap.current) {
+      const location = new window.naver.maps.LatLng(lat, lng);
+      naverMap.current.setCenter(location);
+      naverMap.current.setZoom(16);
+      
+      // 해당 마커의 클릭 이벤트 트리거 (InfoWindow는 마커에서 이미 생성됨)
+      if (scheduleIndex !== -1 && scheduleMarkersRef.current[scheduleIndex]) {
+        const marker = scheduleMarkersRef.current[scheduleIndex];
+        // 네이버맵 마커 클릭 이벤트 트리거
+        window.naver.maps.Event.trigger(marker, 'click');
+      }
+    } else if (mapType === 'google' && map.current) {
+      const location = { lat, lng };
+      map.current.setCenter(location);
+      map.current.setZoom(16);
+      
+      // 해당 마커의 클릭 이벤트 트리거 (InfoWindow는 마커에서 이미 생성됨)
+      if (scheduleIndex !== -1 && scheduleMarkersRef.current[scheduleIndex]) {
+        const marker = scheduleMarkersRef.current[scheduleIndex];
+        // 구글맵 마커 클릭 이벤트 트리거
+        window.google.maps.event.trigger(marker, 'click');
+      }
+    }
+  };
+
+  // 반복일정 정보를 파싱하고 표시하는 함수
+  const getRepeatDisplayText = (repeatJson?: string | null): string => {
+    if (!repeatJson || repeatJson === 'null' || repeatJson.trim() === '') return '없음';
+    try {
+      const repeatObj = JSON.parse(repeatJson);
+      const r1 = repeatObj.r1;
+      const r2 = repeatObj.r2;
+      
+      switch (r1) {
+        case '5':
+          return '매년';
+        case '4':
+          return '매월';
+        case '3':
+          if (r2) {
+            const days = r2.split(',').map((day: string) => {
+              const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+              return dayNames[parseInt(day)] || day;
+            });
+            return `매주 ${days.join(',')}`;
+          }
+          return '매주';
+        case '2':
+          return '매일';
+        default:
+          return '사용자 정의';
+      }
+    } catch {
+      return '없음';
+    }
+  };
+
+  // 반복일정인지 확인하는 함수
+  const isRepeatingSchedule = (schedule: Schedule): boolean => {
+    return !!(schedule.sst_repeat_json && schedule.sst_repeat_json.trim() !== '') || !!(schedule.sst_pidx && schedule.sst_pidx > 0);
+  };
+
+  // 반복일정 아이콘을 반환하는 함수
+  const getRepeatIcon = (schedule: Schedule): string => {
+    if (isRepeatingSchedule(schedule)) {
+      return '🔄';
+    }
+    return '';
   };
 
   return (
@@ -3219,8 +3430,17 @@ export default function HomePage() {
             )}
             <div className="flex flex-col items-center w-full">
               <span className="text-lg">{todayWeather.icon}</span>
-              <span className="text-sm font-medium">{todayWeather.temp}</span>
-              <span className="text-xs text-white">{todayWeather.condition}</span>
+              {/* 온도 표시 - 최저기온은 파란색, 최고기온은 빨간색 */}
+              <span className="text-sm font-medium">
+                {todayWeather.tempMin !== null && todayWeather.tempMax !== null ? (
+                  <>
+                    <span style={{ color: '#3b82f6' }}>{todayWeather.tempMin}°</span>
+                    <span className="mx-1">/</span>
+                    <span style={{ color: '#ef4444' }}>{todayWeather.tempMax}°</span>
+                  </>
+                ) : todayWeather.temp}
+              </span>
+              <span className="text-xs text-gray-500">{todayWeather.condition}</span>
             </div>
           </div>
         )}
@@ -3764,8 +3984,15 @@ export default function HomePage() {
 
                                             {/* 스케줄명 */}
                                             <div className="flex-1 min-w-0">
-                                              <h3 className="font-medium text-xs truncate text-gray-900">{schedule.title}</h3>
-                                        </div>
+                                              <div className="flex items-center space-x-1">
+                                                <h3 className="font-medium text-xs truncate text-gray-900">{schedule.title}</h3>
+                                              </div>
+                                              {/* {isRepeatingSchedule(schedule) && (
+                                                <p className="text-xs text-indigo-600 truncate mt-0.5">
+                                                  {getRepeatDisplayText(schedule.sst_repeat_json)}
+                                                </p>
+                                              )} */}
+                                            </div>
                                             
                                             {/* 시간 정보 */}
                                             <div className="flex items-center space-x-1 text-xs flex-shrink-0 text-right text-gray-400">

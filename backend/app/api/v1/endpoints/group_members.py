@@ -36,7 +36,12 @@ def get_group_members(
                 m.mt_birth,
                 m.mt_file1,
                 m.mt_gender,
-                m.mt_status
+                m.mt_status,
+                m.mt_weather_pop,
+                m.mt_weather_tmn,
+                m.mt_weather_tmx,
+                m.mt_weather_sky,
+                m.mt_weather_date
             FROM smap_group_detail_t sgd
             JOIN member_t m ON sgd.mt_idx = m.mt_idx
             WHERE sgd.sgt_idx = :group_id 
@@ -110,6 +115,11 @@ def get_group_members(
                 "mt_file1": row.mt_file1,
                 "mt_gender": row.mt_gender,
                 "mt_status": row.mt_status,
+                "mt_weather_pop": row.mt_weather_pop,
+                "mt_weather_tmn": row.mt_weather_tmn,
+                "mt_weather_tmx": row.mt_weather_tmx,
+                "mt_weather_sky": row.mt_weather_sky,
+                "mt_weather_date": row.mt_weather_date,
                 
                 # 최신 위치 정보
                 "mlt_lat": location_info.get("mlt_lat"),
