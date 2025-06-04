@@ -605,7 +605,7 @@ export default function HomePage() {
   // 인증 관련 상태 추가
   const { user, isLoggedIn, loading: authLoading } = useAuth();
   // UserContext 사용
-  const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData, getGroupMemberCount } = useUser();
+  const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData, getGroupMemberCount, selectedGroupId, setSelectedGroupId } = useUser();
   
   const [userName, setUserName] = useState('사용자');
   const [userLocation, setUserLocation] = useState<Location>({ lat: 37.5642, lng: 127.0016 }); // 기본: 서울
@@ -661,9 +661,11 @@ export default function HomePage() {
   const [isFirstMemberSelectionComplete, setIsFirstMemberSelectionComplete] = useState(false); // 첫번째 멤버 선택 완료 상태 추가
 
   // 그룹 관련 상태 - UserContext로 대체됨
-  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
   const [firstMemberSelected, setFirstMemberSelected] = useState(false); // 첫번째 멤버 선택 완료 추적
+
+  // 그룹 드롭다운 ref 추가
+  const groupDropdownRef = useRef<HTMLDivElement>(null);
 
   // 달력 스와이프 관련 상태 - calendarBaseDate 제거, x만 유지
   const x = useMotionValue(0); // 드래그 위치를 위한 motionValue
@@ -2295,24 +2297,25 @@ export default function HomePage() {
     console.log('[handleGroupSelect] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작');
   };
 
-  // 그룹 선택 드롭다운 외부 클릭 시 닫기
+  // 그룹 선택 드롭다운 외부 클릭 시 닫기 - 개선된 로직
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (isGroupSelectorOpen) {
-        const target = event.target as HTMLElement;
-        const groupDropdown = target.closest('.relative');
-        const isGroupDropdownClick = groupDropdown && groupDropdown.querySelector('button[data-group-selector]');
+      if (isGroupSelectorOpen && groupDropdownRef.current) {
+        const target = event.target as Node;
         
-        if (!isGroupDropdownClick) {
+        // 클릭된 요소가 드롭다운 컨테이너 내부에 있는지 확인
+        if (!groupDropdownRef.current.contains(target)) {
+          console.log('[그룹 드롭다운] 외부 클릭으로 드롭다운 닫기');
           setIsGroupSelectorOpen(false);
         }
       }
     };
 
     if (isGroupSelectorOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      // mousedown 대신 click 이벤트 사용 (더 안정적)
+      document.addEventListener('click', handleClickOutside);
       return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('click', handleClickOutside);
       };
     }
   }, [isGroupSelectorOpen]);
@@ -2332,13 +2335,6 @@ export default function HomePage() {
     }
   }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members, dataFetchedRef.current.schedules]);
 
-  // UserContext 데이터가 로딩 완료되면 첫 번째 그룹을 자동 선택
-  useEffect(() => {
-    if (!isUserDataLoading && userGroups.length > 0 && !selectedGroupId) {
-      setSelectedGroupId(userGroups[0].sgt_idx);
-      console.log('[HOME] UserContext에서 첫 번째 그룹 자동 선택:', userGroups[0].sgt_title);
-    }
-  }, [isUserDataLoading, userGroups, selectedGroupId]);
 
   // 개선된 바텀시트 애니메이션 variants - location/page.tsx에서 가져옴
   const bottomSheetVariants = {
@@ -2367,6 +2363,37 @@ export default function HomePage() {
       }
     }
   };
+
+  // 상태 추가
+  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
+
+  // 그룹별 멤버 수 조회 (userGroups가 변경될 때만)
+  useEffect(() => {
+    const fetchGroupMemberCounts = async () => {
+      if (!userGroups || userGroups.length === 0) return;
+
+      console.log('[HOME] 그룹 멤버 수 조회 시작:', userGroups.length, '개 그룹');
+      
+      const counts: Record<number, number> = {};
+      
+      // 모든 그룹의 멤버 수를 병렬로 조회
+      await Promise.all(userGroups.map(async (group) => {
+        try {
+          const count = await getGroupMemberCount(group.sgt_idx);
+          counts[group.sgt_idx] = count;
+          console.log(`[HOME] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수:`, count);
+        } catch (error) {
+          console.error(`[HOME] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+          counts[group.sgt_idx] = 0;
+        }
+      }));
+      
+      setGroupMemberCounts(counts);
+      console.log('[HOME] 그룹 멤버 수 조회 완료:', counts);
+    };
+
+    fetchGroupMemberCounts();
+  }, [userGroups, getGroupMemberCount]);
 
   return (
     <>
@@ -2758,7 +2785,7 @@ export default function HomePage() {
                         
                         <div className="flex items-center space-x-3">
                           {/* 그룹 선택 드롭다운 */}
-                          <div className="relative">
+                          <div className="relative" ref={groupDropdownRef}>
                             <motion.button
                               whileHover={{ 
                                 scale: 1.02, 
@@ -2773,6 +2800,7 @@ export default function HomePage() {
                               }}
                               onClick={(e) => {
                                 e.stopPropagation();
+                                console.log('[그룹 드롭다운] 버튼 클릭, 현재 상태:', isGroupSelectorOpen);
                                 setIsGroupSelectorOpen(!isGroupSelectorOpen);
                               }}
                               className="group-selector flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium min-w-[140px] mobile-button"
@@ -2803,70 +2831,78 @@ export default function HomePage() {
                                 )}
                               </div>
                             </motion.button>
+
+                            {/* 그룹 선택 드롭다운 메뉴 */}
+                            {isGroupSelectorOpen && (
+                              <motion.div
+                                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
+                                className="absolute top-16 right-0 z-50 min-w-[200px] bg-white border border-indigo-200 rounded-xl shadow-xl overflow-hidden"
+                                onClick={(e) => {
+                                  // 드롭다운 메뉴 내부 클릭 시 이벤트 버블링 방지
+                                  e.stopPropagation();
+                                }}
+                              >
+                                <div className="py-2">
+                                  {isUserDataLoading ? (
+                                    <div className="px-4 py-3 text-center">
+                                      <div className="flex items-center justify-center space-x-2">
+                                        <motion.div
+                                          variants={spinnerVariants}
+                                          animate="animate"
+                                        >
+                                          <FiLoader className="text-indigo-500" size={16} />
+                                        </motion.div>
+                                        <span className="text-sm text-gray-600">로딩 중...</span>
+                                      </div>
+                                    </div>
+                                  ) : userGroups.length > 0 ? (
+                                    userGroups.map((group) => (
+                                      <motion.button
+                                        key={group.sgt_idx}
+                                        whileHover={{ backgroundColor: '#f8fafc' }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          console.log('[그룹 드롭다운] 그룹 선택:', group.sgt_title);
+                                          handleGroupSelect(group.sgt_idx);
+                                        }}
+                                        className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 flex items-center justify-between ${
+                                          selectedGroupId === group.sgt_idx
+                                            ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-500'
+                                            : 'text-gray-700 hover:bg-gray-50'
+                                        }`}
+                                      >
+                                        <div className="flex-1">
+                                          <div className="font-semibold truncate">{group.sgt_title}</div>
+                                          <div className="text-xs text-gray-500 mt-0.5">
+                                            멤버 {groupMemberCounts[group.sgt_idx] || 0}명
+                                          </div>
+                                        </div>
+                                        {selectedGroupId === group.sgt_idx && (
+                                          <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                          </svg>
+                                        )}
+                                      </motion.button>
+                                    ))
+                                  ) : (
+                                    <div className="px-4 py-6 text-center">
+                                      <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-2">
+                                        <FiUser className="w-6 h-6 text-gray-400" />
+                                      </div>
+                                      <p className="text-sm text-gray-600 font-medium">참여한 그룹이 없습니다</p>
+                                      <p className="text-xs text-gray-500 mt-1">새로운 그룹을 만들어보세요</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
                           </div>
                         </div>
                       </div>
-
-                      {/* 그룹 선택 드롭다운 메뉴 */}
-                      {isGroupSelectorOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                          transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-                          className="absolute top-16 right-0 z-50 min-w-[200px] bg-white border border-indigo-200 rounded-xl shadow-xl overflow-hidden"
-                        >
-                          <div className="py-2">
-                            {isUserDataLoading ? (
-                              <div className="px-4 py-3 text-center">
-                                <div className="flex items-center justify-center space-x-2">
-                                  <motion.div
-                                    variants={spinnerVariants}
-                                    animate="animate"
-                                  >
-                                    <FiLoader className="text-indigo-500" size={16} />
-                                  </motion.div>
-                                  <span className="text-sm text-gray-600">로딩 중...</span>
-                                </div>
-                              </div>
-                            ) : userGroups.length > 0 ? (
-                              userGroups.map((group) => (
-                                <motion.button
-                                  key={group.sgt_idx}
-                                  whileHover={{ backgroundColor: '#f8fafc' }}
-                                  whileTap={{ scale: 0.98 }}
-                                  onClick={() => handleGroupSelect(group.sgt_idx)}
-                                  className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 flex items-center justify-between ${
-                                    selectedGroupId === group.sgt_idx
-                                      ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-500'
-                                      : 'text-gray-700 hover:bg-gray-50'
-                                  }`}
-                                >
-                                  <div className="flex-1">
-                                    <div className="font-semibold truncate">{group.sgt_title}</div>
-                                    <div className="text-xs text-gray-500 mt-0.5">
-                                      멤버 {getGroupMemberCount(group.sgt_idx)}명
-                                    </div>
-                                  </div>
-                                  {selectedGroupId === group.sgt_idx && (
-                                    <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                  )}
-                                </motion.button>
-                              ))
-                            ) : (
-                              <div className="px-4 py-6 text-center">
-                                <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-2">
-                                  <FiUser className="w-6 h-6 text-gray-400" />
-                                </div>
-                                <p className="text-sm text-gray-600 font-medium">참여한 그룹이 없습니다</p>
-                                <p className="text-xs text-gray-500 mt-1">새로운 그룹을 만들어보세요</p>
-                              </div>
-                            )}
-                          </div>
-                        </motion.div>
-                      )}
 
                       {/* 멤버 목록 내용 */}
                       {(isUserDataLoading || !dataFetchedRef.current.members) ? (
@@ -2995,22 +3031,6 @@ export default function HomePage() {
                         </div>
                       )}
                     </motion.div>
-
-                    {/* 멤버 일정 점 인디케이터 */}
-                    <div className="flex justify-center items-center space-x-2 mt-2.5 mb-2">
-                      <motion.div
-                        className="bg-indigo-600 w-6 h-2 rounded-full"
-                        initial={{ scale: 0.8 }}
-                        animate={{ scale: 1 }}
-                        transition={{ duration: 0.3 }}
-                      />
-                      <motion.div
-                        className="bg-gray-300 w-2 h-2 rounded-full"
-                        initial={{ scale: 0.8 }}
-                        animate={{ scale: 1 }}
-                        transition={{ duration: 0.3, delay: 0.1 }}
-                      />
-                    </div>
                   </div>
 
                   {/* 멤버 일정 탭 */}
@@ -3019,7 +3039,7 @@ export default function HomePage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.5, duration: 0.6 }}
-                      className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl border border-pink-100 h-[200px]"
+                      className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl border border-pink-100 flex-grow"
                     >
                       {/* 고정 헤더 부분 */}
                       <div className="sticky top-0 z-20 bg-gradient-to-r from-pink-50 to-rose-50 rounded-t-2xl pt-4 px-6 border-b border-pink-100/50 backdrop-blur-sm">
@@ -3056,9 +3076,9 @@ export default function HomePage() {
 
                         {/* 날짜 선택 */}
                         <div className="mb-1 overflow-hidden" data-calendar-swipe="true">
-                          <div className="mb-1 relative min-h-[40px] overflow-x-hidden"> 
+                          <div className="mb-1 relative min-h-[50px] overflow-x-hidden"> 
                               <motion.div
-                                className="flex space-x-2 cursor-grab active:cursor-grabbing"
+                                className="flex space-x-2 pb-2 cursor-grab active:cursor-grabbing"
                                 style={{ x }} 
                                 drag="x"
                                 dragConstraints={{ left: -280, right: 8 }}
@@ -3256,27 +3276,24 @@ export default function HomePage() {
                           <motion.div 
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="text-center flex items-center justify-center bg-white rounded-xl border border-pink-100 h-[50px]"
+                            className="text-center py-8 bg-white rounded-xl border border-pink-100"
                           >
-                            <div className="flex items-center space-x-3">
-                              <div className="w-8 h-8 bg-pink-50 rounded-full flex items-center justify-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                              </div>
-                              <div>
-                                <p className="text-gray-500 font-medium text-sm">
-                                  {groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}
-                                </p>
-                              </div>
+                            <div className="w-16 h-16 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
                             </div>
+                            <p className="text-gray-500 font-medium mb-1">
+                              {groupMembers.some(m => m.isSelected) ? '선택한 멤버의 일정이 없습니다' : '오늘 일정이 없습니다'}
+                            </p>
+                            <p className="text-gray-400 text-sm">새로운 일정을 추가해보세요</p>
                           </motion.div>
                         )}
                       </div>
                     </motion.div>
 
-                    {/* 멤버 일정 점 인디케이터 */}
-                    <div className="flex justify-center items-center space-x-2 mt-2.5 mb-2">
+                    {/* 그룹 멤버 점 인디케이터 */}
+                    <div className="flex justify-center items-center space-x-2 mt-4 mb-2">
                       <motion.div
                         className="bg-gray-300 w-2 h-2 rounded-full"
                         initial={{ scale: 0.8 }}

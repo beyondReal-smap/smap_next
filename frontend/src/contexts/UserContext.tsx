@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import groupService, { Group } from '@/services/groupService';
 import memberService from '@/services/memberService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,6 +37,10 @@ interface UserContextType {
   
   // 특정 그룹의 멤버 수 조회
   getGroupMemberCount: (groupId: number) => Promise<number>;
+  
+  // 선택된 그룹
+  selectedGroupId: number | null;
+  setSelectedGroupId: (groupId: number | null) => void;
 }
 
 // Context 생성
@@ -46,14 +50,18 @@ const UserContext = createContext<UserContextType | undefined>(undefined);
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [userGroups, setUserGroups] = useState<Group[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [isUserDataLoading, setIsUserDataLoading] = useState(true);
   const [userDataError, setUserDataError] = useState<string | null>(null);
+
+  // 초기화 완료 상태 추가
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // AuthContext 사용
   const { user, isLoggedIn, loading: authLoading } = useAuth();
 
   // 사용자 데이터 새로고침 함수
-  const refreshUserData = async () => {
+  const refreshUserData = useCallback(async () => {
     try {
       setIsUserDataLoading(true);
       setUserDataError(null);
@@ -118,10 +126,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setIsUserDataLoading(false);
     }
-  };
+  }, [isLoggedIn, user]);
 
   // 특정 그룹의 멤버 수 조회
-  const getGroupMemberCount = async (groupId: number): Promise<number> => {
+  const getGroupMemberCount = useCallback(async (groupId: number): Promise<number> => {
     try {
       const members = await memberService.getGroupMembers(groupId.toString());
       return members.length;
@@ -129,7 +137,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error(`[UserContext] 그룹 ${groupId} 멤버 수 조회 실패:`, error);
       return 0;
     }
-  };
+  }, []);
 
   // AuthContext 상태 변경 시 데이터 새로고침
   useEffect(() => {
@@ -137,13 +145,24 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!authLoading) {
       refreshUserData();
     }
-  }, [authLoading, isLoggedIn, user?.mt_idx]); // user.mt_idx 변경 시에도 새로고침
+  }, [authLoading, isLoggedIn]); // user.mt_idx 제거하여 무한 재조회 방지
+
+  // 그룹 데이터 로딩 완료 후 첫 번째 그룹 자동 선택 (한 번만)
+  useEffect(() => {
+    if (!isInitialized && !isUserDataLoading && userGroups.length > 0 && selectedGroupId === null) {
+      console.log('[UserContext] 초기화: 첫 번째 그룹 자동 선택:', userGroups[0].sgt_title, 'ID:', userGroups[0].sgt_idx);
+      setSelectedGroupId(userGroups[0].sgt_idx);
+      setIsInitialized(true); // 초기화 완료 표시
+    }
+  }, [isInitialized, isUserDataLoading, userGroups.length]); // selectedGroupId 의존성 제거
 
   const value: UserContextType = {
     userInfo,
     setUserInfo,
     userGroups,
     setUserGroups,
+    selectedGroupId,
+    setSelectedGroupId,
     isUserDataLoading,
     setIsUserDataLoading,
     userDataError,

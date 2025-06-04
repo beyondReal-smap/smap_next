@@ -39,6 +39,7 @@ import ReactDOM from 'react-dom';
 import memberService from '@/services/memberService';
 import locationService, { OtherMemberLocationRaw } from '@/services/locationService';
 import groupService, { Group } from '@/services/groupService';
+import { useUser } from '@/contexts/UserContext';
 
 // 모바일 최적화된 CSS 스타일
 const mobileStyles = `
@@ -196,38 +197,41 @@ const pageVariants = {
   }
 };
 
-// 개선된 바텀시트 애니메이션 variants - 더 부드러운 스프링 애니메이션
+// 개선된 바텀시트 애니메이션 variants - home/page.tsx와 동일하게 수정
 const bottomSheetVariants = {
   hidden: { 
-    y: '100%',
-    opacity: 0,
-    transition: {
-      type: "spring",
-      stiffness: 400,
-      damping: 40,
-      mass: 0.8,
-      duration: 0.4
-    }
-  },
-  visible: { 
-    y: 20,
+    top: '90vh', // home/page.tsx와 동일
+    bottom: '0px', // 높이 고정을 위해 bottom 추가
     opacity: 1,
     transition: {
       type: "spring",
       stiffness: 400,
-      damping: 35,
-      mass: 0.7,
+      damping: 30,
+      mass: 0.6,
+      duration: 0.5
+    }
+  },
+  visible: { 
+    top: '20vh', // 3단계 - 거의 전체 화면
+    bottom: '0px', // 높이 고정을 위해 bottom 추가
+    opacity: 1,
+    transition: {
+      type: "spring",
+      stiffness: 400,
+      damping: 30,
+      mass: 0.6,
       duration: 0.5
     }
   },
   peek: {
-    y: '72%',
+    top: '65vh', // home/page.tsx와 완전히 동일 - 2단계이므로 더 크게 열림
+    bottom: '0px', // 높이 고정을 위해 bottom 추가
     opacity: 1,
     transition: {
       type: "spring",
       stiffness: 400,
-      damping: 35,
-      mass: 0.7,
+      damping: 30,
+      mass: 0.6,
       duration: 0.5
     }
   }
@@ -568,6 +572,9 @@ const useImageWithFallback = (src: string | null, fallbackSrc: string) => {
 export default function LocationPage() {
   const router = useRouter();
   
+  // UserContext 사용 추가
+  const { getGroupMemberCount } = useUser();
+  
   // 상태 관리
   const [isExiting, setIsExiting] = useState(false);
   const [shouldAnimate, setShouldAnimate] = useState(true);
@@ -580,6 +587,9 @@ export default function LocationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isLoadingOtherLocations, setIsLoadingOtherLocations] = useState(false);
+  
+  // 그룹별 멤버 수 상태 추가
+  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
   
   // 데이터 로딩 상태 추적을 위한 ref 추가
   const dataFetchedRef = useRef({ 
@@ -1249,7 +1259,15 @@ export default function LocationPage() {
 
   // 그룹 선택 핸들러
   const handleGroupSelect = async (groupId: number) => {
-    console.log('[handleGroupSelect] 그룹 선택:', groupId);
+    console.log('[handleGroupSelect] 그룹 선택:', groupId, '현재 선택된 그룹:', selectedGroupId);
+    
+    // 현재 선택된 그룹과 동일한 그룹을 선택한 경우 드롭다운만 닫기
+    if (selectedGroupId === groupId) {
+      console.log('[handleGroupSelect] 동일한 그룹 선택 - 드롭다운만 닫음');
+      setIsGroupSelectorOpen(false);
+      return;
+    }
+    
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
     setBottomSheetState('peek');
@@ -1826,12 +1844,13 @@ export default function LocationPage() {
       fetchUserGroups();
   }, []);
 
-  // 선택된 그룹이 변경될 때 멤버 데이터 불러오기
+  // 선택된 그룹이 변경될 때 멤버 데이터 불러오기 (무한 재조회 방지)
   useEffect(() => {
-    if (selectedGroupId) {
+    if (selectedGroupId && !dataFetchedRef.current.members) {
+      console.log('[useEffect] selectedGroupId 변경으로 인한 멤버 데이터 로딩:', selectedGroupId);
       fetchGroupMembersData();
     }
-  }, [selectedGroupId]);
+  }, [selectedGroupId]); // dataFetchedRef.current.members 조건으로 중복 실행 방지
   
   // 첫번째 멤버 자동 선택 - 지도 준비되고 멤버가 있을 때
   useEffect(() => {
@@ -1843,12 +1862,15 @@ export default function LocationPage() {
         dataFetchedRef.current.members) {
       console.log('[첫번째 멤버 자동 선택] 시작:', groupMembers[0].name);
       
+      // 상태를 즉시 설정하여 중복 실행 방지
+      setIsFirstMemberSelectionComplete(true);
+      
       // 약간의 지연 후 첫번째 멤버 선택 (지도 렌더링 완료 대기)
       setTimeout(() => {
         handleMemberSelect(groupMembers[0].id);
       }, 500);
     }
-  }, [groupMembers.length, isFirstMemberSelectionComplete, isMapReady, map, dataFetchedRef.current.members]);
+  }, [groupMembers.length, isMapReady]); // dataFetchedRef.current.members와 map 제거하여 의존성 순환 방지
 
   // 페이지 로드 애니메이션
   useEffect(() => {
@@ -1941,7 +1963,7 @@ export default function LocationPage() {
     if (isMapInitialized) { 
       loadOtherMemberLocations();
     }
-  }, [isMapInitialized, activeView, selectedMemberIdRef.current]);
+  }, [isMapInitialized, activeView]); // selectedMemberIdRef.current 제거하여 무한 재조회 방지
 
   // 사용자 그룹 목록 불러오기
   const fetchUserGroups = async () => {
@@ -2785,24 +2807,24 @@ export default function LocationPage() {
     console.log('[handleLocationCardClick] 장소 카드 클릭:', location.name || location.slt_title || '제목 없음', '위치:', lat, lng);
   };
 
-  // 지도 준비 완료 후 첫 번째 멤버 자동 선택
-  useEffect(() => {
-    if (isMapReady && groupMembers.length > 0 && !isFetchingGroupMembers) {
-      const hasSelectedMember = groupMembers.some(member => member.isSelected);
+  // 지도 준비 완료 후 첫 번째 멤버 자동 선택 - 제거하여 무한 재조회 방지
+  // useEffect(() => {
+  //   if (isMapReady && groupMembers.length > 0 && !isFetchingGroupMembers) {
+  //     const hasSelectedMember = groupMembers.some(member => member.isSelected);
       
-      if (!hasSelectedMember) {
-        console.log('[useEffect] 지도 준비 완료 - 첫 번째 멤버 자동 선택');
-        handleMemberSelect(groupMembers[0].id, false, groupMembers);
-      } else {
-        // 이미 선택된 멤버가 있다면 해당 멤버의 장소 데이터 로드
-        const selectedMember = groupMembers.find(m => m.isSelected);
-        if (selectedMember && (!selectedMemberSavedLocations || selectedMemberSavedLocations.length === 0)) {
-          console.log('[useEffect] 선택된 멤버의 장소 데이터 로드:', selectedMember.name);
-          handleMemberSelect(selectedMember.id, false, groupMembers);
-        }
-      }
-    }
-  }, [isMapReady, groupMembers, isFetchingGroupMembers]);
+  //     if (!hasSelectedMember) {
+  //       console.log('[useEffect] 지도 준비 완료 - 첫 번째 멤버 자동 선택');
+  //       handleMemberSelect(groupMembers[0].id, false, groupMembers);
+  //     } else {
+  //       // 이미 선택된 멤버가 있다면 해당 멤버의 장소 데이터 로드
+  //       const selectedMember = groupMembers.find(m => m.isSelected);
+  //       if (selectedMember && (!selectedMemberSavedLocations || selectedMemberSavedLocations.length === 0)) {
+  //         console.log('[useEffect] 선택된 멤버의 장소 데이터 로드:', selectedMember.name);
+  //         handleMemberSelect(selectedMember.id, false, groupMembers);
+  //       }
+  //     }
+  //   }
+  // }, [isMapReady, groupMembers, isFetchingGroupMembers]);
 
   // 장소 삭제 모달 열기
   const openLocationDeleteModal = (location: LocationData | OtherMemberLocationRaw) => {
@@ -2885,6 +2907,68 @@ export default function LocationPage() {
       setIsDeletingLocation(false);
     }
   };
+
+  // 그룹 선택 드롭다운 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (isGroupSelectorOpen) {
+        const target = event.target as HTMLElement;
+        
+        // 그룹 드롭다운 관련 요소들을 더 구체적으로 확인
+        const isGroupDropdownContainer = target.closest('[data-group-dropdown-container]');
+        const isGroupDropdownButton = target.closest('[data-group-selector]');
+        const isGroupDropdownMenu = target.closest('[data-group-dropdown-menu]');
+        
+        // 그룹 드롭다운 관련 요소가 아닌 외부 클릭인 경우에만 닫기
+        if (!isGroupDropdownContainer && !isGroupDropdownButton && !isGroupDropdownMenu) {
+          console.log('[handleClickOutside] 그룹 드롭다운 외부 클릭 감지 - 드롭다운 닫기');
+          setIsGroupSelectorOpen(false);
+        }
+      }
+    };
+
+    if (isGroupSelectorOpen) {
+      // 약간의 지연을 주어 클릭 이벤트가 완전히 처리된 후 리스너 추가
+      const timer = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('touchstart', handleClickOutside);
+      }, 10);
+      
+      return () => {
+        clearTimeout(timer);
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('touchstart', handleClickOutside);
+      };
+    }
+  }, [isGroupSelectorOpen]);
+
+  // 그룹별 멤버 수 조회 (userGroups가 변경될 때만)
+  useEffect(() => {
+    const fetchGroupMemberCounts = async () => {
+      if (!userGroups || userGroups.length === 0) return;
+
+      console.log('[LOCATION] 그룹 멤버 수 조회 시작:', userGroups.length, '개 그룹');
+      
+      const counts: Record<number, number> = {};
+      
+      // 모든 그룹의 멤버 수를 병렬로 조회
+      await Promise.all(userGroups.map(async (group) => {
+        try {
+          const count = await getGroupMemberCount(group.sgt_idx);
+          counts[group.sgt_idx] = count;
+          console.log(`[LOCATION] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수:`, count);
+        } catch (error) {
+          console.error(`[LOCATION] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+          counts[group.sgt_idx] = 0;
+        }
+      }));
+      
+      setGroupMemberCounts(counts);
+      console.log('[LOCATION] 그룹 멤버 수 조회 완료:', counts);
+    };
+
+    fetchGroupMemberCounts();
+  }, [userGroups, getGroupMemberCount]);
 
   return (
     <>
@@ -3379,7 +3463,7 @@ export default function LocationPage() {
           ref={bottomSheetRef}
             variants={bottomSheetVariants}
             animate={bottomSheetState}
-            className="bottom-sheet fixed bottom-0 left-0 right-0 z-30 rounded-t-3xl shadow-2xl max-h-[50vh] overflow-hidden"
+            className="fixed left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
             style={{ touchAction: isHorizontalSwipe ? 'none' : 'pan-y' }}
           onTouchStart={handleDragStart}
           onTouchMove={handleDragMove}
@@ -3397,41 +3481,23 @@ export default function LocationPage() {
             />
             
             <div className="px-6 pb-2 overflow-y-auto max-h-full">
-            <div
-              ref={swipeContainerRef}
-              className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar"
-              onTouchStart={(e) => {
-                e.stopPropagation();
-                handleDragStart(e);
-              }}
-              onTouchMove={(e) => {
-                e.stopPropagation();
-                handleDragMove(e);
-              }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
-                handleDragEnd(e);
-              }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                handleDragStart(e);
-              }}
-              onMouseMove={(e) => {
-                e.stopPropagation();
-                handleDragMove(e);
-              }}
-              onMouseUp={(e) => {
-                e.stopPropagation();
-                handleDragEnd(e);
-              }}
-              onMouseLeave={(e) => {
-                e.stopPropagation();
-                handleDragEnd(e);
-              }}
-              style={{ touchAction: isHorizontalSwipe ? 'pan-x' : 'none' }}
-            >
+              {/* 스와이프 가능한 콘텐츠 컨테이너 */}
+              <div className="flex-grow min-h-0 relative overflow-hidden">
+                <motion.div
+                  className="flex w-[200%] h-full"
+                  animate={{
+                    x: activeView === 'selectedMemberPlaces' ? '0%' : '-50%'
+                  }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 30,
+                    duration: 0.5
+                  }}
+                  style={{ touchAction: 'pan-x' }}
+                >
                 {/* 그룹 멤버 섹션 */}
-              <div className="w-full flex-shrink-0 snap-start">
+              <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
                   <motion.div 
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -3456,7 +3522,7 @@ export default function LocationPage() {
                        
                       <div className="flex items-center space-x-3">
                          {/* 그룹 선택 드롭다운 */}
-                         <div className="relative">
+                         <div className="relative" data-group-dropdown-container="true">
                           <motion.button
                             whileHover={{ 
                               scale: 1.02, 
@@ -3507,6 +3573,7 @@ export default function LocationPage() {
                                 exit={{ opacity: 0, y: -10, scale: 0.96 }}
                                 transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                                 className="absolute top-full right-0 z-50 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto min-w-[180px]"
+                                data-group-dropdown-menu="true"
                               >
                                 {userGroups.map((group) => (
                                   <button
@@ -3523,6 +3590,9 @@ export default function LocationPage() {
                                      {selectedGroupId === group.sgt_idx && (
                                         <span className="text-indigo-500 ml-2">✓</span>
                                      )}
+                                   </div>
+                                   <div className="text-xs text-gray-500 mt-0.5">
+                                     멤버 {groupMemberCounts[group.sgt_idx] || 0}명
                                    </div>
                                   </button>
                                ))}
@@ -3586,17 +3656,6 @@ export default function LocationPage() {
                         animate="visible"
                         className="flex flex-row flex-nowrap justify-start items-center gap-x-6 overflow-x-auto hide-scrollbar px-2 py-2"
                       >
-                        {(() => {
-                          // 선택된 멤버가 없으면 첫 번째 멤버를 자동 선택하는 안전장치
-                          const hasSelectedMember = groupMembers.some(member => member.isSelected);
-                          if (!hasSelectedMember && groupMembers.length > 0 && !isFetchingGroupMembers) {
-                            console.log('[멤버 렌더링] 선택된 멤버가 없음, 첫 번째 멤버 자동 선택:', groupMembers[0].name);
-                            setTimeout(() => {
-                              handleMemberSelect(groupMembers[0].id);
-                            }, 50);
-                          }
-                          return null;
-                        })()}
                         {groupMembers.map((member, index) => {
                           const fallbackImage = getDefaultImage(member.mt_gender, member.original_index);
                           
@@ -3670,7 +3729,7 @@ export default function LocationPage() {
               </div>
 
                 {/* 다른 멤버들의 장소 뷰 */}
-              <div className="w-full flex-shrink-0 snap-start">
+              <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -3845,90 +3904,39 @@ export default function LocationPage() {
                   )}
                   </motion.div>
                     </div>
-                      </div>
+                  </motion.div>
 
-              {/* 개선된 좌우 스와이프 인디케이터 */}
-              <motion.div
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="flex justify-center items-center my-7 bg-gray-50 rounded-2xl py-3 px-6 mx-4"
-              >
-                {/* 왼쪽 화살표 */}
+              {/* 점 인디케이터 */}
+              <div className="flex justify-center items-center space-x-2 mt-1 mb-2">
                 <motion.div
-                  className={`mr-3 transition-all duration-300 ${
-                    activeView === 'otherMembersPlaces' ? 'opacity-100' : 'opacity-30'
+                  className={`rounded-full transition-all duration-300 ${
+                    activeView === 'selectedMemberPlaces' ? 'bg-indigo-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
                   }`}
-                  animate={{ x: activeView === 'otherMembersPlaces' ? -3 : 0 }}
-                >
-                  <svg width="16" height="16" fill="currentColor" className="text-gray-600">
-                    <path d="M10 4L6 8l4 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </motion.div>
-                
-                {/* 뷰 인디케이터 */}
-                <div className="flex items-center space-x-3">
-                <motion.button
-                  whileHover={{ scale: 1.2 }}
-                  whileTap={{ scale: 0.9 }}
-                    onClick={() => handleViewChange('selectedMemberPlaces')}
-                    className={`w-4 h-4 rounded-full focus:outline-none transition-all duration-300 ${
-                    activeView === 'selectedMemberPlaces' 
-                        ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 shadow-lg scale-125' 
-                      : 'bg-gray-300 hover:bg-gray-400'
-                  }`}
-                  aria-label="선택된 멤버 장소 뷰로 전환"
-                />
-                  
-                  {/* 연결선 */}
-                  <motion.div 
-                    className="w-8 h-0.5 bg-gray-300 rounded-full"
-                    animate={{ 
-                      backgroundColor: isHorizontalSwipe ? '#6366f1' : '#d1d5db'
-                    }}
-                    transition={{ duration: 0.3 }}
-                  />
-                  
-                <motion.button
-                  whileHover={{ scale: 1.2 }}
-                  whileTap={{ scale: 0.9 }}
-                    onClick={() => handleViewChange('otherMembersPlaces')}
-                    className={`w-4 h-4 rounded-full focus:outline-none transition-all duration-300 ${
-                    activeView === 'otherMembersPlaces' 
-                        ? 'bg-gradient-to-r from-pink-600 to-pink-700 shadow-lg scale-125' 
-                      : 'bg-gray-300 hover:bg-gray-400'
-                  }`}
-                  aria-label="다른 멤버 장소 뷰로 전환"
-                />
-                </div>
-                
-                {/* 오른쪽 화살표 */}
-                <motion.div
-                  className={`ml-3 transition-all duration-300 ${
-                    activeView === 'selectedMemberPlaces' ? 'opacity-100' : 'opacity-30'
-                  }`}
-                  animate={{ x: activeView === 'selectedMemberPlaces' ? 3 : 0 }}
-                >
-                  <svg width="16" height="16" fill="currentColor" className="text-gray-600">
-                    <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </motion.div>
-                
-                {/* 스와이프 힌트 텍스트 */}
-                <motion.div
-                  className="absolute -bottom-6 left-1/2 transform -translate-x-1/2"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: isHorizontalSwipe ? 1 : 0.7 }}
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
                   transition={{ duration: 0.3 }}
-                >
-                  <span className={`text-xs font-medium ${
-                    isHorizontalSwipe ? 'text-indigo-600' : 'text-gray-400'
-                  }`}>
-                    {isHorizontalSwipe ? '스와이프 중...' : '← 좌우로 스와이프 →'}
-                  </span>
-                </motion.div>
+                />
+                <motion.div
+                  className={`rounded-full transition-all duration-300 ${
+                    activeView === 'otherMembersPlaces' ? 'bg-pink-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
+                  }`}
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                />
+              </div>
+
+              {/* 좌우 스와이프 힌트 */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.7 }}
+                transition={{ delay: 0.8 }}
+                className="text-center mt-2"
+              >
+                <span className="text-xs text-gray-400 font-medium">← 좌우로 스와이프 →</span>
               </motion.div>
               </div>
+            </div>
           </motion.div>
         )}
 
