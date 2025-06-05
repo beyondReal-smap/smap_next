@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, desc, asc
+from sqlalchemy import func, and_, desc, asc, text, or_
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import math
 from ..models.member_location_log import MemberLocationLog
 from ..schemas.member_location_log import (
@@ -9,7 +9,12 @@ from ..schemas.member_location_log import (
     MemberLocationLogUpdate,
     LocationLogListRequest,
     LocationSummaryResponse,
-    LocationPathResponse
+    LocationPathResponse,
+    LocationPath,
+    DailySummary,
+    StayTime,
+    MapMarker,
+    LocationLogSummary
 )
 
 def get_member_location_logs(
@@ -648,4 +653,205 @@ def get_member_map_markers(
             'stay_long': float(row.stay_long) if row.stay_long else None
         })
     
-    return results 
+    return results
+
+def get_schedule_count(db: Session, mt_idx: int, date_str: str) -> int:
+    """특정 날짜의 일정 개수 조회 (PHP get_schedule_array 함수 기반)"""
+    
+    # 개인 일정 조회
+    personal_query = text("""
+        SELECT COUNT(DISTINCT sst_idx) as count
+        FROM smap_schedule_t 
+        WHERE mt_idx = :mt_idx 
+        AND sgt_idx IS NULL 
+        AND (sgdt_idx IS NULL OR sgdt_idx = 0)
+        AND (sst_sdate <= :date_end AND sst_edate >= :date_start)
+        AND sst_show = 'Y'
+        AND sst_title IS NOT NULL AND sst_title != ''
+    """)
+    
+    date_start = f"{date_str} 00:00:00"
+    date_end = f"{date_str} 23:59:59"
+    
+    try:
+        personal_result = db.execute(personal_query, {
+            "mt_idx": mt_idx,
+            "date_start": date_start,
+            "date_end": date_end
+        }).fetchone()
+        
+        personal_count = personal_result.count if personal_result else 0
+        
+        # 그룹 일정 조회
+        group_query = text("""
+            SELECT GROUP_CONCAT(sgt_idx) as gc_sgt_idx, GROUP_CONCAT(sgdt_idx) as gc_sgdt_idx
+            FROM smap_group_detail_t 
+            WHERE mt_idx = :mt_idx 
+            AND sgdt_discharge = 'N' 
+            AND sgdt_exit = 'N'
+        """)
+        
+        group_result = db.execute(group_query, {"mt_idx": mt_idx}).fetchone()
+        
+        group_count = 0
+        if group_result and group_result.gc_sgdt_idx:
+            group_schedule_query = text("""
+                SELECT COUNT(DISTINCT sst_idx) as count
+                FROM smap_schedule_t 
+                WHERE sgdt_idx IN ({})
+                AND (sst_sdate <= :date_end AND sst_edate >= :date_start)
+                AND sst_show = 'Y'
+                AND sst_title IS NOT NULL AND sst_title != ''
+            """.format(group_result.gc_sgdt_idx))
+            
+            group_schedule_result = db.execute(group_schedule_query, {
+                "date_start": date_start,
+                "date_end": date_end
+            }).fetchone()
+            
+            group_count = group_schedule_result.count if group_schedule_result else 0
+        
+        return personal_count + group_count
+        
+    except Exception as e:
+        print(f"일정 개수 조회 오류: {e}")
+        return 0
+
+def get_gps_distance_and_time(db: Session, mt_idx: int, date_str: str, max_accuracy: float = 100.0, min_speed: float = 2.0, max_speed: float = 55.0) -> tuple:
+    """GPS 거리 및 시간 계산 (PHP get_gps_distance 함수 기반)"""
+    
+    # PHP 복잡한 SQL 쿼리를 Python으로 변환
+    distance_query = text("""
+        WITH RankedLogs AS (
+            SELECT
+                mt_idx,
+                mlt_accuacy,
+                mlt_speed,
+                mlt_lat,
+                mlt_long,
+                mlt_gps_time,
+                ROW_NUMBER() OVER (ORDER BY mlt_gps_time ASC) AS rn
+            FROM
+                member_location_log_t
+            WHERE 1=1
+                AND mt_idx = :mt_idx
+                AND mlt_gps_time BETWEEN :date_start AND :date_end
+                AND mlt_speed > 0
+                AND mlt_accuacy < :max_accuracy
+        ),
+        Diffs AS (
+            SELECT
+                L1.rn,
+                L1.mlt_lat AS lat1,
+                L1.mlt_long AS long1,
+                L2.mlt_lat AS lat2,
+                L2.mlt_long AS long2,
+                L1.mlt_gps_time AS wdate1,
+                L2.mlt_gps_time AS wdate2,
+                L1.mlt_speed AS speed,
+                L1.mlt_accuacy AS accuracy,
+                TIMESTAMPDIFF(SECOND, L1.mlt_gps_time, L2.mlt_gps_time) AS time_diff_seconds
+            FROM
+                RankedLogs L1
+            INNER JOIN RankedLogs L2 ON L1.rn = L2.rn - 1
+        )
+        SELECT 
+            SUM(CASE
+                WHEN rslt.time_diff_seconds > 10
+                AND ROUND((rslt.distance_meters / rslt.time_diff_seconds) * 3600 / 1000, 1) < :min_speed
+                AND rslt.time_diff_seconds > rslt.distance_meters / 0.6
+                THEN rslt.distance_meters / 0.6
+                ELSE time_diff_seconds
+            END) / 60 AS moving_minute,
+            SUM(rslt.distance_meters) AS moving_meters
+        FROM (
+            SELECT
+                rn,
+                lat1,
+                long1,
+                lat2,
+                long2,
+                wdate1,
+                wdate2,
+                speed,
+                accuracy,
+                time_diff_seconds,
+                ROUND(6371000 * ACOS(COS(RADIANS(lat2)) * COS(RADIANS(lat1)) * COS(RADIANS(long1) - RADIANS(long2)) + SIN(RADIANS(lat1)) * SIN(RADIANS(lat2))), 1) AS distance_meters
+            FROM
+                Diffs
+        ) rslt
+        WHERE ROUND((rslt.distance_meters / rslt.time_diff_seconds) * 3600 / 1000, 1) BETWEEN :min_speed AND :max_speed
+    """)
+    
+    date_start = f"{date_str} 00:00:00"
+    date_end = f"{date_str} 23:59:59"
+    
+    try:
+        result = db.execute(distance_query, {
+            "mt_idx": mt_idx,
+            "date_start": date_start,
+            "date_end": date_end,
+            "max_accuracy": max_accuracy,
+            "min_speed": min_speed,
+            "max_speed": max_speed
+        }).fetchone()
+        
+        moving_meters = result.moving_meters if result and result.moving_meters else 0
+        moving_minutes = result.moving_minute if result and result.moving_minute else 0
+        
+        # 걸음수 조회 (해당 날짜의 마지막 기록)
+        steps_query = text("""
+            SELECT mt_health_work 
+            FROM member_location_log_t 
+            WHERE mt_idx = :mt_idx 
+            AND mlt_wdate BETWEEN :date_start AND :date_end
+            ORDER BY mlt_gps_time DESC 
+            LIMIT 1
+        """)
+        
+        steps_result = db.execute(steps_query, {
+            "mt_idx": mt_idx,
+            "date_start": date_start,
+            "date_end": date_end
+        }).fetchone()
+        
+        steps = steps_result.mt_health_work if steps_result and steps_result.mt_health_work else 0
+        
+        return moving_meters, moving_minutes, steps
+        
+    except Exception as e:
+        print(f"GPS 거리/시간 계산 오류: {e}")
+        return 0, 0, 0
+
+def format_distance_km(meters: float) -> str:
+    """거리를 km 형식으로 포맷팅"""
+    if meters < 1000:
+        return f"{int(meters)}m"
+    else:
+        km = meters / 1000
+        return f"{km:.1f}km"
+
+def format_duration_hm(minutes: float) -> str:
+    """시간을 시간:분 형식으로 포맷팅"""
+    if minutes < 60:
+        return f"{int(minutes)}분"
+    else:
+        hours = int(minutes // 60)
+        mins = int(minutes % 60)
+        return f"{hours}시간 {mins}분"
+
+def get_location_log_summary(db: Session, mt_idx: int, date_str: str) -> LocationLogSummary:
+    """PHP 로직 기반 위치 로그 요약 정보 생성"""
+    
+    # 일정 개수 조회
+    schedule_count = get_schedule_count(db, mt_idx, date_str)
+    
+    # GPS 거리, 시간, 걸음수 조회
+    distance_meters, time_minutes, steps = get_gps_distance_and_time(db, mt_idx, date_str)
+    
+    return LocationLogSummary(
+        schedule_count=f"{schedule_count:,}",
+        distance=format_distance_km(distance_meters),
+        duration=format_duration_hm(time_minutes),
+        steps=int(steps)
+    ) 

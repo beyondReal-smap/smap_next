@@ -16,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import memberService from '@/services/memberService';
 
 import groupService, { Group } from '@/services/groupService';
-import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker } from '@/services/memberLocationLogService';
+import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker, LocationLogSummary } from '@/services/memberLocationLogService';
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
 declare global {
@@ -495,6 +495,7 @@ export default function LogsPage() {
   const [dailySummaryData, setDailySummaryData] = useState<DailySummary[]>([]);
   const [stayTimesData, setStayTimesData] = useState<StayTime[]>([]);
   const [mapMarkersData, setMapMarkersData] = useState<MapMarker[]>([]);
+  const [locationLogSummaryData, setLocationLogSummaryData] = useState<LocationLogSummary | null>(null);
   
   const [sliderValue, setSliderValue] = useState(60); // 슬라이더 초기 값 (0-100)
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
@@ -931,13 +932,14 @@ export default function LogsPage() {
       setIsLocationDataLoading(true);
       console.log('[loadLocationData] 위치 데이터 로딩 시작:', { mtIdx, date });
 
-      // 모든 API를 병렬로 호출
-      const [logs, summary, dailySummary, stayTimes, mapMarkers] = await Promise.all([
+      // 모든 API를 병렬로 호출 (PHP 로직 기반 요약 API 추가)
+      const [logs, summary, dailySummary, stayTimes, mapMarkers, locationLogSummary] = await Promise.all([
         memberLocationLogService.getDailyLocationLogs(mtIdx, date),
         memberLocationLogService.getDailyLocationSummary(mtIdx, date),
         memberLocationLogService.getDailySummaryByRange(mtIdx, date, date),
         memberLocationLogService.getStayTimes(mtIdx, date),
-        memberLocationLogService.getMapMarkers(mtIdx, date)
+        memberLocationLogService.getMapMarkers(mtIdx, date),
+        memberLocationLogService.getLocationLogSummary(mtIdx, date) // PHP 로직 기반 요약 API
       ]);
 
       // 기존 위치 로그 데이터 설정
@@ -958,10 +960,12 @@ export default function LogsPage() {
       setDailySummaryData(dailySummary);
       setStayTimesData(stayTimes);
       setMapMarkersData(mapMarkers);
+      setLocationLogSummaryData(locationLogSummary); // PHP 로직 기반 요약 데이터 설정
       
       console.log('[loadLocationData] 날짜별 요약 데이터 로딩 완료:', dailySummary.length, '일');
       console.log('[loadLocationData] 체류시간 분석 데이터 로딩 완료:', stayTimes.length, '개');
       console.log('[loadLocationData] 지도 마커 데이터 로딩 완료:', mapMarkers.length, '개');
+      console.log('[loadLocationData] PHP 로직 기반 요약 데이터 로딩 완료:', locationLogSummary);
 
       // 지도에 위치 경로 표시 (나중에 구현)
       // updateLocationPath(logs);
@@ -975,6 +979,7 @@ export default function LogsPage() {
       setDailySummaryData([]);
       setStayTimesData([]);
       setMapMarkersData([]);
+      setLocationLogSummaryData(null);
     } finally {
       setIsLocationDataLoading(false);
     }
@@ -998,15 +1003,16 @@ export default function LogsPage() {
     console.log('🗓️ 날짜별 요약 데이터:', dailySummaryData);
     console.log('⏱️ 체류시간 분석 데이터:', stayTimesData);
     console.log('📍 지도 마커 데이터:', mapMarkersData);
+    console.log('📝 PHP 로직 기반 요약 데이터:', locationLogSummaryData);
     console.log('============================');
   };
 
   // 새로운 API 데이터가 변경될 때마다 콘솔에 출력
   useEffect(() => {
-    if (dailySummaryData.length > 0 || stayTimesData.length > 0 || mapMarkersData.length > 0) {
+    if (dailySummaryData.length > 0 || stayTimesData.length > 0 || mapMarkersData.length > 0 || locationLogSummaryData) {
       logNewApiData();
     }
-  }, [dailySummaryData, stayTimesData, mapMarkersData]);
+  }, [dailySummaryData, stayTimesData, mapMarkersData, locationLogSummaryData]);
 
   // useEffect for auto-selecting the first member (only sets state)
   useEffect(() => {
@@ -1949,6 +1955,46 @@ export default function LogsPage() {
                       </div>
                       )}
                       
+                      {/* PHP 로직 기반 요약 정보 섹션 */}
+                      {locationLogSummaryData && (
+                        <div className="mt-4 pt-3 border-t border-pink-200">
+                          <h4 className="text-xs font-semibold text-gray-600 mb-3 flex items-center">
+                            <span className="mr-2">🎯</span>
+                            오늘의 활동 요약 (PHP 로직)
+                          </h4>
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div className="bg-white rounded-lg p-2 border border-pink-200">
+                              <div className="flex items-center space-x-1 mb-1">
+                                <span className="text-blue-600">📅</span>
+                                <span className="text-gray-600 font-medium">일정</span>
+                              </div>
+                              <div className="text-gray-900 font-bold">{locationLogSummaryData.schedule_count}</div>
+                            </div>
+                            <div className="bg-white rounded-lg p-2 border border-pink-200">
+                              <div className="flex items-center space-x-1 mb-1">
+                                <span className="text-green-600">🚶</span>
+                                <span className="text-gray-600 font-medium">거리</span>
+                              </div>
+                              <div className="text-gray-900 font-bold">{locationLogSummaryData.distance}</div>
+                            </div>
+                            <div className="bg-white rounded-lg p-2 border border-pink-200">
+                              <div className="flex items-center space-x-1 mb-1">
+                                <span className="text-purple-600">⏰</span>
+                                <span className="text-gray-600 font-medium">시간</span>
+                              </div>
+                              <div className="text-gray-900 font-bold">{locationLogSummaryData.duration}</div>
+                            </div>
+                            <div className="bg-white rounded-lg p-2 border border-pink-200">
+                              <div className="flex items-center space-x-1 mb-1">
+                                <span className="text-orange-600">👟</span>
+                                <span className="text-gray-600 font-medium">걸음</span>
+                              </div>
+                              <div className="text-gray-900 font-bold">{locationLogSummaryData.steps.toLocaleString()}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* 새로운 API 데이터 디버그 섹션 */}
                       {(dailySummaryData.length > 0 || stayTimesData.length > 0 || mapMarkersData.length > 0) && (
                         <div className="mt-4 pt-3 border-t border-pink-200">

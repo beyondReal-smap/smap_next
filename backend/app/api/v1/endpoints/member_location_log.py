@@ -10,7 +10,11 @@ from ....schemas.member_location_log import (
     MemberLocationLogResponse,
     LocationLogListRequest,
     LocationSummaryResponse,
-    LocationPathResponse
+    LocationPathResponse,
+    DailySummary,
+    StayTime,
+    MapMarker,
+    LocationLogSummaryResponse
 )
 from ....crud import member_location_log as location_log_crud
 
@@ -330,6 +334,31 @@ async def handle_location_log_request(
                 
             except Exception as e:
                 logger.error(f"Error getting map markers: {str(e)}")
+                logger.error(traceback.format_exc())
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        elif act == "get_location_summary":
+            # 특정 회원의 위치 로그 요약 정보 조회 (PHP 로직 기반)
+            try:
+                mt_idx = body.get("mt_idx")
+                if not mt_idx:
+                    raise HTTPException(status_code=400, detail="mt_idx is required")
+                
+                date = body.get("date")
+                if not date:
+                    raise HTTPException(status_code=400, detail="date is required (YYYY-MM-DD format)")
+                
+                summary = location_log_crud.get_location_log_summary(db, mt_idx=mt_idx, date_str=date)
+                
+                logger.info(f"Retrieved location summary for member {mt_idx} on {date}")
+                return LocationLogSummaryResponse(
+                    result="Y",
+                    data=summary,
+                    message="위치 로그 요약 정보 조회 성공"
+                )
+                
+            except Exception as e:
+                logger.error(f"Error getting location summary: {str(e)}")
                 logger.error(traceback.format_exc())
                 raise HTTPException(status_code=500, detail=str(e))
         

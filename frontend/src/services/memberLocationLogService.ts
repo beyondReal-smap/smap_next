@@ -82,6 +82,14 @@ export interface ApiResponse<T> {
   total_markers?: number;
 }
 
+// PHP 로직 기반 요약 데이터 인터페이스
+export interface LocationLogSummary {
+  schedule_count: string;  // 일정 개수 (포맷된 문자열)
+  distance: string;        // 이동거리 (포맷된 문자열, 예: "5.2km")
+  duration: string;        // 이동시간 (포맷된 문자열, 예: "2시간 30분")
+  steps: number;          // 걸음수
+}
+
 class MemberLocationLogService {
   /**
    * 일일 위치 로그 조회 (정확한 날짜 매칭)
@@ -198,16 +206,16 @@ class MemberLocationLogService {
         address: "서울시 중구 명동"
       },
       {
-        timestamp: `${date}T12:00:00`,
+        timestamp: `${date}T12:30:00`,
         latitude: 37.5660,
         longitude: 126.9785,
         address: "서울시 중구 을지로"
       },
       {
-        timestamp: `${date}T15:00:00`,
-        latitude: 37.5670,
+        timestamp: `${date}T18:00:00`,
+        latitude: 37.5655,
         longitude: 126.9790,
-        address: "서울시 중구 소공동"
+        address: "서울시 중구 충무로"
       }
     ];
 
@@ -243,22 +251,22 @@ class MemberLocationLogService {
   }
 
   /**
-   * 특정 날짜에 로그가 있는 멤버 목록 조회
+   * 위치 로그가 있는 멤버 목록 조회
    */
   async getMembersWithLogs(groupId: number, date: string): Promise<number[]> {
-    const mockData: number[] = [282, 1186];
+    const mockData: number[] = [1186, 1187, 1188];
 
     try {
-      console.log('[MemberLocationLogService] 로그가 있는 멤버 목록 조회 시작:', { groupId, date });
+      console.log('[MemberLocationLogService] 위치 로그가 있는 멤버 조회 시작:', { groupId, date });
       
       const response = await apiClient.get<number[]>(`/location-logs/members-with-logs?group_id=${groupId}&date=${date}`);
       
-      console.log('[MemberLocationLogService] 로그가 있는 멤버 목록 조회 응답:', {
+      console.log('[MemberLocationLogService] 위치 로그가 있는 멤버 조회 응답:', {
         status: response.status,
         dataLength: response.data?.length || 0
       });
       
-      if (Array.isArray(response.data) && response.data.length >= 0) {
+      if (Array.isArray(response.data)) {
         console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용:', response.data.length, '명');
         return response.data;
       } else {
@@ -266,7 +274,7 @@ class MemberLocationLogService {
         return mockData;
       }
     } catch (error) {
-      console.error('[MemberLocationLogService] 로그가 있는 멤버 목록 조회 오류:', error);
+      console.error('[MemberLocationLogService] 위치 로그가 있는 멤버 조회 오류:', error);
       
       if (error instanceof Error) {
         console.error('[MemberLocationLogService] 오류 상세:', {
@@ -280,7 +288,7 @@ class MemberLocationLogService {
   }
 
   /**
-   * 날짜별 위치 로그 요약 정보 조회 (새로운 API)
+   * 날짜별 요약 데이터 조회 (새로운 API)
    */
   async getDailySummaryByRange(
     memberId: number, 
@@ -291,10 +299,10 @@ class MemberLocationLogService {
   ): Promise<DailySummary[]> {
     const mockData: DailySummary[] = [
       {
-        mlt_idx: 1,
+        mlt_idx: 52890682,
         log_date: startDate,
-        start_time: `${startDate} 08:30:15`,
-        end_time: `${startDate} 18:45:32`
+        start_time: `${startDate} 08:28:10`,
+        end_time: `${startDate} 21:48:20`
       }
     ];
 
@@ -480,6 +488,54 @@ class MemberLocationLogService {
       }
     } catch (error) {
       console.error('[MemberLocationLogService] 지도 마커 데이터 조회 오류:', error);
+      
+      if (error instanceof Error) {
+        console.error('[MemberLocationLogService] 오류 상세:', {
+          message: error.message,
+          name: error.name,
+        });
+      }
+      
+      return mockData;
+    }
+  }
+
+  /**
+   * PHP 로직 기반 위치 로그 요약 정보 조회 (새로운 API)
+   */
+  async getLocationLogSummary(memberId: number, date: string): Promise<LocationLogSummary> {
+    const mockData: LocationLogSummary = {
+      schedule_count: "3",
+      distance: "5.2km",
+      duration: "2시간 30분",
+      steps: 7500
+    };
+
+    try {
+      console.log('[MemberLocationLogService] PHP 로직 기반 요약 조회 시작:', { memberId, date });
+      
+      const response = await apiClient.get(`location-logs/location-summary/${memberId}?date=${date}`);
+
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result: ApiResponse<LocationLogSummary> = response.data;
+      
+      console.log('[MemberLocationLogService] PHP 로직 기반 요약 조회 응답:', {
+        status: response.status,
+        data: result.data
+      });
+      
+      if (result.result === 'Y' && result.data) {
+        console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용 (PHP 로직)');
+        return result.data;
+      } else {
+        console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');
+        return mockData;
+      }
+    } catch (error) {
+      console.error('[MemberLocationLogService] PHP 로직 기반 요약 조회 오류:', error);
       
       if (error instanceof Error) {
         console.error('[MemberLocationLogService] 오류 상세:', {
