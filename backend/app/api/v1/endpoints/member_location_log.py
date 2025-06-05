@@ -242,6 +242,97 @@ async def handle_location_log_request(
                 logger.error(traceback.format_exc())
                 raise HTTPException(status_code=500, detail=str(e))
         
+        elif act == "get_daily_summary_by_range":
+            # 특정 회원의 날짜 범위별 위치 로그 요약 정보 (제공된 SQL 쿼리 기반)
+            try:
+                mt_idx = body.get("mt_idx")
+                start_date = body.get("start_date")
+                end_date = body.get("end_date")
+                max_accuracy = body.get("max_accuracy", 50.0)
+                min_speed = body.get("min_speed", 0.0)
+                
+                if not mt_idx:
+                    raise HTTPException(status_code=400, detail="mt_idx is required")
+                if not start_date:
+                    raise HTTPException(status_code=400, detail="start_date is required (YYYY-MM-DD format)")
+                if not end_date:
+                    raise HTTPException(status_code=400, detail="end_date is required (YYYY-MM-DD format)")
+                
+                summary_data = location_log_crud.get_member_location_logs_daily_summary(
+                    db, mt_idx, start_date, end_date, max_accuracy, min_speed
+                )
+                
+                logger.info(f"Retrieved daily summary by range for member {mt_idx}: {len(summary_data)} days")
+                return {
+                    "result": "Y", 
+                    "data": summary_data,
+                    "total_days": len(summary_data)
+                }
+                
+            except Exception as e:
+                logger.error(f"Error getting daily summary by range: {str(e)}")
+                logger.error(traceback.format_exc())
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        elif act == "get_stay_times":
+            # 특정 회원의 특정 날짜 체류시간 분석 (제공된 복잡한 CTE 쿼리 기반)
+            try:
+                mt_idx = body.get("mt_idx")
+                date = body.get("date")
+                min_speed = body.get("min_speed", 1.0)
+                max_accuracy = body.get("max_accuracy", 50.0)
+                min_duration = body.get("min_duration", 5)
+                
+                if not mt_idx:
+                    raise HTTPException(status_code=400, detail="mt_idx is required")
+                if not date:
+                    raise HTTPException(status_code=400, detail="date is required (YYYY-MM-DD format)")
+                
+                stay_times = location_log_crud.get_member_stay_times(
+                    db, mt_idx, date, min_speed, max_accuracy, min_duration
+                )
+                
+                logger.info(f"Retrieved stay times for member {mt_idx} on {date}: {len(stay_times)} stays")
+                return {
+                    "result": "Y", 
+                    "data": stay_times,
+                    "total_stays": len(stay_times)
+                }
+                
+            except Exception as e:
+                logger.error(f"Error getting stay times: {str(e)}")
+                logger.error(traceback.format_exc())
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        elif act == "get_map_markers":
+            # 특정 회원의 특정 날짜 지도 마커용 이동로그 데이터 조회 (제공된 SQL 쿼리 기반)
+            try:
+                mt_idx = body.get("mt_idx")
+                date = body.get("date")
+                min_speed = body.get("min_speed", 1.0)
+                max_accuracy = body.get("max_accuracy", 50.0)
+                
+                if not mt_idx:
+                    raise HTTPException(status_code=400, detail="mt_idx is required")
+                if not date:
+                    raise HTTPException(status_code=400, detail="date is required (YYYY-MM-DD format)")
+                
+                map_markers = location_log_crud.get_member_map_markers(
+                    db, mt_idx, date, min_speed, max_accuracy
+                )
+                
+                logger.info(f"Retrieved map markers for member {mt_idx} on {date}: {len(map_markers)} markers")
+                return {
+                    "result": "Y", 
+                    "data": map_markers,
+                    "total_markers": len(map_markers)
+                }
+                
+            except Exception as e:
+                logger.error(f"Error getting map markers: {str(e)}")
+                logger.error(traceback.format_exc())
+                raise HTTPException(status_code=500, detail=str(e))
+        
         else:
             logger.error(f"Invalid act value: {act}")
             raise HTTPException(status_code=400, detail=f"Invalid act value: {act}")
@@ -394,5 +485,103 @@ async def get_members_with_logs(
         
     except Exception as e:
         logger.error(f"Error getting members with logs: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/member-location-logs/{mt_idx}/daily-summary")
+async def get_member_location_logs_daily_summary(
+    mt_idx: int,
+    start_date: str = Query(..., description="시작 날짜 (YYYY-MM-DD 형식)"),
+    end_date: str = Query(..., description="종료 날짜 (YYYY-MM-DD 형식)"),
+    max_accuracy: float = Query(50.0, description="최대 정확도 값"),
+    min_speed: float = Query(0.0, description="최소 속도 값"),
+    db: Session = Depends(get_db)
+):
+    """
+    특정 회원의 위치 로그를 날짜별로 그룹화하여 요약 정보 조회 (GET 방식)
+    제공된 SQL 쿼리를 기반으로 구현된 API
+    """
+    try:
+        logger.info(f"[GET] Daily summary: mt_idx={mt_idx}, start_date={start_date}, end_date={end_date}")
+        
+        summary_data = location_log_crud.get_member_location_logs_daily_summary(
+            db, mt_idx, start_date, end_date, max_accuracy, min_speed
+        )
+        
+        logger.info(f"Retrieved daily summary for member {mt_idx}: {len(summary_data)} days")
+        
+        return {
+            "result": "Y",
+            "data": summary_data,
+            "total_days": len(summary_data)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting daily summary: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/member-location-logs/{mt_idx}/stay-times")
+async def get_member_stay_times(
+    mt_idx: int,
+    date: str = Query(..., description="분석할 날짜 (YYYY-MM-DD 형식)"),
+    min_speed: float = Query(1.0, description="체류/이동 구분 기준 속도"),
+    max_accuracy: float = Query(50.0, description="최대 정확도 값"),
+    min_duration: int = Query(5, description="최소 체류시간(분)"),
+    db: Session = Depends(get_db)
+):
+    """
+    특정 회원의 특정 날짜 체류시간 분석 (GET 방식)
+    제공된 복잡한 CTE 쿼리를 기반으로 구현된 API
+    """
+    try:
+        logger.info(f"[GET] Stay times: mt_idx={mt_idx}, date={date}, min_speed={min_speed}")
+        
+        stay_times = location_log_crud.get_member_stay_times(
+            db, mt_idx, date, min_speed, max_accuracy, min_duration
+        )
+        
+        logger.info(f"Retrieved stay times for member {mt_idx} on {date}: {len(stay_times)} stays")
+        
+        return {
+            "result": "Y",
+            "data": stay_times,
+            "total_stays": len(stay_times)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting stay times: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/member-location-logs/{mt_idx}/map-markers")
+async def get_member_map_markers(
+    mt_idx: int,
+    date: str = Query(..., description="조회할 날짜 (YYYY-MM-DD 형식)"),
+    min_speed: float = Query(1.0, description="최소 속도 값"),
+    max_accuracy: float = Query(50.0, description="최대 정확도 값"),
+    db: Session = Depends(get_db)
+):
+    """
+    특정 회원의 특정 날짜 지도 마커용 이동로그 데이터 조회 (GET 방식)
+    제공된 SQL 쿼리를 기반으로 구현된 API (데이터 샘플링 포함)
+    """
+    try:
+        logger.info(f"[GET] Map markers: mt_idx={mt_idx}, date={date}, min_speed={min_speed}")
+        
+        map_markers = location_log_crud.get_member_map_markers(
+            db, mt_idx, date, min_speed, max_accuracy
+        )
+        
+        logger.info(f"Retrieved map markers for member {mt_idx} on {date}: {len(map_markers)} markers")
+        
+        return {
+            "result": "Y",
+            "data": map_markers,
+            "total_markers": len(map_markers)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting map markers: {str(e)}")
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e)) 

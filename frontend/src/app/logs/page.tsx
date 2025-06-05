@@ -16,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import memberService from '@/services/memberService';
 
 import groupService, { Group } from '@/services/groupService';
-import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData } from '@/services/memberLocationLogService';
+import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker } from '@/services/memberLocationLogService';
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
 declare global {
@@ -490,6 +490,12 @@ export default function LogsPage() {
   const [locationSummary, setLocationSummary] = useState<LocationSummary>(DEFAULT_LOCATION_SUMMARY);
   const [currentLocationLogs, setCurrentLocationLogs] = useState<LocationLog[]>([]);
   const [isLocationDataLoading, setIsLocationDataLoading] = useState(false);
+  
+  // 새로운 API 응답 상태 추가
+  const [dailySummaryData, setDailySummaryData] = useState<DailySummary[]>([]);
+  const [stayTimesData, setStayTimesData] = useState<StayTime[]>([]);
+  const [mapMarkersData, setMapMarkersData] = useState<MapMarker[]>([]);
+  
   const [sliderValue, setSliderValue] = useState(60); // 슬라이더 초기 값 (0-100)
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
 
@@ -809,7 +815,10 @@ export default function LogsPage() {
     
     // 선택된 멤버의 위치 데이터 로드
     if (selectedMember && selectedDate) {
+      console.log('[LOGS] 멤버 선택 - 위치 데이터 로딩:', selectedMember.name, selectedDate);
       loadLocationData(parseInt(selectedMember.id), selectedDate);
+    } else {
+      console.log('[LOGS] 멤버 선택 - 조건 불충족:', { hasSelectedMember: !!selectedMember, hasSelectedDate: !!selectedDate });
     }
   };
 
@@ -901,14 +910,17 @@ export default function LogsPage() {
     setSelectedDate(date);
     setActiveLogView('members');
     
-    // 선택된 멤버가 있으면 해당 멤버의 위치 데이터를 로드
+    // 선택된 멤버가 있으면 해당 멤버의 위치 데이터를 자동으로 로드
     const selectedMember = groupMembers.find(m => m.isSelected);
     if (selectedMember) {
+      console.log('[LOGS] 날짜 변경 - 선택된 멤버의 위치 데이터 로딩:', selectedMember.name, date);
       loadLocationData(parseInt(selectedMember.id), date);
+    } else {
+      console.log('[LOGS] 날짜 변경 - 선택된 멤버가 없음, 데이터 로딩 안함');
     }
   };
 
-  // 위치 로그 데이터 로딩 함수
+  // 위치 로그 데이터 로딩 함수 (새로운 3개 API 포함)
   const loadLocationData = async (mtIdx: number, date: string) => {
     if (!mtIdx || !date) {
       console.log('[loadLocationData] mtIdx 또는 date가 없어서 실행하지 않음:', { mtIdx, date });
@@ -919,25 +931,37 @@ export default function LogsPage() {
       setIsLocationDataLoading(true);
       console.log('[loadLocationData] 위치 데이터 로딩 시작:', { mtIdx, date });
 
-      // 위치 로그와 요약 정보를 병렬로 가져오기
-      const [logs, summary] = await Promise.all([
+      // 모든 API를 병렬로 호출
+      const [logs, summary, dailySummary, stayTimes, mapMarkers] = await Promise.all([
         memberLocationLogService.getDailyLocationLogs(mtIdx, date),
-        memberLocationLogService.getDailyLocationSummary(mtIdx, date)
+        memberLocationLogService.getDailyLocationSummary(mtIdx, date),
+        memberLocationLogService.getDailySummaryByRange(mtIdx, date, date),
+        memberLocationLogService.getStayTimes(mtIdx, date),
+        memberLocationLogService.getMapMarkers(mtIdx, date)
       ]);
 
-      // 위치 로그 데이터 설정
+      // 기존 위치 로그 데이터 설정
       setCurrentLocationLogs(logs);
       console.log('[loadLocationData] 위치 로그 데이터 로딩 완료:', logs.length, '개');
 
-      // 요약 정보를 UI 형식으로 변환
+      // 기존 요약 정보를 UI 형식으로 변환
       const formattedSummary: LocationSummary = {
         distance: summary.total_distance ? `${(summary.total_distance / 1000).toFixed(1)} km` : '0 km',
-        time: summary.total_time ? formatTime(summary.total_time) : '0분',
-        steps: summary.total_steps ? `${summary.total_steps.toLocaleString()} 걸음` : '0 걸음'
+        time: summary.total_time ? formatTime(parseInt(summary.total_time.toString())) : '0분',
+        steps: summary.step_count ? `${summary.step_count.toLocaleString()} 걸음` : '0 걸음'
       };
       
       setLocationSummary(formattedSummary);
       console.log('[loadLocationData] 위치 요약 데이터 로딩 완료:', formattedSummary);
+
+      // 새로운 API 응답 데이터 설정
+      setDailySummaryData(dailySummary);
+      setStayTimesData(stayTimes);
+      setMapMarkersData(mapMarkers);
+      
+      console.log('[loadLocationData] 날짜별 요약 데이터 로딩 완료:', dailySummary.length, '일');
+      console.log('[loadLocationData] 체류시간 분석 데이터 로딩 완료:', stayTimes.length, '개');
+      console.log('[loadLocationData] 지도 마커 데이터 로딩 완료:', mapMarkers.length, '개');
 
       // 지도에 위치 경로 표시 (나중에 구현)
       // updateLocationPath(logs);
@@ -948,6 +972,9 @@ export default function LogsPage() {
       // 오류 시 기본값으로 설정
       setCurrentLocationLogs([]);
       setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+      setDailySummaryData([]);
+      setStayTimesData([]);
+      setMapMarkersData([]);
     } finally {
       setIsLocationDataLoading(false);
     }
@@ -964,6 +991,22 @@ export default function LogsPage() {
       return `${minutes}분`;
     }
   };
+
+  // 새로운 API 데이터 디버깅 함수
+  const logNewApiData = () => {
+    console.log('=== 새로운 API 데이터 현황 ===');
+    console.log('🗓️ 날짜별 요약 데이터:', dailySummaryData);
+    console.log('⏱️ 체류시간 분석 데이터:', stayTimesData);
+    console.log('📍 지도 마커 데이터:', mapMarkersData);
+    console.log('============================');
+  };
+
+  // 새로운 API 데이터가 변경될 때마다 콘솔에 출력
+  useEffect(() => {
+    if (dailySummaryData.length > 0 || stayTimesData.length > 0 || mapMarkersData.length > 0) {
+      logNewApiData();
+    }
+  }, [dailySummaryData, stayTimesData, mapMarkersData]);
 
   // useEffect for auto-selecting the first member (only sets state)
   useEffect(() => {
@@ -984,11 +1027,18 @@ export default function LogsPage() {
       console.log("[LogsPage] Member selection detected or map initialized with selection. Updating markers and view.");
       updateMemberMarkers(groupMembers);
       setActiveLogView('members'); // 멤버 선택/지도 업데이트 시 members 뷰 활성화
+      
+      // 선택된 멤버의 위치 데이터 로드
+      const selectedMember = groupMembers.find(m => m.isSelected);
+      if (selectedMember && selectedDate) {
+        console.log("[LogsPage] 선택된 멤버의 위치 데이터 로드:", selectedMember.name, selectedDate);
+        loadLocationData(parseInt(selectedMember.id), selectedDate);
+      }
     } else if (isMapInitializedLogs) {
       // 선택된 멤버가 없을 경우 (예: 모든 선택 해제 시)
       // updateMemberMarkers([]); // 필요하다면 마커를 지우는 로직
     }
-  }, [groupMembers, isMapInitializedLogs]); // updateMemberMarkers는 의존성 배열에서 제외 (함수가 재생성되지 않는다면)
+  }, [groupMembers, isMapInitializedLogs, selectedDate]); // selectedDate 의존성 추가
 
   // 로그 뷰 스크롤 이벤트 핸들러
   const handleLogSwipeScroll = () => {
@@ -1222,19 +1272,32 @@ export default function LogsPage() {
     }
   }, [isGroupSelectorOpen]);
 
-  // 첫번째 멤버 자동 선택
+  // 첫 번째 그룹 자동 선택
   useEffect(() => {
-    if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && !firstMemberSelected && dataFetchedRef.current.members) {
-      console.log('[LOGS] 첫번째 멤버 자동 선택 시작:', groupMembers[0].name);
+    if (!selectedGroupId && userGroups && userGroups.length > 0) {
+      console.log('[LOGS] 첫 번째 그룹 자동 선택:', userGroups[0].sgt_idx, userGroups[0].sgt_title);
+      setSelectedGroupId(userGroups[0].sgt_idx);
+    }
+  }, [userGroups, selectedGroupId]);
+
+  // 첫번째 멤버 자동 선택 및 위치 데이터 로딩
+  useEffect(() => {
+    if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && !firstMemberSelected && dataFetchedRef.current.members && selectedDate) {
+      console.log('[LOGS] 첫번째 멤버 자동 선택 시작:', groupMembers[0].name, '선택된 날짜:', selectedDate);
       
       setFirstMemberSelected(true);
       
       setTimeout(() => {
         console.log('[LOGS] 첫번째 멤버 자동 선택 실행:', groupMembers[0].id);
         handleMemberSelect(groupMembers[0].id, {} as React.MouseEvent);
+        
+        // 첫 번째 멤버의 위치 데이터 자동 로딩
+        const firstMemberId = parseInt(groupMembers[0].id);
+        console.log('[LOGS] 첫번째 멤버 위치 데이터 로딩 시작:', firstMemberId, selectedDate);
+        loadLocationData(firstMemberId, selectedDate);
       }, 500);
     }
-  }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members]);
+  }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members, selectedDate]);
 
   return (
     <>
@@ -1867,21 +1930,48 @@ export default function LogsPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex justify-around text-center px-1">
-                          <div className="flex flex-col items-center">
-                            <FiTrendingUp className="w-6 h-6 text-amber-500 mb-1" />
-                            <p className="text-xs text-gray-500">이동거리</p>
-                            <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.distance}</p>
-                          </div>
-                          <div className="flex flex-col items-center">
-                            <FiClock className="w-6 h-6 text-amber-500 mb-1" />
-                            <p className="text-xs text-gray-500">이동시간</p>
-                            <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.time}</p>
-                          </div>
-                          <div className="flex flex-col items-center">
-                            <FiZap className="w-6 h-6 text-amber-500 mb-1" />
-                            <p className="text-xs text-gray-500">걸음 수</p>
-                            <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.steps}</p>
+                      <div className="flex justify-around text-center px-1">
+                        <div className="flex flex-col items-center">
+                          <FiTrendingUp className="w-6 h-6 text-amber-500 mb-1" />
+                          <p className="text-xs text-gray-500">이동거리</p>
+                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.distance}</p>
+                        </div>
+                        <div className="flex flex-col items-center">
+                          <FiClock className="w-6 h-6 text-amber-500 mb-1" />
+                          <p className="text-xs text-gray-500">이동시간</p>
+                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.time}</p>
+                        </div>
+                        <div className="flex flex-col items-center">
+                          <FiZap className="w-6 h-6 text-amber-500 mb-1" />
+                          <p className="text-xs text-gray-500">걸음 수</p>
+                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.steps}</p>
+                        </div>
+                      </div>
+                      )}
+                      
+                      {/* 새로운 API 데이터 디버그 섹션 */}
+                      {(dailySummaryData.length > 0 || stayTimesData.length > 0 || mapMarkersData.length > 0) && (
+                        <div className="mt-4 pt-3 border-t border-pink-200">
+                          <h4 className="text-xs font-semibold text-gray-600 mb-2">🚀 새로운 API 데이터</h4>
+                          <div className="space-y-1 text-xs">
+                            {dailySummaryData.length > 0 && (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-blue-600">📅</span>
+                                <span className="text-gray-700">날짜별 요약: {dailySummaryData.length}일</span>
+                    </div>
+                            )}
+                            {stayTimesData.length > 0 && (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-green-600">⏰</span>
+                                <span className="text-gray-700">체류시간: {stayTimesData.length}개</span>
+                  </div>
+                            )}
+                            {mapMarkersData.length > 0 && (
+                              <div className="flex items-center space-x-2">
+                                <span className="text-red-600">📍</span>
+                                <span className="text-gray-700">지도 마커: {mapMarkersData.length}개</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}

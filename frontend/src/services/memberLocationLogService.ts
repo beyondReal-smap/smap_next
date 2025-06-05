@@ -35,6 +35,53 @@ export interface LocationPathData {
   points: LocationPoint[];
 }
 
+// 날짜별 요약 데이터 인터페이스
+export interface DailySummary {
+  mlt_idx: number;
+  log_date: string;
+  start_time: string;
+  end_time: string;
+}
+
+// 체류시간 분석 데이터 인터페이스
+export interface StayTime {
+  label: string;
+  grp: number;
+  start_time: string;
+  end_time: string;
+  duration: number;
+  distance: number;
+  start_lat: number;
+  start_long: number;
+}
+
+// 지도 마커 데이터 인터페이스
+export interface MapMarker {
+  mlt_idx: number;
+  mt_idx: number;
+  mlt_gps_time: string;
+  mlt_speed: number;
+  mlt_lat: number;
+  mlt_long: number;
+  mlt_accuacy: number;
+  mt_health_work: number;
+  mlt_battery: number;
+  mlt_fine_location: string;
+  mlt_location_chk: string;
+  mlt_wdate: string;
+  stay_lat?: number;
+  stay_long?: number;
+}
+
+// API 응답 인터페이스
+export interface ApiResponse<T> {
+  result: string;
+  data: T;
+  total_days?: number;
+  total_stays?: number;
+  total_markers?: number;
+}
+
 class MemberLocationLogService {
   /**
    * 일일 위치 로그 조회 (정확한 날짜 매칭)
@@ -220,6 +267,219 @@ class MemberLocationLogService {
       }
     } catch (error) {
       console.error('[MemberLocationLogService] 로그가 있는 멤버 목록 조회 오류:', error);
+      
+      if (error instanceof Error) {
+        console.error('[MemberLocationLogService] 오류 상세:', {
+          message: error.message,
+          name: error.name,
+        });
+      }
+      
+      return mockData;
+    }
+  }
+
+  /**
+   * 날짜별 위치 로그 요약 정보 조회 (새로운 API)
+   */
+  async getDailySummaryByRange(
+    memberId: number, 
+    startDate: string, 
+    endDate: string, 
+    maxAccuracy: number = 50.0, 
+    minSpeed: number = 0.0
+  ): Promise<DailySummary[]> {
+    const mockData: DailySummary[] = [
+      {
+        mlt_idx: 1,
+        log_date: startDate,
+        start_time: `${startDate} 08:30:15`,
+        end_time: `${startDate} 18:45:32`
+      }
+    ];
+
+    try {
+      console.log('[MemberLocationLogService] 날짜별 요약 조회 시작:', { 
+        memberId, startDate, endDate, maxAccuracy, minSpeed 
+      });
+      
+      const params = new URLSearchParams({
+        start_date: startDate,
+        end_date: endDate,
+        max_accuracy: maxAccuracy.toString(),
+        min_speed: minSpeed.toString()
+      });
+      
+      const url = `location-logs/daily-summary/${memberId}?${params}`;
+      const response = await apiClient.get(url);
+
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result: ApiResponse<DailySummary[]> = response.data;
+      
+      console.log('[MemberLocationLogService] 날짜별 요약 조회 응답:', {
+        status: response.status,
+        dataLength: result.data?.length || 0,
+        totalDays: result.total_days
+      });
+      
+      if (result.result === 'Y' && Array.isArray(result.data)) {
+        console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용:', result.data.length, '일');
+        return result.data;
+      } else {
+        console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');
+        return mockData;
+      }
+    } catch (error) {
+      console.error('[MemberLocationLogService] 날짜별 요약 조회 오류:', error);
+      
+      if (error instanceof Error) {
+        console.error('[MemberLocationLogService] 오류 상세:', {
+          message: error.message,
+          name: error.name,
+        });
+      }
+      
+      return mockData;
+    }
+  }
+
+  /**
+   * 특정 날짜 체류시간 분석 조회 (새로운 API)
+   */
+  async getStayTimes(
+    memberId: number, 
+    date: string, 
+    minSpeed: number = 1.0, 
+    maxAccuracy: number = 50.0, 
+    minDuration: number = 5
+  ): Promise<StayTime[]> {
+    const mockData: StayTime[] = [
+      {
+        label: 'stay',
+        grp: 1,
+        start_time: `${date} 09:00:00`,
+        end_time: `${date} 09:15:00`,
+        duration: 15.0,
+        distance: 0.1,
+        start_lat: 37.5665,
+        start_long: 126.9780
+      }
+    ];
+
+    try {
+      console.log('[MemberLocationLogService] 체류시간 분석 조회 시작:', { 
+        memberId, date, minSpeed, maxAccuracy, minDuration 
+      });
+      
+      const params = new URLSearchParams({
+        date: date,
+        min_speed: minSpeed.toString(),
+        max_accuracy: maxAccuracy.toString(),
+        min_duration: minDuration.toString()
+      });
+      
+      const url = `location-logs/stay-times/${memberId}?${params}`;
+      const response = await apiClient.get(url);
+
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result: ApiResponse<StayTime[]> = response.data;
+      
+      console.log('[MemberLocationLogService] 체류시간 분석 조회 응답:', {
+        status: response.status,
+        dataLength: result.data?.length || 0,
+        totalStays: result.total_stays
+      });
+      
+      if (result.result === 'Y' && Array.isArray(result.data)) {
+        console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용:', result.data.length, '개');
+        return result.data;
+      } else {
+        console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');
+        return mockData;
+      }
+    } catch (error) {
+      console.error('[MemberLocationLogService] 체류시간 분석 조회 오류:', error);
+      
+      if (error instanceof Error) {
+        console.error('[MemberLocationLogService] 오류 상세:', {
+          message: error.message,
+          name: error.name,
+        });
+      }
+      
+      return mockData;
+    }
+  }
+
+  /**
+   * 지도 마커용 이동로그 데이터 조회 (새로운 API)
+   */
+  async getMapMarkers(
+    memberId: number, 
+    date: string, 
+    minSpeed: number = 1.0, 
+    maxAccuracy: number = 50.0
+  ): Promise<MapMarker[]> {
+    const mockData: MapMarker[] = [
+      {
+        mlt_idx: 1,
+        mt_idx: memberId,
+        mlt_gps_time: `${date} 09:30:00`,
+        mlt_speed: 2.5,
+        mlt_lat: 37.5665,
+        mlt_long: 126.9780,
+        mlt_accuacy: 15.0,
+        mt_health_work: 5000,
+        mlt_battery: 85,
+        mlt_fine_location: 'Y',
+        mlt_location_chk: 'Y',
+        mlt_wdate: `${date} 09:30:00`,
+        stay_lat: undefined,
+        stay_long: undefined
+      }
+    ];
+
+    try {
+      console.log('[MemberLocationLogService] 지도 마커 데이터 조회 시작:', { 
+        memberId, date, minSpeed, maxAccuracy 
+      });
+      
+      const params = new URLSearchParams({
+        date: date,
+        min_speed: minSpeed.toString(),
+        max_accuracy: maxAccuracy.toString()
+      });
+      
+      const url = `location-logs/map-markers/${memberId}?${params}`;
+      const response = await apiClient.get(url);
+
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result: ApiResponse<MapMarker[]> = response.data;
+      
+      console.log('[MemberLocationLogService] 지도 마커 데이터 조회 응답:', {
+        status: response.status,
+        dataLength: result.data?.length || 0,
+        totalMarkers: result.total_markers
+      });
+      
+      if (result.result === 'Y' && Array.isArray(result.data)) {
+        console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용:', result.data.length, '개');
+        return result.data;
+      } else {
+        console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');
+        return mockData;
+      }
+    } catch (error) {
+      console.error('[MemberLocationLogService] 지도 마커 데이터 조회 오류:', error);
       
       if (error instanceof Error) {
         console.error('[MemberLocationLogService] 오류 상세:', {
