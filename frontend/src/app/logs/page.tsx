@@ -469,7 +469,9 @@ export default function LogsPage() {
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null); 
-  const memberNaverMarkers = useRef<any[]>([]); 
+  const memberNaverMarkers = useRef<any[]>([]);
+  const locationLogMarkers = useRef<any[]>([]); // 위치 로그 마커들을 위한 ref
+  const stayTimeMarkers = useRef<any[]>([]); // 체류시간 마커들을 위한 ref 
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true); 
   const [isMapInitializedLogs, setIsMapInitializedLogs] = useState(false); // Logs 페이지용 지도 초기화 상태
@@ -602,6 +604,31 @@ export default function LogsPage() {
       }
     }
     return () => {
+      // 기존 마커들 정리
+      memberNaverMarkers.current.forEach(marker => {
+        if (marker && marker.setMap) {
+          marker.setMap(null);
+        }
+      });
+      memberNaverMarkers.current = [];
+      
+      // 위치 로그 마커들 정리
+      locationLogMarkers.current.forEach(marker => {
+        if (marker && marker.setMap) {
+          marker.setMap(null);
+        }
+      });
+      locationLogMarkers.current = [];
+      
+      // 체류시간 마커들 정리
+      stayTimeMarkers.current.forEach(marker => {
+        if (marker && marker.setMap) {
+          marker.setMap(null);
+        }
+      });
+      stayTimeMarkers.current = [];
+      
+      // 지도 파괴
       if (map.current && typeof map.current.destroy === 'function') {
          map.current.destroy();
       }
@@ -823,6 +850,420 @@ export default function LogsPage() {
     }
   };
 
+  // 위치 로그 마커를 지도에 업데이트하는 함수
+  const updateLocationLogMarkers = (markers: MapMarker[]) => {
+    if (!map.current || !window.naver?.maps) {
+      console.log('[updateLocationLogMarkers] 지도가 준비되지 않음');
+      return;
+    }
+
+    console.log('[updateLocationLogMarkers] 위치 로그 마커 업데이트 시작:', markers.length, '개');
+
+    // 기존 위치 로그 마커들 제거
+    locationLogMarkers.current.forEach((marker) => {
+      if (marker && marker.setMap) {
+        marker.setMap(null);
+      }
+    });
+    locationLogMarkers.current = [];
+
+    if (markers.length === 0) {
+      console.log('[updateLocationLogMarkers] 표시할 마커가 없음');
+      return;
+    }
+
+    // 새로운 위치 로그 마커들 생성
+    markers.forEach((markerData, index) => {
+      try {
+        const position = new window.naver.maps.LatLng(markerData.mlt_lat, markerData.mlt_long);
+        
+        // 속도에 따른 마커 색상 결정
+        let markerColor = '#3b82f6'; // 기본 파란색
+        if (markerData.mlt_speed > 5) {
+          markerColor = '#ef4444'; // 빠른 속도 - 빨간색
+        } else if (markerData.mlt_speed > 2) {
+          markerColor = '#f59e0b'; // 중간 속도 - 주황색
+        } else if (markerData.mlt_speed > 0.5) {
+          markerColor = '#10b981'; // 느린 속도 - 초록색
+        }
+
+        // 위치 로그 마커 생성 (작은 원형 마커)
+        const marker = new window.naver.maps.Marker({
+          position: position,
+          map: map.current,
+          icon: {
+            content: `
+              <div style="
+                width: 8px; 
+                height: 8px; 
+                background: ${markerColor}; 
+                border: 2px solid white; 
+                border-radius: 50%; 
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                cursor: pointer;
+              "></div>
+            `,
+            anchor: new window.naver.maps.Point(6, 6)
+          },
+          zIndex: 100 + index
+        });
+
+        // 마커 클릭 이벤트 - 상세 정보 표시 (home/page.tsx 스타일과 애니메이션 적용)
+        const infoWindow = new window.naver.maps.InfoWindow({
+          content: `
+            <style>
+              @keyframes slideInFromBottom {
+                0% {
+                  opacity: 0;
+                  transform: translateY(20px) scale(0.95);
+                }
+                100% {
+                  opacity: 1;
+                  transform: translateY(0) scale(1);
+                }
+              }
+              .info-window-container {
+                animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+              }
+              .close-button {
+                transition: all 0.2s ease;
+              }
+              .close-button:hover {
+                background: rgba(0, 0, 0, 0.2) !important;
+                transform: scale(1.1);
+              }
+            </style>
+            <div class="info-window-container" style="
+              padding: 12px 16px;
+              min-width: 200px;
+              max-width: 280px;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background: white;
+              border-radius: 12px;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+              position: relative;
+            ">
+              <!-- 닫기 버튼 -->
+              <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background: rgba(0, 0, 0, 0.1);
+                border: none;
+                border-radius: 50%;
+                width: 22px;
+                height: 22px;
+                font-size: 14px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #666;
+              ">×</button>
+              
+              <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px; text-align: center;">
+                📍 위치 로그
+              </h3>
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #64748b;">
+                  🕒 시간: <span style="color: #111827; font-weight: 500;">${markerData.mlt_gps_time ? markerData.mlt_gps_time.split(' ')[1] || markerData.mlt_gps_time : '정보 없음'}</span>
+                </p>
+              </div>
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #64748b;">
+                  🚶 속도: <span style="color: #111827; font-weight: 500;">${markerData.mlt_speed?.toFixed(2) || 0} km/h</span>
+                </p>
+              </div>
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #64748b;">
+                  📍 정확도: <span style="color: #111827; font-weight: 500;">${markerData.mlt_accuacy?.toFixed(1) || 0}m</span>
+                </p>
+              </div>
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #64748b;">
+                  🔋 배터리: <span style="color: #111827; font-weight: 500;">${markerData.mlt_battery || 0}%</span>
+                </p>
+              </div>
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #64748b;">
+                  👟 걸음수: <span style="color: #111827; font-weight: 500;">${markerData.mt_health_work?.toLocaleString() || 0}</span>
+                </p>
+              </div>
+              <div style="margin-bottom: 0;">
+                <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                  🌍 좌표: ${markerData.mlt_lat.toFixed(6)}, ${markerData.mlt_long.toFixed(6)}
+                </p>
+              </div>
+            </div>
+          `,
+          borderWidth: 0,
+          backgroundColor: 'transparent',
+          disableAnchor: true,
+          pixelOffset: new window.naver.maps.Point(0, -10)
+        });
+
+        window.naver.maps.Event.addListener(marker, 'click', () => {
+          if (infoWindow.getMap()) {
+            infoWindow.close();
+          } else {
+            infoWindow.open(map.current, marker);
+          }
+        });
+
+        locationLogMarkers.current.push(marker);
+      } catch (error) {
+        console.error('[updateLocationLogMarkers] 마커 생성 오류:', error, markerData);
+      }
+    });
+
+    console.log('[updateLocationLogMarkers] 위치 로그 마커 생성 완료:', locationLogMarkers.current.length, '개');
+
+    // 마커들이 모두 보이도록 지도 범위 조정
+    if (markers.length > 0) {
+      const bounds = new window.naver.maps.LatLngBounds();
+      markers.forEach(markerData => {
+        bounds.extend(new window.naver.maps.LatLng(markerData.mlt_lat, markerData.mlt_long));
+      });
+      
+      // 부드럽게 지도 범위 조정
+      map.current.fitBounds(bounds, {
+        top: 50,
+        right: 50,
+        bottom: 50,
+        left: 50
+      });
+    }
+  };
+
+  // 체류시간 마커를 지도에 업데이트하는 함수
+  const updateStayTimeMarkers = (stayTimes: StayTime[]) => {
+    if (!map.current || !window.naver?.maps) {
+      console.log('[updateStayTimeMarkers] 지도가 준비되지 않음');
+      return;
+    }
+
+    console.log('[updateStayTimeMarkers] 체류시간 마커 업데이트 시작:', stayTimes.length, '개');
+
+    // 기존 체류시간 마커들 제거
+    stayTimeMarkers.current.forEach((marker) => {
+      if (marker && marker.setMap) {
+        marker.setMap(null);
+      }
+    });
+    stayTimeMarkers.current = [];
+
+    if (stayTimes.length === 0) {
+      console.log('[updateStayTimeMarkers] 표시할 체류시간 마커가 없음');
+      return;
+    }
+
+    // 체류시간에 따른 마커 크기와 색상 결정 함수
+    const getMarkerStyle = (duration: number, index: number) => {
+      let size = 30; // 기본 크기
+      let bgColor = '#f59e0b'; // 기본 주황색
+      let textColor = 'white';
+      
+      // 체류시간에 따른 크기 조정
+      if (duration >= 300) { // 5시간 이상
+        size = 40;
+        bgColor = '#dc2626'; // 빨간색 (가장 긴 체류)
+      } else if (duration >= 120) { // 2시간 이상
+        size = 36;
+        bgColor = '#ea580c'; // 진한 주황색
+      } else if (duration >= 60) { // 1시간 이상
+        size = 32;
+        bgColor = '#f59e0b'; // 주황색
+      } else if (duration >= 30) { // 30분 이상
+        size = 28;
+        bgColor = '#eab308'; // 노란색
+      } else { // 30분 미만
+        size = 26;
+        bgColor = '#22c55e'; // 초록색 (짧은 체류)
+      }
+
+      return { size, bgColor, textColor };
+    };
+
+    // 체류시간 포맷 함수
+    const formatDuration = (minutes: number): string => {
+      const hours = Math.floor(minutes / 60);
+      const mins = Math.floor(minutes % 60);
+      
+      if (hours > 0) {
+        return `${hours}시간 ${mins}분`;
+      } else {
+        return `${mins}분`;
+      }
+    };
+
+    // 새로운 체류시간 마커들 생성
+    stayTimes.forEach((stayData, index) => {
+      try {
+        const position = new window.naver.maps.LatLng(stayData.start_lat, stayData.start_long);
+        const markerStyle = getMarkerStyle(stayData.duration, index);
+        const markerNumber = index + 1; // 1부터 시작하는 순서
+
+        // 체류시간 마커 생성 (순서 번호가 있는 원형 마커)
+        const marker = new window.naver.maps.Marker({
+          position: position,
+          map: map.current,
+          icon: {
+            content: `
+              <div style="
+                position: relative;
+                width: ${markerStyle.size}px; 
+                height: ${markerStyle.size}px; 
+                background: ${markerStyle.bgColor}; 
+                border: 3px solid white; 
+                border-radius: 50%; 
+                box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                font-size: ${markerStyle.size > 32 ? '14px' : '12px'};
+                color: ${markerStyle.textColor};
+              ">
+                ${markerNumber}
+                                 <div style="
+                   position: absolute;
+                   top: -20px;
+                   right: -20px;
+                   background: #1f2937;
+                   color: white;
+                   border-radius: 8px;
+                   padding: 2px 4px;
+                   font-size: 10px;
+                   font-weight: normal;
+                   white-space: nowrap;
+                   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+                 ">${formatDuration(stayData.duration)}</div>
+              </div>
+            `,
+            anchor: new window.naver.maps.Point(markerStyle.size/2, markerStyle.size/2)
+          },
+          zIndex: 200 + index // 체류시간 마커가 위치 로그 마커보다 위에 표시
+        });
+
+        // 마커 클릭 이벤트 - 상세 정보 표시 (home/page.tsx 스타일과 애니메이션 적용)
+        const infoWindow = new window.naver.maps.InfoWindow({
+          content: `
+            <style>
+              @keyframes slideInFromBottom {
+                0% {
+                  opacity: 0;
+                  transform: translateY(20px) scale(0.95);
+                }
+                100% {
+                  opacity: 1;
+                  transform: translateY(0) scale(1);
+                }
+              }
+              .info-window-container {
+                animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+              }
+              .close-button {
+                transition: all 0.2s ease;
+              }
+              .close-button:hover {
+                background: rgba(0, 0, 0, 0.2) !important;
+                transform: scale(1.1);
+              }
+            </style>
+            <div class="info-window-container" style="
+              padding: 12px 16px;
+              min-width: 200px;
+              max-width: 280px;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background: white;
+              border-radius: 12px;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+              position: relative;
+            ">
+              <!-- 닫기 버튼 -->
+              <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background: rgba(0, 0, 0, 0.1);
+                border: none;
+                border-radius: 50%;
+                width: 22px;
+                height: 22px;
+                font-size: 14px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #666;
+              ">×</button>
+              
+              <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px; text-align: center;">
+                🏠 체류 지점 #${markerNumber}
+              </h3>
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #64748b;">
+                  🕐 시작: <span style="color: #111827; font-weight: 500;">${stayData.start_time.split(' ')[1]}</span>
+                </p>
+              </div>
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #64748b;">
+                  🕐 종료: <span style="color: #111827; font-weight: 500;">${stayData.end_time.split(' ')[1]}</span>
+                </p>
+              </div>
+              <div style="margin-bottom: 0;">
+                <p style="margin: 0; font-size: 12px; color: #64748b;">
+                  ⏱️ 체류시간: <span style="
+                    color: ${markerStyle.bgColor}; 
+                    font-weight: bold; 
+                    background: ${markerStyle.bgColor}20; 
+                    padding: 4px 8px; 
+                    border-radius: 8px;
+                  ">${formatDuration(stayData.duration)}</span>
+                </p>
+              </div>
+            </div>
+          `,
+          borderWidth: 0,
+          backgroundColor: 'transparent',
+          disableAnchor: true,
+          pixelOffset: new window.naver.maps.Point(0, -10)
+        });
+
+        window.naver.maps.Event.addListener(marker, 'click', () => {
+          if (infoWindow.getMap()) {
+            infoWindow.close();
+          } else {
+            infoWindow.open(map.current, marker);
+          }
+        });
+
+        stayTimeMarkers.current.push(marker);
+      } catch (error) {
+        console.error('[updateStayTimeMarkers] 마커 생성 오류:', error, stayData);
+      }
+    });
+
+    console.log('[updateStayTimeMarkers] 체류시간 마커 생성 완료:', stayTimeMarkers.current.length, '개');
+
+    // 체류시간 마커들이 모두 보이도록 지도 범위 조정
+    if (stayTimes.length > 0) {
+      const bounds = new window.naver.maps.LatLngBounds();
+      stayTimes.forEach(stayData => {
+        bounds.extend(new window.naver.maps.LatLng(stayData.start_lat, stayData.start_long));
+      });
+      
+      // 부드럽게 지도 범위 조정
+      map.current.fitBounds(bounds, {
+        top: 80,
+        right: 80,
+        bottom: 80,
+        left: 80
+      });
+    }
+  };
+
   const updateMemberMarkers = (members: GroupMember[]) => {
     // 지도 초기화 체크 로직 개선
     if (!map.current) {
@@ -1013,6 +1454,22 @@ export default function LogsPage() {
       logNewApiData();
     }
   }, [dailySummaryData, stayTimesData, mapMarkersData, locationLogSummaryData]);
+
+  // 지도 마커 데이터가 변경될 때마다 지도에 마커 업데이트
+  useEffect(() => {
+    if (isMapInitializedLogs && mapMarkersData.length > 0) {
+      console.log('[LOGS] 지도 마커 데이터 변경 감지 - 지도에 마커 업데이트:', mapMarkersData.length, '개');
+      updateLocationLogMarkers(mapMarkersData);
+    }
+  }, [mapMarkersData, isMapInitializedLogs]);
+
+  // 체류시간 데이터가 변경될 때마다 지도에 체류시간 마커 업데이트
+  useEffect(() => {
+    if (isMapInitializedLogs && stayTimesData.length > 0) {
+      console.log('[LOGS] 체류시간 데이터 변경 감지 - 지도에 체류시간 마커 업데이트:', stayTimesData.length, '개');
+      updateStayTimeMarkers(stayTimesData);
+    }
+  }, [stayTimesData, isMapInitializedLogs]);
 
   // useEffect for auto-selecting the first member (only sets state)
   useEffect(() => {
