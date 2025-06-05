@@ -3233,8 +3233,8 @@ export default function SchedulePage() {
     groupMembers: any[] // 실제 백엔드 그룹 멤버 데이터
   ): ScheduleEvent => {
     // tgtSgdtIdx와 일치하는 멤버 찾기
-    console.log(`[mapMemberLocationToSchedule] 스케줄 "${schedule.title}" 처리 시작, tgtSgdtIdx: ${schedule.tgtSgdtIdx}, tgtMtIdx: ${schedule.tgtMtIdx}`); const targetMember = groupMembers.find(member => 
-      member.sgdt_idx === schedule.tgtSgdtIdx || member.mt_idx === schedule.tgtMtIdx
+    const targetMember = groupMembers.find(member => 
+      member.sgdt_idx === schedule.tgtSgdtIdx
     );
     
     if (!targetMember) {
@@ -3264,7 +3264,7 @@ export default function SchedulePage() {
       updatedSchedule.distance = distance;
       updatedSchedule.distanceText = formatDistance(distance);
       
-      console.log(`[DISTANCE] 스케줄 "${schedule.title}" - 멤버 "${targetMember.mt_name}": ${formatDistance(distance)}`); console.log(`[DISTANCE] 스케줄 위치: (${schedule.locationLat}, ${schedule.locationLng}), 멤버 위치: (${targetMember.mlt_lat}, ${targetMember.mlt_long})`);
+      console.log(`[DISTANCE] 스케줄 "${schedule.title}" - 멤버 "${targetMember.mt_name}": ${formatDistance(distance)}`);
     }
     
     return updatedSchedule;
@@ -5365,7 +5365,7 @@ export default function SchedulePage() {
                                       key={group.sgt_idx}
                                       type="button"
                                       onClick={() => handleGroupSelect(group.sgt_idx)}
-                                        className={`w-full px-4 py-2 text-left text-sm font-medium hover:bg-gray-50 transition-colors duration-150 ${
+                                        className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors ${
                                           selectedGroupId === group.sgt_idx ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'
                                         }`}
                                       >

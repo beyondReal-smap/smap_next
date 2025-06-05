@@ -605,6 +605,7 @@ export default function LocationPage() {
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [selectedMemberIdRef, setSelectedMemberIdRef] = useState<React.MutableRefObject<string | null>>({ current: null });
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
+  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
   
   // 장소 관련 상태
   const [otherMembersSavedLocations, setOtherMembersSavedLocations] = useState<OtherMemberLocationRaw[]>([]);
@@ -1980,6 +1981,33 @@ export default function LocationPage() {
     }
   }, [isMapInitialized, activeView]); // selectedMemberIdRef.current 제거하여 무한 재조회 방지
 
+  // 그룹별 멤버 수 조회
+  useEffect(() => {
+    const fetchGroupMemberCounts = async () => {
+      if (!userGroups || userGroups.length === 0) return;
+
+      console.log('[LOCATION] 그룹 멤버 수 조회 시작:', userGroups.length, '개 그룹');
+      
+      const counts: Record<number, number> = {};
+      
+      await Promise.all(userGroups.map(async (group) => {
+        try {
+          const count = await getGroupMemberCount(group.sgt_idx);
+          counts[group.sgt_idx] = count;
+          console.log(`[LOCATION] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수:`, count);
+        } catch (error) {
+          console.error(`[LOCATION] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+          counts[group.sgt_idx] = 0;
+        }
+      }));
+      
+      setGroupMemberCounts(counts);
+      console.log('[LOCATION] 그룹 멤버 수 조회 완료:', counts);
+    };
+
+    fetchGroupMemberCounts();
+  }, [userGroups]);
+
   // 사용자 그룹 목록 불러오기
   const fetchUserGroups = async () => {
     setIsLoadingGroups(true);
@@ -2003,6 +2031,17 @@ export default function LocationPage() {
       dataFetchedRef.current.groups = true;
     } finally {
       setIsLoadingGroups(false);
+    }
+  };
+
+  // 그룹 멤버 수를 가져오는 함수
+  const getGroupMemberCount = async (groupId: number): Promise<number> => {
+    try {
+      const memberData = await memberService.getGroupMembers(groupId.toString());
+      return memberData ? memberData.length : 0;
+    } catch (error) {
+      console.error(`그룹 ${groupId} 멤버 수 조회 실패:`, error);
+      return 0;
     }
   };
 
@@ -3631,16 +3670,23 @@ export default function LocationPage() {
                                   <button
                                    key={group.sgt_idx}
                                    onClick={() => handleGroupSelect(group.sgt_idx)}
-                                      className={`w-full px-4 py-3 text-left text-sm hover:bg-indigo-50 focus:outline-none focus:bg-indigo-50 transition-all duration-200 mobile-button ${
-                                     selectedGroupId === group.sgt_idx 
-                                          ? 'bg-indigo-50 text-indigo-700 font-semibold' 
-                                       : 'text-gray-900'
+                                      className={`w-full px-4 py-2 text-left text-sm font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
+                                                                            selectedGroupId === group.sgt_idx 
+                                            ? 'bg-indigo-50 text-indigo-700 font-medium' 
+                                       : 'text-gray-700'
                                    }`}
                                  >
                                    <div className="flex items-center justify-between">
-                                     <span className="truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</span>
+                                     <div className="flex-1">
+                                       <div className="font-semibold truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</div>
+                                       <div className="text-xs text-gray-500 mt-0.5">
+                                         멤버 {groupMemberCounts[group.sgt_idx] || 0}명
+                                       </div>
+                                     </div>
                                      {selectedGroupId === group.sgt_idx && (
-                                        <span className="text-indigo-500 ml-2">✓</span>
+                                       <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                       </svg>
                                      )}
                                    </div>
                                   </button>
@@ -3956,7 +4002,7 @@ export default function LocationPage() {
                   </motion.div>
 
               {/* 점 인디케이터 */}
-              <div className="flex justify-center items-center space-x-2 mt-1 mb-2">
+              <div className="flex justify-center items-center space-x-2 mb-2">
                 <motion.div
                   className={`rounded-full transition-all duration-300 ${
                     activeView === 'selectedMemberPlaces' ? 'bg-indigo-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BottomNavBar } from './index';
+import { FaUsers } from 'react-icons/fa';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -30,7 +31,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     { name: '그룹', path: '/group', icon: 'users' },
     { name: '일정', path: '/schedule', icon: 'calendar' },
     { name: '내장소', path: '/location', icon: 'map-pin' },
-    { name: '로그', path: '/logs', icon: 'list' },
+    { name: '활동 로그', path: '/logs', icon: 'document' },
   ];
   
   // 특정 페이지 확인 (일정, 내장소, 로그)
@@ -66,6 +67,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
   
   // 메인 영역 배경색 결정
   const mainBgClass = isSimplifiedHeader ? 'bg-gray-50' : ''; // simplifiedHeader 페이지에 배경색 적용
+
+  const handleNavigation = (path: string) => {
+    router.push(path);
+    setIsMenuOpen(false);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
@@ -259,7 +265,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                             ? 'bg-indigo-50 text-indigo-600'
                             : 'text-gray-700 hover:bg-gray-50 hover:text-indigo-500'
                         }`}
-                        onClick={toggleMenu}
+                        onClick={() => handleNavigation(item.path)}
                       >
                         <div className="flex items-center">
                           <span>{item.name}</span>
@@ -274,7 +280,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <Link
                   href="/profile"
                   className="block px-3 py-2 rounded-md text-gray-700 hover:bg-gray-50 hover:text-indigo-500"
-                  onClick={toggleMenu}
+                  onClick={() => handleNavigation('/profile')}
                 >
                   <div className="flex items-center">
                     <span>프로필</span>
@@ -283,7 +289,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <Link
                   href="/logout"
                   className="block px-3 py-2 rounded-md text-gray-700 hover:bg-gray-50 hover:text-red-500"
-                  onClick={toggleMenu}
+                  onClick={() => handleNavigation('/logout')}
                 >
                   <div className="flex items-center">
                     <span>로그아웃</span>

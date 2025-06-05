@@ -3720,7 +3720,7 @@ export default function HomePage() {
             />
 
             {/* 바텀시트 내용 */}
-            <div className="px-6 pb-2 overflow-y-auto max-h-full">
+            <div className="px-6 pb-1 overflow-y-auto max-h-full">
               {/* 스와이프 가능한 콘텐츠 컨테이너 */}
               <div className="flex-grow min-h-0 relative overflow-hidden">
                 <motion.div
@@ -3816,7 +3816,7 @@ export default function HomePage() {
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                                 transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-                                className="absolute top-16 right-0 z-50 min-w-[200px] bg-white border border-indigo-200 rounded-xl shadow-xl overflow-hidden"
+                                className="absolute top-full mt-2 right-0 z-50 min-w-[200px] bg-white border border-indigo-200 rounded-xl shadow-xl overflow-hidden"
                                 onClick={(e) => {
                                   // 드롭다운 메뉴 내부 클릭 시 이벤트 버블링 방지
                                   e.stopPropagation();
