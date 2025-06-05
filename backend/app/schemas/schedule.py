@@ -60,4 +60,4 @@ class ScheduleResponse(ScheduleBase):
     mt_schedule_idx: Optional[int] = None
 
     class Config:
-        orm_mode = True 
+        from_attributes = True 

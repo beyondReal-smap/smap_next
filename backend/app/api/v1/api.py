@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import health, auth, users, groups, group_details, locations, schedules, push_logs, push_fcms, members, group_members, weather, group_schedule_manage
+from app.api.v1.endpoints import health, auth, users, groups, group_details, locations, schedules, push_logs, push_fcms, members, group_members, weather, group_schedule_manage, member_location_log
 
 api_router = APIRouter()
 
@@ -15,4 +15,5 @@ api_router.include_router(push_logs.router, prefix="/push-logs", tags=["push-log
 api_router.include_router(push_fcms.router, prefix="/push-fcms", tags=["push-fcms"]) 
 api_router.include_router(members.router, prefix="/members", tags=["members"])
 api_router.include_router(group_members.router, prefix="/group-members", tags=["group-members"])
-api_router.include_router(weather.router, prefix="/weather", tags=["weather"]) 
+api_router.include_router(weather.router, prefix="/weather", tags=["weather"])
+api_router.include_router(member_location_log.router, prefix="/logs", tags=["member-location-logs"]) 

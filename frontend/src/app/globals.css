@@ -133,4 +133,25 @@ h2 {
 
 p {
   @apply text-base leading-relaxed;
-} 
+}
+
+/* 스크롤바 숨기기 */
+.hide-scrollbar {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE/Edge */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none !important; /* Chrome/Safari */
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+.hide-scrollbar::-webkit-scrollbar-track {
+  display: none !important;
+}
+
+.hide-scrollbar::-webkit-scrollbar-thumb {
+  display: none !important;
+}

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel
@@ -32,4 +32,32 @@ class LocationResponse(LocationBase):
     slt_ddate: Optional[datetime] = None
 
     class Config:
-        orm_mode = True 
+        from_attributes = True
+
+# 누락된 스키마 클래스들 추가
+class LocationData(BaseModel):
+    """위치 데이터 스키마"""
+    slt_idx: int
+    slt_title: Optional[str] = None
+    slt_lat: Optional[Decimal] = None
+    slt_long: Optional[Decimal] = None
+    
+    class Config:
+        from_attributes = True
+
+class MemberLocation(BaseModel):
+    """멤버 위치 스키마"""
+    mt_idx: int
+    mt_name: Optional[str] = None
+    locations: List[LocationData] = []
+    
+    class Config:
+        from_attributes = True
+
+class GroupMemberWithLocations(BaseModel):
+    """그룹 멤버와 위치 정보 스키마"""
+    group_id: int
+    members: List[MemberLocation] = []
+    
+    class Config:
+        from_attributes = True 

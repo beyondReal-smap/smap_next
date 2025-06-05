@@ -27,4 +27,4 @@ class PushFCMResponse(PushFCMBase):
     pft_wdate: Optional[datetime] = None
 
     class Config:
-        orm_mode = True 
+        from_attributes = True 

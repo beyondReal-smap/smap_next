@@ -14,8 +14,9 @@ import { API_KEYS, MAP_CONFIG } from '../../config';
 import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
 import memberService from '@/services/memberService';
-import scheduleService from '../../services/scheduleService';
+
 import groupService, { Group } from '@/services/groupService';
+import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData } from '@/services/memberLocationLogService';
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
 declare global {
@@ -33,27 +34,11 @@ interface Location { // home/page.tsx의 Location 인터페이스 (필요시 log
   lng: number;
 }
 
-interface Schedule {
-  id: string;
-  sst_pidx?: number | null; memberId?: string | null; mt_schedule_idx?: number | null;
-  title?: string | null; date?: string | null; sst_edate?: string | null; sst_sedate?: string | null;
-  sst_all_day?: any | null; sst_repeat_json?: string | null; sst_repeat_json_v?: string | null;
-  sgt_idx?: number | null; sgdt_idx?: number | null; sgdt_idx_t?: string | null;
-  sst_alram?: number | null; sst_alram_t?: string | null; sst_adate?: string | null;
-  slt_idx?: number | null; slt_idx_t?: string | null; location?: string | null;
-  sst_location_add?: string | null; sst_location_lat?: number | null; sst_location_long?: number | null;
-  sst_supplies?: string | null; sst_memo?: string | null; sst_show?: any | null;
-  sst_location_alarm?: number | null; sst_schedule_alarm_chk?: any | null;
-  sst_pick_type?: string | null; sst_pick_result?: number | null; sst_schedule_alarm?: string | null;
-  sst_update_chk?: string | null; sst_wdate?: string | null; sst_udate?: string | null;
-  sst_ddate?: string | null; sst_in_chk?: any | null; sst_schedule_chk?: any | null;
-  sst_entry_cnt?: number | null; sst_exit_cnt?: number | null;
-  statusDetail?: { name: 'completed' | 'ongoing' | 'upcoming' | 'default'; text: string; color: string; bgColor: string; };
-}
+
 
 interface GroupMember {
   id: string; name: string; photo: string | null; isSelected: boolean; location: Location;
-  schedules: Schedule[]; mt_gender?: number | null; original_index: number;
+  mt_gender?: number | null; original_index: number;
   mt_weather_sky?: string | number | null; mt_weather_tmx?: string | number | null;
   mt_weather_tmn?: string | number | null; mt_weather_date?: string | null;
   mlt_lat?: number | null; mlt_long?: number | null; mlt_speed?: number | null;
@@ -62,24 +47,21 @@ interface GroupMember {
   sgdt_idx?: number; // 그룹 상세 인덱스 추가
 }
 
-const RECENT_SCHEDULES_HOME: Schedule[] = [
-  { id: 'h_rs_1_log', title: '팀 미팅 (로그)', date: '오늘 14:00', location: '강남 사무실' },
-  { id: 'h_rs_2_log', title: '프로젝트 발표 (로그)', date: '내일 10:00', location: '회의실 A' },
-];
+
 // --- home/page.tsx에서 가져온 인터페이스 및 데이터 끝 ---
 
-// 위치기록 요약 데이터 인터페이스
+// 위치기록 요약 데이터 인터페이스 (UI용)
 interface LocationSummary {
   distance: string;
   time: string;
   steps: string;
 }
 
-// 모의 위치기록 요약 데이터
-const MOCK_LOCATION_SUMMARY: LocationSummary = {
-  distance: '12.5 km',
-  time: '2시간 30분',
-  steps: '15,203 걸음',
+// 기본 위치기록 요약 데이터
+const DEFAULT_LOCATION_SUMMARY: LocationSummary = {
+  distance: '0 km',
+  time: '0분',
+  steps: '0 걸음',
 };
 
 // 모의 로그 데이터 - 날짜를 최근으로 업데이트
@@ -474,17 +456,17 @@ export default function LogsPage() {
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
   const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
   const [firstMemberSelected, setFirstMemberSelected] = useState(false);
-  const [groupSchedules, setGroupSchedules] = useState<Schedule[]>([]);
+
   
   // 그룹 드롭다운 ref 추가
   const groupDropdownRef = useRef<HTMLDivElement>(null);
   
   // 데이터 fetch 상태 관리
-  const dataFetchedRef = useRef({ members: false, schedules: false });
+  const dataFetchedRef = useRef({ members: false });
 
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
-
+  
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null); 
   const memberNaverMarkers = useRef<any[]>([]); 
@@ -494,7 +476,7 @@ export default function LogsPage() {
   const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false); // 초기 데이터 로딩 상태 추가
 
   // home/page.tsx와 동일한 바텀시트 상태 관리
-  const [bottomSheetState, setBottomSheetState] = useState<'hidden' | 'peek'>('peek');
+  const [bottomSheetState, setBottomSheetState] = useState<'hidden' | 'middle' | 'peek'>('peek');
   const bottomSheetRef = useRef<HTMLDivElement>(null);
   const startDragY = useRef<number | null>(null);
   const startDragX = useRef<number | null>(null);
@@ -505,14 +487,28 @@ export default function LogsPage() {
   // 로그 페이지 뷰 상태 및 Ref
   const [activeLogView, setActiveLogView] = useState<'members' | 'summary'>('members');
   const logSwipeContainerRef = useRef<HTMLDivElement>(null);
-  const [locationSummary, setLocationSummary] = useState<LocationSummary>(MOCK_LOCATION_SUMMARY);
+  const [locationSummary, setLocationSummary] = useState<LocationSummary>(DEFAULT_LOCATION_SUMMARY);
+  const [currentLocationLogs, setCurrentLocationLogs] = useState<LocationLog[]>([]);
+  const [isLocationDataLoading, setIsLocationDataLoading] = useState(false);
   const [sliderValue, setSliderValue] = useState(60); // 슬라이더 초기 값 (0-100)
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
 
-  // home/page.tsx와 동일한 bottomSheetVariants
+  // home/page.tsx와 동일한 bottomSheetVariants + middle 상태 추가
   const bottomSheetVariants = {
-    hidden: {
+    hidden: { 
       top: '90vh',
+      bottom: '0px',
+      opacity: 1,
+      transition: {
+        type: "spring",
+        stiffness: 400,
+        damping: 30,
+        mass: 0.6,
+        duration: 0.5
+      }
+    },
+    middle: {
+      top: '65vh', // 위치기록 요약 섹션 높이(200px)에 맞춤
       bottom: '0px',
       opacity: 1,
       transition: {
@@ -722,21 +718,29 @@ export default function LogsPage() {
       const dragThreshold = 50;
       const velocityThreshold = 0.3;
       
-      let nextState: 'hidden' | 'peek' = bottomSheetState;
+      let nextState: 'hidden' | 'middle' | 'peek' = bottomSheetState;
     
       // 위로 드래그 (Y 감소) - 상태 확장
       if (dragDeltaY < 0) {
         if (bottomSheetState === 'hidden' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
+          nextState = 'middle';
+          console.log('[DragEnd] 위로 드래그 감지 (hidden -> middle)');
+          triggerHaptic();
+        } else if (bottomSheetState === 'middle' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
           nextState = 'peek';
-          console.log('[DragEnd] 위로 드래그 감지 (hidden -> peek)');
+          console.log('[DragEnd] 위로 드래그 감지 (middle -> peek)');
           triggerHaptic();
         }
       }
       // 아래로 드래그 (Y 증가) - 상태 축소
       else if (dragDeltaY > 0) {
         if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
+          nextState = 'middle';
+          console.log('[DragEnd] 아래로 드래그 감지 (peek -> middle)');
+          triggerHaptic();
+        } else if (bottomSheetState === 'middle' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
           nextState = 'hidden';
-          console.log('[DragEnd] 아래로 드래그 감지 (peek -> hidden)');
+          console.log('[DragEnd] 아래로 드래그 감지 (middle -> hidden)');
           triggerHaptic();
         }
       }
@@ -761,7 +765,7 @@ export default function LogsPage() {
 
   const toggleBottomSheet = () => {
     setBottomSheetState(prev => {
-      const next = prev === 'hidden' ? 'peek' : 'hidden';
+      const next = prev === 'hidden' ? 'middle' : prev === 'middle' ? 'peek' : 'hidden';
       console.log('[BOTTOM_SHEET] toggleBottomSheet 상태 변경:', prev, '→', next);
       return next;
     });
@@ -770,10 +774,10 @@ export default function LogsPage() {
   const handleMemberSelect = (id: string, e: React.MouseEvent) => {
     // 이벤트 전파 중단 (이벤트 객체가 유효한 경우에만)
     if (e && typeof e.preventDefault === 'function') {
-      e.preventDefault();
+    e.preventDefault();
     }
     if (e && typeof e.stopPropagation === 'function') {
-      e.stopPropagation();
+    e.stopPropagation();
     }
     
     console.log('Member selection started:', id);
@@ -802,6 +806,11 @@ export default function LogsPage() {
     // 선택 상태 변경 확인을 위한 로그
     const selectedMember = updatedMembers.find(m => m.isSelected);
     console.log('Selected member:', selectedMember?.name);
+    
+    // 선택된 멤버의 위치 데이터 로드
+    if (selectedMember && selectedDate) {
+      loadLocationData(parseInt(selectedMember.id), selectedDate);
+    }
   };
 
   const updateMemberMarkers = (members: GroupMember[]) => {
@@ -888,19 +897,72 @@ export default function LogsPage() {
   };
 
   const handleDateSelect = (date: string) => {
+    console.log('[LOGS] 날짜 선택:', date);
     setSelectedDate(date);
-    const newDistance = (Math.random() * 20).toFixed(1);
-    const newTimeHours = Math.floor(Math.random() * 5);
-    const newTimeMinutes = Math.floor(Math.random() * 60);
-    const newSteps = Math.floor(Math.random() * 20000).toLocaleString();
-
-    setLocationSummary({
-      distance: `${newDistance} km`,
-      time: `${newTimeHours}시간 ${newTimeMinutes}분`,
-      steps: `${newSteps} 걸음`
-    });
-    setSliderValue(Math.floor(Math.random() * 101)); // 날짜 변경 시 슬라이더 값도 임의로 변경
     setActiveLogView('members');
+    
+    // 선택된 멤버가 있으면 해당 멤버의 위치 데이터를 로드
+    const selectedMember = groupMembers.find(m => m.isSelected);
+    if (selectedMember) {
+      loadLocationData(parseInt(selectedMember.id), date);
+    }
+  };
+
+  // 위치 로그 데이터 로딩 함수
+  const loadLocationData = async (mtIdx: number, date: string) => {
+    if (!mtIdx || !date) {
+      console.log('[loadLocationData] mtIdx 또는 date가 없어서 실행하지 않음:', { mtIdx, date });
+      return;
+    }
+
+    try {
+      setIsLocationDataLoading(true);
+      console.log('[loadLocationData] 위치 데이터 로딩 시작:', { mtIdx, date });
+
+      // 위치 로그와 요약 정보를 병렬로 가져오기
+      const [logs, summary] = await Promise.all([
+        memberLocationLogService.getDailyLocationLogs(mtIdx, date),
+        memberLocationLogService.getDailyLocationSummary(mtIdx, date)
+      ]);
+
+      // 위치 로그 데이터 설정
+      setCurrentLocationLogs(logs);
+      console.log('[loadLocationData] 위치 로그 데이터 로딩 완료:', logs.length, '개');
+
+      // 요약 정보를 UI 형식으로 변환
+      const formattedSummary: LocationSummary = {
+        distance: summary.total_distance ? `${(summary.total_distance / 1000).toFixed(1)} km` : '0 km',
+        time: summary.total_time ? formatTime(summary.total_time) : '0분',
+        steps: summary.total_steps ? `${summary.total_steps.toLocaleString()} 걸음` : '0 걸음'
+      };
+      
+      setLocationSummary(formattedSummary);
+      console.log('[loadLocationData] 위치 요약 데이터 로딩 완료:', formattedSummary);
+
+      // 지도에 위치 경로 표시 (나중에 구현)
+      // updateLocationPath(logs);
+
+    } catch (error) {
+      console.error('[loadLocationData] 위치 데이터 로딩 오류:', error);
+      
+      // 오류 시 기본값으로 설정
+      setCurrentLocationLogs([]);
+      setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+    } finally {
+      setIsLocationDataLoading(false);
+    }
+  };
+
+  // 시간을 포맷하는 헬퍼 함수
+  const formatTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (hours > 0) {
+      return `${hours}시간 ${minutes}분`;
+    } else {
+      return `${minutes}분`;
+    }
   };
 
   // useEffect for auto-selecting the first member (only sets state)
@@ -939,6 +1001,17 @@ export default function LogsPage() {
       const newView = scrollLeft < threshold ? 'members' : 'summary';
       if (activeLogView !== newView) {
         setActiveLogView(newView);
+        
+        // 위치기록 요약으로 스와이프할 때 바텀시트를 middle 상태로 변경
+        if (newView === 'summary' && bottomSheetState !== 'middle') {
+          setBottomSheetState('middle');
+          console.log('[LOG_SWIPE] 위치기록 요약으로 스와이프 - 바텀시트 middle 상태로 변경');
+        }
+        // 그룹 멤버로 다시 스와이프할 때 바텀시트를 peek 상태로 변경
+        else if (newView === 'members' && bottomSheetState === 'middle') {
+          setBottomSheetState('peek');
+          console.log('[LOG_SWIPE] 그룹 멤버로 스와이프 - 바텀시트 peek 상태로 변경');
+        }
       }
     }
   };
@@ -1011,7 +1084,7 @@ export default function LogsPage() {
       }
 
       // 이미 데이터가 로드되었거나 로딩 중이면 중복 실행 방지
-      if (dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
+      if (dataFetchedRef.current.members) {
         return;
       }
 
@@ -1062,40 +1135,12 @@ export default function LogsPage() {
           }
         }
 
-        if (dataFetchedRef.current.members && !dataFetchedRef.current.schedules) {
-          const scheduleResponse = await scheduleService.getGroupSchedules(parseInt(groupIdToUse)); 
-          if (isMounted) {
-            const rawSchedules = scheduleResponse.data.schedules;
-            if (rawSchedules && rawSchedules.length > 0) {
-              setGroupSchedules(rawSchedules);
-              setGroupMembers(prevMembers =>
-                prevMembers.map(member => {
-                  const memberSchedules = rawSchedules
-                    .filter((schedule: Schedule) => 
-                      schedule.sgdt_idx !== null && 
-                      schedule.sgdt_idx !== undefined && 
-                      Number(schedule.sgdt_idx) === Number(member.sgdt_idx)
-                    );
-                  
-                  return {
-                    ...member,
-                    schedules: memberSchedules
-                  };
-                })
-              );
-            } else {
-              console.warn('No schedule data from API for the group, or API call failed.');
-              setGroupSchedules([]);
-            }
-            dataFetchedRef.current.schedules = true; 
-          }
-        }
+
       } catch (error) {
         console.error('[LOGS PAGE] 그룹 데이터(멤버 또는 스케줄) 조회 오류:', error);
         if (isMounted && !dataFetchedRef.current.members) {
           dataFetchedRef.current.members = true;
         }
-        if (isMounted && !dataFetchedRef.current.schedules) dataFetchedRef.current.schedules = true;
       }
     };
 
@@ -1112,9 +1157,8 @@ export default function LogsPage() {
     
     // 기존 데이터 초기화
     setGroupMembers([]);
-    setGroupSchedules([]);
     setFirstMemberSelected(false);
-    dataFetchedRef.current = { members: false, schedules: false };
+    dataFetchedRef.current = { members: false };
     
     console.log('[handleGroupSelect] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작');
   };
@@ -1180,7 +1224,7 @@ export default function LogsPage() {
 
   // 첫번째 멤버 자동 선택
   useEffect(() => {
-    if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && !firstMemberSelected && dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
+    if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && !firstMemberSelected && dataFetchedRef.current.members) {
       console.log('[LOGS] 첫번째 멤버 자동 선택 시작:', groupMembers[0].name);
       
       setFirstMemberSelected(true);
@@ -1190,7 +1234,7 @@ export default function LogsPage() {
         handleMemberSelect(groupMembers[0].id, {} as React.MouseEvent);
       }, 500);
     }
-  }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members, dataFetchedRef.current.schedules]);
+  }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members]);
 
   return (
     <>
@@ -1589,7 +1633,7 @@ export default function LogsPage() {
                             >
                               <FiUser className="w-6 h-6 text-white" />
                             </motion.div>
-                          </div>
+                              </div>
                           
                           <motion.div
                             variants={loadingTextVariants}
@@ -1661,8 +1705,8 @@ export default function LogsPage() {
                                   <span className={`block text-sm font-semibold mt-3 transition-colors duration-200 ${
                                     member.isSelected ? 'text-indigo-700' : 'text-gray-700'
                                   }`}>
-                                    {member.name}
-                                  </span>
+                                {member.name}
+                              </span>
                                 </motion.button>
                               </motion.div>
                             );
@@ -1791,8 +1835,10 @@ export default function LogsPage() {
                   </motion.div>
                 </div>
 
-                <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white">
-                  <div className="content-section summary-section min-h-[280px] max-h-[280px] overflow-y-auto flex flex-col">
+                <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white to-rose-50">
+                  <div 
+                    className="content-section summary-section min-h-[200px] max-h-[200px] overflow-hidden flex flex-col bg-gradient-to-r from-pink-50 to-rose-50"
+                  >
                     <div>
                       <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-2">
                         {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 위치기록 요약` : "위치기록 요약"}
@@ -1813,31 +1859,42 @@ export default function LogsPage() {
                           ></div>
                         </div>
                       </div>
-                      <div className="flex justify-around text-center px-1">
-                        <div className="flex flex-col items-center">
-                          <FiTrendingUp className="w-6 h-6 text-amber-500 mb-1" />
-                          <p className="text-xs text-gray-500">이동거리</p>
-                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.distance}</p>
+                      {isLocationDataLoading ? (
+                        <div className="flex justify-center items-center py-4">
+                          <div className="flex items-center space-x-2">
+                            <FiLoader className="w-5 h-5 text-indigo-600 animate-spin" />
+                            <span className="text-sm text-gray-600">위치 데이터를 불러오는 중...</span>
+                          </div>
                         </div>
-                        <div className="flex flex-col items-center">
-                          <FiClock className="w-6 h-6 text-amber-500 mb-1" />
-                          <p className="text-xs text-gray-500">이동시간</p>
-                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.time}</p>
+                      ) : (
+                        <div className="flex justify-around text-center px-1">
+                          <div className="flex flex-col items-center">
+                            <FiTrendingUp className="w-6 h-6 text-amber-500 mb-1" />
+                            <p className="text-xs text-gray-500">이동거리</p>
+                            <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.distance}</p>
+                          </div>
+                          <div className="flex flex-col items-center">
+                            <FiClock className="w-6 h-6 text-amber-500 mb-1" />
+                            <p className="text-xs text-gray-500">이동시간</p>
+                            <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.time}</p>
+                          </div>
+                          <div className="flex flex-col items-center">
+                            <FiZap className="w-6 h-6 text-amber-500 mb-1" />
+                            <p className="text-xs text-gray-500">걸음 수</p>
+                            <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.steps}</p>
+                          </div>
                         </div>
-                        <div className="flex flex-col items-center">
-                          <FiZap className="w-6 h-6 text-amber-500 mb-1" />
-                          <p className="text-xs text-gray-500">걸음 수</p>
-                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.steps}</p>
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* 점 인디케이터 */}
-              <div className="flex-shrink-0 pb-3 bg-white">
-                <div className="flex justify-center items-center space-x-2 mb-2">
+              <div className={`flex-shrink-0 pb-3 bg-white transition-all duration-300 ${
+                activeLogView === 'summary' ? '-mt-44 pt-5' : ''
+              }`}>
+                <div className="flex justify-center items-center space-x-2 mb-1">
                   <motion.div
                     className={`rounded-full transition-all duration-300 ${
                       activeLogView === 'members' ? 'bg-indigo-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
