@@ -1761,7 +1761,7 @@ export default function HomePage() {
         // 안전한 이미지 URL 사용
         const photoForMarker = getSafeImageUrl(memberData.photo, memberData.mt_gender, memberData.original_index);
         // 선택 상태에 따른 테두리 색상 설정 - 빨간색으로 변경
-        const borderColor = isSelected ? '#EF4444' : '#4F46E5'; // 선택시 빨간색, 기본은 인디고
+        const borderColor = isSelected ? '#EC4899' : '#4F46E5'; // 선택시 핑크, 기본은 인디고
         
         const newMarker = new window.naver.maps.Marker({
           position: naverPos,
@@ -1770,7 +1770,7 @@ export default function HomePage() {
           icon: {
             content: `
               <div style="position: relative; text-align: center;">
-                <div style="width: 32px; height: 32px; background-color: white; border: 3px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: ${isSelected ? '0 0 8px rgba(239, 68, 68, 0.5)' : '0 1px 3px rgba(0,0,0,0.2)'};">
+                <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: ${isSelected ? '0 0 8px rgba(239, 68, 68, 0.5)' : '0 1px 3px rgba(0,0,0,0.2)'};">
                   <img 
                     src="${photoForMarker}" 
                     alt="${memberData.name}" 
