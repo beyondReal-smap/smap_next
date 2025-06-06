@@ -13,7 +13,7 @@ import { ko } from 'date-fns/locale';
 import { PageContainer, Card, Button } from '../components/layout';
 import { Loader } from '@googlemaps/js-api-loader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { FiLoader, FiChevronDown, FiUser } from 'react-icons/fi';
+import { FiLoader, FiChevronDown, FiUser, FiCalendar } from 'react-icons/fi';
 import config, { API_KEYS, detectLanguage, MAP_CONFIG } from '../../config';
 import mapService, { 
   MapType as MapTypeService, 
@@ -3746,9 +3746,12 @@ export default function HomePage() {
                 >
                   <div className="flex justify-between items-center mb-2">
                     <div className="flex items-center space-x-3">
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
-                        <p className="text-sm text-gray-600">멤버들의 위치를 확인하세요</p>
+                      <div className="flex items-center space-x-2">
+                        <FiUser className="w-5 h-5 text-indigo-600" />
+                        <div>
+                          <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
+                          <p className="text-sm text-gray-600">멤버들의 위치를 확인하세요</p>
+                        </div>
                       </div>
                       {(isUserDataLoading || !dataFetchedRef.current.members) && (
                         <motion.div
@@ -4030,11 +4033,14 @@ export default function HomePage() {
                       {/* 고정 헤더 부분 */}
                       <div className="sticky top-0 z-20 bg-gradient-to-r from-pink-50 to-rose-50 rounded-t-2xl pt-4 px-6 border-b border-pink-100/50 backdrop-blur-sm">
                     <div className="flex justify-between items-center mb-3">
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-900">
-                          {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
-                        </h2>
-                        <p className="text-sm text-gray-600">예정된 일정을 확인하세요</p>
+                      <div className="flex items-center space-x-2">
+                        <FiCalendar className="w-5 h-5 text-pink-600" />
+                        <div>
+                          <h2 className="text-lg font-bold text-gray-900">
+                            {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
+                          </h2>
+                          <p className="text-sm text-gray-600">예정된 일정을 확인하세요</p>
+                        </div>
                       </div>
                       {groupMembers.some(m => m.isSelected) ? (
                         <motion.button

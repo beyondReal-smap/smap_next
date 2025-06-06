@@ -1,8 +1,11 @@
 {
+  "/api/locations/other-members/[memberId]/route": "app/api/locations/other-members/[memberId]/route.js",
   "/_not-found/page": "app/_not-found/page.js",
+  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
+  "/api/groups/current-user/route": "app/api/groups/current-user/route.js",
   "/logs/page": "app/logs/page.js",
-  "/location/page": "app/location/page.js",
   "/schedule/page": "app/schedule/page.js",
+  "/location/page": "app/location/page.js",
   "/group/page": "app/group/page.js",
   "/home/page": "app/home/page.js"
 }

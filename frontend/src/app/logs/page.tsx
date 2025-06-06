@@ -481,6 +481,10 @@ export default function LogsPage() {
   const [isMapInitializedLogs, setIsMapInitializedLogs] = useState(false); // Logs 페이지용 지도 초기화 상태
   const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false); // 초기 데이터 로딩 상태 추가
 
+  // 첫 진입 애니메이션 상태 관리
+  const [showHeader, setShowHeader] = useState(true);
+  const [showDateSelection, setShowDateSelection] = useState(false);
+
   // home/page.tsx와 동일한 바텀시트 상태 관리
   const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'expanded'>('expanded');
   const bottomSheetRef = useRef<HTMLDivElement>(null);
@@ -510,27 +514,25 @@ export default function LogsPage() {
   // 바텀시트 variants - collapsed/expanded 상태만 사용
   const bottomSheetVariants = {
     collapsed: { 
-      top: '89.5vh',
-      bottom: '0px',
+      translateY: '75%',
       opacity: 1,
       transition: {
         type: "spring",
-        stiffness: 400,
-        damping: 30,
-        mass: 0.6,
-        duration: 0.5
+        stiffness: 200,
+        damping: 40,
+        mass: 0.8,
+        duration: 0.8
       }
     },
     expanded: {
-      top: '65vh',
-      bottom: '0px',
+      translateY: '-15px',
       opacity: 1,
       transition: {
         type: "spring",
-        stiffness: 400,
-        damping: 30,
-        mass: 0.6,
-        duration: 0.5
+        stiffness: 200,
+        damping: 40,
+        mass: 0.8,
+        duration: 0.8
       }
     }
   };
@@ -543,6 +545,19 @@ export default function LogsPage() {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // 첫 진입 시 헤더 애니메이션 제어
+  useEffect(() => {
+    if (isInitialDataLoaded && !isMapLoading && isMapInitializedLogs) {
+      // 2초 후 헤더 숨기고 동시에 날짜선택 섹션 표시
+      const headerTimer = setTimeout(() => {
+        setShowHeader(false);
+        setShowDateSelection(true); // 동시에 실행
+      }, 2000);
+
+      return () => clearTimeout(headerTimer);
+    }
+  }, [isInitialDataLoaded, isMapLoading, isMapInitializedLogs]);
 
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
@@ -2376,142 +2391,164 @@ export default function LogsPage() {
         exit="out"
         className="bg-gradient-to-br from-purple-50 via-white to-pink-50 min-h-screen relative overflow-hidden"
       >
-        {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
+        {/* 통합 헤더 - 내용만 변경됨 */}
         {!(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) && (
           <motion.header 
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed top-0 left-0 right-0 z-20 glass-effect"
+            transition={{ 
+              duration: 0.5, 
+              ease: [0.22, 1, 0.36, 1],
+              delay: 0.1 
+            }}
+            className="fixed top-0 left-0 right-0 z-20 bg-gradient-to-r from-purple-50/90 via-white/95 to-pink-50/90 backdrop-blur-sm border-b border-purple-100/50 h-16"
           >
-            <div className="flex items-center justify-between h-16 px-4">
-              <div className="flex items-center space-x-3">
+            {/* 헤더 내용 */}
+            {showHeader && (
+              <motion.div 
+                initial={{ opacity: 1 }}
+                animate={{ opacity: showHeader ? 1 : 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="flex items-center justify-between h-16 px-4"
+              >
                 <div className="flex items-center space-x-3">
-                  <motion.div
-                    initial={{ rotate: -180, scale: 0 }}
-                    animate={{ rotate: 0, scale: 1 }}
-                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                    className="p-2 bg-indigo-600 rounded-xl"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 text-white stroke-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                  <div className="flex items-center space-x-3">
+                    <motion.div
+                      initial={{ rotate: -180, scale: 0 }}
+                      animate={{ rotate: 0, scale: 1 }}
+                      transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                      className="p-2 bg-indigo-600 rounded-xl"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </motion.div>
-                  <div>
-                    <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
-                    <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5 text-white stroke-2"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </motion.div>
+                    <div>
+                      <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
+                      <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          </motion.header>
-        )}
+              </motion.div>
+            )}
 
-        {/* 날짜 선택 영역 - 헤더 바로 아래 독립 영역 */}
-        {!(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) && (
-          <motion.div 
-            initial={{ y: -50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed top-16 left-0 right-0 z-10 bg-gradient-to-r from-purple-50/90 via-white/95 to-pink-50/90 backdrop-blur-sm border-b border-purple-100/50"
-          >
-            <div className="px-4 py-3">
+                        {/* 날짜 선택 내용 */}
+            {showDateSelection && (
               <motion.div 
-                className="flex items-center space-x-2 mb-3"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, delay: 0.6 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="h-full px-4 flex flex-col justify-center"
               >
-                <motion.div
-                  initial={{ rotate: 0 }}
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, delay: 0.7 }}
-                >
-                  <FiClock className="w-4 h-4 text-purple-600" />
-                </motion.div>
-                <h3 className="text-base font-bold text-gray-900">날짜 선택</h3>
                 <motion.div 
-                  className="text-xs text-gray-500"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.3, delay: 0.9 }}
+                  className="flex items-center space-x-2"
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.4, delay: 0.1 }}
                 >
-                  ({getRecentDays().filter(day => day.hasLogs).length}일 기록 있음)
+                  <motion.div
+                    initial={{ rotate: 0, scale: 0 }}
+                    animate={{ rotate: 360, scale: 1 }}
+                    transition={{ 
+                      duration: 0.6, 
+                      delay: 0.2,
+                      type: "spring",
+                      stiffness: 200
+                    }}
+                  >
+                    <FiClock className="w-4 h-4 text-purple-600" />
+                  </motion.div>
+                  <h3 className="text-base font-bold text-gray-900">날짜 선택</h3>
+                  <motion.div 
+                    className="text-xs text-gray-500"
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ 
+                      duration: 0.3, 
+                      delay: 0.3,
+                      type: "spring",
+                      stiffness: 150
+                    }}
+                  >
+                    ({getRecentDays().filter(day => day.hasLogs).length}일 기록 있음)
+                  </motion.div>
+                </motion.div>
+                <motion.div 
+                  ref={dateScrollContainerRef} 
+                  className="flex space-x-2 overflow-x-auto hide-scrollbar"
+                  onLoad={() => scrollToTodayDate()}
+                  style={{ scrollBehavior: 'auto' }}
+                  variants={staggerContainer}
+                  initial="initial"
+                  animate="animate"
+                >
+                  {getRecentDays().map((day, idx) => {
+                    // 마지막 날짜 버튼(오늘)이 렌더링될 때 스크롤 트리거
+                    if (idx === getRecentDays().length - 1) {
+                      setTimeout(() => scrollToTodayDate(), 50);
+                    }
+                    const isSelected = selectedDate === day.value;
+                    const isToday = idx === getRecentDays().length - 1; // 오늘인지 확인
+
+                    return (
+                      <motion.button 
+                        key={idx} 
+                        custom={idx}
+                        variants={{
+                          initial: { opacity: 0, y: 10 },
+                          animate: { 
+                            opacity: 1, 
+                            y: 0,
+                            transition: { duration: 0.3, delay: 0.4 + (idx * 0.02) }
+                          },
+                          hover: { 
+                            y: day.hasLogs || isSelected ? -2 : 0,
+                            boxShadow: day.hasLogs || isSelected ? "0 3px 6px rgba(0,0,0,0.1)" : "0 1px 2px rgba(0,0,0,0.1)",
+                            transition: { duration: 0.2 }
+                          },
+                          tap: { 
+                            y: -1,
+                            transition: { duration: 0.1 }
+                          }
+                        }}
+                        initial="initial"
+                        animate="animate"
+                        whileHover="hover"
+                        whileTap="tap"
+                        onClick={() => day.hasLogs && handleDateSelect(day.value)}
+                        disabled={!day.hasLogs && !isSelected}
+                        className={`px-2.5 py-1 rounded-lg flex-shrink-0 focus:outline-none text-xs min-w-[65px] h-7 flex flex-col justify-center items-center border transition-all duration-300 ${
+                          isSelected
+                            ? `bg-purple-600 text-white font-semibold shadow-md border-purple-600 ${!day.hasLogs ? 'opacity-70' : ''}`
+                            : day.hasLogs
+                            ? 'bg-white text-gray-700 hover:bg-purple-50 hover:border-purple-300 border-gray-200 font-medium shadow-sm'
+                            : 'bg-gray-50 text-gray-400 line-through cursor-not-allowed border-gray-100 font-medium'
+                        }`}
+                      >
+                        <motion.div 
+                          className="text-center text-xs whitespace-nowrap font-medium"
+                          animate={isSelected ? {
+                            opacity: [0.8, 1, 0.8],
+                            transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+                          } : {}}
+                        >
+                          {day.display}
+                        </motion.div>
+                      </motion.button>
+                    );
+                  })}
                 </motion.div>
               </motion.div>
-              <motion.div 
-                ref={dateScrollContainerRef} 
-                className="flex space-x-2 overflow-x-auto pb-1.5 hide-scrollbar"
-                onLoad={() => scrollToTodayDate()}
-                style={{ scrollBehavior: 'auto' }}
-                variants={staggerContainer}
-                initial="initial"
-                animate="animate"
-              >
-                {getRecentDays().map((day, idx) => {
-                  // 마지막 날짜 버튼(오늘)이 렌더링될 때 스크롤 트리거
-                  if (idx === getRecentDays().length - 1) {
-                    setTimeout(() => scrollToTodayDate(), 50);
-                  }
-                  const isSelected = selectedDate === day.value;
-                  const isToday = idx === getRecentDays().length - 1; // 오늘인지 확인
-
-                  return (
-                    <motion.button 
-                      key={idx} 
-                      custom={idx}
-                      variants={{
-                        initial: { opacity: 0, y: 10 },
-                        animate: { 
-                          opacity: 1, 
-                          y: 0,
-                          transition: { duration: 0.3, delay: 0.7 + (idx * 0.02) }
-                        },
-                        hover: { 
-                          y: day.hasLogs || isSelected ? -2 : 0,
-                          boxShadow: day.hasLogs || isSelected ? "0 3px 6px rgba(0,0,0,0.1)" : "0 1px 2px rgba(0,0,0,0.1)",
-                          transition: { duration: 0.2 }
-                        },
-                        tap: { 
-                          y: -1,
-                          transition: { duration: 0.1 }
-                        }
-                      }}
-                      initial="initial"
-                      animate="animate"
-                      whileHover="hover"
-                      whileTap="tap"
-                      onClick={() => day.hasLogs && handleDateSelect(day.value)}
-                      disabled={!day.hasLogs && !isSelected}
-                      className={`px-2.5 py-1.5 rounded-lg flex-shrink-0 focus:outline-none text-xs min-w-[65px] h-8 flex flex-col justify-center items-center border transition-all duration-300 ${
-                        isSelected
-                          ? `bg-purple-600 text-white font-semibold shadow-md border-purple-600 ${!day.hasLogs ? 'opacity-70' : ''}`
-                          : day.hasLogs
-                          ? 'bg-white text-gray-700 hover:bg-purple-50 hover:border-purple-300 border-gray-200 font-medium shadow-sm'
-                          : 'bg-gray-50 text-gray-400 line-through cursor-not-allowed border-gray-100 font-medium'
-                      }`}
-                    >
-                      <motion.div 
-                        className="text-center text-xs whitespace-nowrap font-medium"
-                        animate={isSelected ? {
-                          opacity: [0.8, 1, 0.8],
-                          transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
-                        } : {}}
-                      >
-                        {day.display}
-                      </motion.div>
-                    </motion.button>
-                  );
-                })}
-              </motion.div>
-            </div>
-          </motion.div>
+            )}
+          </motion.header>
         )}
         
         {/* 전체화면 로딩 - 체크리스트 형태 */}
@@ -2634,9 +2671,7 @@ export default function LogsPage() {
         <div 
           className="full-map-container" 
           style={{ 
-            paddingTop: (isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) 
-              ? '0px' 
-              : '140px' // 헤더(64px) + 날짜 선택 영역(76px) 
+            paddingTop: '0px' // 지도 영역을 화면 전체로 확장
           }}
         >
           <div ref={mapContainer} className="w-full h-full" />
@@ -2646,9 +2681,10 @@ export default function LogsPage() {
         {!(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) && (
           <motion.div 
             ref={bottomSheetRef}
+            initial={{ translateY: '100%' }}
             variants={bottomSheetVariants}
             animate={bottomSheetState}
-            className="fixed left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
+            className="fixed bottom-0 left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
             style={{ touchAction: isHorizontalSwipeRef.current === true ? 'pan-x' : 'pan-y' }}
             onTouchStart={handleDragStart}
             onTouchMove={handleDragMove}
@@ -2661,8 +2697,8 @@ export default function LogsPage() {
             {/* 바텀시트 핸들 - home/page.tsx와 동일한 스타일 */}
             <motion.div 
               className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-3 cursor-grab active:cursor-grabbing"
-              whileHover={{ scale: 1.2, backgroundColor: '#6366f1' }}
-              transition={{ duration: 0.2 }}
+              whileHover={{ scale: 1.05, backgroundColor: '#6366f1' }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
             />
 
             {/* 바텀시트 내용 - 스크롤 가능하도록 수정 */}
@@ -2688,12 +2724,15 @@ export default function LogsPage() {
                       transition={{ delay: 0.3, duration: 0.6 }}
                       className="hide-scrollbar flex-1"
                     >
-                      <div className="flex justify-between items-center mb-2">
-                        <div className="flex items-center space-x-3">
-                          <div>
-                            <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
-                            <p className="text-sm text-gray-600">멤버들의 위치를 확인하세요</p>
-                          </div>
+                                              <div className="flex justify-between items-center mb-2">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-2">
+                              <FiUser className="w-5 h-5 text-indigo-600" />
+                              <div>
+                                <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
+                                <p className="text-sm text-gray-600">멤버들의 위치를 확인하세요</p>
+                              </div>
+                            </div>
                           {(isUserDataLoading || !dataFetchedRef.current.members) && (
                             <motion.div
                               variants={spinnerVariants}
@@ -3012,73 +3051,6 @@ export default function LogsPage() {
                           <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.steps}</p>
                         </div>
                       </div>
-                      )}
-                      
-                      {/* PHP 로직 기반 요약 정보 섹션 */}
-                      {locationLogSummaryData && (
-                        <div className="mt-4 pt-3 border-t border-pink-200">
-                          <h4 className="text-xs font-semibold text-gray-600 mb-3 flex items-center">
-                            <span className="mr-2">🎯</span>
-                            오늘의 활동 요약 (PHP 로직)
-                          </h4>
-                          <div className="grid grid-cols-2 gap-3 text-xs">
-                            <div className="bg-white rounded-lg p-2 border border-pink-200">
-                              <div className="flex items-center space-x-1 mb-1">
-                                <span className="text-blue-600">📅</span>
-                                <span className="text-gray-600 font-medium">일정</span>
-                    </div>
-                              <div className="text-gray-900 font-bold">{locationLogSummaryData.schedule_count}</div>
-                  </div>
-                            <div className="bg-white rounded-lg p-2 border border-pink-200">
-                              <div className="flex items-center space-x-1 mb-1">
-                                <span className="text-green-600">🚶</span>
-                                <span className="text-gray-600 font-medium">거리</span>
-                </div>
-                              <div className="text-gray-900 font-bold">{locationLogSummaryData.distance}</div>
-              </div>
-                            <div className="bg-white rounded-lg p-2 border border-pink-200">
-                              <div className="flex items-center space-x-1 mb-1">
-                                <span className="text-purple-600">⏰</span>
-                                <span className="text-gray-600 font-medium">시간</span>
-                              </div>
-                              <div className="text-gray-900 font-bold">{locationLogSummaryData.duration}</div>
-                            </div>
-                            <div className="bg-white rounded-lg p-2 border border-pink-200">
-                              <div className="flex items-center space-x-1 mb-1">
-                                <span className="text-orange-600">👟</span>
-                                <span className="text-gray-600 font-medium">걸음</span>
-                              </div>
-                              <div className="text-gray-900 font-bold">{locationLogSummaryData.steps ? locationLogSummaryData.steps.toLocaleString() : '0'}</div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 새로운 API 데이터 디버그 섹션 */}
-                      {(dailySummaryData.length > 0 || stayTimesData.length > 0 || mapMarkersData.length > 0) && (
-                        <div className="mt-4 pt-3 border-t border-pink-200">
-                          <h4 className="text-xs font-semibold text-gray-600 mb-2">🚀 새로운 API 데이터</h4>
-                          <div className="space-y-1 text-xs">
-                            {dailySummaryData.length > 0 && (
-                              <div className="flex items-center space-x-2">
-                                <span className="text-blue-600">📅</span>
-                                <span className="text-gray-700">날짜별 요약: {dailySummaryData.length}일</span>
-                    </div>
-                            )}
-                            {stayTimesData.length > 0 && (
-                              <div className="flex items-center space-x-2">
-                                <span className="text-green-600">⏰</span>
-                                <span className="text-gray-700">체류시간: {stayTimesData.length}개</span>
-                  </div>
-                            )}
-                            {mapMarkersData.length > 0 && (
-                              <div className="flex items-center space-x-2">
-                                <span className="text-red-600">📍</span>
-                                <span className="text-gray-700">지도 마커: {mapMarkersData.length}개</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
                       )}
                     </div>
                   </div>

@@ -3578,9 +3578,12 @@ export default function LocationPage() {
                   >
                     <div className="flex justify-between items-center mb-2">
                        <div className="flex items-center space-x-3">
-                        <div>                                                                                                               
-                          <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
-                          <p className="text-sm text-gray-600">멤버들의 장소를 확인하세요</p>
+                        <div className="flex items-center space-x-2">
+                          <FiUser className="w-5 h-5 text-indigo-600" />
+                          <div>                                                                                                               
+                            <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
+                            <p className="text-sm text-gray-600">멤버들의 장소를 확인하세요</p>
+                          </div>
                         </div>
                         {isFetchingGroupMembers && (
                           <motion.div
@@ -3814,6 +3817,7 @@ export default function LocationPage() {
                   >
                     <div className="flex justify-between items-center mb-2">
                       <div className="flex items-center space-x-3">
+                        <FiMapPin className="w-5 h-5 text-pink-500" />
                         <div>
                           <h2 className="text-lg font-bold text-gray-900">
                             {groupMembers.find((m: GroupMember) => m.isSelected)?.name ?
@@ -3823,14 +3827,7 @@ export default function LocationPage() {
                   </h2>
                           <p className="text-sm text-gray-600">장소들을 확인하세요</p>
                         </div>
-                        {isLoadingOtherLocations && (
-                          <motion.div
-                            variants={spinnerVariants}
-                            animate="animate"
-                          >
-                            <FiLoader className="text-purple-500" size={18}/>
-                          </motion.div>
-                        )}
+
                       </div>
                     </div>
 
@@ -3892,21 +3889,8 @@ export default function LocationPage() {
                               }}
                             >
                               {/* 상단: 제목과 버튼들 */}
-                              <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-start justify-between mb-1">
                                 <div className="flex items-center min-w-0 flex-1">
-                                  <motion.div
-                                    whileHover={{ rotate: hasValidCoords ? 360 : 0 }}
-                                    transition={{ duration: 0.3 }}
-                                    className={`p-2 rounded-xl mr-3 flex-shrink-0 ${
-                                      !hasValidCoords 
-                                        ? 'bg-gradient-to-r from-gray-400 to-gray-500' 
-                                        : isSelected 
-                                          ? 'bg-pink-600 shadow-lg' 
-                                          : 'bg-indigo-600'
-                                    }`}
-                                  >
-                                    <FiMapPin className={`w-4 h-4 ${!hasValidCoords ? 'text-gray-200' : 'text-white'}`} />
-                                  </motion.div>
                                   <div className="min-w-0 flex-1">
                                     <h4 className={`text-sm font-bold truncate ${
                                       isSelected ? 'text-gray-800' : 'text-gray-800'
