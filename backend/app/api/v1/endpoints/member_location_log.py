@@ -613,4 +613,185 @@ async def get_member_map_markers(
     except Exception as e:
         logger.error(f"Error getting map markers: {str(e)}")
         logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e)) 
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/daily-counts")
+async def get_daily_location_counts(
+    group_id: int = Query(..., description="그룹 ID"),
+    days: int = Query(14, description="조회할 일수 (기본값: 14일)"),
+    db: Session = Depends(get_db)
+):
+    """
+    최근 N일간 그룹 멤버들의 일별 위치 기록 카운트를 반환합니다.
+    """
+    try:
+        from datetime import datetime, timedelta
+        from sqlalchemy import func, and_, text
+        from ....models.member import Member
+        from ....models.group import Group
+        from ....models.member_location_log import MemberLocationLog
+        
+        # 현재 날짜부터 N일 전까지의 날짜 범위 계산
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days-1)
+        
+        logger.info(f"조회 기간: {start_date} ~ {end_date}, 그룹 ID: {group_id}")
+        
+        # 그룹 멤버 확인
+        group_members = db.query(Member).join(
+            Group, Member.mt_group_idx == Group.sgt_idx
+        ).filter(
+            Group.sgt_idx == group_id
+        ).all()
+        
+        if not group_members:
+            logger.warning(f"그룹 {group_id}에 멤버가 없습니다.")
+            return {"daily_counts": [], "total_days": days}
+        
+        member_ids = [member.mt_idx for member in group_members]
+        
+        # 일별 위치 기록 카운트 조회
+        # SQL 쿼리로 직접 날짜별 카운트를 가져옴
+        query = text("""
+            SELECT 
+                DATE(mlt_gps_time) as log_date,
+                COUNT(DISTINCT mlt_idx) as count
+            FROM member_location_log_t 
+            WHERE mlt_member_idx IN :member_ids
+            AND DATE(mlt_gps_time) BETWEEN :start_date AND :end_date
+            GROUP BY DATE(mlt_gps_time)
+            ORDER BY log_date DESC
+        """)
+        
+        result = db.execute(query, {
+            "member_ids": tuple(member_ids),
+            "start_date": start_date,
+            "end_date": end_date
+        }).fetchall()
+        
+        # 결과를 딕셔너리로 변환 (날짜 -> 카운트)
+        count_dict = {str(row.log_date): row.count for row in result}
+        
+        # 모든 날짜에 대해 카운트 정보 생성 (기록이 없는 날은 0)
+        daily_counts = []
+        current_date = end_date
+        
+        for i in range(days):
+            date_str = str(current_date)
+            count = count_dict.get(date_str, 0)
+            
+            daily_counts.append({
+                "date": date_str,
+                "count": count,
+                "formatted_date": current_date.strftime("%m.%d"),
+                "day_of_week": current_date.strftime("%a"),
+                "is_today": current_date == end_date,
+                "is_weekend": current_date.weekday() >= 5
+            })
+            
+            current_date -= timedelta(days=1)
+        
+        logger.info(f"일별 카운트 조회 완료: {len(daily_counts)}일간 데이터")
+        
+        return {
+            "daily_counts": daily_counts,
+            "total_days": days,
+            "start_date": str(start_date),
+            "end_date": str(end_date),
+            "group_id": group_id,
+            "total_members": len(group_members)
+        }
+        
+    except Exception as e:
+        logger.error(f"일별 위치 기록 카운트 조회 중 오류: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"일별 위치 기록 카운트 조회 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.get("/member-activity")
+async def get_member_activity_by_date(
+    group_id: int = Query(..., description="그룹 ID"),
+    date: str = Query(..., description="조회할 날짜 (YYYY-MM-DD)"),
+    db: Session = Depends(get_db)
+):
+    """
+    특정 날짜의 그룹 멤버별 위치 기록 활동을 반환합니다.
+    """
+    try:
+        from datetime import datetime
+        from sqlalchemy import func, and_
+        from ....models.member import Member
+        from ....models.group import Group
+        from ....models.member_location_log import MemberLocationLog
+        
+        # 날짜 파싱
+        target_date = datetime.strptime(date, "%Y-%m-%d").date()
+        
+        logger.info(f"멤버 활동 조회: {target_date}, 그룹 ID: {group_id}")
+        
+        # 그룹 멤버 조회
+        group_members = db.query(Member).join(
+            Group, Member.mt_group_idx == Group.sgt_idx
+        ).filter(
+            Group.sgt_idx == group_id
+        ).all()
+        
+        if not group_members:
+            return {"member_activities": [], "date": date}
+        
+        member_activities = []
+        
+        for member in group_members:
+            # 해당 날짜의 위치 기록 카운트
+            count = db.query(MemberLocationLog).filter(
+                and_(
+                    MemberLocationLog.mlt_member_idx == member.mt_idx,
+                    func.date(MemberLocationLog.mlt_gps_time) == target_date
+                )
+            ).count()
+            
+            # 첫 번째와 마지막 위치 기록 시간
+            first_log = db.query(MemberLocationLog).filter(
+                and_(
+                    MemberLocationLog.mlt_member_idx == member.mt_idx,
+                    func.date(MemberLocationLog.mlt_gps_time) == target_date
+                )
+            ).order_by(MemberLocationLog.mlt_gps_time.asc()).first()
+            
+            last_log = db.query(MemberLocationLog).filter(
+                and_(
+                    MemberLocationLog.mlt_member_idx == member.mt_idx,
+                    func.date(MemberLocationLog.mlt_gps_time) == target_date
+                )
+            ).order_by(MemberLocationLog.mlt_gps_time.desc()).first()
+            
+            member_activities.append({
+                "member_id": member.mt_idx,
+                "member_name": member.mt_name,
+                "member_photo": member.mt_photo,
+                "member_gender": member.mt_gender,
+                "log_count": count,
+                "first_log_time": first_log.mlt_gps_time.isoformat() if first_log else None,
+                "last_log_time": last_log.mlt_gps_time.isoformat() if last_log else None,
+                "is_active": count > 0
+            })
+        
+        logger.info(f"멤버 활동 조회 완료: {len(member_activities)}명")
+        
+        return {
+            "member_activities": member_activities,
+            "date": date,
+            "group_id": group_id,
+            "total_members": len(group_members),
+            "active_members": len([m for m in member_activities if m["is_active"]])
+        }
+        
+    except ValueError:
+        raise HTTPException(status_code=400, detail="잘못된 날짜 형식입니다. YYYY-MM-DD 형식을 사용해주세요.")
+    except Exception as e:
+        logger.error(f"멤버 활동 조회 중 오류: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"멤버 활동 조회 중 오류가 발생했습니다: {str(e)}"
+        ) 

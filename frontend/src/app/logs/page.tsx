@@ -16,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import memberService from '@/services/memberService';
 
 import groupService, { Group } from '@/services/groupService';
-import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker, LocationLogSummary } from '@/services/memberLocationLogService';
+import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker, LocationLogSummary, DailyCountsResponse, MemberActivityResponse } from '@/services/memberLocationLogService';
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
 declare global {
@@ -206,7 +206,7 @@ const pageStyles = `
 
 /* home/page.tsx에서 가져온 추가 섹션 스타일 */
 .members-section {
-  background: linear-gradient(135deg, #e0e7ff 0%, #e0f2fe 100%);
+  background: linear-gradient(to right, #eef2ff, #faf5ff) !important;
   border: 1px solid rgba(99, 102, 241, 0.2);
   border-radius: 16px;
   padding: 16px;
@@ -286,11 +286,7 @@ const pageStyles = `
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
 }
 
-/* 그룹멤버 섹션 그라디언트 배경 */
-.members-section-gradient {
-  background: linear-gradient(135deg, #e0e7ff 0%, #e0f2fe 30%, #f0e6ff 100%);
-  border: 1px solid rgba(99, 102, 241, 0.15);
-}
+
 
 @media (max-width: 640px) {
   .member-avatar {
@@ -493,6 +489,12 @@ export default function LogsPage() {
   const [stayTimesData, setStayTimesData] = useState<StayTime[]>([]);
   const [mapMarkersData, setMapMarkersData] = useState<MapMarker[]>([]);
   const [locationLogSummaryData, setLocationLogSummaryData] = useState<LocationLogSummary | null>(null);
+  
+  // 날짜별 활동 로그 상태 추가
+  const [dailyCountsData, setDailyCountsData] = useState<DailyCountsResponse | null>(null);
+  const [memberActivityData, setMemberActivityData] = useState<MemberActivityResponse | null>(null);
+  const [isDailyCountsLoading, setIsDailyCountsLoading] = useState(false);
+  const [isMemberActivityLoading, setIsMemberActivityLoading] = useState(false);
   
   const [sliderValue, setSliderValue] = useState(60); // 슬라이더 초기 값 (0-100)
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
@@ -1994,15 +1996,55 @@ export default function LogsPage() {
     console.log('⏱️ 체류시간 분석 데이터:', stayTimesData);
     console.log('📍 지도 마커 데이터:', mapMarkersData);
     console.log('📝 PHP 로직 기반 요약 데이터:', locationLogSummaryData);
+    console.log('📊 일별 카운트 데이터:', dailyCountsData);
+    console.log('👥 멤버 활동 데이터:', memberActivityData);
     console.log('============================');
+  };
+
+  // 일별 위치 기록 카운트 조회 함수
+  const loadDailyLocationCounts = async (groupId: number, days: number = 14) => {
+    if (isDailyCountsLoading) return;
+    
+    setIsDailyCountsLoading(true);
+    console.log('[LOGS] 일별 위치 기록 카운트 조회 시작:', { groupId, days });
+    
+    try {
+      const response = await memberLocationLogService.getDailyLocationCounts(groupId, days);
+      setDailyCountsData(response);
+      console.log('[LOGS] 일별 위치 기록 카운트 조회 완료:', response);
+    } catch (error) {
+      console.error('[LOGS] 일별 위치 기록 카운트 조회 실패:', error);
+      setDailyCountsData(null);
+    } finally {
+      setIsDailyCountsLoading(false);
+    }
+  };
+
+  // 특정 날짜의 멤버 활동 조회 함수
+  const loadMemberActivityByDate = async (groupId: number, date: string) => {
+    if (isMemberActivityLoading) return;
+    
+    setIsMemberActivityLoading(true);
+    console.log('[LOGS] 멤버 활동 조회 시작:', { groupId, date });
+    
+    try {
+      const response = await memberLocationLogService.getMemberActivityByDate(groupId, date);
+      setMemberActivityData(response);
+      console.log('[LOGS] 멤버 활동 조회 완료:', response);
+    } catch (error) {
+      console.error('[LOGS] 멤버 활동 조회 실패:', error);
+      setMemberActivityData(null);
+    } finally {
+      setIsMemberActivityLoading(false);
+    }
   };
 
   // 새로운 API 데이터가 변경될 때마다 콘솔에 출력
   useEffect(() => {
-    if (dailySummaryData.length > 0 || stayTimesData.length > 0 || mapMarkersData.length > 0 || locationLogSummaryData) {
+    if (dailySummaryData.length > 0 || stayTimesData.length > 0 || mapMarkersData.length > 0 || locationLogSummaryData || dailyCountsData || memberActivityData) {
       logNewApiData();
     }
-  }, [dailySummaryData, stayTimesData, mapMarkersData, locationLogSummaryData]);
+  }, [dailySummaryData, stayTimesData, mapMarkersData, locationLogSummaryData, dailyCountsData, memberActivityData]);
 
   // 지도 마커 데이터가 변경될 때마다 지도에 마커 업데이트
   useEffect(() => {
@@ -2703,7 +2745,13 @@ export default function LogsPage() {
                 onMouseUp={handleLogSwipeScroll}
               >
                 <div className="w-full flex-shrink-0 snap-start overflow-visible bg-white">
-                  <div className="content-section members-section min-h-[200px] max-h-[200px] overflow-y-auto members-section-gradient rounded-xl p-4">
+                  <div 
+                    className="content-section members-section rounded-2xl p-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
+                    style={{
+                      background: 'linear-gradient(to right, #eef2ff, #faf5ff) !important',
+                      backgroundImage: 'linear-gradient(to right, #eef2ff, #faf5ff) !important'
+                    }}
+                  >
                     <motion.div 
                       initial={{ opacity: 0, y: 30 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -2883,7 +2931,10 @@ export default function LogsPage() {
                             ))}
                             
                             <motion.div
-                              className="relative w-12 h-12 bg-gradient-to-br from-indigo-50 via-white to-purple-50 rounded-full flex items-center justify-center shadow-lg"
+                              className="relative w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
+                              style={{
+                                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
+                              }}
                               variants={spinnerVariants}
                               animate="animate"
                             >

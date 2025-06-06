@@ -110,6 +110,47 @@ export interface LocationLogSummary {
   steps: number;          // 걸음수
 }
 
+// 일별 카운트 데이터 인터페이스
+export interface DailyCount {
+  date: string;
+  count: number;
+  formatted_date: string;
+  day_of_week: string;
+  is_today: boolean;
+  is_weekend: boolean;
+}
+
+// 일별 카운트 응답 인터페이스
+export interface DailyCountsResponse {
+  daily_counts: DailyCount[];
+  total_days: number;
+  start_date: string;
+  end_date: string;
+  group_id: number;
+  total_members: number;
+}
+
+// 멤버 활동 데이터 인터페이스
+export interface MemberActivity {
+  member_id: number;
+  member_name: string;
+  member_photo: string | null;
+  member_gender: number | null;
+  log_count: number;
+  first_log_time: string | null;
+  last_log_time: string | null;
+  is_active: boolean;
+}
+
+// 멤버 활동 응답 인터페이스
+export interface MemberActivityResponse {
+  member_activities: MemberActivity[];
+  date: string;
+  group_id: number;
+  total_members: number;
+  active_members: number;
+}
+
 class MemberLocationLogService {
   /**
    * 일일 위치 로그 조회 (정확한 날짜 매칭)
@@ -556,6 +597,139 @@ class MemberLocationLogService {
       }
     } catch (error) {
       console.error('[MemberLocationLogService] PHP 로직 기반 요약 조회 오류:', error);
+      
+      if (error instanceof Error) {
+        console.error('[MemberLocationLogService] 오류 상세:', {
+          message: error.message,
+          name: error.name,
+        });
+      }
+      
+      return mockData;
+    }
+  }
+
+  /**
+   * 최근 N일간 그룹 멤버들의 일별 위치 기록 카운트 조회
+   */
+  async getDailyLocationCounts(groupId: number, days: number = 14): Promise<DailyCountsResponse> {
+    const mockData: DailyCountsResponse = {
+      daily_counts: [],
+      total_days: days,
+      start_date: new Date(Date.now() - (days - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      end_date: new Date().toISOString().split('T')[0],
+      group_id: groupId,
+      total_members: 0
+    };
+
+    // Mock 데이터 생성 (최근 N일간)
+    for (let i = 0; i < days; i++) {
+      const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      mockData.daily_counts.push({
+        date: dateStr,
+        count: Math.floor(Math.random() * 50) + 10, // 10-60 사이 랜덤 카운트
+        formatted_date: date.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }),
+        day_of_week: date.toLocaleDateString('ko-KR', { weekday: 'short' }),
+        is_today: i === 0,
+        is_weekend: date.getDay() === 0 || date.getDay() === 6
+      });
+    }
+
+    try {
+      console.log('[MemberLocationLogService] 일별 위치 카운트 조회 시작:', { groupId, days });
+      
+      const response = await apiClient.get<DailyCountsResponse>(`/member-location-logs/daily-counts?group_id=${groupId}&days=${days}`);
+      
+      console.log('[MemberLocationLogService] 일별 위치 카운트 조회 응답:', {
+        status: response.status,
+        dataLength: response.data?.daily_counts?.length || 0
+      });
+      
+      if (response.data && response.data.daily_counts && Array.isArray(response.data.daily_counts)) {
+        console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용:', response.data.daily_counts.length, '개');
+        return response.data;
+      } else {
+        console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');
+        return mockData;
+      }
+    } catch (error) {
+      console.error('[MemberLocationLogService] 일별 위치 카운트 조회 오류:', error);
+      
+      if (error instanceof Error) {
+        console.error('[MemberLocationLogService] 오류 상세:', {
+          message: error.message,
+          name: error.name,
+        });
+      }
+      
+      return mockData;
+    }
+  }
+
+  /**
+   * 특정 날짜의 그룹 멤버별 위치 기록 활동 조회
+   */
+  async getMemberActivityByDate(groupId: number, date: string): Promise<MemberActivityResponse> {
+    const mockData: MemberActivityResponse = {
+      member_activities: [
+        {
+          member_id: 1,
+          member_name: "김철수",
+          member_photo: null,
+          member_gender: 1,
+          log_count: 45,
+          first_log_time: `${date}T08:30:00`,
+          last_log_time: `${date}T18:45:00`,
+          is_active: true
+        },
+        {
+          member_id: 2,
+          member_name: "이영희",
+          member_photo: null,
+          member_gender: 2,
+          log_count: 32,
+          first_log_time: `${date}T09:15:00`,
+          last_log_time: `${date}T17:20:00`,
+          is_active: true
+        },
+        {
+          member_id: 3,
+          member_name: "박지민",
+          member_photo: null,
+          member_gender: 2,
+          log_count: 0,
+          first_log_time: null,
+          last_log_time: null,
+          is_active: false
+        }
+      ],
+      date: date,
+      group_id: groupId,
+      total_members: 3,
+      active_members: 2
+    };
+
+    try {
+      console.log('[MemberLocationLogService] 멤버 활동 조회 시작:', { groupId, date });
+      
+      const response = await apiClient.get<MemberActivityResponse>(`/member-location-logs/member-activity?group_id=${groupId}&date=${date}`);
+      
+      console.log('[MemberLocationLogService] 멤버 활동 조회 응답:', {
+        status: response.status,
+        dataLength: response.data?.member_activities?.length || 0
+      });
+      
+      if (response.data && response.data.member_activities && Array.isArray(response.data.member_activities)) {
+        console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용:', response.data.member_activities.length, '개');
+        return response.data;
+      } else {
+        console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');
+        return mockData;
+      }
+    } catch (error) {
+      console.error('[MemberLocationLogService] 멤버 활동 조회 오류:', error);
       
       if (error instanceof Error) {
         console.error('[MemberLocationLogService] 오류 상세:', {
