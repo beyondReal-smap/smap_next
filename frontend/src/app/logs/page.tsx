@@ -423,24 +423,10 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
 };
 
 // SSL 인증서 오류가 있는 URL인지 확인하는 함수 (home/page.tsx와 동일)
-const isUnsafeImageUrl = (url: string | null): boolean => {
-  if (!url) return true;
-  
-  // 알려진 문제가 있는 서버 URL들
-  const unsafeHosts = [
-    '118.67.130.71:8000',
-    // 필요시 다른 문제가 있는 호스트들을 추가
-  ];
-  
-  return unsafeHosts.some(host => url.includes(host));
-};
-
-// 안전한 이미지 URL을 반환하는 함수 (home/page.tsx와 동일)
+// 안전한 이미지 URL을 반환하는 함수 - location/home과 동일한 로직
 const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  if (isUnsafeImageUrl(photoUrl)) {
-    return getDefaultImage(gender, index);
-  }
-  return photoUrl || getDefaultImage(gender, index);
+  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
+  return photoUrl ?? getDefaultImage(gender, index);
 };
 
 export default function LogsPage() {
@@ -2412,30 +2398,30 @@ export default function LogsPage() {
                 transition={{ duration: 0.3 }}
                 className="flex items-center justify-between h-16 px-4"
               >
+              <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-3">
-                    <motion.div
-                      initial={{ rotate: -180, scale: 0 }}
-                      animate={{ rotate: 0, scale: 1 }}
-                      transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                      className="p-2 bg-indigo-600 rounded-xl"
+                  <motion.div
+                    initial={{ rotate: -180, scale: 0 }}
+                    animate={{ rotate: 0, scale: 1 }}
+                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                    className="p-2 bg-indigo-600 rounded-xl"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 text-white stroke-2"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5 text-white stroke-2"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                    </motion.div>
-                    <div>
-                      <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
-                      <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
-                    </div>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </motion.div>
+                  <div>
+                    <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
+                    <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
                   </div>
                 </div>
+              </div>
               </motion.div>
             )}
 
@@ -2897,7 +2883,7 @@ export default function LogsPage() {
                             ))}
                             
                             <motion.div
-                              className="relative w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg"
+                              className="relative w-12 h-12 bg-gradient-to-br from-indigo-50 via-white to-purple-50 rounded-full flex items-center justify-center shadow-lg"
                               variants={spinnerVariants}
                               animate="animate"
                             >

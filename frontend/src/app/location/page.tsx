@@ -1450,10 +1450,18 @@ export default function LocationPage() {
        return;
     }
 
-    // 이미 선택된 멤버이고, 첫 멤버 선택이 완료된 상태라면 중복 실행 방지
+    // 이미 선택된 멤버인 경우, InfoWindow가 열려있는지 확인
     if (selectedMemberIdRef.current === memberId && isFirstMemberSelectionComplete) {
-       console.log('[handleMemberSelect] 이미 선택된 멤버입니다. 중복 실행 방지:', memberId);
-      return;
+      // InfoWindow가 열려있는지 확인
+      const isInfoWindowOpen = infoWindow && infoWindow.getMap();
+      
+      if (isInfoWindowOpen) {
+        console.log('[handleMemberSelect] 이미 선택된 멤버이고 InfoWindow가 열려있습니다. 중복 실행 방지:', memberId);
+        return;
+      } else {
+        console.log('[handleMemberSelect] 이미 선택된 멤버이지만 InfoWindow가 닫혀있습니다. InfoWindow 재표시:', memberId);
+        // InfoWindow가 닫혀있으면 계속 진행하여 InfoWindow 표시
+      }
     }
     
     // *** 마커 정리 로직 강화 ***
@@ -1593,6 +1601,112 @@ export default function LocationPage() {
             tempMarker.current.setMap(null);
         }
       }
+
+      // 선택된 멤버의 InfoWindow 자동 표시
+      const selectedMarker = memberMarkers.find(marker => {
+        const memberIndex = memberMarkers.indexOf(marker);
+        return updatedMembers[memberIndex]?.isSelected;
+      });
+      
+      if (selectedMarker && newlySelectedMember) {
+        // 기존 InfoWindow 닫기
+        if (infoWindow) {
+          infoWindow.close();
+        }
+
+                             const lat = parseCoordinate(newlySelectedMember.location.lat);
+           const lng = parseCoordinate(newlySelectedMember.location.lng);
+
+        const memberInfoWindow = new window.naver.maps.InfoWindow({
+          content: `
+            <style>
+              @keyframes slideInFromBottom {
+                0% {
+                  opacity: 0;
+                  transform: translateY(20px) scale(0.95);
+                }
+                100% {
+                  opacity: 1;
+                  transform: translateY(0) scale(1);
+                }
+              }
+              .member-info-window-container {
+                animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+              }
+              .close-button {
+                transition: all 0.2s ease;
+              }
+              .close-button:hover {
+                background: rgba(0, 0, 0, 0.2) !important;
+                transform: scale(1.1);
+              }
+            </style>
+            <div class="member-info-window-container" style="
+              padding: 12px 16px;
+              min-width: 200px;
+              max-width: 280px;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background: white;
+              border-radius: 12px;
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+              position: relative;
+            ">
+              <!-- 닫기 버튼 -->
+              <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background: rgba(0, 0, 0, 0.1);
+                border: none;
+                border-radius: 50%;
+                width: 22px;
+                height: 22px;
+                font-size: 14px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #666;
+              ">×</button>
+
+              <div style="margin-bottom: 8px;">
+                <h3 style="
+                  margin: 0 0 4px 0;
+                  font-size: 14px;
+                  font-weight: 600;
+                  color: #111827;
+                  padding-right: 25px;
+                ">👤 ${newlySelectedMember.name}</h3>
+                <p style="
+                  margin: 0;
+                  font-size: 12px;
+                  color: #64748b;
+                ">선택된 멤버</p>
+              </div>
+              
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #64748b;">
+                  📍 위치: <span style="color: #4F46E5; font-weight: 500;">${lat?.toFixed(4)}, ${lng?.toFixed(4)}</span>
+                </p>
+              </div>
+              <div>
+                <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                  🗺️ 현재 위치 정보
+                </p>
+              </div>
+            </div>
+          `,
+          borderWidth: 0,
+          backgroundColor: 'transparent',
+          disableAnchor: true,
+          pixelOffset: new window.naver.maps.Point(0, -10)
+        });
+
+        memberInfoWindow.open(map, selectedMarker);
+        setInfoWindow(memberInfoWindow);
+        console.log('[handleMemberSelect] 자동 InfoWindow 표시:', newlySelectedMember.name);
+      }
+      
     } else {
       // 아무도 선택되지 않은 경우
       setSelectedMemberSavedLocations(null); 
@@ -1869,6 +1983,140 @@ export default function LocationPage() {
     }
   }, [groupMembers.length, isMapReady]); // dataFetchedRef.current.members와 map 제거하여 의존성 순환 방지
 
+  // 멤버 마커가 생성된 후 첫 번째 멤버 InfoWindow 자동 표시
+  useEffect(() => {
+    if (memberMarkers.length > 0 && groupMembers.length > 0 && !isFirstMemberSelectionComplete && map) {
+      const firstMember = groupMembers.find(member => member.isSelected);
+      
+      if (firstMember) {
+        // 첫 번째 선택된 멤버의 마커 찾기
+        const memberIndex = groupMembers.findIndex(member => member.isSelected);
+        const selectedMarker = memberMarkers[memberIndex];
+        
+        if (selectedMarker) {
+          console.log('[초기 InfoWindow] 첫 번째 멤버 InfoWindow 표시:', firstMember.name);
+          
+          // 기존 InfoWindow 닫기
+          if (infoWindow) {
+            infoWindow.close();
+          }
+
+                      const lat = parseCoordinate(firstMember.location.lat);
+            const lng = parseCoordinate(firstMember.location.lng);
+            const photoForMarker = getSafeImageUrl(firstMember.photo, firstMember.mt_gender, firstMember.original_index);
+            const borderColor = '#f59e0b'; // 선택된 멤버 색상
+
+          const memberInfoWindow = new window.naver.maps.InfoWindow({
+            content: `
+              <style>
+                @keyframes slideInFromBottom {
+                  0% {
+                    opacity: 0;
+                    transform: translateY(20px) scale(0.95);
+                  }
+                  100% {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                  }
+                }
+                .member-info-window-container {
+                  animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+                }
+                .close-button {
+                  transition: all 0.2s ease;
+                }
+                .close-button:hover {
+                  background: rgba(0, 0, 0, 0.2) !important;
+                  transform: scale(1.1);
+                }
+              </style>
+              <div class="member-info-window-container" style="
+                padding: 12px 16px;
+                min-width: 200px;
+                max-width: 280px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                position: relative;
+              ">
+                <!-- 닫기 버튼 -->
+                <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                  position: absolute;
+                  top: 8px;
+                  right: 8px;
+                  background: rgba(0, 0, 0, 0.1);
+                  border: none;
+                  border-radius: 50%;
+                  width: 22px;
+                  height: 22px;
+                  font-size: 14px;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: #666;
+                ">×</button>
+
+                <div style="
+                  display: flex;
+                  align-items: center;
+                  margin-bottom: 8px;
+                ">
+                  <div style="
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    overflow: hidden;
+                    margin-right: 12px;
+                    border: 2px solid ${borderColor};
+                  ">
+                    <img src="${photoForMarker}" 
+                         style="width: 100%; height: 100%; object-fit: cover;" 
+                         alt="${firstMember.name}" />
+                  </div>
+                  <div style="padding-right: 25px;">
+                    <h3 style="
+                      margin: 0;
+                      font-size: 14px;
+                      font-weight: 600;
+                      color: #111827;
+                    ">👤 ${firstMember.name}</h3>
+                    <p style="
+                      margin: 2px 0 0 0;
+                      font-size: 12px;
+                      color: #64748b;
+                    ">선택된 멤버</p>
+                  </div>
+                </div>
+                
+                <div style="margin-bottom: 6px;">
+                  <p style="margin: 0; font-size: 12px; color: #64748b;">
+                    📍 위치: <span style="color: #4F46E5; font-weight: 500;">${lat?.toFixed(4)}, ${lng?.toFixed(4)}</span>
+                  </p>
+                </div>
+                <div>
+                  <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                    🗺️ 현재 위치 정보
+                  </p>
+                </div>
+              </div>
+            `,
+            borderWidth: 0,
+            backgroundColor: 'transparent',
+            disableAnchor: true,
+            pixelOffset: new window.naver.maps.Point(0, -10)
+          });
+
+          memberInfoWindow.open(map, selectedMarker);
+          setInfoWindow(memberInfoWindow);
+          setIsFirstMemberSelectionComplete(true);
+          console.log('[초기 InfoWindow] 첫 번째 멤버 InfoWindow 표시 완료:', firstMember.name);
+        }
+      }
+    }
+  }, [memberMarkers, groupMembers, isFirstMemberSelectionComplete, map]);
+
   // 페이지 로드 애니메이션
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -2035,8 +2283,8 @@ export default function LocationPage() {
 
   // 안전한 이미지 URL 가져오기 헬퍼 함수
   const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-    // 항상 로컬 이미지를 사용
-    return getDefaultImage(gender, index);
+    // 그룹멤버 리스트와 동일한 로직: 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
+    return photoUrl ?? getDefaultImage(gender, index);
   };
 
   // 지도에 그룹멤버 마커 표시 (home/page.tsx 방식 참고)
@@ -2112,76 +2360,9 @@ export default function LocationPage() {
             zIndex: member.isSelected ? 200 : 150 // 선택된 멤버가 위에 표시되도록
           });
 
-          // 멤버 마커 클릭 이벤트
-      window.naver.maps.Event.addListener(marker, 'click', () => {
+          // 멤버 마커 클릭 이벤트 - handleMemberSelect만 호출하도록 단순화
+          window.naver.maps.Event.addListener(marker, 'click', () => {
             handleMemberSelect(member.id);
-            
-        // 기존 정보창 닫기
-        if (infoWindow) {
-          infoWindow.close();
-        }
-
-            // 멤버 정보창 생성
-            const memberInfoWindow = new window.naver.maps.InfoWindow({
-          content: `
-            <div style="
-              padding: 16px;
-              min-width: 200px;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background: white;
-              border-radius: 12px;
-              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            ">
-              <div style="
-                display: flex;
-                align-items: center;
-                margin-bottom: 12px;
-              ">
-                <div style="
-                      width: 40px;
-                      height: 40px;
-                  border-radius: 50%;
-                      overflow: hidden;
-                      margin-right: 12px;
-                      border: 2px solid ${borderColor};
-                    ">
-                      <img src="${photoForMarker}" 
-                           style="width: 100%; height: 100%; object-fit: cover;" 
-                           alt="${member.name}" />
-                </div>
-                    <div>
-                <h3 style="
-                  margin: 0;
-                  font-size: 16px;
-                  font-weight: 600;
-                  color: #1f2937;
-                      ">${member.name}</h3>
-                <p style="
-                        margin: 4px 0 0 0;
-                        font-size: 12px;
-                  color: #6b7280;
-                      ">${member.isSelected ? '선택된 멤버' : '그룹 멤버'}</p>
-                    </div>
-              </div>
-              
-                  <div style="
-                    background: #f3f4f6;
-                    padding: 8px 12px;
-                    border-radius: 8px;
-                    font-size: 13px;
-                    color: #374151;
-                  ">
-                    📍 현재 위치: ${lat.toFixed(4)}, ${lng.toFixed(4)}
-                </div>
-                </div>
-              `,
-              borderWidth: 0,
-              backgroundColor: 'transparent',
-              pixelOffset: new window.naver.maps.Point(0, -15)
-            });
-
-            memberInfoWindow.open(map, marker);
-            setInfoWindow(memberInfoWindow);
           });
 
           newMemberMarkers.push(marker);
@@ -2332,6 +2513,9 @@ export default function LocationPage() {
         selectedLocationIdRef.current = location.id;
         
         console.log('[마커 클릭] 장소 선택됨:', location.id, location.name, '이전 선택:', previousSelectedId);
+        
+        // 모든 마커의 색상을 즉시 업데이트
+        updateMarkerColors(location.id);
       });
 
       newMarkers.push(marker);
@@ -2414,74 +2598,9 @@ export default function LocationPage() {
             zIndex: member.isSelected ? 200 : 150
           });
 
-          // 멤버 마커 클릭 이벤트
+          // 멤버 마커 클릭 이벤트 - handleMemberSelect만 호출하도록 단순화
           window.naver.maps.Event.addListener(marker, 'click', () => {
             handleMemberSelect(member.id);
-            
-            if (infoWindow) {
-              infoWindow.close();
-            }
-
-            const memberInfoWindow = new window.naver.maps.InfoWindow({
-          content: `
-            <div style="
-              padding: 16px;
-              min-width: 200px;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background: white;
-              border-radius: 12px;
-              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            ">
-              <div style="
-                display: flex;
-                align-items: center;
-                margin-bottom: 12px;
-              ">
-                <div style="
-                      width: 40px;
-                      height: 40px;
-                  border-radius: 50%;
-                      overflow: hidden;
-                      margin-right: 12px;
-                      border: 2px solid ${borderColor};
-                    ">
-                      <img src="${photoForMarker}" 
-                           style="width: 100%; height: 100%; object-fit: cover;" 
-                           alt="${member.name}" />
-                </div>
-                    <div>
-                <h3 style="
-                  margin: 0;
-                  font-size: 16px;
-                  font-weight: 600;
-                  color: #1f2937;
-                      ">${member.name}</h3>
-                <p style="
-                        margin: 4px 0 0 0;
-                        font-size: 12px;
-                  color: #6b7280;
-                      ">${member.isSelected ? '선택된 멤버' : '그룹 멤버'}</p>
-                    </div>
-              </div>
-              
-                  <div style="
-                    background: #f3f4f6;
-                    padding: 8px 12px;
-                    border-radius: 8px;
-                    font-size: 13px;
-                    color: #374151;
-                  ">
-                    📍 현재 위치: ${lat.toFixed(4)}, ${lng.toFixed(4)}
-                </div>
-                </div>
-              `,
-              borderWidth: 0,
-              backgroundColor: 'transparent',
-              pixelOffset: new window.naver.maps.Point(0, -15)
-            });
-
-            memberInfoWindow.open(map, marker);
-            setInfoWindow(memberInfoWindow);
           });
 
           newMemberMarkers.push(marker);
@@ -2527,7 +2646,7 @@ export default function LocationPage() {
                   width: 32px;
                   height: 32px;
                   background-color: white;
-                  border: 2px solid ${isMarkerSelected ? '#ec4899' : '#6366f1'};
+                  border: 2px solid ${isMarkerSelected ? '#f59e0b' : '#6366f1'};
                   border-radius: 50%;
                   overflow: hidden;
                 display: flex;
@@ -2538,7 +2657,7 @@ export default function LocationPage() {
                   z-index: ${isMarkerSelected ? '200' : '150'};
                   transition: all 0.3s ease;
                 ">
-                  <svg width="16" height="16" fill="${isMarkerSelected ? '#ec4899' : '#6366f1'}" viewBox="0 0 24 24">
+                  <svg width="16" height="16" fill="${isMarkerSelected ? '#f59e0b' : '#6366f1'}" viewBox="0 0 24 24">
                     <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
                   </svg>
                 </div>
@@ -2551,7 +2670,7 @@ export default function LocationPage() {
                     transform: translate(-50%, -50%);
                     width: 40px;
                     height: 40px;
-                    background: rgba(236, 72, 153, 0.2);
+                    background: rgba(245, 158, 11, 0.2);
                     border-radius: 50%;
                     animation: selectedGlow 2s ease-in-out infinite;
                     z-index: 140;
@@ -2621,6 +2740,9 @@ export default function LocationPage() {
         selectedLocationIdRef.current = location.id;
         
           console.log('[updateAllMarkers] 장소 선택됨:', location.id, location.name, '이전 선택:', previousSelectedId);
+          
+          // 모든 마커의 색상을 즉시 업데이트
+          updateMarkerColors(location.id);
         });
 
         newLocationMarkers.push(marker);
@@ -2666,6 +2788,109 @@ export default function LocationPage() {
     }
   }, [selectedMemberSavedLocations, groupMembers, map, isMapReady]);
 
+  // 마커 색상 업데이트 함수
+  const updateMarkerColors = (selectedId: string | null) => {
+    console.log('[updateMarkerColors] 마커 색상 업데이트:', selectedId);
+    
+    markers.forEach((marker, index) => {
+      // selectedMemberSavedLocations 또는 otherMembersSavedLocations에서 해당 location 찾기
+      let location = null;
+      
+      if (selectedMemberSavedLocations && selectedMemberSavedLocations[index]) {
+        location = selectedMemberSavedLocations[index];
+      } else if (otherMembersSavedLocations && otherMembersSavedLocations[index]) {
+        location = otherMembersSavedLocations[index];
+        // otherMembersSavedLocations의 경우 id 구성이 다를 수 있음
+        location = {
+          ...location,
+          id: location.slt_idx ? location.slt_idx.toString() : location.id
+        };
+      }
+      
+      if (location) {
+        const isSelected = selectedId === location.id;
+        
+        // 마커 아이콘 업데이트
+        marker.setIcon({
+          content: `
+            <div style="position: relative; text-align: center;">
+              <div style="
+                width: 32px;
+                height: 32px;
+                background-color: white;
+                border: 2px solid ${isSelected ? '#f59e0b' : '#6366f1'};
+                border-radius: 50%;
+                overflow: hidden;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                position: relative;
+                z-index: ${isSelected ? '200' : '150'};
+                transition: all 0.3s ease;
+              ">
+                <svg width="16" height="16" fill="${isSelected ? '#f59e0b' : '#6366f1'}" viewBox="0 0 24 24">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
+                </svg>
+              </div>
+              
+              ${isSelected ? `
+                <div style="
+                  position: absolute;
+                  top: 50%;
+                  left: 50%;
+                  transform: translate(-50%, -50%);
+                  width: 40px;
+                  height: 40px;
+                  background: rgba(236, 72, 153, 0.2);
+                  border-radius: 50%;
+                  animation: selectedGlow 2s ease-in-out infinite;
+                  z-index: 140;
+                "></div>
+              ` : ''}
+              
+              <div style="
+                position: absolute;
+                bottom: -18px;
+                left: 50%;
+                transform: translateX(-50%);
+                background-color: rgba(0,0,0,0.7);
+                color: white;
+                padding: 2px 5px;
+                border-radius: 3px;
+                white-space: nowrap;
+                font-size: 10px;
+                font-weight: 500;
+                max-width: 80px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+              ">
+                ${location.name || (location as any).slt_title || '제목 없음'}
+              </div>
+            </div>
+            
+            <style>
+              @keyframes selectedGlow {
+                0%, 100% { 
+                  transform: translate(-50%, -50%) scale(0.8); 
+                  opacity: 0.4; 
+                }
+                50% { 
+                  transform: translate(-50%, -50%) scale(1.2); 
+                  opacity: 0.1; 
+                }
+              }
+            </style>
+          `,
+          anchor: new window.naver.maps.Point(16, 16)
+        });
+        
+        // z-index 업데이트
+        marker.setZIndex(isSelected ? 200 : 150);
+      }
+    });
+  };
+
   // 선택된 장소가 변경될 때만 마커 스타일 업데이트 (무한 루프 방지)
   useEffect(() => {
     if (selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0 && markers.length > 0) {
@@ -2709,7 +2934,7 @@ export default function LocationPage() {
                     transform: translate(-50%, -50%);
                     width: 40px;
                     height: 40px;
-                    background: rgba(236, 72, 153, 0.2);
+                    background: rgba(245, 158, 11, 0.2);
                     border-radius: 50%;
                     animation: selectedGlow 2s ease-in-out infinite;
                     z-index: 140;
@@ -2760,37 +2985,74 @@ export default function LocationPage() {
   }, [selectedLocationId]); // selectedLocationId가 변경될 때만 실행
 
 
-  // 통일된 정보창 생성 함수
+  // 통일된 정보창 생성 함수 - home/page.tsx 스타일 적용
   const createLocationInfoWindow = (locationName: string, locationAddress: string) => {
     const newInfoWindow = new window.naver.maps.InfoWindow({
       content: `
-        <div style="
-          padding: 8px 12px;
-          min-width: 160px;
-          max-width: 200px;
+        <style>
+          @keyframes slideInFromBottom {
+            0% {
+              opacity: 0;
+              transform: translateY(20px) scale(0.95);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+          .location-info-window-container {
+            animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+          }
+          .close-button {
+            transition: all 0.2s ease;
+          }
+          .close-button:hover {
+            background: rgba(0, 0, 0, 0.2) !important;
+            transform: scale(1.1);
+          }
+        </style>
+        <div class="location-info-window-container" style="
+          padding: 12px 16px;
+          min-width: 200px;
+          max-width: 280px;
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          border: 1px solid rgba(99, 102, 241, 0.1);
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          position: relative;
         ">
-          <div style="
-            margin-bottom: 6px;
-          ">
-            <h3 style="margin: 0; font-size: 13px; font-weight: 600; color: #111827; line-height: 1.2;">${locationName}</h3>
-          </div>
+          <!-- 닫기 버튼 -->
+          <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.1);
+            border: none;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+          ">×</button>
           
-          <div>
-            <p style="margin: 0; font-size: 11px; color: #4b5563; line-height: 1.3; background: #f3f4f6; padding: 4px 6px; border-radius: 4px; border-left: 2px solid #3b82f6; word-break: keep-all;">${locationAddress}</p>
+          <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px;">
+            📍 ${locationName}
+          </h3>
+          <div style="margin-bottom: 6px;">
+            <p style="margin: 0; font-size: 12px; color: #64748b;">
+              <span style="color: #64748b; font-weight: 500; word-break: keep-all;">${locationAddress}</span>
+            </p>
           </div>
         </div>
       `,
       borderWidth: 0,
       backgroundColor: 'transparent',
       disableAnchor: true,
-      pixelOffset: new window.naver.maps.Point(100, -5),
-      closeButton: true, // 기본 닫기 버튼 활성화
-      removable: true // 클릭으로 닫을 수 있도록 설정
+      pixelOffset: new window.naver.maps.Point(0, -10)
     });
     
     // InfoWindow가 닫힐 때 상태 업데이트
@@ -2816,6 +3078,9 @@ export default function LocationPage() {
     selectedLocationIdRef.current = locationId;
     
     console.log('[handleLocationCardClick] 장소 선택됨:', locationId, location.name || location.slt_title, '이전 선택:', previousSelectedId);
+    
+    // 모든 마커의 색상을 즉시 업데이트
+    updateMarkerColors(locationId);
     
     // 지도와 좌표가 유효한 경우에만 지도 이동 및 마커 처리
     if (!map || !window.naver || lat === 0 || lng === 0) {
@@ -3815,7 +4080,7 @@ export default function LocationPage() {
                     transition={{ delay: 0.1, duration: 0.3 }}
                     className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl p-4 border border-pink-100 h-[200px] overflow-y-auto hide-scrollbar"
                   >
-                    <div className="flex justify-between items-center mb-2">
+                    <div className="flex justify-between items-center mb-4">
                       <div className="flex items-center space-x-3">
                         <FiMapPin className="w-5 h-5 text-pink-500" />
                         <div>
@@ -3839,12 +4104,6 @@ export default function LocationPage() {
                         className="flex flex-col items-center justify-center py-8"
                       >
                         <motion.div
-                          variants={spinnerVariants}
-                          animate="animate"
-                          className="w-10 h-10 mx-auto mb-4 bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl flex items-center justify-center">
-                          <FiLoader className="w-5 h-5 text-white" />
-                        </motion.div>
-                        <motion.div
                           variants={loadingTextVariants}
                           initial="hidden"
                           animate="visible"
@@ -3858,7 +4117,7 @@ export default function LocationPage() {
                         variants={staggerContainer}
                         initial="hidden"
                         animate="visible"
-                        className="flex overflow-x-auto space-x-4 pb-2 hide-scrollbar -mx-1 px-1"
+                        className="flex overflow-x-auto space-x-3 pb-2 hide-scrollbar -mx-1 px-1"
                       >
                         {otherMembersSavedLocations.map((location, index) => {
                           const lat = parseFloat(String(location.slt_lat || '0')) || 0;
@@ -3880,87 +4139,95 @@ export default function LocationPage() {
                               animate="visible"
                               whileHover={!isSelected ? "hover" : undefined}
                               whileTap="tap"
-                              className={`location-card flex-shrink-0 w-64 h-24 rounded-2xl p-4 cursor-pointer shadow-lg transition-all duration-300 ${
-                                isSelected ? 'selected ring-2 ring-blue-400 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50' : 'hover:shadow-xl'
-                              } ${!hasValidCoords ? 'opacity-75 border-dashed border-2 border-gray-300' : ''}`}
+                              className={`flex-shrink-0 w-[220px] h-[80px] bg-white rounded-xl p-4 cursor-pointer transition-all duration-300 border shadow-sm ${
+                                isSelected 
+                                  ? 'border-amber-200 shadow-lg ring-1 ring-amber-100' 
+                                  : 'border-gray-200 hover:border-amber-200 hover:shadow-md active:scale-[0.98]'
+                              } ${!hasValidCoords ? 'opacity-70 border-dashed border-orange-200 bg-orange-50/30' : ''}`}
+                              style={{
+                                background: isSelected 
+                                  ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)'
+                                  : 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
+                                boxShadow: isSelected 
+                                  ? '0 4px 20px rgba(245, 158, 11, 0.15)' 
+                                  : '0 2px 8px rgba(0, 0, 0, 0.04)'
+                              }}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleLocationCardClick(location);
                               }}
                             >
-                              {/* 상단: 제목과 버튼들 */}
-                              <div className="flex items-start justify-between mb-1">
+                                                                                            <div className="flex items-center justify-between h-full">
                                 <div className="flex items-center min-w-0 flex-1">
+                                  {/* 텍스트 정보 */}
                                   <div className="min-w-0 flex-1">
-                                    <h4 className={`text-sm font-bold truncate ${
-                                      isSelected ? 'text-gray-800' : 'text-gray-800'
-                                    }`}>
+                                    <h4 className="text-base font-semibold text-gray-900 truncate leading-tight">
                                       {location.name || location.slt_title || '제목 없음'}
                                     </h4>
-                              </div>
+                                    {!hasValidCoords && (
+                                      <p className="text-xs text-orange-500 mt-1">위치정보 없음</p>
+                                    )}
+                                  </div>
                                 </div>
                                 
-                                {/* 버튼들 */}
-                                <div className="flex items-center space-x-1 flex-shrink-0">
+                                {/* 액션 버튼들 */}
+                                <div className="flex items-center space-x-1.5 flex-shrink-0 ml-2">
                                   <motion.button
-                                    whileHover={{ scale: 1.1 }}
-                                    whileTap={{ scale: 0.9 }}
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleNotificationToggle(location);
                                     }}
-                                    className={`p-1.5 rounded-lg transition-all duration-200 ${
+                                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
                                       (location.notifications === true || location.slt_enter_alarm === 'Y')
-                                        ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-100 border border-emerald-200' 
-                                        : 'bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200'
+                                        ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' 
+                                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                                     }`}
                                     title={`알림 ${(location.notifications === true || location.slt_enter_alarm === 'Y') ? '끄기' : '켜기'}`}
                                   >
                                     {(location.notifications === true || location.slt_enter_alarm === 'Y') ? (
-                                      <FiBell size={14} />
+                                      <FiBell size={13} />
                                     ) : (
-                                      <FiBellOff size={14} />
+                                      <FiBellOff size={13} />
                                     )}
                                   </motion.button>
                                   
                                   <motion.button
-                                    whileHover={{ scale: 1.1 }}
-                                    whileTap={{ scale: 0.9 }}
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleHideLocation(location);
                                     }}
-                                    className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 transition-all duration-200"
-                                    title="장소 숨김"
+                                    className="w-8 h-8 rounded-lg bg-red-100 text-red-500 hover:bg-red-200 hover:text-red-600 flex items-center justify-center transition-all duration-200"
+                                    title="장소 삭제"
                                   >
-                                    <FiTrash2 size={14} />
+                                    <FiTrash2 size={13} />
                                   </motion.button>
                                 </div>
-                          </div>
-                                
-                              {/* 하단: 주소 */}
-                              <div className="flex-1">
-                                <p className={`text-xs truncate ${
-                                  isSelected ? 'text-gray-600' : 'text-gray-500'
-                                }`}>
-                                  {location.address || location.slt_add || '주소 정보 없음'}
-                                  {!hasValidCoords && <span className="text-orange-500 ml-1">(위치 정보 없음)</span>}
-                                </p>
-                  </div>
+                              </div>
                 </motion.div>
                         );
                       })}
               </motion.div>
                     ) : (
-                      <div className="bg-gradient-to-r from-indigo-50 to-pink-50 rounded-xl shadow-lg p-4 text-center text-gray-500 border border-gray-200">
-                        <p className="font-medium">
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex flex-col items-center justify-center text-center"
+                      >
+                        <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center mb-3">
+                          <FiMapPin className="w-6 h-6 text-pink-500" />
+                        </div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">
                           {groupMembers.find((m: GroupMember) => m.isSelected)?.name ?
-                            `${groupMembers.find((m: GroupMember) => m.isSelected)?.name}님이 등록한 장소가 없습니다.` : 
-                            '다른 멤버들이 등록한 장소가 없습니다.'
+                            `${groupMembers.find((m: GroupMember) => m.isSelected)?.name}님의 장소가 없습니다` : 
+                            '저장된 장소가 없습니다'
                           }
                         </p>
-                        <p className="text-sm mt-1">새로운 장소를 추가해보세요</p>
-                  </div>
+                        <p className="text-xs text-gray-400">새로운 장소를 추가해보세요</p>
+                      </motion.div>
                   )}
                   </motion.div>
                     </div>

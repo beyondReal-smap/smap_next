@@ -79,24 +79,10 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
 };
 
 // SSL 인증서 오류가 있는 URL인지 확인하는 함수
-const isUnsafeImageUrl = (url: string | null): boolean => {
-  if (!url) return true;
-  
-  // 알려진 문제가 있는 서버 URL들
-  const unsafeHosts = [
-    '118.67.130.71:8000',
-    // 필요시 다른 문제가 있는 호스트들을 추가
-  ];
-  
-  return unsafeHosts.some(host => url.includes(host));
-};
-
-// 안전한 이미지 URL을 반환하는 함수
+// 안전한 이미지 URL을 반환하는 함수 - location/home과 동일한 로직
 const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  if (isUnsafeImageUrl(photoUrl)) {
-    return getDefaultImage(gender, index);
-  }
-  return photoUrl || getDefaultImage(gender, index);
+  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
+  return photoUrl ?? getDefaultImage(gender, index);
 };
 
 // Framer Motion 애니메이션 variants

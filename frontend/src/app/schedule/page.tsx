@@ -54,13 +54,10 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
   }
 };
 
-// 안전한 이미지 URL 가져오기 함수 (frontend/public/images의 로컬 이미지 사용)
+// 안전한 이미지 URL 가져오기 함수 - location/home과 동일한 로직
 const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  // photoUrl이 있고 유효한 URL이면 그것을 사용, 없으면 로컬 이미지 사용
-  if (photoUrl && photoUrl.trim() && !photoUrl.startsWith('/images/')) {
-    return photoUrl;
-  }
-  return getDefaultImage(gender, index);
+  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
+  return photoUrl ?? getDefaultImage(gender, index);
 };
 
 // 모바일 최적화된 CSS 스타일
