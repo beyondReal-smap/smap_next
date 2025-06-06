@@ -1491,9 +1491,9 @@ export default function LogsPage() {
 
        // 요약 데이터 설정 (PHP 로직 기반 요약 또는 계산된 요약 사용)
        // locationLogSummary가 존재하고 distance, time, steps 속성이 있는지 확인
-       const finalSummary: LocationSummary = (locationLogSummary && typeof locationLogSummary.distance === 'string' && typeof locationLogSummary.time === 'string' && typeof locationLogSummary.steps === 'string')
-         ? { distance: locationLogSummary.distance, time: locationLogSummary.time, steps: locationLogSummary.steps }
-         : calculateLocationStats(logs);
+               const finalSummary: LocationSummary = (locationLogSummary && typeof locationLogSummary.distance === 'string' && typeof locationLogSummary.steps === 'string')
+          ? { distance: locationLogSummary.distance, time: calculateLocationStats(logs).time, steps: locationLogSummary.steps }
+          : calculateLocationStats(logs);
       setLocationSummary(finalSummary);
       console.log('[loadLocationData] 최종 요약 데이터 설정:', finalSummary);
 
