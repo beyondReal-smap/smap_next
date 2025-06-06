@@ -1102,7 +1102,8 @@ export default function LogsPage() {
           // 위도 좌표를 직접 조정하여 200px 아래쪽으로 이동 (대략 0.002도 차이)
                   // 날짜 변경 시에는 시작지점 기준 지도 조정을 우선하므로 멤버 위치 기준 조정은 건너뜀
         // isDateChangedRef.current가 true인 경우도 건너뜀 (날짜 변경 진행 중)
-        if (!isDateChange && !isDateChangedRef.current) {
+        // 로그 마커가 있을 때도 건너뜀 (첫 번째 로그 마커를 우선시)
+        if (!isDateChange && !isDateChangedRef.current && sortedLocationData.length === 0) {
           const latOffset = -0.002; // 200px 아래쪽에 해당하는 위도 오프셋
           const adjustedPosition = new window.naver.maps.LatLng(
             member.location.lat + latOffset, 
@@ -1123,7 +1124,12 @@ export default function LogsPage() {
           map.current.refresh(true); 
           console.log('[LogsPage] Map center set 200px below member location:', member.name, 'Original:', member.location, 'Adjusted:', adjustedPosition);
         } else {
-          console.log('[LogsPage] 날짜 변경 시 - 시작지점 기준 지도 조정을 위해 멤버 위치 기준 조정 건너뜀');
+          console.log('[LogsPage] 멤버 위치 기준 지도 조정 건너뜀 - 이유:', {
+            isDateChange,
+            isDateChangedRef: isDateChangedRef.current,
+            hasLocationData: sortedLocationData.length > 0,
+            locationDataCount: sortedLocationData.length
+          });
         }
         
         // 날짜 변경 플래그 리셋
@@ -1424,7 +1430,12 @@ export default function LogsPage() {
         // 플래그 리셋하고 데이터 로딩
         isDateChangingRef.current = false;
         console.log('[handleDateSelect] 자동 재생성 방지 플래그 OFF - 새 데이터 로딩 시작');
-        loadLocationData(parseInt(selectedMember.id), date);
+        
+        // 데이터 로딩과 동시에 지도 중심 이동 플래그 설정
+        const memberId = parseInt(selectedMember.id);
+        loadLocationData(memberId, date).then(() => {
+          console.log('[handleDateSelect] 로그 데이터 로딩 완료 - 첫 번째 로그 마커로 지도 중심 이동 확인');
+        });
       } else {
         // 선택된 멤버가 없으면 로딩 해제하고 플래그 리셋
         isDateChangingRef.current = false;
@@ -1504,6 +1515,20 @@ export default function LogsPage() {
       if (map.current) {
            await renderLocationDataOnMap(mapMarkers, stayTimes, locationLogSummary, currentMembers, map.current);
            console.log('[loadLocationData] 통합 지도 렌더링 함수 호출 완료');
+           
+           // 렌더링 완료 후 추가로 첫 번째 로그 마커로 지도 중심 확실히 이동
+           if (mapMarkers.length > 0) {
+             setTimeout(() => {
+               const firstMarker = mapMarkers[0];
+               const firstLogPosition = new window.naver.maps.LatLng(
+                 firstMarker.latitude || firstMarker.mlt_lat || 0, 
+                 firstMarker.longitude || firstMarker.mlt_long || 0
+               );
+               map.current?.setCenter(firstLogPosition);
+               map.current?.setZoom(16);
+               console.log('[loadLocationData] 최종 확인 - 첫 번째 로그 마커로 지도 중심 재설정 완료');
+             }, 200);
+           }
       }
 
     } catch (error) {
@@ -2073,17 +2098,24 @@ export default function LogsPage() {
           console.log('[LOGS] 시작지점 기준 지도 조정:', { lat, lng, adjustedPosition });
         }
       } else if (map.current && mapMarkersData.length === 0) {
-          // 데이터가 없을 때도 멤버 아이콘은 표시되도록 updateMemberMarkers 호출
-          console.log('[LOGS] 마커 데이터 없음 - 멤버 마커 업데이트 및 지도 중앙 이동');
+          // 데이터가 없을 때도 멤버 아이콘은 표시되도록 처리 (지도 중심 먼저 설정)
+          console.log('[LOGS] 마커 데이터 없음 - 지도 중앙 이동 후 멤버 마커 업데이트');
           const selectedMember = groupMembers.find(m => m.isSelected);
           if(selectedMember) {
               const memberLat = selectedMember.mlt_lat || selectedMember.location.lat || 37.5665;
               const memberLng = selectedMember.mlt_long || selectedMember.location.lng || 126.9780;
-               const memberPosition = new window.naver.maps.LatLng(memberLat, memberLng);
-              map.current.setCenter(memberPosition);
+              const latOffset = -0.002; // 아래쪽 오프셋
+              const adjustedPosition = new window.naver.maps.LatLng(memberLat + latOffset, memberLng);
+              
+              // 지도 중심 먼저 설정
+              map.current.setCenter(adjustedPosition);
               map.current.setZoom(16);
-              updateMemberMarkers(groupMembers, false);
-               console.log('[LOGS] 멤버 아이콘 업데이트 및 지도 중앙 이동 완료');
+              
+              // 지연 후 멤버 마커 생성
+              setTimeout(() => {
+                updateMemberMarkers(groupMembers, false);
+                console.log('[LOGS] 지도 중앙 이동 후 멤버 아이콘 업데이트 완료');
+              }, 50);
           }
       }
     } else {
@@ -2106,12 +2138,28 @@ export default function LogsPage() {
       console.log('[LOGS] 그룹 멤버 변경 감지 - 멤버 마커 업데이트:', groupMembers.length, '명');
       // 날짜 변경 중이 아닐 때만 업데이트 (날짜 변경 중에는 자동 재생성 방지)
       if (!isDateChangingRef.current) {
-        updateMemberMarkers(groupMembers, false);
+        // 로그 데이터가 없고 선택된 멤버가 있으면 지도 중심 먼저 설정
+        const selectedMember = groupMembers.find(m => m.isSelected);
+        if (selectedMember && sortedLocationData.length === 0 && map.current) {
+          const memberLat = selectedMember.mlt_lat || selectedMember.location.lat || 37.5665;
+          const memberLng = selectedMember.mlt_long || selectedMember.location.lng || 126.9780;
+          const latOffset = -0.002; // 아래쪽 오프셋
+          const adjustedPosition = new window.naver.maps.LatLng(memberLat + latOffset, memberLng);
+          
+          map.current.setCenter(adjustedPosition);
+          map.current.setZoom(16);
+          
+          setTimeout(() => {
+            updateMemberMarkers(groupMembers, false);
+          }, 50);
+        } else {
+          updateMemberMarkers(groupMembers, false);
+        }
       } else {
         console.log('[LOGS] 날짜 변경 중으로 멤버 마커 업데이트 건너뜀');
       }
     }
-  }, [groupMembers, isMapInitializedLogs]);
+  }, [groupMembers, isMapInitializedLogs, sortedLocationData]);
 
   // 슬라이더 드래그를 위한 전역 이벤트 리스너
   useEffect(() => {
@@ -2183,11 +2231,26 @@ export default function LogsPage() {
           isSelected: index === 0
         }));
         
+        // 지도 중심을 먼저 설정한 후 마커 생성 (부자연스러운 이동 방지)
+        const firstMember = updatedMembers[0];
+        if (map.current && firstMember) {
+          const latOffset = -0.002; // 아래쪽 오프셋
+          const adjustedPosition = new window.naver.maps.LatLng(
+            firstMember.location.lat + latOffset, 
+            firstMember.location.lng
+          );
+          map.current.setCenter(adjustedPosition);
+          map.current.setZoom(16);
+          console.log("[LogsPage] Auto-selection: 지도 중심 먼저 설정 완료");
+        }
+        
         setGroupMembers(updatedMembers);
         
-        // 즉시 멤버 마커 생성
-        console.log("[LogsPage] Auto-selection: 즉시 멤버 마커 생성");
-        updateMemberMarkers(updatedMembers, false);
+        // 지연 후 멤버 마커 생성 (지도 중심 설정 후)
+        setTimeout(() => {
+          console.log("[LogsPage] Auto-selection: 지연 후 멤버 마커 생성");
+          updateMemberMarkers(updatedMembers, false);
+        }, 50);
         
         // handleMemberSelect도 호출하여 위치 데이터 로딩
         const firstMemberId = groupMembers[0].id;
