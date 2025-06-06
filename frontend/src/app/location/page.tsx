@@ -196,11 +196,11 @@ const pageVariants = {
   }
 };
 
-// 개선된 바텀시트 애니메이션 variants - home/page.tsx와 동일하게 수정
+// 바텀시트 variants - collapsed/expanded 상태만 사용
 const bottomSheetVariants = {
-  hidden: { 
-    top: '90vh', // home/page.tsx와 동일
-    bottom: '0px', // 높이 고정을 위해 bottom 추가
+  collapsed: { 
+    top: '89.5vh',
+    bottom: '0px',
     opacity: 1,
     transition: {
       type: "spring",
@@ -210,21 +210,9 @@ const bottomSheetVariants = {
       duration: 0.5
     }
   },
-  visible: { 
-    top: '20vh', // 3단계 - 거의 전체 화면
-    bottom: '0px', // 높이 고정을 위해 bottom 추가
-    opacity: 1,
-    transition: {
-      type: "spring",
-      stiffness: 400,
-      damping: 30,
-      mass: 0.6,
-      duration: 0.5
-    }
-  },
-  peek: {
-    top: '65vh', // home/page.tsx와 완전히 동일 - 2단계이므로 더 크게 열림
-    bottom: '0px', // 높이 고정을 위해 bottom 추가
+  expanded: {
+    top: '65vh',
+    bottom: '0px',  
     opacity: 1,
     transition: {
       type: "spring",
@@ -614,7 +602,7 @@ export default function LocationPage() {
   const [selectedLocationIdRef, setSelectedLocationIdRef] = useState<React.MutableRefObject<string | null>>({ current: null });
   
   // UI 상태
-  const [bottomSheetState, setBottomSheetState] = useState<'hidden' | 'peek' | 'visible'>('peek');
+  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'expanded'>('expanded');
   const [activeView, setActiveView] = useState<'selectedMemberPlaces' | 'otherMembersPlaces'>('selectedMemberPlaces');
   const [isLocationInfoPanelOpen, setIsLocationInfoPanelOpen] = useState(false);
   const [isEditingPanel, setIsEditingPanel] = useState(false);
@@ -1220,31 +1208,19 @@ export default function LocationPage() {
         };
 
         // 간소화된 바텀시트 상태 결정 로직 (DOM 계산 제거)
-        let nextState: 'hidden' | 'peek' | 'visible' = bottomSheetState;
+        let nextState: 'collapsed' | 'expanded' = bottomSheetState;
 
-        // 위로 드래그 (Y 감소) - 더욱 민감하게 반응
-        if (dragDeltaY < 0) {
-            if (bottomSheetState === 'hidden' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
-                nextState = 'peek';
-                console.log('[DragEnd] 위로 드래그 감지 (hidden -> peek)');
-                triggerHaptic();
-            } else if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
-                nextState = 'visible';
-                console.log('[DragEnd] 위로 드래그 감지 (peek -> visible)');
-                triggerHaptic();
-            }
-        } 
-        // 아래로 드래그 (Y 증가) - 더욱 민감하게 반응
-        else if (dragDeltaY > 0) {
-            if (bottomSheetState === 'visible' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
-                nextState = 'peek';
-                console.log('[DragEnd] 아래로 드래그 감지 (visible -> peek)');
-                triggerHaptic();
-            } else if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
-                nextState = 'hidden';
-                console.log('[DragEnd] 아래로 드래그 감지 (peek -> hidden)');
-                triggerHaptic();
-            }
+        // 위로 드래그 (Y 감소) - 확장
+        if (dragDeltaY < 0 && bottomSheetState === 'collapsed' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
+            nextState = 'expanded';
+            console.log('[DragEnd] 위로 드래그 감지 (collapsed -> expanded)');
+            triggerHaptic();
+        }
+        // 아래로 드래그 (Y 증가) - 축소
+        else if (dragDeltaY > 0 && bottomSheetState === 'expanded' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
+            nextState = 'collapsed';
+            console.log('[DragEnd] 아래로 드래그 감지 (expanded -> collapsed)');
+            triggerHaptic();
         }
 
         // 즉시 상태 업데이트 (무거운 계산 제거)
@@ -1272,7 +1248,7 @@ export default function LocationPage() {
     
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
-    setBottomSheetState('peek');
+    setBottomSheetState('expanded');
     
     // *** 기존 마커 및 데이터 초기화 강화 ***
     // 1. 현재 지도에 있는 모든 멤버 마커 즉시 제거
@@ -1514,10 +1490,15 @@ export default function LocationPage() {
     setGroupMembers(updatedMembers); // 이 호출이 updateMemberMarkers를 트리거 (useEffect를 통해)
   
     if (map && window.naver?.maps) {
-      // 선택된 멤버의 위치로 지도 중심 이동
+      // 선택된 멤버의 위치로 지도 중심 이동 (바텀시트에 가려지지 않도록 위쪽으로 오프셋)
       console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember.name, '위치:', newlySelectedMember.location);
       const memberPosition = new window.naver.maps.LatLng(newlySelectedMember.location.lat, newlySelectedMember.location.lng);
+      
+      // 먼저 멤버 위치로 지도 중심을 설정
       map.setCenter(memberPosition);
+      
+      // 그 다음 지도를 100px 아래쪽으로 이동 (멤버가 화면 위쪽에 보이도록)
+      map.panBy(new window.naver.maps.Point(0, 100));
       map.setZoom(16); // 적절한 줌 레벨로 설정
       
       // 첫번째 멤버 선택 완료 상태 설정
@@ -1822,8 +1803,8 @@ export default function LocationPage() {
         setIsLocationInfoPanelOpen(true);
         setIsEditingPanel(false);
         
-        // 바텀시트를 peek 상태로 변경 (핸들이 보이는 정도로 내림)
-        setBottomSheetState('peek');
+        // 바텀시트를 collapsed 상태로 변경 (핸들이 보이는 정도로 내림)
+        setBottomSheetState('collapsed');
         
         // 주소 변환
         if (window.naver.maps.Service) {
@@ -3115,8 +3096,8 @@ export default function LocationPage() {
                   onClick={() => {
                     setIsLocationInfoPanelOpen(true);
                     setIsEditingPanel(false);
-                    // 바텀시트를 peek 상태로 변경 (핸들이 보이도록)
-                    setBottomSheetState('peek');
+                    // 바텀시트를 collapsed 상태로 변경 (핸들이 보이도록)
+                    setBottomSheetState('collapsed');
                     // 새 장소 입력을 위한 기본값 설정
                     setNewLocation({
                       name: '',
@@ -3365,8 +3346,8 @@ export default function LocationPage() {
                   setIsLocationInfoPanelOpen(false);
                   if (tempMarker.current) tempMarker.current.setMap(null);
                   setIsEditingPanel(false);
-                  // 패널 닫을 때 바텀시트를 다시 visible 상태로 복원
-                  setBottomSheetState('visible');
+                  // 패널 닫을 때 바텀시트를 다시 expanded 상태로 복원
+                  setBottomSheetState('expanded');
                     }} 
                     className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-all duration-200"
                   > 
@@ -3518,8 +3499,8 @@ export default function LocationPage() {
                     setIsLocationInfoPanelOpen(false);
                     if (tempMarker.current) tempMarker.current.setMap(null);
                     setIsEditingPanel(false);
-                    // 패널 닫을 때 바텀시트를 다시 visible 상태로 복원
-                    setBottomSheetState('visible');
+                    // 패널 닫을 때 바텀시트를 다시 expanded 상태로 복원
+                    setBottomSheetState('expanded');
                       }}
                       className="flex-1 py-3 px-4 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-medium rounded-xl shadow-lg mobile-button"
                     >

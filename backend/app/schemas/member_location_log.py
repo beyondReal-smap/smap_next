@@ -52,24 +52,16 @@ class LocationLogListRequest(BaseModel):
 
 class LocationSummaryResponse(BaseModel):
     """위치 로그 요약 응답 스키마"""
-    total_distance: float  # 총 이동거리 (km)
-    total_time: int        # 총 이동시간 (분)
-    total_steps: int       # 총 걸음수
-    average_speed: float   # 평균 속도 (km/h)
-    battery_usage: int     # 배터리 사용량
-    log_count: int         # 로그 개수
-
-class LocationPathResponse(BaseModel):
-    """위치 경로 응답 스키마"""
-    points: List[dict]  # 위치 포인트 목록
-    summary: LocationSummaryResponse 
-
-class LocationSummaryResponse(BaseModel):
     total_distance: float
     total_time: str
     step_count: int
     average_speed: float
     battery_consumption: int
+
+class LocationPathResponse(BaseModel):
+    """위치 경로 응답 스키마"""
+    points: List[dict]  # 위치 포인트 목록
+    summary: LocationSummaryResponse
 
 class LocationPathPoint(BaseModel):
     timestamp: str

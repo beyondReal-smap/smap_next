@@ -29,11 +29,81 @@ async function fetchWithFallback(url: string, options: RequestInit = {}) {
   }
 }
 
+// 백엔드 응답을 안전하게 변환하는 함수
+function transformMapMarkersResponse(backendData: any) {
+  console.log('[Map Markers API] 백엔드 원본 데이터:', backendData);
+  
+  try {
+    // 배열 형태의 응답 처리
+    if (Array.isArray(backendData)) {
+      return {
+        data: backendData.map(transformSingleMarkerData),
+        success: true,
+        message: "지도 마커 데이터 조회 성공"
+      };
+    }
+    
+    // 객체 형태의 응답 처리
+    if (backendData.data && Array.isArray(backendData.data)) {
+      return {
+        ...backendData,
+        data: backendData.data.map(transformSingleMarkerData)
+      };
+    }
+    
+    // 단일 객체 응답 처리
+    return {
+      data: [transformSingleMarkerData(backendData)],
+      success: true,
+      message: "지도 마커 데이터 조회 성공"
+    };
+  } catch (error) {
+    console.error('[Map Markers API] 응답 변환 중 오류:', error);
+    return {
+      data: [],
+      success: false,
+      message: "지도 마커 데이터 조회 실패"
+    };
+  }
+}
+
+function transformSingleMarkerData(markerData: any) {
+  return {
+    id: markerData.id || markerData.marker_id || markerData.mlt_idx || Math.random().toString(36).substr(2, 9),
+    latitude: Number(markerData.mlt_lat) || Number(markerData.latitude) || Number(markerData.lat) || 0,
+    longitude: Number(markerData.mlt_long) || Number(markerData.longitude) || Number(markerData.lng) || 0,
+    timestamp: formatTimestamp(markerData.mlt_gps_time || markerData.timestamp || markerData.created_at),
+    speed: Number(markerData.mlt_speed) || Number(markerData.speed) || 0,
+    accuracy: Number(markerData.mlt_accuacy) || Number(markerData.accuracy) || 0,
+    battery_level: Number(markerData.mlt_battery) || Number(markerData.battery_level) || Number(markerData.battery) || 0,
+    marker_type: markerData.marker_type || markerData.type || "waypoint",
+    address: markerData.address || markerData.location || "주소 정보 없음"
+  };
+}
+
+function formatTimestamp(timestamp: any): string {
+  if (typeof timestamp === 'string') {
+    return timestamp;
+  }
+  
+  if (timestamp instanceof Date) {
+    return timestamp.toISOString();
+  }
+  
+  // 타임스탬프인 경우 (초 단위)
+  if (typeof timestamp === 'number') {
+    return new Date(timestamp * 1000).toISOString();
+  }
+  
+  return new Date().toISOString();
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { memberId: string } }
+  { params }: { params: Promise<{ memberId: string }> }
 ) {
   try {
+    const { memberId } = await params;
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
     const minSpeed = searchParams.get('min_speed') || '1';
@@ -45,13 +115,22 @@ export async function GET(
     queryParams.append('min_speed', minSpeed);
     queryParams.append('max_accuracy', maxAccuracy);
     
-    const backendUrl = `https://118.67.130.71:8000/api/v1/logs/member-location-logs/${params.memberId}/map-markers?${queryParams.toString()}`;
+    const backendUrl = `https://118.67.130.71:8000/api/v1/logs/member-location-logs`;
+    
+    const requestBody = {
+      act: 'get_map_markers',
+      mt_idx: parseInt(memberId),
+      date: date,
+      min_speed: parseFloat(minSpeed),
+      max_accuracy: parseFloat(maxAccuracy)
+    };
     
     const response = await fetchWithFallback(backendUrl, {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
@@ -60,7 +139,10 @@ export async function GET(
 
     const data = await response.json();
     
-    return NextResponse.json(data);
+    // 백엔드 응답을 안전하게 변환
+    const transformedData = transformMapMarkersResponse(data);
+    
+    return NextResponse.json(transformedData);
   } catch (error) {
     console.error('지도 마커 데이터 API 오류:', error);
     

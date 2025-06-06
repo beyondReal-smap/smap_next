@@ -108,11 +108,10 @@ def get_location_summary(
     if not logs:
         return LocationSummaryResponse(
             total_distance=0.0,
-            total_time=0,
-            total_steps=0,
+            total_time='0분',
+            step_count=0,
             average_speed=0.0,
-            battery_usage=0,
-            log_count=0
+            battery_consumption=0
         )
     
     # 총 이동거리 계산
@@ -149,13 +148,25 @@ def get_location_summary(
     end_battery = logs[-1].mlt_battery or 100
     battery_usage = max(0, start_battery - end_battery)
     
+    # 시간을 문자열 형식으로 변환
+    def format_duration(minutes: int) -> str:
+        if minutes <= 0:
+            return '0분'
+        hours = minutes // 60
+        mins = minutes % 60
+        if hours > 0 and mins > 0:
+            return f'{hours}시간 {mins}분'
+        elif hours > 0:
+            return f'{hours}시간'
+        else:
+            return f'{mins}분'
+    
     return LocationSummaryResponse(
         total_distance=round(total_distance, 2),
-        total_time=total_time,
-        total_steps=total_steps,
+        total_time=format_duration(total_time),
+        step_count=total_steps,
         average_speed=round(average_speed, 2),
-        battery_usage=battery_usage,
-        log_count=len(logs)
+        battery_consumption=battery_usage
     )
 
 def get_location_path(
@@ -237,11 +248,10 @@ def get_member_daily_location_summary(
     if not logs:
         return LocationSummaryResponse(
             total_distance=0.0,
-            total_time=0,
-            total_steps=0,
+            total_time='0분',
+            step_count=0,
             average_speed=0.0,
-            battery_usage=0,
-            log_count=0
+            battery_consumption=0
         )
     
     # 총 이동거리 계산
@@ -288,13 +298,25 @@ def get_member_daily_location_summary(
     else:
         battery_usage = 0
     
+    # 시간을 문자열 형식으로 변환
+    def format_duration(minutes: int) -> str:
+        if minutes <= 0:
+            return '0분'
+        hours = minutes // 60
+        mins = minutes % 60
+        if hours > 0 and mins > 0:
+            return f'{hours}시간 {mins}분'
+        elif hours > 0:
+            return f'{hours}시간'
+        else:
+            return f'{mins}분'
+    
     return LocationSummaryResponse(
         total_distance=round(total_distance, 2),
-        total_time=total_time,
-        total_steps=total_steps,
+        total_time=format_duration(total_time),
+        step_count=total_steps,
         average_speed=round(average_speed, 2),
-        battery_usage=battery_usage,
-        log_count=len(logs)
+        battery_consumption=battery_usage
     )
 
 def get_member_daily_location_path(

@@ -93,16 +93,29 @@ export async function GET(
       return NextResponse.json({ error: 'date parameter is required' }, { status: 400 });
     }
 
-    // 백엔드 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/logs/member-location-logs/${memberId}/daily?date=${date}`;
+    // 올바른 POST 방식으로 백엔드 API 호출
+    const backendUrl = `https://118.67.130.71:8000/api/v1/logs/member-location-logs`;
     console.log('[Daily Location Logs API] 백엔드 API 호출:', backendUrl);
     
-    const data = await fetchWithFallback(backendUrl);
-    console.log('[Daily Location Logs API] 백엔드 응답 성공:', { 
-      dataLength: Array.isArray(data) ? data.length : 'not array'
+    const requestBody = {
+      act: 'get_daily_location_logs',
+      mt_idx: parseInt(memberId),
+      date: date,
+      limit: 1000
+    };
+    
+    const data = await fetchWithFallback(backendUrl, {
+      method: 'POST',
+      body: JSON.stringify(requestBody)
     });
     
-    return NextResponse.json(data, {
+    // 백엔드 응답이 { result: "Y", data: [...] } 형식인 경우
+    const actualData = data.result === "Y" ? data.data : data;
+    console.log('[Daily Location Logs API] 백엔드 응답 성공:', { 
+      dataLength: Array.isArray(actualData) ? actualData.length : 'not array'
+    });
+    
+    return NextResponse.json(actualData, {
       headers: {
         'X-Data-Source': 'backend-direct'
       }

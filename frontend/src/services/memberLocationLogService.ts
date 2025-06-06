@@ -45,32 +45,52 @@ export interface DailySummary {
 
 // 체류시간 분석 데이터 인터페이스
 export interface StayTime {
-  label: string;
-  grp: number;
+  // 기존 백엔드 필드들
+  label?: string;
+  grp?: number;
   start_time: string;
   end_time: string;
   duration: number;
-  distance: number;
-  start_lat: number;
-  start_long: number;
+  distance?: number;
+  start_lat?: number;
+  start_long?: number;
+  
+  // 변환된 API 응답 필드들
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  stay_duration?: string;
+  point_count?: number;
 }
 
 // 지도 마커 데이터 인터페이스
 export interface MapMarker {
-  mlt_idx: number;
-  mt_idx: number;
-  mlt_gps_time: string;
-  mlt_speed: number;
-  mlt_lat: number;
-  mlt_long: number;
-  mlt_accuacy: number;
-  mt_health_work: number;
-  mlt_battery: number;
-  mlt_fine_location: string;
-  mlt_location_chk: string;
-  mlt_wdate: string;
+  // 기존 백엔드 필드들
+  mlt_idx?: number;
+  mt_idx?: number;
+  mlt_gps_time?: string;
+  mlt_speed?: number;
+  mlt_lat?: number;
+  mlt_long?: number;
+  mlt_accuacy?: number;
+  mt_health_work?: number;
+  mlt_battery?: number;
+  mlt_fine_location?: string;
+  mlt_location_chk?: string;
+  mlt_wdate?: string;
   stay_lat?: number;
   stay_long?: number;
+  
+  // 변환된 API 응답 필드들
+  id?: string | number;
+  latitude?: number;
+  longitude?: number;
+  timestamp?: string;
+  speed?: number;
+  accuracy?: number;
+  battery_level?: number;
+  marker_type?: string;
+  address?: string;
 }
 
 // API 응답 인터페이스

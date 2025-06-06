@@ -466,11 +466,15 @@ export default function LogsPage() {
 
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [previousDate, setPreviousDate] = useState<string | null>(null); // 이전 날짜 추적
+  const isDateChangedRef = useRef<boolean>(false); // 날짜 변경 플래그
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null); 
-  const memberNaverMarkers = useRef<any[]>([]);
+  const memberNaverMarkers = useRef<any[]>([]); 
   const locationLogMarkers = useRef<any[]>([]); // 위치 로그 마커들을 위한 ref
+  const locationLogPolyline = useRef<any>(null); // 위치 로그 연결선을 위한 ref
+  const startEndMarkers = useRef<any[]>([]); // 시작/종료 마커들을 위한 ref
   const stayTimeMarkers = useRef<any[]>([]); // 체류시간 마커들을 위한 ref 
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true); 
@@ -478,13 +482,14 @@ export default function LogsPage() {
   const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false); // 초기 데이터 로딩 상태 추가
 
   // home/page.tsx와 동일한 바텀시트 상태 관리
-  const [bottomSheetState, setBottomSheetState] = useState<'hidden' | 'middle' | 'peek'>('peek');
+  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'expanded'>('expanded');
   const bottomSheetRef = useRef<HTMLDivElement>(null);
   const startDragY = useRef<number | null>(null);
   const startDragX = useRef<number | null>(null);
   const dragStartTime = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
   const isHorizontalSwipeRef = useRef<boolean | null>(null);
+  const hasUserInteracted = useRef<boolean>(false); // 사용자 상호작용 추적
 
   // 로그 페이지 뷰 상태 및 Ref
   const [activeLogView, setActiveLogView] = useState<'members' | 'summary'>('members');
@@ -502,10 +507,10 @@ export default function LogsPage() {
   const [sliderValue, setSliderValue] = useState(60); // 슬라이더 초기 값 (0-100)
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
 
-  // home/page.tsx와 동일한 bottomSheetVariants + middle 상태 추가
+  // 바텀시트 variants - collapsed/expanded 상태만 사용
   const bottomSheetVariants = {
-    hidden: { 
-      top: '90vh',
+    collapsed: { 
+      top: '89.5vh',
       bottom: '0px',
       opacity: 1,
       transition: {
@@ -516,20 +521,8 @@ export default function LogsPage() {
         duration: 0.5
       }
     },
-    middle: {
-      top: '65vh', // 위치기록 요약 섹션 높이(200px)에 맞춤
-      bottom: '0px',
-      opacity: 1,
-      transition: {
-        type: "spring",
-        stiffness: 400,
-        damping: 30,
-        mass: 0.6,
-        duration: 0.5
-      }
-    },
-    peek: {
-      top: '48vh',
+    expanded: {
+      top: '65vh',
       bottom: '0px',
       opacity: 1,
       transition: {
@@ -620,6 +613,20 @@ export default function LogsPage() {
       });
       locationLogMarkers.current = [];
       
+      // 위치 로그 연결선 정리
+      if (locationLogPolyline.current) {
+        locationLogPolyline.current.setMap(null);
+        locationLogPolyline.current = null;
+      }
+      
+      // 시작/종료 마커들 정리
+      startEndMarkers.current.forEach(marker => {
+        if (marker && marker.setMap) {
+          marker.setMap(null);
+        }
+      });
+      startEndMarkers.current = [];
+      
       // 체류시간 마커들 정리
       stayTimeMarkers.current.forEach(marker => {
         if (marker && marker.setMap) {
@@ -683,6 +690,7 @@ export default function LogsPage() {
     dragStartTime.current = performance.now();
     isDraggingRef.current = true;
     isHorizontalSwipeRef.current = null; // 방향 판단 초기화
+    hasUserInteracted.current = true; // 사용자 상호작용 플래그 설정
     
     // 시작 시간 저장 (정확한 속도 계산용)
     (e.target as any)._startedAt = performance.now();
@@ -732,18 +740,24 @@ export default function LogsPage() {
     const dragDeltaX = clientX - startDragX.current;
     const deltaTime = dragStartTime.current ? performance.now() - dragStartTime.current : 0;
     
-    // 햅틱 피드백 함수
+    // 햅틱 피드백 함수 - 사용자 상호작용 후에만 실행
     const triggerHaptic = () => {
+      // 사용자 상호작용이 없으면 햅틱 피드백 건너뜀
+      if (!hasUserInteracted.current || !('vibrate' in navigator)) {
+        return;
+      }
+      
       try {
-        if ('vibrate' in navigator) {
+        // document가 활성 상태일 때만 실행
+        if (document.visibilityState === 'visible' && !document.hidden) {
           navigator.vibrate([20, 5, 15]);
         }
       } catch (error) {
-        console.debug('햅틱 피드백이 차단되었습니다:', error);
+        // 에러 발생 시 조용히 무시 (콘솔 노이즈 방지)
       }
     };
 
-    // 상하 드래그에 대한 바텀시트 상태 변경 (2단계만)
+    // 상하 드래그에 대한 바텀시트 상태 변경 (collapsed/expanded만)
     if (isHorizontalSwipeRef.current === false || isHorizontalSwipeRef.current === null) {
       const startTime = (e.target as any)._startedAt || performance.now() - 200;
       const duration = performance.now() - startTime;
@@ -752,31 +766,19 @@ export default function LogsPage() {
       const dragThreshold = 50;
       const velocityThreshold = 0.3;
       
-      let nextState: 'hidden' | 'middle' | 'peek' = bottomSheetState;
+      let nextState: 'collapsed' | 'expanded' = bottomSheetState;
     
-      // 위로 드래그 (Y 감소) - 상태 확장
-      if (dragDeltaY < 0) {
-        if (bottomSheetState === 'hidden' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-          nextState = 'middle';
-          console.log('[DragEnd] 위로 드래그 감지 (hidden -> middle)');
-          triggerHaptic();
-        } else if (bottomSheetState === 'middle' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-          nextState = 'peek';
-          console.log('[DragEnd] 위로 드래그 감지 (middle -> peek)');
+      // 위로 드래그 (Y 감소) - 확장
+      if (dragDeltaY < 0 && bottomSheetState === 'collapsed' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
+        nextState = 'expanded';
+        console.log('[DragEnd] 위로 드래그 감지 (collapsed -> expanded)');
           triggerHaptic();
         }
-      }
-      // 아래로 드래그 (Y 증가) - 상태 축소
-      else if (dragDeltaY > 0) {
-        if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-          nextState = 'middle';
-          console.log('[DragEnd] 아래로 드래그 감지 (peek -> middle)');
+      // 아래로 드래그 (Y 증가) - 축소
+      else if (dragDeltaY > 0 && bottomSheetState === 'expanded' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
+        nextState = 'collapsed';
+        console.log('[DragEnd] 아래로 드래그 감지 (expanded -> collapsed)');
           triggerHaptic();
-        } else if (bottomSheetState === 'middle' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-          nextState = 'hidden';
-          console.log('[DragEnd] 아래로 드래그 감지 (middle -> hidden)');
-          triggerHaptic();
-        }
       }
       
       // 상태 업데이트
@@ -799,7 +801,7 @@ export default function LogsPage() {
 
   const toggleBottomSheet = () => {
     setBottomSheetState(prev => {
-      const next = prev === 'hidden' ? 'middle' : prev === 'middle' ? 'peek' : 'hidden';
+      const next = prev === 'collapsed' ? 'expanded' : 'collapsed';
       console.log('[BOTTOM_SHEET] toggleBottomSheet 상태 변경:', prev, '→', next);
       return next;
     });
@@ -816,6 +818,12 @@ export default function LogsPage() {
     
     console.log('Member selection started:', id);
     
+    // 멤버 재선택 시 날짜 변경 플래그 리셋 (멤버 위치 기준 지도 조정 허용)
+    if (isDateChangedRef.current) {
+      isDateChangedRef.current = false;
+      console.log('[handleMemberSelect] 멤버 재선택으로 날짜 변경 플래그 리셋');
+    }
+    
     // 현재 바텀시트 상태 유지
     const currentBottomSheetState = bottomSheetState;
     
@@ -831,7 +839,7 @@ export default function LogsPage() {
     console.log('Updated members:', updatedMembers);
     
     setGroupMembers(updatedMembers);
-    updateMemberMarkers(updatedMembers);
+    // updateMemberMarkers는 useEffect에서 처리되도록 제거
     setActiveLogView('members');
     
     // 바텀시트 상태 유지
@@ -839,15 +847,10 @@ export default function LogsPage() {
     
     // 선택 상태 변경 확인을 위한 로그
     const selectedMember = updatedMembers.find(m => m.isSelected);
-    console.log('Selected member:', selectedMember?.name);
+    console.log('[handleMemberSelect] Selected member:', selectedMember?.name);
     
-    // 선택된 멤버의 위치 데이터 로드
-    if (selectedMember && selectedDate) {
-      console.log('[LOGS] 멤버 선택 - 위치 데이터 로딩:', selectedMember.name, selectedDate);
-      loadLocationData(parseInt(selectedMember.id), selectedDate);
-    } else {
-      console.log('[LOGS] 멤버 선택 - 조건 불충족:', { hasSelectedMember: !!selectedMember, hasSelectedDate: !!selectedDate });
-    }
+    // loadLocationData는 useEffect에서 처리되도록 제거
+    console.log('[handleMemberSelect] 멤버 선택 완료 - useEffect에서 지도 업데이트 및 데이터 로딩 처리됨');
   };
 
   // 위치 로그 마커를 지도에 업데이트하는 함수
@@ -858,6 +861,7 @@ export default function LogsPage() {
     }
 
     console.log('[updateLocationLogMarkers] 위치 로그 마커 업데이트 시작:', markers.length, '개');
+    console.log('[updateLocationLogMarkers] 첫 번째 마커 데이터:', markers[0]);
 
     // 기존 위치 로그 마커들 제거
     locationLogMarkers.current.forEach((marker) => {
@@ -867,23 +871,111 @@ export default function LogsPage() {
     });
     locationLogMarkers.current = [];
 
+    // 기존 위치 로그 연결선 제거
+    if (locationLogPolyline.current) {
+      locationLogPolyline.current.setMap(null);
+      locationLogPolyline.current = null;
+    }
+
+    // 기존 시작/종료 마커들 제거
+    startEndMarkers.current.forEach((marker) => {
+      if (marker && marker.setMap) {
+        marker.setMap(null);
+      }
+    });
+    startEndMarkers.current = [];
+
     if (markers.length === 0) {
       console.log('[updateLocationLogMarkers] 표시할 마커가 없음');
       return;
     }
 
-    // 새로운 위치 로그 마커들 생성
+    // 위치 로그와 체류지점을 시간 순서로 통합
+    const allTimePoints: Array<{
+      type: 'location' | 'stay';
+      data: any;
+      lat: number;
+      lng: number;
+      time: string;
+      sortKey: number;
+    }> = [];
+    
+    // 위치 로그 데이터 추가
     markers.forEach((markerData, index) => {
+      // 변환된 API 응답 형식과 기존 형식 모두 지원
+      const lat = markerData.latitude || markerData.mlt_lat;
+      const lng = markerData.longitude || markerData.mlt_long;
+      const time = markerData.timestamp || markerData.mlt_gps_time || new Date().toISOString();
+      const sortKey = markerData.id || markerData.mlt_idx || index;
+      
+      if (!lat || !lng) {
+        console.warn('[updateLocationLogMarkers] 유효하지 않은 위치 데이터:', index, markerData);
+        return;
+      }
+      
+      allTimePoints.push({
+        type: 'location',
+        data: markerData,
+        lat: Number(lat),
+        lng: Number(lng),
+        time: time,
+        sortKey: Number(sortKey)
+      });
+    });
+    
+    // 체류지점 데이터 추가
+    stayTimesData.forEach((stayData) => {
+      allTimePoints.push({
+        type: 'stay',
+        data: stayData,
+        lat: stayData.latitude || stayData.start_lat || 0,
+        lng: stayData.longitude || stayData.start_long || 0,
+        time: stayData.start_time,
+        sortKey: new Date(stayData.start_time).getTime() // 시간으로 정렬
+      });
+    });
+    
+    // 시간 순서로 정렬 (mlt_idx와 시간을 모두 고려)
+    const sortedTimePoints = allTimePoints.sort((a, b) => {
+      if (a.type === 'location' && b.type === 'location') {
+        return a.sortKey - b.sortKey; // 위치 로그끼리는 mlt_idx로 정렬
+      }
+      // 시간으로 비교
+      const timeA = new Date(a.time).getTime();
+      const timeB = new Date(b.time).getTime();
+      return timeA - timeB;
+    });
+    
+    // 위치 로그만 따로 추출 (기존 마커 생성용)
+    const sortedMarkers = sortedTimePoints
+      .filter(point => point.type === 'location')
+      .map(point => point.data);
+
+    // 새로운 위치 로그 마커들 생성
+    console.log('[updateLocationLogMarkers] 마커 생성 시작:', sortedMarkers.length, '개');
+    sortedMarkers.forEach((markerData, index) => {
       try {
-        const position = new window.naver.maps.LatLng(markerData.mlt_lat, markerData.mlt_long);
+        if (index < 3) { // 처음 3개만 로그
+          console.log(`[updateLocationLogMarkers] 마커 ${index} 생성:`, {
+            lat: markerData.mlt_lat,
+            lng: markerData.mlt_long,
+            time: markerData.mlt_gps_time
+          });
+        }
+        // 변환된 API 응답 형식과 기존 형식 모두 지원
+        const lat = markerData.latitude || markerData.mlt_lat || 0;
+        const lng = markerData.longitude || markerData.mlt_long || 0;
+        const speed = markerData.speed || markerData.mlt_speed || 0;
+        
+        const position = new window.naver.maps.LatLng(Number(lat), Number(lng));
         
         // 속도에 따른 마커 색상 결정
         let markerColor = '#3b82f6'; // 기본 파란색
-        if (markerData.mlt_speed > 5) {
+        if (speed > 5) {
           markerColor = '#ef4444'; // 빠른 속도 - 빨간색
-        } else if (markerData.mlt_speed > 2) {
+        } else if (speed > 2) {
           markerColor = '#f59e0b'; // 중간 속도 - 주황색
-        } else if (markerData.mlt_speed > 0.5) {
+        } else if (speed > 0.5) {
           markerColor = '#10b981'; // 느린 속도 - 초록색
         }
 
@@ -966,12 +1058,12 @@ export default function LogsPage() {
               </h3>
               <div style="margin-bottom: 6px;">
                 <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  🕒 시간: <span style="color: #111827; font-weight: 500;">${markerData.mlt_gps_time ? markerData.mlt_gps_time.split(' ')[1] || markerData.mlt_gps_time : '정보 없음'}</span>
+                  🕒 시간: <span style="color: #111827; font-weight: 500;">${markerData.timestamp || markerData.mlt_gps_time || '정보 없음'}</span>
                 </p>
               </div>
               <div style="margin-bottom: 6px;">
                 <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  🚶 속도: <span style="color: #111827; font-weight: 500;">${markerData.mlt_speed?.toFixed(2) || 0} km/h</span>
+                  🚶 속도: <span style="color: #111827; font-weight: 500;">${speed.toFixed(2)} km/h</span>
                 </p>
               </div>
               <div style="margin-bottom: 6px;">
@@ -986,12 +1078,12 @@ export default function LogsPage() {
               </div>
               <div style="margin-bottom: 6px;">
                 <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  👟 걸음수: <span style="color: #111827; font-weight: 500;">${markerData.mt_health_work?.toLocaleString() || 0}</span>
+                  👟 걸음수: <span style="color: #111827; font-weight: 500;">${markerData.mt_health_work ? markerData.mt_health_work.toLocaleString() : 0}</span>
                 </p>
               </div>
               <div style="margin-bottom: 0;">
                 <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                  🌍 좌표: ${markerData.mlt_lat.toFixed(6)}, ${markerData.mlt_long.toFixed(6)}
+                  🌍 좌표: ${markerData.mlt_lat ? markerData.mlt_lat.toFixed(6) : '0.000000'}, ${markerData.mlt_long ? markerData.mlt_long.toFixed(6) : '0.000000'}
                 </p>
               </div>
             </div>
@@ -1018,25 +1110,320 @@ export default function LogsPage() {
 
     console.log('[updateLocationLogMarkers] 위치 로그 마커 생성 완료:', locationLogMarkers.current.length, '개');
 
-    // 마커들이 모두 보이도록 지도 범위 조정
-    if (markers.length > 0) {
+    // 시간 순서대로 모든 지점을 연결하는 Polyline 생성
+    if (sortedTimePoints.length > 1) {
+      const pathCoordinates = sortedTimePoints.map(point => 
+        new window.naver.maps.LatLng(point.lat, point.lng)
+      );
+
+      locationLogPolyline.current = new window.naver.maps.Polyline({
+        map: map.current,
+        path: pathCoordinates,
+        strokeColor: '#3b82f6', // 파란색 선
+        strokeOpacity: 0.8,
+        strokeWeight: 3,
+        strokeStyle: 'solid'
+      });
+
+      console.log('[updateLocationLogMarkers] 통합 경로 연결선 생성 완료:', pathCoordinates.length, '개 좌표');
+    }
+
+    // 시작점과 종료점에 특별한 마커 추가 (통합된 시간 기준)
+    if (sortedTimePoints.length > 0) {
+      const startPoint = sortedTimePoints[0];
+      const endPoint = sortedTimePoints[sortedTimePoints.length - 1];
+
+      // 시작점 마커 (초록색 원형 마커)
+      const startPosition = new window.naver.maps.LatLng(startPoint.lat, startPoint.lng);
+      const startIcon = new window.naver.maps.Marker({
+        position: startPosition,
+        map: map.current,
+        icon: {
+          content: `
+            <div style="
+              width: 20px; 
+              height: 20px; 
+              background: #22c55e; 
+              border: 3px solid white; 
+              border-radius: 50%; 
+              box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+              font-size: 10px;
+              color: white;
+            ">S</div>
+          `,
+          anchor: new window.naver.maps.Point(13, 13)
+        },
+        zIndex: 300
+      });
+
+      // 시작점 InfoWindow
+      const startInfoWindow = new window.naver.maps.InfoWindow({
+        content: `
+          <style>
+            @keyframes slideInFromBottom {
+              0% {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+              }
+              100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+            .info-window-container {
+              animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            }
+            .close-button {
+              transition: all 0.2s ease;
+            }
+            .close-button:hover {
+              background: rgba(0, 0, 0, 0.2) !important;
+              transform: scale(1.1);
+            }
+          </style>
+          <div class="info-window-container" style="
+            padding: 12px 16px;
+            min-width: 200px;
+            max-width: 280px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            position: relative;
+          ">
+            <!-- 닫기 버튼 -->
+            <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+              position: absolute;
+              top: 8px;
+              right: 8px;
+              background: rgba(0, 0, 0, 0.1);
+              border: none;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+              font-size: 14px;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #666;
+            ">×</button>
+            
+            <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #22c55e; padding-right: 25px; text-align: center;">
+              🚀 시작 지점
+            </h3>
+            <div style="margin-bottom: 6px;">
+              <p style="margin: 0; font-size: 12px; color: #64748b;">
+                                  🕒 시간: <span style="color: #111827; font-weight: 500;">${startPoint.time ? startPoint.time.split(' ')[1] || startPoint.time : '정보 없음'}</span>
+                </p>
+              </div>
+              <div style="margin-bottom: 6px;">
+                <p style="margin: 0; font-size: 12px; color: #64748b;">
+                  🚶 속도: <span style="color: #111827; font-weight: 500;">${startPoint.type === 'location' ? (startPoint.data.mlt_speed?.toFixed(2) || 0) : 0} km/h</span>
+                </p>
+              </div>
+              <div style="margin-bottom: 0;">
+                <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                  🌍 좌표: ${startPoint.lat ? startPoint.lat.toFixed(6) : '0.000000'}, ${startPoint.lng ? startPoint.lng.toFixed(6) : '0.000000'}
+              </p>
+            </div>
+          </div>
+        `,
+        borderWidth: 0,
+        backgroundColor: 'transparent',
+        disableAnchor: true,
+        pixelOffset: new window.naver.maps.Point(0, -10)
+      });
+
+      window.naver.maps.Event.addListener(startIcon, 'click', () => {
+        if (startInfoWindow.getMap()) {
+          startInfoWindow.close();
+        } else {
+          startInfoWindow.open(map.current, startIcon);
+        }
+      });
+
+      startEndMarkers.current.push(startIcon);
+
+              // 종료점 마커 (빨간색 원형 마커) - 시작점과 다른 경우에만
+        if (sortedTimePoints.length > 1) {
+          const endPosition = new window.naver.maps.LatLng(endPoint.lat, endPoint.lng);
+          const endIcon = new window.naver.maps.Marker({
+            position: endPosition,
+            map: map.current,
+            icon: {
+              content: `
+                <div style="
+                  width: 20px; 
+                  height: 20px; 
+                  background: #ef4444; 
+                  border: 3px solid white; 
+                  border-radius: 50%; 
+                  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-weight: bold;
+                  font-size: 10px;
+                  color: white;
+                ">E</div>
+              `,
+              anchor: new window.naver.maps.Point(13, 13)
+            },
+            zIndex: 300
+          });
+
+          // 종료점 InfoWindow
+          const endInfoWindow = new window.naver.maps.InfoWindow({
+            content: `
+              <style>
+                @keyframes slideInFromBottom {
+                  0% {
+                    opacity: 0;
+                    transform: translateY(20px) scale(0.95);
+                  }
+                  100% {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                  }
+                }
+                .info-window-container {
+                  animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+                }
+                .close-button {
+                  transition: all 0.2s ease;
+                }
+                .close-button:hover {
+                  background: rgba(0, 0, 0, 0.2) !important;
+                  transform: scale(1.1);
+                }
+              </style>
+              <div class="info-window-container" style="
+                padding: 12px 16px;
+                min-width: 200px;
+                max-width: 280px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: white;
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                position: relative;
+              ">
+                <!-- 닫기 버튼 -->
+                <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                  position: absolute;
+                  top: 8px;
+                  right: 8px;
+                  background: rgba(0, 0, 0, 0.1);
+                  border: none;
+                  border-radius: 50%;
+                  width: 22px;
+                  height: 22px;
+                  font-size: 14px;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  color: #666;
+                ">×</button>
+                
+                <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #ef4444; padding-right: 25px; text-align: center;">
+                  🏁 종료 지점
+                </h3>
+                <div style="margin-bottom: 6px;">
+                  <p style="margin: 0; font-size: 12px; color: #64748b;">
+                    🕒 시간: <span style="color: #111827; font-weight: 500;">${endPoint.time ? endPoint.time.split(' ')[1] || endPoint.time : '정보 없음'}</span>
+                  </p>
+                </div>
+                <div style="margin-bottom: 6px;">
+                  <p style="margin: 0; font-size: 12px; color: #64748b;">
+                    🚶 속도: <span style="color: #111827; font-weight: 500;">${endPoint.type === 'location' ? (endPoint.data.mlt_speed?.toFixed(2) || 0) : 0} km/h</span>
+                  </p>
+                </div>
+                <div style="margin-bottom: 0;">
+                  <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                    🌍 좌표: ${endPoint.lat ? endPoint.lat.toFixed(6) : '0.000000'}, ${endPoint.lng ? endPoint.lng.toFixed(6) : '0.000000'}
+                  </p>
+                </div>
+              </div>
+            `,
+            borderWidth: 0,
+            backgroundColor: 'transparent',
+            disableAnchor: true,
+            pixelOffset: new window.naver.maps.Point(0, -10)
+          });
+
+          window.naver.maps.Event.addListener(endIcon, 'click', () => {
+            if (endInfoWindow.getMap()) {
+              endInfoWindow.close();
+            } else {
+              endInfoWindow.open(map.current, endIcon);
+            }
+          });
+
+          startEndMarkers.current.push(endIcon);
+        }
+
+      console.log('[updateLocationLogMarkers] 시작/종료 마커 생성 완료');
+    }
+
+    // 체류시간 마커도 업데이트 (시작/종료점 정보 전달)
+    if (stayTimesData.length > 0) {
+      const startEndPoints = sortedTimePoints.length > 0 ? {
+        start: sortedTimePoints[0],
+        end: sortedTimePoints[sortedTimePoints.length - 1]
+      } : undefined;
+      
+      updateStayTimeMarkers(stayTimesData, startEndPoints);
+    }
+
+    // 모든 마커들(위치로그 + 체류시간)이 보이도록 지도 범위 조정 및 중심 이동
+    if (sortedTimePoints.length > 0) {
       const bounds = new window.naver.maps.LatLngBounds();
-      markers.forEach(markerData => {
-        bounds.extend(new window.naver.maps.LatLng(markerData.mlt_lat, markerData.mlt_long));
+      
+      // 모든 시간 기준 지점들을 범위에 포함
+      sortedTimePoints.forEach(point => {
+        bounds.extend(new window.naver.maps.LatLng(point.lat, point.lng));
       });
       
-      // 부드럽게 지도 범위 조정
-      map.current.fitBounds(bounds, {
-        top: 50,
-        right: 50,
-        bottom: 50,
-        left: 50
-      });
+      // 부드럽게 지도 범위 조정 및 중심 이동
+      try {
+        // fitBounds 후 적절한 줌 레벨 설정
+        map.current.fitBounds(bounds, {
+          top: 60,
+          right: 60,
+          bottom: 60,
+          left: 60
+        });
+
+        // 날짜 변경 시에는 시작지점 기준 지도 조정을 우선하므로 경로 중심 이동 건너뜀
+        // 멤버가 선택된 상태에서는 경로 중심 이동 건너뜀 (멤버 위치 기준 조정 우선)
+        const hasMemberSelected = groupMembers.some(m => m.isSelected);
+        if (!isDateChangedRef.current && !hasMemberSelected) {
+          // 약간의 지연 후 중심점으로 부드럽게 이동
+          setTimeout(() => {
+            if (map.current && bounds) {
+              const center = bounds.getCenter();
+              map.current.panTo(center); // setCenter 대신 panTo 사용으로 부드러운 이동
+              console.log('[updateLocationLogMarkers] 지도 중심 이동 완료:', center);
+            }
+          }, 200);
+        } else {
+          console.log('[updateLocationLogMarkers] 날짜 변경 중이거나 멤버 선택됨 - 경로 중심 이동 건너뜀');
+        }
+      } catch (error) {
+        console.error('[updateLocationLogMarkers] 지도 범위 조정 중 오류:', error);
+      }
     }
   };
 
   // 체류시간 마커를 지도에 업데이트하는 함수
-  const updateStayTimeMarkers = (stayTimes: StayTime[]) => {
+  const updateStayTimeMarkers = (stayTimes: StayTime[], startEndPoints?: { start?: any, end?: any }) => {
     if (!map.current || !window.naver?.maps) {
       console.log('[updateStayTimeMarkers] 지도가 준비되지 않음');
       return;
@@ -1086,6 +1473,11 @@ export default function LogsPage() {
 
     // 체류시간 포맷 함수
     const formatDuration = (minutes: number): string => {
+      // NaN이나 유효하지 않은 값 처리
+      if (isNaN(minutes) || !isFinite(minutes) || minutes < 0) {
+        return '정보 없음';
+      }
+      
       const hours = Math.floor(minutes / 60);
       const mins = Math.floor(minutes % 60);
       
@@ -1096,12 +1488,93 @@ export default function LogsPage() {
       }
     };
 
-    // 새로운 체류시간 마커들 생성
-    stayTimes.forEach((stayData, index) => {
+    // 실제 체류지점 데이터를 시간 순서로 정렬
+    const sortedStayTimes = [...stayTimes].sort((a, b) => {
+      const timeA = new Date(a.start_time).getTime();
+      const timeB = new Date(b.start_time).getTime();
+      return timeA - timeB;
+    });
+
+    // 시작점/종료점과 겹치는 체류지점 필터링 함수
+    const isOverlapping = (stayPoint: StayTime, comparePoint: any): boolean => {
+      if (!comparePoint) return false;
+      
+      const lat1 = stayPoint.latitude || stayPoint.start_lat || 0;
+      const lng1 = stayPoint.longitude || stayPoint.start_long || 0;
+      const lat2 = comparePoint.lat || 0;
+      const lng2 = comparePoint.lng || 0;
+      
+      // 좌표 차이 (약 10m 이내면 같은 지점으로 간주)
+      const latDiff = Math.abs(lat1 - lat2);
+      const lngDiff = Math.abs(lng1 - lng2);
+      const threshold = 0.0001; // 약 10-11m 정도의 오차범위
+      
+      return latDiff < threshold && lngDiff < threshold;
+    };
+
+    // 시작점/종료점과 겹치지 않는 체류지점만 필터링
+    const filteredStayTimes = sortedStayTimes.filter(stayPoint => {
+      const overlapWithStart = startEndPoints?.start && isOverlapping(stayPoint, startEndPoints.start);
+      const overlapWithEnd = startEndPoints?.end && isOverlapping(stayPoint, startEndPoints.end);
+      
+      if (overlapWithStart || overlapWithEnd) {
+        console.log('[updateStayTimeMarkers] 체류지점이 시작/종료점과 겹쳐서 제외됨:', stayPoint);
+        return false;
+      }
+      return true;
+    });
+
+    // 필터링된 체류시간 마커들 생성 (연속된 번호로)
+    filteredStayTimes.forEach((stayData, index) => {
       try {
-        const position = new window.naver.maps.LatLng(stayData.start_lat, stayData.start_long);
-        const markerStyle = getMarkerStyle(stayData.duration, index);
-        const markerNumber = index + 1; // 1부터 시작하는 순서
+        // 변환된 API 응답 형식과 기존 형식 모두 지원
+        const lat = stayData.latitude || stayData.start_lat;
+        const lng = stayData.longitude || stayData.start_long;
+        
+        // 유효하지 않은 위치 데이터 건너뛰기
+        if (!lat || !lng || lat === 0 || lng === 0) {
+          console.warn('[updateStayTimeMarkers] 유효하지 않은 체류시간 위치 데이터:', index, stayData);
+          return;
+        }
+        
+        const position = new window.naver.maps.LatLng(Number(lat), Number(lng));
+        
+        // 체류시간 계산 (변환된 형식과 기존 형식 모두 지원)
+        let durationMinutes = 0;
+        
+        console.log(`[updateStayTimeMarkers] 체류시간 데이터 ${index}:`, {
+          duration: stayData.duration,
+          stay_duration: stayData.stay_duration,
+          stayData: stayData
+        });
+        
+        // 숫자 형식 체류시간 (분 단위)
+        if (typeof stayData.duration === 'number' && !isNaN(stayData.duration)) {
+          durationMinutes = stayData.duration;
+        }
+        // 문자열 형식 체류시간 ("HH:MM:SS" 또는 "MM:SS")
+        else if (stayData.stay_duration && typeof stayData.stay_duration === 'string') {
+          const timeParts = stayData.stay_duration.split(':');
+          if (timeParts.length >= 2) {
+            if (timeParts.length === 3) {
+              // "HH:MM:SS" 형식
+              const hours = parseInt(timeParts[0]) || 0;
+              const minutes = parseInt(timeParts[1]) || 0;
+              const seconds = parseFloat(timeParts[2]) || 0;
+              durationMinutes = hours * 60 + minutes + seconds / 60;
+            } else if (timeParts.length === 2) {
+              // "MM:SS" 형식
+              const minutes = parseInt(timeParts[0]) || 0;
+              const seconds = parseFloat(timeParts[1]) || 0;
+              durationMinutes = minutes + seconds / 60;
+            }
+          }
+        }
+        
+        console.log(`[updateStayTimeMarkers] 계산된 체류시간 ${index}:`, durationMinutes, '분');
+        
+        const markerStyle = getMarkerStyle(durationMinutes, index);
+        const markerNumber = index + 1; // 연속된 번호 (1부터 시작)
 
         // 체류시간 마커 생성 (순서 번호가 있는 원형 마커)
         const marker = new window.naver.maps.Marker({
@@ -1138,7 +1611,7 @@ export default function LogsPage() {
                    font-weight: normal;
                    white-space: nowrap;
                    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                 ">${formatDuration(stayData.duration)}</div>
+                 ">${formatDuration(durationMinutes)}</div>
               </div>
             `,
             anchor: new window.naver.maps.Point(markerStyle.size/2, markerStyle.size/2)
@@ -1220,7 +1693,7 @@ export default function LogsPage() {
                     background: ${markerStyle.bgColor}20; 
                     padding: 4px 8px; 
                     border-radius: 8px;
-                  ">${formatDuration(stayData.duration)}</span>
+                  ">${formatDuration(durationMinutes)}</span>
                 </p>
               </div>
             </div>
@@ -1245,13 +1718,17 @@ export default function LogsPage() {
       }
     });
 
-    console.log('[updateStayTimeMarkers] 체류시간 마커 생성 완료:', stayTimeMarkers.current.length, '개');
+    console.log('[updateStayTimeMarkers] 체류시간 마커 생성 완료:', stayTimeMarkers.current.length, '개 (필터링 전:', sortedStayTimes.length, '개)');
 
     // 체류시간 마커들이 모두 보이도록 지도 범위 조정
-    if (stayTimes.length > 0) {
+    if (filteredStayTimes.length > 0) {
       const bounds = new window.naver.maps.LatLngBounds();
-      stayTimes.forEach(stayData => {
-        bounds.extend(new window.naver.maps.LatLng(stayData.start_lat, stayData.start_long));
+      filteredStayTimes.forEach(stayData => {
+        const lat = stayData.latitude || stayData.start_lat || 0;
+        const lng = stayData.longitude || stayData.start_long || 0;
+        if (lat && lng && lat !== 0 && lng !== 0) {
+          bounds.extend(new window.naver.maps.LatLng(lat, lng));
+        }
       });
       
       // 부드럽게 지도 범위 조정
@@ -1264,7 +1741,7 @@ export default function LogsPage() {
     }
   };
 
-  const updateMemberMarkers = (members: GroupMember[]) => {
+  const updateMemberMarkers = (members: GroupMember[], isDateChange: boolean = false) => {
     // 지도 초기화 체크 로직 개선
     if (!map.current) {
       console.warn('Map is not initialized');
@@ -1314,32 +1791,53 @@ export default function LogsPage() {
         }
       });
 
-      // 단일 멤버 선택 시 해당 위치로 지도 이동 (중심보다 위쪽으로 20px 오프셋)
+      // 단일 멤버 선택 시 해당 위치로 지도 이동 (멤버 위치보다 200px 아래로 중심 이동)
       if (selectedMembers.length === 1) {
         const member = selectedMembers[0];
         try {
           const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
           console.log('[LogsPage] Attempting to set map center to:', position, 'Current center:', map.current.getCenter());
           
-          // 지도 크기를 가져와서 20px 위쪽 오프셋 계산
-          const mapSize = map.current.getSize();
-          const offsetPixels = new window.naver.maps.Point(0, -20); // 20px 위쪽으로 오프셋
-          const offsetPosition = map.current.getProjection().fromCoordToOffset(position);
-          const adjustedOffset = new window.naver.maps.Point(
-            offsetPosition.x + offsetPixels.x,
-            offsetPosition.y + offsetPixels.y
+          // 위도 좌표를 직접 조정하여 200px 아래쪽으로 이동 (대략 0.002도 차이)
+                  // 날짜 변경 시에는 시작지점 기준 지도 조정을 우선하므로 멤버 위치 기준 조정은 건너뜀
+        // isDateChangedRef.current가 true인 경우도 건너뜀 (날짜 변경 진행 중)
+        if (!isDateChange && !isDateChangedRef.current) {
+          const latOffset = -0.002; // 200px 아래쪽에 해당하는 위도 오프셋
+          const adjustedPosition = new window.naver.maps.LatLng(
+            member.location.lat + latOffset, 
+            member.location.lng
           );
-          const adjustedPosition = map.current.getProjection().fromOffsetToCoord(adjustedOffset);
           
           map.current.setCenter(adjustedPosition);
-          map.current.setZoom(14);
+          
+          // 첫 멤버 선택일 때만 줌 설정, 그 외에는 중심만 이동
+          if (!firstMemberSelected) {
+            map.current.setZoom(16);
+            setFirstMemberSelected(true);
+            console.log('[LogsPage] 줌 레벨 설정: 16 (첫 멤버 선택)');
+          } else {
+            console.log('[LogsPage] 멤버 재선택 - 중심만 이동, 줌 유지');
+          }
+          
           map.current.refresh(true); 
-          console.log('[LogsPage] Map center set to member location with offset:', member.name, member.location, 'New center:', map.current.getCenter());
+          console.log('[LogsPage] Map center set 200px below member location:', member.name, 'Original:', member.location, 'Adjusted:', adjustedPosition);
+        } else {
+          console.log('[LogsPage] 날짜 변경 시 - 시작지점 기준 지도 조정을 위해 멤버 위치 기준 조정 건너뜀');
+        }
+        
+        // 날짜 변경 플래그 리셋
+        if (isDateChange) {
+          isDateChangedRef.current = false;
+          setPreviousDate(selectedDate);
+          console.log('[LogsPage] 날짜 변경 플래그 리셋 완료');
+        }
+          
+          // 잠시 후 최종 중심점 확인
           setTimeout(() => {
             if (map.current) {
-              console.log('[LogsPage] Center after 100ms delay (setCenter):', map.current.getCenter());
+              console.log('[LogsPage] Final center after 500ms:', map.current.getCenter());
             }
-          }, 100);
+          }, 500);
         } catch (error) {
           console.error('[LogsPage] Error setting map center:', error);
         }
@@ -1348,11 +1846,26 @@ export default function LogsPage() {
   };
 
   const handleDateSelect = (date: string) => {
-    console.log('[LOGS] 날짜 선택:', date);
+    console.log('[LOGS] 날짜 선택:', date, '이전 날짜:', selectedDate);
+    
+    // 같은 날짜를 재선택한 경우 무시
+    const isDateActuallyChanging = selectedDate !== date;
+    if (!isDateActuallyChanging) {
+      console.log('[LOGS] 같은 날짜 재선택 - 무시');
+      return;
+    }
+    
+    // 이전 날짜 저장 후 새 날짜 설정
+    setPreviousDate(selectedDate);
     setSelectedDate(date);
     setActiveLogView('members');
     
-    // 선택된 멤버가 있으면 해당 멤버의 위치 데이터를 자동으로 로드
+    // 날짜가 실제로 변경되는 경우 firstMemberSelected 상태 리셋
+    setFirstMemberSelected(false);
+    isDateChangedRef.current = true; // 날짜 변경 플래그 설정
+    console.log('[LOGS] 날짜 변경으로 firstMemberSelected 리셋 및 날짜 변경 플래그 설정');
+    
+    // 선택된 멤버가 있으면 데이터 로딩 (시작지점 기준 지도 조정은 데이터 로드 후 처리)
     const selectedMember = groupMembers.find(m => m.isSelected);
     if (selectedMember) {
       console.log('[LOGS] 날짜 변경 - 선택된 멤버의 위치 데이터 로딩:', selectedMember.name, date);
@@ -1373,6 +1886,41 @@ export default function LogsPage() {
       setIsLocationDataLoading(true);
       console.log('[loadLocationData] 위치 데이터 로딩 시작:', { mtIdx, date });
 
+      // 새로운 날짜 데이터 로드 전에 기존 마커들 모두 정리
+      console.log('[loadLocationData] 기존 마커들 정리 시작');
+      
+      // 위치 로그 마커들 정리
+      locationLogMarkers.current.forEach(marker => {
+        if (marker && marker.setMap) {
+          marker.setMap(null);
+        }
+      });
+      locationLogMarkers.current = [];
+      
+      // 경로 폴리라인 정리
+      if (locationLogPolyline.current) {
+        locationLogPolyline.current.setMap(null);
+        locationLogPolyline.current = null;
+      }
+      
+      // 시작/종료 마커들 정리
+      startEndMarkers.current.forEach(marker => {
+        if (marker && marker.setMap) {
+          marker.setMap(null);
+        }
+      });
+      startEndMarkers.current = [];
+      
+      // 체류시간 마커들 정리
+      stayTimeMarkers.current.forEach(marker => {
+        if (marker && marker.setMap) {
+          marker.setMap(null);
+        }
+      });
+      stayTimeMarkers.current = [];
+      
+      console.log('[loadLocationData] 기존 마커들 정리 완료');
+
       // 모든 API를 병렬로 호출 (PHP 로직 기반 요약 API 추가)
       const [logs, summary, dailySummary, stayTimes, mapMarkers, locationLogSummary] = await Promise.all([
         memberLocationLogService.getDailyLocationLogs(mtIdx, date),
@@ -1391,7 +1939,7 @@ export default function LogsPage() {
       const formattedSummary: LocationSummary = {
         distance: summary.total_distance ? `${(summary.total_distance / 1000).toFixed(1)} km` : '0 km',
         time: summary.total_time ? formatTime(parseInt(summary.total_time.toString())) : '0분',
-        steps: summary.step_count ? `${summary.step_count.toLocaleString()} 걸음` : '0 걸음'
+                  steps: summary.step_count ? `${Number(summary.step_count).toLocaleString()} 걸음` : '0 걸음'
       };
       
       setLocationSummary(formattedSummary);
@@ -1457,51 +2005,101 @@ export default function LogsPage() {
 
   // 지도 마커 데이터가 변경될 때마다 지도에 마커 업데이트
   useEffect(() => {
-    if (isMapInitializedLogs && mapMarkersData.length > 0) {
-      console.log('[LOGS] 지도 마커 데이터 변경 감지 - 지도에 마커 업데이트:', mapMarkersData.length, '개');
+    console.log('[LOGS] 마커 데이터 변경 감지:', {
+      isMapInitializedLogs,
+      mapMarkersDataLength: mapMarkersData.length,
+      mapMarkersData: mapMarkersData.slice(0, 2) // 첫 2개만 로그
+    });
+    
+    if (isMapInitializedLogs) {
+      console.log('[LOGS] 지도에 마커 업데이트 실행:', mapMarkersData.length, '개');
       updateLocationLogMarkers(mapMarkersData);
+      
+      // 첫 번째 마커(시작지점)를 기준으로 지도 중심 조정
+      if (map.current && mapMarkersData.length > 0) {
+        const firstMarker = mapMarkersData[0];
+        const lat = firstMarker.latitude || firstMarker.mlt_lat || 0;
+        const lng = firstMarker.longitude || firstMarker.mlt_long || 0;
+        
+        if (lat !== 0 && lng !== 0) {
+          const latOffset = -0.002; // 아래쪽 오프셋
+          const adjustedPosition = new window.naver.maps.LatLng(lat + latOffset, lng);
+          
+          map.current.setCenter(adjustedPosition);
+          map.current.setZoom(16); // 줌 레벨 16으로 설정
+          map.current.refresh(true);
+          
+          // 시작지점 기준 지도 조정 완료 후 firstMemberSelected를 true로 설정하여 추가 조정 방지
+          setFirstMemberSelected(true);
+          
+          // 날짜 변경 플래그 리셋 (시작지점 기준 조정 완료 후)
+          if (isDateChangedRef.current) {
+            isDateChangedRef.current = false;
+            console.log('[LOGS] 시작지점 기준 지도 조정 완료 후 날짜 변경 플래그 리셋');
+          }
+          
+          console.log('[LOGS] 시작지점 기준 지도 조정:', { lat, lng, adjustedPosition });
+        }
+      }
+    } else {
+      console.log('[LOGS] 지도가 초기화되지 않아서 마커 업데이트 건너뜀');
     }
   }, [mapMarkersData, isMapInitializedLogs]);
 
   // 체류시간 데이터가 변경될 때마다 지도에 체류시간 마커 업데이트
-  useEffect(() => {
-    if (isMapInitializedLogs && stayTimesData.length > 0) {
-      console.log('[LOGS] 체류시간 데이터 변경 감지 - 지도에 체류시간 마커 업데이트:', stayTimesData.length, '개');
-      updateStayTimeMarkers(stayTimesData);
-    }
-  }, [stayTimesData, isMapInitializedLogs]);
+  // (이제 updateLocationLogMarkers 내에서 호출되므로 별도 useEffect 불필요)
+  // useEffect(() => {
+  //   if (isMapInitializedLogs && stayTimesData.length > 0) {
+  //     console.log('[LOGS] 체류시간 데이터 변경 감지 - 지도에 체류시간 마커 업데이트:', stayTimesData.length, '개');
+  //     updateStayTimeMarkers(stayTimesData);
+  //   }
+  // }, [stayTimesData, isMapInitializedLogs]);
 
-  // useEffect for auto-selecting the first member (only sets state)
+  // useEffect for auto-selecting the first member and updating map based on selection
   useEffect(() => {
-    if (isMapInitializedLogs && groupMembers.length > 0 && !groupMembers.some(m => m.isSelected)) {
+    if (isMapInitializedLogs && groupMembers.length > 0) {
+      // 첫 번째 멤버 자동 선택 (선택된 멤버가 없는 경우)
+      if (!groupMembers.some(m => m.isSelected)) {
       console.log("[LogsPage] Auto-selection: Setting first member as selected.");
       const updatedMembers = groupMembers.map((member, index) => ({
         ...member,
         isSelected: index === 0,
       }));
       setGroupMembers(updatedMembers);
-      // setActiveLogView('members'); // setActiveLogView 호출은 아래 map update effect로 이동하거나 유지 결정 필요
+        return; // 상태 업데이트 후 다음 렌더 사이클에서 처리되도록 return
     }
-  }, [isMapInitializedLogs, groupMembers]);
 
-  // useEffect for updating map and view based on groupMember selection
-  useEffect(() => {
-    if (isMapInitializedLogs && groupMembers.some(m => m.isSelected)) {
+      // 선택된 멤버가 있는 경우 지도 업데이트
       console.log("[LogsPage] Member selection detected or map initialized with selection. Updating markers and view.");
-      updateMemberMarkers(groupMembers);
+      
+      // 날짜 변경 플래그 확인
+      const isDateChange = isDateChangedRef.current;
+      console.log('[LOGS] useEffect - 날짜 변경 체크:', { 
+        previousDate, 
+        selectedDate, 
+        isDateChange,
+        firstMemberSelected,
+        isDateChangedRefValue: isDateChangedRef.current
+      });
+      updateMemberMarkers(groupMembers, isDateChange);
       setActiveLogView('members'); // 멤버 선택/지도 업데이트 시 members 뷰 활성화
       
-      // 선택된 멤버의 위치 데이터 로드
+      // 선택된 멤버의 위치 데이터 로드 (기존 데이터가 없거나 날짜 변경된 경우에만)
       const selectedMember = groupMembers.find(m => m.isSelected);
       if (selectedMember && selectedDate) {
-        console.log("[LogsPage] 선택된 멤버의 위치 데이터 로드:", selectedMember.name, selectedDate);
-        loadLocationData(parseInt(selectedMember.id), selectedDate);
+        // 기존 로그 데이터가 있고 날짜 변경이 아닌 경우 재조회 안함
+        const hasExistingData = mapMarkersData.length > 0 || currentLocationLogs.length > 0;
+        const isDateChangeCase = isDateChangedRef.current;
+        
+        if (!hasExistingData || isDateChangeCase) {
+          console.log("[LogsPage] 선택된 멤버의 위치 데이터 로드:", selectedMember.name, selectedDate, { hasExistingData, isDateChangeCase });
+          loadLocationData(parseInt(selectedMember.id), selectedDate);
+        } else {
+          console.log("[LogsPage] 기존 로그 데이터 유지 - 재조회하지 않음:", selectedMember.name, selectedDate);
+        }
       }
-    } else if (isMapInitializedLogs) {
-      // 선택된 멤버가 없을 경우 (예: 모든 선택 해제 시)
-      // updateMemberMarkers([]); // 필요하다면 마커를 지우는 로직
     }
-  }, [groupMembers, isMapInitializedLogs, selectedDate]); // selectedDate 의존성 추가
+  }, [groupMembers, isMapInitializedLogs]); // selectedDate 제거 - 날짜 변경 시 지도 조정 중복 방지
 
   // 로그 뷰 스크롤 이벤트 핸들러
   const handleLogSwipeScroll = () => {
@@ -1509,22 +2107,26 @@ export default function LogsPage() {
       const container = logSwipeContainerRef.current;
       const scrollLeft = container.scrollLeft;
       const containerWidth = container.offsetWidth;
-      const threshold = containerWidth / 2;
+      const threshold = containerWidth * 0.3; // 30% 이상 스와이프하면 전환
 
       const newView = scrollLeft < threshold ? 'members' : 'summary';
       if (activeLogView !== newView) {
         setActiveLogView(newView);
+        console.log('[LOG_SWIPE] 뷰 변경:', activeLogView, '→', newView, '(무조건 완료)');
         
-        // 위치기록 요약으로 스와이프할 때 바텀시트를 middle 상태로 변경
-        if (newView === 'summary' && bottomSheetState !== 'middle') {
-          setBottomSheetState('middle');
-          console.log('[LOG_SWIPE] 위치기록 요약으로 스와이프 - 바텀시트 middle 상태로 변경');
-        }
-        // 그룹 멤버로 다시 스와이프할 때 바텀시트를 peek 상태로 변경
-        else if (newView === 'members' && bottomSheetState === 'middle') {
-          setBottomSheetState('peek');
-          console.log('[LOG_SWIPE] 그룹 멤버로 스와이프 - 바텀시트 peek 상태로 변경');
-        }
+        // 즉시 끝까지 스크롤하여 완료
+        setTimeout(() => {
+          if (logSwipeContainerRef.current) {
+            if (newView === 'members') {
+              logSwipeContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+            } else {
+              const secondChild = logSwipeContainerRef.current.children[1] as HTMLElement;
+              if (secondChild) {
+                logSwipeContainerRef.current.scrollTo({ left: secondChild.offsetLeft, behavior: 'smooth' });
+              }
+            }
+          }
+        }, 50);
       }
     }
   };
@@ -1810,6 +2412,107 @@ export default function LogsPage() {
             </div>
           </motion.header>
         )}
+
+        {/* 날짜 선택 영역 - 헤더 바로 아래 독립 영역 */}
+        {!(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) && (
+          <motion.div 
+            initial={{ y: -50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed top-16 left-0 right-0 z-10 bg-gradient-to-r from-purple-50/90 via-white/95 to-pink-50/90 backdrop-blur-sm border-b border-purple-100/50"
+          >
+            <div className="px-4 py-3">
+              <motion.div 
+                className="flex items-center space-x-2 mb-3"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, delay: 0.6 }}
+              >
+                <motion.div
+                  initial={{ rotate: 0 }}
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, delay: 0.7 }}
+                >
+                  <FiClock className="w-4 h-4 text-purple-600" />
+                </motion.div>
+                <h3 className="text-base font-bold text-gray-900">날짜 선택</h3>
+                <motion.div 
+                  className="text-xs text-gray-500"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3, delay: 0.9 }}
+                >
+                  ({getRecentDays().filter(day => day.hasLogs).length}일 기록 있음)
+                </motion.div>
+              </motion.div>
+              <motion.div 
+                ref={dateScrollContainerRef} 
+                className="flex space-x-2 overflow-x-auto pb-1.5 hide-scrollbar"
+                onLoad={() => scrollToTodayDate()}
+                style={{ scrollBehavior: 'auto' }}
+                variants={staggerContainer}
+                initial="initial"
+                animate="animate"
+              >
+                {getRecentDays().map((day, idx) => {
+                  // 마지막 날짜 버튼(오늘)이 렌더링될 때 스크롤 트리거
+                  if (idx === getRecentDays().length - 1) {
+                    setTimeout(() => scrollToTodayDate(), 50);
+                  }
+                  const isSelected = selectedDate === day.value;
+                  const isToday = idx === getRecentDays().length - 1; // 오늘인지 확인
+
+                  return (
+                    <motion.button 
+                      key={idx} 
+                      custom={idx}
+                      variants={{
+                        initial: { opacity: 0, y: 10 },
+                        animate: { 
+                          opacity: 1, 
+                          y: 0,
+                          transition: { duration: 0.3, delay: 0.7 + (idx * 0.02) }
+                        },
+                        hover: { 
+                          y: day.hasLogs || isSelected ? -2 : 0,
+                          boxShadow: day.hasLogs || isSelected ? "0 3px 6px rgba(0,0,0,0.1)" : "0 1px 2px rgba(0,0,0,0.1)",
+                          transition: { duration: 0.2 }
+                        },
+                        tap: { 
+                          y: -1,
+                          transition: { duration: 0.1 }
+                        }
+                      }}
+                      initial="initial"
+                      animate="animate"
+                      whileHover="hover"
+                      whileTap="tap"
+                      onClick={() => day.hasLogs && handleDateSelect(day.value)}
+                      disabled={!day.hasLogs && !isSelected}
+                      className={`px-2.5 py-1.5 rounded-lg flex-shrink-0 focus:outline-none text-xs min-w-[65px] h-8 flex flex-col justify-center items-center border transition-all duration-300 ${
+                        isSelected
+                          ? `bg-purple-600 text-white font-semibold shadow-md border-purple-600 ${!day.hasLogs ? 'opacity-70' : ''}`
+                          : day.hasLogs
+                          ? 'bg-white text-gray-700 hover:bg-purple-50 hover:border-purple-300 border-gray-200 font-medium shadow-sm'
+                          : 'bg-gray-50 text-gray-400 line-through cursor-not-allowed border-gray-100 font-medium'
+                      }`}
+                    >
+                      <motion.div 
+                        className="text-center text-xs whitespace-nowrap font-medium"
+                        animate={isSelected ? {
+                          opacity: [0.8, 1, 0.8],
+                          transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+                        } : {}}
+                      >
+                        {day.display}
+                      </motion.div>
+                    </motion.button>
+                  );
+                })}
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
         
         {/* 전체화면 로딩 - 체크리스트 형태 */}
         {(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) && (
@@ -1933,7 +2636,7 @@ export default function LogsPage() {
           style={{ 
             paddingTop: (isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) 
               ? '0px' 
-              : '64px' 
+              : '140px' // 헤더(64px) + 날짜 선택 영역(76px) 
           }}
         >
           <div ref={mapContainer} className="w-full h-full" />
@@ -1968,15 +2671,17 @@ export default function LogsPage() {
                 ref={logSwipeContainerRef}
                 className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar mb-2 gap-2 bg-white"
                 style={{
-                  minHeight: '350px',
+                  minHeight: '200px',
                   overflowY: 'visible',
                   overscrollBehavior: 'none',
                   WebkitOverflowScrolling: 'auto'
                 }}
                 onScroll={handleLogSwipeScroll}
+                onTouchEnd={handleLogSwipeScroll}
+                onMouseUp={handleLogSwipeScroll}
               >
                 <div className="w-full flex-shrink-0 snap-start overflow-visible bg-white">
-                  <div className="content-section members-section min-h-[200px] max-h-[200px] overflow-y-auto mb-4 members-section-gradient rounded-xl p-4">
+                  <div className="content-section members-section min-h-[200px] max-h-[200px] overflow-y-auto members-section-gradient rounded-xl p-4">
                     <motion.div 
                       initial={{ opacity: 0, y: 30 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -1997,7 +2702,7 @@ export default function LogsPage() {
                               <FiLoader className="text-indigo-500" size={18}/>
                             </motion.div>
                           )}
-                        </div>
+                              </div>
                         
                         <div className="flex items-center space-x-3">
                           {/* 그룹 선택 드롭다운 */}
@@ -2045,7 +2750,7 @@ export default function LogsPage() {
                                     <FiChevronDown className="text-gray-400" size={14} />
                                   </motion.div>
                                 )}
-                              </div>
+                          </div>
                             </motion.button>
 
                             {/* 그룹 선택 드롭다운 메뉴 */}
@@ -2071,7 +2776,7 @@ export default function LogsPage() {
                                           <FiLoader className="text-indigo-500" size={16} />
                                         </motion.div>
                                         <span className="text-sm text-gray-600">로딩 중...</span>
-                                      </div>
+                      </div>
                                     </div>
                                   ) : userGroups.length > 0 ? (
                                     userGroups.map((group) => (
@@ -2188,7 +2893,7 @@ export default function LogsPage() {
                             return null;
                           })()}
                           {groupMembers.map((member, index) => {
-                            return (
+                        return (
                               <motion.div 
                                 key={member.id} 
                                 custom={index}
@@ -2235,8 +2940,8 @@ export default function LogsPage() {
                               </span>
                                 </motion.button>
                               </motion.div>
-                            );
-                          })}
+                        );
+                      })}
                         </motion.div>
                       ) : (
                         <div className="text-center py-6 text-gray-500">
@@ -2250,120 +2955,17 @@ export default function LogsPage() {
                           </motion.div>
                           <p className="font-medium">그룹에 참여한 멤버가 없습니다</p>
                           <p className="text-sm mt-1">그룹에 멤버를 초대해보세요</p>
-                        </div>
+                    </div>
                       )}
                     </motion.div>
                   </div>
 
-                  {/* logs/page.tsx의 날짜 선택 부분을 아래에 추가 */}
-                  <motion.div 
-                    className="bg-gradient-to-br from-purple-50 via-indigo-50 to-pink-50 rounded-xl p-4 border border-purple-200 shadow-sm"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.4 }}
-                  >
-                    <motion.div 
-                      className="flex items-center space-x-2 mb-3"
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.4, delay: 0.5 }}
-                    >
-                      <motion.div
-                        initial={{ rotate: 0 }}
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, delay: 0.6 }}
-                      >
-                        <FiClock className="w-5 h-5 text-purple-600" />
-                      </motion.div>
-                      <h3 className="text-lg font-bold text-gray-900">날짜 선택</h3>
-                      <motion.div 
-                        className="text-sm text-gray-500"
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.3, delay: 0.8 }}
-                      >
-                        ({getRecentDays().filter(day => day.hasLogs).length}일 기록 있음)
-                      </motion.div>
-                    </motion.div>
-                    <motion.div 
-                      ref={dateScrollContainerRef} 
-                      className="flex space-x-2 overflow-x-auto pb-1.5 hide-scrollbar"
-                      onLoad={() => scrollToTodayDate()}
-                      style={{ scrollBehavior: 'auto' }}
-                      variants={staggerContainer}
-                      initial="initial"
-                      animate="animate"
-                    >
-                      {getRecentDays().map((day, idx) => {
-                        // 마지막 날짜 버튼(오늘)이 렌더링될 때 스크롤 트리거
-                        if (idx === getRecentDays().length - 1) {
-                          setTimeout(() => scrollToTodayDate(), 50);
-                        }
-                        const isSelected = selectedDate === day.value;
-                        const isToday = idx === getRecentDays().length - 1; // 오늘인지 확인
 
-                        return (
-                          <motion.button 
-                            key={idx} 
-                            custom={idx}
-                            variants={{
-                              initial: { opacity: 0, y: 10 },
-                              animate: { 
-                                opacity: 1, 
-                                y: 0,
-                                transition: { duration: 0.3, delay: idx * 0.03 }
-                              },
-                              hover: { 
-                                y: day.hasLogs || isSelected ? -3 : 0,
-                                boxShadow: day.hasLogs || isSelected ? "0 4px 8px rgba(0,0,0,0.1)" : "0 1px 3px rgba(0,0,0,0.1)",
-                                transition: { duration: 0.2 }
-                              },
-                              tap: { 
-                                y: -1,
-                                transition: { duration: 0.1 }
-                              }
-                            }}
-                            initial="initial"
-                            animate="animate"
-                            whileHover="hover"
-                            whileTap="tap"
-                            onClick={() => day.hasLogs && handleDateSelect(day.value)}
-                            disabled={!day.hasLogs && !isSelected}
-                            className={`px-3 py-2 rounded-lg flex-shrink-0 focus:outline-none text-sm min-w-[75px] h-10 flex flex-col justify-center items-center border transition-all duration-300 ${
-                              isSelected
-                                ? `bg-purple-600 text-white font-semibold shadow-lg border-purple-600 ${!day.hasLogs ? 'opacity-70' : ''}`
-                                : day.hasLogs
-                                ? 'bg-white text-gray-700 hover:bg-purple-50 hover:border-purple-300 border-gray-200 font-medium shadow-sm'
-                                : 'bg-gray-50 text-gray-400 line-through cursor-not-allowed border-gray-100 font-medium'
-                            }`}
-                          >
-                            <motion.div 
-                              className="text-center text-xs whitespace-nowrap font-medium"
-                              animate={isSelected ? {
-                                opacity: [0.8, 1, 0.8],
-                                transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
-                              } : {}}
-                            >
-                              {day.display}
-                            </motion.div>
-                          </motion.button>
-                        );
-                      })}
-                    </motion.div>
-                    <motion.p 
-                      className="text-xs text-gray-500 mt-2"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.3, delay: 1.2 }}
-                    >
-                      • 기록이 있는 날짜만 선택 가능합니다
-                    </motion.p>
-                  </motion.div>
                 </div>
 
                 <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white to-rose-50">
                   <div 
-                    className="content-section summary-section min-h-[200px] max-h-[200px] overflow-hidden flex flex-col bg-gradient-to-r from-pink-50 to-rose-50"
+                    className="content-section summary-section min-h-[200px] max-h-[200px] overflow-y-auto flex flex-col bg-gradient-to-r from-pink-50 to-rose-50 rounded-xl p-4"
                   >
                     <div>
                       <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-2">
@@ -2424,16 +3026,16 @@ export default function LogsPage() {
                               <div className="flex items-center space-x-1 mb-1">
                                 <span className="text-blue-600">📅</span>
                                 <span className="text-gray-600 font-medium">일정</span>
-                              </div>
+                    </div>
                               <div className="text-gray-900 font-bold">{locationLogSummaryData.schedule_count}</div>
-                            </div>
+                  </div>
                             <div className="bg-white rounded-lg p-2 border border-pink-200">
                               <div className="flex items-center space-x-1 mb-1">
                                 <span className="text-green-600">🚶</span>
                                 <span className="text-gray-600 font-medium">거리</span>
-                              </div>
+                </div>
                               <div className="text-gray-900 font-bold">{locationLogSummaryData.distance}</div>
-                            </div>
+              </div>
                             <div className="bg-white rounded-lg p-2 border border-pink-200">
                               <div className="flex items-center space-x-1 mb-1">
                                 <span className="text-purple-600">⏰</span>
@@ -2446,7 +3048,7 @@ export default function LogsPage() {
                                 <span className="text-orange-600">👟</span>
                                 <span className="text-gray-600 font-medium">걸음</span>
                               </div>
-                              <div className="text-gray-900 font-bold">{locationLogSummaryData.steps.toLocaleString()}</div>
+                              <div className="text-gray-900 font-bold">{locationLogSummaryData.steps ? locationLogSummaryData.steps.toLocaleString() : '0'}</div>
                             </div>
                           </div>
                         </div>
@@ -2483,11 +3085,9 @@ export default function LogsPage() {
                 </div>
               </div>
 
-              {/* 점 인디케이터 */}
-              <div className={`flex-shrink-0 pb-3 bg-white transition-all duration-300 ${
-                activeLogView === 'summary' ? '-mt-44 pt-5' : ''
-              }`}>
-                <div className="flex justify-center items-center space-x-2 mb-1">
+              {/* 점 인디케이터 - 섹션과 네비게이션 바 사이 중앙 고정 */}
+              <div className="flex-shrink-0 pt-2 pb-6 bg-white -mt-7">
+                <div className="flex justify-center items-center space-x-2 mb-2">
                   <motion.div
                     className={`rounded-full transition-all duration-300 ${
                       activeLogView === 'members' ? 'bg-indigo-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
