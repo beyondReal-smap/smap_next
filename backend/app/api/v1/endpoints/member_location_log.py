@@ -596,7 +596,7 @@ async def get_member_map_markers(
     제공된 SQL 쿼리를 기반으로 구현된 API (데이터 샘플링 포함)
     """
     try:
-        logger.info(f"[GET] Map markers API 호출: mt_idx={mt_idx}, date={date}, min_speed={min_speed}, max_accuracy={max_accuracy}")
+        logger.info(f"[GET] Map markers API 호출: mt_idx={mt_idx}, date={date}, min_speed={min_speed}, max_ㅣaccuracy={max_accuracy}")
         
         map_markers = location_log_crud.get_member_map_markers(
             db, mt_idx, date, min_speed, max_accuracy

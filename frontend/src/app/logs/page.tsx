@@ -9,7 +9,7 @@ import { format, addDays, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { motion, useMotionValue } from 'framer-motion';
 import { PageContainer, Button } from '../components/layout';
-import { FiPlus, FiTrendingUp, FiClock, FiZap, FiPlayCircle, FiSettings, FiUser, FiLoader, FiChevronDown } from 'react-icons/fi';
+import { FiPlus, FiTrendingUp, FiClock, FiZap, FiPlayCircle, FiSettings, FiUser, FiLoader, FiChevronDown, FiActivity } from 'react-icons/fi';
 import { API_KEYS, MAP_CONFIG } from '../../config'; 
 import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -468,7 +468,9 @@ export default function LogsPage() {
   const locationLogMarkers = useRef<any[]>([]); // 위치 로그 마커들을 위한 ref
   const locationLogPolyline = useRef<any>(null); // 위치 로그 연결선을 위한 ref
   const startEndMarkers = useRef<any[]>([]); // 시작/종료 마커들을 위한 ref
-  const stayTimeMarkers = useRef<any[]>([]); // 체류시간 마커들을 위한 ref 
+  const stayTimeMarkers = useRef<any[]>([]); // 체류시간 마커들을 위한 ref
+    const currentPositionMarker = useRef<any>(null); // 슬라이더 현재 위치 마커를 위한 ref
+  const sliderRef = useRef<HTMLDivElement>(null); // 슬라이더 요소를 위한 ref
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true); 
   const [isMapInitializedLogs, setIsMapInitializedLogs] = useState(false); // Logs 페이지용 지도 초기화 상태
@@ -507,7 +509,9 @@ export default function LogsPage() {
   const [isDailyCountsLoading, setIsDailyCountsLoading] = useState(false);
   const [isMemberActivityLoading, setIsMemberActivityLoading] = useState(false);
   
-  const [sliderValue, setSliderValue] = useState(60); // 슬라이더 초기 값 (0-100)
+  const [sliderValue, setSliderValue] = useState(0); // 슬라이더 초기 값 (0-100) - 시작은 0으로
+  const [sortedLocationData, setSortedLocationData] = useState<MapMarker[]>([]); // 정렬된 위치 로그 데이터
+  const [isSliderDragging, setIsSliderDragging] = useState(false); // 슬라이더 드래그 중인지 확인
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
 
   // 바텀시트 variants - collapsed/expanded 상태만 사용
@@ -902,6 +906,13 @@ export default function LogsPage() {
     if (isChangingMember) {
       clearMapMarkersAndPaths();
       console.log('[handleMemberSelect] 멤버 변경으로 지도 초기화 완료');
+      
+      // 새로운 멤버 선택 시 날짜를 오늘로 초기화
+      const today = format(new Date(), 'yyyy-MM-dd');
+      if (selectedDate !== today) {
+        setSelectedDate(today);
+        console.log('[handleMemberSelect] 새로운 멤버 선택으로 날짜를 오늘로 초기화:', today);
+      }
     }
     
     // 멤버 재선택 시 날짜 변경 플래그 리셋 (멤버 위치 기준 지도 조정 허용)
@@ -998,7 +1009,7 @@ export default function LogsPage() {
       const sortKey = markerData.id || markerData.mlt_idx || index;
       
       if (!lat || !lng) {
-        console.warn('[updateLocationLogMarkers] 유효하지 않은 위치 데이터:', index, markerData);
+        // console.warn('[updateLocationLogMarkers] 유효하지 않은 위치 데이터:', index, markerData);
         return;
       }
       
@@ -1039,6 +1050,22 @@ export default function LogsPage() {
     const sortedMarkers = sortedTimePoints
       .filter(point => point.type === 'location')
       .map(point => point.data);
+    
+    // 경로따라가기용 정렬된 데이터 저장
+    setSortedLocationData(sortedMarkers);
+    
+    // 데이터 로드 후 슬라이더가 0%인 경우 첫 번째 위치에 현재 위치 마커 표시
+    if (sortedMarkers.length > 0 && sliderValue === 0) {
+      const firstMarker = sortedMarkers[0];
+      const lat = firstMarker.latitude || firstMarker.mlt_lat || 0;
+      const lng = firstMarker.longitude || firstMarker.mlt_long || 0;
+      
+      if (lat && lng) {
+        setTimeout(() => {
+          createOrUpdateCurrentPositionMarker(Number(lat), Number(lng), 0, sortedMarkers.length);
+        }, 100); // 약간의 지연을 주어 지도가 준비된 후 실행
+      }
+    }
 
     // 새로운 위치 로그 마커들 생성
     console.log('[updateLocationLogMarkers] 마커 생성 시작:', sortedMarkers.length, '개');
@@ -1054,7 +1081,8 @@ export default function LogsPage() {
         // 변환된 API 응답 형식과 기존 형식 모두 지원
         const lat = markerData.latitude || markerData.mlt_lat || 0;
         const lng = markerData.longitude || markerData.mlt_long || 0;
-        const speed = markerData.speed || markerData.mlt_speed || 0;
+        const speedMs = markerData.speed || markerData.mlt_speed || 0; // m/s
+        const speed = speedMs * 3.6; // m/s를 km/h로 변환
         const accuracy = markerData.accuracy || markerData.mlt_accuacy || 0;
         const battery = markerData.battery_level || markerData.mlt_battery || 0;
         // 걸음수는 위치로그 요약 데이터에서 가져오기 (개별 마커에는 없음)
@@ -1108,97 +1136,54 @@ export default function LogsPage() {
           zIndex: 100 + index
         });
 
-        // 마커 클릭 이벤트 - 상세 정보 표시 (home/page.tsx 스타일과 애니메이션 적용)
+        // 마커 클릭 이벤트 - 상세 정보 표시 (슬라이더 InfoWindow와 동일한 스타일)
         const infoWindow = new window.naver.maps.InfoWindow({
           content: `
-            <style>
-              @keyframes slideInFromBottom {
-                0% {
-                  opacity: 0;
-                  transform: translateY(20px) scale(0.95);
-                }
-                100% {
-                  opacity: 1;
-                  transform: translateY(0) scale(1);
-                }
-              }
-              .info-window-container {
-                animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-              }
-              .close-button {
-                transition: all 0.2s ease;
-              }
-              .close-button:hover {
-                background: rgba(0, 0, 0, 0.2) !important;
-                transform: scale(1.1);
-              }
-            </style>
-            <div class="info-window-container" style="
-              padding: 12px 16px;
-              min-width: 200px;
-              max-width: 280px;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            <div style="
+              padding: 8px;
               background: white;
-              border-radius: 12px;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-              position: relative;
+              border-radius: 6px;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              min-width: 130px;
+              max-width: 150px;
             ">
-              <!-- 닫기 버튼 -->
-              <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-                position: absolute;
-                top: 8px;
-                right: 8px;
-                background: rgba(0, 0, 0, 0.1);
-                border: none;
-                border-radius: 50%;
-                width: 22px;
-                height: 22px;
-                font-size: 14px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #666;
-              ">×</button>
-              
-              <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px; text-align: center;">
-                📍 위치 로그
-              </h3>
-              <div style="margin-bottom: 6px;">
-                <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  🕒 시간: <span style="color: #111827; font-weight: 500;">${timeOnly}</span>
-                </p>
+              <div style="
+                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+                color: white;
+                padding: 4px 6px;
+                border-radius: 4px;
+                margin: -8px -8px 6px -8px;
+                font-weight: 600;
+                font-size: 11px;
+                text-align: center;
+              ">
+                ${index + 1} / ${markers.length}
               </div>
-              <div style="margin-bottom: 6px;">
-                <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  🚶 속도: <span style="color: #111827; font-weight: 500;">${speed.toFixed(2)} km/h</span>
-                </p>
-              </div>
-              <div style="margin-bottom: 6px;">
-                <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  📍 정확도: <span style="color: #111827; font-weight: 500;">${accuracy.toFixed(1)}m</span>
-                </p>
-              </div>
-              <div style="margin-bottom: 6px;">
-                <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  🔋 배터리: <span style="color: #111827; font-weight: 500;">${battery}%</span>
-                </p>
-              </div>
-              <div style="margin-bottom: 6px;">
-                <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  📍 위치점 번호: <span style="color: #111827; font-weight: 500;">#${index + 1}</span>
-                </p>
-              </div>
-              <div style="margin-bottom: 0;">
-                <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                  🌍 좌표: ${lat.toFixed(6)}, ${lng.toFixed(6)}
-                </p>
+              <div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;">
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: #666;">⏰ 시간:</span>
+                  <span style="font-weight: 600; font-size: 10px;">${timeOnly}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: #666;">🚀 속도:</span>
+                  <span style="font-weight: 600; font-size: 10px;">${speed.toFixed(1)}km/h</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: #666;">📍 정확도:</span>
+                  <span style="font-weight: 600; font-size: 10px;">${accuracy.toFixed(0)}m</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: #666;">🔋 배터리:</span>
+                  <span style="font-weight: 600; font-size: 10px;">${battery}%</span>
+                </div>
               </div>
             </div>
           `,
-          borderWidth: 0,
           backgroundColor: 'transparent',
-          disableAnchor: true,
+          borderColor: 'transparent',
+          borderWidth: 0,
+          anchorSize: new window.naver.maps.Size(0, 0),
           pixelOffset: new window.naver.maps.Point(0, -10)
         });
 
@@ -1375,7 +1360,7 @@ export default function LogsPage() {
               </div>
               <div style="margin-bottom: 6px;">
                 <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  🚶 속도: <span style="color: #111827; font-weight: 500;">${startPoint.type === 'location' ? (startPoint.data.mlt_speed?.toFixed(2) || 0) : 0} km/h</span>
+                  🚶 속도: <span style="color: #111827; font-weight: 500;">${startPoint.type === 'location' ? ((startPoint.data.mlt_speed || 0) * 3.6).toFixed(1) : 0} km/h</span>
                 </p>
               </div>
               <div style="margin-bottom: 0;">
@@ -1493,7 +1478,7 @@ export default function LogsPage() {
                 </div>
                 <div style="margin-bottom: 6px;">
                   <p style="margin: 0; font-size: 12px; color: #64748b;">
-                    🚶 속도: <span style="color: #111827; font-weight: 500;">${endPoint.type === 'location' ? (endPoint.data.mlt_speed?.toFixed(2) || 0) : 0} km/h</span>
+                    🚶 속도: <span style="color: #111827; font-weight: 500;">${endPoint.type === 'location' ? ((endPoint.data.mlt_speed || 0) * 3.6).toFixed(1) : 0} km/h</span>
                   </p>
                 </div>
                 <div style="margin-bottom: 0;">
@@ -1591,7 +1576,7 @@ export default function LogsPage() {
     stayTimeMarkers.current = [];
 
     if (stayTimes.length === 0) {
-      console.log('[updateStayTimeMarkers] 표시할 체류시간 마커가 없음');
+      console.log('[updateStayTimeMarkers] 표시할 체류시간 마커가 없음'); 
       return;
     }
 
@@ -1684,7 +1669,7 @@ export default function LogsPage() {
         
         // 유효하지 않은 위치 데이터 건너뛰기
         if (!lat || !lng || lat === 0 || lng === 0) {
-          console.warn('[updateStayTimeMarkers] 유효하지 않은 체류시간 위치 데이터:', index, stayData);
+          // console.warn('[updateStayTimeMarkers] 유효하지 않은 체류시간 위치 데이터:', index, stayData);
           return;
         }
         
@@ -2029,6 +2014,16 @@ export default function LogsPage() {
       }
     });
     stayTimeMarkers.current = [];
+
+    // 현재 위치 마커 정리
+    if (currentPositionMarker.current) {
+      // InfoWindow가 있다면 먼저 닫기
+      if (currentPositionMarker.current.infoWindow) {
+        currentPositionMarker.current.infoWindow.close();
+      }
+      currentPositionMarker.current.setMap(null);
+      currentPositionMarker.current = null;
+    }
     
     // 상태 데이터도 즉시 초기화
     setCurrentLocationLogs([]);
@@ -2055,6 +2050,20 @@ export default function LogsPage() {
     // 이전 날짜 저장 후 새 날짜 설정
     setPreviousDate(selectedDate);
     setSelectedDate(date);
+    
+    // 날짜 변경 시 슬라이더를 맨 왼쪽(0%)으로 초기화
+    setSliderValue(0);
+    console.log('[handleDateSelect] 날짜 변경으로 슬라이더를 0%로 초기화');
+    
+    // 현재 위치 마커도 정리 (새로운 데이터 로드 시 재생성됨)
+    if (currentPositionMarker.current) {
+      // InfoWindow가 있다면 먼저 닫기
+      if (currentPositionMarker.current.infoWindow) {
+        currentPositionMarker.current.infoWindow.close();
+      }
+      currentPositionMarker.current.setMap(null);
+      currentPositionMarker.current = null;
+    }
     setActiveLogView('members');
     
     // 날짜가 실제로 변경되는 경우 firstMemberSelected 상태 리셋
@@ -2141,6 +2150,16 @@ export default function LogsPage() {
         }
       });
       stayTimeMarkers.current = [];
+
+      // 현재 위치 마커 정리
+      if (currentPositionMarker.current) {
+        // InfoWindow가 있다면 먼저 닫기
+        if (currentPositionMarker.current.infoWindow) {
+          currentPositionMarker.current.infoWindow.close();
+        }
+        currentPositionMarker.current.setMap(null);
+        currentPositionMarker.current = null;
+      }
       
       console.log('[loadLocationData] 기존 마커들 정리 완료');
 
@@ -2158,15 +2177,23 @@ export default function LogsPage() {
       setCurrentLocationLogs(logs);
       console.log('[loadLocationData] 위치 로그 데이터 로딩 완료:', logs.length, '개');
 
-      // 기존 요약 정보를 UI 형식으로 변환
-      const formattedSummary: LocationSummary = {
+      // 서버에서 받은 요약 정보를 UI 형식으로 변환
+      const serverSummary: LocationSummary = {
         distance: summary.total_distance ? `${(summary.total_distance / 1000).toFixed(1)} km` : '0 km',
         time: summary.total_time ? formatTime(parseInt(summary.total_time.toString())) : '0분',
-                  steps: summary.step_count ? `${Number(summary.step_count).toLocaleString()} 걸음` : '0 걸음'
+        steps: summary.step_count ? `${Number(summary.step_count).toLocaleString()} 걸음` : '0 걸음'
       };
+
+      // 위치 로그 데이터로부터 직접 계산한 통계
+      const calculatedStats = calculateLocationStats(logs);
       
-      setLocationSummary(formattedSummary);
-      console.log('[loadLocationData] 위치 요약 데이터 로딩 완료:', formattedSummary);
+      // 계산된 통계를 사용하거나 서버 데이터와 비교
+      const finalSummary = calculatedStats;
+      
+      setLocationSummary(finalSummary);
+      console.log('[loadLocationData] 서버 요약 데이터:', serverSummary);
+      console.log('[loadLocationData] 계산된 요약 데이터:', calculatedStats);
+      console.log('[loadLocationData] 최종 사용 데이터:', finalSummary);
 
       // 새로운 API 응답 데이터 설정
       setDailySummaryData(dailySummary);
@@ -2179,8 +2206,30 @@ export default function LogsPage() {
       console.log('[loadLocationData] 지도 마커 데이터 로딩 완료:', mapMarkers.length, '개');
       console.log('[loadLocationData] PHP 로직 기반 요약 데이터 로딩 완료:', locationLogSummary);
 
-      // 지도에 위치 경로 표시 (나중에 구현)
-      // updateLocationPath(logs);
+      // 지도에 마커 표시
+      if (mapMarkers.length > 0) {
+        console.log('[loadLocationData] 지도에 마커 표시:', mapMarkers.length, '개');
+        updateLocationLogMarkers(mapMarkers);
+        
+        // 정렬된 데이터를 슬라이더용으로 설정
+        const sortedMarkers = [...mapMarkers].sort((a, b) => {
+          const timeA = a.timestamp || a.mlt_gps_time || '';
+          const timeB = b.timestamp || b.mlt_gps_time || '';
+          return timeA.localeCompare(timeB);
+        });
+        setSortedLocationData(sortedMarkers);
+        console.log('[loadLocationData] 슬라이더용 정렬된 데이터 설정:', sortedMarkers.length, '개');
+      } else {
+        console.log('[loadLocationData] 표시할 마커가 없음');
+        // 마커가 없는 경우 슬라이더 데이터도 초기화
+        setSortedLocationData([]);
+      }
+
+      // 체류시간 마커도 표시
+      if (stayTimes.length > 0) {
+        console.log('[loadLocationData] 체류시간 마커 표시:', stayTimes.length, '개');
+        // updateStayTimeMarkers는 updateLocationLogMarkers 내에서 호출됨
+      }
 
     } catch (error) {
       console.error('[loadLocationData] 위치 데이터 로딩 오류:', error);
@@ -2211,6 +2260,344 @@ export default function LogsPage() {
     }
   };
 
+  // 두 좌표 간의 거리 계산 (Haversine 공식)
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371000; // 지구 반지름(미터)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // 미터 단위
+  };
+
+  // 위치 로그 데이터로부터 이동거리, 이동시간, 걸음수 계산
+  const calculateLocationStats = (locationData: any[]): { distance: string; time: string; steps: string } => {
+    if (!locationData || locationData.length === 0) {
+      return { distance: '0 km', time: '0분', steps: '0 걸음' };
+    }
+
+    // 시간 순으로 정렬
+    const sortedData = [...locationData].sort((a, b) => {
+      const timeA = a.timestamp || a.mlt_gps_time || '';
+      const timeB = b.timestamp || b.mlt_gps_time || '';
+      return new Date(timeA).getTime() - new Date(timeB).getTime();
+    });
+
+    let totalDistance = 0;
+    let movingTimeSeconds = 0;
+    
+    // 이동거리와 실제 이동시간 계산 (체류시간 제외)
+    for (let i = 1; i < sortedData.length; i++) {
+      const prev = sortedData[i - 1];
+      const curr = sortedData[i];
+      
+      const prevLat = prev.latitude || prev.mlt_lat;
+      const prevLng = prev.longitude || prev.mlt_long;
+      const currLat = curr.latitude || curr.mlt_lat;
+      const currLng = curr.longitude || curr.mlt_long;
+      
+      if (prevLat && prevLng && currLat && currLng) {
+        const distance = calculateDistance(prevLat, prevLng, currLat, currLng);
+        
+        // 오차 데이터 필터링 (1km 이상 점프는 제외)
+        if (distance < 1000) {
+          totalDistance += distance;
+          
+          // 이동시간 계산 - 실제로 움직인 구간만 계산
+          const prevTime = new Date(prev.timestamp || prev.mlt_gps_time || '').getTime();
+          const currTime = new Date(curr.timestamp || curr.mlt_gps_time || '').getTime();
+          
+          if (!isNaN(prevTime) && !isNaN(currTime)) {
+            const segmentTimeSeconds = (currTime - prevTime) / 1000;
+            const speedMs = curr.speed || curr.mlt_speed || 0; // m/s
+            const speedKmh = speedMs * 3.6; // km/h로 변환
+            
+            // 이동 판정 조건:
+            // 1. 거리가 10미터 이상 변화했거나
+            // 2. 속도가 0.5km/h 이상인 경우를 이동으로 간주
+            const isMoving = distance >= 10 || speedKmh >= 0.5;
+            
+            if (isMoving && segmentTimeSeconds > 0 && segmentTimeSeconds < 3600) { // 1시간 이상의 구간은 제외
+              movingTimeSeconds += segmentTimeSeconds;
+            }
+          }
+        }
+      }
+    }
+
+    // 걸음수 가져오기 (실제 디바이스 데이터 사용)
+    let actualSteps = 0;
+    
+    if (sortedData.length > 0) {
+      // 가장 최근 데이터의 mt_health_work 값 사용
+      const latestData = sortedData[sortedData.length - 1];
+      const healthWork = latestData.mt_health_work || latestData.health_work || 0;
+      
+      if (healthWork > 0) {
+        actualSteps = healthWork;
+        console.log('[calculateLocationStats] 실제 걸음수 데이터 사용:', {
+          latestDataTime: latestData.timestamp || latestData.mlt_gps_time,
+          healthWork: healthWork
+        });
+      } else {
+        // 첫 번째 데이터도 확인해보기
+        const firstData = sortedData[0];
+        const firstHealthWork = firstData.mt_health_work || firstData.health_work || 0;
+        
+        if (firstHealthWork > 0) {
+          actualSteps = firstHealthWork;
+          console.log('[calculateLocationStats] 첫 번째 데이터의 걸음수 사용:', {
+            firstDataTime: firstData.timestamp || firstData.mlt_gps_time,
+            healthWork: firstHealthWork
+          });
+        } else {
+          console.log('[calculateLocationStats] mt_health_work 데이터가 없어서 0으로 설정');
+        }
+      }
+    }
+
+    // 포맷팅
+    const distanceKm = (totalDistance / 1000).toFixed(1);
+    const timeFormatted = formatTime(movingTimeSeconds);
+    const stepsFormatted = actualSteps.toLocaleString();
+
+    console.log('[calculateLocationStats] 계산 결과:', {
+      totalDistance: totalDistance,
+      distanceKm: distanceKm,
+      movingTimeSeconds: movingTimeSeconds,
+      timeFormatted: timeFormatted,
+      actualSteps: actualSteps,
+      dataPoints: sortedData.length,
+      note: '체류시간 제외된 실제 이동시간, 실제 걸음수 데이터 사용'
+    });
+
+    return {
+      distance: `${distanceKm} km`,
+      time: timeFormatted,
+      steps: `${stepsFormatted} 걸음`
+    };
+  };
+
+  // 슬라이더 이벤트 핸들러들
+  const handleSliderStart = (e: React.TouchEvent | React.MouseEvent) => {
+    // 이벤트 전파 차단하여 상위 스와이프 동작 방지
+    e.stopPropagation();
+    
+    setIsSliderDragging(true);
+    updateSliderValue(e);
+    
+    console.log('[슬라이더] 드래그 시작 - 상위 스와이프 이벤트 차단');
+  };
+
+  const handleSliderMove = (e: React.TouchEvent | React.MouseEvent) => {
+    if (!isSliderDragging) return;
+    
+    // 드래그 중일 때도 이벤트 전파 차단
+    e.stopPropagation();
+    
+    updateSliderValue(e);
+  };
+
+  const handleSliderEnd = (e?: React.TouchEvent | React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    
+    setIsSliderDragging(false);
+    console.log('[슬라이더] 드래그 종료');
+  };
+
+  const updateSliderValue = (e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => {
+    if (!sliderRef.current) return;
+
+    const rect = sliderRef.current.getBoundingClientRect();
+    let clientX: number;
+    
+    // 이벤트 타입에 따라 clientX 추출
+    if ('touches' in e && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+    } else if ('changedTouches' in e && e.changedTouches.length > 0) {
+      clientX = e.changedTouches[0].clientX;
+    } else {
+      clientX = (e as MouseEvent).clientX;
+    }
+    
+    const percentage = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+    
+    setSliderValue(percentage);
+    updatePathProgress(percentage);
+  };
+
+  // 현재 위치 마커 생성/업데이트 함수
+  const createOrUpdateCurrentPositionMarker = (lat: number, lng: number, targetIndex: number, totalMarkers: number) => {
+    if (!map.current || !window.naver?.maps) return;
+
+    const position = new window.naver.maps.LatLng(lat, lng);
+
+    // 기존 현재 위치 마커 제거
+    if (currentPositionMarker.current) {
+      // InfoWindow가 있다면 먼저 닫기
+      if (currentPositionMarker.current.infoWindow) {
+        currentPositionMarker.current.infoWindow.close();
+      }
+      currentPositionMarker.current.setMap(null);
+    }
+
+    // 현재 마커 데이터 가져오기
+    const currentMarkerData = sortedLocationData[targetIndex];
+    if (!currentMarkerData) return;
+
+    // 마커 데이터에서 정보 추출
+    const speedMs = currentMarkerData.speed || currentMarkerData.mlt_speed || 0; // m/s
+    const speed = speedMs * 3.6; // m/s를 km/h로 변환
+    const accuracy = currentMarkerData.accuracy || currentMarkerData.mlt_accuacy || 0;
+    const battery = currentMarkerData.battery_level || currentMarkerData.mlt_battery || 0;
+    const timestamp = currentMarkerData.timestamp || currentMarkerData.mlt_gps_time || '정보 없음';
+    
+    // 시간에서 날짜 부분 제거 (시간만 표시)
+    const timeOnly = timestamp === '정보 없음' ? '정보 없음' : 
+      timestamp.includes('T') ? timestamp.split('T')[1]?.substring(0, 8) || timestamp :
+      timestamp.includes(' ') ? timestamp.split(' ')[1] || timestamp :
+      timestamp;
+
+    // InfoWindow 내용 생성 (컴팩트)
+    const infoContent = `
+      <div style="
+        padding: 8px;
+        background: white;
+        border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        min-width: 130px;
+        max-width: 150px;
+      ">
+        <div style="
+          background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+          color: white;
+          padding: 4px 6px;
+          border-radius: 4px;
+          margin: -8px -8px 6px -8px;
+          font-weight: 600;
+          font-size: 11px;
+          text-align: center;
+        ">
+          ${targetIndex + 1} / ${totalMarkers}
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;">
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #666;">⏰ 시간:</span>
+            <span style="font-weight: 600; font-size: 10px;">${timeOnly}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #666;">🚀 속도:</span>
+            <span style="font-weight: 600; font-size: 10px;">${speed.toFixed(1)}km/h</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #666;">📍 정확도:</span>
+            <span style="font-weight: 600; font-size: 10px;">${accuracy.toFixed(0)}m</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #666;">🔋 배터리:</span>
+            <span style="font-weight: 600; font-size: 10px;">${battery}%</span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // 새로운 현재 위치 마커 생성
+    currentPositionMarker.current = new window.naver.maps.Marker({
+      position: position,
+      map: map.current,
+      title: `현재 위치 (${targetIndex + 1}/${totalMarkers})`,
+      icon: {
+        content: `
+          <div style="
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            border: 3px solid white;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            animation: pulse 2s infinite;
+          ">
+            <div style="
+              width: 8px;
+              height: 8px;
+              background: white;
+              border-radius: 50%;
+            "></div>
+          </div>
+          <style>
+            @keyframes pulse {
+              0% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2); }
+              50% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 8px rgba(239,68,68,0.1); }
+              100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2); }
+            }
+          </style>
+        `,
+        anchor: new window.naver.maps.Point(12, 12)
+      },
+      zIndex: 1000 // 가장 위에 표시
+    });
+
+    // InfoWindow 생성 및 표시
+    const infoWindow = new window.naver.maps.InfoWindow({
+      content: infoContent,
+      backgroundColor: 'transparent',
+      borderColor: 'transparent',
+      borderWidth: 0,
+      anchorSize: new window.naver.maps.Size(0, 0),
+      pixelOffset: new window.naver.maps.Point(0, -10)
+    });
+
+    // InfoWindow 즉시 표시
+    infoWindow.open(map.current, currentPositionMarker.current);
+
+    // 마커에 InfoWindow 참조 저장 (정리할 때 함께 제거하기 위해)
+    currentPositionMarker.current.infoWindow = infoWindow;
+
+    console.log(`[현재위치마커] 위치 업데이트: (${lat}, ${lng}) - ${targetIndex + 1}/${totalMarkers}`);
+  };
+
+  // 슬라이더 값에 따라 경로 진행 상황 업데이트
+  const updatePathProgress = (percentage: number) => {
+    if (!map.current || sortedLocationData.length === 0) return;
+
+    const totalMarkers = sortedLocationData.length;
+    const currentIndex = Math.floor((percentage / 100) * totalMarkers);
+    const targetIndex = Math.min(currentIndex, totalMarkers - 1);
+
+    if (targetIndex >= 0 && sortedLocationData[targetIndex]) {
+      const targetMarker = sortedLocationData[targetIndex];
+      const lat = targetMarker.latitude || targetMarker.mlt_lat || 0;
+      const lng = targetMarker.longitude || targetMarker.mlt_long || 0;
+
+      if (lat && lng) {
+        // 남쪽으로 0.002도 오프셋 적용 (마커가 화면 상단에 위치하도록)
+        const latOffset = -0.002;
+        const adjustedLat = Number(lat) + latOffset;
+        const center = new window.naver.maps.LatLng(adjustedLat, Number(lng));
+        map.current.setCenter(center);
+        
+        // 현재 위치 마커 생성/업데이트 (원래 좌표 사용)
+        createOrUpdateCurrentPositionMarker(Number(lat), Number(lng), targetIndex, totalMarkers);
+        
+        console.log(`[경로따라가기] ${percentage.toFixed(1)}% - ${targetIndex + 1}/${totalMarkers} 마커로 이동:`, {
+          lat: Number(lat),
+          lng: Number(lng),
+          adjustedCenter: { lat: adjustedLat, lng: Number(lng) },
+          time: targetMarker.mlt_gps_time || targetMarker.timestamp
+        });
+      }
+    }
+  };
+
   // 새로운 API 데이터 디버깅 함수
   const logExecutedRef = useRef(false);
   
@@ -2236,7 +2623,7 @@ export default function LogsPage() {
       console.log('  - 조회 기간:', dailyCountsData.start_date, '~', dailyCountsData.end_date);
       
       // 멤버별 상세 일별 카운트 출력
-      console.log('  - 멤버별 상세 데이터:');
+      console.log('  - 멤버별 상세 데이터:'); // 멤버별 상세 데이터 출력
       dailyCountsData.member_daily_counts.forEach((member, index) => {
         console.log(`    ${index + 1}. ${member.member_name} (ID: ${member.member_id}):`);
         member.daily_counts.forEach(dayCount => {
@@ -2354,12 +2741,56 @@ export default function LogsPage() {
 
   // 체류시간 데이터가 변경될 때마다 지도에 체류시간 마커 업데이트
   // (이제 updateLocationLogMarkers 내에서 호출되므로 별도 useEffect 불필요)
-  // useEffect(() => {
-  //   if (isMapInitializedLogs && stayTimesData.length > 0) {
-  //     console.log('[LOGS] 체류시간 데이터 변경 감지 - 지도에 체류시간 마커 업데이트:', stayTimesData.length, '개');
-  //     updateStayTimeMarkers(stayTimesData);
-  //   }
-  // }, [stayTimesData, isMapInitializedLogs]);
+  useEffect(() => {
+    if (isMapInitializedLogs && stayTimesData.length > 0) {
+      console.log('[LOGS] 체류시간 데이터 변경 감지 - 지도에 체류시간 마커 업데이트:', stayTimesData.length, '개');
+      updateStayTimeMarkers(stayTimesData);
+    }
+  }, [stayTimesData, isMapInitializedLogs]);
+
+  // 슬라이더 드래그를 위한 전역 이벤트 리스너
+  useEffect(() => {
+    if (!isSliderDragging) return;
+
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      updateSliderValue(e);
+    };
+
+    const handleGlobalMouseUp = (e: MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setIsSliderDragging(false);
+      console.log('[슬라이더] 전역 마우스 드래그 종료');
+    };
+
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      updateSliderValue(e);
+    };
+
+    const handleGlobalTouchEnd = (e: TouchEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      setIsSliderDragging(false);
+      console.log('[슬라이더] 전역 터치 드래그 종료');
+    };
+
+    // 마우스 및 터치 이벤트 모두 처리
+    document.addEventListener('mousemove', handleGlobalMouseMove, { passive: false });
+    document.addEventListener('mouseup', handleGlobalMouseUp, { passive: false });
+    document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+    document.addEventListener('touchend', handleGlobalTouchEnd, { passive: false });
+
+    return () => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.removeEventListener('touchmove', handleGlobalTouchMove);
+      document.removeEventListener('touchend', handleGlobalTouchEnd);
+    };
+  }, [isSliderDragging]);
 
   // useEffect for auto-selecting the first member and updating map based on selection
   useEffect(() => {
@@ -3414,54 +3845,76 @@ export default function LogsPage() {
 
                 <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white to-rose-50">
                   <div 
-                    className="content-section summary-section min-h-[200px] max-h-[200px] overflow-y-auto flex flex-col bg-gradient-to-r from-pink-50 to-rose-50 rounded-xl p-4"
+                    className="content-section summary-section min-h-[200px] max-h-[200px] overflow-hidden flex flex-col bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl pt-3 px-3 pb-0"
                   >
-                    <div>
-                      <h2 className="text-lg font-medium text-gray-900 flex justify-between items-center section-title mb-2">
+                    <div className="flex-1">
+                      {/* 헤더 섹션 */}
+                      <div className="mb-2">
+                        <h2 className="text-base font-bold text-gray-900 flex items-center">
+                          <FiActivity className="w-4 h-4 text-amber-500 mr-2" />
                         {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 위치기록 요약` : "위치기록 요약"}
                       </h2>
-                      <div className="mb-2 px-1 flex items-center">
-                        <FiPlayCircle className="w-6 h-6 text-amber-500 mr-2" />
-                        <h4 className="text-sm font-medium text-gray-700">경로 따라가기</h4>
                       </div>
-                      <div className="px-2 pt-2 mb-6">
-                        <div className="relative w-full h-1.5 bg-gray-200 rounded-full">
-                          <div 
-                            className="absolute top-0 left-0 h-1.5 bg-indigo-600 rounded-full transition-all duration-300 ease-out"
-                            style={{ width: `${sliderValue}%` }} 
-                          ></div>
-                          <div 
-                            className="absolute top-1/2 w-4 h-4 bg-indigo-600 rounded-full border-2 border-white shadow transform -translate-y-1/2 transition-all duration-300 ease-out"
-                            style={{ left: `calc(${sliderValue}% - 8px)` }}
-                          ></div>
+
+                                            {/* 통계 카드들 */}
+                      <div className="grid grid-cols-3 gap-2 mb-2 h-[68px]">
+                        {isLocationDataLoading ? (
+                          <div className="col-span-3 bg-white/60 backdrop-blur-sm rounded-lg p-2 border border-amber-100 flex items-center justify-center h-full">
+                            <div className="flex items-center space-x-2">
+                              <FiLoader className="w-4 h-4 text-amber-500 animate-spin" />
+                              <span className="text-xs text-gray-600">요약 데이터를 불러오는 중...</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2 text-center border border-amber-100 h-full flex flex-col justify-center">
+                              <FiTrendingUp className="w-4 h-4 text-amber-500 mx-auto mb-1" />
+                              <p className="text-xs text-gray-500">이동거리</p>
+                              <p className="text-xs font-bold text-gray-800">{locationSummary.distance}</p>
+                            </div>
+                            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2 text-center border border-amber-100 h-full flex flex-col justify-center">
+                              <FiClock className="w-4 h-4 text-amber-500 mx-auto mb-1" />
+                              <p className="text-xs text-gray-500">이동시간</p>
+                              <p className="text-xs font-bold text-gray-800">{locationSummary.time}</p>
+                            </div>
+                            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2 text-center border border-amber-100 h-full flex flex-col justify-center">
+                              <FiZap className="w-4 h-4 text-amber-500 mx-auto mb-1" />
+                              <p className="text-xs text-gray-500">걸음 수</p>
+                              <p className="text-xs font-bold text-gray-800">{locationSummary.steps}</p>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* 경로 따라가기 섹션 */}
+                      <div className="bg-white/60 backdrop-blur-sm rounded-lg py-2 px-3 border border-amber-100">
+                        <div className="flex items-center mb-2">
+                          <FiPlayCircle className="w-5 h-5 text-amber-500 mr-2" />
+                          <h4 className="text-sm font-medium text-gray-800">경로 따라가기</h4>
                         </div>
-                      </div>
-                      {isLocationDataLoading ? (
-                        <div className="flex justify-center items-center py-4">
-                          <div className="flex items-center space-x-2">
-                            <FiLoader className="w-5 h-5 text-indigo-600 animate-spin" />
-                            <span className="text-sm text-gray-600">위치 데이터를 불러오는 중...</span>
+                        <div className="px-2 pb-1">
+                          <div 
+                            ref={sliderRef}
+                            className="relative w-full h-2.5 bg-gray-200 rounded-full cursor-pointer"
+                            onMouseDown={handleSliderStart}
+                            onMouseMove={handleSliderMove}
+                            onMouseUp={(e) => handleSliderEnd(e)}
+                            onMouseLeave={(e) => handleSliderEnd(e)}
+                            onTouchStart={handleSliderStart}
+                            onTouchMove={handleSliderMove}
+                            onTouchEnd={(e) => handleSliderEnd(e)}
+                          >
+                            <div 
+                              className="absolute top-0 left-0 h-2.5 bg-amber-500 rounded-full transition-all duration-150 ease-out pointer-events-none"
+                              style={{ width: `${sliderValue}%` }} 
+                            ></div>
+                            <div 
+                              className="absolute top-1/2 w-5 h-5 bg-amber-500 rounded-full border-2 border-white shadow transform -translate-y-1/2 transition-all duration-150 ease-out cursor-grab active:cursor-grabbing pointer-events-none"
+                              style={{ left: `calc(${sliderValue}% - 10px)` }}
+                            ></div>
                           </div>
                         </div>
-                      ) : (
-                      <div className="flex justify-around text-center px-1">
-                        <div className="flex flex-col items-center">
-                          <FiTrendingUp className="w-6 h-6 text-amber-500 mb-1" />
-                          <p className="text-xs text-gray-500">이동거리</p>
-                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.distance}</p>
-                        </div>
-                        <div className="flex flex-col items-center">
-                          <FiClock className="w-6 h-6 text-amber-500 mb-1" />
-                          <p className="text-xs text-gray-500">이동시간</p>
-                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.time}</p>
-                        </div>
-                        <div className="flex flex-col items-center">
-                          <FiZap className="w-6 h-6 text-amber-500 mb-1" />
-                          <p className="text-xs text-gray-500">걸음 수</p>
-                          <p className="text-sm font-semibold text-gray-700 mt-0.5">{locationSummary.steps}</p>
-                        </div>
                       </div>
-                      )}
                     </div>
                   </div>
                 </div>
