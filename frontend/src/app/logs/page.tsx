@@ -626,7 +626,7 @@ export default function LogsPage() {
         const mapOptions = {
             ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
             center: initialCenter,
-            zoom: MAP_CONFIG.NAVER.DEFAULT_OPTIONS?.zoom || 10, 
+            zoom: MAP_CONFIG.NAVER.DEFAULT_OPTIONS?.zoom || 16, 
             logoControl: false,
             mapDataControl: false,
         };
@@ -899,15 +899,15 @@ export default function LogsPage() {
     
     console.log('Member selection started:', id);
     
-    // 멤버 변경 시 즉시 지도 초기화 (다른 멤버 선택 시에만)
+    // 멤버 선택 시 항상 지도 초기화 (깔끔한 UX를 위해)
+    clearMapMarkersAndPaths();
+    console.log('[handleMemberSelect] 멤버 선택으로 지도 초기화 완료');
+    
+    // 다른 멤버 선택 시 날짜를 오늘로 초기화
     const currentSelectedMember = groupMembers.find(m => m.isSelected);
     const isChangingMember = !currentSelectedMember || currentSelectedMember.id !== id;
     
     if (isChangingMember) {
-      clearMapMarkersAndPaths();
-      console.log('[handleMemberSelect] 멤버 변경으로 지도 초기화 완료');
-      
-      // 새로운 멤버 선택 시 날짜를 오늘로 초기화
       const today = format(new Date(), 'yyyy-MM-dd');
       if (selectedDate !== today) {
         setSelectedDate(today);
@@ -949,8 +949,13 @@ export default function LogsPage() {
     const selectedMember = updatedMembers.find(m => m.isSelected);
     console.log('[handleMemberSelect] Selected member:', selectedMember?.name);
     
-    // loadLocationData는 useEffect에서 처리되도록 제거
-    console.log('[handleMemberSelect] 멤버 선택 완료 - useEffect에서 지도 업데이트 및 데이터 로딩 처리됨');
+    // 선택된 멤버의 위치 데이터 즉시 로딩 (지도 중심 이동을 위해)
+    if (selectedDate) {
+      console.log('[handleMemberSelect] 선택된 멤버의 위치 데이터 즉시 로딩:', id, selectedDate);
+      loadLocationData(parseInt(id), selectedDate);
+    }
+    
+    console.log('[handleMemberSelect] 멤버 선택 완료');
   };
 
   // 위치 로그 마커를 지도에 업데이트하는 함수
@@ -1556,6 +1561,26 @@ export default function LogsPage() {
         console.error('[updateLocationLogMarkers] 지도 범위 조정 중 오류:', error);
       }
     }
+
+    // 첫 번째 마커(시작지점)로 지도 중심 즉시 이동 (줌 16으로 설정)
+    if (sortedTimePoints.length > 0) {
+      const firstPoint = sortedTimePoints[0];
+      if (firstPoint.lat && firstPoint.lng) {
+        const latOffset = -0.002; // 아래쪽 오프셋 (마커가 화면 상단에 위치하도록)
+        const adjustedPosition = new window.naver.maps.LatLng(firstPoint.lat + latOffset, firstPoint.lng);
+        
+        if (map.current) {
+          map.current.setCenter(adjustedPosition);
+          map.current.setZoom(16); // 줌 레벨 16으로 설정
+          map.current.refresh(true);
+          console.log('[updateLocationLogMarkers] 첫 번째 마커로 지도 중심 이동 완료:', { 
+            lat: firstPoint.lat, 
+            lng: firstPoint.lng, 
+            adjustedPosition: adjustedPosition 
+          });
+        }
+      }
+    }
   };
 
   // 체류시간 마커를 지도에 업데이트하는 함수
@@ -2032,6 +2057,13 @@ export default function LogsPage() {
     setMapMarkersData([]);
     setLocationLogSummaryData(null);
     setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+    
+    // 슬라이더 관련 상태도 초기화
+    setSortedLocationData([]);
+    setSliderValue(0);
+    setIsSliderDragging(false);
+    
+    console.log('[clearMapMarkersAndPaths] 모든 마커, 경로, 상태 초기화 완료');
   };
 
   const handleDateSelect = (date: string) => {
@@ -2051,19 +2083,8 @@ export default function LogsPage() {
     setPreviousDate(selectedDate);
     setSelectedDate(date);
     
-    // 날짜 변경 시 슬라이더를 맨 왼쪽(0%)으로 초기화
-    setSliderValue(0);
-    console.log('[handleDateSelect] 날짜 변경으로 슬라이더를 0%로 초기화');
-    
-    // 현재 위치 마커도 정리 (새로운 데이터 로드 시 재생성됨)
-    if (currentPositionMarker.current) {
-      // InfoWindow가 있다면 먼저 닫기
-      if (currentPositionMarker.current.infoWindow) {
-        currentPositionMarker.current.infoWindow.close();
-      }
-      currentPositionMarker.current.setMap(null);
-      currentPositionMarker.current = null;
-    }
+    // 슬라이더 관련 초기화는 clearMapMarkersAndPaths에서 처리됨
+    console.log('[handleDateSelect] 날짜 변경으로 지도 및 상태 초기화 완료');
     setActiveLogView('members');
     
     // 날짜가 실제로 변경되는 경우 firstMemberSelected 상태 리셋
@@ -2426,6 +2447,14 @@ export default function LogsPage() {
     
     const percentage = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
     
+    console.log('[슬라이더] 값 계산:', {
+      clientX,
+      rectLeft: rect.left,
+      rectWidth: rect.width,
+      percentage: percentage.toFixed(1),
+      sliderRef: !!sliderRef.current
+    });
+    
     setSliderValue(percentage);
     updatePathProgress(percentage);
   };
@@ -2583,17 +2612,21 @@ export default function LogsPage() {
         const latOffset = -0.002;
         const adjustedLat = Number(lat) + latOffset;
         const center = new window.naver.maps.LatLng(adjustedLat, Number(lng));
-        map.current.setCenter(center);
         
-        // 현재 위치 마커 생성/업데이트 (원래 좌표 사용)
-        createOrUpdateCurrentPositionMarker(Number(lat), Number(lng), targetIndex, totalMarkers);
-        
-        console.log(`[경로따라가기] ${percentage.toFixed(1)}% - ${targetIndex + 1}/${totalMarkers} 마커로 이동:`, {
+        console.log(`[경로따라가기] 지도 중심 이동 시도: ${percentage.toFixed(1)}% - ${targetIndex + 1}/${totalMarkers}`, {
           lat: Number(lat),
           lng: Number(lng),
-          adjustedCenter: { lat: adjustedLat, lng: Number(lng) },
-          time: targetMarker.mlt_gps_time || targetMarker.timestamp
+          adjustedCenter: { lat: adjustedLat, lng: Number(lng) }
         });
+        
+        // 1. 지도 중심을 즉시 이동 (애니메이션 없이)
+        map.current.setCenter(center);
+        map.current.setZoom(16);
+        console.log('[경로따라가기] 지도 중심 즉시 이동 (애니메이션 없음)');
+        
+        // 2. 지도 중심 이동 완료 후 마커 생성/업데이트
+        createOrUpdateCurrentPositionMarker(Number(lat), Number(lng), targetIndex, totalMarkers);
+        map.current.refresh(true);
       }
     }
   };
@@ -2740,13 +2773,13 @@ export default function LogsPage() {
   }, [mapMarkersData, isMapInitializedLogs]);
 
   // 체류시간 데이터가 변경될 때마다 지도에 체류시간 마커 업데이트
-  // (이제 updateLocationLogMarkers 내에서 호출되므로 별도 useEffect 불필요)
-  useEffect(() => {
-    if (isMapInitializedLogs && stayTimesData.length > 0) {
-      console.log('[LOGS] 체류시간 데이터 변경 감지 - 지도에 체류시간 마커 업데이트:', stayTimesData.length, '개');
-      updateStayTimeMarkers(stayTimesData);
-    }
-  }, [stayTimesData, isMapInitializedLogs]);
+  // (updateLocationLogMarkers 내에서 호출되므로 중복 실행 방지를 위해 주석 처리)
+  // useEffect(() => {
+  //   if (isMapInitializedLogs && stayTimesData.length > 0) {
+  //     console.log('[LOGS] 체류시간 데이터 변경 감지 - 지도에 체류시간 마커 업데이트:', stayTimesData.length, '개');
+  //     updateStayTimeMarkers(stayTimesData);
+  //   }
+  // }, [stayTimesData, isMapInitializedLogs]);
 
   // 슬라이더 드래그를 위한 전역 이벤트 리스너
   useEffect(() => {
