@@ -1107,62 +1107,14 @@ export default function LogsPage() {
         }
       });
 
-      // 단일 멤버 선택 시 해당 위치로 지도 이동 (멤버 위치보다 200px 아래로 중심 이동)
-      if (selectedMembers.length === 1) {
-        const member = selectedMembers[0];
-        try {
-          const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
-          console.log('[LogsPage] Attempting to set map center to:', position, 'Current center:', map.current.getCenter());
-          
-          // 위도 좌표를 직접 조정하여 200px 아래쪽으로 이동 (대략 0.002도 차이)
-                  // 날짜 변경 시에는 시작지점 기준 지도 조정을 우선하므로 멤버 위치 기준 조정은 건너뜀
-        // isDateChangedRef.current가 true인 경우도 건너뜀 (날짜 변경 진행 중)
-        // 로그 마커가 있을 때도 건너뜀 (첫 번째 로그 마커를 우선시)
-        if (!isDateChange && !isDateChangedRef.current && sortedLocationData.length === 0) {
-          const latOffset = -0.002; // 200px 아래쪽에 해당하는 위도 오프셋
-          const adjustedPosition = new window.naver.maps.LatLng(
-            member.location.lat + latOffset, 
-            member.location.lng
-          );
-          
-          map.current.setCenter(adjustedPosition);
-          
-          // 첫 멤버 선택일 때만 줌 설정, 그 외에는 중심만 이동
-          if (!firstMemberSelected) {
-            map.current.setZoom(16);
-            setFirstMemberSelected(true);
-            console.log('[LogsPage] 줌 레벨 설정: 16 (첫 멤버 선택)');
-          } else {
-            console.log('[LogsPage] 멤버 재선택 - 중심만 이동, 줌 유지');
-          }
-          
-          map.current.refresh(true); 
-          console.log('[LogsPage] Map center set 200px below member location:', member.name, 'Original:', member.location, 'Adjusted:', adjustedPosition);
-        } else {
-          console.log('[LogsPage] 멤버 위치 기준 지도 조정 건너뜀 - 이유:', {
-            isDateChange,
-            isDateChangedRef: isDateChangedRef.current,
-            hasLocationData: sortedLocationData.length > 0,
-            locationDataCount: sortedLocationData.length
-          });
-        }
-        
-        // 날짜 변경 플래그 리셋
-        if (isDateChange) {
-          isDateChangedRef.current = false;
-          setPreviousDate(selectedDate);
-          console.log('[LogsPage] 날짜 변경 플래그 리셋 완료');
-        }
-          
-          // 잠시 후 최종 중심점 확인
-          setTimeout(() => {
-            if (map.current) {
-              console.log('[LogsPage] Final center after 500ms:', map.current.getCenter());
-            }
-          }, 500);
-        } catch (error) {
-          console.error('[LogsPage] Error setting map center:', error);
-        }
+      // 멤버 마커 생성 완료 - 지도 중심 이동은 renderLocationDataOnMap에서 처리
+      console.log('[updateMemberMarkers] 멤버 마커 생성 완료 - 지도 중심 이동은 별도 처리됨');
+      
+      // 날짜 변경 플래그 리셋
+      if (isDateChange) {
+        isDateChangedRef.current = false;
+        setPreviousDate(selectedDate);
+        console.log('[LogsPage] 날짜 변경 플래그 리셋 완료');
       }
     }
   };
@@ -2695,6 +2647,46 @@ export default function LogsPage() {
     // 1. 지도 완전히 정리 (멤버 마커 포함)
     clearMapMarkersAndPaths(true);
 
+    // 2. 먼저 지도 중심 위치 계산 및 설정 (마커 생성 전에)
+    console.log('[renderLocationDataOnMap] 지도 중심 위치 사전 계산 시작');
+    let mapCenter = null;
+    let shouldSetZoom = false;
+    
+    if (locationMarkersData.length > 0) {
+      // 로그 데이터가 있으면 첫 번째 로그 위치를 중심으로 설정
+      const firstLogPoint = locationMarkersData[0];
+      mapCenter = new window.naver.maps.LatLng(
+        firstLogPoint.latitude || firstLogPoint.mlt_lat, 
+        firstLogPoint.longitude || firstLogPoint.mlt_long
+      );
+      shouldSetZoom = true;
+      console.log('[renderLocationDataOnMap] 첫 번째 로그 위치로 지도 중심 설정:', mapCenter);
+    } else {
+      // 로그 데이터가 없으면 선택된 멤버 위치를 중심으로 설정
+      const selectedMember = groupMembers.find(m => m.isSelected);
+      if (selectedMember && selectedMember.location && selectedMember.location.lat && selectedMember.location.lng) {
+        const memberLat = selectedMember.mlt_lat || selectedMember.location.lat || 37.5665;
+        const memberLng = selectedMember.mlt_long || selectedMember.location.lng || 126.9780;
+        mapCenter = new window.naver.maps.LatLng(memberLat, memberLng);
+        shouldSetZoom = true;
+        console.log('[renderLocationDataOnMap] 멤버 위치로 지도 중심 설정:', mapCenter);
+      } else {
+        // 기본 위치로 설정
+        mapCenter = new window.naver.maps.LatLng(37.5665, 126.9780);
+        shouldSetZoom = true;
+        console.log('[renderLocationDataOnMap] 기본 위치로 지도 중심 설정:', mapCenter);
+      }
+    }
+    
+    // 지도 중심과 줌 레벨을 먼저 설정
+    if (mapCenter) {
+      if (shouldSetZoom) {
+        mapInstance.setZoom(16);
+      }
+      mapInstance.setCenter(mapCenter);
+      console.log('[renderLocationDataOnMap] 지도 중심 사전 설정 완료');
+    }
+
     // 2. 멤버 마커 표시 (선택된 멤버만)
     console.log('[renderLocationDataOnMap] 멤버 마커 생성 시작');
     const selectedMember = groupMembers.find(m => m.isSelected);
@@ -2918,54 +2910,8 @@ export default function LogsPage() {
     }
      console.log('[renderLocationDataOnMap] 경로 연결선 및 화살표 생성 완료');
 
-    // 8. 지도 범위 조정 및 중심 이동
-    console.log('[renderLocationDataOnMap] 지도 범위 조정 및 중심 이동 시작');
-    console.log('[renderLocationDataOnMap] 로그 마커 데이터 개수:', sortedLocationMarkers.length);
-    
-    if (sortedLocationMarkers.length > 0) { // 로그 마커가 있으면 첫 번째 마커를 중심으로 설정
-           const firstLogPoint = sortedLocationMarkers[0];
-           const firstLogPosition = new window.naver.maps.LatLng(firstLogPoint.lat, firstLogPoint.lng);
-           console.log('[renderLocationDataOnMap] 첫 번째 로그 마커 좌표:', firstLogPoint.lat, firstLogPoint.lng);
-           
-           // 강제로 지도 중심 이동 - 여러 방법 동시 사용
-           mapInstance.setZoom(16); // 줌 레벨 먼저 설정
-           mapInstance.setCenter(firstLogPosition); // 중심 이동
-           
-           // 지연 후 다시 한 번 확실하게 이동
-           setTimeout(() => {
-             mapInstance.setCenter(firstLogPosition);
-             mapInstance.panTo(firstLogPosition);
-             mapInstance.refresh(true);
-             console.log('[renderLocationDataOnMap] 지연 후 재차 지도 중심 이동 완료');
-           }, 100);
-           
-           // 추가 지연 후 최종 확인
-           setTimeout(() => {
-             mapInstance.setCenter(firstLogPosition);
-             console.log('[renderLocationDataOnMap] 최종 확인 - 지도 중심:', mapInstance.getCenter());
-           }, 300);
-           
-           console.log('[renderLocationDataOnMap] 첫 번째 로그 마커 중심으로 지도 이동 (줌 16)');
-    } else if (selectedMember && selectedMember.location && selectedMember.location.lat && selectedMember.location.lng) { // 위치 데이터는 없지만 멤버가 선택되었으면 멤버 위치 중심으로 이동
-           const memberLat = selectedMember.mlt_lat || selectedMember.location.lat || 37.5665;
-           const memberLng = selectedMember.mlt_long || selectedMember.location.lng || 126.9780;
-           const memberPosition = new window.naver.maps.LatLng(memberLat, memberLng);
-           console.log('[renderLocationDataOnMap] 멤버 위치 좌표:', memberLat, memberLng);
-           
-           mapInstance.setZoom(16);
-           mapInstance.setCenter(memberPosition);
-           setTimeout(() => {
-             mapInstance.setCenter(memberPosition);
-             mapInstance.panTo(memberPosition);
-           }, 100);
-           
-           console.log('[renderLocationDataOnMap] 데이터 없음 - 멤버 아이콘 중심으로 지도 이동');
-    } else { // 데이터도 없고 멤버도 없으면 기본 위치로 이동 (초기 상태)
-        const initialCenter = new window.naver.maps.LatLng(37.5665, 126.9780);
-         mapInstance.setCenter(initialCenter);
-         mapInstance.setZoom(16);
-         console.log('[renderLocationDataOnMap] 데이터 없음/멤버 없음 - 기본 위치로 지도 이동');
-    }
+    // 8. 지도 렌더링 완료 - 중심 이동은 이미 완료됨
+    console.log('[renderLocationDataOnMap] 지도 렌더링 완료 - 중심 이동은 사전에 완료됨');
 
     // 9. 지도 새로고침 (지연 후 실행)
     setTimeout(() => {
@@ -3152,121 +3098,7 @@ export default function LogsPage() {
           </motion.header>
         )}
         
-        {/* 전체화면 로딩 - 체크리스트 형태 */}
-        {(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) && (
-          <div className="fixed inset-0 z-50 bg-gradient-to-br from-purple-50 via-white to-pink-50 flex items-center justify-center">
-            <div className="text-center max-w-sm mx-auto px-6">
-              {/* 상단 로고 및 제목 */}
-              <div className="mb-6">
-                <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">활동 로그를 준비하고 있습니다</h2>
-                <p className="text-sm text-gray-600">잠시만 기다려주세요...</p>
-              </div>
-
-              {/* 로딩 체크리스트 - 컴팩트 버전 */}
-              <div className="space-y-1">
-                {/* 1. 지도 로딩 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    !isMapLoading 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : 'border-indigo-300 animate-pulse'
-                  }`}>
-                    {!isMapLoading ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    !isMapLoading ? 'text-green-700' : 'text-gray-700'
-                  }`}>
-                    지도 불러오기
-                  </span>
-                </div>
-
-                {/* 2. 지도 초기화 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    !isMapLoading && isMapInitializedLogs 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : isMapLoading 
-                        ? 'border-gray-300' 
-                        : 'border-purple-300 animate-pulse'
-                  }`}>
-                    {!isMapLoading && isMapInitializedLogs ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : !isMapLoading ? (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    ) : (
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    !isMapLoading && isMapInitializedLogs ? 'text-green-700' : isMapLoading ? 'text-gray-400' : 'text-gray-700'
-                  }`}>
-                    지도 초기화
-                  </span>
-                </div>
-
-                {/* 3. 활동 데이터 로딩 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    !isMapLoading && isMapInitializedLogs && isInitialDataLoaded 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : (!isMapLoading && isMapInitializedLogs)
-                        ? 'border-purple-300 animate-pulse'
-                        : 'border-gray-300'
-                  }`}>
-                    {!isMapLoading && isMapInitializedLogs && isInitialDataLoaded ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (!isMapLoading && isMapInitializedLogs) ? (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    ) : (
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    !isMapLoading && isMapInitializedLogs && isInitialDataLoaded ? 'text-green-700' : (!isMapLoading && isMapInitializedLogs) ? 'text-gray-700' : 'text-gray-400'
-                  }`}>
-                    활동 데이터 불러오기
-                  </span>
-                </div>
-              </div>
-
-              {/* 진행률 표시 */}
-              <div className="mt-6">
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="h-2 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full transition-all duration-700 ease-out"
-                    style={{
-                      width: `${
-                        (!isMapLoading ? 33 : 0) +
-                        (!isMapLoading && isMapInitializedLogs ? 34 : 0) +
-                        (!isMapLoading && isMapInitializedLogs && isInitialDataLoaded ? 33 : 0)
-                      }%`
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {(!isMapLoading ? 1 : 0) +
-                   (!isMapLoading && isMapInitializedLogs ? 1 : 0) +
-                   (!isMapLoading && isMapInitializedLogs && isInitialDataLoaded ? 1 : 0)}/3 단계 완료
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+        
 
         {/* 지도 영역 */}
         <div 
@@ -3279,19 +3111,21 @@ export default function LogsPage() {
           <div ref={mapContainer} className="w-full h-full" />
           
           {/* 지도 로딩 오버레이 */}
-          {(isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) && (
+          {(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded || isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) && (
             <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-40">
               <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
                 {/* 스피너 */}
                 <div className="relative">
-                  <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                  <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}></div>
+                  <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
+                  <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '2s' }}></div>
                 </div>
                 
                 {/* 로딩 텍스트 */}
                 <div className="text-center">
                   <p className="text-lg font-semibold text-gray-900 mb-1">
-                    {isLocationDataLoading ? '위치 로그 데이터 로딩 중...' :
+                    {isMapLoading || !isMapInitializedLogs ? '지도를 초기화하는 중...' :
+                     !isInitialDataLoaded ? '초기 데이터를 불러오는 중...' :
+                     isLocationDataLoading ? '위치 로그 데이터 로딩 중...' :
                      isDailyCountsLoading ? '일별 위치 카운트 조회 중...' :
                      isMemberActivityLoading ? '멤버 활동 데이터 조회 중...' : '데이터 로딩 중...'}
                   </p>

@@ -25,7 +25,7 @@ import {
 import { FaSearch as FaSearchSolid } from 'react-icons/fa';
 import dynamic from 'next/dynamic';
 import { FaTrash } from 'react-icons/fa';
-import LoadingSpinner from '../components/common/LoadingSpinner'; // LoadingSpinner 추가
+
 
 // 커스텀 알림 상태 추가 (react-toastify 관련 없음)
 interface CustomToast {
@@ -414,32 +414,7 @@ const spinnerVariants = {
   }
 };
 
-const loadingVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-      delayChildren: 0.2
-    }
-  }
-};
 
-const loadingTextVariants = {
-  hidden: { 
-    opacity: 0,
-    y: 10
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      type: "spring",
-      stiffness: 300,
-      damping: 25
-    }
-  }
-};
 
 // 타입 정의
 declare global {
@@ -3391,150 +3366,6 @@ export default function LocationPage() {
           </motion.header>
         )}
         
-        {/* 전체화면 로딩 - 체크리스트 형태 */}
-        {(isMapLoading || !dataFetchedRef.current.groups || !dataFetchedRef.current.members || !isFirstMemberSelectionComplete) && (
-          <div className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-            <div className="text-center max-w-sm mx-auto px-6">
-              {/* 상단 로고 및 제목 */}
-              <div className="mb-6">
-                <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">내 장소를 준비하고 있습니다</h2>
-                <p className="text-sm text-gray-600">잠시만 기다려주세요...</p>
-              </div>
-
-              {/* 로딩 체크리스트 - 컴팩트 버전 */}
-              <div className="space-y-1">
-                {/* 1. 지도 로딩 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    !isMapLoading 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : 'border-indigo-300 animate-pulse'
-                  }`}>
-                    {!isMapLoading ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    !isMapLoading ? 'text-green-700' : 'text-gray-700'
-                  }`}>
-                    지도 불러오기
-                  </span>
-                </div>
-
-                {/* 2. 그룹 정보 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    !isMapLoading && dataFetchedRef.current.groups 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : isMapLoading 
-                        ? 'border-gray-300' 
-                        : 'border-indigo-300 animate-pulse'
-                  }`}>
-                    {!isMapLoading && dataFetchedRef.current.groups ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : !isMapLoading ? (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    ) : (
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    !isMapLoading && dataFetchedRef.current.groups ? 'text-green-700' : isMapLoading ? 'text-gray-400' : 'text-gray-700'
-                  }`}>
-                    그룹 정보 불러오기
-                  </span>
-                </div>
-
-                {/* 3. 그룹 멤버 데이터 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    !isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : (isMapLoading || !dataFetchedRef.current.groups) 
-                        ? 'border-gray-300' 
-                        : 'border-indigo-300 animate-pulse'
-                  }`}>
-                    {!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : !isMapLoading && dataFetchedRef.current.groups ? (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    ) : (
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    !isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members ? 'text-green-700' : (isMapLoading || !dataFetchedRef.current.groups) ? 'text-gray-400' : 'text-gray-700'
-                  }`}>
-                    그룹 멤버 불러오기
-                  </span>
-                </div>
-
-                {/* 4. 첫번째 멤버 위치 이동 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    isFirstMemberSelectionComplete 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : (!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members)
-                        ? 'border-indigo-300 animate-pulse' 
-                        : 'border-gray-300'
-                  }`}>
-                    {isFirstMemberSelectionComplete ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members) ? (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    ) : (
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    isFirstMemberSelectionComplete ? 'text-green-700' : (!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members) ? 'text-gray-700' : 'text-gray-400'
-                  }`}>
-                    멤버 위치로 이동
-                  </span>
-                </div>
-              </div>
-
-              {/* 진행률 표시 */}
-              <div className="mt-6">
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="h-2 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full transition-all duration-700 ease-out"
-                    style={{
-                      width: `${
-                        (!isMapLoading ? 25 : 0) +
-                        (!isMapLoading && dataFetchedRef.current.groups ? 25 : 0) +
-                        (!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members ? 25 : 0) +
-                        (isFirstMemberSelectionComplete ? 25 : 0)
-                      }%`
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {(!isMapLoading ? 1 : 0) +
-                   (!isMapLoading && dataFetchedRef.current.groups ? 1 : 0) +
-                   (!isMapLoading && dataFetchedRef.current.groups && dataFetchedRef.current.members ? 1 : 0) +
-                   (isFirstMemberSelectionComplete ? 1 : 0)}/4 단계 완료
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-        
         {/* 지도 컨테이너 */}
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
@@ -3784,17 +3615,9 @@ export default function LocationPage() {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={handleConfirmPanelAction}
-                      disabled={isSavingLocationPanel}
-                      className="flex-1 py-3 px-4 bg-indigo-700 text-white font-medium rounded-xl shadow-lg mobile-button disabled:opacity-50"
+                      className="flex-1 py-3 px-4 bg-indigo-700 text-white font-medium rounded-xl shadow-lg mobile-button"
                     >
-                      {isSavingLocationPanel ? (
-                        <div className="flex items-center justify-center">
-                          <FiLoader className="animate-spin mr-2" />
-                          저장 중...
-                </div>
-                      ) : (
-                        "내 장소 등록"
-            )}
+                      내 장소 등록
                     </motion.button>
                   </motion.div>
                 </motion.div>
@@ -3859,14 +3682,6 @@ export default function LocationPage() {
                             <p className="text-sm text-gray-600">멤버들의 장소를 확인하세요</p>
                           </div>
                         </div>
-                        {isFetchingGroupMembers && (
-                          <motion.div
-                            variants={spinnerVariants}
-                            animate="animate"
-                          >
-                            <FiLoader className="text-indigo-500" size={18}/>
-                          </motion.div>
-                        )}
                        </div>
                        
                       <div className="flex items-center space-x-3">
@@ -3886,31 +3701,18 @@ export default function LocationPage() {
                             }}
                              onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
                             className="group-selector flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium min-w-[140px] mobile-button"
-                             disabled={isLoadingGroups}
                              data-group-selector="true"
                            >
                              <span className="truncate text-gray-700">
-                               {isLoadingGroups 
-                                 ? '로딩 중...' 
-                                 : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
-                               }
+                               {userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'}
                              </span>
                             <div className="ml-2 flex-shrink-0">
-                               {isLoadingGroups ? (
-                                <motion.div
-                                  variants={spinnerVariants}
-                                  animate="animate"
-                                >
-                                  <FiLoader className="text-gray-400" size={14} />
-                                </motion.div>
-                              ) : (
                                 <motion.div
                                   animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
                                   transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                                 >
                                   <FiChevronDown className="text-gray-400" size={14} />
                                 </motion.div>
-                               )}
                              </div>
                           </motion.button>
 
@@ -3957,52 +3759,7 @@ export default function LocationPage() {
                        </div>
                   </div>
 
-                   {isLoading ? (
-                      <motion.div 
-                        variants={loadingVariants}
-                        initial="hidden"
-                        animate="visible"
-                        className="flex flex-col items-center justify-center py-8"
-                      >
-                        {/* 배경 원형 파도 효과 */}
-                        <div className="relative flex items-center justify-center mb-4">
-                          {[...Array(3)].map((_, i) => (
-                            <motion.div
-                              key={i}
-                              className="absolute w-12 h-12 border border-indigo-200 rounded-full"
-                              animate={{
-                                scale: [1, 1.8, 1],
-                                opacity: [0.4, 0, 0.4],
-                              }}
-                              transition={{
-                                duration: 1.5,
-                                repeat: Infinity,
-                                delay: i * 0.4,
-                                ease: [0.22, 1, 0.36, 1]
-                              }}
-                            />
-                          ))}
-                          
-                          {/* 중앙 그룹 아이콘 */}
-                          <motion.div
-                            className="relative w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg"
-                            variants={spinnerVariants}
-                            animate="animate"
-                          >
-                            <FiUser className="w-6 h-6 text-white" />
-                          </motion.div>
-                        </div>
-                        
-                        <motion.div
-                          variants={loadingTextVariants}
-                          initial="hidden"
-                          animate="visible"
-                        >
-                          <p className="font-medium text-gray-900 mb-1">멤버 정보를 불러오는 중...</p>
-                          <p className="text-sm text-gray-600">잠시만 기다려주세요</p>
-                        </motion.div>
-                      </motion.div>
-                   ) : groupMembers.length > 0 ? (
+                   {groupMembers.length > 0 ? (
                       <motion.div 
                         variants={staggerContainer}
                         initial="hidden"
@@ -4105,23 +3862,7 @@ export default function LocationPage() {
                       </div>
                     </div>
 
-                  {isLoadingOtherLocations ? (
-                      <motion.div 
-                        variants={loadingVariants}
-                        initial="hidden"
-                        animate="visible"
-                        className="flex flex-col items-center justify-center py-8"
-                      >
-                        <motion.div
-                          variants={loadingTextVariants}
-                          initial="hidden"
-                          animate="visible"
-                        >
-                          <p className="font-medium text-gray-900 mb-1">장소 정보를 불러오는 중...</p>
-                          <p className="text-sm text-gray-600">잠시만 기다려주세요</p>
-                        </motion.div>
-                      </motion.div>
-                  ) : otherMembersSavedLocations.length > 0 ? (
+                  {otherMembersSavedLocations.length > 0 ? (
                       <motion.div 
                         variants={staggerContainer}
                         initial="hidden"
