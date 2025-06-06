@@ -16,14 +16,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import memberService from '@/services/memberService';
 
 import groupService, { Group } from '@/services/groupService';
-import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker, LocationLogSummary, DailyCountsResponse, MemberActivityResponse } from '@/services/memberLocationLogService';
+import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker, LocationLogSummary, DailyCountsResponse, MemberActivityResponse, MemberDailyCount } from '@/services/memberLocationLogService';
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
 declare global {
   interface Window {
-    naver: any;
-    // google: any; // google은 logs 페이지에서 아직 사용하지 않으므로 주석 처리 또는 필요시 추가
-  }
+  naver: any;
+  getRecentDaysDebugLogged?: boolean;
+  // google: any; // google은 logs 페이지에서 아직 사용하지 않으므로 주석 처리 또는 필요시 추가
+}
 }
 
 const NAVER_MAPS_CLIENT_ID = API_KEYS.NAVER_MAPS_CLIENT_ID;
@@ -425,6 +426,10 @@ const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefi
   return photoUrl ?? getDefaultImage(gender, index);
 };
 
+// 전역 실행 제어 - 한 번만 실행되도록 보장
+let globalPageExecuted = false;
+let globalComponentInstances = 0;
+
 export default function LogsPage() {
   const router = useRouter();
   
@@ -445,11 +450,17 @@ export default function LogsPage() {
   
   // 데이터 fetch 상태 관리
   const dataFetchedRef = useRef({ members: false });
+  
+  // 컴포넌트 인스턴스별 실행 제어
+  const instanceId = useRef(Math.random().toString(36).substr(2, 9));
+  const hasExecuted = useRef(false);
+  const isMainInstance = useRef(false);
 
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [previousDate, setPreviousDate] = useState<string | null>(null); // 이전 날짜 추적
   const isDateChangedRef = useRef<boolean>(false); // 날짜 변경 플래그
+  const loadLocationDataExecutingRef = useRef<boolean>(false); // loadLocationData 중복 실행 방지
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null); 
@@ -571,6 +582,34 @@ export default function LogsPage() {
     }
   };
 
+  // 컴포넌트 인스턴스 등록 및 메인 인스턴스 결정
+  useEffect(() => {
+    globalComponentInstances++;
+    const currentInstanceCount = globalComponentInstances;
+    
+    console.log(`[${instanceId.current}] 컴포넌트 생성됨 - 인스턴스 번호: ${currentInstanceCount}`);
+    
+    // 첫 번째 인스턴스만 메인으로 설정
+    if (currentInstanceCount === 1 && !globalPageExecuted) {
+      isMainInstance.current = true;
+      globalPageExecuted = true;
+      console.log(`[${instanceId.current}] 메인 인스턴스로 설정됨`);
+    } else {
+      console.log(`[${instanceId.current}] 서브 인스턴스 - 실행하지 않음`);
+    }
+    
+    return () => {
+      globalComponentInstances--;
+      console.log(`[${instanceId.current}] 컴포넌트 제거됨 - 남은 인스턴스: ${globalComponentInstances}`);
+      
+      // 모든 인스턴스가 제거되면 전역 플래그 리셋
+      if (globalComponentInstances === 0) {
+        globalPageExecuted = false;
+        console.log('모든 인스턴스 제거됨 - 전역 플래그 리셋');
+      }
+    };
+  }, []);
+
   useEffect(() => {
     loadNaverMapsAPI();
   }, []);
@@ -647,12 +686,81 @@ export default function LogsPage() {
   }, [naverMapsLoaded]);
 
   const getRecentDays = () => {
-    return Array.from({ length: 15 }, (_, i) => { // 오늘부터 14일전까지 (오늘 포함 15일)
+    const recentDays = Array.from({ length: 15 }, (_, i) => { // 오늘부터 14일전까지 (오늘 포함 15일)
       const date = subDays(new Date(), 14 - i);
       const dateString = format(date, 'yyyy-MM-dd');
-      const hasLogs = MOCK_LOGS.some(log => log.timestamp.startsWith(dateString));
+      
+      // 선택된 멤버 찾기
+      const selectedMember = groupMembers.find(m => m.isSelected);
+      
+      // 실제 데이터에서 해당 날짜의 로그 개수 확인
+      let hasLogs = false;
+      let dayCount = 0;
+      let dayData = null;
+      
+      if (dailyCountsData && selectedMember) {
+        // mt_idx 기준으로 멤버 데이터 찾기
+        const memberMtIdx = parseInt(selectedMember.id);
+        const memberData = dailyCountsData.member_daily_counts.find(
+          member => member.member_id === memberMtIdx
+        );
+        
+        if (memberData) {
+          // 날짜 형식 맞추기: 2025-06-06 -> 06.06
+          const shortDateString = format(date, 'MM.dd');
+          
+          dayData = memberData.daily_counts.find(
+            day => day.formatted_date === shortDateString || day.formatted_date === dateString
+          );
+          if (dayData) {
+            dayCount = dayData.count;
+            hasLogs = dayCount > 0;
+          }
+        }
+        
+        // 첫 번째 날짜에 대해서만 디버깅 로그 출력 (중복 실행 방지)
+        if (i === 0 && !window.getRecentDaysDebugLogged) {
+          window.getRecentDaysDebugLogged = true;
+          console.log('[getRecentDays] 디버깅:', {
+            dateString,
+            selectedMemberName: selectedMember?.name,
+            selectedMemberId: selectedMember?.id,
+            memberMtIdx,
+            hasDailyCountsData: !!dailyCountsData,
+            memberDataFound: !!memberData,
+            memberDataCount: memberData?.daily_counts?.length,
+            dayDataFound: !!dayData,
+            dayCount,
+            // 실제 백엔드 날짜 형식들 확인
+            backendDates: memberData?.daily_counts?.slice(0, 5).map(day => ({
+              formatted_date: day.formatted_date,
+              count: day.count
+            }))
+          });
+          
+          // 3초 후 플래그 리셋
+          setTimeout(() => {
+            window.getRecentDaysDebugLogged = false;
+          }, 3000);
+        }
+      } else {
+        // dailyCountsData가 없거나 선택된 멤버가 없는 경우 MOCK_LOGS 사용
+        hasLogs = MOCK_LOGS.some(log => log.timestamp.startsWith(dateString));
+        
+        // 첫 번째 날짜에 대해서만 디버깅 로그 출력
+        if (i === 0) {
+          console.log('[getRecentDays] 데이터 없음:', {
+            dateString,
+            hasDailyCountsData: !!dailyCountsData,
+            hasSelectedMember: !!selectedMember,
+            selectedMemberName: selectedMember?.name,
+            usingMockLogs: true
+          });
+        }
+      }
       
       let displayString = format(date, 'MM.dd(E)', { locale: ko }); // 예: "05.07(수)"
+      
       if (i === 14) {
         displayString = `오늘(${format(date, 'E', { locale: ko })})`;
       } else if (i === 13) {
@@ -663,8 +771,11 @@ export default function LogsPage() {
         value: dateString,
         display: displayString,
         hasLogs: hasLogs,
+        count: dayCount,
       };
     });
+    
+    return recentDays;
   };
 
   // home/page.tsx와 동일한 드래그 핸들러들
@@ -844,6 +955,9 @@ export default function LogsPage() {
     setGroupMembers(updatedMembers);
     // updateMemberMarkers는 useEffect에서 처리되도록 제거
     setActiveLogView('members');
+    
+    // 멤버 선택 시 날짜 스크롤 위치 조정
+    setTimeout(() => scrollToTodayDate('멤버 선택'), 100);
     
     // 바텀시트 상태 유지
     setBottomSheetState(currentBottomSheetState);
@@ -1868,6 +1982,12 @@ export default function LogsPage() {
     isDateChangedRef.current = true; // 날짜 변경 플래그 설정
     console.log('[LOGS] 날짜 변경으로 firstMemberSelected 리셋 및 날짜 변경 플래그 설정');
     
+    // 날짜 변경 시 멤버 활동 데이터 다시 조회
+    if (selectedGroupId) {
+      console.log('[LOGS] 날짜 변경 - 멤버 활동 데이터 재조회:', date);
+      loadMemberActivityByDate(selectedGroupId, date);
+    }
+    
     // 선택된 멤버가 있으면 데이터 로딩 (시작지점 기준 지도 조정은 데이터 로드 후 처리)
     const selectedMember = groupMembers.find(m => m.isSelected);
     if (selectedMember) {
@@ -1884,6 +2004,16 @@ export default function LogsPage() {
       console.log('[loadLocationData] mtIdx 또는 date가 없어서 실행하지 않음:', { mtIdx, date });
       return;
     }
+
+    // 중복 실행 방지
+    const executionId = `${mtIdx}-${date}-${Date.now()}`;
+    if (loadLocationDataExecutingRef.current) {
+      console.log(`[loadLocationData] 이미 실행 중이므로 건너뜀: ${executionId}`);
+      return;
+    }
+    
+    loadLocationDataExecutingRef.current = true;
+    console.log(`[loadLocationData] 실행 시작: ${executionId}`);
 
     try {
       setIsLocationDataLoading(true);
@@ -1974,6 +2104,8 @@ export default function LogsPage() {
       setLocationLogSummaryData(null);
     } finally {
       setIsLocationDataLoading(false);
+      loadLocationDataExecutingRef.current = false;
+      console.log(`[loadLocationData] 실행 완료: ${executionId}`);
     }
   };
 
@@ -1996,7 +2128,38 @@ export default function LogsPage() {
     console.log('⏱️ 체류시간 분석 데이터:', stayTimesData);
     console.log('📍 지도 마커 데이터:', mapMarkersData);
     console.log('📝 PHP 로직 기반 요약 데이터:', locationLogSummaryData);
-    console.log('📊 일별 카운트 데이터:', dailyCountsData);
+    
+    // 멤버별 일별 카운트 데이터 로깅
+    if (dailyCountsData) {
+      console.log('📊 멤버별 일별 카운트 데이터:');
+      console.log('  - 전체 멤버:', dailyCountsData.total_members, '명');
+      console.log('  - 조회 기간:', dailyCountsData.start_date, '~', dailyCountsData.end_date);
+      
+      // 멤버별 상세 일별 카운트 출력
+      console.log('  - 멤버별 상세 데이터:');
+      dailyCountsData.member_daily_counts.forEach((member, index) => {
+        console.log(`    ${index + 1}. ${member.member_name} (ID: ${member.member_id}):`);
+        member.daily_counts.forEach(dayCount => {
+          console.log(`      📅 ${dayCount.formatted_date}: ${dayCount.count}건`);
+        });
+        const totalCount = member.daily_counts.reduce((sum, day) => sum + day.count, 0);
+        console.log(`      🔢 총합: ${totalCount}건`);
+        console.log('');
+      });
+      
+      // 전체 일별 합계 (모든 날짜)
+      console.log('  - 전체 일별 합계:');
+      dailyCountsData.total_daily_counts.forEach(day => {
+        console.log(`    📅 ${day.formatted_date}: ${day.count}건`);
+      });
+      
+      // 전체 총합
+      const grandTotal = dailyCountsData.total_daily_counts.reduce((sum, day) => sum + day.count, 0);
+      console.log(`  🔢 총 전체 위치 기록: ${grandTotal}건`);
+    } else {
+      console.log('📊 일별 카운트 데이터: null');
+    }
+    
     console.log('👥 멤버 활동 데이터:', memberActivityData);
     console.log('============================');
   };
@@ -2136,6 +2299,7 @@ export default function LogsPage() {
         
         if (!hasExistingData || isDateChangeCase) {
           console.log("[LogsPage] 선택된 멤버의 위치 데이터 로드:", selectedMember.name, selectedDate, { hasExistingData, isDateChangeCase });
+          // loadLocationData에서 중복 실행 방지가 적용됨
           loadLocationData(parseInt(selectedMember.id), selectedDate);
         } else {
           console.log("[LogsPage] 기존 로그 데이터 유지 - 재조회하지 않음:", selectedMember.name, selectedDate);
@@ -2189,62 +2353,86 @@ export default function LogsPage() {
   }, [activeLogView]);
 
   // 날짜 스크롤 자동 조정 함수
-  const scrollToTodayDate = () => {
+  const scrollToTodayDate = (reason?: string) => {
     if (dateScrollContainerRef.current) {
       const container = dateScrollContainerRef.current;
       // 즉시 스크롤을 맨 오른쪽으로 이동 (오늘 날짜 보이게)
       container.scrollLeft = container.scrollWidth;
-      console.log('[날짜 스크롤] 오늘 날짜로 이동 완료');
+      console.log('[날짜 스크롤] 오늘 날짜로 이동 완료', reason ? `(${reason})` : '');
     }
   };
 
-  // 날짜 버튼 초기 스크롤 위치 설정 (오늘 날짜가 보이도록)
+  // 날짜 버튼 초기 스크롤 위치 설정 (초기 로드 시에만)
+  const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
+  
   useEffect(() => {
-    // DOM이 완전히 렌더링된 후 실행하기 위해 requestAnimationFrame 사용
-    const scheduleScroll = () => {
-      requestAnimationFrame(() => {
-        scrollToTodayDate();
-      });
-    };
+    if (!isInitialScrollDone && showDateSelection) {
+      // DOM이 완전히 렌더링된 후 실행
+      const scheduleScroll = () => {
+        requestAnimationFrame(() => {
+          scrollToTodayDate('초기 로드');
+          setIsInitialScrollDone(true);
+        });
+      };
 
-    // 다양한 타이밍에 스크롤 시도
-    setTimeout(scheduleScroll, 100);
-    setTimeout(scheduleScroll, 300);
-    setTimeout(scheduleScroll, 1000);
-  }, []);
+      // 첫 로드 시에만 스크롤 실행
+      setTimeout(scheduleScroll, 300);
+    }
+  }, [showDateSelection, isInitialScrollDone]);
 
-  // 그룹이 변경될 때도 오늘 날짜로 스크롤
+  // 그룹이 변경될 때만 오늘 날짜로 스크롤
   useEffect(() => {
-    if (selectedGroupId) {
-      setTimeout(scrollToTodayDate, 200);
+    if (selectedGroupId && isInitialScrollDone) {
+      setTimeout(() => scrollToTodayDate('그룹 변경'), 200);
     }
   }, [selectedGroupId]);
 
-  // UserContext 데이터가 로딩 완료되면 첫 번째 그룹을 자동 선택
+  // UserContext 데이터가 로딩 완료되면 첫 번째 그룹을 자동 선택 - 메인 인스턴스에서만
   useEffect(() => {
+    if (!isMainInstance.current) return;
+    
     if (!isUserDataLoading && userGroups.length > 0 && !selectedGroupId) {
       setSelectedGroupId(userGroups[0].sgt_idx);
-      console.log('[LOGS] UserContext에서 첫 번째 그룹 자동 선택:', userGroups[0].sgt_title);
+      console.log(`[${instanceId.current}] UserContext에서 첫 번째 그룹 자동 선택:`, userGroups[0].sgt_title);
     }
   }, [isUserDataLoading, userGroups, selectedGroupId]);
 
-  // 그룹 멤버 및 스케줄 데이터 가져오기 (home/page.tsx와 동일)
+  // 그룹 멤버 및 스케줄 데이터 가져오기 - 메인 인스턴스에서만 실행
+  const fetchDataExecutingRef = useRef(false);
   useEffect(() => {
+    // 메인 인스턴스가 아니면 실행하지 않음
+    if (!isMainInstance.current) {
+      console.log(`[${instanceId.current}] 서브 인스턴스 - fetchAllGroupData 건너뜀`);
+      return;
+    }
+
+    // 이미 실행되었으면 건너뜀
+    if (hasExecuted.current) {
+      console.log(`[${instanceId.current}] 이미 실행됨 - fetchAllGroupData 건너뜀`);
+      return;
+    }
+
     let isMounted = true;
     
     const fetchAllGroupData = async () => {
-      if (!isMounted) return;
+      if (!isMounted || !isMainInstance.current) return;
 
       // selectedGroupId가 없으면 실행하지 않음
       if (!selectedGroupId) {
-        console.log('[fetchAllGroupData] selectedGroupId가 없어서 실행하지 않음');
+        console.log(`[${instanceId.current}] selectedGroupId가 없어서 실행하지 않음`);
         return;
       }
 
-      // 이미 데이터가 로드되었거나 로딩 중이면 중복 실행 방지
-      if (dataFetchedRef.current.members) {
+      // 중복 실행 방지
+      if (dataFetchedRef.current.members || fetchDataExecutingRef.current || hasExecuted.current) {
+        console.log(`[${instanceId.current}] 중복 실행 방지 - 이미 로드됨 또는 실행 중`);
         return;
       }
+
+      hasExecuted.current = true;
+      fetchDataExecutingRef.current = true;
+      const fetchId = Math.random().toString(36).substr(2, 9);
+      console.log(`[${instanceId.current}-fetchAllGroupData-${fetchId}] 데이터 페칭 시작:`, selectedGroupId);
 
       try {
         const groupIdToUse = selectedGroupId.toString();
@@ -2290,6 +2478,21 @@ export default function LogsPage() {
             }
             setGroupMembers(currentMembers); 
             dataFetchedRef.current.members = true;
+
+            // 그룹 멤버 조회 완료 후 날짜별 활동 로그 관련 API 호출
+            console.log('[LOGS] 그룹 멤버 조회 완료 - 날짜별 활동 로그 API 호출 시작');
+            
+            // 1. 최근 14일간 일별 카운트 조회
+            if (isMounted) {
+              await loadDailyLocationCounts(selectedGroupId, 14);
+            }
+            
+            // 2. 현재 선택된 날짜의 멤버 활동 조회
+            if (isMounted && selectedDate) {
+              await loadMemberActivityByDate(selectedGroupId, selectedDate);
+            }
+            
+            console.log('[LOGS] 날짜별 활동 로그 API 호출 완료');
           }
         }
 
@@ -2299,17 +2502,28 @@ export default function LogsPage() {
         if (isMounted && !dataFetchedRef.current.members) {
           dataFetchedRef.current.members = true;
         }
+      } finally {
+        fetchDataExecutingRef.current = false;
+        console.log(`[${instanceId.current}-fetchAllGroupData-${fetchId}] 데이터 페칭 완료`);
       }
     };
 
     fetchAllGroupData();
 
-    return () => { isMounted = false; };
+    return () => { 
+      isMounted = false; 
+      fetchDataExecutingRef.current = false;
+    };
   }, [selectedGroupId]);
 
-  // 그룹 선택 핸들러
+  // 그룹 선택 핸들러 - 메인 인스턴스에서만
   const handleGroupSelect = async (groupId: number) => {
-    console.log('[handleGroupSelect] 그룹 선택:', groupId);
+    if (!isMainInstance.current) {
+      console.log(`[${instanceId.current}] 서브 인스턴스 - 그룹 선택 건너뜀`);
+      return;
+    }
+
+    console.log(`[${instanceId.current}] 그룹 선택:`, groupId);
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
     
@@ -2317,16 +2531,26 @@ export default function LogsPage() {
     setGroupMembers([]);
     setFirstMemberSelected(false);
     dataFetchedRef.current = { members: false };
+    fetchDataExecutingRef.current = false;
+    hasExecuted.current = false; // 실행 플래그도 리셋
+    loadLocationDataExecutingRef.current = false; // loadLocationData 실행 플래그도 리셋
+    firstMemberSelectExecutingRef.current = false; // 첫 멤버 선택 실행 플래그도 리셋
     
-    console.log('[handleGroupSelect] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작');
+    // 날짜별 활동 로그 데이터 초기화
+    setDailyCountsData(null);
+    setMemberActivityData(null);
+    
+    console.log(`[${instanceId.current}] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작`);
   };
 
-  // 그룹별 멤버 수 조회
+  // 그룹별 멤버 수 조회 - 메인 인스턴스에서만
   useEffect(() => {
+    if (!isMainInstance.current) return;
+    
     const fetchGroupMemberCounts = async () => {
       if (!userGroups || userGroups.length === 0) return;
 
-      console.log('[LOGS] 그룹 멤버 수 조회 시작:', userGroups.length, '개 그룹');
+      console.log(`[${instanceId.current}] 그룹 멤버 수 조회 시작:`, userGroups.length, '개 그룹');
       
       const counts: Record<number, number> = {};
       
@@ -2334,15 +2558,15 @@ export default function LogsPage() {
         try {
           const count = await getGroupMemberCount(group.sgt_idx);
           counts[group.sgt_idx] = count;
-          console.log(`[LOGS] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수:`, count);
+          console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수:`, count);
         } catch (error) {
-          console.error(`[LOGS] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+          console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
           counts[group.sgt_idx] = 0;
         }
       }));
       
       setGroupMemberCounts(counts);
-      console.log('[LOGS] 그룹 멤버 수 조회 완료:', counts);
+      console.log(`[${instanceId.current}] 그룹 멤버 수 조회 완료:`, counts);
     };
 
     fetchGroupMemberCounts();
@@ -2380,32 +2604,39 @@ export default function LogsPage() {
     }
   }, [isGroupSelectorOpen]);
 
-  // 첫 번째 그룹 자동 선택
-  useEffect(() => {
-    if (!selectedGroupId && userGroups && userGroups.length > 0) {
-      console.log('[LOGS] 첫 번째 그룹 자동 선택:', userGroups[0].sgt_idx, userGroups[0].sgt_title);
-      setSelectedGroupId(userGroups[0].sgt_idx);
-    }
-  }, [userGroups, selectedGroupId]);
 
-  // 첫번째 멤버 자동 선택 및 위치 데이터 로딩
+
+  // 첫번째 멤버 자동 선택 및 위치 데이터 로딩 - 메인 인스턴스에서만
+  const firstMemberSelectExecutingRef = useRef(false);
   useEffect(() => {
-    if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && !firstMemberSelected && dataFetchedRef.current.members && selectedDate) {
-      console.log('[LOGS] 첫번째 멤버 자동 선택 시작:', groupMembers[0].name, '선택된 날짜:', selectedDate);
+    if (!isMainInstance.current) {
+      console.log(`[${instanceId.current}] 서브 인스턴스 - 첫번째 멤버 자동 선택 건너뜀`);
+      return;
+    }
+
+    if (groupMembers.length > 0 && 
+        !groupMembers.some(m => m.isSelected) && 
+        !firstMemberSelected && 
+        dataFetchedRef.current.members && 
+        selectedDate &&
+        !firstMemberSelectExecutingRef.current) {
       
+      console.log(`[${instanceId.current}] 첫번째 멤버 자동 선택 시작:`, groupMembers[0].name, '선택된 날짜:', selectedDate);
+      
+      firstMemberSelectExecutingRef.current = true;
       setFirstMemberSelected(true);
       
       setTimeout(() => {
-        console.log('[LOGS] 첫번째 멤버 자동 선택 실행:', groupMembers[0].id);
+        console.log(`[${instanceId.current}] 첫번째 멤버 자동 선택 실행:`, groupMembers[0].id);
         handleMemberSelect(groupMembers[0].id, {} as React.MouseEvent);
         
-        // 첫 번째 멤버의 위치 데이터 자동 로딩
-        const firstMemberId = parseInt(groupMembers[0].id);
-        console.log('[LOGS] 첫번째 멤버 위치 데이터 로딩 시작:', firstMemberId, selectedDate);
-        loadLocationData(firstMemberId, selectedDate);
+        // 첫 번째 멤버의 위치 데이터는 useEffect에서 멤버 선택 감지로 자동 로딩됨
+        console.log(`[${instanceId.current}] 첫번째 멤버 선택 완료, 위치 데이터는 useEffect에서 처리됨`);
+        
+        firstMemberSelectExecutingRef.current = false;
       }, 500);
     }
-  }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members, selectedDate]);
+  }, [groupMembers, firstMemberSelected, selectedDate]);
 
   return (
     <>
@@ -2506,23 +2737,28 @@ export default function LogsPage() {
                       stiffness: 150
                     }}
                   >
-                    ({getRecentDays().filter(day => day.hasLogs).length}일 기록 있음)
+                    {(() => {
+                      const selectedMember = groupMembers.find(m => m.isSelected);
+                      const recentDays = getRecentDays();
+                      const daysWithLogs = recentDays.filter(day => day.hasLogs).length;
+                      
+                      if (selectedMember) {
+                        return `${selectedMember.name}: ${daysWithLogs}일 기록`;
+                      } else {
+                        return `(${daysWithLogs}일 기록 있음)`;
+                      }
+                    })()}
                   </motion.div>
                 </motion.div>
                 <motion.div 
                   ref={dateScrollContainerRef} 
                   className="flex space-x-2 overflow-x-auto hide-scrollbar"
-                  onLoad={() => scrollToTodayDate()}
                   style={{ scrollBehavior: 'auto' }}
                   variants={staggerContainer}
                   initial="initial"
                   animate="animate"
                 >
                   {getRecentDays().map((day, idx) => {
-                    // 마지막 날짜 버튼(오늘)이 렌더링될 때 스크롤 트리거
-                    if (idx === getRecentDays().length - 1) {
-                      setTimeout(() => scrollToTodayDate(), 50);
-                    }
                     const isSelected = selectedDate === day.value;
                     const isToday = idx === getRecentDays().length - 1; // 오늘인지 확인
 

@@ -246,7 +246,7 @@ async def handle_location_log_request(
                 logger.error(traceback.format_exc())
                 raise HTTPException(status_code=500, detail=str(e))
         
-        elif act == "get_daily_summary_by_range":
+        elif act == "get_daily_summary_by_range" or act == "get_daily_summary":
             # 특정 회원의 날짜 범위별 위치 로그 요약 정보 (제공된 SQL 쿼리 기반)
             try:
                 mt_idx = body.get("mt_idx")
@@ -638,10 +638,15 @@ async def get_daily_location_counts(
         logger.info(f"조회 기간: {start_date} ~ {end_date}, 그룹 ID: {group_id}")
         
         # 그룹 멤버 확인
+        from ....models.group_detail import GroupDetail
+        
         group_members = db.query(Member).join(
-            Group, Member.mt_group_idx == Group.sgt_idx
+            GroupDetail, Member.mt_idx == GroupDetail.mt_idx
         ).filter(
-            Group.sgt_idx == group_id
+            GroupDetail.sgt_idx == group_id,
+            GroupDetail.sgdt_exit == 'N',
+            GroupDetail.sgdt_discharge == 'N', 
+            GroupDetail.sgdt_show == 'Y'
         ).all()
         
         if not group_members:
@@ -654,13 +659,14 @@ async def get_daily_location_counts(
         # SQL 쿼리로 직접 날짜별 카운트를 가져옴
         query = text("""
             SELECT 
+                mt_idx as member_idx,
                 DATE(mlt_gps_time) as log_date,
                 COUNT(DISTINCT mlt_idx) as count
             FROM member_location_log_t 
-            WHERE mlt_member_idx IN :member_ids
+            WHERE mt_idx IN :member_ids
             AND DATE(mlt_gps_time) BETWEEN :start_date AND :end_date
-            GROUP BY DATE(mlt_gps_time)
-            ORDER BY log_date DESC
+            GROUP BY mt_idx, DATE(mlt_gps_time)
+            ORDER BY mt_idx, log_date DESC
         """)
         
         result = db.execute(query, {
@@ -669,20 +675,60 @@ async def get_daily_location_counts(
             "end_date": end_date
         }).fetchall()
         
-        # 결과를 딕셔너리로 변환 (날짜 -> 카운트)
-        count_dict = {str(row.log_date): row.count for row in result}
+        # 결과를 딕셔너리로 변환 (멤버ID -> 날짜 -> 카운트)
+        member_count_dict = {}
+        for row in result:
+            member_id = row.member_idx
+            date_str = str(row.log_date)
+            count = row.count
+            
+            if member_id not in member_count_dict:
+                member_count_dict[member_id] = {}
+            member_count_dict[member_id][date_str] = count
         
-        # 모든 날짜에 대해 카운트 정보 생성 (기록이 없는 날은 0)
-        daily_counts = []
+        # 멤버별 일별 카운트 데이터 생성
+        member_daily_counts = []
+        for member in group_members:
+            member_counts = []
+            current_date = end_date
+            
+            for i in range(days):
+                date_str = str(current_date)
+                count = member_count_dict.get(member.mt_idx, {}).get(date_str, 0)
+                
+                member_counts.append({
+                    "date": date_str,
+                    "count": count,
+                    "formatted_date": current_date.strftime("%m.%d"),
+                    "day_of_week": current_date.strftime("%a"),
+                    "is_today": current_date == end_date,
+                    "is_weekend": current_date.weekday() >= 5
+                })
+                
+                current_date -= timedelta(days=1)
+            
+            member_daily_counts.append({
+                "member_id": member.mt_idx,
+                "member_name": member.mt_name,
+                "member_photo": getattr(member, 'mt_file1', None),  # Member 모델에는 mt_file1이 실제 photo 필드
+                "member_gender": getattr(member, 'mt_gender', None),
+                "daily_counts": member_counts
+            })
+        
+        # 전체 그룹의 일별 총 카운트도 계산 (기존 로직 유지)
+        total_daily_counts = []
         current_date = end_date
         
         for i in range(days):
             date_str = str(current_date)
-            count = count_dict.get(date_str, 0)
+            total_count = sum(
+                member_count_dict.get(member.mt_idx, {}).get(date_str, 0) 
+                for member in group_members
+            )
             
-            daily_counts.append({
+            total_daily_counts.append({
                 "date": date_str,
-                "count": count,
+                "count": total_count,
                 "formatted_date": current_date.strftime("%m.%d"),
                 "day_of_week": current_date.strftime("%a"),
                 "is_today": current_date == end_date,
@@ -691,10 +737,11 @@ async def get_daily_location_counts(
             
             current_date -= timedelta(days=1)
         
-        logger.info(f"일별 카운트 조회 완료: {len(daily_counts)}일간 데이터")
+        logger.info(f"멤버별 일별 카운트 조회 완료: {len(member_daily_counts)}명, {days}일간 데이터")
         
         return {
-            "daily_counts": daily_counts,
+            "member_daily_counts": member_daily_counts,
+            "total_daily_counts": total_daily_counts,
             "total_days": days,
             "start_date": str(start_date),
             "end_date": str(end_date),
@@ -707,6 +754,86 @@ async def get_daily_location_counts(
         raise HTTPException(
             status_code=500, 
             detail=f"일별 위치 기록 카운트 조회 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.get("/daily-counts-simple")
+async def get_daily_location_counts_simple(
+    group_id: int = Query(..., description="그룹 ID"),
+    days: int = Query(14, description="조회할 일수 (기본값: 14일)"),
+    db: Session = Depends(get_db)
+):
+    """
+    멤버별 일별 위치 기록 카운트를 간단한 텍스트 형태로 반환합니다.
+    """
+    try:
+        from datetime import datetime, timedelta
+        from sqlalchemy import func, and_, text
+        from ....models.member import Member
+        from ....models.group import Group
+        from ....models.member_location_log import MemberLocationLog
+        
+        # 현재 날짜부터 N일 전까지의 날짜 범위 계산
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days-1)
+        
+        logger.info(f"간단 조회 기간: {start_date} ~ {end_date}, 그룹 ID: {group_id}")
+        
+        # 그룹 멤버 확인
+        from ....models.group_detail import GroupDetail
+        
+        group_members = db.query(Member).join(
+            GroupDetail, Member.mt_idx == GroupDetail.mt_idx
+        ).filter(
+            GroupDetail.sgt_idx == group_id,
+            GroupDetail.sgdt_exit == 'N',
+            GroupDetail.sgdt_discharge == 'N', 
+            GroupDetail.sgdt_show == 'Y'
+        ).all()
+        
+        if not group_members:
+            return {"message": f"그룹 {group_id}에 멤버가 없습니다."}
+        
+        member_ids = [member.mt_idx for member in group_members]
+        
+        # 일별 위치 기록 카운트 조회
+        query = text("""
+            SELECT 
+                mt_idx as member_idx,
+                DATE(mlt_gps_time) as log_date,
+                COUNT(DISTINCT mlt_idx) as count
+            FROM member_location_log_t 
+            WHERE mt_idx IN :member_ids
+            AND DATE(mlt_gps_time) BETWEEN :start_date AND :end_date
+            GROUP BY mt_idx, DATE(mlt_gps_time)
+            HAVING COUNT(DISTINCT mlt_idx) > 0
+            ORDER BY mt_idx, log_date DESC
+        """)
+        
+        result = db.execute(query, {
+            "member_ids": tuple(member_ids),
+            "start_date": start_date,
+            "end_date": end_date
+        }).fetchall()
+        
+        # 간단한 텍스트 형태로 변환
+        simple_data = []
+        for row in result:
+            simple_data.append(f"{row.member_idx} {row.log_date} {row.count}")
+        
+        logger.info(f"간단 형태 데이터: {len(simple_data)}건")
+        
+        return {
+            "simple_format": simple_data,
+            "total_records": len(simple_data),
+            "group_id": group_id,
+            "date_range": f"{start_date} ~ {end_date}"
+        }
+        
+    except Exception as e:
+        logger.error(f"간단 일별 카운트 조회 중 오류: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"간단 일별 카운트 조회 중 오류가 발생했습니다: {str(e)}"
         )
 
 @router.get("/member-activity")
@@ -724,6 +851,7 @@ async def get_member_activity_by_date(
         from ....models.member import Member
         from ....models.group import Group
         from ....models.member_location_log import MemberLocationLog
+        from ....models.group_detail import GroupDetail
         
         # 날짜 파싱
         target_date = datetime.strptime(date, "%Y-%m-%d").date()
@@ -732,9 +860,12 @@ async def get_member_activity_by_date(
         
         # 그룹 멤버 조회
         group_members = db.query(Member).join(
-            Group, Member.mt_group_idx == Group.sgt_idx
+            GroupDetail, Member.mt_idx == GroupDetail.mt_idx
         ).filter(
-            Group.sgt_idx == group_id
+            GroupDetail.sgt_idx == group_id,
+            GroupDetail.sgdt_exit == 'N',
+            GroupDetail.sgdt_discharge == 'N', 
+            GroupDetail.sgdt_show == 'Y'
         ).all()
         
         if not group_members:
@@ -769,8 +900,8 @@ async def get_member_activity_by_date(
             member_activities.append({
                 "member_id": member.mt_idx,
                 "member_name": member.mt_name,
-                "member_photo": member.mt_photo,
-                "member_gender": member.mt_gender,
+                "member_photo": getattr(member, 'mt_file1', None),  # Member 모델에는 mt_file1이 실제 photo 필드
+                "member_gender": getattr(member, 'mt_gender', None),
                 "log_count": count,
                 "first_log_time": first_log.mlt_gps_time.isoformat() if first_log else None,
                 "last_log_time": last_log.mlt_gps_time.isoformat() if last_log else None,

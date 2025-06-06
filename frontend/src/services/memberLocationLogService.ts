@@ -120,9 +120,19 @@ export interface DailyCount {
   is_weekend: boolean;
 }
 
-// 일별 카운트 응답 인터페이스
-export interface DailyCountsResponse {
+// 멤버별 일별 카운트 데이터 인터페이스
+export interface MemberDailyCount {
+  member_id: number;
+  member_name: string;
+  member_photo: string | null;
+  member_gender: number | null;
   daily_counts: DailyCount[];
+}
+
+// 일별 카운트 응답 인터페이스 (멤버별 분리)
+export interface DailyCountsResponse {
+  member_daily_counts: MemberDailyCount[];
+  total_daily_counts: DailyCount[];
   total_days: number;
   start_date: string;
   end_date: string;
@@ -613,29 +623,67 @@ class MemberLocationLogService {
    * 최근 N일간 그룹 멤버들의 일별 위치 기록 카운트 조회
    */
   async getDailyLocationCounts(groupId: number, days: number = 14): Promise<DailyCountsResponse> {
-    const mockData: DailyCountsResponse = {
-      daily_counts: [],
-      total_days: days,
-      start_date: new Date(Date.now() - (days - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      end_date: new Date().toISOString().split('T')[0],
-      group_id: groupId,
-      total_members: 0
-    };
+    // 멤버별 Mock 데이터 생성
+    const mockMemberDailyCounts: MemberDailyCount[] = [
+      {
+        member_id: 1,
+        member_name: "김철수",
+        member_photo: null,
+        member_gender: 1,
+        daily_counts: []
+      },
+      {
+        member_id: 2,
+        member_name: "이영희", 
+        member_photo: null,
+        member_gender: 2,
+        daily_counts: []
+      }
+    ];
+
+    const mockTotalDailyCounts: DailyCount[] = [];
 
     // Mock 데이터 생성 (최근 N일간)
     for (let i = 0; i < days; i++) {
       const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
       const dateStr = date.toISOString().split('T')[0];
       
-      mockData.daily_counts.push({
+      const dailyCountTemplate = {
         date: dateStr,
-        count: Math.floor(Math.random() * 50) + 10, // 10-60 사이 랜덤 카운트
         formatted_date: date.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }),
         day_of_week: date.toLocaleDateString('ko-KR', { weekday: 'short' }),
         is_today: i === 0,
         is_weekend: date.getDay() === 0 || date.getDay() === 6
+      };
+
+      let totalCount = 0;
+      
+      // 각 멤버별 카운트 생성
+      mockMemberDailyCounts.forEach(member => {
+        const count = Math.floor(Math.random() * 25) + 5; // 5-30 사이 랜덤 카운트
+        member.daily_counts.push({
+          ...dailyCountTemplate,
+          count: count
+        });
+        totalCount += count;
+      });
+
+      // 전체 카운트 추가
+      mockTotalDailyCounts.push({
+        ...dailyCountTemplate,
+        count: totalCount
       });
     }
+
+    const mockData: DailyCountsResponse = {
+      member_daily_counts: mockMemberDailyCounts,
+      total_daily_counts: mockTotalDailyCounts,
+      total_days: days,
+      start_date: new Date(Date.now() - (days - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      end_date: new Date().toISOString().split('T')[0],
+      group_id: groupId,
+      total_members: mockMemberDailyCounts.length
+    };
 
     try {
       console.log('[MemberLocationLogService] 일별 위치 카운트 조회 시작:', { groupId, days });
@@ -644,11 +692,12 @@ class MemberLocationLogService {
       
       console.log('[MemberLocationLogService] 일별 위치 카운트 조회 응답:', {
         status: response.status,
-        dataLength: response.data?.daily_counts?.length || 0
+        memberCountsLength: response.data?.member_daily_counts?.length || 0,
+        totalCountsLength: response.data?.total_daily_counts?.length || 0
       });
       
-      if (response.data && response.data.daily_counts && Array.isArray(response.data.daily_counts)) {
-        console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용:', response.data.daily_counts.length, '개');
+      if (response.data && response.data.member_daily_counts && Array.isArray(response.data.member_daily_counts)) {
+        console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용:', response.data.member_daily_counts.length, '명');
         return response.data;
       } else {
         console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');
