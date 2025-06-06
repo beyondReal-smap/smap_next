@@ -460,7 +460,7 @@ export default function LogsPage() {
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [previousDate, setPreviousDate] = useState<string | null>(null); // 이전 날짜 추적
   const isDateChangedRef = useRef<boolean>(false); // 날짜 변경 플래그
-  const loadLocationDataExecutingRef = useRef<{ executing: boolean; lastExecution?: number }>({ executing: false }); // loadLocationData 중복 실행 방지
+  const loadLocationDataExecutingRef = useRef<{ executing: boolean; lastExecution?: number; currentRequest?: string; cancelled?: boolean }>({ executing: false }); // loadLocationData 중복 실행 방지
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null); 
@@ -469,6 +469,7 @@ export default function LogsPage() {
   const locationLogPolyline = useRef<any>(null); // 위치 로그 연결선을 위한 ref
   const startEndMarkers = useRef<any[]>([]); // 시작/종료 마커들을 위한 ref
   const stayTimeMarkers = useRef<any[]>([]); // 체류시간 마커들을 위한 ref
+  const arrowMarkers = useRef<any[]>([]); // 화살표 마커들을 저장할 배열 추가
     const currentPositionMarker = useRef<any>(null); // 슬라이더 현재 위치 마커를 위한 ref
   const sliderRef = useRef<HTMLDivElement>(null); // 슬라이더 요소를 위한 ref
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
@@ -681,6 +682,14 @@ export default function LogsPage() {
       });
       stayTimeMarkers.current = [];
       
+      // 화살표 마커들 정리
+      arrowMarkers.current.forEach(marker => {
+        if (marker && marker.setMap) {
+          marker.setMap(null);
+        }
+      });
+      arrowMarkers.current = [];
+      
       // 지도 파괴
       if (map.current && typeof map.current.destroy === 'function') {
          map.current.destroy();
@@ -888,7 +897,7 @@ export default function LogsPage() {
     });
   };
 
-  const handleMemberSelect = (id: string, e: React.MouseEvent) => {
+  const handleMemberSelect = (id: string, e?: React.MouseEvent | null) => {
     // 이벤트 전파 중단 (이벤트 객체가 유효한 경우에만)
     if (e && typeof e.preventDefault === 'function') {
     e.preventDefault();
@@ -899,26 +908,62 @@ export default function LogsPage() {
     
     console.log('Member selection started:', id);
     
-    // 멤버 선택 시 항상 지도 초기화 (깔끔한 UX를 위해)
-    clearMapMarkersAndPaths();
+    // 멤버 선택 시 모든 요청 취소 및 상태 완전 초기화
+    console.log('[handleMemberSelect] 멤버 선택 - 모든 요청 취소 및 상태 초기화 시작');
+    
+    // 모든 진행 중인 요청 강제 취소
+    if (loadLocationDataExecutingRef.current.executing) {
+      loadLocationDataExecutingRef.current.cancelled = true;
+    }
+    
+    // 즉시 지도 초기화 (위치 로그만 제거, 멤버 마커는 보존, 요청은 취소)
+    clearMapMarkersAndPaths(false, true);
+    
+    // 추가로 경로 제거 재확인
+    if (locationLogPolyline.current) {
+      locationLogPolyline.current.setMap(null);
+      locationLogPolyline.current = null;
+      console.log('[handleMemberSelect] 경로 추가 제거 완료');
+    }
+    
+    // 지도 강제 새로고침
+    if (map.current) {
+      map.current.refresh(true);
+      setTimeout(() => {
+        if (map.current) {
+          map.current.refresh(true);
+          console.log('[handleMemberSelect] 지도 이중 새로고침 완료');
+        }
+      }, 100);
+    }
+    
     console.log('[handleMemberSelect] 멤버 선택으로 지도 초기화 완료');
     
     // 다른 멤버 선택 시 날짜를 오늘로 초기화
     const currentSelectedMember = groupMembers.find(m => m.isSelected);
     const isChangingMember = !currentSelectedMember || currentSelectedMember.id !== id;
     
+    const today = format(new Date(), 'yyyy-MM-dd');
+    let targetDate = selectedDate;
+    
     if (isChangingMember) {
-      const today = format(new Date(), 'yyyy-MM-dd');
+      targetDate = today;
       if (selectedDate !== today) {
         setSelectedDate(today);
         console.log('[handleMemberSelect] 새로운 멤버 선택으로 날짜를 오늘로 초기화:', today);
       }
     }
     
-    // 멤버 재선택 시 날짜 변경 플래그 리셋 (멤버 위치 기준 지도 조정 허용)
+    // 멤버 재선택 시 모든 플래그 리셋 (지도 조정 허용)
     if (isDateChangedRef.current) {
       isDateChangedRef.current = false;
       console.log('[handleMemberSelect] 멤버 재선택으로 날짜 변경 플래그 리셋');
+    }
+    
+    // 자동 재생성 방지 플래그도 리셋
+    if (isDateChangingRef.current) {
+      isDateChangingRef.current = false;
+      console.log('[handleMemberSelect] 멤버 재선택으로 자동 재생성 방지 플래그 리셋');
     }
     
     // 현재 바텀시트 상태 유지
@@ -949,968 +994,47 @@ export default function LogsPage() {
     const selectedMember = updatedMembers.find(m => m.isSelected);
     console.log('[handleMemberSelect] Selected member:', selectedMember?.name);
     
-    // 선택된 멤버의 위치 데이터 즉시 로딩 (지도 중심 이동을 위해)
-    if (selectedDate) {
-      console.log('[handleMemberSelect] 선택된 멤버의 위치 데이터 즉시 로딩:', id, selectedDate);
-      loadLocationData(parseInt(id), selectedDate);
-    }
+    // 선택된 멤버의 위치 데이터 로딩 (올바른 날짜 사용 - 지연 실행으로 상태 동기화 보장)
+    // setTimeout(() => {
+      setIsLocationDataLoading(true); // 데이터 로딩 직전에 로딩 상태 설정
+      
+      // 새로운 요청 시작 전에 취소 플래그 리셋
+      loadLocationDataExecutingRef.current.cancelled = false;
+      loadLocationDataExecutingRef.current.executing = false;
+      
+      console.log('[handleMemberSelect] 선택된 멤버의 위치 데이터 로딩:', id, targetDate);
+      loadLocationData(parseInt(id), targetDate);
+    // }, 50);
     
     console.log('[handleMemberSelect] 멤버 선택 완료');
   };
 
-  // 위치 로그 마커를 지도에 업데이트하는 함수
-  const updateLocationLogMarkers = (markers: MapMarker[]) => {
-    if (!map.current || !window.naver?.maps) {
-      console.log('[updateLocationLogMarkers] 지도가 준비되지 않음');
-      return;
-    }
+  // 위치 로그 마커를 지도에 업데이트하는 함수 (새 함수로 대체)
+  // const updateLocationLogMarkers = async (markers: MapMarker[]): Promise<void> => { /* ... */ };
 
-    console.log('[updateLocationLogMarkers] 위치 로그 마커 업데이트 시작:', markers.length, '개');
-    console.log('[updateLocationLogMarkers] 첫 번째 마커 데이터:', markers[0]);
+  // 체류시간 마커를 지도에 업데이트하는 함수 (새 함수로 대체)
+  // const updateStayTimeMarkers = async (stayTimes: StayTime[], startEndPoints?: { start?: any, end?: any }): Promise<void> => { /* ... */ };
 
-    // 기존 위치 로그 마커들 제거
-    locationLogMarkers.current.forEach((marker) => {
-      if (marker && marker.setMap) {
-        marker.setMap(null);
-      }
-    });
-    locationLogMarkers.current = [];
-
-    // 기존 위치 로그 연결선 제거
-    if (locationLogPolyline.current) {
-      locationLogPolyline.current.setMap(null);
-      locationLogPolyline.current = null;
-    }
-
-    // 기존 시작/종료 마커들 제거
-    startEndMarkers.current.forEach((marker) => {
-      if (marker && marker.setMap) {
-        marker.setMap(null);
-      }
-    });
-    startEndMarkers.current = [];
-
-    if (markers.length === 0) {
-      console.log('[updateLocationLogMarkers] 표시할 마커가 없음');
-      return;
-    }
-
-    // 위치 로그와 체류지점을 시간 순서로 통합
-    const allTimePoints: Array<{
-      type: 'location' | 'stay';
-      data: any;
-      lat: number;
-      lng: number;
-      time: string;
-      sortKey: number;
-    }> = [];
-    
-    // 위치 로그 데이터 추가
-    markers.forEach((markerData, index) => {
-      // 변환된 API 응답 형식과 기존 형식 모두 지원
-      const lat = markerData.latitude || markerData.mlt_lat;
-      const lng = markerData.longitude || markerData.mlt_long;
-      const time = markerData.timestamp || markerData.mlt_gps_time || new Date().toISOString();
-      const sortKey = markerData.id || markerData.mlt_idx || index;
-      
-      if (!lat || !lng) {
-        // console.warn('[updateLocationLogMarkers] 유효하지 않은 위치 데이터:', index, markerData);
-        return;
-      }
-      
-      allTimePoints.push({
-        type: 'location',
-        data: markerData,
-        lat: Number(lat),
-        lng: Number(lng),
-        time: time,
-        sortKey: Number(sortKey)
-      });
-    });
-    
-    // 체류지점 데이터 추가
-    stayTimesData.forEach((stayData) => {
-      allTimePoints.push({
-        type: 'stay',
-        data: stayData,
-        lat: stayData.latitude || stayData.start_lat || 0,
-        lng: stayData.longitude || stayData.start_long || 0,
-        time: stayData.start_time,
-        sortKey: new Date(stayData.start_time).getTime() // 시간으로 정렬
-      });
-    });
-    
-    // 시간 순서로 정렬 (mlt_idx와 시간을 모두 고려)
-    const sortedTimePoints = allTimePoints.sort((a, b) => {
-      if (a.type === 'location' && b.type === 'location') {
-        return a.sortKey - b.sortKey; // 위치 로그끼리는 mlt_idx로 정렬
-      }
-      // 시간으로 비교
-      const timeA = new Date(a.time).getTime();
-      const timeB = new Date(b.time).getTime();
-      return timeA - timeB;
-    });
-    
-    // 위치 로그만 따로 추출 (기존 마커 생성용)
-    const sortedMarkers = sortedTimePoints
-      .filter(point => point.type === 'location')
-      .map(point => point.data);
-    
-    // 경로따라가기용 정렬된 데이터 저장
-    setSortedLocationData(sortedMarkers);
-    
-    // 데이터 로드 후 슬라이더가 0%인 경우 첫 번째 위치에 현재 위치 마커 표시
-    if (sortedMarkers.length > 0 && sliderValue === 0) {
-      const firstMarker = sortedMarkers[0];
-      const lat = firstMarker.latitude || firstMarker.mlt_lat || 0;
-      const lng = firstMarker.longitude || firstMarker.mlt_long || 0;
-      
-      if (lat && lng) {
-        setTimeout(() => {
-          createOrUpdateCurrentPositionMarker(Number(lat), Number(lng), 0, sortedMarkers.length);
-        }, 100); // 약간의 지연을 주어 지도가 준비된 후 실행
-      }
-    }
-
-    // 새로운 위치 로그 마커들 생성
-    console.log('[updateLocationLogMarkers] 마커 생성 시작:', sortedMarkers.length, '개');
-    sortedMarkers.forEach((markerData, index) => {
-      try {
-        if (index < 3) { // 처음 3개만 로그
-          console.log(`[updateLocationLogMarkers] 마커 ${index} 생성:`, {
-            lat: markerData.mlt_lat,
-            lng: markerData.mlt_long,
-            time: markerData.mlt_gps_time
-          });
-        }
-        // 변환된 API 응답 형식과 기존 형식 모두 지원
-        const lat = markerData.latitude || markerData.mlt_lat || 0;
-        const lng = markerData.longitude || markerData.mlt_long || 0;
-        const speedMs = markerData.speed || markerData.mlt_speed || 0; // m/s
-        const speed = speedMs * 3.6; // m/s를 km/h로 변환
-        const accuracy = markerData.accuracy || markerData.mlt_accuacy || 0;
-        const battery = markerData.battery_level || markerData.mlt_battery || 0;
-        // 걸음수는 위치로그 요약 데이터에서 가져오기 (개별 마커에는 없음)
-        const steps = locationLogSummaryData?.steps || 0;
-        const timestamp = markerData.timestamp || markerData.mlt_gps_time || '정보 없음';
-        
-        // 시간에서 날짜 부분 제거 (시간만 표시)
-        const timeOnly = timestamp === '정보 없음' ? '정보 없음' : 
-          timestamp.includes('T') ? timestamp.split('T')[1]?.substring(0, 8) || timestamp :
-          timestamp.includes(' ') ? timestamp.split(' ')[1] || timestamp :
-          timestamp;
-        
-        // 디버깅을 위한 데이터 로깅 (처음 3개만)
-        if (index < 3) {
-          console.log(`[updateLocationLogMarkers] 마커 ${index} 원본 데이터:`, markerData);
-          console.log(`[updateLocationLogMarkers] 마커 ${index} 파싱된 데이터:`, {
-            lat, lng, speed, accuracy, battery, steps, timestamp
-          });
-        }
-        
-        const position = new window.naver.maps.LatLng(Number(lat), Number(lng));
-        
-        // 속도에 따른 마커 색상 결정
-        let markerColor = '#3b82f6'; // 기본 파란색
-        if (speed > 5) {
-          markerColor = '#ef4444'; // 빠른 속도 - 빨간색
-        } else if (speed > 2) {
-          markerColor = '#f59e0b'; // 중간 속도 - 주황색
-        } else if (speed > 0.5) {
-          markerColor = '#10b981'; // 느린 속도 - 초록색
-        }
-
-        // 위치 로그 마커 생성 (작은 원형 마커)
-        const marker = new window.naver.maps.Marker({
-          position: position,
-          map: map.current,
-          icon: {
-            content: `
-              <div style="
-                width: 8px; 
-                height: 8px; 
-                background: ${markerColor}; 
-                border: 2px solid white; 
-                border-radius: 50%; 
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                cursor: pointer;
-              "></div>
-            `,
-            anchor: new window.naver.maps.Point(6, 6)
-          },
-          zIndex: 100 + index
-        });
-
-        // 마커 클릭 이벤트 - 상세 정보 표시 (슬라이더 InfoWindow와 동일한 스타일)
-        const infoWindow = new window.naver.maps.InfoWindow({
-          content: `
-            <div style="
-              padding: 8px;
-              background: white;
-              border-radius: 6px;
-              box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              min-width: 130px;
-              max-width: 150px;
-            ">
-              <div style="
-                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-                color: white;
-                padding: 4px 6px;
-                border-radius: 4px;
-                margin: -8px -8px 6px -8px;
-                font-weight: 600;
-                font-size: 11px;
-                text-align: center;
-              ">
-                ${index + 1} / ${markers.length}
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;">
-                <div style="display: flex; justify-content: space-between;">
-                  <span style="color: #666;">⏰ 시간:</span>
-                  <span style="font-weight: 600; font-size: 10px;">${timeOnly}</span>
-                </div>
-                <div style="display: flex; justify-content: space-between;">
-                  <span style="color: #666;">🚀 속도:</span>
-                  <span style="font-weight: 600; font-size: 10px;">${speed.toFixed(1)}km/h</span>
-                </div>
-                <div style="display: flex; justify-content: space-between;">
-                  <span style="color: #666;">📍 정확도:</span>
-                  <span style="font-weight: 600; font-size: 10px;">${accuracy.toFixed(0)}m</span>
-                </div>
-                <div style="display: flex; justify-content: space-between;">
-                  <span style="color: #666;">🔋 배터리:</span>
-                  <span style="font-weight: 600; font-size: 10px;">${battery}%</span>
-                </div>
-              </div>
-            </div>
-          `,
-          backgroundColor: 'transparent',
-          borderColor: 'transparent',
-          borderWidth: 0,
-          anchorSize: new window.naver.maps.Size(0, 0),
-          pixelOffset: new window.naver.maps.Point(0, -10)
-        });
-
-        window.naver.maps.Event.addListener(marker, 'click', () => {
-          if (infoWindow.getMap()) {
-            infoWindow.close();
-          } else {
-            infoWindow.open(map.current, marker);
-          }
-        });
-
-        locationLogMarkers.current.push(marker);
-      } catch (error) {
-        console.error('[updateLocationLogMarkers] 마커 생성 오류:', error, markerData);
-      }
-    });
-
-    console.log('[updateLocationLogMarkers] 위치 로그 마커 생성 완료:', locationLogMarkers.current.length, '개');
-
-    // 시간 순서대로 모든 지점을 연결하는 Polyline 생성
-    if (sortedTimePoints.length > 1) {
-      const pathCoordinates = sortedTimePoints.map(point => 
-        new window.naver.maps.LatLng(point.lat, point.lng)
-      );
-
-      locationLogPolyline.current = new window.naver.maps.Polyline({
-        map: map.current,
-        path: pathCoordinates,
-        strokeColor: '#3b82f6', // 파란색 선
-        strokeOpacity: 0.8,
-        strokeWeight: 3,
-        strokeStyle: 'solid'
-      });
-
-      // 각 마커 사이에 방향을 나타내는 화살표 추가
-      for (let i = 0; i < sortedTimePoints.length - 1; i++) {
-        const currentPoint = sortedTimePoints[i];
-        const nextPoint = sortedTimePoints[i + 1];
-        
-        // 두 점 사이의 중점 계산
-        const midLat = (currentPoint.lat + nextPoint.lat) / 2;
-        const midLng = (currentPoint.lng + nextPoint.lng) / 2;
-        
-        // 방향 계산 (현재 지점에서 다음 지점으로의 각도)
-        const deltaLat = nextPoint.lat - currentPoint.lat;
-        const deltaLng = nextPoint.lng - currentPoint.lng;
-        // Math.atan2는 동쪽이 0도, CSS rotate는 북쪽이 0도이므로 -90도 보정
-        const angle = Math.atan2(deltaLng, deltaLat) * (180 / Math.PI);
-        
-        // 화살표 마커 생성
-        const arrowMarker = new window.naver.maps.Marker({
-          position: new window.naver.maps.LatLng(midLat, midLng),
-          map: map.current,
-          icon: {
-            content: `
-              <div style="
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-bottom: 10px solid white;
-                border-top: none;
-                transform: rotate(${angle}deg);
-                transform-origin: center center;
-                opacity: 0.9;
-                cursor: pointer;
-                filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
-              "></div>
-            `,
-            anchor: new window.naver.maps.Point(5, 5)
-          },
-          zIndex: 50
-        });
-        
-        locationLogMarkers.current.push(arrowMarker);
-      }
-
-      console.log('[updateLocationLogMarkers] 통합 경로 연결선 및 화살표 생성 완료:', pathCoordinates.length, '개 좌표,', sortedTimePoints.length - 1, '개 화살표');
-    }
-
-    // 시작점과 종료점에 특별한 마커 추가 (통합된 시간 기준)
-    if (sortedTimePoints.length > 0) {
-      const startPoint = sortedTimePoints[0];
-      const endPoint = sortedTimePoints[sortedTimePoints.length - 1];
-
-      // 시작점 마커 (초록색 원형 마커)
-      const startPosition = new window.naver.maps.LatLng(startPoint.lat, startPoint.lng);
-      const startIcon = new window.naver.maps.Marker({
-        position: startPosition,
-        map: map.current,
-        icon: {
-          content: `
-            <div style="
-              width: 20px; 
-              height: 20px; 
-              background: #22c55e; 
-              border: 3px solid white; 
-              border-radius: 50%; 
-              box-shadow: 0 3px 6px rgba(0,0,0,0.4);
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-weight: bold;
-              font-size: 10px;
-              color: white;
-            ">S</div>
-          `,
-          anchor: new window.naver.maps.Point(13, 13)
-        },
-        zIndex: 300
-      });
-
-      // 시작점 InfoWindow
-      const startInfoWindow = new window.naver.maps.InfoWindow({
-        content: `
-          <style>
-            @keyframes slideInFromBottom {
-              0% {
-                opacity: 0;
-                transform: translateY(20px) scale(0.95);
-              }
-              100% {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-              }
-            }
-            .info-window-container {
-              animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-            }
-            .close-button {
-              transition: all 0.2s ease;
-            }
-            .close-button:hover {
-              background: rgba(0, 0, 0, 0.2) !important;
-              transform: scale(1.1);
-            }
-          </style>
-          <div class="info-window-container" style="
-            padding: 12px 16px;
-            min-width: 200px;
-            max-width: 280px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            position: relative;
-          ">
-            <!-- 닫기 버튼 -->
-            <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-              position: absolute;
-              top: 8px;
-              right: 8px;
-              background: rgba(0, 0, 0, 0.1);
-              border: none;
-              border-radius: 50%;
-              width: 22px;
-              height: 22px;
-              font-size: 14px;
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: #666;
-            ">×</button>
-            
-            <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #22c55e; padding-right: 25px; text-align: center;">
-              🚀 시작 지점
-            </h3>
-            <div style="margin-bottom: 6px;">
-              <p style="margin: 0; font-size: 12px; color: #64748b;">
-                                  🕒 시간: <span style="color: #111827; font-weight: 500;">${startPoint.time ? startPoint.time.split(' ')[1] || startPoint.time : '정보 없음'}</span>
-                </p>
-              </div>
-              <div style="margin-bottom: 6px;">
-                <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  🚶 속도: <span style="color: #111827; font-weight: 500;">${startPoint.type === 'location' ? ((startPoint.data.mlt_speed || 0) * 3.6).toFixed(1) : 0} km/h</span>
-                </p>
-              </div>
-              <div style="margin-bottom: 0;">
-                <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                  🌍 좌표: ${startPoint.lat ? startPoint.lat.toFixed(6) : '0.000000'}, ${startPoint.lng ? startPoint.lng.toFixed(6) : '0.000000'}
-              </p>
-            </div>
-          </div>
-        `,
-        borderWidth: 0,
-        backgroundColor: 'transparent',
-        disableAnchor: true,
-        pixelOffset: new window.naver.maps.Point(0, -10)
-      });
-
-      window.naver.maps.Event.addListener(startIcon, 'click', () => {
-        if (startInfoWindow.getMap()) {
-          startInfoWindow.close();
-        } else {
-          startInfoWindow.open(map.current, startIcon);
-        }
-      });
-
-      startEndMarkers.current.push(startIcon);
-
-              // 종료점 마커 (빨간색 원형 마커) - 시작점과 다른 경우에만
-        if (sortedTimePoints.length > 1) {
-          const endPosition = new window.naver.maps.LatLng(endPoint.lat, endPoint.lng);
-          const endIcon = new window.naver.maps.Marker({
-            position: endPosition,
-            map: map.current,
-            icon: {
-              content: `
-                <div style="
-                  width: 20px; 
-                  height: 20px; 
-                  background: #ef4444; 
-                  border: 3px solid white; 
-                  border-radius: 50%; 
-                  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  font-weight: bold;
-                  font-size: 10px;
-                  color: white;
-                ">E</div>
-              `,
-              anchor: new window.naver.maps.Point(13, 13)
-            },
-            zIndex: 300
-          });
-
-          // 종료점 InfoWindow
-          const endInfoWindow = new window.naver.maps.InfoWindow({
-            content: `
-              <style>
-                @keyframes slideInFromBottom {
-                  0% {
-                    opacity: 0;
-                    transform: translateY(20px) scale(0.95);
-                  }
-                  100% {
-                    opacity: 1;
-                    transform: translateY(0) scale(1);
-                  }
-                }
-                .info-window-container {
-                  animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-                }
-                .close-button {
-                  transition: all 0.2s ease;
-                }
-                .close-button:hover {
-                  background: rgba(0, 0, 0, 0.2) !important;
-                  transform: scale(1.1);
-                }
-              </style>
-              <div class="info-window-container" style="
-                padding: 12px 16px;
-                min-width: 200px;
-                max-width: 280px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: white;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                position: relative;
-              ">
-                <!-- 닫기 버튼 -->
-                <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-                  position: absolute;
-                  top: 8px;
-                  right: 8px;
-                  background: rgba(0, 0, 0, 0.1);
-                  border: none;
-                  border-radius: 50%;
-                  width: 22px;
-                  height: 22px;
-                  font-size: 14px;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  color: #666;
-                ">×</button>
-                
-                <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #ef4444; padding-right: 25px; text-align: center;">
-                  🏁 종료 지점
-                </h3>
-                <div style="margin-bottom: 6px;">
-                  <p style="margin: 0; font-size: 12px; color: #64748b;">
-                    🕒 시간: <span style="color: #111827; font-weight: 500;">${endPoint.time ? endPoint.time.split(' ')[1] || endPoint.time : '정보 없음'}</span>
-                  </p>
-                </div>
-                <div style="margin-bottom: 6px;">
-                  <p style="margin: 0; font-size: 12px; color: #64748b;">
-                    🚶 속도: <span style="color: #111827; font-weight: 500;">${endPoint.type === 'location' ? ((endPoint.data.mlt_speed || 0) * 3.6).toFixed(1) : 0} km/h</span>
-                  </p>
-                </div>
-                <div style="margin-bottom: 0;">
-                  <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                    🌍 좌표: ${endPoint.lat ? endPoint.lat.toFixed(6) : '0.000000'}, ${endPoint.lng ? endPoint.lng.toFixed(6) : '0.000000'}
-                  </p>
-                </div>
-              </div>
-            `,
-            borderWidth: 0,
-            backgroundColor: 'transparent',
-            disableAnchor: true,
-            pixelOffset: new window.naver.maps.Point(0, -10)
-          });
-
-          window.naver.maps.Event.addListener(endIcon, 'click', () => {
-            if (endInfoWindow.getMap()) {
-              endInfoWindow.close();
-            } else {
-              endInfoWindow.open(map.current, endIcon);
-            }
-          });
-
-          startEndMarkers.current.push(endIcon);
-        }
-
-      console.log('[updateLocationLogMarkers] 시작/종료 마커 생성 완료');
-    }
-
-    // 체류시간 마커도 업데이트 (시작/종료점 정보 전달)
-    if (stayTimesData.length > 0) {
-      const startEndPoints = sortedTimePoints.length > 0 ? {
-        start: sortedTimePoints[0],
-        end: sortedTimePoints[sortedTimePoints.length - 1]
-      } : undefined;
-      
-      updateStayTimeMarkers(stayTimesData, startEndPoints);
-    }
-
-    // 모든 마커들(위치로그 + 체류시간)이 보이도록 지도 범위 조정 및 중심 이동
-    if (sortedTimePoints.length > 0) {
-      const bounds = new window.naver.maps.LatLngBounds();
-      
-      // 모든 시간 기준 지점들을 범위에 포함
-      sortedTimePoints.forEach(point => {
-        bounds.extend(new window.naver.maps.LatLng(point.lat, point.lng));
-      });
-      
-      // 부드럽게 지도 범위 조정 및 중심 이동
-      try {
-        // fitBounds 후 적절한 줌 레벨 설정
-        map.current.fitBounds(bounds, {
-          top: 60,
-          right: 60,
-          bottom: 60,
-          left: 60
-        });
-
-        // 날짜 변경 시에는 시작지점 기준 지도 조정을 우선하므로 경로 중심 이동 건너뜀
-        // 멤버가 선택된 상태에서는 경로 중심 이동 건너뜀 (멤버 위치 기준 조정 우선)
-        const hasMemberSelected = groupMembers.some(m => m.isSelected);
-        if (!isDateChangedRef.current && !hasMemberSelected) {
-          // 약간의 지연 후 중심점으로 부드럽게 이동
-          setTimeout(() => {
-            if (map.current && bounds) {
-              const center = bounds.getCenter();
-              map.current.panTo(center); // setCenter 대신 panTo 사용으로 부드러운 이동
-              console.log('[updateLocationLogMarkers] 지도 중심 이동 완료:', center);
-            }
-          }, 200);
-        } else {
-          console.log('[updateLocationLogMarkers] 날짜 변경 중이거나 멤버 선택됨 - 경로 중심 이동 건너뜀');
-        }
-      } catch (error) {
-        console.error('[updateLocationLogMarkers] 지도 범위 조정 중 오류:', error);
-      }
-    }
-
-    // 첫 번째 마커(시작지점)로 지도 중심 즉시 이동 (줌 16으로 설정)
-    if (sortedTimePoints.length > 0) {
-      const firstPoint = sortedTimePoints[0];
-      if (firstPoint.lat && firstPoint.lng) {
-        const latOffset = -0.002; // 아래쪽 오프셋 (마커가 화면 상단에 위치하도록)
-        const adjustedPosition = new window.naver.maps.LatLng(firstPoint.lat + latOffset, firstPoint.lng);
-        
-        if (map.current) {
-          map.current.setCenter(adjustedPosition);
-          map.current.setZoom(16); // 줌 레벨 16으로 설정
-          map.current.refresh(true);
-          console.log('[updateLocationLogMarkers] 첫 번째 마커로 지도 중심 이동 완료:', { 
-            lat: firstPoint.lat, 
-            lng: firstPoint.lng, 
-            adjustedPosition: adjustedPosition 
-          });
-        }
-      }
-    }
-  };
-
-  // 체류시간 마커를 지도에 업데이트하는 함수
-  const updateStayTimeMarkers = (stayTimes: StayTime[], startEndPoints?: { start?: any, end?: any }) => {
-    if (!map.current || !window.naver?.maps) {
-      console.log('[updateStayTimeMarkers] 지도가 준비되지 않음');
-      return;
-    }
-
-    console.log('[updateStayTimeMarkers] 체류시간 마커 업데이트 시작:', stayTimes.length, '개');
-
-    // 기존 체류시간 마커들 제거
-    stayTimeMarkers.current.forEach((marker) => {
-      if (marker && marker.setMap) {
-        marker.setMap(null);
-      }
-    });
-    stayTimeMarkers.current = [];
-
-    if (stayTimes.length === 0) {
-      console.log('[updateStayTimeMarkers] 표시할 체류시간 마커가 없음'); 
-      return;
-    }
-
-    // 체류시간에 따른 마커 크기와 색상 결정 함수
-    const getMarkerStyle = (duration: number, index: number) => {
-      let size = 30; // 기본 크기
-      let bgColor = '#f59e0b'; // 기본 주황색
-      let textColor = 'white';
-      
-      // 체류시간에 따른 크기 조정
-      if (duration >= 300) { // 5시간 이상
-        size = 40;
-        bgColor = '#dc2626'; // 빨간색 (가장 긴 체류)
-      } else if (duration >= 120) { // 2시간 이상
-        size = 36;
-        bgColor = '#ea580c'; // 진한 주황색
-      } else if (duration >= 60) { // 1시간 이상
-        size = 32;
-        bgColor = '#f59e0b'; // 주황색
-      } else if (duration >= 30) { // 30분 이상
-        size = 28;
-        bgColor = '#eab308'; // 노란색
-      } else { // 30분 미만
-        size = 26;
-        bgColor = '#22c55e'; // 초록색 (짧은 체류)
-      }
-
-      return { size, bgColor, textColor };
-    };
-
-    // 체류시간 포맷 함수
-    const formatDuration = (minutes: number): string => {
-      // NaN이나 유효하지 않은 값 처리
-      if (isNaN(minutes) || !isFinite(minutes) || minutes < 0) {
-        return '정보 없음';
-      }
-      
-      const hours = Math.floor(minutes / 60);
-      const mins = Math.floor(minutes % 60);
-      
-      if (hours > 0) {
-        return `${hours}시간 ${mins}분`;
-      } else {
-        return `${mins}분`;
-      }
-    };
-
-    // 실제 체류지점 데이터를 시간 순서로 정렬
-    const sortedStayTimes = [...stayTimes].sort((a, b) => {
-      const timeA = new Date(a.start_time).getTime();
-      const timeB = new Date(b.start_time).getTime();
-      return timeA - timeB;
-    });
-
-    // 시작점/종료점과 겹치는 체류지점 필터링 함수
-    const isOverlapping = (stayPoint: StayTime, comparePoint: any): boolean => {
-      if (!comparePoint) return false;
-      
-      const lat1 = stayPoint.latitude || stayPoint.start_lat || 0;
-      const lng1 = stayPoint.longitude || stayPoint.start_long || 0;
-      const lat2 = comparePoint.lat || 0;
-      const lng2 = comparePoint.lng || 0;
-      
-      // 좌표 차이 (약 10m 이내면 같은 지점으로 간주)
-      const latDiff = Math.abs(lat1 - lat2);
-      const lngDiff = Math.abs(lng1 - lng2);
-      const threshold = 0.0001; // 약 10-11m 정도의 오차범위
-      
-      return latDiff < threshold && lngDiff < threshold;
-    };
-
-    // 시작점/종료점과 겹치지 않는 체류지점만 필터링
-    const filteredStayTimes = sortedStayTimes.filter(stayPoint => {
-      const overlapWithStart = startEndPoints?.start && isOverlapping(stayPoint, startEndPoints.start);
-      const overlapWithEnd = startEndPoints?.end && isOverlapping(stayPoint, startEndPoints.end);
-      
-      if (overlapWithStart || overlapWithEnd) {
-        console.log('[updateStayTimeMarkers] 체류지점이 시작/종료점과 겹쳐서 제외됨:', stayPoint);
-        return false;
-      }
-      return true;
-    });
-
-    // 필터링된 체류시간 마커들 생성 (연속된 번호로)
-    filteredStayTimes.forEach((stayData, index) => {
-      try {
-        // 변환된 API 응답 형식과 기존 형식 모두 지원
-        const lat = stayData.latitude || stayData.start_lat;
-        const lng = stayData.longitude || stayData.start_long;
-        
-        // 유효하지 않은 위치 데이터 건너뛰기
-        if (!lat || !lng || lat === 0 || lng === 0) {
-          // console.warn('[updateStayTimeMarkers] 유효하지 않은 체류시간 위치 데이터:', index, stayData);
-          return;
-        }
-        
-        const position = new window.naver.maps.LatLng(Number(lat), Number(lng));
-        
-        // 체류시간 계산 (변환된 형식과 기존 형식 모두 지원)
-        let durationMinutes = 0;
-        
-        console.log(`[updateStayTimeMarkers] 체류시간 데이터 ${index}:`, {
-          duration: stayData.duration,
-          stay_duration: stayData.stay_duration,
-          stayData: stayData
-        });
-        
-        // 숫자 형식 체류시간 (분 단위)
-        if (typeof stayData.duration === 'number' && !isNaN(stayData.duration)) {
-          durationMinutes = stayData.duration;
-        }
-        // 문자열 형식 체류시간 ("HH:MM:SS" 또는 "MM:SS")
-        else if (stayData.stay_duration && typeof stayData.stay_duration === 'string') {
-          const timeParts = stayData.stay_duration.split(':');
-          if (timeParts.length >= 2) {
-            if (timeParts.length === 3) {
-              // "HH:MM:SS" 형식
-              const hours = parseInt(timeParts[0]) || 0;
-              const minutes = parseInt(timeParts[1]) || 0;
-              const seconds = parseFloat(timeParts[2]) || 0;
-              durationMinutes = hours * 60 + minutes + seconds / 60;
-            } else if (timeParts.length === 2) {
-              // "MM:SS" 형식
-              const minutes = parseInt(timeParts[0]) || 0;
-              const seconds = parseFloat(timeParts[1]) || 0;
-              durationMinutes = minutes + seconds / 60;
-            }
-          }
-        }
-        
-        console.log(`[updateStayTimeMarkers] 계산된 체류시간 ${index}:`, durationMinutes, '분');
-        
-        const markerStyle = getMarkerStyle(durationMinutes, index);
-        const markerNumber = index + 1; // 연속된 번호 (1부터 시작)
-
-        // 체류시간 마커 생성 (순서 번호가 있는 원형 마커)
-        const marker = new window.naver.maps.Marker({
-          position: position,
-          map: map.current,
-          icon: {
-            content: `
-              <div style="
-                position: relative;
-                width: ${markerStyle.size}px; 
-                height: ${markerStyle.size}px; 
-                background: ${markerStyle.bgColor}; 
-                border: 3px solid white; 
-                border-radius: 50%; 
-                box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-weight: bold;
-                font-size: ${markerStyle.size > 32 ? '14px' : '12px'};
-                color: ${markerStyle.textColor};
-              ">
-                ${markerNumber}
-                                 <div style="
-                   position: absolute;
-                   top: -20px;
-                   right: -20px;
-                   background: #1f2937;
-                   color: white;
-                   border-radius: 8px;
-                   padding: 2px 4px;
-                   font-size: 10px;
-                   font-weight: normal;
-                   white-space: nowrap;
-                   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                 ">${formatDuration(durationMinutes)}</div>
-              </div>
-            `,
-            anchor: new window.naver.maps.Point(markerStyle.size/2, markerStyle.size/2)
-          },
-          zIndex: 200 + index // 체류시간 마커가 위치 로그 마커보다 위에 표시
-        });
-
-        // 마커 클릭 이벤트 - 상세 정보 표시 (home/page.tsx 스타일과 애니메이션 적용)
-        const infoWindow = new window.naver.maps.InfoWindow({
-          content: `
-            <style>
-              @keyframes slideInFromBottom {
-                0% {
-                  opacity: 0;
-                  transform: translateY(20px) scale(0.95);
-                }
-                100% {
-                  opacity: 1;
-                  transform: translateY(0) scale(1);
-                }
-              }
-              .info-window-container {
-                animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-              }
-              .close-button {
-                transition: all 0.2s ease;
-              }
-              .close-button:hover {
-                background: rgba(0, 0, 0, 0.2) !important;
-                transform: scale(1.1);
-              }
-            </style>
-            <div class="info-window-container" style="
-              padding: 12px 16px;
-              min-width: 200px;
-              max-width: 280px;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background: white;
-              border-radius: 12px;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-              position: relative;
-            ">
-              <!-- 닫기 버튼 -->
-              <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-                position: absolute;
-                top: 8px;
-                right: 8px;
-                background: rgba(0, 0, 0, 0.1);
-                border: none;
-                border-radius: 50%;
-                width: 22px;
-                height: 22px;
-                font-size: 14px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #666;
-              ">×</button>
-              
-              <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px; text-align: center;">
-                🏠 체류 지점 #${markerNumber}
-              </h3>
-              <div style="margin-bottom: 6px;">
-                <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  🕐 시작: <span style="color: #111827; font-weight: 500;">${stayData.start_time.split(' ')[1]}</span>
-                </p>
-              </div>
-              <div style="margin-bottom: 6px;">
-                <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  🕐 종료: <span style="color: #111827; font-weight: 500;">${stayData.end_time.split(' ')[1]}</span>
-                </p>
-              </div>
-              <div style="margin-bottom: 0;">
-                <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  ⏱️ 체류시간: <span style="
-                    color: ${markerStyle.bgColor}; 
-                    font-weight: bold; 
-                    background: ${markerStyle.bgColor}20; 
-                    padding: 4px 8px; 
-                    border-radius: 8px;
-                  ">${formatDuration(durationMinutes)}</span>
-                </p>
-              </div>
-            </div>
-          `,
-          borderWidth: 0,
-          backgroundColor: 'transparent',
-          disableAnchor: true,
-          pixelOffset: new window.naver.maps.Point(0, -10)
-        });
-
-        window.naver.maps.Event.addListener(marker, 'click', () => {
-          if (infoWindow.getMap()) {
-            infoWindow.close();
-          } else {
-            infoWindow.open(map.current, marker);
-          }
-        });
-
-        stayTimeMarkers.current.push(marker);
-      } catch (error) {
-        console.error('[updateStayTimeMarkers] 마커 생성 오류:', error, stayData);
-      }
-    });
-
-    console.log('[updateStayTimeMarkers] 체류시간 마커 생성 완료:', stayTimeMarkers.current.length, '개 (필터링 전:', sortedStayTimes.length, '개)');
-
-    // 체류시간 마커들이 모두 보이도록 지도 범위 조정
-    if (filteredStayTimes.length > 0) {
-      const bounds = new window.naver.maps.LatLngBounds();
-      filteredStayTimes.forEach(stayData => {
-        const lat = stayData.latitude || stayData.start_lat || 0;
-        const lng = stayData.longitude || stayData.start_long || 0;
-        if (lat && lng && lat !== 0 && lng !== 0) {
-          bounds.extend(new window.naver.maps.LatLng(lat, lng));
-        }
-      });
-      
-      // 부드럽게 지도 범위 조정
-      map.current.fitBounds(bounds, {
-        top: 80,
-        right: 80,
-        bottom: 80,
-        left: 80
-      });
-    }
-  };
+  // --- 새로운 통합 지도 렌더링 함수 ---
 
   const updateMemberMarkers = (members: GroupMember[], isDateChange: boolean = false) => {
+    console.log('[🔥 updateMemberMarkers] 함수 호출됨:', {
+      membersLength: members.length,
+      isDateChange,
+      mapExists: !!map.current,
+      naverMapsExists: !!window.naver?.maps,
+      memberNames: members.map(m => m.name),
+      memberLocations: members.map(m => m.location)
+    });
+    
     // 지도 초기화 체크 로직 개선
     if (!map.current) {
-      console.warn('Map is not initialized');
+      console.warn('❌ Map is not initialized');
       return;
     }
     
     if (!window.naver?.maps) {
-      console.warn('Naver Maps API is not loaded');
+      console.warn('❌ Naver Maps API is not loaded');
       return;
     }
     
@@ -1920,11 +1044,26 @@ export default function LogsPage() {
     
     const selectedMembers = members.filter(member => member.isSelected);
     
+    console.log('[updateMemberMarkers] 마커 생성 시작:', {
+      totalMembers: members.length,
+      selectedMembers: selectedMembers.length,
+      memberNames: members.map(m => m.name),
+      selectedNames: selectedMembers.map(m => m.name),
+      selectedMemberLocations: selectedMembers.map(m => m.location)
+    });
+    
     // 선택된 멤버가 있는 경우에만 마커 생성 및 지도 이동
     if (selectedMembers.length > 0) {
-      selectedMembers.forEach(member => {
+      console.log('[🔥 updateMemberMarkers] 마커 생성 시작:', selectedMembers.length, '개');
+      selectedMembers.forEach((member, index) => {
+        console.log(`[🔥 updateMemberMarkers] 멤버 ${index + 1} 마커 생성:`, {
+          name: member.name,
+          location: member.location,
+          isSelected: member.isSelected
+        });
         try {
           const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
+          console.log(`[🔥 updateMemberMarkers] 네이버맵 LatLng 생성:`, position);
           // 안전한 이미지 URL 사용
           const safeImageUrl = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
           // 선택된 멤버는 핑크색 border, 그렇지 않으면 인디고 border
@@ -1947,8 +1086,9 @@ export default function LogsPage() {
             zIndex: member.isSelected ? 200 : 150 // 선택된 멤버가 위에 표시되도록
           });
           memberNaverMarkers.current.push(marker);
+          console.log(`[✅ updateMemberMarkers] 멤버 ${member.name} 마커 생성 완료 (총 ${memberNaverMarkers.current.length}개)`);
         } catch (error) {
-          console.error('Error creating marker:', error);
+          console.error(`[❌ updateMemberMarkers] 멤버 ${member.name} 마커 생성 실패:`, error);
         }
       });
 
@@ -2006,266 +1146,421 @@ export default function LogsPage() {
     }
   };
 
-  // 지도 마커와 경로 즉시 초기화 함수
-  const clearMapMarkersAndPaths = () => {
-    console.log('[clearMapMarkersAndPaths] 지도 마커와 경로 즉시 초기화');
-    
-    // 위치 로그 마커들 정리
-    locationLogMarkers.current.forEach(marker => {
-      if (marker && marker.setMap) {
-        marker.setMap(null);
-      }
+  // 지도 마커와 경로 즉시 초기화 함수 - 완전 강화 버전
+  const clearMapMarkersAndPaths = (clearMemberMarkers: boolean = false, cancelPendingRequests: boolean = true) => {
+    console.log('[clearMapMarkersAndPaths] ===== 완전 초기화 시작 =====');
+    console.log('[clearMapMarkersAndPaths] 제거할 마커 개수:', {
+      locationLog: locationLogMarkers.current.length,
+      startEnd: startEndMarkers.current.length,
+      stayTime: stayTimeMarkers.current.length,
+      arrow: arrowMarkers.current.length,
+      member: memberNaverMarkers.current.length,
+      currentPosition: currentPositionMarker.current ? 1 : 0,
+      polyline: locationLogPolyline.current ? 1 : 0
     });
-    locationLogMarkers.current = [];
+
+    // 1. 조건부 요청 취소 - 일반적인 위치 로그 정리시에는 취소하지 않음
+    if (cancelPendingRequests && loadLocationDataExecutingRef.current?.executing) {
+      loadLocationDataExecutingRef.current.cancelled = true;
+      loadLocationDataExecutingRef.current.executing = false;
+      console.log('[clearMapMarkersAndPaths] 진행 중인 위치 데이터 요청 강제 취소');
+    } else if (!cancelPendingRequests) {
+      console.log('[clearMapMarkersAndPaths] 진행 중인 요청은 유지함 (위치 로그 정리만 수행)');
+    }
+
+    // 2. 모든 InfoWindow 먼저 닫기
+    if (window.naver?.maps) {
+      try {
+        // 모든 활성 InfoWindow 닫기
+        const infoWindows = document.querySelectorAll('.naver-info-window');
+        infoWindows.forEach(el => el.remove());
+      } catch (e) {
+        console.log('[clearMapMarkersAndPaths] InfoWindow 정리 중 오류 무시:', e);
+      }
+    }
     
-    // 경로 폴리라인 정리
-    if (locationLogPolyline.current) {
-      locationLogPolyline.current.setMap(null);
+    // 3. 위치 로그 마커들 완전 정리
+    try {
+      locationLogMarkers.current.forEach((marker, index) => {
+        if (marker) {
+          try {
+            if (marker.infoWindow) {
+              marker.infoWindow.close();
+              marker.infoWindow = null;
+            }
+            if (marker.setMap) {
+              marker.setMap(null);
+            }
+          } catch (e) {
+            console.log(`[clearMapMarkersAndPaths] 위치 로그 마커 ${index} 제거 오류 무시:`, e);
+          }
+        }
+      });
+      locationLogMarkers.current = [];
+      console.log('[clearMapMarkersAndPaths] 위치 로그 마커 완전 정리 완료');
+    } catch (e) {
+      console.log('[clearMapMarkersAndPaths] 위치 로그 마커 정리 오류 무시:', e);
+      locationLogMarkers.current = [];
+    }
+    
+    // 4. 경로 폴리라인 완전 정리
+    try {
+      if (locationLogPolyline.current) {
+        locationLogPolyline.current.setMap(null);
+        locationLogPolyline.current = null;
+      }
+             // 혹시 모를 다른 경로들도 정리
+       if (window.naver?.maps && map.current) {
+         const overlays = map.current.overlays;
+         if (overlays && overlays.forEach) {
+           overlays.forEach((overlay: any) => {
+             if (overlay && overlay.setMap) {
+               overlay.setMap(null);
+             }
+           });
+         }
+       }
+      console.log('[clearMapMarkersAndPaths] 경로 폴리라인 완전 정리 완료');
+    } catch (e) {
+      console.log('[clearMapMarkersAndPaths] 경로 정리 오류 무시:', e);
       locationLogPolyline.current = null;
     }
     
-    // 시작/종료 마커들 정리
-    startEndMarkers.current.forEach(marker => {
-      if (marker && marker.setMap) {
-        marker.setMap(null);
-      }
-    });
-    startEndMarkers.current = [];
-    
-    // 체류시간 마커들 정리
-    stayTimeMarkers.current.forEach(marker => {
-      if (marker && marker.setMap) {
-        marker.setMap(null);
-      }
-    });
-    stayTimeMarkers.current = [];
-
-    // 현재 위치 마커 정리
-    if (currentPositionMarker.current) {
-      // InfoWindow가 있다면 먼저 닫기
-      if (currentPositionMarker.current.infoWindow) {
-        currentPositionMarker.current.infoWindow.close();
-      }
-      currentPositionMarker.current.setMap(null);
-      currentPositionMarker.current = null;
+    // 5. 시작/종료 마커들 완전 정리
+    try {
+      startEndMarkers.current.forEach((marker, index) => {
+        if (marker) {
+          try {
+            if (marker.infoWindow) {
+              marker.infoWindow.close();
+              marker.infoWindow = null;
+            }
+            if (marker.setMap) {
+              marker.setMap(null);
+            }
+          } catch (e) {
+            console.log(`[clearMapMarkersAndPaths] 시작/종료 마커 ${index} 제거 오류 무시:`, e);
+          }
+        }
+      });
+      startEndMarkers.current = [];
+      console.log('[clearMapMarkersAndPaths] 시작/종료 마커 완전 정리 완료');
+    } catch (e) {
+      console.log('[clearMapMarkersAndPaths] 시작/종료 마커 정리 오류 무시:', e);
+      startEndMarkers.current = [];
     }
     
-    // 상태 데이터도 즉시 초기화
+    // 6. 체류시간 마커들 완전 정리
+    try {
+      stayTimeMarkers.current.forEach((marker, index) => {
+        if (marker) {
+          try {
+            if (marker.infoWindow) {
+              marker.infoWindow.close();
+              marker.infoWindow = null;
+            }
+            if (marker.setMap) {
+              marker.setMap(null);
+            }
+          } catch (e) {
+            console.log(`[clearMapMarkersAndPaths] 체류시간 마커 ${index} 제거 오류 무시:`, e);
+          }
+        }
+      });
+      stayTimeMarkers.current = [];
+      console.log('[clearMapMarkersAndPaths] 체류시간 마커 완전 정리 완료');
+    } catch (e) {
+      console.log('[clearMapMarkersAndPaths] 체류시간 마커 정리 오류 무시:', e);
+      stayTimeMarkers.current = [];
+    }
+
+    // 6-1. 화살표 마커들 완전 정리
+    try {
+      arrowMarkers.current.forEach((marker, index) => {
+        if (marker) {
+          try {
+            if (marker.setMap) {
+              marker.setMap(null);
+            }
+          } catch (e) {
+            console.log(`[clearMapMarkersAndPaths] 화살표 마커 ${index} 제거 오류 무시:`, e);
+          }
+        }
+      });
+      arrowMarkers.current = [];
+      console.log('[clearMapMarkersAndPaths] 화살표 마커 완전 정리 완료');
+    } catch (e) {
+      console.log('[clearMapMarkersAndPaths] 화살표 마커 정리 오류 무시:', e);
+      arrowMarkers.current = [];
+    }
+
+    // 7. 현재 위치 마커 완전 정리
+    try {
+      if (currentPositionMarker.current) {
+        if (currentPositionMarker.current.infoWindow) {
+          currentPositionMarker.current.infoWindow.close();
+          currentPositionMarker.current.infoWindow = null;
+        }
+        currentPositionMarker.current.setMap(null);
+        currentPositionMarker.current = null;
+      }
+      console.log('[clearMapMarkersAndPaths] 현재 위치 마커 완전 정리 완료');
+    } catch (e) {
+      console.log('[clearMapMarkersAndPaths] 현재 위치 마커 정리 오류 무시:', e);
+      currentPositionMarker.current = null;
+    }
+
+    // 8. 멤버 마커들 완전 정리 (선택적 - 날짜 변경 시에만)
+    // 8. 멤버 마커들 조건부 정리
+    if (clearMemberMarkers) {
+      try {
+        memberNaverMarkers.current.forEach((marker, index) => {
+          if (marker) {
+            try {
+              if (marker.setMap) {
+                marker.setMap(null);
+              }
+            } catch (e) {
+              console.log(`[clearMapMarkersAndPaths] 멤버 마커 ${index} 제거 오류 무시:`, e);
+            }
+          }
+        });
+        memberNaverMarkers.current = [];
+        console.log('[clearMapMarkersAndPaths] 멤버 마커 완전 정리 완료');
+      } catch (e) {
+        console.log('[clearMapMarkersAndPaths] 멤버 마커 정리 오류 무시:', e);
+        memberNaverMarkers.current = [];
+      }
+    } else {
+      console.log('[clearMapMarkersAndPaths] 멤버 마커는 보존함 (위치 로그 정리와 별개)');
+    }
+
+    // 9. 모든 React 상태 즉시 초기화
     setCurrentLocationLogs([]);
     setDailySummaryData([]);
     setStayTimesData([]);
     setMapMarkersData([]);
     setLocationLogSummaryData(null);
     setLocationSummary(DEFAULT_LOCATION_SUMMARY);
-    
-    // 슬라이더 관련 상태도 초기화
     setSortedLocationData([]);
     setSliderValue(0);
     setIsSliderDragging(false);
     
-    console.log('[clearMapMarkersAndPaths] 모든 마커, 경로, 상태 초기화 완료');
+    // 10. 지도 강력 새로고침 (삼중 새로고침)
+    if (map.current) {
+      try {
+        map.current.refresh(true);
+        setTimeout(() => {
+          if (map.current) {
+            map.current.refresh(true);
+            setTimeout(() => {
+              if (map.current) {
+                map.current.refresh(true);
+                console.log('[clearMapMarkersAndPaths] 지도 삼중 새로고침 완료');
+              }
+            }, 50);
+          }
+        }, 50);
+      } catch (e) {
+        console.log('[clearMapMarkersAndPaths] 지도 새로고침 오류 무시:', e);
+      }
+    }
+    
+    console.log('[clearMapMarkersAndPaths] ===== 완전 초기화 완료 =====');
   };
 
   const handleDateSelect = (date: string) => {
-    console.log('[LOGS] 날짜 선택:', date, '이전 날짜:', selectedDate);
+    console.log('[LOGS] ===== 날짜 선택 시작 =====');
+    console.log('[LOGS] 새 날짜:', date, '현재 날짜:', selectedDate);
     
     // 같은 날짜를 재선택한 경우 무시
-    const isDateActuallyChanging = selectedDate !== date;
-    if (!isDateActuallyChanging) {
+    if (selectedDate === date) {
       console.log('[LOGS] 같은 날짜 재선택 - 무시');
       return;
     }
     
-    // 날짜 변경 시 즉시 지도 초기화
-    clearMapMarkersAndPaths();
+    console.log('[LOGS] 날짜 변경 - 완전 초기화 후 재생성');
     
-    // 이전 날짜 저장 후 새 날짜 설정
+    // 1. 날짜 변경 중 플래그 설정 (자동 재생성 방지)
+    isDateChangingRef.current = true;
+    console.log('[handleDateSelect] 자동 재생성 방지 플래그 ON');
+    
+    // 2. 모든 것을 완전히 지우기 (날짜 변경 시에는 멤버 마커도 제거)
+    clearMapMarkersAndPaths(true);
+    
+    // 3. 추가 상태 초기화 (확실히 하기 위해)
+    setActiveLogView('members');
+    setFirstMemberSelected(false);
+    isDateChangedRef.current = true;
+    setIsLocationDataLoading(true);
+    
+    // 4. 날짜 상태 업데이트
     setPreviousDate(selectedDate);
     setSelectedDate(date);
     
-    // 슬라이더 관련 초기화는 clearMapMarkersAndPaths에서 처리됨
-    console.log('[handleDateSelect] 날짜 변경으로 지도 및 상태 초기화 완료');
-    setActiveLogView('members');
+    console.log('[LOGS] 완전 초기화 완료 - 새 데이터 로딩 시작');
     
-    // 날짜가 실제로 변경되는 경우 firstMemberSelected 상태 리셋
-    setFirstMemberSelected(false);
-    isDateChangedRef.current = true; // 날짜 변경 플래그 설정
-    console.log('[LOGS] 날짜 변경으로 firstMemberSelected 리셋 및 날짜 변경 플래그 설정');
-    
-    // 날짜 변경 시 멤버 활동 데이터 다시 조회
+    // 5. 새 데이터 로딩 준비
     if (selectedGroupId) {
-      console.log('[LOGS] 날짜 변경 - 멤버 활동 데이터 재조회:', date);
       loadMemberActivityByDate(selectedGroupId, date);
     }
     
-    // 선택된 멤버가 있으면 데이터 로딩 (시작지점 기준 지도 조정은 데이터 로드 후 처리)
-    const selectedMember = groupMembers.find(m => m.isSelected);
-    if (selectedMember) {
-      console.log('[LOGS] 날짜 변경 - 선택된 멤버의 위치 데이터 로딩:', selectedMember.name, date);
-      loadLocationData(parseInt(selectedMember.id), date);
-    } else {
-      console.log('[LOGS] 날짜 변경 - 선택된 멤버가 없음, 데이터 로딩 안함');
-    }
+    // 6. 멤버 마커 재생성 후 위치 데이터 로딩
+    console.log('[LOGS] 멤버 마커 재생성 후 위치 데이터 로딩 준비');
+    
+    // 약간의 지연 후 멤버 마커 재생성 및 데이터 로딩
+    // setTimeout(() => {
+      // 먼저 멤버 마커 재생성
+      // if (groupMembers.length > 0) {
+      //   console.log('[LOGS] 날짜 변경 후 멤버 마커 재생성');
+      //   updateMemberMarkers(groupMembers, true); // 날짜 변경임을 명시
+      // }
+      
+      // 선택된 멤버가 있으면 위치 데이터 로딩
+      const selectedMember = groupMembers.find(m => m.isSelected);
+      if (selectedMember) {
+        console.log('[LOGS] 선택된 멤버 새 데이터 로딩:', selectedMember.name, date);
+        
+        // 플래그 리셋하고 데이터 로딩
+        isDateChangingRef.current = false;
+        console.log('[handleDateSelect] 자동 재생성 방지 플래그 OFF - 새 데이터 로딩 시작');
+        loadLocationData(parseInt(selectedMember.id), date);
+      } else {
+        // 선택된 멤버가 없으면 로딩 해제하고 플래그 리셋
+        isDateChangingRef.current = false;
+        setIsLocationDataLoading(false);
+        console.log('[handleDateSelect] 선택된 멤버 없음 - 플래그 리셋 및 로딩 해제');
+      }
+    // }, 100); // 초기화 완료를 위한 지연
+    
+    console.log('[LOGS] ===== 날짜 선택 완료 =====');
   };
 
   // 위치 로그 데이터 로딩 함수 (새로운 3개 API 포함)
   const loadLocationData = async (mtIdx: number, date: string) => {
-    if (!mtIdx || !date) {
-      console.log('[loadLocationData] mtIdx 또는 date가 없어서 실행하지 않음:', { mtIdx, date });
+    if (!mtIdx || !date || !map.current) {
+      console.log('[loadLocationData] mtIdx, date 또는 map이 없어 실행하지 않음:', { mtIdx, date, mapReady: !!map.current });
       return;
     }
 
-    // 중복 실행 방지 (더 강화)
+    // 중복 실행 방지 및 이전 요청 취소
     const executionKey = `${mtIdx}-${date}`;
     const currentTime = Date.now();
     
-    // 같은 요청이 3초 이내에 들어오면 무시
+    // 이전 요청이 있으면 취소
     if (loadLocationDataExecutingRef.current.executing) {
-      console.log(`[loadLocationData] 이미 실행 중이므로 건너뜀: ${executionKey}`);
-      return;
+      console.log(`[loadLocationData] 이전 요청 취소: ${loadLocationDataExecutingRef.current.currentRequest}`);
+      loadLocationDataExecutingRef.current.cancelled = true;
     }
     
-    if (loadLocationDataExecutingRef.current.lastExecution && 
-        (currentTime - loadLocationDataExecutingRef.current.lastExecution) < 3000) {
-      console.log(`[loadLocationData] 3초 이내 중복 요청 무시: ${executionKey}`);
-      return;
-    }
-    
+    // 새로운 요청 시작
     loadLocationDataExecutingRef.current.executing = true;
+    loadLocationDataExecutingRef.current.currentRequest = executionKey;
     loadLocationDataExecutingRef.current.lastExecution = currentTime;
+    loadLocationDataExecutingRef.current.cancelled = false; // 새로운 요청이므로 false로 설정
     console.log(`[loadLocationData] 실행 시작: ${executionKey}-${currentTime}`);
 
+    setIsLocationDataLoading(true); // 로딩 상태 시작
+    console.log('[loadLocationData] 위치 데이터 로딩 시작:', { mtIdx, date });
+
     try {
-      setIsLocationDataLoading(true);
-      console.log('[loadLocationData] 위치 데이터 로딩 시작:', { mtIdx, date });
-
-      // 새로운 날짜 데이터 로드 전에 기존 마커들 모두 정리
-      console.log('[loadLocationData] 기존 마커들 정리 시작');
-      
-      // 위치 로그 마커들 정리
-      locationLogMarkers.current.forEach(marker => {
-        if (marker && marker.setMap) {
-          marker.setMap(null);
-        }
-      });
-      locationLogMarkers.current = [];
-      
-      // 경로 폴리라인 정리
-      if (locationLogPolyline.current) {
-        locationLogPolyline.current.setMap(null);
-        locationLogPolyline.current = null;
-      }
-      
-      // 시작/종료 마커들 정리
-      startEndMarkers.current.forEach(marker => {
-        if (marker && marker.setMap) {
-          marker.setMap(null);
-        }
-      });
-      startEndMarkers.current = [];
-      
-      // 체류시간 마커들 정리
-      stayTimeMarkers.current.forEach(marker => {
-        if (marker && marker.setMap) {
-          marker.setMap(null);
-        }
-      });
-      stayTimeMarkers.current = [];
-
-      // 현재 위치 마커 정리
-      if (currentPositionMarker.current) {
-        // InfoWindow가 있다면 먼저 닫기
-        if (currentPositionMarker.current.infoWindow) {
-          currentPositionMarker.current.infoWindow.close();
-        }
-        currentPositionMarker.current.setMap(null);
-        currentPositionMarker.current = null;
-      }
-      
-      console.log('[loadLocationData] 기존 마커들 정리 완료');
-
-      // 모든 API를 병렬로 호출 (PHP 로직 기반 요약 API 추가)
+      // 모든 API를 병렬로 호출 (PHP 로직 기반 요약 API 포함)
       const [logs, summary, dailySummary, stayTimes, mapMarkers, locationLogSummary] = await Promise.all([
-        memberLocationLogService.getDailyLocationLogs(mtIdx, date),
-        memberLocationLogService.getDailyLocationSummary(mtIdx, date),
-        memberLocationLogService.getDailySummaryByRange(mtIdx, date, date),
-        memberLocationLogService.getStayTimes(mtIdx, date),
-        memberLocationLogService.getMapMarkers(mtIdx, date),
-        memberLocationLogService.getLocationLogSummary(mtIdx, date) // PHP 로직 기반 요약 API
+        memberLocationLogService.getDailyLocationLogs(mtIdx, date), // 사용하지 않을 수 있지만 함께 호출
+        memberLocationLogService.getDailyLocationSummary(mtIdx, date), // 사용하지 않을 수 있지만 함께 호출
+        memberLocationLogService.getDailySummaryByRange(mtIdx, date, date), // UI 표시용
+        memberLocationLogService.getStayTimes(mtIdx, date), // 지도 표시용
+        memberLocationLogService.getMapMarkers(mtIdx, date), // 지도 표시용 (주요 위치 데이터)
+        memberLocationLogService.getLocationLogSummary(mtIdx, date) // UI 표시용 (PHP 로직)
       ]);
 
-      // 기존 위치 로그 데이터 설정
-      setCurrentLocationLogs(logs);
-      console.log('[loadLocationData] 위치 로그 데이터 로딩 완료:', logs.length, '개');
-
-      // 서버에서 받은 요약 정보를 UI 형식으로 변환
-      const serverSummary: LocationSummary = {
-        distance: summary.total_distance ? `${(summary.total_distance / 1000).toFixed(1)} km` : '0 km',
-        time: summary.total_time ? formatTime(parseInt(summary.total_time.toString())) : '0분',
-        steps: summary.step_count ? `${Number(summary.step_count).toLocaleString()} 걸음` : '0 걸음'
-      };
-
-      // 위치 로그 데이터로부터 직접 계산한 통계
-      const calculatedStats = calculateLocationStats(logs);
-      
-      // 계산된 통계를 사용하거나 서버 데이터와 비교
-      const finalSummary = calculatedStats;
-      
-      setLocationSummary(finalSummary);
-      console.log('[loadLocationData] 서버 요약 데이터:', serverSummary);
-      console.log('[loadLocationData] 계산된 요약 데이터:', calculatedStats);
-      console.log('[loadLocationData] 최종 사용 데이터:', finalSummary);
-
-      // 새로운 API 응답 데이터 설정
-      setDailySummaryData(dailySummary);
-      setStayTimesData(stayTimes);
-      setMapMarkersData(mapMarkers);
-      setLocationLogSummaryData(locationLogSummary); // PHP 로직 기반 요약 데이터 설정
-      
-      console.log('[loadLocationData] 날짜별 요약 데이터 로딩 완료:', dailySummary.length, '일');
-      console.log('[loadLocationData] 체류시간 분석 데이터 로딩 완료:', stayTimes.length, '개');
-      console.log('[loadLocationData] 지도 마커 데이터 로딩 완료:', mapMarkers.length, '개');
-      console.log('[loadLocationData] PHP 로직 기반 요약 데이터 로딩 완료:', locationLogSummary);
-
-      // 지도에 마커 표시
-      if (mapMarkers.length > 0) {
-        console.log('[loadLocationData] 지도에 마커 표시:', mapMarkers.length, '개');
-        updateLocationLogMarkers(mapMarkers);
-        
-        // 정렬된 데이터를 슬라이더용으로 설정
-        const sortedMarkers = [...mapMarkers].sort((a, b) => {
-          const timeA = a.timestamp || a.mlt_gps_time || '';
-          const timeB = b.timestamp || b.mlt_gps_time || '';
-          return timeA.localeCompare(timeB);
-        });
-        setSortedLocationData(sortedMarkers);
-        console.log('[loadLocationData] 슬라이더용 정렬된 데이터 설정:', sortedMarkers.length, '개');
-      } else {
-        console.log('[loadLocationData] 표시할 마커가 없음');
-        // 마커가 없는 경우 슬라이더 데이터도 초기화
-        setSortedLocationData([]);
+      // 요청이 취소되었는지 다시 확인
+      if (loadLocationDataExecutingRef.current.cancelled) {
+        console.log(`[loadLocationData] 요청이 취소됨 - 결과 무시: ${executionKey}`);
+        return;
       }
 
-      // 체류시간 마커도 표시
-      if (stayTimes.length > 0) {
-        console.log('[loadLocationData] 체류시간 마커 표시:', stayTimes.length, '개');
-        // updateStayTimeMarkers는 updateLocationLogMarkers 내에서 호출됨
+      console.log('[loadLocationData] 모든 API 응답 수신 완료');
+      
+      // UI 상태 업데이트
+      setCurrentLocationLogs(logs); // 필요시 사용
+      setDailySummaryData(dailySummary);
+      setStayTimesData(stayTimes);
+      setMapMarkersData(mapMarkers); // 지도 렌더링 함수로 전달
+      setLocationLogSummaryData(locationLogSummary);
+
+       // 요약 데이터 설정 (PHP 로직 기반 요약 또는 계산된 요약 사용)
+       // locationLogSummary가 존재하고 distance, time, steps 속성이 있는지 확인
+       const finalSummary: LocationSummary = (locationLogSummary && typeof locationLogSummary.distance === 'string' && typeof locationLogSummary.time === 'string' && typeof locationLogSummary.steps === 'string')
+         ? { distance: locationLogSummary.distance, time: locationLogSummary.time, steps: locationLogSummary.steps }
+         : calculateLocationStats(logs);
+      setLocationSummary(finalSummary);
+      console.log('[loadLocationData] 최종 요약 데이터 설정:', finalSummary);
+
+      // 모든 데이터가 준비되면 통합 지도 렌더링 함수 호출
+      console.log('[loadLocationData] 통합 지도 렌더링 함수 호출 준비');
+      const currentMembers = groupMembers; // 최신 멤버 상태 전달
+
+      if (map.current) {
+           await renderLocationDataOnMap(mapMarkers, stayTimes, locationLogSummary, currentMembers, map.current);
+           console.log('[loadLocationData] 통합 지도 렌더링 함수 호출 완료');
       }
 
     } catch (error) {
       console.error('[loadLocationData] 위치 데이터 로딩 오류:', error);
       
-      // 오류 시 기본값으로 설정
+      // 오류 시 기본값으로 설정 및 지도 정리
       setCurrentLocationLogs([]);
       setLocationSummary(DEFAULT_LOCATION_SUMMARY);
       setDailySummaryData([]);
       setStayTimesData([]);
       setMapMarkersData([]);
       setLocationLogSummaryData(null);
+      setSortedLocationData([]);
+
+      // 오류 발생 시에도 멤버 아이콘은 표시되도록 지도 정리 후 멤버 마커만 다시 그림
+       if(map.current) {
+           console.log('[loadLocationData] 오류 발생 - 지도 정리 후 멤버 아이콘만 다시 그림');
+           clearMapMarkersAndPaths(true); // 전체 정리
+           const selectedMember = groupMembers.find(m => m.isSelected);
+            if (selectedMember) {
+                try {
+                    const lat = selectedMember.mlt_lat !== null && selectedMember.mlt_lat !== undefined && selectedMember.mlt_lat !== 0 ? parseFloat(selectedMember.mlt_lat.toString()) : parseFloat(selectedMember.location.lat.toString() || '37.5665');
+                    const lng = selectedMember.mlt_long !== null && selectedMember.mlt_long !== undefined && selectedMember.mlt_long !== 0 ? parseFloat(selectedMember.mlt_long.toString()) : parseFloat(selectedMember.location.lng.toString() || '126.9780');
+                     const position = new window.naver.maps.LatLng(lat, lng);
+                     const safeImageUrl = getSafeImageUrl(selectedMember.photo, selectedMember.mt_gender, selectedMember.original_index);
+                     const marker = new window.naver.maps.Marker({
+                       position: position,
+                       map: map.current,
+                       icon: { content: `<div style="position: relative; text-align: center;"><div style="width: 32px; height: 32px; background-color: white; border: 2px solid #EC4899; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);"><img src="${safeImageUrl}" alt="${selectedMember.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='${getDefaultImage(selectedMember.mt_gender, selectedMember.original_index)}'" /></div><div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">${selectedMember.name}</div></div>`, size: new window.naver.maps.Size(36, 48), anchor: new window.naver.maps.Point(18, 42) }, zIndex: 200
+                     });
+                     memberNaverMarkers.current = [marker];
+                     map.current.setCenter(position); // 멤버 위치로 지도 이동
+                     map.current.setZoom(16); // 줌 레벨 설정
+                     map.current.refresh(true);
+                     console.log('[loadLocationData] 오류 시 멤버 아이콘 표시 및 지도 이동 완료');
+                } catch (e) { console.error('[loadLocationData] 오류 시 멤버 마커 생성 실패:', e); }
+            }
+       }
+
     } finally {
-      setIsLocationDataLoading(false);
-      loadLocationDataExecutingRef.current.executing = false;
-      console.log(`[loadLocationData] 실행 완료: ${executionKey}-${currentTime}`);
+      // 현재 요청이 취소되지 않은 경우에만 상태 정리
+      if (!loadLocationDataExecutingRef.current.cancelled) {
+        setIsLocationDataLoading(false); // 로딩 상태 종료
+        loadLocationDataExecutingRef.current.executing = false;
+        loadLocationDataExecutingRef.current.currentRequest = undefined;
+        console.log(`[loadLocationData] 모든 처리 및 실행 완료: ${executionKey}-${currentTime}`);
+      } else {
+        console.log(`[loadLocationData] 취소된 요청 정리 완료: ${executionKey}-${currentTime}`);
+        // 취소된 요청이라도 executing은 false로 설정하여 다음 요청이 진행될 수 있도록 함
+        loadLocationDataExecutingRef.current.executing = false;
+        setIsLocationDataLoading(false); // 취소 시에도 로딩 상태 종료
+       }
+       // 날짜 변경 플래그 리셋 (loadLocationData 완료 시점에 리셋)
+       if (isDateChangingRef.current) {
+         isDateChangingRef.current = false;
+         console.log('[loadLocationData] 날짜 변경 플래그 리셋');
+       }
     }
   };
 
@@ -2352,30 +1647,31 @@ export default function LogsPage() {
     let actualSteps = 0;
     
     if (sortedData.length > 0) {
-      // 가장 최근 데이터의 mt_health_work 값 사용
+      const firstData = sortedData[0];
       const latestData = sortedData[sortedData.length - 1];
-      const healthWork = latestData.mt_health_work || latestData.health_work || 0;
       
-      if (healthWork > 0) {
-        actualSteps = healthWork;
-        console.log('[calculateLocationStats] 실제 걸음수 데이터 사용:', {
+      const firstHealthWork = firstData.mt_health_work || firstData.health_work || 0;
+      const latestHealthWork = latestData.mt_health_work || latestData.health_work || 0;
+      
+      if (latestHealthWork > 0 && firstHealthWork >= 0) {
+        // 하루 동안의 걸음수 증가량 계산
+        actualSteps = Math.max(0, latestHealthWork - firstHealthWork);
+        console.log('[calculateLocationStats] 하루 걸음수 증가량 계산:', {
+          firstDataTime: firstData.timestamp || firstData.mlt_gps_time,
           latestDataTime: latestData.timestamp || latestData.mlt_gps_time,
-          healthWork: healthWork
+          firstHealthWork: firstHealthWork,
+          latestHealthWork: latestHealthWork,
+          actualSteps: actualSteps
+        });
+      } else if (latestHealthWork > 0) {
+        // 최신 데이터만 있는 경우 그 값 사용
+        actualSteps = latestHealthWork;
+        console.log('[calculateLocationStats] 최신 걸음수 데이터 사용:', {
+          latestDataTime: latestData.timestamp || latestData.mlt_gps_time,
+          latestHealthWork: latestHealthWork
         });
       } else {
-        // 첫 번째 데이터도 확인해보기
-        const firstData = sortedData[0];
-        const firstHealthWork = firstData.mt_health_work || firstData.health_work || 0;
-        
-        if (firstHealthWork > 0) {
-          actualSteps = firstHealthWork;
-          console.log('[calculateLocationStats] 첫 번째 데이터의 걸음수 사용:', {
-            firstDataTime: firstData.timestamp || firstData.mlt_gps_time,
-            healthWork: firstHealthWork
-          });
-        } else {
-          console.log('[calculateLocationStats] mt_health_work 데이터가 없어서 0으로 설정');
-        }
+        console.log('[calculateLocationStats] mt_health_work 데이터가 없어서 0으로 설정');
       }
     }
 
@@ -2729,17 +2025,27 @@ export default function LogsPage() {
     }
   }, [dailySummaryData, stayTimesData, mapMarkersData, locationLogSummaryData, dailyCountsData, memberActivityData]);
 
-  // 지도 마커 데이터가 변경될 때마다 지도에 마커 업데이트
+  // 날짜 변경 중 자동 재생성 방지 플래그
+  const isDateChangingRef = useRef(false);
+
+  // 지도 마커 데이터가 변경될 때마다 지도에 마커 업데이트 (날짜 변경 중에는 방지)
   useEffect(() => {
     console.log('[LOGS] 마커 데이터 변경 감지:', {
       isMapInitializedLogs,
       mapMarkersDataLength: mapMarkersData.length,
-      mapMarkersData: mapMarkersData.slice(0, 2) // 첫 2개만 로그
+      mapMarkersData: mapMarkersData.slice(0, 2), // 첫 2개만 로그
+      isDateChanging: isDateChangingRef.current
     });
+    
+         // 날짜 변경 중이면 자동 재생성 완전 방지
+     if (isDateChangingRef.current) {
+       console.log('[LOGS] 날짜 변경 중 - 자동 마커 업데이트 완전 차단!');
+       return;
+     }
     
     if (isMapInitializedLogs) {
       console.log('[LOGS] 지도에 마커 업데이트 실행:', mapMarkersData.length, '개');
-      updateLocationLogMarkers(mapMarkersData);
+      // updateLocationLogMarkers(mapMarkersData); // loadLocationData에서 호출하므로 주석 처리
       
       // 첫 번째 마커(시작지점)를 기준으로 지도 중심 조정
       if (map.current && mapMarkersData.length > 0) {
@@ -2766,11 +2072,24 @@ export default function LogsPage() {
           
           console.log('[LOGS] 시작지점 기준 지도 조정:', { lat, lng, adjustedPosition });
         }
+      } else if (map.current && mapMarkersData.length === 0) {
+          // 데이터가 없을 때도 멤버 아이콘은 표시되도록 updateMemberMarkers 호출
+          console.log('[LOGS] 마커 데이터 없음 - 멤버 마커 업데이트 및 지도 중앙 이동');
+          const selectedMember = groupMembers.find(m => m.isSelected);
+          if(selectedMember) {
+              const memberLat = selectedMember.mlt_lat || selectedMember.location.lat || 37.5665;
+              const memberLng = selectedMember.mlt_long || selectedMember.location.lng || 126.9780;
+               const memberPosition = new window.naver.maps.LatLng(memberLat, memberLng);
+              map.current.setCenter(memberPosition);
+              map.current.setZoom(16);
+              updateMemberMarkers(groupMembers, false);
+               console.log('[LOGS] 멤버 아이콘 업데이트 및 지도 중앙 이동 완료');
+          }
       }
     } else {
       console.log('[LOGS] 지도가 초기화되지 않아서 마커 업데이트 건너뜀');
     }
-  }, [mapMarkersData, isMapInitializedLogs]);
+  }, [mapMarkersData, isMapInitializedLogs, groupMembers]); // groupMembers 종속성 추가
 
   // 체류시간 데이터가 변경될 때마다 지도에 체류시간 마커 업데이트
   // (updateLocationLogMarkers 내에서 호출되므로 중복 실행 방지를 위해 주석 처리)
@@ -2780,6 +2099,19 @@ export default function LogsPage() {
   //     updateStayTimeMarkers(stayTimesData);
   //   }
   // }, [stayTimesData, isMapInitializedLogs]);
+
+  // 그룹 멤버가 변경될 때마다 멤버 마커 업데이트
+  useEffect(() => {
+    if (isMapInitializedLogs && groupMembers.length > 0) {
+      console.log('[LOGS] 그룹 멤버 변경 감지 - 멤버 마커 업데이트:', groupMembers.length, '명');
+      // 날짜 변경 중이 아닐 때만 업데이트 (날짜 변경 중에는 자동 재생성 방지)
+      if (!isDateChangingRef.current) {
+        updateMemberMarkers(groupMembers, false);
+      } else {
+        console.log('[LOGS] 날짜 변경 중으로 멤버 마커 업데이트 건너뜀');
+      }
+    }
+  }, [groupMembers, isMapInitializedLogs]);
 
   // 슬라이더 드래그를 위한 전역 이벤트 리스너
   useEffect(() => {
@@ -2827,17 +2159,46 @@ export default function LogsPage() {
 
   // useEffect for auto-selecting the first member and updating map based on selection
   useEffect(() => {
+    console.log("[LogsPage] 🔥 useEffect 실행됨:", {
+      isMapInitializedLogs,
+      groupMembersLength: groupMembers.length,
+      hasSelectedMember: groupMembers.some(m => m.isSelected),
+      mapExists: !!map.current,
+      naverMapsExists: !!window.naver?.maps
+    });
+    
     if (isMapInitializedLogs && groupMembers.length > 0) {
       // 첫 번째 멤버 자동 선택 (선택된 멤버가 없는 경우)
       if (!groupMembers.some(m => m.isSelected)) {
-      console.log("[LogsPage] Auto-selection: Setting first member as selected.");
-      const updatedMembers = groupMembers.map((member, index) => ({
-        ...member,
-        isSelected: index === 0,
-      }));
-      setGroupMembers(updatedMembers);
+        console.log("[LogsPage] 🎯 Auto-selection: Setting first member as selected.");
+        
+        // 자동 선택 전에 모든 플래그 리셋 (확실히 하기 위해)
+        isDateChangingRef.current = false;
+        isDateChangedRef.current = false;
+        console.log("[LogsPage] Auto-selection: 모든 플래그 리셋 완료");
+        
+        // 멤버 상태 업데이트 후 마커 생성
+        const updatedMembers = groupMembers.map((member, index) => ({
+          ...member,
+          isSelected: index === 0
+        }));
+        
+        setGroupMembers(updatedMembers);
+        
+        // 즉시 멤버 마커 생성
+        console.log("[LogsPage] Auto-selection: 즉시 멤버 마커 생성");
+        updateMemberMarkers(updatedMembers, false);
+        
+        // handleMemberSelect도 호출하여 위치 데이터 로딩
+        const firstMemberId = groupMembers[0].id;
+        console.log("[LogsPage] Auto-selection: Calling handleMemberSelect for:", firstMemberId);
+        
+        setTimeout(() => {
+          handleMemberSelect(firstMemberId, null as any);
+        }, 100);
+        
         return; // 상태 업데이트 후 다음 렌더 사이클에서 처리되도록 return
-    }
+      }
 
       // 선택된 멤버가 있는 경우 지도 업데이트
       console.log("[LogsPage] Member selection detected or map initialized with selection. Updating markers and view.");
@@ -2851,23 +2212,13 @@ export default function LogsPage() {
         firstMemberSelected,
         isDateChangedRefValue: isDateChangedRef.current
       });
-      updateMemberMarkers(groupMembers, isDateChange);
+      // updateMemberMarkers(groupMembers, isDateChange); // loadLocationData에서 처리하도록 주석 처리
       setActiveLogView('members'); // 멤버 선택/지도 업데이트 시 members 뷰 활성화
       
-      // 선택된 멤버의 위치 데이터 로드 (기존 데이터가 없거나 날짜 변경된 경우에만)
-      const selectedMember = groupMembers.find(m => m.isSelected);
-      if (selectedMember && selectedDate) {
-        // 기존 로그 데이터가 있고 날짜 변경이 아닌 경우 재조회 안함
-        const hasExistingData = mapMarkersData.length > 0 || currentLocationLogs.length > 0;
-        const isDateChangeCase = isDateChangedRef.current;
-        
-        if (!hasExistingData || isDateChangeCase) {
-          console.log("[LogsPage] 선택된 멤버의 위치 데이터 로드:", selectedMember.name, selectedDate, { hasExistingData, isDateChangeCase });
-          // loadLocationData에서 중복 실행 방지가 적용됨
-          loadLocationData(parseInt(selectedMember.id), selectedDate);
-        } else {
-          console.log("[LogsPage] 기존 로그 데이터 유지 - 재조회하지 않음:", selectedMember.name, selectedDate);
-        }
+      // 자동 재생성 방지 플래그가 설정되어 있으면 리셋
+      if (isDateChangingRef.current) {
+        console.log('[LOGS] useEffect - 자동 재생성 방지 플래그 강제 리셋');
+        isDateChangingRef.current = false;
       }
     }
   }, [groupMembers, isMapInitializedLogs]); // selectedDate 제거 - 날짜 변경 시 지도 조정 중복 방지
@@ -3010,19 +2361,30 @@ export default function LogsPage() {
           const memberData = await memberService.getGroupMembers(groupIdToUse);
           if (isMounted) { 
             if (memberData && memberData.length > 0) { 
-              currentMembers = memberData.map((member: any, index: number) => ({
-                id: member.mt_idx.toString(),
-                name: member.mt_name || `멤버 ${index + 1}`,
-                photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
-                isSelected: false,
-                location: { 
-                  lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
-                    ? parseFloat(member.mlt_lat.toString()) 
-                    : parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
-                  lng: member.mlt_long !== null && member.mlt_long !== undefined 
-                    ? parseFloat(member.mlt_long.toString()) 
-                    : parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
-                },
+              currentMembers = memberData.map((member: any, index: number) => {
+                // 위치 데이터 우선순위: mlt_lat/mlt_long (최신 GPS) > mt_lat/mt_long (기본 위치)
+                const lat = member.mlt_lat !== null && member.mlt_lat !== undefined && member.mlt_lat !== 0
+                  ? parseFloat(member.mlt_lat.toString())
+                  : parseFloat(member.mt_lat || '37.5665'); // 서울시청 기본 좌표
+                const lng = member.mlt_long !== null && member.mlt_long !== undefined && member.mlt_long !== 0
+                  ? parseFloat(member.mlt_long.toString())
+                  : parseFloat(member.mt_long || '126.9780');
+                
+                console.log(`[LOGS] 멤버 ${member.mt_name} 위치 설정:`, {
+                  mlt_lat: member.mlt_lat,
+                  mlt_long: member.mlt_long,
+                  mt_lat: member.mt_lat,
+                  mt_long: member.mt_long,
+                  final_lat: lat,
+                  final_lng: lng
+                });
+                
+                return {
+                  id: member.mt_idx.toString(),
+                  name: member.mt_name || `멤버 ${index + 1}`,
+                  photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
+                  isSelected: index === 0, // 첫 번째 멤버만 자동 선택
+                  location: { lat, lng },
                 schedules: [], 
                 mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
                 original_index: index,
@@ -3038,11 +2400,19 @@ export default function LogsPage() {
                 sgdt_owner_chk: member.sgdt_owner_chk,
                 sgdt_leader_chk: member.sgdt_leader_chk,
                 sgdt_idx: member.sgdt_idx
-              }));
+              };
+              });
+              
+              console.log('[🔥 LOGS] setGroupMembers 호출:', {
+                currentMembersLength: currentMembers.length,
+                firstMember: currentMembers[0],
+                hasValidLocation: currentMembers[0]?.location?.lat && currentMembers[0]?.location?.lng
+              });
+              setGroupMembers(currentMembers);
             } else {
-              console.warn('No member data from API, or API call failed.');
-            }
-            setGroupMembers(currentMembers); 
+              console.warn('❌ No member data from API, or API call failed.');
+              setGroupMembers([]);
+            } 
             dataFetchedRef.current.members = true;
 
             // 그룹 멤버 조회 완료 후 날짜별 활동 로그 관련 API 호출
@@ -3091,8 +2461,8 @@ export default function LogsPage() {
 
     console.log(`[${instanceId.current}] 그룹 선택:`, groupId);
     
-    // 그룹 변경 시 즉시 지도 초기화
-    clearMapMarkersAndPaths();
+    // 그룹 변경 시 즉시 지도 초기화 (멤버 마커도 제거)
+    clearMapMarkersAndPaths(true);
     console.log(`[${instanceId.current}] 그룹 변경으로 지도 초기화 완료`);
     
     setSelectedGroupId(groupId);
@@ -3105,7 +2475,7 @@ export default function LogsPage() {
     fetchDataExecutingRef.current = false;
     hasExecuted.current = false; // 실행 플래그도 리셋
     loadLocationDataExecutingRef.current.executing = false; // loadLocationData 실행 플래그도 리셋
-    firstMemberSelectExecutingRef.current = false; // 첫 멤버 선택 실행 플래그도 리셋
+    // 첫 멤버 선택 실행 플래그는 통합 useEffect에서 처리하므로 제거
     
     // 날짜별 활동 로그 데이터 초기화
     setDailyCountsData(null);
@@ -3178,36 +2548,293 @@ export default function LogsPage() {
 
 
   // 첫번째 멤버 자동 선택 및 위치 데이터 로딩 - 메인 인스턴스에서만
-  const firstMemberSelectExecutingRef = useRef(false);
+  // 첫번째 멤버 자동 선택 - 위의 통합 useEffect에서 처리하므로 제거
+
+  // 선택된 멤버가 변경될 때 위치 데이터 자동 로드
   useEffect(() => {
-    if (!isMainInstance.current) {
-      console.log(`[${instanceId.current}] 서브 인스턴스 - 첫번째 멤버 자동 선택 건너뜀`);
+    const selectedMember = groupMembers.find(m => m.isSelected);
+    if (selectedMember && selectedDate && !loadLocationDataExecutingRef.current.executing) {
+      console.log('[LOGS] 선택된 멤버 변경 감지 - 위치 데이터 로드:', selectedMember.name, selectedDate);
+      
+      setIsLocationDataLoading(true);
+      loadLocationData(parseInt(selectedMember.id), selectedDate);
+    }
+  }, [groupMembers.map(m => m.isSelected).join(',')]);
+
+  // --- 새로운 통합 지도 렌더링 함수 ---
+  const renderLocationDataOnMap = async (locationMarkersData: MapMarker[], stayTimesData: StayTime[], locationLogSummaryData: LocationLogSummary | null, groupMembers: GroupMember[], mapInstance: any) => {
+    if (!mapInstance || !window.naver?.maps) {
+      console.log('[renderLocationDataOnMap] 지도가 준비되지 않음');
       return;
     }
 
-    if (groupMembers.length > 0 && 
-        !groupMembers.some(m => m.isSelected) && 
-        !firstMemberSelected && 
-        dataFetchedRef.current.members && 
-        selectedDate &&
-        !firstMemberSelectExecutingRef.current) {
-      
-      console.log(`[${instanceId.current}] 첫번째 멤버 자동 선택 시작:`, groupMembers[0].name, '선택된 날짜:', selectedDate);
-      
-      firstMemberSelectExecutingRef.current = true;
-      setFirstMemberSelected(true);
-      
-      setTimeout(() => {
-        console.log(`[${instanceId.current}] 첫번째 멤버 자동 선택 실행:`, groupMembers[0].id);
-        handleMemberSelect(groupMembers[0].id, {} as React.MouseEvent);
-        
-        // 첫 번째 멤버의 위치 데이터는 useEffect에서 멤버 선택 감지로 자동 로딩됨
-        console.log(`[${instanceId.current}] 첫번째 멤버 선택 완료, 위치 데이터는 useEffect에서 처리됨`);
-        
-        firstMemberSelectExecutingRef.current = false;
-      }, 500);
+    console.log('[renderLocationDataOnMap] 통합 지도 렌더링 시작');
+
+    // 1. 지도 완전히 정리 (멤버 마커 포함)
+    clearMapMarkersAndPaths(true);
+
+    // 2. 멤버 마커 표시 (선택된 멤버만)
+    console.log('[renderLocationDataOnMap] 멤버 마커 생성 시작');
+    const selectedMember = groupMembers.find(m => m.isSelected);
+    if (selectedMember) {
+      try {
+        // 사용 가능한 최신 위치 데이터 확인 (mlt_lat/mlt_long 우선)
+        const lat = selectedMember.mlt_lat !== null && selectedMember.mlt_lat !== undefined && selectedMember.mlt_lat !== 0
+          ? parseFloat(selectedMember.mlt_lat.toString())
+          : parseFloat(selectedMember.location.lat.toString() || '37.5665'); // 기본값
+        const lng = selectedMember.mlt_long !== null && selectedMember.mlt_long !== undefined && selectedMember.mlt_long !== 0
+          ? parseFloat(selectedMember.mlt_long.toString())
+          : parseFloat(selectedMember.location.lng.toString() || '126.9780'); // 기본값
+
+        const position = new window.naver.maps.LatLng(lat, lng);
+        const safeImageUrl = getSafeImageUrl(selectedMember.photo, selectedMember.mt_gender, selectedMember.original_index);
+        const marker = new window.naver.maps.Marker({
+          position: position,
+          map: mapInstance,
+          icon: {
+            content: `<div style="position: relative; text-align: center;">
+              <div style="width: 32px; height: 32px; background-color: white; border: 2px solid #EC4899; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
+                <img src="${safeImageUrl}" alt="${selectedMember.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='${getDefaultImage(selectedMember.mt_gender, selectedMember.original_index)}'" />
+              </div>
+              <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
+                ${selectedMember.name}
+              </div>
+            </div>`,
+            size: new window.naver.maps.Size(36, 48),
+            anchor: new window.naver.maps.Point(18, 42)
+          },
+          zIndex: 200
+        });
+        memberNaverMarkers.current = [marker]; // 기존 멤버 마커 교체
+        console.log(`[renderLocationDataOnMap] 멤버 ${selectedMember.name} 마커 생성 완료`);
+      } catch (error) {
+        console.error(`[renderLocationDataOnMap] 멤버 ${selectedMember.name} 마커 생성 실패:`, error);
+      }
+    } else {
+        memberNaverMarkers.current = []; // 선택된 멤버 없으면 멤버 마커 초기화
+        console.log('[renderLocationDataOnMap] 선택된 멤버 없음 - 멤버 마커 생성 건너뜀');
     }
-  }, [groupMembers, firstMemberSelected, selectedDate]);
+
+    // 3. 위치 로그와 체류지점을 시간 순서로 통합 및 정렬
+    console.log('[renderLocationDataOnMap] 위치 로그 및 체류지점 통합/정렬 시작');
+    const allTimePoints: Array<{
+      type: 'location' | 'stay';
+      data: any;
+      lat: number;
+      lng: number;
+      time: string;
+      sortKey: number; // mlt_idx 또는 시간
+    }> = [];
+    
+    // 위치 로그 데이터 추가
+    locationMarkersData.forEach((markerData, index) => {
+      const lat = markerData.latitude || markerData.mlt_lat;
+      const lng = markerData.longitude || markerData.mlt_long;
+      const time = markerData.timestamp || markerData.mlt_gps_time || new Date().toISOString();
+      const sortKey = markerData.id || markerData.mlt_idx || index;
+      
+      if (!lat || !lng) return;
+      
+      allTimePoints.push({ type: 'location', data: markerData, lat: Number(lat), lng: Number(lng), time: time, sortKey: Number(sortKey) });
+    });
+    
+    // 체류지점 데이터 추가
+    stayTimesData.forEach((stayData) => {
+        const lat = stayData.latitude || stayData.start_lat || 0;
+        const lng = stayData.longitude || stayData.start_long || 0;
+        if (!lat || !lng) return;
+      allTimePoints.push({ type: 'stay', data: stayData, lat: Number(lat), lng: Number(lng), time: stayData.start_time, sortKey: new Date(stayData.start_time).getTime() });
+    });
+    
+    // 시간 순서로 정렬 (mlt_idx와 시간을 모두 고려)
+    const sortedTimePoints = allTimePoints.sort((a, b) => {
+      // 위치 로그끼리는 mlt_idx로 정렬 (mlt_idx가 없는 경우는 timestamp로 대체)
+      if (a.type === 'location' && b.type === 'location') {
+        const keyA = a.data.mlt_idx !== undefined ? a.sortKey : new Date(a.time).getTime();
+        const keyB = b.data.mlt_idx !== undefined ? b.sortKey : new Date(b.time).getTime();
+        // 유효한 mlt_idx가 있는 경우 mlt_idx로 정렬, 아니면 시간으로 정렬
+        if (a.data.mlt_idx !== undefined && b.data.mlt_idx !== undefined) return a.sortKey - b.sortKey;
+        return keyA - keyB;
+      }
+      // 다른 타입 또는 mlt_idx가 없는 경우는 시간으로 비교
+      const timeA = new Date(a.time).getTime();
+      const timeB = new Date(b.time).getTime();
+      return timeA - timeB;
+    });
+    
+    // 위치 로그만 따로 추출 (마커 생성용)
+    const sortedLocationMarkers = sortedTimePoints
+      .filter(point => point.type === 'location')
+      .map(point => point.data);
+    
+    // 경로따라가기용 정렬된 데이터 저장
+    setSortedLocationData(sortedLocationMarkers);
+    console.log('[renderLocationDataOnMap] 위치 로그 및 체류지점 통합/정렬 완료:', sortedTimePoints.length, '개 지점');
+
+    // 4. 시작/종료 마커 생성
+    console.log('[renderLocationDataOnMap] 시작/종료 마커 생성 시작');
+    startEndMarkers.current = []; // 기존 시작/종료 마커 초기화
+    if (sortedTimePoints.length > 0) {
+      const startPoint = sortedTimePoints[0];
+      const endPoint = sortedTimePoints[sortedTimePoints.length - 1];
+
+      // 시작점 마커 (초록색 원형 마커)
+      const startPosition = new window.naver.maps.LatLng(startPoint.lat, startPoint.lng);
+      const startIcon = new window.naver.maps.Marker({ position: startPosition, map: mapInstance, icon: { content: `<div style="width: 20px; height: 20px; background: #22c55e; border: 3px solid white; border-radius: 50%; box-shadow: 0 3px 6px rgba(0,0,0,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; color: white;">S</div>`, anchor: new window.naver.maps.Point(13, 13) }, zIndex: 300 });
+
+      // 시작점 InfoWindow
+      const startInfoWindow = new window.naver.maps.InfoWindow({ content: `<style>@keyframes slideInFromBottom { 0% { opacity: 0; transform: translateY(20px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); }} .info-window-container { animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);} .close-button { transition: all 0.2s ease;} .close-button:hover { background: rgba(0, 0, 0, 0.2) !important; transform: scale(1.1);}</style><div class="info-window-container" style="padding: 12px 16px; min-width: 200px; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); position: relative;"><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.1); border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #666;">×</button><h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #22c55e; padding-right: 25px; text-align: center;">🚀 시작 지점</h3><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🕒 시간: <span style="color: #111827; font-weight: 500;">${startPoint.time ? startPoint.time.split(' ')[1] || startPoint.time : '정보 없음'}</span></p></div><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🚶 속도: <span style="color: #111827; font-weight: 500;">${startPoint.type === 'location' ? ((startPoint.data.mlt_speed || 0) * 3.6).toFixed(1) : 0} km/h</span></p></div><div style="margin-bottom: 0;"><p style="margin: 0; font-size: 11px; color: #9ca3af;">🌍 좌표: ${startPoint.lat ? startPoint.lat.toFixed(6) : '0.000000'}, ${startPoint.lng ? startPoint.lng.toFixed(6) : '0.000000'}</p></div></div>`, borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true, pixelOffset: new window.naver.maps.Point(0, -10) });
+      window.naver.maps.Event.addListener(startIcon, 'click', () => { if (startInfoWindow.getMap()) { startInfoWindow.close(); } else { startInfoWindow.open(mapInstance, startIcon); } });
+      startEndMarkers.current.push(startIcon);
+
+      // 종료점 마커 (빨간색 원형 마커) - 시작점과 다른 경우에만
+      if (sortedTimePoints.length > 1) {
+        const endPosition = new window.naver.maps.LatLng(endPoint.lat, endPoint.lng);
+        const endIcon = new window.naver.maps.Marker({ position: endPosition, map: mapInstance, icon: { content: `<div style="width: 20px; height: 20px; background: #ef4444; border: 3px solid white; border-radius: 50%; box-shadow: 0 3px 6px rgba(0,0,0,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; color: white;">E</div>`, anchor: new window.naver.maps.Point(13, 13) }, zIndex: 300 });
+
+        // 종료점 InfoWindow
+        const endInfoWindow = new window.naver.maps.InfoWindow({ content: `<style>@keyframes slideInFromBottom { 0% { opacity: 0; transform: translateY(20px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); }} .info-window-container { animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);} .close-button { transition: all 0.2s ease;} .close-button:hover { background: rgba(0, 0, 0, 0.2) !important; transform: scale(1.1);}</style><div class="info-window-container" style="padding: 12px 16px; min-width: 200px; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); position: relative;"><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.1); border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #666;">×</button><h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #ef4444; padding-right: 25px; text-align: center;">🏁 종료 지점</h3><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🕒 시간: <span style="color: #111827; font-weight: 500;">${endPoint.time ? endPoint.time.split(' ')[1] || endPoint.time : '정보 없음'}</span></p></div><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🚶 속도: <span style="color: #111827; font-weight: 500;">${endPoint.type === 'location' ? ((endPoint.data.mlt_speed || 0) * 3.6).toFixed(1) : 0} km/h</span></p></div><div style="margin-bottom: 0;"><p style="margin: 0; font-size: 11px; color: #9ca3af;">🌍 좌표: ${endPoint.lat ? endPoint.lat.toFixed(6) : '0.000000'}, ${endPoint.lng ? endPoint.lng.toFixed(6) : '0.000000'}</p></div></div>`, borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true, pixelOffset: new window.naver.maps.Point(0, -10) });
+        window.naver.maps.Event.addListener(endIcon, 'click', () => { if (endInfoWindow.getMap()) { endInfoWindow.close(); } else { endInfoWindow.open(mapInstance, endIcon); } });
+        startEndMarkers.current.push(endIcon);
+      }
+      console.log('[renderLocationDataOnMap] 시작/종료 마커 생성 완료');
+    }
+
+    // 5. 체류시간 마커 생성
+    console.log('[renderLocationDataOnMap] 체류시간 마커 생성 시작');
+    stayTimeMarkers.current = []; // 기존 체류시간 마커 초기화
+    if (stayTimesData.length > 0) {
+        // 체류시간에 따른 마커 크기와 색상 결정 함수
+        const getMarkerStyle = (duration: number) => {
+            let size = 30; // 기본 크기
+            let bgColor = '#f59e0b'; // 기본 주황색
+            let textColor = 'white';
+            if (duration >= 300) { size = 40; bgColor = '#dc2626'; } else if (duration >= 120) { size = 36; bgColor = '#ea580c'; } else if (duration >= 60) { size = 32; bgColor = '#f59e0b'; } else if (duration >= 30) { size = 28; bgColor = '#eab308'; } else { size = 26; bgColor = '#22c55e'; }
+            return { size, bgColor, textColor };
+        };
+        // 체류시간 포맷 함수
+        const formatDuration = (minutes: number): string => { if (isNaN(minutes) || !isFinite(minutes) || minutes < 0) return '정보 없음'; const hours = Math.floor(minutes / 60); const mins = Math.floor(minutes % 60); if (hours > 0) return `${hours}시간 ${mins}분`; else return `${mins}분`; };
+
+        // 시작점/종료점과 겹치지 않는 체류지점만 필터링
+        const startEndPoints = sortedTimePoints.length > 0 ? { start: sortedTimePoints[0], end: sortedTimePoints[sortedTimePoints.length - 1] } : undefined;
+        const isOverlapping = (stayPoint: StayTime, comparePoint: any): boolean => { if (!comparePoint) return false; const lat1 = stayPoint.latitude || stayPoint.start_lat || 0; const lng1 = stayPoint.longitude || stayPoint.start_long || 0; const lat2 = comparePoint.lat || 0; const lng2 = comparePoint.lng || 0; const threshold = 0.0001; return Math.abs(lat1 - lat2) < threshold && Math.abs(lng1 - lng2) < threshold; };
+        const filteredStayTimes = [...stayTimesData].filter(stayPoint => { const overlapWithStart = startEndPoints?.start && isOverlapping(stayPoint, startEndPoints.start); const overlapWithEnd = startEndPoints?.end && isOverlapping(stayPoint, startEndPoints.end); return !(overlapWithStart || overlapWithEnd); });
+
+        filteredStayTimes.forEach((stayData, index) => {
+            const lat = stayData.latitude || stayData.start_lat; const lng = stayData.longitude || stayData.start_long; if (!lat || !lng || lat === 0 || lng === 0) return;
+            const position = new window.naver.maps.LatLng(Number(lat), Number(lng));
+            let durationMinutes = 0;
+            if (typeof stayData.duration === 'number' && !isNaN(stayData.duration)) durationMinutes = stayData.duration;
+            else if (stayData.stay_duration && typeof stayData.stay_duration === 'string') { const timeParts = stayData.stay_duration.split(':'); if (timeParts.length >= 2) { if (timeParts.length === 3) { const hours = parseInt(timeParts[0]) || 0; const minutes = parseInt(timeParts[1]) || 0; const seconds = parseFloat(timeParts[2]) || 0; durationMinutes = hours * 60 + minutes + seconds / 60; } else if (timeParts.length === 2) { const minutes = parseInt(timeParts[0]) || 0; const seconds = parseFloat(timeParts[1]) || 0; durationMinutes = minutes + seconds / 60; } } }
+            const markerStyle = getMarkerStyle(durationMinutes); const markerNumber = index + 1;
+            const marker = new window.naver.maps.Marker({ position: position, map: mapInstance, icon: { content: `<div style="position: relative; width: ${markerStyle.size}px; height: ${markerStyle.size}px; background: ${markerStyle.bgColor}; border: 3px solid white; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: ${markerStyle.size > 32 ? '14px' : '12px'}; color: ${markerStyle.textColor};">${markerNumber}<div style="position: absolute; top: -20px; right: -20px; background: #1f2937; color: white; border-radius: 8px; padding: 2px 4px; font-size: 10px; font-weight: normal; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${formatDuration(durationMinutes)}</div></div>`, anchor: new window.naver.maps.Point(markerStyle.size/2, markerStyle.size/2) }, zIndex: 200 + index });
+            const infoWindow = new window.naver.maps.InfoWindow({ content: `<style>@keyframes slideInFromBottom { 0% { opacity: 0; transform: translateY(20px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); }} .info-window-container { animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);} .close-button { transition: all 0.2s ease;} .close-button:hover { background: rgba(0, 0, 0, 0.2) !important; transform: scale(1.1);}</style><div class="info-window-container" style="padding: 12px 16px; min-width: 200px; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); position: relative;"><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.1); border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #666;">×</button><h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px; text-align: center;">🏠 체류 지점 #${markerNumber}</h3><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🕐 시작: <span style="color: #111827; font-weight: 500;">${stayData.start_time.split(' ')[1]}</span></p></div><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🕐 종료: <span style="color: #111827; font-weight: 500;">${stayData.end_time.split(' ')[1]}</span></p></div><div style="margin-bottom: 0;"><p style="margin: 0; font-size: 12px; color: #64748b;">⏱️ 체류시간: <span style="color: ${markerStyle.bgColor}; font-weight: bold; background: ${markerStyle.bgColor}20; padding: 4px 8px; border-radius: 8px;">${formatDuration(durationMinutes)}</span></p></div></div>`, borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true, pixelOffset: new window.naver.maps.Point(0, -10) });
+            window.naver.maps.Event.addListener(marker, 'click', () => { if (infoWindow.getMap()) { infoWindow.close(); } else { infoWindow.open(mapInstance, marker); } });
+            stayTimeMarkers.current.push(marker);
+        });
+    }
+     console.log('[renderLocationDataOnMap] 체류시간 마커 생성 완료:', stayTimeMarkers.current.length, '개');
+
+    // 6. 위치 로그 마커들 생성
+    console.log('[renderLocationDataOnMap] 위치 로그 마커 생성 시작:', sortedLocationMarkers.length, '개');
+    locationLogMarkers.current = []; // 기존 위치 로그 마커 초기화
+    sortedLocationMarkers.forEach((markerData, index) => {
+        const lat = markerData.latitude || markerData.mlt_lat || 0; const lng = markerData.longitude || markerData.mlt_long || 0;
+        const speedMs = markerData.speed || markerData.mlt_speed || 0; const speed = speedMs * 3.6;
+        const accuracy = markerData.accuracy || markerData.mlt_accuacy || 0; const battery = markerData.battery_level || markerData.mlt_battery || 0;
+        const timestamp = markerData.timestamp || markerData.mlt_gps_time || '정보 없음';
+        const timeOnly = timestamp === '정보 없음' ? '정보 없음' : timestamp.includes('T') ? timestamp.split('T')[1]?.substring(0, 8) || timestamp : timestamp.includes(' ') ? timestamp.split(' ')[1] || timestamp : timestamp;
+        const position = new window.naver.maps.LatLng(Number(lat), Number(lng));
+        let markerColor = '#3b82f6'; // 기본 파란색
+        if (speed > 5) markerColor = '#ef4444'; else if (speed > 2) markerColor = '#f59e0b'; else if (speed > 0.5) markerColor = '#10b981';
+
+        const marker = new window.naver.maps.Marker({ position: position, map: mapInstance, icon: { content: `<div style="width: 8px; height: 8px; background: ${markerColor}; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); cursor: pointer;"></div>`, anchor: new window.naver.maps.Point(6, 6) }, zIndex: 100 + index });
+        const infoWindow = new window.naver.maps.InfoWindow({ content: `<div style="padding: 8px; background: white; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 130px; max-width: 150px;"><div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 4px 6px; border-radius: 4px; margin: -8px -8px 6px -8px; font-weight: 600; font-size: 11px; text-align: center;">${index + 1} / ${sortedLocationMarkers.length}</div><div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;"><div style="display: flex; justify-content: space-between;"><span style="color: #666;">⏰ 시간:</span><span style="font-weight: 600; font-size: 10px;">${timeOnly}</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">🚀 속도:</span><span style="font-weight: 600; font-size: 10px;">${speed.toFixed(1)}km/h</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">📍 정확도:</span><span style="font-weight: 600; font-size: 10px;">${accuracy.toFixed(0)}m</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">🔋 배터리:</span><span style="font-weight: 600; font-size: 10px;">${battery}%</span></div></div></div>`, backgroundColor: 'transparent', borderColor: 'transparent', borderWidth: 0, anchorSize: new window.naver.maps.Size(0, 0), pixelOffset: new window.naver.maps.Point(0, -10) });
+        window.naver.maps.Event.addListener(marker, 'click', () => { if (infoWindow.getMap()) { infoWindow.close(); } else { infoWindow.open(mapInstance, marker); } });
+        locationLogMarkers.current.push(marker);
+    });
+    console.log('[renderLocationDataOnMap] 위치 로그 마커 생성 완료:', locationLogMarkers.current.length, '개');
+
+    // 7. 경로(Polyline) 생성
+    console.log('[renderLocationDataOnMap] 경로 및 화살표 생성 시작');
+    if (locationLogPolyline.current) { // 혹시 남아있는 이전 경로 정리
+        try { locationLogPolyline.current.setMap(null); } catch (e) { console.error('[renderLocationDataOnMap] Error setting old polyline map to null:', e); }
+        locationLogPolyline.current = null;
+    }
+    if (sortedTimePoints.length > 1) {
+        const pathCoordinates = sortedTimePoints.map(point => new window.naver.maps.LatLng(point.lat, point.lng));
+        locationLogPolyline.current = new window.naver.maps.Polyline({ map: mapInstance, path: pathCoordinates, strokeColor: '#3b82f6', strokeOpacity: 0.8, strokeWeight: 3, strokeStyle: 'solid' });
+        // 각 마커 사이에 방향을 나타내는 화살표 추가 (모든 마커 사이에 1개씩)
+         for (let i = 0; i < sortedTimePoints.length - 1; i += 3) { // 3개 지점마다 화살표
+            const currentPoint = sortedTimePoints[i]; const nextPoint = sortedTimePoints[i + 1];
+            const midLat = (currentPoint.lat + nextPoint.lat) / 2; const midLng = (currentPoint.lng + nextPoint.lng) / 2;
+            const deltaLat = nextPoint.lat - currentPoint.lat; const deltaLng = nextPoint.lng - currentPoint.lng;
+            const angle = Math.atan2(deltaLng, deltaLat) * (180 / Math.PI);
+            const arrowMarker = new window.naver.maps.Marker({ position: new window.naver.maps.LatLng(midLat, midLng), map: mapInstance, icon: { content: `<div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 10px solid white; border-top: none; transform: rotate(${angle}deg); transform-origin: center center; opacity: 0.9; cursor: pointer; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));"></div>`, anchor: new window.naver.maps.Point(5, 5) }, zIndex: 50 });
+            arrowMarkers.current.push(arrowMarker); // 화살표 마커를 배열에 저장
+        }
+    }
+     console.log('[renderLocationDataOnMap] 경로 연결선 및 화살표 생성 완료');
+
+    // 8. 지도 범위 조정 및 중심 이동
+    console.log('[renderLocationDataOnMap] 지도 범위 조정 및 중심 이동 시작');
+    console.log('[renderLocationDataOnMap] 로그 마커 데이터 개수:', sortedLocationMarkers.length);
+    
+    if (sortedLocationMarkers.length > 0) { // 로그 마커가 있으면 첫 번째 마커를 중심으로 설정
+           const firstLogPoint = sortedLocationMarkers[0];
+           const firstLogPosition = new window.naver.maps.LatLng(firstLogPoint.lat, firstLogPoint.lng);
+           console.log('[renderLocationDataOnMap] 첫 번째 로그 마커 좌표:', firstLogPoint.lat, firstLogPoint.lng);
+           
+           // 강제로 지도 중심 이동 - 여러 방법 동시 사용
+           mapInstance.setZoom(16); // 줌 레벨 먼저 설정
+           mapInstance.setCenter(firstLogPosition); // 중심 이동
+           
+           // 지연 후 다시 한 번 확실하게 이동
+           setTimeout(() => {
+             mapInstance.setCenter(firstLogPosition);
+             mapInstance.panTo(firstLogPosition);
+             mapInstance.refresh(true);
+             console.log('[renderLocationDataOnMap] 지연 후 재차 지도 중심 이동 완료');
+           }, 100);
+           
+           // 추가 지연 후 최종 확인
+           setTimeout(() => {
+             mapInstance.setCenter(firstLogPosition);
+             console.log('[renderLocationDataOnMap] 최종 확인 - 지도 중심:', mapInstance.getCenter());
+           }, 300);
+           
+           console.log('[renderLocationDataOnMap] 첫 번째 로그 마커 중심으로 지도 이동 (줌 16)');
+    } else if (selectedMember && selectedMember.location && selectedMember.location.lat && selectedMember.location.lng) { // 위치 데이터는 없지만 멤버가 선택되었으면 멤버 위치 중심으로 이동
+           const memberLat = selectedMember.mlt_lat || selectedMember.location.lat || 37.5665;
+           const memberLng = selectedMember.mlt_long || selectedMember.location.lng || 126.9780;
+           const memberPosition = new window.naver.maps.LatLng(memberLat, memberLng);
+           console.log('[renderLocationDataOnMap] 멤버 위치 좌표:', memberLat, memberLng);
+           
+           mapInstance.setZoom(16);
+           mapInstance.setCenter(memberPosition);
+           setTimeout(() => {
+             mapInstance.setCenter(memberPosition);
+             mapInstance.panTo(memberPosition);
+           }, 100);
+           
+           console.log('[renderLocationDataOnMap] 데이터 없음 - 멤버 아이콘 중심으로 지도 이동');
+    } else { // 데이터도 없고 멤버도 없으면 기본 위치로 이동 (초기 상태)
+        const initialCenter = new window.naver.maps.LatLng(37.5665, 126.9780);
+         mapInstance.setCenter(initialCenter);
+         mapInstance.setZoom(16);
+         console.log('[renderLocationDataOnMap] 데이터 없음/멤버 없음 - 기본 위치로 지도 이동');
+    }
+
+    // 9. 지도 새로고침 (지연 후 실행)
+    setTimeout(() => {
+      if (mapInstance) { 
+        mapInstance.refresh(true); 
+        console.log('[renderLocationDataOnMap] 최종 지도 새로고침 완료');
+      }
+    }, 500);
+
+    console.log('[renderLocationDataOnMap] 통합 지도 렌더링 완료');
+  };
 
   return (
     <>
@@ -3522,9 +3149,9 @@ export default function LogsPage() {
                 {/* 로딩 텍스트 */}
                 <div className="text-center">
                   <p className="text-lg font-semibold text-gray-900 mb-1">
-                    {isLocationDataLoading ? '위치 데이터 로딩 중...' :
-                     isDailyCountsLoading ? '일별 카운트 조회 중...' :
-                     isMemberActivityLoading ? '멤버 활동 조회 중...' : '데이터 로딩 중...'}
+                    {isLocationDataLoading ? '위치 로그 데이터 로딩 중...' :
+                     isDailyCountsLoading ? '일별 위치 카운트 조회 중...' :
+                     isMemberActivityLoading ? '멤버 활동 데이터 조회 중...' : '데이터 로딩 중...'}
                   </p>
                   <p className="text-sm text-gray-600">
                     잠시만 기다려주세요
@@ -3800,7 +3427,7 @@ export default function LogsPage() {
                             if (!hasSelectedMember && groupMembers.length > 0 && dataFetchedRef.current.members) {
                               console.log('[멤버 렌더링] 선택된 멤버가 없음, 첫 번째 멤버 자동 선택:', groupMembers[0].name);
                               setTimeout(() => {
-                                handleMemberSelect(groupMembers[0].id, {} as React.MouseEvent);
+                                handleMemberSelect(groupMembers[0].id, null);
                               }, 50);
                             }
                             return null;
