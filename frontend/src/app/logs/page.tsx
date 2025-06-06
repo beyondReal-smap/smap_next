@@ -492,8 +492,23 @@ export default function LogsPage() {
   const hasUserInteracted = useRef<boolean>(false); // 사용자 상호작용 추적
 
   // 로그 페이지 뷰 상태 및 Ref
-  const [activeLogView, setActiveLogView] = useState<'members' | 'summary'>('members');
+  const [activeLogView, setActiveLogView] = useState<'members' | 'summary'>('summary');
   const logSwipeContainerRef = useRef<HTMLDivElement>(null);
+  
+  // activeLogView 변경 시 스와이프 컨테이너 스크롤 위치 조정
+  useEffect(() => {
+    if (logSwipeContainerRef.current && activeLogView === 'summary') {
+      setTimeout(() => {
+        if (logSwipeContainerRef.current) {
+          const secondChild = logSwipeContainerRef.current.children[1] as HTMLElement;
+          if (secondChild) {
+            logSwipeContainerRef.current.scrollTo({ left: secondChild.offsetLeft, behavior: 'smooth' });
+            console.log('[UI] 위치기록 요약 섹션으로 자동 스크롤');
+          }
+        }
+      }, 100);
+    }
+  }, [activeLogView]);
   const [locationSummary, setLocationSummary] = useState<LocationSummary>(DEFAULT_LOCATION_SUMMARY);
   const [currentLocationLogs, setCurrentLocationLogs] = useState<LocationLog[]>([]);
   const [isLocationDataLoading, setIsLocationDataLoading] = useState(false);
@@ -1500,13 +1515,24 @@ export default function LogsPage() {
       setMapMarkersData(mapMarkers); // 지도 렌더링 함수로 전달
       setLocationLogSummaryData(locationLogSummary);
 
-       // 요약 데이터 설정 (PHP 로직 기반 요약 또는 계산된 요약 사용)
-       // locationLogSummary가 존재하고 distance, time, steps 속성이 있는지 확인
-               const finalSummary: LocationSummary = (locationLogSummary && typeof locationLogSummary.distance === 'string' && typeof locationLogSummary.steps === 'string')
-          ? { distance: locationLogSummary.distance, time: calculateLocationStats(logs).time, steps: locationLogSummary.steps }
-          : calculateLocationStats(logs);
-      setLocationSummary(finalSummary);
-      console.log('[loadLocationData] 최종 요약 데이터 설정:', finalSummary);
+       // 요약 데이터 설정 (마커 데이터 기반 계산 결과 사용)
+       const calculatedSummary = calculateLocationStats(logs);
+       console.log('[loadLocationData] 마커 데이터 기반 계산 결과:', calculatedSummary);
+       console.log('[loadLocationData] 로그 데이터 개수:', logs.length);
+       
+       setLocationSummary(calculatedSummary);
+       console.log('[loadLocationData] locationSummary 상태 업데이트 완료:', calculatedSummary);
+       
+       // 강제 리렌더링을 위한 추가 상태 업데이트
+       setTimeout(() => {
+         setLocationSummary({...calculatedSummary});
+         console.log('[loadLocationData] 강제 리렌더링을 위한 추가 상태 업데이트:', calculatedSummary);
+       }, 50);
+       
+       // 상태 업데이트 후 검증
+       setTimeout(() => {
+         console.log('[loadLocationData] 상태 업데이트 검증 - 현재 locationSummary:', calculatedSummary);
+       }, 150);
 
       // 모든 데이터가 준비되면 통합 지도 렌더링 함수 호출
       console.log('[loadLocationData] 통합 지도 렌더링 함수 호출 준비');
@@ -1613,7 +1639,7 @@ export default function LogsPage() {
     return R * c; // 미터 단위
   };
 
-  // 위치 로그 데이터로부터 이동거리, 이동시간, 걸음수 계산
+  // 마커 데이터로부터 이동거리, 이동시간, 걸음수 계산 (걸음수는 마지막 마커의 mt_health_work 사용)
   const calculateLocationStats = (locationData: any[]): { distance: string; time: string; steps: string } => {
     if (!locationData || locationData.length === 0) {
       return { distance: '0 km', time: '0분', steps: '0 걸음' };
@@ -1652,6 +1678,7 @@ export default function LogsPage() {
           
           if (!isNaN(prevTime) && !isNaN(currTime)) {
             const segmentTimeSeconds = (currTime - prevTime) / 1000;
+            const segmentTimeHours = segmentTimeSeconds / 3600;
             const speedMs = curr.speed || curr.mlt_speed || 0; // m/s
             const speedKmh = speedMs * 3.6; // km/h로 변환
             
@@ -1660,43 +1687,44 @@ export default function LogsPage() {
             // 2. 속도가 0.5km/h 이상인 경우를 이동으로 간주
             const isMoving = distance >= 10 || speedKmh >= 0.5;
             
-            if (isMoving && segmentTimeSeconds > 0 && segmentTimeSeconds < 3600) { // 1시간 이상의 구간은 제외
+            // 5분(300초) 이상 차이나는 구간은 이동시간에서 제외
+            if (segmentTimeSeconds >= 300) {
+              console.log('[calculateLocationStats] 1시간 이상 구간 제외:', {
+                prevTime: new Date(prev.timestamp || prev.mlt_gps_time || '').toISOString(),
+                currTime: new Date(curr.timestamp || curr.mlt_gps_time || '').toISOString(),
+                segmentTimeHours: segmentTimeHours.toFixed(2) + '시간',
+                distance: distance.toFixed(2) + 'm',
+                reason: '시간 간격이 1시간 이상'
+              });
+            } else if (isMoving && segmentTimeSeconds > 0) {
               movingTimeSeconds += segmentTimeSeconds;
+              console.log('[calculateLocationStats] 이동시간 추가:', {
+                segmentTimeSeconds: segmentTimeSeconds.toFixed(1) + '초',
+                distance: distance.toFixed(2) + 'm',
+                speedKmh: speedKmh.toFixed(1) + 'km/h',
+                totalMovingTime: (movingTimeSeconds / 60).toFixed(1) + '분'
+              });
             }
           }
         }
       }
     }
 
-    // 걸음수 가져오기 (실제 디바이스 데이터 사용)
+    // 걸음수는 마지막 마커의 mt_health_work 데이터 사용
     let actualSteps = 0;
     
     if (sortedData.length > 0) {
-      const firstData = sortedData[0];
       const latestData = sortedData[sortedData.length - 1];
-      
-      const firstHealthWork = firstData.mt_health_work || firstData.health_work || 0;
       const latestHealthWork = latestData.mt_health_work || latestData.health_work || 0;
       
-      if (latestHealthWork > 0 && firstHealthWork >= 0) {
-        // 하루 동안의 걸음수 증가량 계산
-        actualSteps = Math.max(0, latestHealthWork - firstHealthWork);
-        console.log('[calculateLocationStats] 하루 걸음수 증가량 계산:', {
-          firstDataTime: firstData.timestamp || firstData.mlt_gps_time,
-          latestDataTime: latestData.timestamp || latestData.mlt_gps_time,
-          firstHealthWork: firstHealthWork,
-          latestHealthWork: latestHealthWork,
-          actualSteps: actualSteps
-        });
-      } else if (latestHealthWork > 0) {
-        // 최신 데이터만 있는 경우 그 값 사용
+      if (latestHealthWork > 0) {
         actualSteps = latestHealthWork;
-        console.log('[calculateLocationStats] 최신 걸음수 데이터 사용:', {
+        console.log('[calculateLocationStats] 마지막 마커의 걸음수 데이터 사용:', {
           latestDataTime: latestData.timestamp || latestData.mlt_gps_time,
           latestHealthWork: latestHealthWork
         });
       } else {
-        console.log('[calculateLocationStats] mt_health_work 데이터가 없어서 0으로 설정');
+        console.log('[calculateLocationStats] 마지막 마커에 mt_health_work 데이터가 없어서 0으로 설정');
       }
     }
 
@@ -1712,7 +1740,7 @@ export default function LogsPage() {
       timeFormatted: timeFormatted,
       actualSteps: actualSteps,
       dataPoints: sortedData.length,
-      note: '체류시간 제외된 실제 이동시간, 실제 걸음수 데이터 사용'
+      note: '마커 데이터 기반 이동거리/시간 계산, 마지막 마커의 mt_health_work 걸음수 사용'
     });
 
     return {
@@ -1812,7 +1840,27 @@ export default function LogsPage() {
       timestamp.includes(' ') ? timestamp.split(' ')[1] || timestamp :
       timestamp;
 
-    // InfoWindow 내용 생성 (컴팩트)
+    // 속도에 따른 이동 수단 아이콘 결정 (지도 마커와 동일한 로직)
+    const getTransportIcon = (speed: number) => {
+      if (speed >= 30) return '🚗'; // 30km/h 이상: 자동차
+      else if (speed >= 15) return '🏃'; // 15-30km/h: 달리기/자전거
+      else if (speed >= 3) return '🚶'; // 3-15km/h: 걷기
+      else if (speed >= 1) return '🧍'; // 1-3km/h: 천천히 걷기
+      else return '⏸️'; // 1km/h 미만: 정지
+    };
+    
+    const getTransportText = (speed: number) => {
+      if (speed >= 30) return '차량 이동';
+      else if (speed >= 15) return '빠른 이동';
+      else if (speed >= 3) return '걷기';
+      else if (speed >= 1) return '천천히 이동';
+      else return '정지 상태';
+    };
+    
+    const transportIcon = getTransportIcon(speed);
+    const transportText = getTransportText(speed);
+
+    // InfoWindow 내용 생성 (지도 마커와 동일한 스타일)
     const infoContent = `
       <div style="
         padding: 8px;
@@ -1820,8 +1868,8 @@ export default function LogsPage() {
         border-radius: 6px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.12);
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        min-width: 130px;
-        max-width: 150px;
+        min-width: 140px;
+        max-width: 160px;
       ">
         <div style="
           background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
@@ -1836,11 +1884,17 @@ export default function LogsPage() {
           ${targetIndex + 1} / ${totalMarkers}
         </div>
         <div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(59, 130, 246, 0.1); padding: 2px 4px; border-radius: 4px; margin: 2px 0;">
+            <span style="color: #666;">이동 수단:</span>
+            <span style="font-weight: 600; font-size: 11px; display: flex; align-items: center; gap: 2px;">
+              ${transportIcon} <span style="font-size: 9px; color: #3b82f6;">${transportText}</span>
+            </span>
+          </div>
           <div style="display: flex; justify-content: space-between;">
             <span style="color: #666;">⏰ 시간:</span>
             <span style="font-weight: 600; font-size: 10px;">${timeOnly}</span>
           </div>
-          <div style="display: flex; justify-content: space-between;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="color: #666;">🚀 속도:</span>
             <span style="font-weight: 600; font-size: 10px;">${speed.toFixed(1)}km/h</span>
           </div>
@@ -2042,6 +2096,11 @@ export default function LogsPage() {
       setIsMemberActivityLoading(false);
     }
   };
+
+  // locationSummary 상태 변경 모니터링
+  useEffect(() => {
+    console.log('[UI] locationSummary 상태 변경됨:', locationSummary);
+  }, [locationSummary]);
 
   // 새로운 API 데이터가 변경될 때마다 콘솔에 출력
   useEffect(() => {
@@ -2811,8 +2870,28 @@ export default function LogsPage() {
         let markerColor = '#3b82f6'; // 기본 파란색
         if (speed > 5) markerColor = '#ef4444'; else if (speed > 2) markerColor = '#f59e0b'; else if (speed > 0.5) markerColor = '#10b981';
 
+        // 속도에 따른 이동 수단 아이콘 결정
+        const getTransportIcon = (speed: number) => {
+          if (speed >= 30) return '🚗'; // 30km/h 이상: 자동차
+          else if (speed >= 15) return '🏃'; // 15-30km/h: 달리기/자전거
+          else if (speed >= 3) return '🚶'; // 3-15km/h: 걷기
+          else if (speed >= 1) return '🧍'; // 1-3km/h: 천천히 걷기
+          else return '⏸️'; // 1km/h 미만: 정지
+        };
+        
+        const getTransportText = (speed: number) => {
+          if (speed >= 30) return '차량 이동';
+          else if (speed >= 15) return '빠른 이동';
+          else if (speed >= 3) return '걷기';
+          else if (speed >= 1) return '천천히 이동';
+          else return '정지 상태';
+        };
+        
+        const transportIcon = getTransportIcon(speed);
+        const transportText = getTransportText(speed);
+        
         const marker = new window.naver.maps.Marker({ position: position, map: mapInstance, icon: { content: `<div style="width: 8px; height: 8px; background: ${markerColor}; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); cursor: pointer;"></div>`, anchor: new window.naver.maps.Point(6, 6) }, zIndex: 100 + index });
-        const infoWindow = new window.naver.maps.InfoWindow({ content: `<div style="padding: 8px; background: white; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 130px; max-width: 150px;"><div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 4px 6px; border-radius: 4px; margin: -8px -8px 6px -8px; font-weight: 600; font-size: 11px; text-align: center;">${index + 1} / ${sortedLocationMarkers.length}</div><div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;"><div style="display: flex; justify-content: space-between;"><span style="color: #666;">⏰ 시간:</span><span style="font-weight: 600; font-size: 10px;">${timeOnly}</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">🚀 속도:</span><span style="font-weight: 600; font-size: 10px;">${speed.toFixed(1)}km/h</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">📍 정확도:</span><span style="font-weight: 600; font-size: 10px;">${accuracy.toFixed(0)}m</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">🔋 배터리:</span><span style="font-weight: 600; font-size: 10px;">${battery}%</span></div></div></div>`, backgroundColor: 'transparent', borderColor: 'transparent', borderWidth: 0, anchorSize: new window.naver.maps.Size(0, 0), pixelOffset: new window.naver.maps.Point(0, -10) });
+        const infoWindow = new window.naver.maps.InfoWindow({ content: `<div style="padding: 8px; background: white; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 140px; max-width: 160px;"><div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 4px 6px; border-radius: 4px; margin: -8px -8px 6px -8px; font-weight: 600; font-size: 11px; text-align: center;">${index + 1} / ${sortedLocationMarkers.length}</div><div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;"><div style="display: flex; justify-content: space-between; align-items: center; background: rgba(59, 130, 246, 0.1); padding: 2px 4px; border-radius: 4px; margin: 2px 0;"><span style="color: #666;">이동 수단:</span><span style="font-weight: 600; font-size: 11px; display: flex; align-items: center; gap: 2px;">${transportIcon} <span style="font-size: 9px; color: #3b82f6;">${transportText}</span></span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">⏰ 시간:</span><span style="font-weight: 600; font-size: 10px;">${timeOnly}</span></div><div style="display: flex; justify-content: space-between; align-items: center;"><span style="color: #666;">🚀 속도:</span><span style="font-weight: 600; font-size: 10px;">${speed.toFixed(1)}km/h</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">📍 정확도:</span><span style="font-weight: 600; font-size: 10px;">${accuracy.toFixed(0)}m</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">🔋 배터리:</span><span style="font-weight: 600; font-size: 10px;">${battery}%</span></div></div></div>`, backgroundColor: 'transparent', borderColor: 'transparent', borderWidth: 0, anchorSize: new window.naver.maps.Size(0, 0), pixelOffset: new window.naver.maps.Point(0, -10) });
         window.naver.maps.Event.addListener(marker, 'click', () => { if (infoWindow.getMap()) { infoWindow.close(); } else { infoWindow.open(mapInstance, marker); } });
         locationLogMarkers.current.push(marker);
     });
@@ -3590,6 +3669,14 @@ export default function LogsPage() {
                           </div>
                         ) : (
                           <>
+                            {(() => {
+                              console.log('[UI 렌더링] 위치기록 요약 카드 렌더링:', {
+                                locationSummary,
+                                isLocationDataLoading,
+                                activeLogView
+                              });
+                              return null;
+                            })()}
                             <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2 text-center border border-amber-100 h-full flex flex-col justify-center">
                               <FiTrendingUp className="w-4 h-4 text-amber-500 mx-auto mb-1" />
                               <p className="text-xs text-gray-500">이동거리</p>
