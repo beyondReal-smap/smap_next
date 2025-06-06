@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format, addDays, subDays } from 'date-fns';
@@ -21,10 +21,10 @@ import memberLocationLogService, { LocationLog, LocationSummary as APILocationSu
 // window 전역 객체에 naver 프로퍼티 타입 선언
 declare global {
   interface Window {
-  naver: any;
+    naver: any;
   getRecentDaysDebugLogged?: boolean;
-  // google: any; // google은 logs 페이지에서 아직 사용하지 않으므로 주석 처리 또는 필요시 추가
-}
+    // google: any; // google은 logs 페이지에서 아직 사용하지 않으므로 주석 처리 또는 필요시 추가
+  }
 }
 
 const NAVER_MAPS_CLIENT_ID = API_KEYS.NAVER_MAPS_CLIENT_ID;
@@ -460,7 +460,7 @@ export default function LogsPage() {
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [previousDate, setPreviousDate] = useState<string | null>(null); // 이전 날짜 추적
   const isDateChangedRef = useRef<boolean>(false); // 날짜 변경 플래그
-  const loadLocationDataExecutingRef = useRef<boolean>(false); // loadLocationData 중복 실행 방지
+  const loadLocationDataExecutingRef = useRef<{ executing: boolean; lastExecution?: number }>({ executing: false }); // loadLocationData 중복 실행 방지
   
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null); 
@@ -685,7 +685,7 @@ export default function LogsPage() {
     };
   }, [naverMapsLoaded]);
 
-  const getRecentDays = () => {
+  const getRecentDays = useCallback(() => {
     const recentDays = Array.from({ length: 15 }, (_, i) => { // 오늘부터 14일전까지 (오늘 포함 15일)
       const date = subDays(new Date(), 14 - i);
       const dateString = format(date, 'yyyy-MM-dd');
@@ -717,46 +717,9 @@ export default function LogsPage() {
             hasLogs = dayCount > 0;
           }
         }
-        
-        // 첫 번째 날짜에 대해서만 디버깅 로그 출력 (중복 실행 방지)
-        if (i === 0 && !window.getRecentDaysDebugLogged) {
-          window.getRecentDaysDebugLogged = true;
-          console.log('[getRecentDays] 디버깅:', {
-            dateString,
-            selectedMemberName: selectedMember?.name,
-            selectedMemberId: selectedMember?.id,
-            memberMtIdx,
-            hasDailyCountsData: !!dailyCountsData,
-            memberDataFound: !!memberData,
-            memberDataCount: memberData?.daily_counts?.length,
-            dayDataFound: !!dayData,
-            dayCount,
-            // 실제 백엔드 날짜 형식들 확인
-            backendDates: memberData?.daily_counts?.slice(0, 5).map(day => ({
-              formatted_date: day.formatted_date,
-              count: day.count
-            }))
-          });
-          
-          // 3초 후 플래그 리셋
-          setTimeout(() => {
-            window.getRecentDaysDebugLogged = false;
-          }, 3000);
-        }
       } else {
         // dailyCountsData가 없거나 선택된 멤버가 없는 경우 MOCK_LOGS 사용
         hasLogs = MOCK_LOGS.some(log => log.timestamp.startsWith(dateString));
-        
-        // 첫 번째 날짜에 대해서만 디버깅 로그 출력
-        if (i === 0) {
-          console.log('[getRecentDays] 데이터 없음:', {
-            dateString,
-            hasDailyCountsData: !!dailyCountsData,
-            hasSelectedMember: !!selectedMember,
-            selectedMemberName: selectedMember?.name,
-            usingMockLogs: true
-          });
-        }
       }
       
       let displayString = format(date, 'MM.dd(E)', { locale: ko }); // 예: "05.07(수)"
@@ -776,7 +739,7 @@ export default function LogsPage() {
     });
     
     return recentDays;
-  };
+  }, [groupMembers, dailyCountsData]);
 
   // home/page.tsx와 동일한 드래그 핸들러들
   const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
@@ -932,6 +895,15 @@ export default function LogsPage() {
     
     console.log('Member selection started:', id);
     
+    // 멤버 변경 시 즉시 지도 초기화 (다른 멤버 선택 시에만)
+    const currentSelectedMember = groupMembers.find(m => m.isSelected);
+    const isChangingMember = !currentSelectedMember || currentSelectedMember.id !== id;
+    
+    if (isChangingMember) {
+      clearMapMarkersAndPaths();
+      console.log('[handleMemberSelect] 멤버 변경으로 지도 초기화 완료');
+    }
+    
     // 멤버 재선택 시 날짜 변경 플래그 리셋 (멤버 위치 기준 지도 조정 허용)
     if (isDateChangedRef.current) {
       isDateChangedRef.current = false;
@@ -1083,6 +1055,25 @@ export default function LogsPage() {
         const lat = markerData.latitude || markerData.mlt_lat || 0;
         const lng = markerData.longitude || markerData.mlt_long || 0;
         const speed = markerData.speed || markerData.mlt_speed || 0;
+        const accuracy = markerData.accuracy || markerData.mlt_accuacy || 0;
+        const battery = markerData.battery_level || markerData.mlt_battery || 0;
+        // 걸음수는 위치로그 요약 데이터에서 가져오기 (개별 마커에는 없음)
+        const steps = locationLogSummaryData?.steps || 0;
+        const timestamp = markerData.timestamp || markerData.mlt_gps_time || '정보 없음';
+        
+        // 시간에서 날짜 부분 제거 (시간만 표시)
+        const timeOnly = timestamp === '정보 없음' ? '정보 없음' : 
+          timestamp.includes('T') ? timestamp.split('T')[1]?.substring(0, 8) || timestamp :
+          timestamp.includes(' ') ? timestamp.split(' ')[1] || timestamp :
+          timestamp;
+        
+        // 디버깅을 위한 데이터 로깅 (처음 3개만)
+        if (index < 3) {
+          console.log(`[updateLocationLogMarkers] 마커 ${index} 원본 데이터:`, markerData);
+          console.log(`[updateLocationLogMarkers] 마커 ${index} 파싱된 데이터:`, {
+            lat, lng, speed, accuracy, battery, steps, timestamp
+          });
+        }
         
         const position = new window.naver.maps.LatLng(Number(lat), Number(lng));
         
@@ -1175,7 +1166,7 @@ export default function LogsPage() {
               </h3>
               <div style="margin-bottom: 6px;">
                 <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  🕒 시간: <span style="color: #111827; font-weight: 500;">${markerData.timestamp || markerData.mlt_gps_time || '정보 없음'}</span>
+                  🕒 시간: <span style="color: #111827; font-weight: 500;">${timeOnly}</span>
                 </p>
               </div>
               <div style="margin-bottom: 6px;">
@@ -1185,22 +1176,22 @@ export default function LogsPage() {
               </div>
               <div style="margin-bottom: 6px;">
                 <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  📍 정확도: <span style="color: #111827; font-weight: 500;">${markerData.mlt_accuacy?.toFixed(1) || 0}m</span>
+                  📍 정확도: <span style="color: #111827; font-weight: 500;">${accuracy.toFixed(1)}m</span>
                 </p>
               </div>
               <div style="margin-bottom: 6px;">
                 <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  🔋 배터리: <span style="color: #111827; font-weight: 500;">${markerData.mlt_battery || 0}%</span>
+                  🔋 배터리: <span style="color: #111827; font-weight: 500;">${battery}%</span>
                 </p>
               </div>
               <div style="margin-bottom: 6px;">
                 <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  👟 걸음수: <span style="color: #111827; font-weight: 500;">${markerData.mt_health_work ? markerData.mt_health_work.toLocaleString() : 0}</span>
+                  📍 위치점 번호: <span style="color: #111827; font-weight: 500;">#${index + 1}</span>
                 </p>
               </div>
               <div style="margin-bottom: 0;">
                 <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                  🌍 좌표: ${markerData.mlt_lat ? markerData.mlt_lat.toFixed(6) : '0.000000'}, ${markerData.mlt_long ? markerData.mlt_long.toFixed(6) : '0.000000'}
+                  🌍 좌표: ${lat.toFixed(6)}, ${lng.toFixed(6)}
                 </p>
               </div>
             </div>
@@ -1242,7 +1233,50 @@ export default function LogsPage() {
         strokeStyle: 'solid'
       });
 
-      console.log('[updateLocationLogMarkers] 통합 경로 연결선 생성 완료:', pathCoordinates.length, '개 좌표');
+      // 각 마커 사이에 방향을 나타내는 화살표 추가
+      for (let i = 0; i < sortedTimePoints.length - 1; i++) {
+        const currentPoint = sortedTimePoints[i];
+        const nextPoint = sortedTimePoints[i + 1];
+        
+        // 두 점 사이의 중점 계산
+        const midLat = (currentPoint.lat + nextPoint.lat) / 2;
+        const midLng = (currentPoint.lng + nextPoint.lng) / 2;
+        
+        // 방향 계산 (현재 지점에서 다음 지점으로의 각도)
+        const deltaLat = nextPoint.lat - currentPoint.lat;
+        const deltaLng = nextPoint.lng - currentPoint.lng;
+        // Math.atan2는 동쪽이 0도, CSS rotate는 북쪽이 0도이므로 -90도 보정
+        const angle = Math.atan2(deltaLng, deltaLat) * (180 / Math.PI);
+        
+        // 화살표 마커 생성
+        const arrowMarker = new window.naver.maps.Marker({
+          position: new window.naver.maps.LatLng(midLat, midLng),
+          map: map.current,
+          icon: {
+            content: `
+              <div style="
+                width: 0;
+                height: 0;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-bottom: 10px solid white;
+                border-top: none;
+                transform: rotate(${angle}deg);
+                transform-origin: center center;
+                opacity: 0.9;
+                cursor: pointer;
+                filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+              "></div>
+            `,
+            anchor: new window.naver.maps.Point(5, 5)
+          },
+          zIndex: 50
+        });
+        
+        locationLogMarkers.current.push(arrowMarker);
+      }
+
+      console.log('[updateLocationLogMarkers] 통합 경로 연결선 및 화살표 생성 완료:', pathCoordinates.length, '개 좌표,', sortedTimePoints.length - 1, '개 화살표');
     }
 
     // 시작점과 종료점에 특별한 마커 추가 (통합된 시간 기준)
@@ -1962,6 +1996,49 @@ export default function LogsPage() {
     }
   };
 
+  // 지도 마커와 경로 즉시 초기화 함수
+  const clearMapMarkersAndPaths = () => {
+    console.log('[clearMapMarkersAndPaths] 지도 마커와 경로 즉시 초기화');
+    
+    // 위치 로그 마커들 정리
+    locationLogMarkers.current.forEach(marker => {
+      if (marker && marker.setMap) {
+        marker.setMap(null);
+      }
+    });
+    locationLogMarkers.current = [];
+    
+    // 경로 폴리라인 정리
+    if (locationLogPolyline.current) {
+      locationLogPolyline.current.setMap(null);
+      locationLogPolyline.current = null;
+    }
+    
+    // 시작/종료 마커들 정리
+    startEndMarkers.current.forEach(marker => {
+      if (marker && marker.setMap) {
+        marker.setMap(null);
+      }
+    });
+    startEndMarkers.current = [];
+    
+    // 체류시간 마커들 정리
+    stayTimeMarkers.current.forEach(marker => {
+      if (marker && marker.setMap) {
+        marker.setMap(null);
+      }
+    });
+    stayTimeMarkers.current = [];
+    
+    // 상태 데이터도 즉시 초기화
+    setCurrentLocationLogs([]);
+    setDailySummaryData([]);
+    setStayTimesData([]);
+    setMapMarkersData([]);
+    setLocationLogSummaryData(null);
+    setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+  };
+
   const handleDateSelect = (date: string) => {
     console.log('[LOGS] 날짜 선택:', date, '이전 날짜:', selectedDate);
     
@@ -1971,6 +2048,9 @@ export default function LogsPage() {
       console.log('[LOGS] 같은 날짜 재선택 - 무시');
       return;
     }
+    
+    // 날짜 변경 시 즉시 지도 초기화
+    clearMapMarkersAndPaths();
     
     // 이전 날짜 저장 후 새 날짜 설정
     setPreviousDate(selectedDate);
@@ -2005,15 +2085,25 @@ export default function LogsPage() {
       return;
     }
 
-    // 중복 실행 방지
-    const executionId = `${mtIdx}-${date}-${Date.now()}`;
-    if (loadLocationDataExecutingRef.current) {
-      console.log(`[loadLocationData] 이미 실행 중이므로 건너뜀: ${executionId}`);
+    // 중복 실행 방지 (더 강화)
+    const executionKey = `${mtIdx}-${date}`;
+    const currentTime = Date.now();
+    
+    // 같은 요청이 3초 이내에 들어오면 무시
+    if (loadLocationDataExecutingRef.current.executing) {
+      console.log(`[loadLocationData] 이미 실행 중이므로 건너뜀: ${executionKey}`);
       return;
     }
     
-    loadLocationDataExecutingRef.current = true;
-    console.log(`[loadLocationData] 실행 시작: ${executionId}`);
+    if (loadLocationDataExecutingRef.current.lastExecution && 
+        (currentTime - loadLocationDataExecutingRef.current.lastExecution) < 3000) {
+      console.log(`[loadLocationData] 3초 이내 중복 요청 무시: ${executionKey}`);
+      return;
+    }
+    
+    loadLocationDataExecutingRef.current.executing = true;
+    loadLocationDataExecutingRef.current.lastExecution = currentTime;
+    console.log(`[loadLocationData] 실행 시작: ${executionKey}-${currentTime}`);
 
     try {
       setIsLocationDataLoading(true);
@@ -2104,8 +2194,8 @@ export default function LogsPage() {
       setLocationLogSummaryData(null);
     } finally {
       setIsLocationDataLoading(false);
-      loadLocationDataExecutingRef.current = false;
-      console.log(`[loadLocationData] 실행 완료: ${executionId}`);
+      loadLocationDataExecutingRef.current.executing = false;
+      console.log(`[loadLocationData] 실행 완료: ${executionKey}-${currentTime}`);
     }
   };
 
@@ -2122,12 +2212,22 @@ export default function LogsPage() {
   };
 
   // 새로운 API 데이터 디버깅 함수
+  const logExecutedRef = useRef(false);
+  
   const logNewApiData = () => {
+    if (logExecutedRef.current) return;
+    logExecutedRef.current = true;
+    
     console.log('=== 새로운 API 데이터 현황 ===');
     console.log('🗓️ 날짜별 요약 데이터:', dailySummaryData);
     console.log('⏱️ 체류시간 분석 데이터:', stayTimesData);
     console.log('📍 지도 마커 데이터:', mapMarkersData);
     console.log('📝 PHP 로직 기반 요약 데이터:', locationLogSummaryData);
+    
+    // 3초 후 플래그 리셋
+    setTimeout(() => {
+      logExecutedRef.current = false;
+    }, 3000);
     
     // 멤버별 일별 카운트 데이터 로깅
     if (dailyCountsData) {
@@ -2364,9 +2464,11 @@ export default function LogsPage() {
 
   // 날짜 버튼 초기 스크롤 위치 설정 (초기 로드 시에만)
   const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
+  const scrollExecutedRef = useRef(false);
   
   useEffect(() => {
-    if (!isInitialScrollDone && showDateSelection) {
+    if (!isInitialScrollDone && showDateSelection && !scrollExecutedRef.current) {
+      scrollExecutedRef.current = true;
       // DOM이 완전히 렌더링된 후 실행
       const scheduleScroll = () => {
         requestAnimationFrame(() => {
@@ -2524,6 +2626,11 @@ export default function LogsPage() {
     }
 
     console.log(`[${instanceId.current}] 그룹 선택:`, groupId);
+    
+    // 그룹 변경 시 즉시 지도 초기화
+    clearMapMarkersAndPaths();
+    console.log(`[${instanceId.current}] 그룹 변경으로 지도 초기화 완료`);
+    
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
     
@@ -2533,7 +2640,7 @@ export default function LogsPage() {
     dataFetchedRef.current = { members: false };
     fetchDataExecutingRef.current = false;
     hasExecuted.current = false; // 실행 플래그도 리셋
-    loadLocationDataExecutingRef.current = false; // loadLocationData 실행 플래그도 리셋
+    loadLocationDataExecutingRef.current.executing = false; // loadLocationData 실행 플래그도 리셋
     firstMemberSelectExecutingRef.current = false; // 첫 멤버 선택 실행 플래그도 리셋
     
     // 날짜별 활동 로그 데이터 초기화
@@ -2742,11 +2849,8 @@ export default function LogsPage() {
                       const recentDays = getRecentDays();
                       const daysWithLogs = recentDays.filter(day => day.hasLogs).length;
                       
-                      if (selectedMember) {
-                        return `${selectedMember.name}: ${daysWithLogs}일 기록`;
-                      } else {
-                        return `(${daysWithLogs}일 기록 있음)`;
-                      }
+                      return `(${daysWithLogs}일 기록 있음)`;
+                      
                     })()}
                   </motion.div>
                 </motion.div>
@@ -2935,10 +3039,43 @@ export default function LogsPage() {
         <div 
           className="full-map-container" 
           style={{ 
-            paddingTop: '0px' // 지도 영역을 화면 전체로 확장
+            paddingTop: '0px', // 지도 영역을 화면 전체로 확장
+            position: 'relative' // 로딩 오버레이를 위한 relative 포지션
           }}
         >
           <div ref={mapContainer} className="w-full h-full" />
+          
+          {/* 지도 로딩 오버레이 */}
+          {(isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) && (
+            <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-40">
+              <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
+                {/* 스피너 */}
+                <div className="relative">
+                  <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+                  <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}></div>
+                </div>
+                
+                {/* 로딩 텍스트 */}
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-gray-900 mb-1">
+                    {isLocationDataLoading ? '위치 데이터 로딩 중...' :
+                     isDailyCountsLoading ? '일별 카운트 조회 중...' :
+                     isMemberActivityLoading ? '멤버 활동 조회 중...' : '데이터 로딩 중...'}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    잠시만 기다려주세요
+                  </p>
+                </div>
+                
+                {/* 진행 표시 점들 */}
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bottom Sheet - home/page.tsx와 동일한 framer-motion 적용 */}
@@ -3000,7 +3137,7 @@ export default function LogsPage() {
                               <FiUser className="w-5 h-5 text-indigo-600" />
                               <div>
                                 <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
-                                <p className="text-sm text-gray-600">멤버들의 위치를 확인하세요</p>
+                                <p className="text-sm text-gray-600">멤버들의 로그를 확인하세요</p>
                               </div>
                             </div>
                           {(isUserDataLoading || !dataFetchedRef.current.members) && (

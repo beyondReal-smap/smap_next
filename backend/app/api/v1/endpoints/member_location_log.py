@@ -596,13 +596,17 @@ async def get_member_map_markers(
     제공된 SQL 쿼리를 기반으로 구현된 API (데이터 샘플링 포함)
     """
     try:
-        logger.info(f"[GET] Map markers: mt_idx={mt_idx}, date={date}, min_speed={min_speed}")
+        logger.info(f"[GET] Map markers API 호출: mt_idx={mt_idx}, date={date}, min_speed={min_speed}, max_accuracy={max_accuracy}")
         
         map_markers = location_log_crud.get_member_map_markers(
             db, mt_idx, date, min_speed, max_accuracy
         )
         
-        logger.info(f"Retrieved map markers for member {mt_idx} on {date}: {len(map_markers)} markers")
+        logger.info(f"[GET] Map markers API 응답: member={mt_idx}, date={date}, 마커 수={len(map_markers)}개")
+        
+        # 600건 넘는 경우 경고 로그
+        if len(map_markers) > 600:
+            logger.warning(f"[GET] Map markers 경고: {len(map_markers)}건으로 600건 초과! 샘플링 로직 확인 필요")
         
         return {
             "result": "Y",

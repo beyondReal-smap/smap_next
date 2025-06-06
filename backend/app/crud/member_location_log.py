@@ -675,6 +675,26 @@ def get_member_map_markers(
             'stay_long': float(row.stay_long) if row.stay_long else None
         })
     
+    # 데이터가 300건을 넘으면 균일하게 샘플링하여 300건으로 제한
+    max_markers = 300
+    if len(results) > max_markers:
+        print(f"[get_member_map_marker] 데이터 건수: {len(results)}건 -> {max_markers}건으로 샘플링")
+        
+        # 균일한 간격으로 샘플링
+        total_count = len(results)
+        step = total_count / max_markers
+        
+        sampled_results = []
+        for i in range(max_markers):
+            index = int(i * step)
+            if index < total_count:
+                sampled_results.append(results[index])
+        
+        print(f"[get_member_map_markers] 샘플링 완료: {len(sampled_results)}건")
+        return sampled_results
+    else:
+        print(f"[get_member_map_markers] 데이터 건수: {len(results)}건 (샘플링 불필요)")
+    
     return results
 
 def get_schedule_count(db: Session, mt_idx: int, date_str: str) -> int:

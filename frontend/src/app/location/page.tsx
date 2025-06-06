@@ -1498,16 +1498,22 @@ export default function LocationPage() {
     setGroupMembers(updatedMembers); // 이 호출이 updateMemberMarkers를 트리거 (useEffect를 통해)
   
     if (map && window.naver?.maps) {
-      // 선택된 멤버의 위치로 지도 중심 이동 (바텀시트에 가려지지 않도록 위쪽으로 오프셋)
+      // 선택된 멤버의 위치로 지도 중심 이동 (바텀시트에 가려지지 않도록 아래쪽으로 오프셋)
       console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember.name, '위치:', newlySelectedMember.location);
-      const memberPosition = new window.naver.maps.LatLng(newlySelectedMember.location.lat, newlySelectedMember.location.lng);
       
-      // 먼저 멤버 위치로 지도 중심을 설정
-      map.setCenter(memberPosition);
+      // 멤버 위치에서 아래쪽(남쪽)으로 offset을 준 위치를 지도 중심으로 설정
+      const offsetLat = newlySelectedMember.location.lat - 0.002; // 남쪽으로 약 220m 아래쪽으로 offset
+      const offsetPosition = new window.naver.maps.LatLng(offsetLat, newlySelectedMember.location.lng);
       
-      // 그 다음 지도를 100px 아래쪽으로 이동 (멤버가 화면 위쪽에 보이도록)
-      map.panBy(new window.naver.maps.Point(0, 100));
+      // offset이 적용된 위치로 지도 중심을 설정
+      map.setCenter(offsetPosition);
       map.setZoom(16); // 적절한 줌 레벨로 설정
+      
+      console.log('[handleMemberSelect] 지도 중심 이동 (offset 적용):', {
+        member: newlySelectedMember.name,
+        original: { lat: newlySelectedMember.location.lat, lng: newlySelectedMember.location.lng },
+        offset: { lat: offsetLat, lng: newlySelectedMember.location.lng }
+      });
       
       // 첫번째 멤버 선택 완료 상태 설정
       if (!isFirstMemberSelectionComplete) {
@@ -2378,10 +2384,11 @@ export default function LocationPage() {
         const lng = parseCoordinate(selectedMember.location.lng);
 
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
-          // 지도 중심 이동 및 줌 레벨 조정 (즉시 실행)
-          map.setCenter(new window.naver.maps.LatLng(lat, lng));
+          // 지도 중심 이동 및 줌 레벨 조정 (멤버 위치 아래쪽으로 offset 적용)
+          const offsetLat = lat - 0.002; // 남쪽으로 약 220m 아래쪽으로 offset
+          map.setCenter(new window.naver.maps.LatLng(offsetLat, lng));
           map.setZoom(16);
-          console.log('지도 중심 이동:', selectedMember.name, { lat, lng });
+          console.log('지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
         } else {
           console.warn('유효하지 않은 선택된 멤버 좌표:', selectedMember.name, selectedMember.location);
         }
@@ -2614,9 +2621,11 @@ export default function LocationPage() {
         const lng = parseCoordinate(selectedMember.location.lng);
 
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
-          map.setCenter(new window.naver.maps.LatLng(lat, lng));
+          // 멤버 위치에서 아래쪽(남쪽)으로 offset을 준 위치를 지도 중심으로 설정
+          const offsetLat = lat - 0.002; // 남쪽으로 약 220m 아래쪽으로 offset
+          map.setCenter(new window.naver.maps.LatLng(offsetLat, lng));
           map.setZoom(16);
-          console.log('[updateAllMarkers] 지도 중심 이동:', selectedMember.name, { lat, lng });
+          console.log('[updateAllMarkers] 지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
         }
       }
     }

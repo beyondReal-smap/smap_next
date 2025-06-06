@@ -2921,16 +2921,20 @@ export default function HomePage() {
         if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
           // 네이버 지도 이동 및 줌 레벨 조정
           setTimeout(() => {
-            naverMap.current.setCenter(new window.naver.maps.LatLng(lat, lng));
+            // 멤버 위치에서 아래쪽(남쪽)으로 offset을 준 위치를 지도 중심으로 설정
+            const offsetLat = lat - 0.001; // 남쪽으로 약 220m 아래쪽으로 offset
+            naverMap.current.setCenter(new window.naver.maps.LatLng(offsetLat, lng));
             naverMap.current.setZoom(17);
-            console.log('네이버 지도 중심 이동:', selectedMember.name, { lat, lng });
+            console.log('네이버 지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
           }, 100);
         } else if (mapType === 'google' && map.current && googleMapsLoaded) {
           // 구글 지도 이동 및 줌 레벨 조정
           setTimeout(() => {
-            map.current.panTo({ lat, lng });
+            // 멤버 위치에서 아래쪽(남쪽)으로 offset을 준 위치를 지도 중심으로 설정
+            const offsetLat = lat - 0.001; // 남쪽으로 약 220m 아래쪽으로 offset
+            map.current.panTo({ lat: offsetLat, lng });
             map.current.setZoom(17);
-            console.log('구글 지도 중심 이동:', selectedMember.name, { lat, lng });
+            console.log('구글 지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
           }, 100);
         }
       } else {

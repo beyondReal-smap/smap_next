@@ -535,7 +535,7 @@ class MemberLocationLogService {
         max_accuracy: maxAccuracy.toString()
       });
       
-      const url = `location-logs/map-markers/${memberId}?${params}`;
+      const url = `/member-location-logs/${memberId}/map-markers?${params}`;
       const response = await apiClient.get(url);
 
       if (response.status < 200 || response.status >= 300) {
@@ -552,6 +552,12 @@ class MemberLocationLogService {
       
       if (result.result === 'Y' && Array.isArray(result.data)) {
         console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용:', result.data.length, '개');
+        
+        // 600건 넘는 경우 경고 로그
+        if (result.data.length > 600) {
+          console.warn(`[MemberLocationLogService] ⚠️ 지도 마커 600건 초과 경고: ${result.data.length}건 (member=${memberId}, date=${date})`);
+        }
+        
         return result.data;
       } else {
         console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');
