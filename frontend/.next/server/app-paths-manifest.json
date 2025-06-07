@@ -1,9 +1,12 @@
 {
+  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
+  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
+  "/api/push-logs/[...slug]/route": "app/api/push-logs/[...slug]/route.js",
+  "/api/groups/current-user/route": "app/api/groups/current-user/route.js",
   "/setting/page": "app/setting/page.js",
-  "/setting/subscription/page": "app/setting/subscription/page.js",
-  "/setting/purchase/page": "app/setting/purchase/page.js",
-  "/setting/terms/page": "app/setting/terms/page.js",
-  "/setting/account/page": "app/setting/account/page.js",
   "/setting/referrer/page": "app/setting/referrer/page.js",
-  "/setting/security/page": "app/setting/security/page.js"
+  "/setting/security/page": "app/setting/security/page.js",
+  "/notice/page": "app/notice/page.js",
+  "/home/page": "app/home/page.js",
+  "/group/page": "app/group/page.js"
 }
