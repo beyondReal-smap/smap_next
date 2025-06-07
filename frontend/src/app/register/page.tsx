@@ -120,6 +120,29 @@ export default function RegisterPage() {
     verification_code: ''
   });
 
+  // 전화번호 포맷팅 함수
+  const formatPhoneNumber = (value: string) => {
+    if (!value) return value;
+    const numericValue = value.replace(/[^0-9]/g, '');
+    const length = numericValue.length;
+
+    if (length < 4) return numericValue;
+    if (length < 7) {
+      return `${numericValue.slice(0, 3)}-${numericValue.slice(3)}`;
+    }
+    if (length < 11) {
+      return `${numericValue.slice(0, 3)}-${numericValue.slice(3, 6)}-${numericValue.slice(6)}`;
+    }
+    return `${numericValue.slice(0, 3)}-${numericValue.slice(3, 7)}-${numericValue.slice(7, 11)}`;
+  };
+
+  // 전화번호 입력 핸들러
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value;
+    const formatted = formatPhoneNumber(rawValue);
+    setRegisterData(prev => ({ ...prev, mt_id: formatted }));
+  };
+
   // 인증번호 타이머
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -191,7 +214,7 @@ export default function RegisterPage() {
         },
         body: JSON.stringify({
           action: 'send_verification',
-          phone: registerData.mt_id
+          phone: registerData.mt_id.replace(/-/g, '')
         }),
       });
 
@@ -223,7 +246,7 @@ export default function RegisterPage() {
         },
         body: JSON.stringify({
           action: 'verify_code',
-          phone: registerData.mt_id,
+          phone: registerData.mt_id.replace(/-/g, ''),
           code: registerData.verification_code
         }),
       });
@@ -272,6 +295,7 @@ export default function RegisterPage() {
         },
         body: JSON.stringify({
           ...registerData,
+          mt_id: registerData.mt_id.replace(/-/g, ''), // 전화번호에서 하이픈 제거
           mt_type: 1, // 일반 회원
           mt_level: 2, // 일반(무료)
           mt_status: 1, // 정상
@@ -479,8 +503,9 @@ export default function RegisterPage() {
                     <input
                       type="tel"
                       value={registerData.mt_id}
-                      onChange={(e) => setRegisterData(prev => ({ ...prev, mt_id: e.target.value }))}
+                      onChange={handlePhoneNumberChange}
                       placeholder="010-1234-5678"
+                      maxLength={13}
                       className="w-full pl-12 pr-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     />
                   </div>
