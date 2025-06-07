@@ -1,8 +1,9 @@
 {
-  "buildCommand": "npm ci && npm run build",
+  "buildCommand": "cd frontend && npm ci && npm run build",
+  "outputDirectory": "frontend/.next",
   "framework": "nextjs",
   "functions": {
-    "app/api/**/*.js": {
+    "frontend/src/app/api/**/*.js": {
       "runtime": "nodejs18.x"
     }
   },
