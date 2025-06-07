@@ -208,6 +208,17 @@ export default function RegisterPage() {
     
     setIsLoading(true);
     try {
+      const cleanPhone = registerData.mt_id.replace(/-/g, '');
+      
+      // 테스트용 전화번호 처리
+      if (cleanPhone === '01011111111') {
+        setVerificationSent(true);
+        setVerificationTimer(180); // 3분
+        // 테스트 번호는 실제 SMS 발송 없이 바로 다음 단계로 이동
+        handleNext();
+        return;
+      }
+
       const response = await fetch('/api/auth/register', {
         method: 'PUT',
         headers: {
@@ -215,7 +226,7 @@ export default function RegisterPage() {
         },
         body: JSON.stringify({
           action: 'send_verification',
-          phone: registerData.mt_id.replace(/-/g, '')
+          phone: cleanPhone
         }),
       });
 
@@ -230,7 +241,11 @@ export default function RegisterPage() {
       }
     } catch (error) {
       console.error('인증번호 발송 실패:', error);
-      alert(error instanceof Error ? error.message : '인증번호 발송에 실패했습니다.');
+      setErrorModal({
+        isOpen: true,
+        title: '발송 실패',
+        message: error instanceof Error ? error.message : '인증번호 발송에 실패했습니다.'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -242,6 +257,24 @@ export default function RegisterPage() {
     
     setIsLoading(true);
     try {
+      const cleanPhone = registerData.mt_id.replace(/-/g, '');
+      
+      // 테스트용 전화번호 처리
+      if (cleanPhone === '01011111111') {
+        if (registerData.verification_code === '111111') {
+          handleNext();
+          return;
+        } else {
+          setErrorModal({
+            isOpen: true,
+            title: '인증 실패',
+            message: '테스트 번호의 인증번호는 111111입니다.'
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+
       const response = await fetch('/api/auth/register', {
         method: 'PUT',
         headers: {
@@ -249,7 +282,7 @@ export default function RegisterPage() {
         },
         body: JSON.stringify({
           action: 'verify_code',
-          phone: registerData.mt_id.replace(/-/g, ''),
+          phone: cleanPhone,
           code: registerData.verification_code
         }),
       });
@@ -530,7 +563,7 @@ export default function RegisterPage() {
                     전화번호
                   </label>
                   <div className="relative">
-                    <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <FiPhone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500 w-5 h-5" />
                     <input
                       type="tel"
                       value={registerData.mt_id}
