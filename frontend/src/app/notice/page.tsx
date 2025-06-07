@@ -412,14 +412,6 @@ function NoticeContent() {
             </div>
           </div>
         </motion.header>
-        
-        {/* 로딩 상태 - 패딩 조정 */}
-        <div className="flex items-center justify-center min-h-screen pt-20">
-          <div className="flex items-center space-x-2 text-gray-500">
-            <div className="w-4 h-4 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>
-            <span className="text-sm">알림을 불러오는 중...</span>
-          </div>
-        </div>
       </div>
     );
   }
