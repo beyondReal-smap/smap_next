@@ -18,4 +18,15 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
     
     # Firebase 설정
-    FIREBASE_CREDENTIALS_PATH = os.getenv('FIREBASE_CREDENTIALS_PATH', '/app/com-dmonster-smap-firebase-adminsdk-2zx5p-2610556cf5.json') 
+    FIREBASE_CREDENTIALS_PATH = os.getenv('FIREBASE_CREDENTIALS_PATH', '/app/com-dmonster-smap-firebase-adminsdk-2zx5p-2610556cf5.json')
+    
+    # 비밀번호 해시화 설정 (PHP PASSWORD_DEFAULT와 유사)
+    PASSWORD_DEFAULT = "2y"  # bcrypt 알고리즘 식별자
+    PASSWORD_BCRYPT_COST = int(os.getenv('PASSWORD_BCRYPT_COST', '12'))  # bcrypt 비용 (기본값: 12)
+    PASSWORD_MIN_LENGTH = int(os.getenv('PASSWORD_MIN_LENGTH', '8'))  # 최소 비밀번호 길이
+    
+    # 비밀번호 정책 설정
+    PASSWORD_REQUIRE_UPPERCASE = os.getenv('PASSWORD_REQUIRE_UPPERCASE', 'true').lower() == 'true'
+    PASSWORD_REQUIRE_LOWERCASE = os.getenv('PASSWORD_REQUIRE_LOWERCASE', 'true').lower() == 'true'
+    PASSWORD_REQUIRE_NUMBERS = os.getenv('PASSWORD_REQUIRE_NUMBERS', 'true').lower() == 'true'
+    PASSWORD_REQUIRE_SPECIAL = os.getenv('PASSWORD_REQUIRE_SPECIAL', 'true').lower() == 'true' 

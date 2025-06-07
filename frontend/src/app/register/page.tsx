@@ -613,26 +613,37 @@ export default function RegisterPage() {
 
   // 회원가입 완료
   const handleRegister = async () => {
+    console.log('회원가입 시작 - handleRegister 호출됨');
+    console.log('현재 registerData:', registerData);
+    
     setIsLoading(true);
     try {
+      const requestData = {
+        ...registerData,
+        mt_id: registerData.mt_id.replace(/-/g, ''), // 전화번호에서 하이픈 제거
+        mt_type: 1, // 일반 회원
+        mt_level: 2, // 일반(무료)
+        mt_status: 1, // 정상
+        mt_onboarding: 'N',
+        mt_show: 'Y'
+      };
+      
+      console.log('API 요청 데이터:', requestData);
+      
       // API 호출
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          ...registerData,
-          mt_id: registerData.mt_id.replace(/-/g, ''), // 전화번호에서 하이픈 제거
-          mt_type: 1, // 일반 회원
-          mt_level: 2, // 일반(무료)
-          mt_status: 1, // 정상
-          mt_onboarding: 'N',
-          mt_show: 'Y'
-        }),
+        body: JSON.stringify(requestData),
       });
 
+      console.log('API 응답 상태:', response.status);
+      
       const data = await response.json();
+      console.log('API 응답 데이터:', data);
+      
       if (response.ok && data.success) {
         console.log('회원가입 성공:', data);
         setCurrentStep(REGISTER_STEPS.COMPLETE);
@@ -1461,8 +1472,22 @@ export default function RegisterPage() {
           style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
         >
           <motion.button
-            onClick={currentStep === REGISTER_STEPS.PHONE ? handleSendVerification : 
-                     currentStep === REGISTER_STEPS.LOCATION ? handleRegister : handleNext}
+            onClick={() => {
+              console.log('하단 버튼 클릭됨, 현재 단계:', currentStep);
+              console.log('isStepValid():', isStepValid());
+              console.log('isLoading:', isLoading);
+              
+              if (currentStep === REGISTER_STEPS.PHONE) {
+                console.log('인증번호 발송 함수 호출');
+                handleSendVerification();
+              } else if (currentStep === REGISTER_STEPS.LOCATION) {
+                console.log('회원가입 완료 함수 호출');
+                handleRegister();
+              } else {
+                console.log('다음 단계 함수 호출');
+                handleNext();
+              }
+            }}
             disabled={!isStepValid() || isLoading}
             whileHover={{ scale: isStepValid() ? 1.02 : 1 }}
             whileTap={{ scale: isStepValid() ? 0.98 : 1 }}

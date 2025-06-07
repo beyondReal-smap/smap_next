@@ -3,7 +3,9 @@ import bcrypt
 from datetime import datetime # mt_wdate 등 날짜 필드용
 from app.models.member import Member  # member_t 테이블에 매핑된 모델
 from app.schemas.auth import UserIdentity, RegisterRequest # RegisterRequest 임포트
+from app.config import Config  # 설정 파일 import
 from typing import Optional
+import re
 
 def get_user_by_phone(db: Session, phone_number: str) -> Optional[Member]:
     """전화번호(mt_id)로 사용자를 조회합니다."""
@@ -25,10 +27,44 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
-def get_hashed_password(password: str) -> str:
-    """비밀번호를 해싱합니다."""
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+def validate_password_policy(password: str) -> tuple[bool, list[str]]:
+    """비밀번호 정책을 검증합니다."""
+    errors = []
+    
+    # 최소 길이 검사
+    if len(password) < Config.PASSWORD_MIN_LENGTH:
+        errors.append(f"비밀번호는 최소 {Config.PASSWORD_MIN_LENGTH}자 이상이어야 합니다.")
+    
+    # 대문자 검사
+    if Config.PASSWORD_REQUIRE_UPPERCASE and not re.search(r'[A-Z]', password):
+        errors.append("비밀번호에 대문자가 포함되어야 합니다.")
+    
+    # 소문자 검사
+    if Config.PASSWORD_REQUIRE_LOWERCASE and not re.search(r'[a-z]', password):
+        errors.append("비밀번호에 소문자가 포함되어야 합니다.")
+    
+    # 숫자 검사
+    if Config.PASSWORD_REQUIRE_NUMBERS and not re.search(r'\d', password):
+        errors.append("비밀번호에 숫자가 포함되어야 합니다.")
+    
+    # 특수문자 검사
+    if Config.PASSWORD_REQUIRE_SPECIAL and not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        errors.append("비밀번호에 특수문자가 포함되어야 합니다.")
+    
+    return len(errors) == 0, errors
 
+def get_hashed_password(password: str) -> str:
+    """비밀번호를 해싱합니다. (PHP PASSWORD_DEFAULT와 유사한 방식)"""
+    # 비밀번호 정책 검증
+    is_valid, errors = validate_password_policy(password)
+    if not is_valid:
+        raise ValueError(f"비밀번호 정책 위반: {', '.join(errors)}")
+    
+    # bcrypt 비용 설정 (PHP의 PASSWORD_DEFAULT와 동일한 방식)
+    cost = Config.PASSWORD_BCRYPT_COST
+    salt = bcrypt.gensalt(rounds=cost)
+    
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 def create_user(db: Session, user_in: RegisterRequest) -> Member:
     """새로운 사용자를 생성합니다."""

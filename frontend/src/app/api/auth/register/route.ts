@@ -29,6 +29,9 @@ interface RegisterRequest {
 export async function POST(request: NextRequest) {
   try {
     const body: RegisterRequest = await request.json();
+    
+    console.log('=== 프론트엔드 API 라우터 호출됨 ===');
+    console.log('받은 요청 데이터:', JSON.stringify(body, null, 2));
 
     // 필수 필드 검증
     if (!body.mt_id || !body.mt_pwd || !body.mt_name || !body.mt_nickname) {
@@ -85,9 +88,13 @@ export async function POST(request: NextRequest) {
     };
 
     try {
-      // 백엔드 API 호출
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-      const backendResponse = await fetch(`${backendUrl}/api/v1/members/register`, {
+      // 백엔드 API 호출 (직접 URL 설정)
+      const backendUrl = new URL('https://118.67.130.71:8000/api/v1/members/register');
+      console.log('=== 백엔드 API 호출 시작 ===');
+      console.log('백엔드 URL:', backendUrl.toString());
+      console.log('전송할 데이터:', JSON.stringify(memberData, null, 2));
+      
+      const backendResponse = await fetch(backendUrl.toString(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -95,15 +102,19 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify(memberData),
       });
 
+      console.log('백엔드 응답 상태:', backendResponse.status);
       const backendData = await backendResponse.json();
+      console.log('백엔드 응답 데이터:', backendData);
 
       if (!backendResponse.ok) {
+        console.error('백엔드 API 오류:', backendData);
         return NextResponse.json(
           { error: backendData.message || '회원가입에 실패했습니다.' },
           { status: backendResponse.status }
         );
       }
 
+      console.log('백엔드 API 호출 성공');
       return NextResponse.json(backendData);
     } catch (fetchError) {
       console.error('백엔드 연결 실패, 임시 처리:', fetchError);
