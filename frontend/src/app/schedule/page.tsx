@@ -3474,151 +3474,31 @@ export default function SchedulePage() {
       <style jsx global>{pageStyles}</style>
       <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-20">
         
-        {/* 전체화면 로딩 - 체크리스트 형태 */}
+        {/* 일정 로딩 오버레이 - logs/location 페이지와 동일 */}
         {isInitialLoading && (
-          <div className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-            <div className="text-center max-w-sm mx-auto px-6">
-              {/* 상단 로고 및 제목 */}
-              <div className="mb-6">
-                <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-8 w-8 text-white stroke-2"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">일정을 불러오고 있습니다</h2>
-                <p className="text-sm text-gray-600">잠시만 기다려주세요...</p>
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{backgroundColor: '#ffffff'}}>
+            <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
+              {/* 스피너 */}
+              <div className="relative">
+                <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
+                <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '2s' }}></div>
               </div>
-
-              {/* 로딩 체크리스트 - 컴팩트 버전 */}
-              <div className="space-y-1">
-                {/* 1. 그룹 목록 불러오기 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    loadingSteps.groups 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : 'border-indigo-300 animate-pulse'
-                  }`}>
-                    {loadingSteps.groups ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    loadingSteps.groups ? 'text-green-700' : 'text-gray-700'
-                  }`}>
-                    그룹 목록 불러오기
-                  </span>
-                </div>
-
-                {/* 2. 일정 데이터 로드 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    loadingSteps.groups && loadingSteps.schedules 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : loadingSteps.groups 
-                        ? 'border-indigo-300 animate-pulse'
-                        : 'border-gray-300'
-                  }`}>
-                    {loadingSteps.groups && loadingSteps.schedules ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : loadingSteps.groups ? (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    ) : (
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    loadingSteps.groups && loadingSteps.schedules ? 'text-green-700' : loadingSteps.groups ? 'text-gray-700' : 'text-gray-400'
-                  }`}>
-                    일정 데이터 로드
-                  </span>
-                </div>
-
-                {/* 3. 캘린더 초기화 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : (loadingSteps.groups && loadingSteps.schedules)
-                        ? 'border-indigo-300 animate-pulse'
-                        : 'border-gray-300'
-                  }`}>
-                    {loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (loadingSteps.groups && loadingSteps.schedules) ? (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    ) : (
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar ? 'text-green-700' : (loadingSteps.groups && loadingSteps.schedules) ? 'text-gray-700' : 'text-gray-400'
-                  }`}>
-                    캘린더 초기화
-                  </span>
-                </div>
-
-                {/* 4. 화면 구성 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    isLoadingComplete 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : (loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar)
-                        ? 'border-indigo-300 animate-pulse'
-                        : 'border-gray-300'
-                  }`}>
-                    {isLoadingComplete ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar) ? (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    ) : (
-                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    isLoadingComplete ? 'text-green-700' : (loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar) ? 'text-gray-700' : 'text-gray-400'
-                  }`}>
-                    화면 구성
-                  </span>
-                </div>
-              </div>
-
-              {/* 진행률 표시 */}
-              <div className="mt-6">
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="h-2 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full transition-all duration-700 ease-out"
-                    style={{
-                      width: `${
-                        (loadingSteps.groups ? 25 : 0) +
-                        (loadingSteps.schedules ? 25 : 0) +
-                        (loadingSteps.calendar ? 25 : 0) +
-                        (loadingSteps.ui ? 25 : 0)
-                      }%`
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {(loadingSteps.groups ? 1 : 0) +
-                   (loadingSteps.schedules ? 1 : 0) +
-                   (loadingSteps.calendar ? 1 : 0) +
-                   (loadingSteps.ui ? 1 : 0)}/4 단계 완료
+              
+              {/* 로딩 텍스트 */}
+              <div className="text-center">
+                <p className="text-lg font-semibold text-gray-900 mb-1">
+                  일정을 불러오는 중...
                 </p>
+                <p className="text-sm text-gray-600">
+                  잠시만 기다려주세요
+                </p>
+              </div>
+              
+              {/* 진행 표시 점들 */}
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
               </div>
             </div>
           </div>

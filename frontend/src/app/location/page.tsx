@@ -39,14 +39,44 @@ import ReactDOM from 'react-dom';
 import memberService from '@/services/memberService';
 import locationService, { OtherMemberLocationRaw } from '@/services/locationService';
 import groupService, { Group } from '@/services/groupService';
+import { useAuth } from '@/contexts/AuthContext';
 
 // 모바일 최적화된 CSS 스타일
 const mobileStyles = `
-html, body {
+* {
+  box-sizing: border-box;
+}
+
+html, body, #__next, main {
   width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
   overflow-x: hidden;
   position: relative;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+}
+
+body {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  background-image: none !important;
+}
+
+.full-map-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 .hide-scrollbar {
@@ -196,30 +226,28 @@ const pageVariants = {
   }
 };
 
-// 바텀시트 variants - collapsed/expanded 상태만 사용
+// 바텀시트 variants - logs 페이지와 완전히 동일한 애니메이션
 const bottomSheetVariants = {
   collapsed: { 
-    top: '89.5vh',
-    bottom: '0px',
+    translateY: '65%',
     opacity: 1,
     transition: {
       type: "spring",
-      stiffness: 400,
-      damping: 30,
-      mass: 0.6,
-      duration: 0.5
+      stiffness: 200,
+      damping: 40,
+      mass: 0.8,
+      duration: 0.8
     }
   },
   expanded: {
-    top: '65vh',
-    bottom: '0px',  
+    translateY: '-40px',
     opacity: 1,
     transition: {
       type: "spring",
-      stiffness: 400,
-      damping: 30,
-      mass: 0.6,
-      duration: 0.5
+      stiffness: 200,
+      damping: 40,
+      mass: 0.8,
+      duration: 0.8
     }
   }
 };
@@ -416,6 +444,8 @@ const spinnerVariants = {
 
 
 
+
+
 // 타입 정의
 declare global {
   interface Window {
@@ -533,6 +563,7 @@ const useImageWithFallback = (src: string | null, fallbackSrc: string) => {
 
 export default function LocationPage() {
   const router = useRouter();
+  const { user } = useAuth(); // 현재 로그인한 사용자 정보
   
   // 상태 관리
   const [isExiting, setIsExiting] = useState(false);
@@ -1289,30 +1320,44 @@ export default function LocationPage() {
         const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
 
         setTimeout(async () => {
-          const convertedMembers = membersData.map((member: any, index: number) => ({
-            id: member.mt_idx.toString(),
-            name: member.mt_name || member.mt_nickname || '이름 없음',
-            photo: member.mt_file1,
-            isSelected: index === 0,
-            location: {
-              lat: parseFloat(String(member.mlt_lat || '37.5665')) || 37.5665,
-              lng: parseFloat(String(member.mlt_long || '126.9780')) || 126.9780
-            },
-            schedules: [],
-            savedLocations: [],
-            mt_gender: member.mt_gender,
-            original_index: index,
-            mlt_lat: member.mlt_lat,
-            mlt_long: member.mlt_long,
-            mlt_speed: member.mlt_speed,
-            mlt_battery: member.mlt_battery,
-            mlt_gps_time: member.mlt_gps_time,
-            sgdt_owner_chk: member.sgdt_owner_chk,
-            sgdt_leader_chk: member.sgdt_leader_chk,
-          }));
+          const convertedMembers = membersData.map((member: any, index: number) => {
+            // 현재 로그인한 사용자인지 확인
+            const isCurrentUser = !!(user && member.mt_idx === user.mt_idx);
+            
+            return {
+              id: member.mt_idx.toString(),
+              name: member.mt_name || member.mt_nickname || '이름 없음',
+              photo: member.mt_file1,
+              isSelected: isCurrentUser, // 현재 로그인한 사용자를 선택
+              location: {
+                lat: parseFloat(String(member.mlt_lat || '37.5665')) || 37.5665,
+                lng: parseFloat(String(member.mlt_long || '126.9780')) || 126.9780
+              },
+              schedules: [],
+              savedLocations: [],
+              mt_gender: member.mt_gender,
+              original_index: index,
+              mlt_lat: member.mlt_lat,
+              mlt_long: member.mlt_long,
+              mlt_speed: member.mlt_speed,
+              mlt_battery: member.mlt_battery,
+              mlt_gps_time: member.mlt_gps_time,
+              sgdt_owner_chk: member.sgdt_owner_chk,
+              sgdt_leader_chk: member.sgdt_leader_chk,
+            };
+          });
+          
+          // 현재 로그인한 사용자가 선택되지 않은 경우 첫 번째 멤버 선택
+          const hasSelectedUser = convertedMembers.some(member => member.isSelected);
+          if (!hasSelectedUser && convertedMembers.length > 0) {
+            convertedMembers[0].isSelected = true;
+          }
 
-          // selectedMemberIdRef 업데이트
-          if (convertedMembers.length > 0) {
+          // selectedMemberIdRef 업데이트 - 선택된 멤버의 ID로 설정
+          const selectedMember = convertedMembers.find(member => member.isSelected);
+          if (selectedMember) {
+            setSelectedMemberIdRef({ current: selectedMember.id });
+          } else if (convertedMembers.length > 0) {
             setSelectedMemberIdRef({ current: convertedMembers[0].id });
           }
 
@@ -1476,19 +1521,48 @@ export default function LocationPage() {
       // 선택된 멤버의 위치로 지도 중심 이동 (바텀시트에 가려지지 않도록 아래쪽으로 오프셋)
       console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember.name, '위치:', newlySelectedMember.location);
       
-      // 멤버 위치에서 아래쪽(남쪽)으로 offset을 준 위치를 지도 중심으로 설정
-      const offsetLat = newlySelectedMember.location.lat - 0.002; // 남쪽으로 약 220m 아래쪽으로 offset
-      const offsetPosition = new window.naver.maps.LatLng(offsetLat, newlySelectedMember.location.lng);
+      // 좌표 파싱 및 검증
+      const lat = parseCoordinate(newlySelectedMember.location.lat);
+      const lng = parseCoordinate(newlySelectedMember.location.lng);
       
-      // offset이 적용된 위치로 지도 중심을 설정
-      map.setCenter(offsetPosition);
-      map.setZoom(16); // 적절한 줌 레벨로 설정
-      
-      console.log('[handleMemberSelect] 지도 중심 이동 (offset 적용):', {
-        member: newlySelectedMember.name,
-        original: { lat: newlySelectedMember.location.lat, lng: newlySelectedMember.location.lng },
-        offset: { lat: offsetLat, lng: newlySelectedMember.location.lng }
+      console.log('[handleMemberSelect] 좌표 파싱 결과:', {
+        original: newlySelectedMember.location,
+        parsed: { lat, lng }
       });
+      
+      if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+        // 멤버 위치에서 아래쪽(남쪽)으로 offset을 준 위치를 지도 중심으로 설정
+        const offsetLat = lat - 0.002; // 남쪽으로 약 220m 아래쪽으로 offset
+        const offsetPosition = new window.naver.maps.LatLng(offsetLat, lng);
+        
+        console.log('[handleMemberSelect] 지도 중심 이동 실행:', {
+          member: newlySelectedMember.name,
+          original: { lat, lng },
+          offset: { lat: offsetLat, lng },
+          mapInstance: !!map
+        });
+        
+        // 부드러운 이동을 위해 panTo 사용
+        map.panTo(offsetPosition, {
+          duration: 1000,
+          easing: 'easeOutCubic'
+        });
+        
+        // 줌 레벨 설정
+        const currentZoom = map.getZoom();
+        if (currentZoom < 15) {
+          setTimeout(() => {
+            map.setZoom(16, {
+              duration: 500,
+              easing: 'easeOutQuad'
+            });
+          }, 200);
+        }
+        
+        console.log('[handleMemberSelect] 지도 중심 이동 완료');
+      } else {
+        console.warn('[handleMemberSelect] 유효하지 않은 좌표:', { lat, lng });
+      }
       
       // 첫번째 멤버 선택 완료 상태 설정
       if (!isFirstMemberSelectionComplete) {
@@ -1795,16 +1869,93 @@ export default function LocationPage() {
       isMapLoading,
       hasMapContainer: !!mapContainer.current,
       hasNaverAPI: !!(window.naver && window.naver.maps),
-      hasMap: !!map
+      hasMap: !!map,
+      hasGroupMembers: groupMembers.length > 0,
+      hasUser: !!user,
+      userMtIdx: user?.mt_idx
     });
     
-    if (!isMapLoading && mapContainer.current && window.naver && window.naver.maps && !map) {
-      console.log('[지도 초기화] 시작');
+    if (!isMapLoading && mapContainer.current && window.naver && window.naver.maps && !map && groupMembers.length > 0 && user) {
+      console.log('[지도 초기화] 시작 - 현재 로그인 사용자 위치로 초기화');
       
       try {
+        // 현재 로그인한 사용자(1186)의 위치를 그룹멤버 데이터에서 찾아서 지도 초기화
+        let initialCenter = new window.naver.maps.LatLng(37.5665, 126.9780); // 기본값
+        let initialZoom = 13;
+        let foundUserLocation = false;
+        
+        // 그룹멤버 중 현재 로그인한 사용자 찾기
+        const currentUserMember = groupMembers.find(member => member.id === user.mt_idx.toString());
+        console.log('[지도 초기화] 그룹멤버 중 현재 사용자 찾기:', {
+          searchId: user.mt_idx.toString(),
+          found: !!currentUserMember,
+          memberName: currentUserMember?.name,
+          memberData: currentUserMember ? {
+            mlt_lat: currentUserMember.mlt_lat,
+            mlt_long: currentUserMember.mlt_long,
+            location: currentUserMember.location
+          } : null,
+          allMemberIds: groupMembers.map(m => ({ id: m.id, name: m.name }))
+        });
+        
+        if (currentUserMember) {
+          // mlt_lat, mlt_long 직접 사용 (더 정확한 실시간 위치)
+          const lat = parseCoordinate(currentUserMember.mlt_lat);
+          const lng = parseCoordinate(currentUserMember.mlt_long);
+          
+          console.log('[지도 초기화] 현재 사용자 위치 파싱:', {
+            original: { mlt_lat: currentUserMember.mlt_lat, mlt_long: currentUserMember.mlt_long },
+            parsed: { lat, lng }
+          });
+          
+          if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+            // 바텀시트에 가려지지 않도록 아래쪽으로 offset 적용
+            const offsetLat = lat - 0.002;
+            initialCenter = new window.naver.maps.LatLng(offsetLat, lng);
+            initialZoom = 16;
+            foundUserLocation = true;
+            console.log('[지도 초기화] 현재 로그인 사용자(1186) 실시간 위치로 초기화:', currentUserMember.name, { 
+              lat: offsetLat, 
+              lng,
+              originalLat: lat 
+            });
+          } else {
+            // mlt_lat, mlt_long이 유효하지 않으면 location 정보 사용
+            const locationLat = parseCoordinate(currentUserMember.location?.lat);
+            const locationLng = parseCoordinate(currentUserMember.location?.lng);
+            
+            if (locationLat !== null && locationLng !== null && locationLat !== 0 && locationLng !== 0) {
+              const offsetLat = locationLat - 0.002;
+              initialCenter = new window.naver.maps.LatLng(offsetLat, locationLng);
+              initialZoom = 16;
+              foundUserLocation = true;
+              console.log('[지도 초기화] 현재 사용자 location 정보로 초기화:', currentUserMember.name, { lat: offsetLat, lng: locationLng });
+            }
+          }
+        }
+        
+        // 백업: 첫 번째 그룹멤버의 위치
+        if (!foundUserLocation && groupMembers.length > 0) {
+          const firstMember = groupMembers[0];
+          const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat);
+          const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng);
+          
+          if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+            const offsetLat = lat - 0.002;
+            initialCenter = new window.naver.maps.LatLng(offsetLat, lng);
+            initialZoom = 16;
+            foundUserLocation = true;
+            console.log('[지도 초기화] 첫 번째 멤버 위치로 초기화:', firstMember.name, { lat: offsetLat, lng });
+          }
+        }
+        
+        if (!foundUserLocation) {
+          console.log('[지도 초기화] 사용자 위치를 찾을 수 없어 기본 위치로 초기화:', { lat: 37.5665, lng: 126.9780 });
+        }
+        
       const mapOptions = {
-          center: new window.naver.maps.LatLng(37.5665, 126.9780), // 서울 시청
-        zoom: 13,
+          center: initialCenter,
+        zoom: initialZoom,
         minZoom: 8,
         maxZoom: 18,
         mapTypeControl: false,
@@ -1819,9 +1970,15 @@ export default function LocationPage() {
       };
 
       const newMap = new window.naver.maps.Map(mapContainer.current, mapOptions);
+      
+      // 지도 초기화 완료 이벤트 리스너 추가
+      window.naver.maps.Event.addListener(newMap, 'init', () => {
+        console.log('[지도 초기화] 네이버 지도 초기화 완료');
+        setIsMapInitialized(true);
+        setIsMapReady(true);
+      });
+      
       setMap(newMap);
-      setIsMapInitialized(true);
-        setIsMapReady(true); // 즉시 준비 완료로 설정
         console.log('[지도 초기화] 완료 - 지도 준비됨');
 
       // 지도 클릭 이벤트
@@ -1929,7 +2086,7 @@ export default function LocationPage() {
         console.error('[지도 초기화] 오류:', error);
     }
     }
-  }, [isMapLoading, map, groupMembers]);
+  }, [isMapLoading, map, groupMembers, user]);
 
   // 컴포넌트 마운트 시 그룹 데이터 먼저 로드
   useEffect(() => {
@@ -1947,20 +2104,31 @@ export default function LocationPage() {
   // 첫번째 멤버 자동 선택 - 지도 준비되고 멤버가 있을 때
   useEffect(() => {
     if (groupMembers.length > 0 && 
-        !groupMembers.some(m => m.isSelected) && 
         !isFirstMemberSelectionComplete && 
         isMapReady && 
         map &&
         dataFetchedRef.current.members) {
-      console.log('[첫번째 멤버 자동 선택] 시작:', groupMembers[0].name);
       
-      // 상태를 즉시 설정하여 중복 실행 방지
-      setIsFirstMemberSelectionComplete(true);
+      // 이미 선택된 멤버가 있는지 확인
+      const selectedMember = groupMembers.find(m => m.isSelected);
       
-      // 약간의 지연 후 첫번째 멤버 선택 (지도 렌더링 완료 대기)
-      setTimeout(() => {
-        handleMemberSelect(groupMembers[0].id);
-      }, 500);
+      if (selectedMember) {
+        console.log('[첫번째 멤버 자동 선택] 이미 선택된 멤버 있음:', selectedMember.name);
+        setIsFirstMemberSelectionComplete(true);
+        
+        // 선택된 멤버로 handleMemberSelect 호출하여 장소 데이터 로드
+        setTimeout(() => {
+          handleMemberSelect(selectedMember.id);
+        }, 500);
+      } else {
+        console.log('[첫번째 멤버 자동 선택] 첫번째 멤버 선택:', groupMembers[0].name);
+        setIsFirstMemberSelectionComplete(true);
+        
+        // 약간의 지연 후 첫번째 멤버 선택 (지도 렌더링 완료 대기)
+        setTimeout(() => {
+          handleMemberSelect(groupMembers[0].id);
+        }, 500);
+      }
     }
   }, [groupMembers.length, isMapReady]); // dataFetchedRef.current.members와 map 제거하여 의존성 순환 방지
 
@@ -2352,22 +2520,8 @@ export default function LocationPage() {
         }
       });
 
-      // 선택된 멤버가 있으면 해당 위치로 지도 이동 (즉시 실행으로 변경)
-      const selectedMember = members.find(member => member.isSelected);
-      if (selectedMember) {
-        const lat = parseCoordinate(selectedMember.location.lat);
-        const lng = parseCoordinate(selectedMember.location.lng);
-
-        if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
-          // 지도 중심 이동 및 줌 레벨 조정 (멤버 위치 아래쪽으로 offset 적용)
-          const offsetLat = lat - 0.002; // 남쪽으로 약 220m 아래쪽으로 offset
-          map.setCenter(new window.naver.maps.LatLng(offsetLat, lng));
-          map.setZoom(16);
-          console.log('지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
-        } else {
-          console.warn('유효하지 않은 선택된 멤버 좌표:', selectedMember.name, selectedMember.location);
-        }
-      }
+      // 지도 초기화 시점에 이미 올바른 위치로 설정되므로 추가 이동 불필요
+      // (handleMemberSelect에서만 지도 중심 이동 처리)
     }
 
     setMemberMarkers(newMemberMarkers);
@@ -2589,20 +2743,8 @@ export default function LocationPage() {
         }
       });
 
-      // 선택된 멤버가 있으면 해당 위치로 지도 이동
-      const selectedMember = members.find(member => member.isSelected);
-      if (selectedMember) {
-        const lat = parseCoordinate(selectedMember.location.lat);
-        const lng = parseCoordinate(selectedMember.location.lng);
-
-        if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
-          // 멤버 위치에서 아래쪽(남쪽)으로 offset을 준 위치를 지도 중심으로 설정
-          const offsetLat = lat - 0.002; // 남쪽으로 약 220m 아래쪽으로 offset
-          map.setCenter(new window.naver.maps.LatLng(offsetLat, lng));
-          map.setZoom(16);
-          console.log('[updateAllMarkers] 지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
-        }
-      }
+      // 지도 초기화 시점에 이미 올바른 위치로 설정되므로 추가 이동 불필요
+      // (handleMemberSelect에서만 지도 중심 이동 처리)
     }
 
     // 새 장소 마커들 생성
@@ -2771,6 +2913,8 @@ export default function LocationPage() {
       }
     }
   }, [selectedMemberSavedLocations, groupMembers, map, isMapReady]);
+
+
 
   // 마커 색상 업데이트 함수
   const updateMarkerColors = (selectedId: string | null) => {
@@ -3301,7 +3445,12 @@ export default function LocationPage() {
           isExiting ? "out" : "in"
         }
         variants={pageVariants}
-        className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen relative overflow-hidden"
+        className="bg-white min-h-screen relative overflow-hidden"
+        style={{ 
+          backgroundColor: '#ffffff', 
+          background: '#ffffff', 
+          backgroundImage: 'none' 
+        }}
       >
         {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
         {!(isMapLoading || !dataFetchedRef.current.groups || !dataFetchedRef.current.members || !isFirstMemberSelectionComplete) && (
@@ -3366,23 +3515,46 @@ export default function LocationPage() {
           </motion.header>
         )}
         
-        {/* 지도 컨테이너 */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.15, duration: 0.4 }}
-          className={`map-container fixed left-0 right-0 bottom-0 w-full ${
-            (isMapLoading || !dataFetchedRef.current.groups || !dataFetchedRef.current.members || !isFirstMemberSelectionComplete) 
-              ? 'top-0' 
-              : 'top-16'
-          }`}
+        {/* 지도 영역 - logs/page.tsx와 동일한 구조 */}
+        <div 
+          className="full-map-container" 
+          style={{ 
+            paddingTop: '0px', 
+            position: 'relative'
+          }}
         >
-          {/* 지도 컨테이너 - 항상 렌더링 */}
-          <div 
-            ref={mapContainer} 
-            className="w-full h-full"
-          />
-        </motion.div>
+          <div ref={mapContainer} className="w-full h-full" />
+          
+          {/* 지도 로딩 오버레이 - logs/page.tsx와 동일 */}
+          {(isMapLoading || !isMapInitialized) && (
+            <div className="absolute inset-0 flex items-center justify-center z-40" style={{backgroundColor: '#ffffff'}}>
+              <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
+                {/* 스피너 */}
+                <div className="relative">
+                  <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
+                  <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '2s' }}></div>
+                </div>
+                
+                {/* 로딩 텍스트 */}
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-gray-900 mb-1">
+                    지도를 초기화하는 중...
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    잠시만 기다려주세요
+                  </p>
+                </div>
+                
+                {/* 진행 표시 점들 */}
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* 개선된 위치 정보 패널 */}
         <AnimatePresence>
@@ -3630,9 +3802,10 @@ export default function LocationPage() {
         {isMapReady && (
           <motion.div
           ref={bottomSheetRef}
+            initial={{ translateY: '100%' }}
             variants={bottomSheetVariants}
             animate={bottomSheetState}
-            className="fixed left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
+            className="fixed bottom-0 left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
             style={{ touchAction: isHorizontalSwipe ? 'none' : 'pan-y' }}
           onTouchStart={handleDragStart}
           onTouchMove={handleDragMove}
@@ -3667,119 +3840,126 @@ export default function LocationPage() {
                 >
                 {/* 그룹 멤버 섹션 */}
               <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
-                  <motion.div 
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3, duration: 0.6 }}
+                  <div 
                     className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
                   >
-                    <div className="flex justify-between items-center mb-2">
-                       <div className="flex items-center space-x-3">
-                        <div className="flex items-center space-x-2">
-                          <FiUser className="w-5 h-5 text-indigo-600" />
-                          <div>                                                                                                               
-                            <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
-                            <p className="text-sm text-gray-600">멤버들의 장소를 확인하세요</p>
-                          </div>
-                        </div>
-                       </div>
-                       
-                      <div className="flex items-center space-x-3">
-                         {/* 그룹 선택 드롭다운 */}
-                         <div className="relative" data-group-dropdown-container="true">
-                          <motion.button
-                            whileHover={{ 
-                              scale: 1.02, 
-                              y: -2,
-                              borderColor: "#6366f1",
-                              boxShadow: "0 4px 12px rgba(99, 102, 241, 0.15)",
-                              transition: { duration: 0.2, ease: "easeOut" }
-                            }}
-                            whileTap={{ 
-                              scale: 0.98,
-                              transition: { duration: 0.1, ease: "easeInOut" }
-                            }}
-                             onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
-                            className="group-selector flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium min-w-[140px] mobile-button"
-                             data-group-selector="true"
-                           >
-                             <span className="truncate text-gray-700">
-                               {userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'}
-                             </span>
-                            <div className="ml-2 flex-shrink-0">
-                                <motion.div
-                                  animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-                                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                                >
-                                  <FiChevronDown className="text-gray-400" size={14} />
-                                </motion.div>
-                             </div>
-                          </motion.button>
-
-                          <AnimatePresence>
-                           {isGroupSelectorOpen && userGroups.length > 0 && (
-                              <motion.div
-                                initial={{ opacity: 0, y: -10, scale: 0.96 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -10, scale: 0.96 }}
-                                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                                className="absolute top-full right-0 z-50 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto min-w-[180px]"
-                                data-group-dropdown-menu="true"
-                              >
-                                {userGroups.map((group) => (
-                                  <button
-                                   key={group.sgt_idx}
-                                   onClick={() => handleGroupSelect(group.sgt_idx)}
-                                      className={`w-full px-4 py-2 text-left text-sm font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
-                                                                            selectedGroupId === group.sgt_idx 
-                                            ? 'bg-indigo-50 text-indigo-700 font-medium' 
-                                       : 'text-gray-700'
-                                   }`}
-                                 >
-                                   <div className="flex items-center justify-between">
-                                     <div className="flex-1">
-                                       <div className="font-semibold truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</div>
-                                       <div className="text-xs text-gray-500 mt-0.5">
-                                         멤버 {groupMemberCounts[group.sgt_idx] || 0}명
-                                       </div>
-                                     </div>
-                                     {selectedGroupId === group.sgt_idx && (
-                                       <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                       </svg>
-                                     )}
-                                   </div>
-                                  </button>
-                               ))}
-                              </motion.div>
-                           )}
-                          </AnimatePresence>
-                         </div>
-
-                       </div>
-                  </div>
-
-                   {groupMembers.length > 0 ? (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 30 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3, duration: 0.6 }}
+                      className="hide-scrollbar flex-1"
+                    >
+                      {/* 헤더와 드롭다운 */}
                       <motion.div 
-                        variants={staggerContainer}
-                        initial="hidden"
-                        animate="visible"
-                        className="flex flex-row flex-nowrap justify-start items-center gap-x-6 overflow-x-auto hide-scrollbar px-2 py-2"
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                        className="flex justify-between items-center mb-2"
                       >
+                         <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-2">
+                            <FiUser className="w-5 h-5 text-indigo-600" />
+                            <div>                                                                                                               
+                              <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
+                              <p className="text-sm text-gray-600">멤버들의 장소를 확인하세요</p>
+                            </div>
+                          </div>
+                         </div>
+                         
+                        <div className="flex items-center space-x-3">
+                           {/* 그룹 선택 드롭다운 */}
+                           <div className="relative" data-group-dropdown-container="true">
+                            <motion.button
+                              whileHover={{ 
+                                scale: 1.02, 
+                                y: -2,
+                                borderColor: "#6366f1",
+                                boxShadow: "0 4px 12px rgba(99, 102, 241, 0.15)",
+                                transition: { duration: 0.2, ease: "easeOut" }
+                              }}
+                              whileTap={{ 
+                                scale: 0.98,
+                                transition: { duration: 0.1, ease: "easeInOut" }
+                              }}
+                               onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
+                              className="group-selector flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium min-w-[140px] mobile-button"
+                               data-group-selector="true"
+                             >
+                               <span className="truncate text-gray-700">
+                                 {userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'}
+                               </span>
+                              <div className="ml-2 flex-shrink-0">
+                                  <motion.div
+                                    animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
+                                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                                  >
+                                    <FiChevronDown className="text-gray-400" size={14} />
+                                  </motion.div>
+                               </div>
+                            </motion.button>
+
+                            <AnimatePresence>
+                             {isGroupSelectorOpen && userGroups.length > 0 && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -10, scale: 0.96 }}
+                                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                                  exit={{ opacity: 0, y: -10, scale: 0.96 }}
+                                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                                  className="absolute top-full right-0 z-50 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto min-w-[180px]"
+                                  data-group-dropdown-menu="true"
+                                >
+                                  {userGroups.map((group) => (
+                                    <button
+                                     key={group.sgt_idx}
+                                     onClick={() => handleGroupSelect(group.sgt_idx)}
+                                        className={`w-full px-4 py-2 text-left text-sm font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
+                                                                              selectedGroupId === group.sgt_idx 
+                                              ? 'bg-indigo-50 text-indigo-700 font-medium' 
+                                         : 'text-gray-700'
+                                     }`}
+                                   >
+                                     <div className="flex items-center justify-between">
+                                       <div className="flex-1">
+                                         <div className="font-semibold truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</div>
+                                         <div className="text-xs text-gray-500 mt-0.5">
+                                           멤버 {groupMemberCounts[group.sgt_idx] || 0}명
+                                         </div>
+                                       </div>
+                                       {selectedGroupId === group.sgt_idx && (
+                                         <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                         </svg>
+                                       )}
+                                     </div>
+                                    </button>
+                                 ))}
+                                </motion.div>
+                             )}
+                            </AnimatePresence>
+                           </div>
+
+                         </div>
+                      </motion.div>
+
+                     {/* 멤버 목록 */}
+                     <motion.div 
+                       initial={{ opacity: 0, y: 15 }}
+                       animate={{ opacity: 1, y: 0 }}
+                       transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                       className="flex flex-row flex-nowrap justify-start items-center gap-x-6 overflow-x-auto hide-scrollbar px-2 py-2"
+                     >
                         {groupMembers.map((member, index) => {
                           const fallbackImage = getDefaultImage(member.mt_gender, member.original_index);
                           
                           return (
                           <motion.div 
                             key={member.id} 
-                            custom={index}
-                            variants={memberAvatarVariants}
-                            initial="initial"
-                            animate="animate"
-                            whileHover="hover"
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
                             className="flex flex-col items-center p-0 flex-shrink-0"
                           >
-                            <motion.button
+                            <button
                                onClick={(e) => {
                                  e.stopPropagation();
                                  handleMemberSelect(member.id);
@@ -3788,13 +3968,11 @@ export default function LocationPage() {
                                onTouchMove={(e) => e.stopPropagation()}
                                onTouchEnd={(e) => e.stopPropagation()}
                               className="flex flex-col items-center focus:outline-none mobile-button"
-                              animate={member.isSelected ? "selected" : "animate"}
                             >
-                                <motion.div
+                                <div
                                   className={`member-avatar w-13 h-13 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                                     member.isSelected ? 'selected' : ''
                                   }`}
-                                  animate={member.isSelected ? "selected" : undefined}
                                 >
                                   <img 
                                     src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}
@@ -3811,31 +3989,19 @@ export default function LocationPage() {
                                       console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
                                     }}
                                   />
-                                </motion.div>
+                                </div>
                               <span className={`block text-sm font-semibold mt-3 transition-colors duration-200 ${
                                 member.isSelected ? 'text-indigo-700' : 'text-gray-700'
                               }`}>
                                {member.name}
                              </span>
-                            </motion.button>
+                            </button>
                           </motion.div>
                           );
                         })}
                       </motion.div>
-                    ) : (
-                      <div className="text-center py-6 text-gray-500">
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ type: "spring", stiffness: 200 }}
-                          className="w-16 h-16 mx-auto mb-3 bg-gray-100 rounded-2xl flex items-center justify-center">
-                          <FiMapPin className="w-8 h-8 text-gray-300" />
-                        </motion.div>
-                        <p className="font-medium">그룹에 참여한 멤버가 없습니다</p>
-                        <p className="text-sm mt-1">그룹에 멤버를 초대해보세요</p>
-                     </div>
-                   )}
-                  </motion.div>
+                    </motion.div>
+                  </div>
               </div>
 
                 {/* 다른 멤버들의 장소 뷰 */}

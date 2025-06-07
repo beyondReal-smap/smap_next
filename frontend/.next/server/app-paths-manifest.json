@@ -2,15 +2,10 @@
   "/_not-found/page": "app/_not-found/page.js",
   "/api/groups/current-user/route": "app/api/groups/current-user/route.js",
   "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
-  "/api/member-location-logs/daily-counts/route": "app/api/member-location-logs/daily-counts/route.js",
-  "/api/location-logs/daily/[memberId]/route": "app/api/location-logs/daily/[memberId]/route.js",
-  "/api/location-logs/summary/[memberId]/route": "app/api/location-logs/summary/[memberId]/route.js",
-  "/api/location-logs/daily-summary/[memberId]/route": "app/api/location-logs/daily-summary/[memberId]/route.js",
-  "/api/location-logs/stay-times/[memberId]/route": "app/api/location-logs/stay-times/[memberId]/route.js",
-  "/api/member-location-logs/[mt_idx]/map-markers/route": "app/api/member-location-logs/[mt_idx]/map-markers/route.js",
-  "/api/member-location-logs/member-activity/route": "app/api/member-location-logs/member-activity/route.js",
-  "/api/location-logs/location-summary/[memberId]/route": "app/api/location-logs/location-summary/[memberId]/route.js",
-  "/api/locations/other-members/[memberId]/route": "app/api/locations/other-members/[memberId]/route.js",
+  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
   "/logs/page": "app/logs/page.js",
-  "/location/page": "app/location/page.js"
+  "/home/page": "app/home/page.js",
+  "/schedule/page": "app/schedule/page.js",
+  "/location/page": "app/location/page.js",
+  "/group/page": "app/group/page.js"
 }

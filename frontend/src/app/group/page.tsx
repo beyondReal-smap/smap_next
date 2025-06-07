@@ -797,113 +797,31 @@ function GroupPageContent() {
       <style jsx global>{floatingButtonStyles}</style>
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
         
-        {/* 전체화면 로딩 - 체크리스트 형태 */}
+        {/* 그룹 로딩 오버레이 - logs/location 페이지와 동일 */}
         {loading && (
-          <div className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-            <div className="text-center max-w-sm mx-auto px-6">
-              {/* 상단 로고 및 제목 */}
-              <div className="mb-6">
-                <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
-                  <FaUsers className="w-8 h-8 text-white" />
-                </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">그룹을 불러오고 있습니다</h2>
-                <p className="text-sm text-gray-600">잠시만 기다려주세요...</p>
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{backgroundColor: '#ffffff'}}>
+            <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
+              {/* 스피너 */}
+              <div className="relative">
+                <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
+                <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '2s' }}></div>
               </div>
-
-              {/* 로딩 체크리스트 - 컴팩트 버전 */}
-              <div className="space-y-1">
-                {/* 1. 그룹 목록 불러오기 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    loadingSteps.groups 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : 'border-indigo-300 animate-pulse'
-                  }`}>
-                    {loadingSteps.groups ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    )}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    loadingSteps.groups ? 'text-green-700' : 'text-gray-700'
-                  }`}>
-                    그룹 목록 불러오기
-                  </span>
-                </div>
-
-                {/* 2. 멤버 수 계산 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    loadingSteps.members 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : loadingSteps.groups
-                        ? 'border-indigo-300 animate-pulse'
-                        : 'border-gray-300'
-                  }`}>
-                    {loadingSteps.members ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : loadingSteps.groups ? (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    ) : null}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    loadingSteps.members ? 'text-green-700' : loadingSteps.groups ? 'text-gray-700' : 'text-gray-400'
-                  }`}>
-                    멤버 수 계산
-                  </span>
-                </div>
-
-                {/* 3. 화면 구성 */}
-                <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                  <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                    loadingSteps.ui 
-                      ? 'bg-green-500 border-green-500 scale-110' 
-                      : loadingSteps.members
-                        ? 'border-indigo-300 animate-pulse'
-                        : 'border-gray-300'
-                  }`}>
-                    {loadingSteps.ui ? (
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : loadingSteps.members ? (
-                      <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                    ) : null}
-                  </div>
-                  <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                    loadingSteps.ui ? 'text-green-700' : loadingSteps.members ? 'text-gray-700' : 'text-gray-400'
-                  }`}>
-                    화면 구성
-                  </span>
-                </div>
-              </div>
-
-              {/* 진행률 표시 */}
-              <div className="mt-6">
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="h-2 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full transition-all duration-700 ease-out"
-                    style={{ 
-                      width: `${
-                        ((loadingSteps.groups ? 1 : 0) + 
-                         (loadingSteps.members ? 1 : 0) + 
-                         (loadingSteps.ui ? 1 : 0)) / 3 * 100
-                      }%` 
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {`${
-                    (loadingSteps.groups ? 1 : 0) + 
-                    (loadingSteps.members ? 1 : 0) + 
-                    (loadingSteps.ui ? 1 : 0)
-                  }/3 단계 ${isLoadingComplete ? '완료' : '진행 중...'}`}
+              
+              {/* 로딩 텍스트 */}
+              <div className="text-center">
+                <p className="text-lg font-semibold text-gray-900 mb-1">
+                  그룹을 불러오는 중...
                 </p>
+                <p className="text-sm text-gray-600">
+                  잠시만 기다려주세요
+                </p>
+              </div>
+              
+              {/* 진행 표시 점들 */}
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
               </div>
             </div>
           </div>

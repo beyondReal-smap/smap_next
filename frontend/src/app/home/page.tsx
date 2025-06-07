@@ -1898,6 +1898,22 @@ export default function HomePage() {
           });
 
           newMarker.addListener('click', () => {
+            // 기존 InfoWindow 닫기
+            if (currentInfoWindowRef.current) {
+              try {
+                currentInfoWindowRef.current.close();
+              } catch (e) {
+                console.warn('[createMarker] 기존 InfoWindow 닫기 실패:', e);
+              }
+            }
+            
+            // 멤버 선택 처리 (바텀시트 연동)
+            if (memberData && memberData.id) {
+              console.log('[createMarker] 네이버맵 멤버 마커 클릭 - 멤버 선택:', memberData.name);
+              handleMemberSelect(memberData.id);
+            }
+            
+            // 새 InfoWindow 참조 저장 및 열기
             currentInfoWindowRef.current = memberInfoWindow;
             try {
               memberInfoWindow.open(naverMap.current, newMarker);
@@ -2064,6 +2080,12 @@ export default function HomePage() {
               }
             }
             
+            // 멤버 선택 처리 (바텀시트 연동)
+            if (memberData && memberData.id) {
+              console.log('[createMarker] 네이버맵 멤버 마커 클릭 - 멤버 선택:', memberData.name);
+              handleMemberSelect(memberData.id);
+            }
+            
             // 새 InfoWindow 참조 저장 및 열기
             currentInfoWindowRef.current = infoWindow;
             infoWindow.open(naverMap.current, newMarker);
@@ -2221,6 +2243,12 @@ export default function HomePage() {
               } catch (e) {
                 console.warn('[createMarker] 기존 InfoWindow 닫기 실패:', e);
               }
+            }
+            
+            // 멤버 선택 처리 (바텀시트 연동)
+            if (memberData && memberData.id) {
+              console.log('[createMarker] 구글맵 멤버 마커 클릭 - 멤버 선택:', memberData.name);
+              handleMemberSelect(memberData.id);
             }
             
             // 새 InfoWindow 참조 저장 및 열기
@@ -2598,7 +2626,7 @@ export default function HomePage() {
     }, 50);
     
     const updatedMembers = groupMembers.map(member => 
-      member.id === id ? { ...member, isSelected: !member.isSelected } : { ...member, isSelected: false }
+      member.id === id ? { ...member, isSelected: true } : { ...member, isSelected: false }
     );
     setGroupMembers(updatedMembers);
     const selectedMember = updatedMembers.find(member => member.isSelected);
@@ -2664,29 +2692,6 @@ export default function HomePage() {
       setFilteredSchedules(allSchedules);
     }
     updateMemberMarkers(updatedMembers);
-    
-    // 선택된 멤버가 있으면 해당 멤버의 InfoWindow 자동 표시
-    if (selectedMember) {
-      // 지도 이동 후 InfoWindow 표시를 위해 약간의 지연 추가
-      setTimeout(() => {
-        // 해당 멤버 마커 찾기
-        const memberMarker = memberMarkers.current.find((marker, index) => {
-          const markerMember = updatedMembers[index];
-          return markerMember && markerMember.id === selectedMember.id;
-        });
-        
-        if (memberMarker) {
-          // 네이버맵인지 구글맵인지에 따라 클릭 이벤트 트리거
-          if (mapType === 'naver' && window.naver?.maps) {
-            window.naver.maps.Event.trigger(memberMarker, 'click');
-            console.log('[handleMemberSelect] 네이버맵 멤버 InfoWindow 자동 표시:', selectedMember.name);
-          } else if (mapType === 'google' && window.google?.maps) {
-            window.google.maps.event.trigger(memberMarker, 'click');
-            console.log('[handleMemberSelect] 구글맵 멤버 InfoWindow 자동 표시:', selectedMember.name);
-          }
-        }
-      }, 200); // 지도 이동과 함께 자연스럽게 InfoWindow 표시
-    }
   };
 
   // 선택된 날짜 변경 핸들러 (filteredSchedules 업데이트)
@@ -3448,182 +3453,35 @@ export default function HomePage() {
           style={{ 
             paddingTop: (authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) 
               ? '0px' 
-              : '64px' 
+              : '64px',
+            position: 'relative'
           }}
         >
-          {/* 전체화면 로딩 - 체크리스트 형태 */}
+          {/* 지도 로딩 오버레이 - logs/location 페이지와 동일 */}
           {(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
-            <div className="fixed inset-0 z-50 bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
-              <div className="text-center max-w-sm mx-auto px-6">
-                {/* 상단 로고 및 제목 */}
-                <div className="mb-6">
-                  <div className="w-16 h-16 mx-auto mb-3 bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-2xl flex items-center justify-center shadow-lg animate-pulse">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-8 w-8 text-white stroke-2"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
-                  </div>
-                  <h2 className="text-xl font-bold text-gray-900 mb-2">홈 화면을 준비하고 있습니다</h2>
-                  <p className="text-sm text-gray-600">잠시만 기다려주세요...</p>
+            <div className="absolute inset-0 flex items-center justify-center z-40" style={{backgroundColor: '#ffffff'}}>
+              <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
+                {/* 스피너 */}
+                <div className="relative">
+                  <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
+                  <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '2s' }}></div>
                 </div>
-
-                {/* 로딩 체크리스트 - 컴팩트 버전 */}
-                <div className="space-y-1">
-                  {/* 1. 로그인 정보 확인 */}
-                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                      !authLoading 
-                        ? 'bg-green-500 border-green-500 scale-110' 
-                        : 'border-indigo-300 animate-pulse'
-                    }`}>
-                      {!authLoading ? (
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                      )}
-                    </div>
-                    <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                      !authLoading ? 'text-green-700' : 'text-gray-700'
-                    }`}>
-                      로그인 정보 확인
-                    </span>
-                  </div>
-
-                  {/* 2. 지도 로딩 */}
-                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                      !authLoading && !isMapLoading 
-                        ? 'bg-green-500 border-green-500 scale-110' 
-                        : authLoading 
-                          ? 'border-gray-300' 
-                          : 'border-indigo-300 animate-pulse'
-                    }`}>
-                      {!authLoading && !isMapLoading ? (
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : !authLoading ? (
-                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                      ) : (
-                        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                      )}
-                    </div>
-                    <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                      !authLoading && !isMapLoading ? 'text-green-700' : authLoading ? 'text-gray-400' : 'text-gray-700'
-                    }`}>
-                      지도 불러오기
-                    </span>
-                  </div>
-
-                  {/* 3. 그룹 멤버 데이터 */}
-                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                      !authLoading && !isMapLoading && dataFetchedRef.current.members 
-                        ? 'bg-green-500 border-green-500 scale-110' 
-                        : (authLoading || isMapLoading) 
-                          ? 'border-gray-300' 
-                          : 'border-indigo-300 animate-pulse'
-                    }`}>
-                      {!authLoading && !isMapLoading && dataFetchedRef.current.members ? (
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : !authLoading && !isMapLoading ? (
-                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                      ) : (
-                        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                      )}
-                    </div>
-                    <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                      !authLoading && !isMapLoading && dataFetchedRef.current.members ? 'text-green-700' : (authLoading || isMapLoading) ? 'text-gray-400' : 'text-gray-700'
-                    }`}>
-                      그룹 멤버 불러오기
-                    </span>
-                  </div>
-
-                  {/* 4. 일정 데이터 */}
-                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                      !authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules 
-                        ? 'bg-green-500 border-green-500 scale-110' 
-                        : (authLoading || isMapLoading || !dataFetchedRef.current.members) 
-                          ? 'border-gray-300' 
-                          : 'border-indigo-300 animate-pulse'
-                    }`}>
-                      {!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules ? (
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : !authLoading && !isMapLoading && dataFetchedRef.current.members ? (
-                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                      ) : (
-                        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                      )}
-                    </div>
-                    <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                      !authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules ? 'text-green-700' : (authLoading || isMapLoading || !dataFetchedRef.current.members) ? 'text-gray-400' : 'text-gray-700'
-                    }`}>
-                      일정 데이터 불러오기
-                    </span>
-                  </div>
-
-                  {/* 5. 첫번째 멤버 위치 이동 */}
-                  <div className="flex items-center space-x-2 p-2 rounded-lg bg-white/60 backdrop-blur-sm border border-white/20">
-                    <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-500 ${
-                      isFirstMemberSelectionComplete 
-                        ? 'bg-green-500 border-green-500 scale-110' 
-                        : (!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules)
-                          ? 'border-indigo-300 animate-pulse' 
-                          : 'border-gray-300'
-                    }`}>
-                      {isFirstMemberSelectionComplete ? (
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules) ? (
-                        <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping"></div>
-                      ) : (
-                        <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                      )}
-                    </div>
-                    <span className={`flex-1 text-left text-sm font-medium transition-colors duration-300 ${
-                      isFirstMemberSelectionComplete ? 'text-green-700' : (!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules) ? 'text-gray-700' : 'text-gray-400'
-                    }`}>
-                      멤버 위치로 이동
-                    </span>
-                  </div>
-                </div>
-
-                {/* 진행률 표시 */}
-                <div className="mt-6">
-                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="h-2 bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-full transition-all duration-700 ease-out"
-                      style={{
-                        width: `${
-                          (!authLoading ? 20 : 0) +
-                          (!authLoading && !isMapLoading ? 20 : 0) +
-                          (!authLoading && !isMapLoading && dataFetchedRef.current.members ? 20 : 0) +
-                          (!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules ? 20 : 0) +
-                          (isFirstMemberSelectionComplete ? 20 : 0)
-                        }%`
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {(!authLoading ? 1 : 0) +
-                     (!authLoading && !isMapLoading ? 1 : 0) +
-                     (!authLoading && !isMapLoading && dataFetchedRef.current.members ? 1 : 0) +
-                     (!authLoading && !isMapLoading && dataFetchedRef.current.members && dataFetchedRef.current.schedules ? 1 : 0) +
-                     (isFirstMemberSelectionComplete ? 1 : 0)}/5 단계 완료
+                
+                {/* 로딩 텍스트 */}
+                <div className="text-center">
+                  <p className="text-lg font-semibold text-gray-900 mb-1">
+                    홈 화면을 준비하는 중...
                   </p>
+                  <p className="text-sm text-gray-600">
+                    잠시만 기다려주세요
+                  </p>
+                </div>
+                
+                {/* 진행 표시 점들 */}
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
                 </div>
               </div>
             </div>

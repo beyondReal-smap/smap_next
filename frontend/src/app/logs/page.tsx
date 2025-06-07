@@ -3097,8 +3097,6 @@ export default function LogsPage() {
             )}
           </motion.header>
         )}
-        
-        
 
         {/* 지도 영역 */}
         <div 
@@ -3112,7 +3110,7 @@ export default function LogsPage() {
           
           {/* 지도 로딩 오버레이 */}
           {(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded || isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) && (
-            <div className="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center z-40">
+            <div className="absolute inset-0 flex items-center justify-center z-40" style={{backgroundColor: '#ffffff'}}>
               <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
                 {/* 스피너 */}
                 <div className="relative">
