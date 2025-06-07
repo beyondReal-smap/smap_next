@@ -356,25 +356,45 @@ export default function RegisterPage() {
       <motion.header 
         initial={{ y: -100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-100"
+        transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-lg border-b border-gray-100/50 shadow-sm"
+        style={{
+          backdropFilter: 'blur(10px)',
+          background: 'rgba(255, 255, 255, 0.7)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)'
+        }}
       >
         <div className="flex items-center justify-between h-16 px-4">
-          <motion.button 
-            onClick={handleBack}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="p-2 hover:bg-gray-100 rounded-full"
-          >
-            <FiArrowLeft className="w-5 h-5 text-gray-700" />
-          </motion.button>
-          
-          <div className="text-center">
-            <h1 className="text-lg font-bold text-gray-900">회원가입</h1>
-            {currentStep !== REGISTER_STEPS.COMPLETE && (
-              <p className="text-xs text-gray-500">
-                {Object.values(REGISTER_STEPS).indexOf(currentStep) + 1} / {Object.values(REGISTER_STEPS).length - 1}
-              </p>
-            )}
+          <div className="flex items-center space-x-3">
+            <motion.button 
+              onClick={handleBack}
+              className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </motion.button>
+            <div className="flex items-center space-x-3">
+              <motion.div
+                initial={{ rotate: -180, scale: 0 }}
+                animate={{ rotate: 0, scale: 1 }}
+                transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                className="p-2 bg-indigo-600 rounded-xl"
+              >
+                <FiUser className="w-5 h-5 text-white" />
+              </motion.div>
+              <div className="min-w-0">
+                <h1 className="text-lg font-bold text-gray-900 whitespace-nowrap">회원가입</h1>
+                {currentStep !== REGISTER_STEPS.COMPLETE && (
+                  <p className="text-xs text-gray-500 whitespace-nowrap">
+                    {Object.values(REGISTER_STEPS).indexOf(currentStep) + 1} / {Object.values(REGISTER_STEPS).length - 1}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
           
           <div className="w-9" /> {/* 균형을 위한 빈 공간 */}
