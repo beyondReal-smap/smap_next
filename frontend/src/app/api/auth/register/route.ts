@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
+import { sendVerificationCode } from '../../sms/send/route';
 
 // 회원가입 요청 타입
 interface RegisterRequest {
@@ -109,29 +110,78 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// 인메모리 저장소 (실제 환경에서는 Redis나 DB 사용)
+const verificationCodes = new Map<string, { code: string; expires: number }>();
+
 // 전화번호 인증 API
 export async function PUT(request: NextRequest) {
   try {
     const { action, phone, code } = await request.json();
 
     if (action === 'send_verification') {
-      // 인증번호 발송 로직
-      // 실제로는 SMS API 호출
-      console.log(`인증번호 발송: ${phone}`);
+      // 전화번호 형식 검증
+      if (!phone) {
+        return NextResponse.json(
+          { error: '전화번호가 필요합니다.' },
+          { status: 400 }
+        );
+      }
+
+      // 실제 SMS 발송
+      const result = await sendVerificationCode(phone);
       
-      return NextResponse.json({
-        success: true,
-        message: '인증번호가 발송되었습니다.'
-      });
+      if (result.success && result.code) {
+        // 인증번호를 메모리에 저장 (3분 후 만료)
+        const expires = Date.now() + (3 * 60 * 1000); // 3분
+        verificationCodes.set(phone, { code: result.code, expires });
+        
+        console.log(`인증번호 발송 성공: ${phone}, 코드: ${result.code}`);
+        
+        return NextResponse.json({
+          success: true,
+          message: '인증번호가 발송되었습니다.'
+        });
+      } else {
+        return NextResponse.json(
+          { error: result.error || '인증번호 발송에 실패했습니다.' },
+          { status: 500 }
+        );
+      }
     }
 
     if (action === 'verify_code') {
-      // 인증번호 확인 로직
-      // 실제로는 저장된 인증번호와 비교
-      console.log(`인증번호 확인: ${phone}, ${code}`);
+      // 전화번호와 인증번호 검증
+      if (!phone || !code) {
+        return NextResponse.json(
+          { error: '전화번호와 인증번호가 필요합니다.' },
+          { status: 400 }
+        );
+      }
+
+      // 저장된 인증번호 확인
+      const storedData = verificationCodes.get(phone);
       
-      // 임시로 모든 인증번호를 성공으로 처리
-      if (code && code.length === 6) {
+      if (!storedData) {
+        return NextResponse.json(
+          { error: '인증번호를 먼저 요청해주세요.' },
+          { status: 400 }
+        );
+      }
+
+      // 만료 시간 확인
+      if (Date.now() > storedData.expires) {
+        verificationCodes.delete(phone);
+        return NextResponse.json(
+          { error: '인증번호가 만료되었습니다. 다시 요청해주세요.' },
+          { status: 400 }
+        );
+      }
+
+      // 인증번호 일치 확인
+      if (storedData.code === code) {
+        verificationCodes.delete(phone); // 사용된 인증번호 삭제
+        console.log(`인증번호 확인 성공: ${phone}`);
+        
         return NextResponse.json({
           success: true,
           message: '인증이 완료되었습니다.'
