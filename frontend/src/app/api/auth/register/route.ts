@@ -84,22 +84,48 @@ export async function POST(request: NextRequest) {
       mt_wdate: new Date().toISOString(),
     };
 
-    // 실제 구현에서는 여기서 DB에 저장
-    // const result = await insertMember(memberData);
-    
-    // 임시로 성공 응답 반환
-    console.log('회원가입 데이터:', memberData);
+    try {
+      // 백엔드 API 호출
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+      const backendResponse = await fetch(`${backendUrl}/api/v1/members/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(memberData),
+      });
 
-    return NextResponse.json({
-      success: true,
-      message: '회원가입이 완료되었습니다.',
-      data: {
-        mt_idx: Math.floor(Math.random() * 10000), // 임시 ID
-        mt_id: body.mt_id,
-        mt_name: body.mt_name,
-        mt_nickname: body.mt_nickname
+      const backendData = await backendResponse.json();
+
+      if (!backendResponse.ok) {
+        return NextResponse.json(
+          { error: backendData.message || '회원가입에 실패했습니다.' },
+          { status: backendResponse.status }
+        );
       }
-    });
+
+      return NextResponse.json(backendData);
+    } catch (fetchError) {
+      console.error('백엔드 연결 실패, 임시 처리:', fetchError);
+      
+      // 백엔드 연결 실패 시 임시 성공 응답 (개발용)
+      const tempMemberData = {
+        mt_idx: Math.floor(Math.random() * 10000) + 1000,
+        mt_id: memberData.mt_id,
+        mt_name: memberData.mt_name,
+        mt_nickname: memberData.mt_nickname,
+        mt_email: memberData.mt_email,
+        mt_wdate: new Date().toISOString()
+      };
+
+      console.log('임시 회원가입 데이터:', tempMemberData);
+
+      return NextResponse.json({
+        success: true,
+        message: '회원가입이 완료되었습니다. (임시 처리)',
+        data: tempMemberData
+      });
+    }
 
   } catch (error) {
     console.error('회원가입 오류:', error);

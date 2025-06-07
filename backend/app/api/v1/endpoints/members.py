@@ -5,11 +5,82 @@ from sqlalchemy import and_
 from app.api import deps
 from app.models.member import Member
 from app.models.group_detail import GroupDetail
-from app.schemas.member import MemberCreate, MemberUpdate, MemberResponse
+from app.schemas.member import (
+    MemberCreate, 
+    MemberUpdate, 
+    MemberResponse, 
+    RegisterRequest, 
+    RegisterResponse,
+    MemberLogin,
+    MemberLoginResponse
+)
+from app.services.member_service import member_service
 from app.models.enums import StatusEnum
 from datetime import datetime
 
 router = APIRouter()
+
+@router.post("/register", response_model=RegisterResponse)
+def register_member(
+    register_data: RegisterRequest,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    회원가입
+    """
+    return member_service.register_member(db, register_data)
+
+@router.post("/login", response_model=MemberLoginResponse)
+def login_member(
+    login_data: MemberLogin,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    로그인
+    """
+    return member_service.login_member(db, login_data.mt_id, login_data.mt_pwd)
+
+@router.get("/check/phone/{phone}")
+def check_phone_availability(
+    phone: str,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    전화번호 사용 가능 여부 확인
+    """
+    is_available = member_service.check_phone_availability(db, phone)
+    return {
+        "available": is_available,
+        "message": "사용 가능한 전화번호입니다." if is_available else "이미 가입된 전화번호입니다."
+    }
+
+@router.get("/check/email/{email}")
+def check_email_availability(
+    email: str,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    이메일 사용 가능 여부 확인
+    """
+    is_available = member_service.check_email_availability(db, email)
+    return {
+        "available": is_available,
+        "message": "사용 가능한 이메일입니다." if is_available else "이미 가입된 이메일입니다."
+    }
+
+@router.get("/check/nickname/{nickname}")
+def check_nickname_availability(
+    nickname: str,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    닉네임 사용 가능 여부 확인
+    """
+    is_available = member_service.check_nickname_availability(db, nickname)
+    return {
+        "available": is_available,
+        "message": "사용 가능한 닉네임입니다." if is_available else "이미 사용 중인 닉네임입니다."
+    }
 
 @router.get("/", response_model=List[MemberResponse])
 def get_members(
