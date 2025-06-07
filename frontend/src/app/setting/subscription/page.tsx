@@ -390,7 +390,7 @@ export default function SubscriptionPage() {
                   <p className="text-xs text-gray-500">프리미엄 기능을 경험하세요</p>
                 </div>
               </div>
-            </div>
+      </div>
             
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -457,7 +457,7 @@ export default function SubscriptionPage() {
                   구독 관리
                 </motion.button>
               </div>
-            </div>
+        </div>
           </div>
         </motion.div>
 
@@ -789,8 +789,8 @@ export default function SubscriptionPage() {
                    </motion.div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">플랜을 업그레이드하시겠어요?</h3>
                   <p className="text-gray-600">더 많은 기능을 경험해보세요</p>
-                </div>
-                
+      </div>
+
                 <div className="space-y-3">
                   <motion.button
                     onClick={handleUpgrade}
@@ -850,7 +850,7 @@ export default function SubscriptionPage() {
                   </motion.div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">구독을 취소하시겠어요?</h3>
                   <p className="text-gray-600">취소하면 프리미엄 기능을 사용할 수 없습니다</p>
-                </div>
+      </div>
                 
                 <div className="space-y-3">
                   <motion.button
@@ -878,7 +878,7 @@ export default function SubscriptionPage() {
                   >
                     계속 이용하기
                   </motion.button>
-                </div>
+      </div>
               </motion.div>
             </motion.div>
           )}
@@ -896,7 +896,7 @@ export default function SubscriptionPage() {
               <div className="bg-green-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-3">
                 <HiCheckCircle className="w-6 h-6" />
                 <span className="font-semibold">성공적으로 처리되었습니다</span>
-              </div>
+    </div>
             </motion.div>
           )}
         </AnimatePresence>
