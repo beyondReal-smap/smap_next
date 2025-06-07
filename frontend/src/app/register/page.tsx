@@ -222,6 +222,8 @@ export default function RegisterPage() {
       if (response.ok) {
         setVerificationSent(true);
         setVerificationTimer(180); // 3분
+        // 인증번호 발송 성공 시 자동으로 다음 단계로 이동
+        handleNext();
       } else {
         throw new Error(data.error || '인증번호 발송에 실패했습니다.');
       }

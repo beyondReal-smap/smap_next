@@ -92,7 +92,7 @@ function NoticeContent() {
   const dataFetchedRef = React.useRef(false);
   const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
   const lastScrollY = useRef(0);
-  const updateTimeoutRef = useRef<NodeJS.Timeout>();
+  const updateTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // 디바운싱된 날짜 업데이트 함수
   const updateStickyDate = useCallback((newDate: string) => {
