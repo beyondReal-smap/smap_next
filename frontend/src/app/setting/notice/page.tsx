@@ -1,7 +1,9 @@
 'use client';
-import Header from '@/components/Header';
 import Link from 'next/link';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { FiBell, FiCalendar } from 'react-icons/fi';
 
 // 공지사항 mock 데이터
 const MOCK_NOTICES = [
@@ -21,33 +23,197 @@ const MOCK_NOTICES = [
 ];
 
 export default function NoticePage() {
+  const router = useRouter();
   const [notices] = useState(MOCK_NOTICES); // []로 바꾸면 내역 없음 테스트 가능
+  const [isExiting, setIsExiting] = useState(false);
+  const [shouldAnimate, setShouldAnimate] = useState(true);
+  const [isPageLoaded, setIsPageLoaded] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsPageLoaded(true);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleBack = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      router.back();
+    }, 400);
+  };
 
   return (
-    <div className="bg-white min-h-screen pb-24">
-      <Header title="공지사항" />
-      <div className="px-4 pt-12">
-        {notices.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-gray-400">
-            <svg className="w-14 h-14 mb-4" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21.75c4.97 0 9-4.03 9-9s-4.03-9-9-9-9 4.03-9 9 4.03 9 9 9Zm0-4.5v-3m0 0a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" /></svg>
-            <div className="text-lg">등록된 공지사항이 없습니다.</div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {notices.map((notice) => (
-              <Link key={notice.id} href={`/setting/notice/${notice.id}`} className="block">
-                <div className="bg-gray-50 rounded-2xl shadow p-5 hover:bg-indigo-50 transition">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-bold text-base text-gray-900">{notice.title}</div>
-                    <div className="text-xs text-gray-400 ml-2">{notice.date}</div>
-                  </div>
-                  <div className="text-sm text-gray-600 truncate">{notice.content}</div>
+    <>
+      <style jsx global>{`
+        @keyframes slideInFromRight {
+          from {
+            transform: translateX(30px);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+
+        @keyframes slideOutToRight {
+          from {
+            transform: translateX(0);
+            opacity: 1;
+          }
+          to {
+            transform: translateX(-30px);
+            opacity: 0;
+          }
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .animate-slideInFromRight {
+          animation: slideInFromRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+
+        .animate-slideOutToRight {
+          animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+
+        .initial-hidden {
+          opacity: 0;
+          transform: translateX(100%);
+        }
+
+        .glass-effect {
+          backdrop-filter: blur(10px);
+          background: rgba(255, 255, 255, 0.7);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        .card-hover {
+          transition: all 0.3s ease;
+        }
+
+        .card-hover:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+      `}</style>
+      
+      <div className={`bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-10 ${
+        isExiting ? 'animate-slideOutToRight' : 
+        (shouldAnimate && isPageLoaded) ? 'animate-slideInFromRight' : 
+        shouldAnimate ? 'initial-hidden' : ''
+      }`} style={{ 
+        position: 'relative',
+        width: '100%',
+        overflow: shouldAnimate && !isPageLoaded ? 'hidden' : 'visible'
+      }}>
+        {/* 개선된 헤더 */}
+        <motion.header 
+          initial={{ y: -100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          className="fixed top-0 left-0 right-0 z-50 glass-effect"
+        >
+          <div className="flex items-center justify-between h-16 px-4">
+            <div className="flex items-center space-x-3">
+              <motion.button 
+                onClick={handleBack}
+                disabled={isExiting}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200 disabled:opacity-50"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </motion.button>
+              <div className="flex items-center space-x-3">
+                <motion.div
+                  initial={{ rotate: -180, scale: 0 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                  className="p-2 bg-red-600 rounded-xl"
+                >
+                  <FiBell className="w-5 h-5 text-white" />
+                </motion.div>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">공지사항</h1>
+                  <p className="text-xs text-gray-500">최신 소식 및 업데이트</p>
                 </div>
-              </Link>
-            ))}
+              </div>
+            </div>
           </div>
-        )}
+        </motion.header>
+
+        {/* 메인 콘텐츠 */}
+        <div className="px-4 pt-20 pb-6">
+          {notices.length === 0 ? (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="flex flex-col items-center justify-center py-24 text-gray-400"
+            >
+              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                <FiBell className="w-8 h-8 text-gray-400" />
+              </div>
+              <div className="text-lg font-medium text-gray-600">등록된 공지사항이 없습니다.</div>
+              <p className="text-sm text-gray-500 mt-2">새로운 소식이 있으면 알려드릴게요</p>
+            </motion.div>
+          ) : (
+            <div className="space-y-4">
+              {notices.map((notice, idx) => (
+                <motion.div
+                  key={notice.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 * idx, duration: 0.5 }}
+                >
+                  <Link href={`/setting/notice/${notice.id}`} className="block">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 card-hover">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-red-600 rounded-xl flex items-center justify-center">
+                            <FiBell className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="font-bold text-base text-gray-900 mb-1">{notice.title}</h3>
+                            <div className="flex items-center space-x-2 text-xs text-gray-500">
+                              <FiCalendar className="w-3 h-3" />
+                              <span>{notice.date}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-gray-400">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 line-clamp-2">{notice.content}</p>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 } 

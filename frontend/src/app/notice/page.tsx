@@ -26,7 +26,7 @@ const mobileAnimations = `
 
 @keyframes slideInFromRight {
   from {
-    transform: translateX(100%);
+    transform: translateX(30px);
     opacity: 0;
   }
   to {
@@ -41,7 +41,7 @@ const mobileAnimations = `
     opacity: 1;
   }
   to {
-    transform: translateX(100%);
+    transform: translateX(-30px);
     opacity: 0;
   }
 }
@@ -51,11 +51,11 @@ const mobileAnimations = `
 }
 
 .animate-slideInFromRight {
-  animation: slideInFromRight 0.3s ease-out forwards;
+  animation: slideInFromRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
 .animate-slideOutToRight {
-  animation: slideOutToRight 0.3s ease-in forwards;
+  animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
 }
 
 /* glass-effect 스타일 추가 */
@@ -274,7 +274,7 @@ function NoticeContent() {
     // 컴포넌트 마운트 후 진입 애니메이션 시작
     const timer = setTimeout(() => {
       setIsEntering(false);
-    }, 300); // 애니메이션 시간과 일치
+    }, 500); // 애니메이션 시간과 일치
 
     return () => clearTimeout(timer);
   }, []);
@@ -359,7 +359,7 @@ function NoticeContent() {
     // 애니메이션 완료 후 페이지 이동
     setTimeout(() => {
       router.back();
-    }, 300); // 애니메이션 시간과 일치
+    }, 400); // 애니메이션 시간과 일치
   };
 
   if (loading) {

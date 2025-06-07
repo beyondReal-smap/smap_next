@@ -7,6 +7,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Image from 'next/image';
+import { motion } from 'framer-motion';
 import { 
   FiUser, 
   FiSettings, 
@@ -39,7 +40,7 @@ html, body {
 
 @keyframes slideInFromRight {
   from {
-    transform: translateX(100%);
+    transform: translateX(30px);
     opacity: 0;
   }
   to {
@@ -54,7 +55,7 @@ html, body {
     opacity: 1;
   }
   to {
-    transform: translateX(100%);
+    transform: translateX(-30px);
     opacity: 0;
   }
 }
@@ -104,11 +105,11 @@ html, body {
 }
 
 .animate-slideInFromRight {
-  animation: slideInFromRight 0.3s ease-out forwards;
+  animation: slideInFromRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
 .animate-slideOutToRight {
-  animation: slideOutToRight 0.3s ease-in forwards;
+  animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
 }
 
 .animate-slideInFromBottom {
@@ -120,7 +121,7 @@ html, body {
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.4s ease-out forwards;
+  animation: fadeIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
 .animate-scaleIn {
@@ -151,7 +152,9 @@ html, body {
 
 .glass-effect {
   backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
 }
 
 .menu-item-hover {
@@ -199,67 +202,11 @@ export default function SettingsPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [isPageLoaded, setIsPageLoaded] = useState(false);
-  const [isExiting, setIsExiting] = useState(false);
-  const [shouldAnimate, setShouldAnimate] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   
   const { control, handleSubmit, reset, formState: { errors, isDirty } } = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
     defaultValues: MOCK_USER_SETTINGS
   });
-
-  // 컴포넌트 마운트 감지
-  useEffect(() => {
-    setIsMounted(true);
-    // 초기 레이아웃 안정화
-    document.body.style.overflowX = 'hidden';
-    document.documentElement.style.overflowX = 'hidden';
-    
-    return () => {
-      // 클린업
-      document.body.style.overflowX = '';
-      document.documentElement.style.overflowX = '';
-    };
-  }, []);
-
-  // 페이지 로드 애니메이션 트리거
-  useEffect(() => {
-    if (!isMounted) return;
-    
-    // 뒤로가기가 아닌 경우에만 애니메이션 활성화
-    const skipAnimation = sessionStorage.getItem('skipEnterAnimation') === 'true';
-    
-    if (skipAnimation) {
-      sessionStorage.removeItem('skipEnterAnimation');
-      setIsPageLoaded(true);
-      setShouldAnimate(false);
-    } else {
-      setShouldAnimate(true);
-      // 레이아웃 안정화를 위해 약간의 지연 추가
-      const timer = setTimeout(() => {
-        setIsPageLoaded(true);
-      }, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [isMounted]);
-
-  // 레이아웃 안정화를 위한 추가 useEffect
-  useEffect(() => {
-    // 페이지 로드 완료 후 레이아웃 강제 재계산
-    if (isPageLoaded) {
-      const forceReflow = () => {
-        document.body.style.height = 'auto';
-        // 강제 리플로우 트리거
-        document.body.offsetHeight;
-        // 스크롤 위치 초기화
-        window.scrollTo(0, 0);
-      };
-      
-      // 다음 프레임에서 실행
-      requestAnimationFrame(forceReflow);
-    }
-  }, [isPageLoaded]);
 
   // 사용자 설정 가져오기
   useEffect(() => {
@@ -432,49 +379,71 @@ export default function SettingsPage() {
     }, 300);
   };
 
-  // 뒤로가기 핸들러 (애니메이션 포함)
+  // 뒤로가기 핸들러
   const handleBack = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      router.back();
-    }, 300);
+    router.back();
   };
 
   return (
     <>
       <style jsx global>{pageAnimations}</style>
-      <div className={`bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-10 ${
-        isExiting ? 'animate-slideOutToRight' : 
-        (shouldAnimate && isPageLoaded) ? 'animate-slideInFromRight' : 
-        shouldAnimate ? 'initial-hidden' : ''
-      }`} style={{ 
-        position: 'relative',
-        width: '100%',
-        overflow: shouldAnimate && !isPageLoaded ? 'hidden' : 'visible'
-      }}>
-        {/* 앱 헤더 */}
-        <div className="sticky top-0 z-10 px-4 bg-white/80 backdrop-blur-md border-b border-gray-200/50">
-          <div className="flex items-center justify-between h-14">
+      <motion.div
+        initial={{ opacity: 0, x: 30 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -30 }}
+        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-10"
+        style={{ 
+          position: 'relative',
+          width: '100%'
+        }}
+      >
+        {/* 개선된 헤더 - home/page.tsx 스타일 */}
+        <motion.header 
+          initial={{ y: -100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          className="fixed top-0 left-0 right-0 z-50 glass-effect"
+        >
+          <div className="flex items-center justify-between h-16 px-4">
             <div className="flex items-center space-x-3">
-              <button 
+              <motion.button 
                 onClick={handleBack}
-                disabled={isExiting}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200 mobile-button disabled:opacity-50"
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-              </button>
-              <div className="flex items-center space-x-2">
-                <FiSettings className="w-5 h-5 text-indigo-600" />
-                <span className="text-lg font-semibold text-gray-900">설정</span>
+              </motion.button>
+              <div className="flex items-center space-x-3">
+                <motion.div
+                  initial={{ rotate: -180, scale: 0 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                  className="p-2 bg-indigo-600 rounded-xl"
+                >
+                  <FiSettings className="w-5 h-5 text-white" />
+                </motion.div>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">설정</h1>
+                  <p className="text-xs text-gray-500">앱 설정과 계정 관리</p>
+                </div>
               </div>
             </div>
+            
+
           </div>
-        </div>
+        </motion.header>
 
         {/* 프로필 영역 - 개선된 디자인 */}
-        <div className="px-4 pt-6 pb-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className="px-4 pt-20 pb-6"
+        >
           <div className="bg-indigo-700 rounded-3xl p-6 text-white shadow-xl">
             <div className="flex items-center space-x-4">
               <div className="relative">
@@ -482,7 +451,6 @@ export default function SettingsPage() {
                   type="button" 
                   onClick={() => setShowSheet(true)} 
                   className="mobile-button group"
-                  disabled={isExiting}
                 >
                   <div className="relative">
                     <Image
@@ -526,12 +494,17 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* 메뉴 섹션들 */}
         <div className="px-4 space-y-6 pb-20">
           {menuSections.map((section, sectionIdx) => (
-            <div key={sectionIdx} className="animate-fadeIn" style={{ animationDelay: `${sectionIdx * 0.1}s` }}>
+            <motion.div 
+              key={sectionIdx}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 + (sectionIdx * 0.1), duration: 0.6 }}
+            >
               <h3 className="text-lg font-semibold text-gray-900 mb-3 px-2 flex items-center">
                 <span>{section.title}</span>
                 <div className="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent ml-3"></div>
@@ -544,9 +517,7 @@ export default function SettingsPage() {
                     <Link
                       key={item.label}
                       href={item.href}
-                      className={`flex items-center px-4 py-4 menu-item-hover mobile-button ${
-                        isExiting ? 'pointer-events-none' : ''
-                      } ${itemIdx !== section.items.length - 1 ? 'border-b border-gray-50' : ''}`}
+                      className={`flex items-center px-4 py-4 menu-item-hover mobile-button ${itemIdx !== section.items.length - 1 ? 'border-b border-gray-50' : ''}`}
                     >
                       <div className={`w-10 h-10 ${item.color} rounded-xl flex items-center justify-center mr-4 shadow-sm`}>
                         <IconComponent className="w-5 h-5 text-white" />
@@ -562,18 +533,23 @@ export default function SettingsPage() {
                   );
                 })}
               </div>
-            </div>
+            </motion.div>
           ))}
           
           {/* 앱 정보 카드 */}
-          <div className="bg-gray-50 rounded-2xl p-4 text-center animate-fadeIn" style={{ animationDelay: '0.4s' }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7, duration: 0.6 }}
+            className="bg-gray-50 rounded-2xl p-4 text-center"
+          >
             <div className="text-sm text-gray-600 mb-1">SMAP</div>
             <div className="text-xs text-gray-500">버전 1.0.0</div>
-          </div>
+          </motion.div>
         </div>
 
         {/* 개선된 프로필 사진 변경 모달 */}
-        {showSheet && !isExiting && (
+        {showSheet && (
           <div 
             className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
             onClick={closeModal}
@@ -622,7 +598,7 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
     </>
   );
 } 
