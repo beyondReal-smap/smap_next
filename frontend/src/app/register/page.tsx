@@ -100,6 +100,7 @@ export default function RegisterPage() {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [verificationSent, setVerificationSent] = useState(false);
   const [verificationTimer, setVerificationTimer] = useState(0);
+  const [errorModal, setErrorModal] = useState({ isOpen: false, title: '', message: '' });
   
   const [registerData, setRegisterData] = useState<RegisterData>({
     mt_agree1: false,
@@ -261,7 +262,11 @@ export default function RegisterPage() {
       }
     } catch (error) {
       console.error('인증번호 확인 실패:', error);
-      alert(error instanceof Error ? error.message : '인증번호 확인에 실패했습니다.');
+      setErrorModal({
+        isOpen: true,
+        title: '인증 실패',
+        message: error instanceof Error ? error.message : '인증번호 확인에 실패했습니다.'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -314,7 +319,11 @@ export default function RegisterPage() {
       }
     } catch (error) {
       console.error('회원가입 실패:', error);
-      alert(error instanceof Error ? error.message : '회원가입에 실패했습니다.');
+      setErrorModal({
+        isOpen: true,
+        title: '회원가입 실패',
+        message: error instanceof Error ? error.message : '회원가입에 실패했습니다.'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -369,7 +378,7 @@ export default function RegisterPage() {
           <div className="flex items-center space-x-3">
             <motion.button 
               onClick={handleBack}
-              className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+              className="p-2 transition-all duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
@@ -964,6 +973,45 @@ export default function RegisterPage() {
              currentStep === REGISTER_STEPS.LOCATION ? '회원가입 완료' : '다음'}
           </motion.button>
         </motion.div>
+      )}
+
+      {/* 오류 모달 */}
+      {errorModal.isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setErrorModal({ isOpen: false, title: '', message: '' })}
+        >
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="bg-white rounded-3xl w-full max-w-sm mx-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 pb-8">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{errorModal.title}</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  {errorModal.message}
+                </p>
+              </div>
+              
+              <motion.button
+                onClick={() => setErrorModal({ isOpen: false, title: '', message: '' })}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full py-4 bg-red-500 text-white rounded-2xl font-medium hover:bg-red-600 transition-colors"
+              >
+                확인
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );
