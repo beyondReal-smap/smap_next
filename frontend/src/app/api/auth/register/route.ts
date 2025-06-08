@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
-import { sendVerificationCode } from '../../sms/send/route';
+import { sendVerificationCode } from '@/lib/sms';
 
 // 회원가입 요청 타입
 interface RegisterRequest {
