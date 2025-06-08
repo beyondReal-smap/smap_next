@@ -27,6 +27,7 @@ import scheduleService from '../../services/scheduleService';
 import groupService, { Group } from '@/services/groupService';
 import { useAuth } from '@/contexts/AuthContext';
 import authService from '@/services/authService';
+import notificationService from '@/services/notificationService';
 import { 
     AllDayCheckEnum, ShowEnum, ScheduleAlarmCheckEnum, InCheckEnum, ScheduleCheckEnum 
 } from '../../types/enums';
@@ -788,6 +789,7 @@ export default function HomePage() {
 
   // 마커 업데이트 중복 방지를 위한 ref
   const markersUpdating = useRef<boolean>(false);
+  const lastSelectedMemberRef = useRef<string | null>(null); // 마지막 선택된 멤버 추적
 
   const [initialWeatherLoaded, setInitialWeatherLoaded] = useState(false);
   const initialWeatherDataRef = useRef<WeatherInfo | null>(null); // 앱 초기/기본 날씨 저장용
@@ -1702,7 +1704,7 @@ export default function HomePage() {
           handleMemberSelect(groupMembers[0].id);
         } else {
           console.log('[HOME] 이미 멤버가 선택되어 있음, 자동 선택 건너뛰기');
-        }
+      }
       }, 300);
     }
   }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members, dataFetchedRef.current.schedules, mapsInitialized.naver, mapsInitialized.google, mapType]);
@@ -2035,7 +2037,29 @@ export default function HomePage() {
           
           const infoWindow = new window.naver.maps.InfoWindow({
             content: `
-              <div style="
+              <style>
+                @keyframes slideInFromBottom {
+                  0% {
+                    opacity: 0;
+                    transform: translateY(20px) scale(0.95);
+                  }
+                  100% {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                  }
+                }
+                .schedule-info-window-container {
+                  animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+                }
+                .schedule-close-button {
+                  transition: all 0.2s ease;
+                }
+                .schedule-close-button:hover {
+                  background: rgba(0, 0, 0, 0.2) !important;
+                  transform: scale(1.1);
+                }
+              </style>
+              <div class="schedule-info-window-container" style="
                 padding: 12px 16px;
                 min-width: 200px;
                 max-width: 280px;
@@ -2046,7 +2070,7 @@ export default function HomePage() {
                 box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
                 overflow: hidden;
               ">
-              <button onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+              <button class="schedule-close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
                 position: absolute;
                 top: 8px;
                 right: 8px;
@@ -2121,6 +2145,14 @@ export default function HomePage() {
                 console.warn('[createMarker] 기존 InfoWindow 닫기 실패:', e);
               }
             }
+            
+            // 바텀시트에 가려지지 않도록 남쪽으로 오프셋 적용하여 지도 중심 이동
+            const offsetLat = validLat - 0.002;
+            const offsetPosition = new window.naver.maps.LatLng(offsetLat, validLng);
+            naverMap.current.panTo(offsetPosition, {
+              duration: 800,
+              easing: 'easeOutCubic'
+            });
             
             // 멤버 선택 처리 (바텀시트 연동) - location 페이지에서는 건너뛰기
             if (memberData && memberData.id && !window.location.pathname.includes('/location')) {
@@ -2362,7 +2394,29 @@ export default function HomePage() {
           
           const googleInfoWindow = new window.google.maps.InfoWindow({
             content: `
-              <div style="
+              <style>
+                @keyframes slideInFromBottom {
+                  0% {
+                    opacity: 0;
+                    transform: translateY(20px) scale(0.95);
+                  }
+                  100% {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                  }
+                }
+                .google-schedule-info-window-container {
+                  animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+                }
+                .google-schedule-close-button {
+                  transition: all 0.2s ease;
+                }
+                .google-schedule-close-button:hover {
+                  background: rgba(0, 0, 0, 0.2) !important;
+                  transform: scale(1.1);
+                }
+              </style>
+              <div class="google-schedule-info-window-container" style="
                 padding: 12px 16px;
                 min-width: 200px;
                 max-width: 280px;
@@ -2373,7 +2427,7 @@ export default function HomePage() {
                 box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
                 overflow: hidden;
               ">
-              <button onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+              <button class="google-schedule-close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
                 position: absolute;
                 top: 8px;
                 right: 8px;
@@ -2445,6 +2499,11 @@ export default function HomePage() {
                 console.warn('[createMarker] 기존 InfoWindow 닫기 실패:', e);
               }
             }
+            
+            // 바텀시트에 가려지지 않도록 남쪽으로 오프셋 적용하여 지도 중심 이동
+            const offsetLat = validLat - 0.002;
+            const offsetPosition = { lat: offsetLat, lng: validLng };
+            map.current.panTo(offsetPosition);
             
             // 새 InfoWindow 참조 저장 및 열기
             currentInfoWindowRef.current = googleInfoWindow;
@@ -2562,7 +2621,8 @@ export default function HomePage() {
       selectedMemberId: id,
       selectedMemberName: selectedMember?.name,
       selectedDate,
-      totalGroupSchedules: groupSchedules.length
+      totalGroupSchedules: groupSchedules.length,
+      currentSelectedDate: selectedDate // 현재 선택된 날짜 명시적 표시
     });
     
     // 첫번째 멤버 선택 완료 상태 설정
@@ -2580,13 +2640,23 @@ export default function HomePage() {
         selectedMember.mt_weather_date
       ));
       
+      // 현재 표시되고 있는 스케줄들의 날짜를 확인하여 해당 날짜 유지
+      let targetDate = selectedDate;
+      if (filteredSchedules.length > 0) {
+        // 현재 표시되고 있는 스케줄이 있으면 그 날짜를 사용
+        const currentScheduleDate = filteredSchedules[0].date;
+        if (currentScheduleDate && typeof currentScheduleDate === 'string') {
+          targetDate = currentScheduleDate.split(' ')[0]; // 날짜 부분만 추출
+        }
+      }
+      
       // sgdt_idx를 기준으로 그룹 스케줄에서 해당 멤버의 스케줄 필터링
       const memberSchedules = groupSchedules.filter(schedule => 
         schedule.sgdt_idx !== null && 
         schedule.sgdt_idx !== undefined && 
         Number(schedule.sgdt_idx) === Number(selectedMember.sgdt_idx) &&
         typeof schedule.date === 'string' && 
-        schedule.date!.startsWith(selectedDate)
+        schedule.date!.startsWith(targetDate)
       );
       console.log('[handleMemberSelect] 선택된 멤버의 스케줄:', {
         memberName: selectedMember.name,
@@ -2594,6 +2664,7 @@ export default function HomePage() {
         totalMemberSchedules: groupSchedules.filter(s => s.sgdt_idx === selectedMember.sgdt_idx).length,
         filteredSchedules: memberSchedules.length,
         selectedDate,
+        targetDate, // 실제 사용된 날짜
         memberSchedulesDetail: memberSchedules.map(s => ({
           id: s.id,
           title: s.title,
@@ -2607,19 +2678,31 @@ export default function HomePage() {
     } else {
       if (initialWeatherDataRef.current) setTodayWeather(initialWeatherDataRef.current);
       
+      // 현재 표시되고 있는 스케줄들의 날짜를 확인하여 해당 날짜 유지
+      let targetDate = selectedDate;
+      if (filteredSchedules.length > 0) {
+        // 현재 표시되고 있는 스케줄이 있으면 그 날짜를 사용
+        const currentScheduleDate = filteredSchedules[0].date;
+        if (currentScheduleDate && typeof currentScheduleDate === 'string') {
+          targetDate = currentScheduleDate.split(' ')[0]; // 날짜 부분만 추출
+        }
+      }
+      
       const allSchedules = groupSchedules
-        .filter(s => typeof s.date === 'string' && s.date!.startsWith(selectedDate))
+        .filter(s => typeof s.date === 'string' && s.date!.startsWith(targetDate))
         .map(({memberId, ...rest}) => rest);
       
       console.log('[handleMemberSelect] 멤버 선택 해제 - 전체 스케줄:', {
         totalGroupSchedules: groupSchedules.length,
         filteredSchedules: allSchedules.length,
-        selectedDate
+        selectedDate,
+        targetDate // 실제 사용된 날짜
       });
       
       setFilteredSchedules(allSchedules);
     }
     updateMemberMarkers(updatedMembers);
+    // 일정 마커는 filteredSchedules useEffect에서 자동으로 업데이트됨
   };
 
   // 선택된 날짜 변경 핸들러 (filteredSchedules 업데이트)
@@ -2798,6 +2881,28 @@ export default function HomePage() {
 
   // 멤버 마커 업데이트 함수 - 모든 그룹멤버 표시
   const updateMemberMarkers = (members: GroupMember[]) => {
+    console.log('[updateMemberMarkers] 마커 업데이트 시작:', {
+      membersCount: members.length,
+      selectedMember: members.find(m => m.isSelected)?.name || 'none',
+      currentInfoWindow: currentInfoWindowRef.current ? 'exists' : 'none',
+      lastSelectedMember: lastSelectedMemberRef.current
+    });
+    
+    // 선택된 멤버 확인
+    const currentSelectedMember = members.find(member => member.isSelected);
+    const selectedMemberName = currentSelectedMember?.name || null;
+    
+    // 같은 멤버가 이미 선택되어 있고 InfoWindow가 열려있으면 중복 실행 방지
+    if (selectedMemberName && 
+        lastSelectedMemberRef.current === selectedMemberName && 
+        currentInfoWindowRef.current) {
+      console.log('[updateMemberMarkers] 같은 멤버 중복 실행 방지:', selectedMemberName);
+      return;
+    }
+    
+    // 마지막 선택된 멤버 업데이트
+    lastSelectedMemberRef.current = selectedMemberName;
+    
     // 기존 마커 삭제
     if (memberMarkers.current.length > 0) {
       memberMarkers.current.forEach(marker => {
@@ -2864,25 +2969,35 @@ export default function HomePage() {
         }
 
         if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
-          // 네이버 지도 이동 및 줌 레벨 조정
-          setTimeout(() => {
-            // 멤버 위치에서 아래쪽(남쪽)으로 offset을 준 위치를 지도 중심으로 설정
+          // 네이버 지도 이동 및 줌 레벨 조정 (즉시 실행)
             const offsetLat = lat - 0.001; // 남쪽으로 약 220m 아래쪽으로 offset
-            naverMap.current.setCenter(new window.naver.maps.LatLng(offsetLat, lng));
+          naverMap.current.panTo(new window.naver.maps.LatLng(offsetLat, lng), {
+            duration: 300,
+            easing: 'easeOutCubic'
+          });
             naverMap.current.setZoom(17);
             console.log('네이버 지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
-          }, 100);
 
-          // 선택된 멤버의 InfoWindow 자동 표시 (중복 방지)
+          // 선택된 멤버의 InfoWindow 자동 표시 (중복 방지) - 짧은 지연
           setTimeout(() => {
             const selectedMarkerIndex = members.findIndex(member => member.isSelected);
             const selectedMarker = memberMarkers.current[selectedMarkerIndex];
             
             if (selectedMarker && window.naver?.maps?.InfoWindow) {
-              // InfoWindow가 이미 열려있는 경우 중복 생성 방지
+              // InfoWindow가 이미 열려있고 같은 멤버인 경우 중복 생성 방지
               if (currentInfoWindowRef.current) {
-                console.log('[updateMemberMarkers] InfoWindow가 이미 열려있음, 중복 생성 방지:', selectedMember.name);
-                return;
+                const currentMemberName = (currentInfoWindowRef.current as any)._memberName;
+                if (currentMemberName === selectedMember.name) {
+                  console.log('[updateMemberMarkers] InfoWindow가 이미 열려있음, 중복 생성 방지:', selectedMember.name);
+                  return;
+                }
+                // 다른 멤버의 InfoWindow가 열려있으면 닫기
+                try {
+                  currentInfoWindowRef.current.close();
+                  currentInfoWindowRef.current = null;
+                } catch (e) {
+                  console.warn('[updateMemberMarkers] 기존 InfoWindow 닫기 실패:', e);
+                }
               }
               
               console.log('[updateMemberMarkers] 선택된 멤버 InfoWindow 자동 표시:', selectedMember.name);
@@ -3008,27 +3123,34 @@ export default function HomePage() {
                 console.error('[updateMemberMarkers] InfoWindow 열기 실패:', e);
               }
             }
-          }, 200); // 지도 이동 후 InfoWindow 표시
+          }, 100); // 지도 이동 후 InfoWindow 표시 (지연 시간 단축)
         } else if (mapType === 'google' && map.current && googleMapsLoaded) {
-          // 구글 지도 이동 및 줌 레벨 조정
-          setTimeout(() => {
-            // 멤버 위치에서 아래쪽(남쪽)으로 offset을 준 위치를 지도 중심으로 설정
+          // 구글 지도 이동 및 줌 레벨 조정 (즉시 실행)
             const offsetLat = lat - 0.001; // 남쪽으로 약 220m 아래쪽으로 offset
             map.current.panTo({ lat: offsetLat, lng });
             map.current.setZoom(17);
             console.log('구글 지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
-          }, 100);
 
-          // 구글 지도용 InfoWindow 자동 표시
+          // 구글 지도용 InfoWindow 자동 표시 (짧은 지연)
           setTimeout(() => {
             const selectedMarkerIndex = members.findIndex(member => member.isSelected);
             const selectedMarker = memberMarkers.current[selectedMarkerIndex];
             
                                       if (selectedMarker && window.google?.maps?.InfoWindow) {
-               // InfoWindow가 이미 열려있는 경우 중복 생성 방지
+               // InfoWindow가 이미 열려있고 같은 멤버인 경우 중복 생성 방지
                if (currentInfoWindowRef.current) {
-                 console.log('[updateMemberMarkers] 구글 InfoWindow가 이미 열려있음, 중복 생성 방지:', selectedMember.name);
-                 return;
+                 const currentMemberName = (currentInfoWindowRef.current as any)._memberName;
+                 if (currentMemberName === selectedMember.name) {
+                   console.log('[updateMemberMarkers] 구글 InfoWindow가 이미 열려있음, 중복 생성 방지:', selectedMember.name);
+                   return;
+                 }
+                 // 다른 멤버의 InfoWindow가 열려있으면 닫기
+                 try {
+                   currentInfoWindowRef.current.close();
+                   currentInfoWindowRef.current = null;
+                 } catch (e) {
+                   console.warn('[updateMemberMarkers] 구글 기존 InfoWindow 닫기 실패:', e);
+                 }
                }
               
                              console.log('[updateMemberMarkers] 구글 선택된 멤버 InfoWindow 자동 표시:', selectedMember.name);
@@ -3150,7 +3272,7 @@ export default function HomePage() {
                  console.error('[updateMemberMarkers] 구글 InfoWindow 열기 실패:', e);
                }
             }
-          }, 200); // 지도 이동 후 InfoWindow 표시
+          }, 100); // 지도 이동 후 InfoWindow 표시 (지연 시간 단축)
         }
       } else {
         console.warn('유효하지 않은 멤버 좌표:', selectedMember.name, selectedMember.location);
@@ -3197,15 +3319,35 @@ export default function HomePage() {
       markersUpdating.current = true;
       console.log('[HOME] 그룹멤버 데이터 변경 감지 - 마커 업데이트:', groupMembers.length, '명');
       
-      // 약간의 지연을 주어 연속적인 상태 변경을 방지
+      // 즉시 마커 업데이트 실행
+      updateMemberMarkers(groupMembers);
+      
+      // 짧은 지연 후 플래그 해제
       setTimeout(() => {
-        updateMemberMarkers(groupMembers);
-        setTimeout(() => {
-          markersUpdating.current = false;
-        }, 200);
-      }, 50);
+        markersUpdating.current = false;
+      }, 100);
     }
   }, [groupMembers, mapType, mapsInitialized.naver, mapsInitialized.google]); // groupMembers 전체를 감지하여 선택 상태 변경도 포함
+
+  // filteredSchedules 변경 시 일정 마커 업데이트
+  useEffect(() => {
+    // 마커 업데이트 중복 방지
+    if (markersUpdating.current) {
+      console.log('[HOME] 마커 업데이트 중이므로 일정 마커 업데이트 건너뛰기');
+      return;
+    }
+
+    if (
+      filteredSchedules.length >= 0 && // 0개도 유효한 상태 (빈 배열)
+      ((mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) || 
+       (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps))
+    ) {
+      console.log('[HOME] filteredSchedules 변경 감지 - 일정 마커 업데이트:', filteredSchedules.length, '개');
+      
+      // 즉시 일정 마커 업데이트 실행
+      updateScheduleMarkers(filteredSchedules);
+    }
+  }, [filteredSchedules, mapType, mapsInitialized.naver, mapsInitialized.google]);
 
   // 지도 타입 변경 핸들러
   const handleMapTypeChange = () => {
@@ -3411,40 +3553,25 @@ export default function HomePage() {
         if ((mapType === 'naver' && naverMap.current && mapsInitialized.naver) || 
             (mapType === 'google' && map.current && mapsInitialized.google)) {
           console.log('[HOME] 지도 준비 완료, 첫번째 멤버 자동 선택 실행:', groupMembers[0].id);
-          handleMemberSelect(groupMembers[0].id);
+        handleMemberSelect(groupMembers[0].id);
         } else {
           console.log('[HOME] 지도 준비 중, 500ms 후 재시도');
           setTimeout(autoSelectFirstMember, 500);
-        }
+    }
       };
-      
+
       // 약간의 지연 후 실행
       setTimeout(autoSelectFirstMember, 300);
     }
   }, [groupMembers.length, firstMemberSelected, mapsInitialized.naver, mapsInitialized.google, mapType]);
 
-  // 페이지 진입 시 첫 번째 멤버 자동 선택 보장 (추가 보험)
-  useEffect(() => {
-    // 모든 데이터가 로드되고 지도가 준비된 후 첫 번째 멤버 자동 선택
-    if (groupMembers.length > 0 && 
-        !groupMembers.some(m => m.isSelected) && 
-        ((mapType === 'naver' && mapsInitialized.naver) || (mapType === 'google' && mapsInitialized.google)) &&
-        dataFetchedRef.current.members && 
-        dataFetchedRef.current.schedules) {
-      
-      console.log('[HOME] 페이지 진입 시 첫 번째 멤버 자동 선택 보장:', groupMembers[0].name);
-      
-      setTimeout(() => {
-        handleMemberSelect(groupMembers[0].id);
-      }, 800); // 충분한 지연 시간
-    }
-  }, [groupMembers.length, mapsInitialized.naver, mapsInitialized.google, mapType, dataFetchedRef.current.members, dataFetchedRef.current.schedules]);
+
 
 
   // 개선된 바텀시트 애니메이션 variants - location/page.tsx와 동일한 구조로 수정
   const bottomSheetVariants = {
     collapsed: { 
-      translateY: '65%',
+      translateY: '60%',
       opacity: 1,
       transition: {
         type: "spring",
@@ -3469,6 +3596,9 @@ export default function HomePage() {
 
   // 상태 추가
   const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
+  
+  // 알림 관련 상태 추가
+  const [hasNewNotifications, setHasNewNotifications] = useState(false);
 
   // 그룹별 멤버 수 조회 (userGroups가 변경될 때만)
   useEffect(() => {
@@ -3498,6 +3628,18 @@ export default function HomePage() {
     fetchGroupMemberCounts();
   }, [userGroups]);
 
+  // 새로운 알림 확인 (사용자 로그인 후)
+  useEffect(() => {
+    if (user?.mt_idx && !authLoading) {
+      checkNewNotifications();
+      
+      // 3분마다 새로운 알림 확인
+      const interval = setInterval(checkNewNotifications, 3 * 60 * 1000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [user?.mt_idx, authLoading]);
+
   // 그룹 멤버 수를 가져오는 함수
   const getGroupMemberCount = async (groupId: number): Promise<number> => {
     try {
@@ -3506,6 +3648,32 @@ export default function HomePage() {
     } catch (error) {
       console.error(`그룹 ${groupId} 멤버 수 조회 실패:`, error);
       return 0;
+    }
+  };
+
+  // 새로운 알림 확인 함수 - DB 구조에 맞게 개선
+  const checkNewNotifications = async () => {
+    try {
+      if (!user?.mt_idx) return;
+      
+      const notifications = await notificationService.getMemberPushLogs(user.mt_idx);
+      
+      // 읽지 않은 알림이 있는지 확인 (plt_read_chk가 'N'인 것)
+      const hasUnread = notifications.some(notification => {
+        return notification.plt_read_chk === 'N' && 
+               notification.plt_show === 'Y' && 
+               notification.plt_status === 2; // 전송 완료된 알림만
+      });
+      
+      setHasNewNotifications(hasUnread);
+      console.log('[HOME] 새로운 알림 확인:', { 
+        hasUnread, 
+        totalNotifications: notifications.length,
+        unreadCount: notifications.filter(n => n.plt_read_chk === 'N').length
+      });
+    } catch (error) {
+      console.error('[HOME] 알림 확인 실패:', error);
+      setHasNewNotifications(false);
     }
   };
 
@@ -3563,10 +3731,14 @@ export default function HomePage() {
     // 해당 스케줄의 마커 찾기
     const scheduleIndex = filteredSchedules.findIndex(s => s.id === schedule.id);
     
-    // 지도 타입에 따른 포커스 이동
+    // 지도 타입에 따른 포커스 이동 (바텀시트에 가려지지 않도록 남쪽으로 오프셋 적용)
     if (mapType === 'naver' && naverMap.current) {
-      const location = new window.naver.maps.LatLng(lat, lng);
-      naverMap.current.setCenter(location);
+      const offsetLat = lat - 0.002; // 남쪽으로 오프셋 적용
+      const location = new window.naver.maps.LatLng(offsetLat, lng);
+      naverMap.current.panTo(location, {
+        duration: 800,
+        easing: 'easeOutCubic'
+      });
       naverMap.current.setZoom(16);
       
       // 해당 마커의 클릭 이벤트 트리거 (InfoWindow는 마커에서 이미 생성됨)
@@ -3576,8 +3748,9 @@ export default function HomePage() {
         window.naver.maps.Event.trigger(marker, 'click');
       }
     } else if (mapType === 'google' && map.current) {
-      const location = { lat, lng };
-      map.current.setCenter(location);
+      const offsetLat = lat - 0.002; // 남쪽으로 오프셋 적용
+      const location = { lat: offsetLat, lng };
+      map.current.panTo(location);
       map.current.setZoom(16);
       
       // 해당 마커의 클릭 이벤트 트리거 (InfoWindow는 마커에서 이미 생성됨)
@@ -3671,7 +3844,7 @@ export default function HomePage() {
                     </svg>
                   </motion.div>
                   <div>
-                    <h1 className="text-lg font-bold text-gray-900">홈</h1>
+                    <h1 className="text-base font-semibold text-gray-900">홈</h1>
                     <p className="text-xs text-gray-500">그룹 멤버들과 실시간으로 소통해보세요</p>
                   </div>
                 </div>
@@ -3682,14 +3855,31 @@ export default function HomePage() {
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200 relative"
-                  onClick={() => router.push('/notice')}
+                  onClick={async () => {
+                    // 알림 페이지로 이동하면서 모든 알림을 읽음 처리
+                    try {
+                      if (user?.mt_idx && hasNewNotifications) {
+                        await notificationService.markAllAsRead(user.mt_idx);
+                        console.log('[HOME] 모든 알림 읽음 처리 완료');
+                      }
+                      setHasNewNotifications(false);
+                      router.push('/notice');
+                    } catch (error) {
+                      console.error('[HOME] 알림 읽음 처리 실패:', error);
+                      // 실패해도 페이지는 이동
+                      setHasNewNotifications(false);
+                      router.push('/notice');
+                    }
+                  }}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
-                  {/* 알림 뱃지 (선택적) */}
-                  <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full">
+                  {/* 읽지 않은 알림이 있을 때만 빨간색 점 표시 */}
+                  {hasNewNotifications && (
+                    <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse">
                   </div>
+                  )}
                 </motion.button>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
@@ -3949,22 +4139,22 @@ export default function HomePage() {
                                           handleGroupSelect(group.sgt_idx);
                                         }}
                                                                         className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
-                                  selectedGroupId === group.sgt_idx
+                                          selectedGroupId === group.sgt_idx
                                     ? 'bg-indigo-50 text-indigo-700 font-medium'
                                     : 'text-gray-700'
-                                }`}
+                                        }`}
                                       >
                                         <div className="flex items-center justify-between">
-                                          <div className="flex-1">
+                                        <div className="flex-1">
                                             <div className="font-medium truncate">
                                               {group.sgt_title} ({groupMemberCounts[group.sgt_idx] || 0}명)
-                                            </div>
                                           </div>
-                                          {selectedGroupId === group.sgt_idx && (
+                                        </div>
+                                        {selectedGroupId === group.sgt_idx && (
                                             <svg className="w-3 h-3 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                          )}
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                          </svg>
+                                        )}
                                         </div>
                                       </motion.button>
                                     ))

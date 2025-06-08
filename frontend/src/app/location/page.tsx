@@ -183,10 +183,27 @@ body {
   border: 1px solid rgba(99, 102, 241, 0.1);
 }
 
-/* 네이버 지도 zoom 컨트롤 위치 조정 - 헤더보다 10px 아래 */
+/* 네이버 지도 zoom 컨트롤 위치 조정 - 헤더 아래로 이동 */
 .nmap_control_zoom {
-  top: 74px !important;
+  top: 200px !important;
   right: 10px !important;
+}
+
+/* 네이버 지도 줌 컨트롤 강제 위치 조정 */
+div[class*="nmap_control_zoom"] {
+  top: 200px !important;
+  right: 10px !important;
+}
+
+/* 네이버 지도 컨트롤 전체 */
+.nmap_control {
+  top: 200px !important;
+}
+
+/* 줌 컨트롤 버튼들 */
+.nmap_control_zoom .nmap_control_zoom_in,
+.nmap_control_zoom .nmap_control_zoom_out {
+  position: relative !important;
 }
 
 @media (max-width: 640px) {
@@ -235,7 +252,7 @@ const pageVariants = {
 // 바텀시트 variants - 올라갈 때도 부드럽게 개선
 const bottomSheetVariants = {
   collapsed: { 
-    translateY: '65%',
+    translateY: '60%',
     opacity: 1,
     transition: {
       type: "spring",
@@ -1866,11 +1883,7 @@ export default function LocationPage() {
         scaleControl: false,
         logoControl: false,
         mapDataControl: false,
-        zoomControl: true,
-        zoomControlOptions: {
-          position: window.naver.maps.Position.TOP_RIGHT,
-          style: window.naver.maps.ZoomControlStyle.SMALL
-        }
+        zoomControl: false // 기본 줌 컨트롤 비활성화
       };
 
       const newMap = new window.naver.maps.Map(mapContainer.current, mapOptions);
@@ -1880,6 +1893,8 @@ export default function LocationPage() {
         console.log('[지도 초기화] 네이버 지도 초기화 완료');
         setIsMapInitialized(true);
         setIsMapReady(true);
+        
+
       });
       
       setMap(newMap);
@@ -2665,6 +2680,15 @@ export default function LocationPage() {
           infoWindow.close();
         }
 
+        // 바텀시트에 가려지지 않도록 남쪽으로 오프셋 적용하여 지도 중심 이동
+        const [lng, lat] = location.coordinates;
+        const offsetLat = lat - 0.002;
+        const offsetPosition = new window.naver.maps.LatLng(offsetLat, lng);
+        map.panTo(offsetPosition, {
+          duration: 800,
+          easing: 'easeOutCubic'
+        });
+
         // 통일된 정보창 생성
         const newInfoWindow = createLocationInfoWindow(location.name, location.address);
         newInfoWindow.open(map, marker);
@@ -2883,6 +2907,15 @@ export default function LocationPage() {
           if (infoWindow) {
             infoWindow.close();
           }
+
+          // 바텀시트에 가려지지 않도록 남쪽으로 오프셋 적용하여 지도 중심 이동
+          const [lng, lat] = location.coordinates;
+          const offsetLat = lat - 0.002;
+          const offsetPosition = new window.naver.maps.LatLng(offsetLat, lng);
+          map.panTo(offsetPosition, {
+            duration: 800,
+            easing: 'easeOutCubic'
+          });
 
           const newInfoWindow = createLocationInfoWindow(location.name, location.address);
         newInfoWindow.open(map, marker);
@@ -3243,9 +3276,11 @@ export default function LocationPage() {
       return;
     }
     
-    const position = new window.naver.maps.LatLng(lat, lng);
+    // 바텀시트에 가려지지 않도록 남쪽으로 오프셋 적용
+    const offsetLat = lat - 0.002;
+    const position = new window.naver.maps.LatLng(offsetLat, lng);
     
-    // 지도 중심을 해당 위치로 이동
+    // 지도 중심을 해당 위치로 이동 (오프셋 적용)
     map.setCenter(position);
     map.setZoom(16);
     
@@ -3551,6 +3586,110 @@ export default function LocationPage() {
           }}
         >
           <div ref={mapContainer} className="w-full h-full" />
+          
+          {/* 커스텀 줌 컨트롤 */}
+          {map && (
+            <div className="absolute top-[200px] right-[10px] z-30 flex flex-col space-y-1">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (map) {
+                    // InfoWindow 상태 완전히 저장
+                    let savedInfoWindow = null;
+                    if (infoWindow && infoWindow.getMap()) {
+                      savedInfoWindow = {
+                        position: infoWindow.getPosition(),
+                        content: infoWindow.getContent(),
+                        options: infoWindow.getOptions ? infoWindow.getOptions() : {}
+                      };
+                      console.log('[줌인] InfoWindow 상태 저장:', savedInfoWindow);
+                    }
+                    
+                    const currentZoom = map.getZoom();
+                    map.setZoom(currentZoom + 1);
+                    
+                    // 줌 완료 후 InfoWindow 재생성
+                    if (savedInfoWindow) {
+                      // 줌 애니메이션이 완료될 때까지 기다린 후 InfoWindow 재생성
+                      setTimeout(() => {
+                        try {
+                          // 새로운 InfoWindow 생성
+                          const newInfoWindow = new window.naver.maps.InfoWindow({
+                            content: savedInfoWindow.content,
+                            position: savedInfoWindow.position,
+                            backgroundColor: '#ffffff',
+                            borderColor: '#e5e7eb',
+                            borderWidth: 1,
+                            anchorSize: new window.naver.maps.Size(10, 10),
+                            pixelOffset: new window.naver.maps.Point(0, -10)
+                          });
+                          
+                          newInfoWindow.open(map);
+                          setInfoWindow(newInfoWindow);
+                          console.log('[줌인] InfoWindow 재생성 완료');
+                        } catch (error) {
+                          console.error('[줌인] InfoWindow 재생성 실패:', error);
+                        }
+                      }, 300);
+                    }
+                  }
+                }}
+                className="w-10 h-10 bg-white border border-gray-300 rounded-t-lg shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-lg font-bold">+</span>
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (map) {
+                    // InfoWindow 상태 완전히 저장
+                    let savedInfoWindow = null;
+                    if (infoWindow && infoWindow.getMap()) {
+                      savedInfoWindow = {
+                        position: infoWindow.getPosition(),
+                        content: infoWindow.getContent(),
+                        options: infoWindow.getOptions ? infoWindow.getOptions() : {}
+                      };
+                      console.log('[줌아웃] InfoWindow 상태 저장:', savedInfoWindow);
+                    }
+                    
+                    const currentZoom = map.getZoom();
+                    map.setZoom(currentZoom - 1);
+                    
+                    // 줌 완료 후 InfoWindow 재생성
+                    if (savedInfoWindow) {
+                      // 줌 애니메이션이 완료될 때까지 기다린 후 InfoWindow 재생성
+                      setTimeout(() => {
+                        try {
+                          // 새로운 InfoWindow 생성
+                          const newInfoWindow = new window.naver.maps.InfoWindow({
+                            content: savedInfoWindow.content,
+                            position: savedInfoWindow.position,
+                            backgroundColor: '#ffffff',
+                            borderColor: '#e5e7eb',
+                            borderWidth: 1,
+                            anchorSize: new window.naver.maps.Size(10, 10),
+                            pixelOffset: new window.naver.maps.Point(0, -10)
+                          });
+                          
+                          newInfoWindow.open(map);
+                          setInfoWindow(newInfoWindow);
+                          console.log('[줌아웃] InfoWindow 재생성 완료');
+                        } catch (error) {
+                          console.error('[줌아웃] InfoWindow 재생성 실패:', error);
+                        }
+                      }, 300);
+                    }
+                  }
+                }}
+                className="w-10 h-10 bg-white border border-gray-300 rounded-b-lg shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-lg font-bold">−</span>
+              </motion.button>
+            </div>
+          )}
           
           {/* 지도 로딩 오버레이 - logs/page.tsx와 동일 */}
           {(isMapLoading || !isMapInitialized) && (
@@ -4041,7 +4180,7 @@ export default function LocationPage() {
                       <div className="flex items-center space-x-3">
                         <FiMapPin className="w-5 h-5 text-pink-500" />
                         <div>
-                          <h2 className="text-lg font-bold text-gray-900">
+                          <h2 className="text-base font-semibold text-gray-900">
                             {groupMembers.find((m: GroupMember) => m.isSelected)?.name ?
                               `${groupMembers.find((m: GroupMember) => m.isSelected)?.name}의 장소` : 
                               '다른 멤버들의 장소'

@@ -35,6 +35,14 @@ class NotificationService {
   }
 
   /**
+   * 모든 알림 읽음 처리
+   */
+  async markAllAsRead(memberId: number | string): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post(`/push-logs/read-all?mt_idx=${memberId}`);
+    return response.data;
+  }
+
+  /**
    * 알림 등록 (관리자 기능)
    */
   async registerNotification(data: FormData): Promise<{ success: boolean; message: string }> {

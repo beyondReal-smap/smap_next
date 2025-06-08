@@ -302,14 +302,42 @@ function NoticeContent() {
         const data = await notificationService.getMemberPushLogs(user.mt_idx.toString());
         
         console.log('[NOTICE PAGE] Fetched data length:', Array.isArray(data) ? data.length : 'Data is not an array');
-        if (isMounted) {
-          if (Array.isArray(data)) {
-        setNotices(data);
+        
+        // 읽지 않은 알림이 있으면 모두 읽음 처리
+        if (Array.isArray(data) && data.length > 0) {
+          const unreadNotifications = data.filter(notification => notification.plt_read_chk === 'N');
+          if (unreadNotifications.length > 0) {
+            try {
+              await notificationService.markAllAsRead(user.mt_idx);
+              console.log('[NOTICE PAGE] 읽지 않은 알림', unreadNotifications.length, '개 읽음 처리 완료');
+              
+              // 읽음 처리 후 데이터 다시 가져오기
+              const updatedData = await notificationService.getMemberPushLogs(user.mt_idx.toString());
+              if (isMounted) {
+                setNotices(Array.isArray(updatedData) ? updatedData : []);
+                dataFetchedRef.current = true;
+              }
+            } catch (error) {
+              console.error('[NOTICE PAGE] 읽음 처리 실패:', error);
+              // 읽음 처리 실패해도 기존 데이터는 표시
+              if (isMounted) {
+                setNotices(data);
+                dataFetchedRef.current = true;
+              }
+            }
           } else {
+            // 읽지 않은 알림이 없으면 그대로 설정
+            if (isMounted) {
+              setNotices(data);
+              dataFetchedRef.current = true;
+            }
+          }
+        } else {
+          if (isMounted) {
             console.error('[NOTICE PAGE] Fetched data is not an array. Setting notices to empty array.', data);
             setNotices([]); // 데이터가 배열이 아니면 빈 배열로 설정
+            dataFetchedRef.current = true;
           }
-          dataFetchedRef.current = true;
         }
       } catch (error) {
         console.error('Error fetching notices:', error);

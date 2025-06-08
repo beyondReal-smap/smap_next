@@ -185,6 +185,94 @@ export async function POST(
     const path = Array.isArray(slug) ? slug.join('/') : slug || '';
     const backendUrl = `https://118.67.130.71:8000/api/v1/push-logs/${path}`;
     
+    // read-all의 경우 쿼리 파라미터에서 mt_idx 추출
+    if (path === 'read-all') {
+      const url = new URL(request.url);
+      const mt_idx = url.searchParams.get('mt_idx');
+      if (!mt_idx) {
+        return NextResponse.json({ error: 'mt_idx is required' }, { status: 400 });
+      }
+      
+      console.log('[API PROXY /push-logs] READ-ALL 요청:', `${backendUrl}?mt_idx=${mt_idx}`);
+      
+      // SSL 인증서 우회 설정
+      const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+      
+      let response: any;
+      let usedMethod = 'default-fetch';
+      
+      try {
+        // 기본 fetch 시도
+        response = await fetch(`${backendUrl}?mt_idx=${mt_idx}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Next.js API Proxy',
+          },
+          // @ts-ignore
+          rejectUnauthorized: false,
+        });
+        console.log('[API PROXY /push-logs] READ-ALL 기본 fetch 성공');
+      } catch (fetchError) {
+        console.log('[API PROXY /push-logs] READ-ALL 기본 fetch 실패, node-fetch 시도:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+        
+        if (nodeFetch) {
+          try {
+            response = await nodeFetch(`${backendUrl}?mt_idx=${mt_idx}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'User-Agent': 'Next.js API Proxy (node-fetch)',
+              },
+              agent: function(_parsedURL: any) {
+                const https = require('https');
+                return new https.Agent({
+                  rejectUnauthorized: false
+                });
+              }
+            });
+            usedMethod = 'node-fetch';
+            console.log('[API PROXY /push-logs] READ-ALL node-fetch 성공');
+          } catch (nodeFetchError) {
+            console.error('[API PROXY /push-logs] READ-ALL node-fetch도 실패:', nodeFetchError);
+            throw fetchError;
+          }
+        } else {
+          throw fetchError;
+        }
+      } finally {
+        // 환경 변수 복원
+        if (originalTlsReject !== undefined) {
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
+        } else {
+          delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+        }
+      }
+
+      console.log('[API PROXY /push-logs] READ-ALL 백엔드 응답 상태:', response.status, response.statusText, '(사용된 방법:', usedMethod + ')');
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[API PROXY /push-logs] READ-ALL 백엔드 에러:', errorText);
+        throw new Error(`Backend API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('[API PROXY /push-logs] READ-ALL 성공:', data);
+      return NextResponse.json(data, {
+        status: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'X-Fetch-Method': usedMethod,
+        },
+      });
+    }
+
     // delete-all의 경우 쿼리 파라미터에서 mt_idx 추출
     if (path === 'delete-all') {
       const url = new URL(request.url);
@@ -449,10 +537,22 @@ export async function PATCH(
     const params = await context.params;
     const { slug } = params;
     const path = Array.isArray(slug) ? slug.join('/') : slug || '';
-    const backendUrl = `https://118.67.130.71:8000/api/v1/push-logs/${path}`;
     
-    const body = await request.json();
-    console.log('[API PROXY /push-logs] PATCH 요청:', backendUrl, body);
+    // read-all의 경우 쿼리 파라미터 처리
+    let backendUrl = `https://118.67.130.71:8000/api/v1/push-logs/${path}`;
+    if (path === 'read-all') {
+      const url = new URL(request.url);
+      const mt_idx = url.searchParams.get('mt_idx');
+      if (!mt_idx) {
+        return NextResponse.json({ error: 'mt_idx is required' }, { status: 400 });
+      }
+      backendUrl = `${backendUrl}?mt_idx=${mt_idx}`;
+    }
+    
+    const body = await request.json().catch(() => ({})); // body가 없을 수도 있음
+    console.log('[API PROXY /push-logs] PATCH 요청 시작:', backendUrl);
+    console.log('[API PROXY /push-logs] PATCH 요청 body:', body);
+    console.log('[API PROXY /push-logs] PATCH 요청 path:', path);
     
     const fetchOptions: RequestInit = {
       method: 'PATCH',
@@ -470,27 +570,41 @@ export async function PATCH(
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     
     let response: any;
+    let usedMethod = 'default-fetch';
     
     try {
+      console.log('[API PROXY /push-logs] PATCH 기본 fetch 시도...');
       response = await fetch(backendUrl, fetchOptions);
+      console.log('[API PROXY /push-logs] PATCH 기본 fetch 성공, 상태:', response.status);
     } catch (fetchError) {
+      console.log('[API PROXY /push-logs] PATCH 기본 fetch 실패:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+      
       if (nodeFetch) {
-        response = await nodeFetch(backendUrl, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'User-Agent': 'Next.js API Proxy (node-fetch)',
-          },
-          body: JSON.stringify(body),
-          agent: function(_parsedURL: any) {
-            const https = require('https');
-            return new https.Agent({
-              rejectUnauthorized: false
-            });
-          }
-        });
+        try {
+          console.log('[API PROXY /push-logs] PATCH node-fetch 시도...');
+          response = await nodeFetch(backendUrl, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'User-Agent': 'Next.js API Proxy (node-fetch)',
+            },
+            body: JSON.stringify(body),
+            agent: function(_parsedURL: any) {
+              const https = require('https');
+              return new https.Agent({
+                rejectUnauthorized: false
+              });
+            }
+          });
+          usedMethod = 'node-fetch';
+          console.log('[API PROXY /push-logs] PATCH node-fetch 성공, 상태:', response.status);
+        } catch (nodeFetchError) {
+          console.error('[API PROXY /push-logs] PATCH node-fetch도 실패:', nodeFetchError);
+          throw fetchError;
+        }
       } else {
+        console.log('[API PROXY /push-logs] node-fetch 패키지 없음');
         throw fetchError;
       }
     } finally {
@@ -501,13 +615,16 @@ export async function PATCH(
       }
     }
 
+    console.log('[API PROXY /push-logs] PATCH 백엔드 응답 상태:', response.status, response.statusText, '(사용된 방법:', usedMethod + ')');
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[API PROXY /push-logs] PATCH 백엔드 에러:', errorText);
+      console.error('[API PROXY /push-logs] PATCH 백엔드 에러 응답:', errorText);
       throw new Error(`Backend API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('[API PROXY /push-logs] PATCH 백엔드 응답 성공:', data);
     return NextResponse.json(data, {
       status: 200,
       headers: {
@@ -517,7 +634,12 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    console.error('[API PROXY /push-logs] PATCH 오류:', error);
+    console.error('[API PROXY /push-logs] PATCH 상세 오류:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      code: (error as any)?.code || 'UNKNOWN',
+      cause: (error as any)?.cause || null,
+    });
     
     return NextResponse.json({ success: true, message: 'Mock patch success' }, {
       status: 200,
