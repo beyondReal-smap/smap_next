@@ -9,10 +9,11 @@ if (process.env.NODE_ENV === 'development') {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { mt_idx: string } }
+  context: { params: Promise<{ mt_idx: string }> }
 ) {
   try {
     const { searchParams } = new URL(request.url);
+    const params = await context.params;
     const { mt_idx } = params;
     const date = searchParams.get('date');
     const minSpeed = searchParams.get('min_speed') || '1.0';
@@ -63,6 +64,7 @@ export async function GET(
     console.error('[API] map-markers 오류:', error);
 
     // 오류 발생 시 모의 데이터 반환
+    const params = await context.params;
     const { mt_idx } = params;
     const { searchParams: errorSearchParams } = new URL(request.url);
     const errorDate = errorSearchParams.get('date') || '2025-06-04';
