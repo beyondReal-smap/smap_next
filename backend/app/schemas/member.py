@@ -104,4 +104,18 @@ class RegisterRequest(BaseModel):
 class RegisterResponse(BaseModel):
     success: bool
     message: str
+    data: Optional[dict] = None
+
+# Google 로그인 요청 스키마
+class GoogleLoginRequest(BaseModel):
+    google_id: str
+    email: str
+    name: str
+    image: Optional[str] = None
+    access_token: Optional[str] = None
+
+# Google 로그인 응답 스키마
+class GoogleLoginResponse(BaseModel):
+    success: bool
+    message: str
     data: Optional[dict] = None 

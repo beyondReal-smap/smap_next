@@ -221,6 +221,10 @@ export default function RegisterPage() {
   // 포커스 상태 관리
   const [focusedField, setFocusedField] = useState<string | null>(null);
   
+  // 위치 정보 관련 상태
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState('');
+  
   const [registerData, setRegisterData] = useState<RegisterData>({
     mt_agree1: false,
     mt_agree2: false,
@@ -595,20 +599,54 @@ export default function RegisterPage() {
 
   // 위치 정보 가져오기
   const handleGetLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setRegisterData(prev => ({
-            ...prev,
-            mt_lat: position.coords.latitude,
-            mt_long: position.coords.longitude
-          }));
-        },
-        (error) => {
-          console.error('위치 정보 가져오기 실패:', error);
-        }
-      );
+    if (!navigator.geolocation) {
+      setLocationError('이 브라우저는 위치 서비스를 지원하지 않습니다.');
+      return;
     }
+
+    setLocationLoading(true);
+    setLocationError('');
+
+    const options = {
+      enableHighAccuracy: true, // 높은 정확도 요청
+      timeout: 10000, // 10초 타임아웃
+      maximumAge: 300000 // 5분 이내 캐시된 위치 허용
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        console.log('위치 정보 가져오기 성공:', position.coords);
+        setRegisterData(prev => ({
+          ...prev,
+          mt_lat: position.coords.latitude,
+          mt_long: position.coords.longitude
+        }));
+        setLocationLoading(false);
+        setLocationError('');
+      },
+      (error) => {
+        console.error('위치 정보 가져오기 실패:', error);
+        setLocationLoading(false);
+        
+        let errorMessage = '';
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = '위치 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해주세요.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = '위치 정보를 사용할 수 없습니다. GPS가 활성화되어 있는지 확인해주세요.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = '위치 정보 요청이 시간 초과되었습니다. 다시 시도해주세요.';
+            break;
+          default:
+            errorMessage = '위치 정보를 가져오는 중 오류가 발생했습니다.';
+            break;
+        }
+        setLocationError(errorMessage);
+      },
+      options
+    );
   };
 
   // 회원가입 완료
@@ -750,7 +788,7 @@ export default function RegisterPage() {
         {currentStep !== REGISTER_STEPS.COMPLETE && (
           <div className="h-1 bg-gray-200">
             <motion.div 
-              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                              className="h-full bg-indigo-600"
               initial={{ width: 0 }}
               animate={{ width: `${getProgress()}%` }}
               transition={{ duration: 0.5 }}
@@ -773,17 +811,17 @@ export default function RegisterPage() {
               exit={{ opacity: 0, x: -50 }}
               className="w-full h-full flex flex-col"
             >
-              <div className="text-center mb-8 register-header">
-                <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FiFileText className="w-8 h-8 text-white" />
+              <div className="text-center mb-4 register-header">
+                <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-2">
+                  <FiFileText className="w-6 h-6 text-white" />
             </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">서비스 이용약관</h2>
-                <p className="text-gray-600" style={{ wordBreak: 'keep-all' }}>SMAP 서비스 이용을 위해 약관에 동의해주세요</p>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">서비스 이용약관</h2>
+                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>SMAP 서비스 이용을 위해 약관에 동의해주세요</p>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-4 pb-4 register-form">
+              <div className="flex-1 overflow-y-auto space-y-3 pb-4 register-form">
                 {/* 전체 동의 */}
-                <div className="bg-white rounded-xl p-6 border-2 border-indigo-100">
+                <div className="bg-white rounded-xl p-4 border-2 border-indigo-100">
                   <label className="flex items-center space-x-4 cursor-pointer">
                     <div className="w-1"></div> {/* 왼쪽 공백 */}
                     <div className="relative">
@@ -795,7 +833,7 @@ export default function RegisterPage() {
                       />
                       <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                         TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)
-                          ? 'bg-indigo-500 border-indigo-500' 
+                          ? 'bg-indigo-600 border-indigo-600' 
                           : 'border-gray-300'
                       }`}>
                         {TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) && (
@@ -809,7 +847,7 @@ export default function RegisterPage() {
 
                 {/* 개별 약관 */}
                 {TERMS_DATA.map((term) => (
-                  <div key={term.id} className="bg-white rounded-xl p-4 border border-gray-100">
+                  <div key={term.id} className="bg-white rounded-xl p-3 border border-gray-100">
                     <label className="flex items-center justify-between cursor-pointer">
                       <div className="flex items-center space-x-4">
                         <div className="w-1"></div> {/* 왼쪽 공백 */}
@@ -822,7 +860,7 @@ export default function RegisterPage() {
                           />
                           <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                             registerData[term.id as keyof RegisterData]
-                              ? 'bg-indigo-500 border-indigo-500' 
+                              ? 'bg-indigo-600 border-indigo-600' 
                               : 'border-gray-300'
                           }`}>
                             {registerData[term.id as keyof RegisterData] && (
@@ -860,12 +898,12 @@ export default function RegisterPage() {
               exit={{ opacity: 0, x: -50 }}
               className="w-full h-full flex flex-col justify-center"
             >
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FiPhone className="w-8 h-8 text-white" />
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-2">
+                  <FiPhone className="w-6 h-6 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">전화번호 인증</h2>
-                <p className="text-gray-600" style={{ wordBreak: 'keep-all' }}>본인 확인을 위해 전화번호를 입력해주세요</p>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">전화번호 인증</h2>
+                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>본인 확인을 위해 전화번호를 입력해주세요</p>
               </div>
 
               <div className="space-y-6">
@@ -875,7 +913,7 @@ export default function RegisterPage() {
                   </label>
                   <div className="relative register-input-container">
                     <FiPhone className={`absolute left-5 top-1/2 transform -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${
-                      focusedField === 'phone' || registerData.mt_id ? 'text-indigo-500' : 'text-gray-400'
+                      focusedField === 'phone' || registerData.mt_id ? 'text-indigo-600' : 'text-gray-400'
                     }`} />
               <input
                       type="tel"
@@ -888,7 +926,7 @@ export default function RegisterPage() {
                       onBlur={() => setFocusedField(null)}
                       placeholder="010-1234-5678"
                       maxLength={13}
-                      className="w-full pl-10 pr-6 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent register-input"
+                      className="w-full pl-10 pr-6 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:border-transparent register-input"
                     />
                   </div>
                 </div>
@@ -900,7 +938,7 @@ export default function RegisterPage() {
                     className="bg-indigo-50 border border-indigo-200 rounded-xl p-4"
                   >
                     <div className="flex items-center space-x-2">
-                      <FiCheck className="w-5 h-5 text-indigo-500" />
+                      <FiCheck className="w-5 h-5 text-indigo-600" />
                       <span className="text-indigo-700 font-medium">인증번호가 발송되었습니다</span>
                     </div>
                     <p className="text-indigo-600 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>
@@ -921,12 +959,12 @@ export default function RegisterPage() {
               exit={{ opacity: 0, x: -50 }}
               className="w-full h-full flex flex-col justify-center"
             >
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FiShield className="w-8 h-8 text-white" />
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-2">
+                  <FiShield className="w-6 h-6 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">인증번호 입력</h2>
-                <p className="text-gray-600" style={{ wordBreak: 'keep-all' }}>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">인증번호 입력</h2>
+                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
                   {registerData.mt_id}로 발송된<br />
                   인증번호 6자리를 입력해주세요
                 </p>
@@ -963,7 +1001,7 @@ export default function RegisterPage() {
                     }}
                     placeholder="123456"
                     maxLength={6}
-                    className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:ring-indigo-500 focus:border-transparent text-center text-2xl font-mono tracking-widest register-input"
+                    className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:ring-indigo-600 focus:border-transparent text-center text-2xl font-mono tracking-widest register-input"
                     style={{ outline: 'none' }}
                   />
                   {verificationTimer > 0 && (
@@ -1013,7 +1051,7 @@ export default function RegisterPage() {
                     disabled={!registerData.verification_code || isLoading}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="flex-1 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-semibold disabled:opacity-50"
+                    className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-semibold disabled:opacity-50"
                   >
                     {isLoading ? '확인 중...' : '확인'}
                   </motion.button>
@@ -1031,25 +1069,25 @@ export default function RegisterPage() {
               exit={{ opacity: 0, x: -50 }}
               className="w-full h-full flex flex-col"
             >
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FiUser className="w-8 h-8 text-white" />
+              <div className="text-center mb-4">
+                <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-2">
+                  <FiUser className="w-6 h-6 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">기본 정보</h2>
-                <p className="text-gray-600" style={{ wordBreak: 'keep-all' }}>서비스 이용을 위한 기본 정보를 입력해주세요</p>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">기본 정보</h2>
+                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>서비스 이용을 위한 기본 정보를 입력해주세요</p>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-4 pb-4 register-form">
+              <div className="flex-1 overflow-y-auto space-y-3 pb-4 register-form">
                 {/* 비밀번호 */}
             <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     비밀번호
               </label>
                   <div className="relative register-input-container">
                     <FiLock className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${
                       passwordError ? 'text-red-400' : 
                       registerData.mt_pwd && !passwordError ? 'text-green-500' : 
-                      focusedField === 'password' || registerData.mt_pwd ? 'text-indigo-500' : 'text-gray-400'
+                      focusedField === 'password' || registerData.mt_pwd ? 'text-indigo-600' : 'text-gray-400'
                     }`} />
               <input
                       type={showPassword ? 'text' : 'password'}
@@ -1062,17 +1100,17 @@ export default function RegisterPage() {
                       onFocus={() => setFocusedField('password')}
                       onBlur={() => setFocusedField(null)}
                       placeholder="8자 이상, 대소문자, 숫자, 특수문자 포함"
-                      className={`w-full pl-8 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
+                      className={`w-full pl-8 pr-8 py-2.5 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
                         passwordError ? 'border-red-300 focus:ring-red-500' :
                         registerData.mt_pwd && !passwordError ? 'border-green-300 focus:ring-green-500' :
-                        'border-gray-200 focus:ring-indigo-500'
+                        'border-gray-200 focus:ring-indigo-600'
                       }`}
                       style={{ outline: 'none' }}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                      className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400"
                     >
                       {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
                     </button>
@@ -1080,7 +1118,7 @@ export default function RegisterPage() {
                   
                   {/* 비밀번호 강도 표시기 */}
                   {registerData.mt_pwd && (
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-2 space-y-1.5">
                       <div className="flex space-x-1">
                         {Object.values(passwordStrength).map((isValid, index) => (
                           <div
@@ -1116,14 +1154,14 @@ export default function RegisterPage() {
 
                 {/* 비밀번호 확인 */}
             <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     비밀번호 확인
               </label>
                   <div className="relative register-input-container">
                     <FiLock className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${
                       passwordConfirm && passwordConfirm !== registerData.mt_pwd ? 'text-red-400' :
                       passwordConfirm && passwordConfirm === registerData.mt_pwd && registerData.mt_pwd ? 'text-green-500' :
-                      focusedField === 'passwordConfirm' || passwordConfirm ? 'text-indigo-500' : 'text-gray-400'
+                      focusedField === 'passwordConfirm' || passwordConfirm ? 'text-indigo-600' : 'text-gray-400'
                     }`} />
               <input
                       type={showPasswordConfirm ? 'text' : 'password'}
@@ -1132,13 +1170,13 @@ export default function RegisterPage() {
                       onFocus={() => setFocusedField('passwordConfirm')}
                       onBlur={() => setFocusedField(null)}
                       placeholder="비밀번호를 다시 입력해주세요"
-                      className="w-full pl-8 pr-12 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:ring-indigo-500 focus:border-transparent register-input"
+                      className="w-full pl-8 pr-10 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:ring-indigo-600 focus:border-transparent register-input"
                       style={{ outline: 'none' }}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                      className="absolute right-2.5 top-1/2 transform -translate-y-1/2 text-gray-400"
                     >
                       {showPasswordConfirm ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
                     </button>
@@ -1156,7 +1194,7 @@ export default function RegisterPage() {
 
                 {/* 이름 */}
             <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     이름
               </label>
               <input
@@ -1164,14 +1202,14 @@ export default function RegisterPage() {
                     value={registerData.mt_name}
                     onChange={(e) => setRegisterData(prev => ({ ...prev, mt_name: e.target.value }))}
                     placeholder="실명을 입력해주세요"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:ring-indigo-500 focus:border-transparent register-input"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:ring-indigo-600 focus:border-transparent register-input"
                     style={{ outline: 'none' }}
                   />
                 </div>
 
                 {/* 닉네임 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     닉네임
                   </label>
                   <input
@@ -1179,14 +1217,14 @@ export default function RegisterPage() {
                     value={registerData.mt_nickname}
                     onChange={(e) => setRegisterData(prev => ({ ...prev, mt_nickname: e.target.value }))}
                     placeholder="다른 사용자에게 표시될 닉네임"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:ring-indigo-500 focus:border-transparent register-input"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:ring-indigo-600 focus:border-transparent register-input"
                     style={{ outline: 'none' }}
                   />
                 </div>
 
                 {/* 이메일 */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     이메일 (선택)
                   </label>
                   <div className="relative register-input-container">
@@ -1196,7 +1234,7 @@ export default function RegisterPage() {
                         : registerData.mt_email && !emailError 
                           ? 'text-green-500' 
                           : focusedField === 'email' || registerData.mt_email
-                            ? 'text-indigo-500'
+                            ? 'text-indigo-600'
                             : 'text-gray-400'
                     }`} />
                     <input
@@ -1210,24 +1248,24 @@ export default function RegisterPage() {
                       onFocus={() => setFocusedField('email')}
                       onBlur={() => setFocusedField(null)}
                       placeholder="example@email.com"
-                      className={`w-full pl-8 pr-12 py-3 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
+                      className={`w-full pl-8 pr-10 py-2.5 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
                         emailError 
                           ? 'border-red-300 focus:ring-red-500' 
                           : registerData.mt_email && !emailError
                             ? 'border-green-300 focus:ring-green-500'
-                            : 'border-gray-200 focus:ring-indigo-500'
+                            : 'border-gray-200 focus:ring-indigo-600'
                       }`}
                       style={{ outline: 'none' }}
                     />
                     {registerData.mt_email && !emailError && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="absolute right-2.5 top-1/2 transform -translate-y-1/2">
                         <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       </div>
                     )}
                     {emailError && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <div className="absolute right-2.5 top-1/2 transform -translate-y-1/2">
                         <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -1251,12 +1289,12 @@ export default function RegisterPage() {
               exit={{ opacity: 0, x: -50 }}
               className="w-full h-full flex flex-col justify-center"
             >
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FiHeart className="w-8 h-8 text-white" />
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-2">
+                  <FiHeart className="w-6 h-6 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">프로필 정보</h2>
-                <p className="text-gray-600" style={{ wordBreak: 'keep-all' }}>추가 정보를 입력해주세요</p>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">프로필 정보</h2>
+                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>추가 정보를 입력해주세요</p>
               </div>
 
               <div className="space-y-6">
@@ -1268,9 +1306,9 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     onClick={handleBirthModalOpen}
-                    className="w-full flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:border-indigo-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors text-left"
+                    className="w-full flex items-center px-4 py-3 border border-gray-200 rounded-xl hover:border-indigo-300 focus:ring-2 focus:ring-indigo-600 focus:border-transparent transition-colors text-left"
                   >
-                    <FiCalendar className="w-5 h-5 text-indigo-500 mr-3" />
+                    <FiCalendar className="w-5 h-5 text-indigo-600 mr-3" />
                     <span className={registerData.mt_birth ? 'text-gray-900' : 'text-gray-500'}>
                       {registerData.mt_birth 
                         ? dayjs(registerData.mt_birth).format('YYYY년 MM월 DD일')
@@ -1292,7 +1330,7 @@ export default function RegisterPage() {
                       onClick={() => setRegisterData(prev => ({ ...prev, mt_gender: 1 }))}
                       className={`py-3 rounded-xl border-2 font-medium transition-all ${
                         registerData.mt_gender === 1
-                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
                           : 'border-gray-200 text-gray-700 hover:border-gray-300'
                       }`}
                     >
@@ -1324,7 +1362,7 @@ export default function RegisterPage() {
                       />
                       <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
                         registerData.mt_push1
-                          ? 'bg-indigo-500 border-indigo-500' 
+                          ? 'bg-indigo-600 border-indigo-600' 
                           : 'border-gray-300'
                       }`}>
                         {registerData.mt_push1 && (
@@ -1351,33 +1389,46 @@ export default function RegisterPage() {
               exit={{ opacity: 0, x: -50 }}
               className="w-full h-full flex flex-col justify-center"
             >
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <FiMapPin className="w-8 h-8 text-white" />
+              <div className="text-center mb-6">
+                <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-2">
+                  <FiMapPin className="w-6 h-6 text-white" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">위치 정보</h2>
-                <p className="text-gray-600" style={{ wordBreak: 'keep-all' }}>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">위치 정보</h2>
+                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
                   위치 기반 서비스 이용을 위해<br />
                   현재 위치를 설정해주세요
                 </p>
               </div>
 
-              <div className="space-y-6">
-                {registerData.mt_lat && registerData.mt_long ? (
+              <div className="space-y-4">
+                {/* 위치 정보 성공 */}
+                {registerData.mt_lat && registerData.mt_long && !locationLoading && (
                   <div className="bg-green-50 border border-green-200 rounded-xl p-4">
                     <div className="flex items-center space-x-2 mb-2">
                       <FiCheck className="w-5 h-5 text-green-500" />
                       <span className="text-green-700 font-medium">위치 정보가 설정되었습니다</span>
-            </div>
-                    <p className="text-green-600 text-sm" style={{ wordBreak: 'keep-all' }}>
+                    </div>
+                    <p className="text-green-600 text-sm mb-3" style={{ wordBreak: 'keep-all' }}>
                       위도: {registerData.mt_lat.toFixed(6)}<br />
                       경도: {registerData.mt_long.toFixed(6)}
                     </p>
+                    <motion.button
+                      onClick={handleGetLocation}
+                      disabled={locationLoading}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="w-full py-2.5 bg-green-100 text-green-700 rounded-xl font-medium text-sm border border-green-200 hover:bg-green-200 transition-colors"
+                    >
+                      위치 다시 가져오기
+                    </motion.button>
                   </div>
-                ) : (
+                )}
+
+                {/* 위치 정보 요청 */}
+                {!registerData.mt_lat && !registerData.mt_long && !locationLoading && !locationError && (
                   <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
                     <div className="flex items-center space-x-2 mb-2">
-                      <FiMapPin className="w-5 h-5 text-indigo-500" />
+                      <FiMapPin className="w-5 h-5 text-indigo-600" />
                       <span className="text-indigo-700 font-medium">위치 정보 설정</span>
                     </div>
                     <p className="text-indigo-600 text-sm mb-4" style={{ wordBreak: 'keep-all' }}>
@@ -1387,12 +1438,75 @@ export default function RegisterPage() {
                       onClick={handleGetLocation}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-semibold shadow-lg"
+                      className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold shadow-lg"
                     >
                       현재 위치 가져오기
                     </motion.button>
                   </div>
                 )}
+
+                {/* 로딩 상태 */}
+                {locationLoading && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <div className="flex items-center space-x-3 mb-2">
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-blue-700 font-medium">위치 정보를 가져오는 중...</span>
+                    </div>
+                    <p className="text-blue-600 text-sm" style={{ wordBreak: 'keep-all' }}>
+                      브라우저에서 위치 권한을 요청할 수 있습니다.<br />
+                      '허용'을 선택해주세요.
+                    </p>
+                  </div>
+                )}
+
+                {/* 에러 상태 */}
+                {locationError && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <span className="text-red-700 font-medium">위치 정보 가져오기 실패</span>
+                    </div>
+                    <p className="text-red-600 text-sm mb-3" style={{ wordBreak: 'keep-all' }}>
+                      {locationError}
+                    </p>
+                    <div className="space-y-2">
+                      <motion.button
+                        onClick={handleGetLocation}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full py-2.5 bg-red-600 text-white rounded-xl font-medium text-sm shadow-lg"
+                      >
+                        다시 시도
+                      </motion.button>
+                      <motion.button
+                        onClick={() => {
+                          setLocationError('');
+                          // 위치 정보 없이 진행하는 경우 (선택사항이므로)
+                        }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm border border-gray-200 hover:bg-gray-200 transition-colors"
+                      >
+                        위치 정보 없이 진행
+                      </motion.button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 위치 정보 안내 */}
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <div className="flex items-start space-x-2">
+                    <FiShield className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-gray-700 text-sm font-medium mb-1">개인정보 보호</p>
+                      <p className="text-gray-600 text-xs leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+                        위치 정보는 그룹 서비스 제공 목적으로만 사용되며, 사용자의 동의 없이 제3자에게 제공되지 않습니다. 언제든지 설정에서 위치 공유를 중단할 수 있습니다.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1488,16 +1602,17 @@ export default function RegisterPage() {
                 handleNext();
               }
             }}
-            disabled={!isStepValid() || isLoading}
-            whileHover={{ scale: isStepValid() ? 1.02 : 1 }}
-            whileTap={{ scale: isStepValid() ? 0.98 : 1 }}
+            disabled={!isStepValid() || isLoading || locationLoading}
+            whileHover={{ scale: (isStepValid() && !locationLoading) ? 1.02 : 1 }}
+            whileTap={{ scale: (isStepValid() && !locationLoading) ? 0.98 : 1 }}
             className={`w-full py-4 rounded-xl font-semibold text-lg transition-all register-button ${
-              isStepValid()
-                ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg'
+              (isStepValid() && !locationLoading)
+                ? 'bg-indigo-600 text-white shadow-lg'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
             {isLoading ? '처리 중...' : 
+             locationLoading ? '위치 정보 가져오는 중...' :
              currentStep === REGISTER_STEPS.PHONE ? '인증번호 발송' :
              currentStep === REGISTER_STEPS.LOCATION ? '회원가입 완료' : '다음'}
           </motion.button>
@@ -1563,14 +1678,14 @@ export default function RegisterPage() {
               transition={{ duration: 0.3 }}
             >
               <div className="p-6">
-                {/* 헤더 */}
-                <div className="text-center mb-6">
-                  <div className="w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <FiCalendar className="w-8 h-8 text-white" />
+                                  {/* 헤더 */}
+                  <div className="text-center mb-4">
+                    <div className="w-12 h-12 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-2">
+                      <FiCalendar className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">생년월일 선택</h3>
+                    <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>생년월일을 선택해주세요</p>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">생년월일 선택</h3>
-                  <p className="text-gray-600" style={{ wordBreak: 'keep-all' }}>생년월일을 선택해주세요</p>
-                </div>
 
                 {/* 캘린더 헤더 */}
                 <div className="flex items-center justify-between mb-6">
@@ -1705,7 +1820,7 @@ export default function RegisterPage() {
                     disabled={!selectedDate}
                     className={`flex-1 py-3 rounded-xl font-medium transition-colors ${
                       selectedDate
-                        ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:from-indigo-600 hover:to-purple-600'
+                        ? 'bg-indigo-600 text-white hover:bg-indigo-600'
                         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     }`}
                   >

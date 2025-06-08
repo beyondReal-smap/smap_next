@@ -5,10 +5,14 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image'; // Image 컴포넌트 임포트
+import { motion, AnimatePresence } from 'framer-motion';
+import { signIn, getSession } from 'next-auth/react';
+import authService from '@/services/authService';
 
 // 아이콘 임포트 (react-icons 사용 예시)
 import { FcGoogle } from 'react-icons/fc';
 import { RiKakaoTalkFill } from 'react-icons/ri';
+import { FiX, FiAlertTriangle, FiPhone, FiLock } from 'react-icons/fi';
 
 export default function SignInPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -16,7 +20,22 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState('');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorModalMessage, setErrorModalMessage] = useState('');
+  const [focusedField, setFocusedField] = useState<string | null>(null);
   const router = useRouter();
+
+  // 컴포넌트 마운트 시 localStorage에서 최근 등록한 전화번호 불러오기
+  useEffect(() => {
+    try {
+      const lastRegisteredPhone = localStorage.getItem('lastRegisteredPhone');
+      if (lastRegisteredPhone) {
+        setPhoneNumber(lastRegisteredPhone);
+      }
+    } catch (error) {
+      console.error('localStorage 접근 실패:', error);
+    }
+  }, []);
 
   // 전화번호 포맷팅 함수 (register/page.tsx의 함수와 유사)
   const formatPhoneNumber = (value: string) => {
@@ -69,75 +88,88 @@ export default function SignInPage() {
     }
 
     try {
-      const response = await fetch('/api/auth/login', { // 실제 백엔드 API 경로로 수정 필요
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mt_hp: phoneNumber.replace(/-/g, ''), // PHP 코드의 mt_hp에 맞춤 (또는 mt_id)
-          mt_pass: password,
-        }),
+      console.log('[SIGNIN] authService.login 호출 시작');
+      
+      // authService를 통해 로그인 (Next.js API 라우터 경유)
+      const loginResponse = await authService.login({
+        mt_id: phoneNumber.replace(/-/g, ''), // 전화번호에서 하이픈 제거
+        mt_pwd: password,
       });
 
-      const data = await response.json();
+      console.log('[SIGNIN] 로그인 응답:', loginResponse);
 
-      if (!response.ok) {
-        // API에서 내려주는 오류 메시지가 있다면 사용, 없다면 기본 메시지
-        throw new Error(data.message || '아이디 또는 비밀번호를 잘못 입력했습니다.');
+      if (!loginResponse.success) {
+        // 로그인 실패 - 모달 표시
+        const errorMessage = loginResponse.message || '아이디 또는 비밀번호가 올바르지 않습니다.';
+        setErrorModalMessage(errorMessage);
+        setShowErrorModal(true);
+        return;
       }
 
       // 로그인 성공
-      router.push('/'); // 홈 화면으로 이동
+      console.log('[SIGNIN] 로그인 성공:', loginResponse.data?.member);
+      
+      // authService에서 이미 사용자 정보와 토큰을 저장했으므로 추가 저장 불필요
+
+      // home/page.tsx로 이동
+      router.push('/home');
 
     } catch (err: any) {
-      setApiError(err.message || '로그인 중 오류가 발생했습니다.');
+      console.error('[SIGNIN] 로그인 오류:', err);
+      const errorMessage = err.message || '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.';
+      setErrorModalMessage(errorMessage);
+      setShowErrorModal(true);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // 에러 모달 닫기
+  const closeErrorModal = () => {
+    setShowErrorModal(false);
+    setErrorModalMessage('');
+  };
+
   // Google 로그인 핸들러
   const handleGoogleLogin = async () => {
     setIsLoading(true);
-    setApiError('');
-    setFormErrors({});
     try {
-      // Google OAuth 클라이언트 초기화
-      const googleClient = window.google?.accounts.oauth2.initTokenClient({
-        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-        scope: 'email profile',
-        callback: async (response: any) => {
-          if (response.access_token) {
-            try {
-              const result = await fetch('/api/auth/social-login', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  provider: 'google',
-                  token: response.access_token,
-                }),
-              });
-
-              const data = await result.json();
-              if (!result.ok) {
-                throw new Error(data.message);
-              }
-
-              // 로그인 성공 시 홈으로 이동
-              router.push('/');
-            } catch (err: any) {
-              setApiError(err.message || 'Google 로그인 중 오류가 발생했습니다.');
-            }
-          }
-        },
+      console.log('Google 로그인 시도');
+      
+      // NextAuth.js를 통한 Google 로그인
+      const result = await signIn('google', {
+        redirect: false, // 자동 리디렉션 방지
+        callbackUrl: '/home'
       });
 
-      googleClient.requestAccessToken();
-    } catch (err: any) {
-      setApiError(err.message || 'Google 로그인 중 오류가 발생했습니다.');
+      console.log('Google 로그인 결과:', result);
+
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+
+      if (result?.ok) {
+        // 세션 정보 가져오기
+        const session = await getSession();
+        console.log('Google 로그인 세션:', session);
+
+        if (session?.backendData) {
+          // 백엔드에서 받은 사용자 정보를 localStorage에 저장
+          try {
+            localStorage.setItem('user', JSON.stringify(session.backendData.member));
+            localStorage.setItem('token', session.backendData.token || '');
+          } catch (error) {
+            console.error('사용자 정보 저장 실패:', error);
+          }
+        }
+
+        // home 페이지로 이동
+        router.push('/home');
+      }
+    } catch (error) {
+      console.error('Google 로그인 실패:', error);
+      setErrorModalMessage('Google 로그인에 실패했습니다.');
+      setShowErrorModal(true);
     } finally {
       setIsLoading(false);
     }
@@ -146,63 +178,54 @@ export default function SignInPage() {
   // Kakao 로그인 핸들러
   const handleKakaoLogin = async () => {
     setIsLoading(true);
-    setApiError('');
-    setFormErrors({});
     try {
-      // Kakao SDK 초기화
-      if (!window.Kakao.isInitialized()) {
-        window.Kakao.init(process.env.NEXT_PUBLIC_KAKAO_CLIENT_ID);
-      }
-
-      // Kakao 로그인 실행
-      window.Kakao.Auth.login({
-        success: async (authObj: any) => {
-          try {
-            const result = await fetch('/api/auth/social-login', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                provider: 'kakao',
-                token: authObj.access_token,
-              }),
-            });
-
-            const data = await result.json();
-            if (!result.ok) {
-              throw new Error(data.message);
-            }
-
-            // 로그인 성공 시 홈으로 이동
-            router.push('/');
-          } catch (err: any) {
-            setApiError(err.message || 'Kakao 로그인 중 오류가 발생했습니다.');
-          }
+      // Kakao 로그인 로직 구현
+      console.log('Kakao 로그인 시도');
+      // 임시로 소셜 로그인 API 호출
+      const response = await fetch('/api/auth/social-login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        fail: (err: any) => {
-          setApiError('Kakao 로그인에 실패했습니다.');
-        },
+        body: JSON.stringify({
+          provider: 'kakao',
+          token: 'mock-kakao-token'
+        }),
       });
-    } catch (err: any) {
-      setApiError(err.message || 'Kakao 로그인 중 오류가 발생했습니다.');
+
+      const data = await response.json();
+      if (data.success) {
+        router.push('/home');
+      }
+    } catch (error) {
+      console.error('Kakao 로그인 실패:', error);
+      setErrorModalMessage('Kakao 로그인에 실패했습니다.');
+      setShowErrorModal(true);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Google SDK 로드
-  useEffect(() => {
-    const loadGoogleSDK = () => {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      document.body.appendChild(script);
-    };
-
-    loadGoogleSDK();
-  }, []);
+  // 로딩 스피너 컴포넌트
+  const LoadingSpinner = ({ message, fullScreen = true }: { message: string; fullScreen?: boolean }) => {
+    if (fullScreen) {
+      return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+            <span className="text-gray-700">{message}</span>
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="flex items-center justify-center space-x-2">
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+        <span>{message}</span>
+      </div>
+    );
+  };
 
   // Kakao SDK 로드
   useEffect(() => {
@@ -218,103 +241,160 @@ export default function SignInPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 sm:p-10 rounded-xl shadow-2xl">
-        <div className="text-center">
-          {/* 로고 추가 */}
-          <Image 
-            className="mx-auto h-20 w-auto" // mb-2 제거
-            src="/images/smap_logo.webp" // public 폴더 경로부터 시작
-            alt="SMAP Logo"
-            width={160} // 실제 이미지 크기에 맞게 조절 (예시)
-            height={80} // 실제 이미지 크기에 맞게 조절 (예시)
-            priority // LCP 이미지일 경우 우선순위 로딩
-          />
-          <h2 className="mt-1 text-3xl font-bold tracking-tight text-gray-900">
+    <motion.div 
+      className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 py-6 px-4 sm:px-6 lg:px-8"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{
+        type: "spring",
+        stiffness: 260,
+        damping: 20,
+        duration: 0.6
+      }}
+    >
+      <motion.div 
+        className="max-w-md w-full space-y-6 bg-white p-6 sm:p-8 rounded-xl shadow-2xl"
+        initial={{ opacity: 0, scale: 0.95, y: 30 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{
+          type: "spring",
+          stiffness: 280,
+          damping: 25,
+          delay: 0.1,
+          duration: 0.5
+        }}
+      >
+        <motion.div 
+          className="text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 25,
+            delay: 0.2,
+            duration: 0.4
+          }}
+        >
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900">
             SMAP 로그인
           </h2>
           <p className="mt-2 text-sm text-gray-600">
             계정에 로그인하여 서비스를 이용하세요.
           </p>
-        </div>
+        </motion.div>
 
-        {/* 전화번호 로그인 폼 */}
-        <form className="mt-8 space-y-6" onSubmit={handlePhoneNumberLogin}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="phone-number" className="sr-only">전화번호</label>
+        <motion.div 
+          className="space-y-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 25,
+            delay: 0.3,
+            duration: 0.4
+          }}
+        >
+          {/* 전화번호 입력 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              전화번호
+            </label>
+            <div className="relative">
+              <FiPhone className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${
+                focusedField === 'phone' || phoneNumber ? 'text-indigo-500' : 'text-gray-400'
+              }`} />
               <input
-                id="phone-number"
-                name="phone"
                 type="tel"
-                autoComplete="tel"
-                required
-                className="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-shadow"
-                placeholder="전화번호 ('-' 없이 입력)"
                 value={phoneNumber}
                 onChange={handlePhoneNumberChange}
+                onFocus={() => setFocusedField('phone')}
+                onBlur={() => setFocusedField(null)}
+                placeholder="010-1234-5678"
                 maxLength={13}
+                className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent transition-all duration-200 ${
+                  formErrors.phoneNumber 
+                    ? 'border-red-300 focus:ring-red-500' 
+                    : 'border-gray-200 focus:ring-indigo-500'
+                }`}
+                style={{ outline: 'none' }}
               />
             </div>
             {formErrors.phoneNumber && (
-              <p className="text-xs text-red-600 px-1 pt-1">{formErrors.phoneNumber}</p>
+              <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>{formErrors.phoneNumber}</p>
             )}
-            <div>
-              <label htmlFor="password_signin_phone" className="sr-only">비밀번호</label>
+          </div>
+
+          {/* 비밀번호 입력 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              비밀번호
+            </label>
+            <div className="relative">
+              <FiLock className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${
+                focusedField === 'password' || password ? 'text-indigo-500' : 'text-gray-400'
+              }`} />
               <input
-                id="password_signin_phone"
-                name="password"
                 type="password"
-                autoComplete="current-password"
-                required
-                className="appearance-none rounded-none relative block w-full px-4 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm transition-shadow"
-                placeholder="비밀번호"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setFocusedField('password')}
+                onBlur={() => setFocusedField(null)}
+                placeholder="비밀번호를 입력해주세요"
+                className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent transition-all duration-200 ${
+                  formErrors.password 
+                    ? 'border-red-300 focus:ring-red-500' 
+                    : 'border-gray-200 focus:ring-indigo-500'
+                }`}
+                style={{ outline: 'none' }}
               />
             </div>
             {formErrors.password && (
-              <p className="text-xs text-red-600 px-1 pt-1">{formErrors.password}</p>
+              <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>{formErrors.password}</p>
             )}
           </div>
+        </motion.div>
 
-          {apiError && (
-            <p className="text-xs text-red-600 text-center bg-red-50 p-2 rounded-md">{apiError}</p>
-          )}
+        {/* 로그인 버튼 */}
+        <motion.form 
+          onSubmit={handlePhoneNumberLogin}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 25,
+            delay: 0.4,
+            duration: 0.4
+          }}
+        >
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95 shadow-md"
+          >
+            {isLoading ? (
+              <LoadingSpinner message="로그인 중..." fullScreen={false} />
+            ) : (
+              '전화번호로 로그인'
+            )}
+          </button>
+        </motion.form>
 
-          {/* '로그인 상태 유지' 및 '비밀번호 찾기'는 전화번호 로그인 방식에 따라 조정 필요 */}
-          {/* 
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center">
-              <input id="remember-me-phone" name="remember-me-phone" type="checkbox" className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded" />
-              <label htmlFor="remember-me-phone" className="ml-2 block text-gray-900">
-                로그인 상태 유지
-              </label>
-            </div>
-            <Link href="/forgot-password">
-              <span className="font-medium text-indigo-600 hover:text-indigo-500">
-                비밀번호를 잊으셨나요?
-              </span>
-            </Link>
-          </div>
-          */}
-
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading && !apiError}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95 shadow-md"
-            >
-              {isLoading && !apiError ? (
-                <LoadingSpinner message="로그인 중..." fullScreen={false} />
-              ) : (
-                '전화번호로 로그인'
-              )}
-            </button>
-          </div>
-        </form>
-
-        <div className="mt-6">
+        <motion.div 
+          className="mt-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 25,
+            delay: 0.5,
+            duration: 0.4
+          }}
+        >
           <div className="relative">
             <div className="absolute inset-0 flex items-center" aria-hidden="true">
               <div className="w-full border-t border-gray-300" />
@@ -326,13 +406,13 @@ export default function SignInPage() {
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-4">
+          <div className="mt-4 grid grid-cols-1 gap-3">
             {/* Google 로그인 버튼 */}
             <button
               type="button"
               onClick={handleGoogleLogin}
               disabled={isLoading}
-              className="w-full inline-flex items-center justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
+              className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
             >
               <FcGoogle className="w-5 h-5 mr-3" aria-hidden="true" />
               Google 계정으로 로그인
@@ -343,42 +423,80 @@ export default function SignInPage() {
               type="button"
               onClick={handleKakaoLogin}
               disabled={isLoading}
-              className="w-full inline-flex items-center justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-base font-medium text-black bg-[#FEE500] hover:bg-[#F0D900] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
+              className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-black bg-[#FEE500] hover:bg-[#F0D900] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
             >
               <RiKakaoTalkFill className="w-5 h-5 mr-3" aria-hidden="true" />
               Kakao 계정으로 로그인
             </button>
           </div>
-        </div>
+        </motion.div>
 
-        <p className="mt-10 text-center text-sm text-gray-500">
-          계정이 없으신가요?{' '}
-          <Link href="/register"> {/* 실제 회원가입 페이지 경로로 수정 필요 */}
-            <span className="font-semibold leading-6 text-indigo-600 hover:text-indigo-500">
+        {/* 회원가입 링크 */}
+        <motion.div 
+          className="text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{
+            type: "spring",
+            stiffness: 300,
+            damping: 25,
+            delay: 0.6,
+            duration: 0.4
+          }}
+        >
+          <p className="text-sm text-gray-600">
+            아직 계정이 없으신가요?{' '}
+            <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
               회원가입
-            </span>
-          </Link>
-        </p>
-      </div>
-    </div>
-  );
-}
+            </Link>
+          </p>
+        </motion.div>
+      </motion.div>
 
-// 공통 로딩 스피너 컴포넌트 (버튼 내부용)
-interface LoadingSpinnerProps {
-  message?: string;
-  fullScreen?: boolean; 
-}
-const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ message = "처리 중...", fullScreen = false }) => {
-  // fullScreen={true} 일 때의 로직은 이전 LoadingSpinner.tsx와 동일하게 가정
-  // 여기서는 fullScreen={false} (버튼 내부) 케이스만 간단히 표현
-  return (
-    <div className="flex items-center justify-center">
-      <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-      </svg>
-      <span>{message}</span>
-    </div>
+      {/* 에러 모달 */}
+      <AnimatePresence>
+        {showErrorModal && (
+          <motion.div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeErrorModal}
+          >
+            <motion.div 
+              className="bg-white rounded-3xl w-full max-w-sm mx-auto shadow-2xl"
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 pb-8">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FiAlertTriangle className="w-8 h-8 text-red-500" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">로그인 실패</h3>
+                  <p className="text-gray-600 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+                    {errorModalMessage}
+                  </p>
+                </div>
+                
+                <motion.button
+                  onClick={closeErrorModal}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="w-full py-4 bg-red-500 text-white rounded-2xl font-medium hover:bg-red-600 transition-colors"
+                >
+                  확인
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 전체 화면 로딩 스피너 */}
+      {isLoading && <LoadingSpinner message="처리 중..." />}
+    </motion.div>
   );
-};
+}

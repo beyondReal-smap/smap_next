@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { SessionProvider } from 'next-auth/react';
 import { BottomNavBar } from './components/layout';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { UserProvider } from '@/contexts/UserContext';
@@ -28,11 +29,13 @@ export default function ClientLayout({
   }
 
   return (
-    <AuthProvider>
-      <UserProvider>
-        {children}
-        {!shouldHideNavBar && <BottomNavBar />}
-      </UserProvider>
-    </AuthProvider>
+    <SessionProvider>
+      <AuthProvider>
+        <UserProvider>
+          {children}
+          {!shouldHideNavBar && <BottomNavBar />}
+        </UserProvider>
+      </AuthProvider>
+    </SessionProvider>
   );
 } 

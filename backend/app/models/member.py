@@ -64,6 +64,7 @@ class Member(BaseModel):
     mt_map = Column(Enum('Y', 'N'), default='N', comment='지도 선택 - 네이버 : N / 구글 : Y')
     mt_remember_token = Column(String(255), nullable=True)
     mt_token_expiry = Column(DateTime, nullable=True)
+    mt_google_id = Column(String(255), nullable=True, comment='Google 계정 ID')
 
     @classmethod
     def find_by_email(cls, db: Session, email: str) -> Optional['Member']:

@@ -784,7 +784,10 @@ export default function HomePage() {
   const isDraggingRef = useRef(false);
   const isHorizontalSwipeRef = useRef<boolean | null>(null); // 수평 스와이프 감지용 ref 추가
 
-  const dataFetchedRef = useRef({ members: false, schedules: false }); // dataFetchedRef를 객체로 변경
+  const dataFetchedRef = useRef({ members: false, schedules: false, loading: false }); // dataFetchedRef를 객체로 변경
+
+  // 마커 업데이트 중복 방지를 위한 ref
+  const markersUpdating = useRef<boolean>(false);
 
   const [initialWeatherLoaded, setInitialWeatherLoaded] = useState(false);
   const initialWeatherDataRef = useRef<WeatherInfo | null>(null); // 앱 초기/기본 날씨 저장용
@@ -812,11 +815,13 @@ export default function HomePage() {
 
   // UserContext 데이터가 로딩 완료되면 첫 번째 그룹을 자동 선택
   useEffect(() => {
+    // 중복 실행 방지를 위한 조건 강화
     if (!isUserDataLoading && userGroups.length > 0 && !selectedGroupId) {
-      setSelectedGroupId(userGroups[0].sgt_idx);
-      console.log('[HOME] UserContext에서 첫 번째 그룹 자동 선택:', userGroups[0].sgt_title);
+      const firstGroup = userGroups[0];
+      setSelectedGroupId(firstGroup.sgt_idx);
+      console.log('[HOME] UserContext에서 첫 번째 그룹 자동 선택:', firstGroup.sgt_title, 'ID:', firstGroup.sgt_idx);
     }
-  }, [isUserDataLoading, userGroups, selectedGroupId]);
+  }, [isUserDataLoading, userGroups.length, selectedGroupId]); // userGroups 대신 userGroups.length 사용
 
   // Bottom Sheet 상태를 클래스 이름으로 변환
   const getBottomSheetClassName = () => {
@@ -1148,18 +1153,27 @@ export default function HomePage() {
         return;
       }
 
-      // 이미 데이터가 로드되었거나 로딩 중이면 중복 실행 방지
+      // 이미 데이터가 로드되었거나 로딩 중이면 중복 실행 방지 - 조건 강화
       if (dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
+        console.log('[fetchAllGroupData] 이미 데이터가 로드되어 중복 실행 방지');
+        return;
+      }
+
+      // 현재 로딩 중인지 확인하는 플래그 추가
+      if (dataFetchedRef.current.loading) {
+        console.log('[fetchAllGroupData] 이미 로딩 중이므로 중복 실행 방지');
         return;
       }
 
       try {
+        dataFetchedRef.current.loading = true; // 로딩 시작 플래그
         const groupIdToUse = selectedGroupId.toString();
         console.log('[fetchAllGroupData] 사용할 그룹 ID:', groupIdToUse);
 
         let currentMembers: GroupMember[] = groupMembers.length > 0 ? [...groupMembers] : [];
 
         if (!dataFetchedRef.current.members) {
+          console.log('[fetchAllGroupData] 멤버 데이터 로딩 시작');
           const memberData = await memberService.getGroupMembers(groupIdToUse);
           if (isMounted) { 
             if (memberData && memberData.length > 0) { 
@@ -1197,6 +1211,7 @@ export default function HomePage() {
                 sgdt_leader_chk: member.sgdt_leader_chk,
                 sgdt_idx: member.sgdt_idx
               }));
+              console.log('[fetchAllGroupData] 멤버 데이터 로딩 완료:', currentMembers.length, '명');
             } else {
               console.warn('No member data from API, or API call failed.');
               setIsFirstMemberSelectionComplete(true);
@@ -1207,6 +1222,7 @@ export default function HomePage() {
         }
 
         if (dataFetchedRef.current.members && !dataFetchedRef.current.schedules) {
+          console.log('[fetchAllGroupData] 스케줄 데이터 로딩 시작');
           const scheduleResponse = await scheduleService.getGroupSchedules(parseInt(groupIdToUse)); 
           if (isMounted) {
             const rawSchedules = scheduleResponse.data.schedules;
@@ -1263,6 +1279,7 @@ export default function HomePage() {
                 schedulesWithLocation: todaySchedules.filter(s => s.sst_location_lat && s.sst_location_long).length
               });
               setFilteredSchedules(todaySchedules);
+              console.log('[fetchAllGroupData] 스케줄 데이터 로딩 완료:', rawSchedules.length, '개');
             } else {
               console.warn('No schedule data from API for the group, or API call failed.');
               setGroupSchedules([]);
@@ -1279,9 +1296,10 @@ export default function HomePage() {
         }
         if (isMounted && !dataFetchedRef.current.schedules) dataFetchedRef.current.schedules = true;
       } finally {
+        dataFetchedRef.current.loading = false; // 로딩 완료 플래그
         if (isMounted && dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
           if (isMapLoading) setIsMapLoading(false); 
-          console.log("All group data fetch attempts completed.");
+          console.log("[fetchAllGroupData] 모든 그룹 데이터 로딩 완료");
         }
       }
     };
@@ -1674,13 +1692,13 @@ export default function HomePage() {
 
   // 공통 좌표 파싱 함수
   const parseCoordinate = (coord: any): number | null => {
-    console.log('[parseCoordinate] 입력:', { coord, type: typeof coord });
-    if (coord === null || coord === undefined) {
-      console.log('[parseCoordinate] null/undefined 반환');
-      return null;
-    }
+    // console.log('[parseCoordinate] 입력:', { coord, type: typeof coord });
+    // if (coord === null || coord === undefined) {
+    //   console.log('[parseCoordinate] null/undefined 반환');
+    //   return null;
+    // }
     const num = parseFloat(coord);
-    console.log('[parseCoordinate] 변환 결과:', { num, isNaN: isNaN(num) });
+    // console.log('[parseCoordinate] 변환 결과:', { num, isNaN: isNaN(num) });
     return isNaN(num) ? null : num;
   };
 
@@ -1697,27 +1715,27 @@ export default function HomePage() {
     let lat: number | null = null;
     let lng: number | null = null;
 
-    console.log('[createMarker] 시작:', { markerType, index, location, memberData: !!memberData, scheduleData: !!scheduleData });
+    // console.log('[createMarker] 시작:', { markerType, index, location, memberData: !!memberData, scheduleData: !!scheduleData });
 
     if (markerType === 'member' && memberData) {
-      console.log('[createMarker] 멤버 좌표 처리:', { 
-        'memberData.location.lat': memberData.location.lat, 
-        'memberData.location.lng': memberData.location.lng 
-      });
+      // console.log('[createMarker] 멤버 좌표 처리:', { 
+      //   'memberData.location.lat': memberData.location.lat, 
+      //   'memberData.location.lng': memberData.location.lng 
+      // });
       lat = parseCoordinate(memberData.location.lat);
       lng = parseCoordinate(memberData.location.lng);
     } else if (markerType === 'schedule' && scheduleData) {
-      console.log('[createMarker] 스케줄 좌표 처리:', { 
-        'scheduleData.sst_location_lat': scheduleData.sst_location_lat, 
-        'scheduleData.sst_location_long': scheduleData.sst_location_long 
-      });
+      // console.log('[createMarker] 스케줄 좌표 처리:', { 
+      //   'scheduleData.sst_location_lat': scheduleData.sst_location_lat, 
+      //   'scheduleData.sst_location_long': scheduleData.sst_location_long 
+      // });
       lat = parseCoordinate(scheduleData.sst_location_lat);
       lng = parseCoordinate(scheduleData.sst_location_long);
     } else if (location) {
-      console.log('[createMarker] location 객체 좌표 처리:', { 
-        'location.lat': location.lat, 
-        'location.lng': location.lng 
-      });
+      // console.log('[createMarker] location 객체 좌표 처리:', { 
+      //   'location.lat': location.lat, 
+      //   'location.lng': location.lng 
+      // });
       lat = parseCoordinate(location.lat);
       lng = parseCoordinate(location.lng);
     }
@@ -1737,7 +1755,7 @@ export default function HomePage() {
     const validLat = lat;
     const validLng = lng;
 
-    console.log('[createMarker] 검증된 좌표:', { validLat, validLng });
+    // console.log('[createMarker] 검증된 좌표:', { validLat, validLng });
 
     if (mapType === 'naver' && naverMap.current && window.naver?.maps) {
       const naverPos = new window.naver.maps.LatLng(validLat, validLng);
@@ -2950,27 +2968,48 @@ export default function HomePage() {
 
   // 지도 타입 변경 시 멤버 마커 업데이트
   useEffect(() => {
+    // 마커 업데이트 중복 방지
+    if (markersUpdating.current) {
+      console.log('[HOME] 마커 업데이트 중이므로 중복 실행 방지');
+      return;
+    }
+
     if (
       (mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) || 
       (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)
     ) {
+      markersUpdating.current = true;
+      console.log('[HOME] 지도 타입 변경으로 마커 업데이트 시작');
       updateMemberMarkers(groupMembers);
       updateScheduleMarkers(filteredSchedules); 
+      setTimeout(() => {
+        markersUpdating.current = false;
+      }, 100);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapType, mapsInitialized.google, mapsInitialized.naver]);
 
-  // 그룹멤버 데이터 변경 시 마커 업데이트
+  // 그룹멤버 데이터 변경 시 마커 업데이트 - 중복 방지 로직 추가
   useEffect(() => {
+    // 마커 업데이트 중복 방지
+    if (markersUpdating.current) {
+      console.log('[HOME] 마커 업데이트 중이므로 중복 실행 방지');
+      return;
+    }
+
     if (
       groupMembers.length > 0 &&
       ((mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) || 
        (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps))
     ) {
+      markersUpdating.current = true;
       console.log('[HOME] 그룹멤버 데이터 변경 감지 - 마커 업데이트:', groupMembers.length, '명');
       updateMemberMarkers(groupMembers);
+      setTimeout(() => {
+        markersUpdating.current = false;
+      }, 100);
     }
-  }, [groupMembers, mapType, mapsInitialized.naver, mapsInitialized.google]);
+  }, [groupMembers.length, mapType, mapsInitialized.naver, mapsInitialized.google]); // groupMembers 대신 groupMembers.length 사용
 
   // 지도 타입 변경 핸들러
   const handleMapTypeChange = () => {
@@ -3135,7 +3174,7 @@ export default function HomePage() {
     setFilteredSchedules([]);
     setFirstMemberSelected(false);
     setIsFirstMemberSelectionComplete(false);
-    dataFetchedRef.current = { members: false, schedules: false };
+    dataFetchedRef.current = { members: false, schedules: false, loading: false };
     
     console.log('[handleGroupSelect] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작');
   };

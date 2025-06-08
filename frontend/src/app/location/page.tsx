@@ -226,17 +226,17 @@ const pageVariants = {
   }
 };
 
-// 바텀시트 variants - logs 페이지와 완전히 동일한 애니메이션
+// 바텀시트 variants - 올라갈 때도 부드럽게 개선
 const bottomSheetVariants = {
   collapsed: { 
     translateY: '65%',
     opacity: 1,
     transition: {
       type: "spring",
-      stiffness: 200,
-      damping: 40,
-      mass: 0.8,
-      duration: 0.8
+      stiffness: 280,
+      damping: 35,
+      mass: 0.7,
+      duration: 0.5
     }
   },
   expanded: {
@@ -244,10 +244,10 @@ const bottomSheetVariants = {
     opacity: 1,
     transition: {
       type: "spring",
-      stiffness: 200,
-      damping: 40,
-      mass: 0.8,
-      duration: 0.8
+      stiffness: 260,
+      damping: 32,
+      mass: 0.6,
+      duration: 0.5
     }
   }
 };

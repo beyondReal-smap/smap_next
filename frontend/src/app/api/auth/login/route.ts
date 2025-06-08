@@ -1,116 +1,178 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Member, LoginResponse } from '@/types/auth';
+import { generateJWT } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
     const { mt_id, mt_pwd } = await request.json();
 
+    console.log('[LOGIN API] 요청 시작:', { mt_id, mt_pwd: '***' });
+
     // 입력 검증
     if (!mt_id || !mt_pwd) {
+      console.log('[LOGIN API] 입력 검증 실패: 빈 값');
       return NextResponse.json(
-        { success: false, message: '아이디와 비밀번호를 입력해주세요.' },
+        { success: false, message: '전화번호와 비밀번호를 입력해주세요.' },
         { status: 400 }
       );
     }
 
-    // TODO: 실제 백엔드 API 호출
-    // const response = await axios.post('http://your-backend-api/auth/login', {
-    //   mt_id,
-    //   mt_pwd
-    // });
+    // 전화번호 형식 정리 (하이픈 제거)
+    const cleanPhoneNumber = mt_id.replace(/-/g, '');
 
-    // 임시 로직 - 실제 구현시 제거
-    if (mt_id === 'test@test.com' && mt_pwd === 'password') {
-      const mockUser: Member = {
-        mt_idx: 1186,
-        mt_type: 1,
-        mt_level: 2,
-        mt_status: 1,
-        mt_id: mt_id,
-        mt_name: '테스트 사용자',
-        mt_nickname: '테스트닉네임',
-        mt_hp: '01012345678',
-        mt_email: 'test@test.com',
-        mt_birth: '1990-01-01',
-        mt_gender: 1,
-        mt_file1: '/images/avatar1.png',
-        mt_lat: 37.5642,
-        mt_long: 127.0016,
-        mt_sido: '서울시',
-        mt_gu: '강남구',
-        mt_dong: '역삼동',
-        mt_onboarding: 'Y',
-        mt_push1: 'Y',
-        mt_plan_check: 'N',
-        mt_plan_date: '',
-        mt_weather_pop: '20',
-        mt_weather_sky: 8,
-        mt_weather_tmn: 18,
-        mt_weather_tmx: 25,
-        mt_weather_date: new Date().toISOString(),
-        mt_ldate: new Date().toISOString(),
-        mt_adate: new Date().toISOString()
-      };
+    console.log('[LOGIN API] 로그인 시도:', { mt_id: cleanPhoneNumber });
 
-      const response: LoginResponse = {
-        success: true,
-        message: '로그인 성공',
-        data: {
-          token: 'mock-jwt-token-' + Date.now(),
-          member: mockUser
+    // 백엔드 API 호출
+    console.log('[LOGIN API] 백엔드 API 호출 시작');
+    try {
+      const backendUrl = 'https://118.67.130.71:8000/api/v1/members/login';
+      
+      console.log('[LOGIN API] 백엔드 URL:', backendUrl);
+      console.log('[LOGIN API] 요청 데이터:', { mt_id: cleanPhoneNumber, mt_pwd: '***' });
+      
+      // SSL 인증서 문제 해결을 위한 설정
+      process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
+
+      const backendResponse = await fetch(backendUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          mt_id: cleanPhoneNumber,
+          mt_pwd: mt_pwd
+        }),
+        // 타임아웃 설정 (10초로 증가)
+        signal: AbortSignal.timeout(10000)
+      });
+
+      console.log('[LOGIN API] 백엔드 응답 상태:', backendResponse.status);
+      console.log('[LOGIN API] 백엔드 응답 헤더:', Object.fromEntries(backendResponse.headers.entries()));
+
+      const backendData = await backendResponse.json();
+      console.log('[LOGIN API] 백엔드 응답 데이터:', backendData);
+
+      if (!backendResponse.ok) {
+        // 백엔드에서 오류 응답이 온 경우
+        console.error('[LOGIN API] 백엔드 오류:', backendResponse.status, backendData);
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: backendData.message || '로그인에 실패했습니다.' 
+          },
+          { status: backendResponse.status }
+        );
+      }
+
+      if (backendData.success && backendData.data?.user) {
+        // 백엔드 로그인 성공
+        console.log('[LOGIN API] 백엔드 로그인 성공 처리');
+        const userData = backendData.data.user;
+        
+        const member: Member = {
+          mt_idx: userData.mt_idx,
+          mt_type: userData.mt_type,
+          mt_level: userData.mt_level,
+          mt_status: userData.mt_status,
+          mt_id: userData.mt_id,
+          mt_name: userData.mt_name,
+          mt_nickname: userData.mt_nickname,
+          mt_hp: userData.mt_hp,
+          mt_email: userData.mt_email,
+          mt_birth: userData.mt_birth,
+          mt_gender: userData.mt_gender,
+          mt_file1: userData.mt_file1,
+          mt_lat: userData.mt_lat,
+          mt_long: userData.mt_long,
+          mt_sido: userData.mt_sido,
+          mt_gu: userData.mt_gu,
+          mt_dong: userData.mt_dong,
+          mt_onboarding: userData.mt_onboarding,
+          mt_push1: userData.mt_push1,
+          mt_plan_check: userData.mt_plan_check,
+          mt_plan_date: userData.mt_plan_date,
+          mt_weather_pop: userData.mt_weather_pop,
+          mt_weather_sky: userData.mt_weather_sky,
+          mt_weather_tmn: userData.mt_weather_tmn,
+          mt_weather_tmx: userData.mt_weather_tmx,
+          mt_weather_date: userData.mt_weather_date,
+          mt_ldate: userData.mt_ldate,
+          mt_adate: userData.mt_adate
+        };
+
+        // JWT 토큰 생성 (실제 사용자 정보 포함)
+        const jwtToken = generateJWT({
+          mt_idx: userData.mt_idx,
+          mt_id: userData.mt_id,
+          mt_name: userData.mt_name,
+          mt_nickname: userData.mt_nickname,
+          mt_file1: userData.mt_file1
+        });
+
+        const response: LoginResponse = {
+          success: true,
+          message: '로그인 성공',
+          data: {
+            token: jwtToken, // 실제 사용자 정보가 포함된 JWT 토큰 사용
+            member: member
+          }
+        };
+
+        console.log('[LOGIN API] 백엔드 로그인 성공:', member.mt_idx, member.mt_name);
+        
+        // 응답 생성 및 쿠키에 토큰 저장
+        const nextResponse = NextResponse.json(response);
+        nextResponse.cookies.set('auth-token', jwtToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7 // 7일
+        });
+        
+        return nextResponse;
+      } else {
+        // 백엔드 로그인 실패
+        console.log('[LOGIN API] 백엔드 로그인 실패:', backendData);
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: backendData.message || '아이디 또는 비밀번호가 올바르지 않습니다.' 
+          },
+          { status: 401 }
+        );
+      }
+
+    } catch (backendError) {
+      // 백엔드 연결 실패
+      console.error('[LOGIN API] 백엔드 연결 실패:', backendError);
+      
+      if (backendError instanceof Error) {
+        if (backendError.name === 'AbortError') {
+          return NextResponse.json(
+            { success: false, message: '서버 응답 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.' },
+            { status: 408 }
+          );
         }
-      };
-
-      return NextResponse.json(response);
+        if (backendError.message.includes('fetch')) {
+          return NextResponse.json(
+            { success: false, message: '서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요.' },
+            { status: 503 }
+          );
+        }
+      }
+      
+      return NextResponse.json(
+        { success: false, message: '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.' },
+        { status: 503 }
+      );
     }
 
-    // 모든 로그인 시도에 대해 mt_idx 1186으로 성공 응답 (데모용)
-    const mockUser: Member = {
-      mt_idx: 1186, // 항상 1186으로 설정
-      mt_type: 1,
-      mt_level: 2,
-      mt_status: 1,
-      mt_id: mt_id,
-      mt_name: '사용자 1186',
-      mt_nickname: '닉네임1186',
-      mt_hp: mt_id, // 입력받은 전화번호/이메일을 저장
-      mt_email: mt_id.includes('@') ? mt_id : 'user1186@example.com',
-      mt_birth: '1990-01-01',
-      mt_gender: 1,
-      mt_file1: '/images/avatar1.png',
-      mt_lat: 37.5642,
-      mt_long: 127.0016,
-      mt_sido: '서울시',
-      mt_gu: '강남구',
-      mt_dong: '역삼동',
-      mt_onboarding: 'Y',
-      mt_push1: 'Y',
-      mt_plan_check: 'N',
-      mt_plan_date: '',
-      mt_weather_pop: '20',
-      mt_weather_sky: 8,
-      mt_weather_tmn: 18,
-      mt_weather_tmx: 25,
-      mt_weather_date: new Date().toISOString(),
-      mt_ldate: new Date().toISOString(),
-      mt_adate: new Date().toISOString()
-    };
-
-    const response: LoginResponse = {
-      success: true,
-      message: '로그인 성공',
-      data: {
-        token: 'mock-jwt-token-1186-' + Date.now(),
-        member: mockUser
-      }
-    };
-
-    return NextResponse.json(response);
-
   } catch (error) {
-    console.error('[API] 로그인 오류:', error);
+    console.error('[LOGIN API] 로그인 오류:', error);
+    
+    // 기타 오류
     return NextResponse.json(
-      { success: false, message: '서버 오류가 발생했습니다.' },
+      { success: false, message: `서버 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}` },
       { status: 500 }
     );
   }

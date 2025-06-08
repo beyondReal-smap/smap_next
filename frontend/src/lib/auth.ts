@@ -100,7 +100,14 @@ export function getCurrentUser(request: NextRequest): JWTPayload | null {
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // 개발 환경에서는 토큰이 없어도 mock 사용자 반환
+    // 쿠키에서 토큰 확인
+    const cookieToken = request.cookies.get('auth-token')?.value;
+    if (cookieToken) {
+      console.log('[AUTH] 쿠키에서 토큰 발견, 검증 시도');
+      return verifyJWT(cookieToken);
+    }
+    
+    // 개발 환경에서만 mock 사용자 반환 (실제 토큰이 없을 때만)
     if (process.env.NODE_ENV === 'development') {
       console.log('[AUTH] 개발 환경 - 인증 헤더 없음, mock 사용자 반환');
       return verifyJWT('mock');

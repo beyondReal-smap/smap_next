@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCurrentUserId } from '@/lib/auth';
 
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;
@@ -11,6 +12,10 @@ try {
 export async function GET(request: NextRequest) {
   try {
     console.log('[Current User Groups API] 현재 사용자 그룹 목록 조회 요청');
+
+    // 현재 로그인한 사용자 ID 가져오기
+    const currentUserId = getCurrentUserId(request);
+    console.log('[Current User Groups API] 현재 사용자 ID:', currentUserId);
 
     // Authorization 헤더에서 토큰 추출
     const authorization = request.headers.get('authorization');
@@ -85,13 +90,17 @@ export async function GET(request: NextRequest) {
 
     console.log('[Current User Groups API] 백엔드 응답 상태:', response.status, response.statusText, '(사용된 방법:', usedMethod + ')');
 
-    // 401 또는 422 에러가 발생한 경우 대체 방법으로 사용자 ID 1186을 직접 사용
+    // 401 또는 422 에러가 발생한 경우 대체 방법으로 현재 사용자 ID를 직접 사용
     if (!response.ok && (response.status === 401 || response.status === 422)) {
       const errorText = await response.text();
-      console.log('[Current User Groups API] 인증 실패, 임시 사용자 ID로 재시도:', errorText);
+      console.log('[Current User Groups API] 인증 실패, 현재 사용자 ID로 재시도:', errorText);
+      
+      // 현재 사용자 ID가 있으면 사용, 없으면 기본값 사용
+      const userIdToUse = currentUserId || 1186;
+      console.log('[Current User Groups API] 사용할 사용자 ID:', userIdToUse);
       
       // 올바른 백엔드 엔드포인트 사용: /groups/member/{member_id}
-      const fallbackUrl = 'https://118.67.130.71:8000/api/v1/groups/member/1186';
+      const fallbackUrl = `https://118.67.130.71:8000/api/v1/groups/member/${userIdToUse}`;
       console.log('[Current User Groups API] 대체 API 호출:', fallbackUrl);
       
       try {
@@ -141,11 +150,15 @@ export async function GET(request: NextRequest) {
     console.error('[Current User Groups API] 오류:', error);
     
     // 최후의 수단으로 목업 데이터 반환
+    const currentUserIdForMock = getCurrentUserId(request);
+    const userIdForMock = currentUserIdForMock || 1186;
+    console.log('[Current User Groups API] 목업 데이터에 사용할 사용자 ID:', userIdForMock);
+    
     const mockGroups = [
       {
         sgt_idx: 1,
         sgt_title: '개발팀',
-        mt_idx: 1186,
+        mt_idx: userIdForMock,
         sgt_code: 'DEV001',
         sgt_memo: '개발팀',
         sgt_show: 'Y',
@@ -158,7 +171,7 @@ export async function GET(request: NextRequest) {
       {
         sgt_idx: 641,
         sgt_title: '디자인팀',
-        mt_idx: 1186,
+        mt_idx: userIdForMock,
         sgt_code: 'DES001',
         sgt_memo: '디자인팀',
         sgt_show: 'Y',
@@ -171,7 +184,7 @@ export async function GET(request: NextRequest) {
       {
         sgt_idx: 642,
         sgt_title: '기획팀',
-        mt_idx: 1186,
+        mt_idx: userIdForMock,
         sgt_code: 'PLA001',
         sgt_memo: '기획팀',
         sgt_show: 'Y',

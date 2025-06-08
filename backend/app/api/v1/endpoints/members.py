@@ -12,7 +12,9 @@ from app.schemas.member import (
     RegisterRequest, 
     RegisterResponse,
     MemberLogin,
-    MemberLoginResponse
+    MemberLoginResponse,
+    GoogleLoginRequest,
+    GoogleLoginResponse
 )
 from app.services.member_service import member_service
 from app.models.enums import StatusEnum
@@ -39,6 +41,16 @@ def login_member(
     로그인
     """
     return member_service.login_member(db, login_data.mt_id, login_data.mt_pwd)
+
+@router.post("/google-login", response_model=GoogleLoginResponse)
+def google_login(
+    google_data: GoogleLoginRequest,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    Google 로그인
+    """
+    return member_service.google_login(db, google_data)
 
 @router.get("/check/phone/{phone}")
 def check_phone_availability(
