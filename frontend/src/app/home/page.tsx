@@ -2604,6 +2604,13 @@ export default function HomePage() {
 
   // 그룹 멤버 선택 핸들러 (filteredSchedules 업데이트)
   const handleMemberSelect = (id: string) => {
+    // 현재 선택된 멤버와 같은 멤버를 재선택하는 경우 아무것도 하지 않음
+    const currentSelectedMember = groupMembers.find(member => member.isSelected);
+    if (currentSelectedMember && currentSelectedMember.id === id) {
+      console.log('[handleMemberSelect] 같은 멤버 재선택 - 무시:', id);
+      return;
+    }
+    
     // 바텀시트 드래그 상태 리셋 (멤버 클릭으로 인한 의도치 않은 상태 변경 방지)
     isDraggingRef.current = false;
     startDragY.current = null;
