@@ -109,6 +109,17 @@ export async function POST(request: NextRequest) {
           mt_file1: userData.mt_file1
         });
 
+        // 세션 정보 로깅 (나중에 DB 저장으로 확장 가능)
+        const sessionInfo = {
+          mt_idx: userData.mt_idx,
+          login_time: new Date().toISOString(),
+          ip_address: request.headers.get('x-forwarded-for') || 
+                     request.headers.get('x-real-ip') || 
+                     'unknown',
+          user_agent: request.headers.get('user-agent') || 'unknown'
+        };
+        console.log('[LOGIN API] 세션 생성:', sessionInfo);
+
         const response: LoginResponse = {
           success: true,
           message: '로그인 성공',
@@ -126,7 +137,7 @@ export async function POST(request: NextRequest) {
           httpOnly: true,
           secure: process.env.NODE_ENV === 'production',
           sameSite: 'lax',
-          maxAge: 60 * 60 * 24 * 7 // 7일
+          maxAge: 60 * 60 * 24 * 30 // 30일 (한 달)
         });
         
         return nextResponse;

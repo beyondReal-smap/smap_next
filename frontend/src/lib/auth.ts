@@ -17,6 +17,7 @@ interface JWTPayload {
   sgdt_leader_chk?: string;
   iat?: number;
   exp?: number;
+  session_id?: string;
 }
 
 // 임시 하드코딩된 사용자 정보 (로그인 기능 구현 전까지 사용)
@@ -84,10 +85,14 @@ export function generateJWT(userInfo: {
   sgdt_owner_chk?: string;
   sgdt_leader_chk?: string;
 }): string {
+  // 세션 ID 생성 (나중에 DB 연동 시 사용 가능)
+  const sessionId = `sess_${userInfo.mt_idx}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   const payload: JWTPayload = {
     ...userInfo,
+    session_id: sessionId, // 세션 추적용 ID 추가
     iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7) // 7일 후 만료
+    exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 30) // 30일 후 만료 (한 달)
   };
 
   return jwt.sign(payload, JWT_SECRET);

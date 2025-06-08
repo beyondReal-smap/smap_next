@@ -212,6 +212,10 @@ class AuthService {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(this.TOKEN_KEY);
       localStorage.removeItem(this.USER_KEY);
+      
+      // 쿠키에서도 토큰 삭제
+      document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax';
+      console.log('[AUTH SERVICE] 로컬스토리지 및 쿠키 삭제 완료');
     }
   }
 
@@ -221,6 +225,20 @@ class AuthService {
   isLoggedIn(): boolean {
     const token = this.getToken();
     const userData = this.getUserData();
+    
+    // 로컬스토리지에 토큰이 없으면 쿠키도 확인
+    if (!token && typeof window !== 'undefined') {
+      const cookieToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('auth-token='))
+        ?.split('=')[1];
+      
+      if (cookieToken && userData) {
+        console.log('[AUTH SERVICE] 쿠키에서 토큰 발견, 자동 로그인 유지');
+        return true;
+      }
+    }
+    
     return !!(token && userData);
   }
 
@@ -236,6 +254,33 @@ class AuthService {
       console.error('[AUTH SERVICE] 토큰 갱신 실패:', error);
       this.clearAuthData();
       throw new Error('인증이 만료되었습니다. 다시 로그인해주세요.');
+    }
+  }
+
+  /**
+   * 토큰 만료 확인 및 자동 갱신
+   */
+  async checkAndRefreshToken(): Promise<boolean> {
+    try {
+      const token = this.getToken();
+      if (!token) return false;
+
+      // JWT 토큰 디코딩하여 만료 시간 확인
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const currentTime = Math.floor(Date.now() / 1000);
+      const timeUntilExpiry = payload.exp - currentTime;
+
+      // 토큰이 3일 이내에 만료되면 갱신
+      if (timeUntilExpiry < 60 * 60 * 24 * 3) {
+        console.log('[AUTH SERVICE] 토큰 만료 임박, 자동 갱신 시도');
+        await this.refreshToken();
+        return true;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('[AUTH SERVICE] 토큰 확인 실패:', error);
+      return false;
     }
   }
 

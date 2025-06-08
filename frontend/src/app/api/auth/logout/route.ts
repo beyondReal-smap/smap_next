@@ -10,11 +10,23 @@ export async function POST(request: NextRequest) {
     //   headers: { Authorization: `Bearer ${token}` }
     // });
 
-    // 로그아웃은 클라이언트에서 토큰 제거하는 것이 주된 로직이므로 간단히 성공 응답
-    return NextResponse.json({
+    // 로그아웃 응답 생성 및 쿠키 삭제
+    const response = NextResponse.json({
       success: true,
       message: '로그아웃되었습니다.'
     });
+
+    // 쿠키에서 토큰 삭제
+    response.cookies.set('auth-token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 0, // 즉시 만료
+      expires: new Date(0) // 과거 날짜로 설정하여 삭제
+    });
+
+    console.log('[LOGOUT API] 쿠키 삭제 완료');
+    return response;
 
   } catch (error) {
     console.error('[API] 로그아웃 오류:', error);
