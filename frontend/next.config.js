@@ -1,7 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false, // 개발 환경에서 두 번 렌더링 방지
-  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  // Vercel에서는 standalone 모드 사용하지 않음
+  output: process.env.VERCEL ? undefined : (process.env.NODE_ENV === 'production' ? 'standalone' : undefined),
   images: {
     remotePatterns: [
       {
