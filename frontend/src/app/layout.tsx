@@ -6,8 +6,6 @@ import { lineSeed } from './fonts'; // LINE SEED 폰트 임포트
 import ClientLayout from './ClientLayout'; // ClientLayout import
 import config, { APP_INFO, getLocalizedAppInfo } from '../config'
 
-// const inter = Inter({ subsets: ['latin'] }) // Inter 폰트 인스턴스 제거
-
 // 언어 설정에 따른 메타데이터 생성
 const getMetadata = (): Metadata => {
   const locale = 'ko' // 서버 사이드에서는 기본값 사용

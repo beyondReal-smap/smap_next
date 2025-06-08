@@ -6,22 +6,23 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { provider, token } = body;
 
-    // 소셜 로그인 처리 로직 - 데모용으로 항상 mt_idx 1186으로 성공 응답
+    // 소셜 로그인 처리 로직 - 데모용 (실제로는 NextAuth 사용)
     // 실제 구현에서는 각 소셜 플랫폼의 토큰 검증 및 사용자 정보 조회가 필요합니다
     
     console.log(`[SOCIAL LOGIN] ${provider} 로그인 시도:`, { token: token?.substring(0, 20) + '...' });
 
-    // 모든 소셜 로그인에 대해 mt_idx 1186으로 성공 응답 (데모용)
+    // 데모용 응답 - 실제로는 NextAuth를 통해 처리됨
+    const mockUserId = Math.floor(Math.random() * 9000) + 1000; // 랜덤 사용자 ID
     const mockUser: Member = {
-      mt_idx: 1186, // 항상 1186으로 설정
+      mt_idx: mockUserId,
       mt_type: 1,
       mt_level: 2,
       mt_status: 1,
-      mt_id: `${provider}_user_1186`,
-      mt_name: `${provider} 사용자 1186`,
-      mt_nickname: `${provider}닉네임1186`,
+      mt_id: `${provider}_user_${mockUserId}`,
+      mt_name: `${provider} 사용자 ${mockUserId}`,
+      mt_nickname: `${provider}닉네임${mockUserId}`,
       mt_hp: '01012345678',
-      mt_email: `user1186@${provider}.com`,
+      mt_email: `user${mockUserId}@${provider}.com`,
       mt_birth: '1990-01-01',
       mt_gender: 1,
       mt_file1: '/images/avatar1.png',
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
       success: true,
       message: `${provider} 로그인 성공`,
       data: {
-        token: `mock-${provider}-token-1186-` + Date.now(),
+        token: `mock-${provider}-token-${mockUserId}-` + Date.now(),
         member: mockUser
       }
     };

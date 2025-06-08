@@ -59,6 +59,14 @@ const authOptions: NextAuthOptions = {
       }
       return session;
     },
+    async redirect({ url, baseUrl }) {
+      // 로그인 성공 후 home으로 리다이렉트
+      console.log('[NEXTAUTH] 리다이렉트:', { url, baseUrl });
+      if (url.startsWith('/') || url.startsWith(baseUrl)) {
+        return `${baseUrl}/home`;
+      }
+      return baseUrl;
+    },
   },
   pages: {
     signIn: '/signin',

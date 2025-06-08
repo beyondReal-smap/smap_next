@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import { PushLog, DeleteAllResponse } from '@/types/push';
 import { useToast } from '@/components/ui/use-toast';
 import notificationService from '@/services/notificationService';
+import { useAuth } from '@/contexts/AuthContext';
 
 // glass-effect 및 모바일 최적화된 CSS 애니메이션
 const mobileAnimations = `
@@ -81,6 +82,7 @@ function groupByDate(list: PushLog[]): Record<string, PushLog[]> {
 function NoticeContent() {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [notices, setNotices] = useState<PushLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -291,7 +293,13 @@ function NoticeContent() {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await notificationService.getMemberPushLogs('1186');
+        if (!user?.mt_idx) {
+          console.error('[NOTICE PAGE] 사용자 정보가 없습니다.');
+          setNotices([]);
+          setLoading(false);
+          return;
+        }
+        const data = await notificationService.getMemberPushLogs(user.mt_idx.toString());
         
         console.log('[NOTICE PAGE] Fetched data length:', Array.isArray(data) ? data.length : 'Data is not an array');
         if (isMounted) {
@@ -320,7 +328,7 @@ function NoticeContent() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [user]);
 
   console.log('[NOTICE PAGE] Render - loading:', loading, 'notices length:', notices.length, 'grouped keys:', Object.keys(grouped));
 
@@ -333,7 +341,11 @@ function NoticeContent() {
   const handleConfirmDelete = async () => {
     setIsDeleting(true);
     try {
-      const response = await notificationService.deleteAllNotifications(1186);
+      if (!user?.mt_idx) {
+        console.error('[NOTICE PAGE] 사용자 정보가 없습니다.');
+        return;
+      }
+      const response = await notificationService.deleteAllNotifications(user.mt_idx);
       console.log(response.message);
       setNotices([]);
       setIsDeleteModalOpen(false);

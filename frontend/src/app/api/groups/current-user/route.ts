@@ -95,8 +95,13 @@ export async function GET(request: NextRequest) {
       const errorText = await response.text();
       console.log('[Current User Groups API] 인증 실패, 현재 사용자 ID로 재시도:', errorText);
       
-      // 현재 사용자 ID가 있으면 사용, 없으면 기본값 사용
-      const userIdToUse = currentUserId || 1186;
+      // 현재 사용자 ID가 없으면 빈 배열 반환 (신규 사용자)
+      if (!currentUserId) {
+        console.log('[Current User Groups API] 인증된 사용자 ID가 없음, 빈 배열 반환');
+        return NextResponse.json([]);
+      }
+      
+      const userIdToUse = currentUserId;
       console.log('[Current User Groups API] 사용할 사용자 ID:', userIdToUse);
       
       // 올바른 백엔드 엔드포인트 사용: /groups/member/{member_id}
@@ -149,54 +154,12 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('[Current User Groups API] 오류:', error);
     
-    // 최후의 수단으로 목업 데이터 반환
+    // 최후의 수단으로 빈 배열 반환 (신규 사용자는 그룹이 없음)
     const currentUserIdForMock = getCurrentUserId(request);
-    const userIdForMock = currentUserIdForMock || 1186;
-    console.log('[Current User Groups API] 목업 데이터에 사용할 사용자 ID:', userIdForMock);
+    console.log('[Current User Groups API] 에러 발생, 사용자 ID:', currentUserIdForMock);
     
-    const mockGroups = [
-      {
-        sgt_idx: 1,
-        sgt_title: '개발팀',
-        mt_idx: userIdForMock,
-        sgt_code: 'DEV001',
-        sgt_memo: '개발팀',
-        sgt_show: 'Y',
-        sgt_wdate: new Date().toISOString(),
-        sgt_udate: new Date().toISOString(),
-        is_owner: true,
-        is_leader: false,
-        join_date: new Date().toISOString()
-      },
-      {
-        sgt_idx: 641,
-        sgt_title: '디자인팀',
-        mt_idx: userIdForMock,
-        sgt_code: 'DES001',
-        sgt_memo: '디자인팀',
-        sgt_show: 'Y',
-        sgt_wdate: new Date().toISOString(),
-        sgt_udate: new Date().toISOString(),
-        is_owner: false,
-        is_leader: true,
-        join_date: new Date().toISOString()
-      },
-      {
-        sgt_idx: 642,
-        sgt_title: '기획팀',
-        mt_idx: userIdForMock,
-        sgt_code: 'PLA001',
-        sgt_memo: '기획팀',
-        sgt_show: 'Y',
-        sgt_wdate: new Date().toISOString(),
-        sgt_udate: new Date().toISOString(),
-        is_owner: false,
-        is_leader: false,
-        join_date: new Date().toISOString()
-      }
-    ];
-    
-    console.log('[Current User Groups API] 목업 데이터 반환:', mockGroups);
-    return NextResponse.json(mockGroups);
+    // 신규 사용자는 그룹이 없으므로 빈 배열 반환
+    console.log('[Current User Groups API] 빈 배열 반환 (신규 사용자)');
+    return NextResponse.json([]);
   }
 } 

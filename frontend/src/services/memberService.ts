@@ -108,7 +108,7 @@ class MemberService {
   async getGroupMembers(groupId: number | string): Promise<Member[]> {
     const mockData: Member[] = [
       {
-        mt_idx: 1186,
+        mt_idx: 2001,
         mt_name: '김철수',
         mt_file1: '/images/avatar3.png',
         mt_lat: '37.5692',
@@ -122,7 +122,7 @@ class MemberService {
         sgdt_show: 1
       },
       {
-        mt_idx: 1187,
+        mt_idx: 2002,
         mt_name: '이영희',
         mt_file1: '/images/avatar1.png',
         mt_lat: '37.5612',
@@ -136,7 +136,7 @@ class MemberService {
         sgdt_show: 1
       },
       {
-        mt_idx: 1188,
+        mt_idx: 2003,
         mt_name: '박민수',
         mt_file1: '/images/avatar2.png',
         mt_lat: '37.5662',

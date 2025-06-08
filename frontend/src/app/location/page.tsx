@@ -1879,7 +1879,7 @@ export default function LocationPage() {
       console.log('[지도 초기화] 시작 - 현재 로그인 사용자 위치로 초기화');
       
       try {
-        // 현재 로그인한 사용자(1186)의 위치를 그룹멤버 데이터에서 찾아서 지도 초기화
+        // 현재 로그인한 사용자의 위치를 그룹멤버 데이터에서 찾아서 지도 초기화
         let initialCenter = new window.naver.maps.LatLng(37.5665, 126.9780); // 기본값
         let initialZoom = 13;
         let foundUserLocation = false;
@@ -1914,7 +1914,7 @@ export default function LocationPage() {
             initialCenter = new window.naver.maps.LatLng(offsetLat, lng);
             initialZoom = 16;
             foundUserLocation = true;
-            console.log('[지도 초기화] 현재 로그인 사용자(1186) 실시간 위치로 초기화:', currentUserMember.name, { 
+            console.log('[지도 초기화] 현재 로그인 사용자 실시간 위치로 초기화:', currentUserMember.name, { 
               lat: offsetLat, 
               lng,
               originalLat: lat 

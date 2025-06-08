@@ -18,8 +18,16 @@ export async function GET(request: NextRequest) {
     }
     
     const searchParams = request.nextUrl.searchParams;
-    // mt_idx는 인증된 사용자 ID 사용 (현재는 하드코딩된 1186)
-    const mt_idx = getCurrentUserId(request)?.toString() || '1186';
+    // mt_idx는 인증된 사용자 ID 사용
+    const mt_idx = getCurrentUserId(request)?.toString();
+    
+    if (!mt_idx) {
+      console.log('[Groups API] 인증된 사용자 ID가 없음, 빈 배열 반환');
+      return NextResponse.json({
+        success: true,
+        data: []
+      });
+    }
 
     console.log('[Groups API] 그룹 목록 조회 요청:', { mt_idx });
 

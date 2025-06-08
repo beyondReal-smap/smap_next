@@ -35,6 +35,7 @@ import groupService, { Group, GroupStats } from '@/services/groupService';
 import memberService from '@/services/memberService';
 import scheduleService from '@/services/scheduleService';
 import locationService from '@/services/locationService';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const dynamic = 'force-dynamic';
 
@@ -289,6 +290,7 @@ interface GroupForm {
 // 메인 컴포넌트
 function GroupPageContent() {
   const router = useRouter();
+  const { user } = useAuth();
   
   // 상태 관리
   const [groups, setGroups] = useState<Group[]>([]);
@@ -568,7 +570,7 @@ function GroupPageContent() {
     setIsCreatingGroup(true);
     try {
       const groupData = {
-        mt_idx: 1186,
+        mt_idx: user?.mt_idx || 0,
         sgt_title: newGroup.name.trim(),
         sgt_memo: newGroup.description.trim() || null,
         sgt_code: null,
@@ -698,8 +700,8 @@ function GroupPageContent() {
   };
 
   const isCurrentUserGroupOwner = () => {
-    if (!selectedGroup || !groupMembers.length) return false;
-    const currentUserId = 1186;
+    if (!selectedGroup || !groupMembers.length || !user) return false;
+    const currentUserId = user.mt_idx;
     const currentUserMember = groupMembers.find(member => member.mt_idx === currentUserId);
     return currentUserMember?.sgdt_owner_chk === 'Y';
   };

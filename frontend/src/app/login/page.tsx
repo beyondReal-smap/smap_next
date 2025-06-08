@@ -77,7 +77,7 @@ export default function LoginPage() {
     }
 
     try {
-      // AuthContext의 login 함수 사용 (내부적으로 mt_idx 1186으로 설정됨)
+      // AuthContext의 login 함수 사용
       await login({
         mt_id: phoneNumber.replace(/-/g, ''), // 전화번호에서 하이픈 제거
         mt_pwd: password

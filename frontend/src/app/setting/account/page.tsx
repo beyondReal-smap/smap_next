@@ -25,6 +25,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 
 const GENDER_OPTIONS = [
   { value: 'male', label: '남성', icon: '👨' },
@@ -216,6 +217,7 @@ html, body {
 
 export default function AccountPage() {
   const router = useRouter();
+  const { logout } = useAuth();
   const [nickname, setNickname] = useState('길동이');
   const [name, setName] = useState('홍길동');
   const [phone, setPhone] = useState('010-1234-5678');
@@ -238,8 +240,26 @@ export default function AccountPage() {
     setShowLogoutModal(true);
   };
 
-  const handleConfirmLogout = () => {
-    router.push('/login');
+  const handleConfirmLogout = async () => {
+    try {
+      console.log('[ACCOUNT] 로그아웃 시작');
+      
+      // AuthContext를 통한 완전한 로그아웃 처리
+      await logout();
+      
+      console.log('[ACCOUNT] 로그아웃 완료, signin으로 이동');
+      
+      // 로그아웃 후 signin 페이지로 이동
+      router.push('/signin');
+      
+      // 모달 닫기
+      setShowLogoutModal(false);
+    } catch (error) {
+      console.error('[ACCOUNT] 로그아웃 실패:', error);
+      // 실패해도 signin으로 이동
+      router.push('/signin');
+      setShowLogoutModal(false);
+    }
   };
 
   const handleImageSelect = (type: 'camera' | 'gallery') => {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getCurrentUserId } from '@/lib/auth';
 
 interface Schedule {
   id: string;
@@ -206,8 +207,15 @@ export async function GET(
     let backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules`;
     const urlParams = new URLSearchParams();
     
-    // current_user_id는 필수 파라미터
-    urlParams.append('current_user_id', '1186'); // TODO: 실제 로그인 사용자 ID로 변경
+    // current_user_id는 필수 파라미터 - 실제 로그인 사용자 ID 사용
+    const currentUserId = getCurrentUserId(request);
+    if (!currentUserId) {
+      return NextResponse.json(
+        { success: false, error: '인증된 사용자 정보가 없습니다.' },
+        { status: 401 }
+      );
+    }
+    urlParams.append('current_user_id', currentUserId.toString());
     
     // days 파라미터 추가
     if (days) {
@@ -280,8 +288,17 @@ export async function POST(
     console.log('[API PROXY] 🔥 스케줄 생성 요청 시작 - groupId:', groupId);
     console.log('[API PROXY] 📝 프론트엔드 요청 데이터:', body);
     
+    // 현재 사용자 ID 확인
+    const currentUserId = getCurrentUserId(request);
+    if (!currentUserId) {
+      return NextResponse.json(
+        { success: false, error: '인증된 사용자 정보가 없습니다.' },
+        { status: 401 }
+      );
+    }
+    
     // 백엔드 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules?current_user_id=1186`;
+    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules?current_user_id=${currentUserId}`;
     console.log('[API PROXY] 🎯 백엔드 호출 URL:', backendUrl);
     
     const backendRequestData = {
@@ -356,8 +373,17 @@ export async function PUT(
     console.log('[API PROXY] 🔥 스케줄 수정 요청 시작 - groupId:', groupId);
     console.log('[API PROXY] 📝 프론트엔드 요청 데이터:', body);
     
+    // 현재 사용자 ID 확인
+    const currentUserId = getCurrentUserId(request);
+    if (!currentUserId) {
+      return NextResponse.json(
+        { success: false, error: '인증된 사용자 정보가 없습니다.' },
+        { status: 401 }
+      );
+    }
+    
     // 백엔드 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules/${body.sst_idx}?current_user_id=1186`;
+    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules/${body.sst_idx}?current_user_id=${currentUserId}`;
     console.log('[API PROXY] 🎯 백엔드 호출 URL:', backendUrl);
     
     const backendRequestData = {
@@ -466,8 +492,17 @@ export async function DELETE(
       );
     }
     
+    // 현재 사용자 ID 확인
+    const currentUserId = getCurrentUserId(request);
+    if (!currentUserId) {
+      return NextResponse.json(
+        { success: false, error: '인증된 사용자 정보가 없습니다.' },
+        { status: 401 }
+      );
+    }
+    
     // 백엔드 API 호출
-    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=1186`;
+    const backendUrl = `https://118.67.130.71:8000/api/v1/schedule/group/${groupId}/schedules/${scheduleId}?current_user_id=${currentUserId}`;
     console.log('[API PROXY] 스케줄 삭제 백엔드 호출:', backendUrl);
     
     const fetchOptions: RequestInit = {

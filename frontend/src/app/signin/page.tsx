@@ -154,10 +154,18 @@ export default function SignInPage() {
         console.log('Google 로그인 세션:', session);
 
         if (session?.backendData) {
-          // 백엔드에서 받은 사용자 정보를 localStorage에 저장
+          // authService를 통해 사용자 정보 저장 (AuthContext가 인식할 수 있도록)
           try {
-            localStorage.setItem('user', JSON.stringify(session.backendData.member));
-            localStorage.setItem('token', session.backendData.token || '');
+            const userData = session.backendData.member;
+            const token = session.backendData.token || '';
+            
+            console.log('[GOOGLE LOGIN] 사용자 정보 저장:', userData);
+            
+            // authService를 통해 저장하여 AuthContext가 인식하도록 함
+            authService.setUserData(userData);
+            authService.setToken(token);
+            
+            console.log('[GOOGLE LOGIN] 저장 완료, home으로 이동');
           } catch (error) {
             console.error('사용자 정보 저장 실패:', error);
           }

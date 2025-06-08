@@ -1328,28 +1328,16 @@ export default function HomePage() {
         return;
       }
 
-      // 로그인되지 않은 경우 로그인 페이지로 리다이렉트
+      // 로그인되지 않은 경우 signin 페이지로 리다이렉트
       if (!isLoggedIn) {
-        console.log('[HOME] 로그인되지 않음 - 로그인 페이지로 리다이렉트');
-        router.push('/login');
+        console.log('[HOME] 로그인되지 않음 - signin 페이지로 리다이렉트');
+        router.push('/signin');
         return;
       }
 
       // 사용자 정보가 있는 경우 초기화
       if (user) {
         setUserName(user.mt_name || '사용자');
-        
-        // mt_idx가 1186이 아닌 경우 1186으로 설정 (데모용)
-        if (user.mt_idx !== 1186) {
-          console.log('[HOME] 사용자 mt_idx를 1186으로 설정 (현재:', user.mt_idx, ')');
-          
-          // 로컬 스토리지의 사용자 데이터 업데이트
-          const updatedUser = { ...user, mt_idx: 1186 };
-          authService.setUserData(updatedUser);
-          
-          // 실제로는 백엔드 API에도 업데이트 요청을 보내야 할 수 있습니다
-          // await authService.updateUserProfile(user.mt_idx, { mt_idx: 1186 });
-        }
 
         // 사용자 위치 정보 설정
         if (user.mt_lat && user.mt_long) {

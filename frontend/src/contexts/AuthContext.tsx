@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { AuthState, AuthAction, UserProfile, GroupWithMembers, LoginRequest } from '@/types/auth';
 import authService from '@/services/authService';
+import { getSession } from 'next-auth/react';
 
 // 초기 상태
 const initialState: AuthState = {
@@ -112,18 +113,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        // 1. 먼저 authService에서 로그인 상태 확인
         if (authService.isLoggedIn()) {
           const userData = authService.getUserData();
           if (userData) {
+            console.log('[AUTH CONTEXT] authService에서 사용자 데이터 발견:', userData.mt_name);
             dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
             // 최신 데이터로 갱신
             await refreshUserData();
-          } else {
-            dispatch({ type: 'SET_LOADING', payload: false });
+            return;
           }
-        } else {
-          dispatch({ type: 'SET_LOADING', payload: false });
         }
+
+        // 2. authService에 데이터가 없으면 NextAuth 세션 확인
+        console.log('[AUTH CONTEXT] authService에 데이터 없음, NextAuth 세션 확인');
+        const session = await getSession();
+        
+        if (session?.backendData?.member) {
+          console.log('[AUTH CONTEXT] NextAuth 세션에서 사용자 데이터 발견:', session.backendData.member.mt_name);
+          
+          // NextAuth 세션의 데이터를 authService에 저장
+          const userData = session.backendData.member;
+          const token = session.backendData.token || '';
+          
+          authService.setUserData(userData);
+          authService.setToken(token);
+          
+          dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+          // 최신 데이터로 갱신
+          await refreshUserData();
+          return;
+        }
+
+        // 3. 둘 다 없으면 로그인되지 않은 상태
+        console.log('[AUTH CONTEXT] 로그인 상태 없음');
+        dispatch({ type: 'SET_LOADING', payload: false });
+        
       } catch (error) {
         console.error('[AUTH CONTEXT] 초기 인증 상태 확인 실패:', error);
         dispatch({ type: 'SET_LOADING', payload: false });

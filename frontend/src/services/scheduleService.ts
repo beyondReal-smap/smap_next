@@ -680,7 +680,7 @@ class ScheduleService {
    */
   async checkUserPermission(
     groupId: number,
-    userId: number = 1186 // 기본 사용자 ID
+    userId?: number // 사용자 ID (선택적)
   ): Promise<UserPermission> {
     try {
       console.log('[SCHEDULE SERVICE] 사용자 권한 확인:', { groupId, userId });
@@ -818,10 +818,8 @@ class ScheduleService {
     try {
       console.log('[SCHEDULE SERVICE] 오너 그룹 전체 스케줄 조회 시작:', { year, month });
       
-      // URL 파라미터 구성
-      const params = new URLSearchParams({
-        current_user_id: '1186'
-      });
+      // URL 파라미터 구성 - 현재 사용자 ID는 백엔드에서 토큰으로 확인
+      const params = new URLSearchParams();
       
       if (year !== undefined) {
         params.append('year', year.toString());

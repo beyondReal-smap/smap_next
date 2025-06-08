@@ -13,8 +13,15 @@ export async function GET(request: NextRequest) {
     }
     
     const { searchParams } = new URL(request.url);
-    // current_user_id는 인증된 사용자 ID 사용 (현재는 하드코딩된 1186)
-    const currentUserId = getCurrentUserId(request)?.toString() || '1186';
+    // current_user_id는 인증된 사용자 ID 사용
+    const currentUserId = getCurrentUserId(request)?.toString();
+    if (!currentUserId) {
+      return NextResponse.json(
+        { success: false, error: '인증된 사용자 정보가 없습니다.' },
+        { status: 401 }
+      );
+    }
+    
     const days = searchParams.get('days') || '7'; // 기본 7일
     const year = searchParams.get('year'); // 년도 파라미터
     const month = searchParams.get('month'); // 월 파라미터
