@@ -29,6 +29,45 @@ import {
   FiDollarSign
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
+import { useAuth } from '@/contexts/AuthContext';
+
+// 기본 이미지 가져오기 함수 (schedule/page.tsx에서 가져옴)
+const getDefaultImage = (gender: number | null | undefined, index: number): string => {
+  // frontend/public/images/ 폴더의 기본 이미지 사용
+  if (gender === 2) { // 여성
+    const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png'];
+    return femaleImages[index % femaleImages.length];
+  } else { // 남성 또는 미정
+    const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png'];
+    return maleImages[index % maleImages.length];
+  }
+};
+
+// 안전한 이미지 URL 가져오기 함수
+const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
+  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
+  return photoUrl ?? getDefaultImage(gender, index);
+};
+
+// 이메일 형식 확인 함수
+const isEmail = (str: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(str);
+};
+
+// 사용자 레벨에 따른 등급 반환 함수
+const getUserLevel = (mtLevel: number | null | undefined): string => {
+  if (mtLevel === 5) return 'VIP';
+  if (mtLevel === 2) return '일반';
+  return '일반'; // 기본값
+};
+
+// 사용자 레벨에 따른 플랜 반환 함수
+const getUserPlan = (mtLevel: number | null | undefined): string => {
+  if (mtLevel === 5) return '프리미엄 플랜';
+  if (mtLevel === 2) return '베이직 플랜';
+  return '베이직 플랜'; // 기본값
+};
 
 // 모바일 최적화된 CSS 애니메이션
 const pageAnimations = `
@@ -182,13 +221,13 @@ const settingsSchema = z.object({
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
 
-// 모의 데이터
-const MOCK_USER_SETTINGS = {
-  name: '홍길동',
-  nickname: '길동이',
-  gender: 'male' as const,
-  email: 'user@example.com',
-  phone: '010-1234-5678'
+// 기본값 (로딩 중일 때 사용)
+const DEFAULT_USER_SETTINGS = {
+  name: '',
+  nickname: '',
+  gender: 'other' as const,
+  email: '',
+  phone: ''
 };
 
 // 성별 옵션
@@ -200,19 +239,31 @@ const GENDER_OPTIONS = [
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   
   const { control, handleSubmit, reset, formState: { errors, isDirty } } = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: MOCK_USER_SETTINGS
+    defaultValues: DEFAULT_USER_SETTINGS
   });
 
   // 사용자 설정 가져오기
   useEffect(() => {
-    // 모의 데이터 로드
-    reset(MOCK_USER_SETTINGS);
-  }, [reset]);
+    if (user) {
+      const userSettings: SettingsFormData = {
+        name: user.mt_name || user.mt_nickname || '',
+        nickname: user.mt_nickname || user.mt_name || '',
+        gender: user.mt_gender === 1 ? 'male' : user.mt_gender === 2 ? 'female' : 'other',
+        email: user.mt_email || '',
+        phone: user.mt_id || '' // mt_id가 전화번호로 사용됨
+      };
+      reset(userSettings);
+      
+      // 프로필 이미지도 업데이트
+      setProfileImg(getSafeImageUrl(user.mt_file1 || null, user.mt_gender, user.mt_idx || 0));
+    }
+  }, [user, reset]);
 
   // 설정 저장
   const onSubmit = async (data: SettingsFormData) => {
@@ -232,14 +283,15 @@ export default function SettingsPage() {
     }
   };
 
-  // 프로필 mock 데이터
+  // 프로필 데이터 (실제 사용자 정보 기반)
   const profile = {
-    avatar: '/images/avatar1.png',
-    name: 'jin(진)',
-    plan: '프리미엄 플랜',
-    phone: '010-2956-5435',
-    memberSince: '2024년 1월',
-    level: 'VIP'
+    avatar: getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0),
+    name: user?.mt_name || user?.mt_nickname || '사용자',
+    plan: getUserPlan(user?.mt_level),
+    contact: user?.mt_id || '',
+    contactType: user?.mt_id ? (isEmail(user.mt_id) ? '이메일' : '연락처') : '연락처',
+    memberSince: user?.mt_wdate ? new Date(user.mt_wdate).getFullYear() + '년 ' + (new Date(user.mt_wdate).getMonth() + 1) + '월' : '2024년 1월',
+    level: getUserLevel(user?.mt_level)
   };
 
   // 개선된 메뉴 데이터 (아이콘과 색상 포함)
@@ -337,7 +389,7 @@ export default function SettingsPage() {
   ];
 
   // 프로필 이미지 관련 상태 및 ref
-  const [profileImg, setProfileImg] = useState(profile.avatar);
+  const [profileImg, setProfileImg] = useState(getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0));
   const [showSheet, setShowSheet] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -459,6 +511,13 @@ export default function SettingsPage() {
                       width={80}
                       height={80}
                       className="rounded-full border-4 border-white/30 bg-white/20 profile-glow"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        const fallbackSrc = getDefaultImage(user?.mt_gender, user?.mt_idx || 0);
+                        console.log(`[프로필 이미지 오류] 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
+                        target.src = fallbackSrc;
+                        setProfileImg(fallbackSrc);
+                      }}
                     />
                     <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-2 shadow-lg group-hover:scale-110 transition-transform">
                       <FiCamera className="w-4 h-4 text-indigo-600" />
@@ -489,8 +548,8 @@ export default function SettingsPage() {
             
             <div className="mt-4 pt-4 border-t border-white/20">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-indigo-100">연락처</span>
-                <span className="text-white font-medium">{profile.phone}</span>
+                <span className="text-indigo-100">{profile.contactType}</span>
+                <span className="text-white font-medium">{profile.contact}</span>
               </div>
             </div>
           </div>

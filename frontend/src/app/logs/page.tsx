@@ -291,8 +291,8 @@ const pageStyles = `
 
 @media (max-width: 640px) {
   .member-avatar {
-    width: 52px; 
-    height: 52px; 
+    width: 48px; 
+    height: 48px; 
   }
 }
 `;
@@ -530,28 +530,28 @@ export default function LogsPage() {
   const [isSliderDragging, setIsSliderDragging] = useState(false); // 슬라이더 드래그 중인지 확인
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
 
-  // 바텀시트 variants - collapsed/expanded 상태만 사용
+  // 바텀시트 variants - location/page.tsx와 동일한 구조로 수정
   const bottomSheetVariants = {
     collapsed: { 
-      translateY: '75%',
+      translateY: '65%',
       opacity: 1,
       transition: {
         type: "spring",
-        stiffness: 200,
-        damping: 40,
-        mass: 0.8,
-        duration: 0.8
+        stiffness: 280,
+        damping: 35,
+        mass: 0.7,
+        duration: 0.5
       }
     },
     expanded: {
-      translateY: '-15px',
+      translateY: '-40px',
       opacity: 1,
       transition: {
         type: "spring",
-        stiffness: 200,
-        damping: 40,
-        mass: 0.8,
-        duration: 0.8
+        stiffness: 260,
+        damping: 32,
+        mass: 0.6,
+        duration: 0.5
       }
     }
   };
@@ -1706,11 +1706,31 @@ export default function LogsPage() {
   const handleSliderStart = (e: React.TouchEvent | React.MouseEvent) => {
     // 이벤트 전파 차단하여 상위 스와이프 동작 방지
     e.stopPropagation();
+    e.preventDefault();
     
     setIsSliderDragging(true);
     updateSliderValue(e);
     
-    console.log('[슬라이더] 드래그 시작 - 상위 스와이프 이벤트 차단');
+    // 글로벌 이벤트 리스너 추가 (드래그가 슬라이더 영역을 벗어나도 추적)
+    const handleGlobalMove = (globalE: MouseEvent | TouchEvent) => {
+      updateSliderValue(globalE);
+    };
+    
+    const handleGlobalEnd = () => {
+      setIsSliderDragging(false);
+      document.removeEventListener('mousemove', handleGlobalMove);
+      document.removeEventListener('mouseup', handleGlobalEnd);
+      document.removeEventListener('touchmove', handleGlobalMove);
+      document.removeEventListener('touchend', handleGlobalEnd);
+      console.log('[슬라이더] 드래그 종료');
+    };
+    
+    document.addEventListener('mousemove', handleGlobalMove, { passive: false });
+    document.addEventListener('mouseup', handleGlobalEnd);
+    document.addEventListener('touchmove', handleGlobalMove, { passive: false });
+    document.addEventListener('touchend', handleGlobalEnd);
+    
+    console.log('[슬라이더] 드래그 시작 - 글로벌 이벤트 리스너 추가');
   };
 
   const handleSliderMove = (e: React.TouchEvent | React.MouseEvent) => {
@@ -1718,6 +1738,7 @@ export default function LogsPage() {
     
     // 드래그 중일 때도 이벤트 전파 차단
     e.stopPropagation();
+    e.preventDefault();
     
     updateSliderValue(e);
   };
@@ -1748,16 +1769,17 @@ export default function LogsPage() {
     
     const percentage = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
     
-    console.log('[슬라이더] 값 계산:', {
-      clientX,
-      rectLeft: rect.left,
-      rectWidth: rect.width,
-      percentage: percentage.toFixed(1),
-      sliderRef: !!sliderRef.current
-    });
+    // 성능 최적화: 값이 크게 변하지 않으면 업데이트 건너뛰기
+    const currentValue = sliderValue;
+    if (Math.abs(percentage - currentValue) < 0.5) return;
     
+    // 즉시 상태 업데이트 (배치 처리 방지)
     setSliderValue(percentage);
-    updatePathProgress(percentage);
+    
+    // 경로 진행률 업데이트도 즉시 실행
+    requestAnimationFrame(() => {
+      updatePathProgress(percentage);
+    });
   };
 
   // 현재 위치 마커 생성/업데이트 함수
@@ -3160,11 +3182,11 @@ export default function LogsPage() {
             onMouseUp={handleDragEnd}
             onMouseLeave={handleDragEnd}
           >
-            {/* 바텀시트 핸들 - home/page.tsx와 동일한 스타일 */}
+            {/* 바텀시트 핸들 - location/page.tsx와 동일한 스타일 */}
             <motion.div 
               className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-3 cursor-grab active:cursor-grabbing"
-              whileHover={{ scale: 1.05, backgroundColor: '#6366f1' }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
+              whileHover={{ scale: 1.2, backgroundColor: '#6366f1' }}
+              transition={{ duration: 0.2 }}
             />
 
             {/* 바텀시트 내용 - 스크롤 가능하도록 수정 */}
@@ -3184,7 +3206,7 @@ export default function LogsPage() {
               >
                 <div className="w-full flex-shrink-0 snap-start overflow-visible bg-white">
                   <div 
-                    className="content-section members-section rounded-2xl p-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
+                    className="content-section members-section rounded-2xl p-4 border border-indigo-100 h-[190px] overflow-y-auto hide-scrollbar"
                     style={{
                       background: 'linear-gradient(to right, #eef2ff, #faf5ff) !important',
                       backgroundImage: 'linear-gradient(to right, #eef2ff, #faf5ff) !important'
@@ -3201,18 +3223,9 @@ export default function LogsPage() {
                             <div className="flex items-center space-x-2">
                               <FiUser className="w-5 h-5 text-indigo-600" />
                               <div>
-                                <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
-                                <p className="text-sm text-gray-600">멤버들의 로그를 확인하세요</p>
+                                <h2 className="text-base font-semibold text-gray-900">그룹 멤버</h2>
                               </div>
                             </div>
-                          {(isUserDataLoading || !dataFetchedRef.current.members) && (
-                            <motion.div
-                              variants={spinnerVariants}
-                              animate="animate"
-                            >
-                              <FiLoader className="text-indigo-500" size={18}/>
-                            </motion.div>
-                          )}
                               </div>
                         
                         <div className="flex items-center space-x-3">
@@ -3235,7 +3248,7 @@ export default function LogsPage() {
                                 console.log('[그룹 드롭다운] 버튼 클릭, 현재 상태:', isGroupSelectorOpen);
                                 setIsGroupSelectorOpen(!isGroupSelectorOpen);
                               }}
-                              className="group-selector flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium min-w-[140px] mobile-button"
+                              className="group-selector flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium min-w-[120px] mobile-button"
                               disabled={isUserDataLoading}
                               data-group-selector="true"
                             >
@@ -3258,7 +3271,7 @@ export default function LogsPage() {
                                     animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
                                     transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                                   >
-                                    <FiChevronDown className="text-gray-400" size={14} />
+                                    <FiChevronDown className="text-gray-400" size={12} />
                                   </motion.div>
                                 )}
                           </div>
@@ -3271,7 +3284,7 @@ export default function LogsPage() {
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                                 transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-                                className="absolute top-full mt-2 right-0 z-50 min-w-[200px] bg-white border border-indigo-200 rounded-xl shadow-xl overflow-hidden"
+                                className="absolute top-full mt-1 right-0 z-50 min-w-[160px] bg-white border border-gray-200 rounded-lg shadow-xl max-h-40 overflow-y-auto"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                 }}
@@ -3307,23 +3320,24 @@ export default function LogsPage() {
                                           
                                           handleGroupSelect(group.sgt_idx);
                                         }}
-                                        className={`w-full px-4 py-2 text-left text-sm font-medium transition-colors duration-150 flex items-center justify-between ${
+                                        className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
                                           selectedGroupId === group.sgt_idx
-                                            ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-500'
-                                            : 'text-gray-700 hover:bg-gray-50'
+                                            ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                            : 'text-gray-700'
                                         }`}
                                       >
-                                        <div className="flex-1">
-                                          <div className="font-semibold truncate">{group.sgt_title}</div>
-                                          <div className="text-xs text-gray-500 mt-0.5">
-                                            멤버 {groupMemberCounts[group.sgt_idx] || 0}명
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex-1">
+                                            <div className="font-medium truncate">
+                                              {group.sgt_title} ({groupMemberCounts[group.sgt_idx] || 0}명)
+                                            </div>
                                           </div>
+                                          {selectedGroupId === group.sgt_idx && (
+                                            <svg className="w-3 h-3 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                          )}
                                         </div>
-                                        {selectedGroupId === group.sgt_idx && (
-                                          <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                          </svg>
-                                        )}
                                       </motion.button>
                                     ))
                                   ) : (
@@ -3367,27 +3381,7 @@ export default function LogsPage() {
                                 }}
                               />
                             ))}
-                            
-                            <motion.div
-                              className="relative w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
-                              style={{
-                                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)'
-                              }}
-                              variants={spinnerVariants}
-                              animate="animate"
-                            >
-                              <FiUser className="w-6 h-6 text-white" />
-                            </motion.div>
                               </div>
-                          
-                          <motion.div
-                            variants={loadingTextVariants}
-                            initial="hidden"
-                            animate="visible"
-                          >
-                            <p className="font-medium text-gray-900 mb-1">멤버 정보를 불러오는 중...</p>
-                            <p className="text-sm text-gray-600">잠시만 기다려주세요</p>
-                          </motion.div>
                         </motion.div>
                       ) : groupMembers.length > 0 ? (
                         <motion.div 
@@ -3429,7 +3423,7 @@ export default function LogsPage() {
                                   animate={member.isSelected ? "selected" : "animate"}
                                 >
                                   <motion.div
-                                    className={`member-avatar w-13 h-13 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
+                                    className={`member-avatar w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                                       member.isSelected ? 'selected' : ''
                                     }`}
                                     animate={member.isSelected ? "selected" : undefined}
@@ -3447,7 +3441,7 @@ export default function LogsPage() {
                                       }}
                                     />
                                   </motion.div>
-                                  <span className={`block text-sm font-semibold mt-3 transition-colors duration-200 ${
+                                  <span className={`block text-sm font-normal mt-1 transition-colors duration-200 ${
                                     member.isSelected ? 'text-indigo-700' : 'text-gray-700'
                                   }`}>
                                 {member.name}
@@ -3479,7 +3473,7 @@ export default function LogsPage() {
 
                 <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white to-rose-50">
                   <div 
-                    className="content-section summary-section min-h-[200px] max-h-[200px] overflow-hidden flex flex-col bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl pt-3 px-3 pb-0"
+                    className="content-section summary-section min-h-[190px] max-h-[190px] overflow-hidden flex flex-col bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl pt-3 px-3 pb-0"
                   >
                     <div className="flex-1">
                       {/* 헤더 섹션 */}
@@ -3530,28 +3524,33 @@ export default function LogsPage() {
 
                       {/* 경로 따라가기 섹션 */}
                       <div className="bg-white/60 backdrop-blur-sm rounded-lg py-2 px-3 border border-amber-100">
-                        <div className="flex items-center mb-2">
-                          <FiPlayCircle className="w-5 h-5 text-amber-500 mr-2" />
+                        <div className="flex items-center">
+                          <FiPlayCircle className="w-4 h-4 text-amber-500 mr-1" />
                           <h4 className="text-sm font-medium text-gray-800">경로 따라가기</h4>
                         </div>
-                        <div className="px-2 pb-1">
+                        <div className="px-2 py-1">
                           <div 
                             ref={sliderRef}
-                            className="relative w-full h-2.5 bg-gray-200 rounded-full cursor-pointer"
+                            className="relative w-full h-2.5 bg-gray-200 rounded-full cursor-pointer select-none touch-none"
+                            style={{ 
+                              touchAction: 'none',
+                              userSelect: 'none',
+                              WebkitUserSelect: 'none',
+                              WebkitTouchCallout: 'none'
+                            }}
                             onMouseDown={handleSliderStart}
-                            onMouseMove={handleSliderMove}
-                            onMouseUp={(e) => handleSliderEnd(e)}
-                            onMouseLeave={(e) => handleSliderEnd(e)}
                             onTouchStart={handleSliderStart}
-                            onTouchMove={handleSliderMove}
-                            onTouchEnd={(e) => handleSliderEnd(e)}
                           >
                             <div 
-                              className="absolute top-0 left-0 h-2.5 bg-amber-500 rounded-full transition-all duration-150 ease-out pointer-events-none"
+                              className={`absolute top-0 left-0 h-2.5 bg-amber-500 rounded-full pointer-events-none ${
+                                isSliderDragging ? '' : 'transition-all duration-150 ease-out'
+                              }`}
                               style={{ width: `${sliderValue}%` }} 
                             ></div>
                             <div 
-                              className="absolute top-1/2 w-5 h-5 bg-amber-500 rounded-full border-2 border-white shadow transform -translate-y-1/2 transition-all duration-150 ease-out cursor-grab active:cursor-grabbing pointer-events-none"
+                              className={`absolute top-1/2 w-5 h-5 bg-amber-500 rounded-full border-2 border-white shadow transform -translate-y-1/2 cursor-grab active:cursor-grabbing pointer-events-none ${
+                                isSliderDragging ? 'scale-110' : 'transition-all duration-150 ease-out hover:scale-105'
+                              }`}
                               style={{ left: `calc(${sliderValue}% - 10px)` }}
                             ></div>
                           </div>
@@ -3582,16 +3581,6 @@ export default function LogsPage() {
                     transition={{ duration: 0.3, delay: 0.1 }}
                   />
                 </div>
-
-                {/* 스와이프 힌트 */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 0.7 }}
-                  transition={{ delay: 0.8 }}
-                  className="text-center"
-                >
-                  <span className="text-xs text-gray-400 font-medium">← 좌우로 스와이프 →</span>
-                </motion.div>
               </div>
             </div>
           </motion.div>

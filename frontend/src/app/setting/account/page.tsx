@@ -27,6 +27,37 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 
+// 기본 이미지 가져오기 함수 (schedule/page.tsx에서 가져옴)
+const getDefaultImage = (gender: number | null | undefined, index: number): string => {
+  // frontend/public/images/ 폴더의 기본 이미지 사용
+  if (gender === 2) { // 여성
+    const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png'];
+    return femaleImages[index % femaleImages.length];
+  } else { // 남성 또는 미정
+    const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png'];
+    return maleImages[index % maleImages.length];
+  }
+};
+
+// 안전한 이미지 URL 가져오기 함수
+const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
+  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
+  return photoUrl ?? getDefaultImage(gender, index);
+};
+
+// 이메일 형식 확인 함수
+const isEmail = (str: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(str);
+};
+
+// 사용자 레벨에 따른 등급 반환 함수
+const getUserLevel = (mtLevel: number | null | undefined): string => {
+  if (mtLevel === 5) return 'VIP';
+  if (mtLevel === 2) return '일반';
+  return '일반'; // 기본값
+};
+
 const GENDER_OPTIONS = [
   { value: 'male', label: '남성', icon: '👨' },
   { value: 'female', label: '여성', icon: '👩' },
@@ -217,19 +248,39 @@ html, body {
 
 export default function AccountPage() {
   const router = useRouter();
-  const { logout } = useAuth();
-  const [nickname, setNickname] = useState('길동이');
-  const [name, setName] = useState('홍길동');
-  const [phone, setPhone] = useState('010-1234-5678');
-  const [birth, setBirth] = useState('1990-01-01');
-  const [gender, setGender] = useState('male');
-  const [originalNickname] = useState('길동이');
+  const { user, logout } = useAuth();
+  const [nickname, setNickname] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [birth, setBirth] = useState('');
+  const [gender, setGender] = useState('other');
+  const [originalNickname, setOriginalNickname] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [profileImage, setProfileImage] = useState('/images/avatar1.png');
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 사용자 정보 로드
+  useEffect(() => {
+    if (user) {
+      const userName = user.mt_name || user.mt_nickname || '';
+      const userNickname = user.mt_nickname || user.mt_name || '';
+      const userPhone = user.mt_id || '';
+      const userBirth = user.mt_birth || '';
+      const userGender = user.mt_gender === 1 ? 'male' : user.mt_gender === 2 ? 'female' : 'other';
+      const userImage = getSafeImageUrl(user.mt_file1 || null, user.mt_gender, user.mt_idx || 0);
+
+      setName(userName);
+      setNickname(userNickname);
+      setOriginalNickname(userNickname);
+      setPhone(userPhone);
+      setBirth(userBirth);
+      setGender(userGender);
+      setProfileImage(userImage);
+    }
+  }, [user]);
 
   // 뒤로가기 핸들러
   const handleBackNavigation = () => {
@@ -407,6 +458,12 @@ export default function AccountPage() {
                           width={96}
                           height={96}
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            const fallbackSrc = getDefaultImage(user?.mt_gender, user?.mt_idx || 0);
+                            console.log(`[프로필 이미지 오류] 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
+                            target.src = fallbackSrc;
+                          }}
                         />
                       </div>
                       <motion.div 
@@ -423,12 +480,16 @@ export default function AccountPage() {
                     <div className="flex items-center space-x-3 mb-2">
                       <h2 className="text-2xl font-bold">{name}</h2>
                       <motion.div 
-                        className="flex items-center space-x-1 bg-gradient-to-r from-yellow-400 to-orange-400 px-3 py-1 rounded-full"
-                        animate={{ scale: [1, 1.05, 1] }}
+                        className={`flex items-center space-x-1 px-3 py-1 rounded-full ${
+                          getUserLevel(user?.mt_level) === 'VIP' 
+                            ? 'bg-gradient-to-r from-yellow-400 to-orange-400' 
+                            : 'bg-gradient-to-r from-gray-400 to-gray-500'
+                        }`}
+                        animate={getUserLevel(user?.mt_level) === 'VIP' ? { scale: [1, 1.05, 1] } : {}}
                         transition={{ duration: 2, repeat: Infinity }}
                       >
                         <HiSparkles className="w-4 h-4 text-white" />
-                        <span className="text-xs font-bold text-white">VIP</span>
+                        <span className="text-xs font-bold text-white">{getUserLevel(user?.mt_level)}</span>
                       </motion.div>
                     </div>
                     <p className="text-white/90 text-base font-medium mb-1">@{nickname}</p>
@@ -536,11 +597,11 @@ export default function AccountPage() {
                   </p>
                 </div>
                 
-                {/* 전화번호 (읽기 전용) */}
+                {/* 연락처/이메일 (읽기 전용) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
                     <FiPhone className="w-4 h-4 mr-1 text-gray-500" />
-                    전화번호
+                    {user?.mt_id ? (isEmail(user.mt_id) ? '이메일' : '연락처') : '연락처'}
                   </label>
                   <div className="relative">
                     <input
@@ -555,7 +616,7 @@ export default function AccountPage() {
                   </div>
                   <p className="text-xs text-gray-500 mt-1 flex items-center">
                     <FiInfo className="w-3 h-3 mr-1" />
-                    전화번호는 고객센터를 통해 변경 가능합니다
+                    {user?.mt_id ? (isEmail(user.mt_id) ? '이메일은' : '연락처는') : '연락처는'} 고객센터를 통해 변경 가능합니다
                   </p>
                 </div>
                 

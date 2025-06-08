@@ -158,8 +158,8 @@ html, body {
 
 @media (max-width: 640px) {
   .member-avatar {
-    width: 52px; 
-    height: 52px; 
+    width: 48px; 
+    height: 48px; 
   }
 }
 
@@ -774,8 +774,8 @@ export default function HomePage() {
     naver: false
   });
 
-  // Bottom Sheet 상태 관리 추가 - 3단계로 확장 (접힘, 중간, 펼쳐짐) - location/page.tsx 패턴 적용
-  const [bottomSheetState, setBottomSheetState] = useState<'hidden' | 'peek'>('peek');
+  // Bottom Sheet 상태 관리 추가 - location/page.tsx와 동일한 상태로 변경
+  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'expanded'>('expanded');
   const [currentTab, setCurrentTab] = useState<'members' | 'schedules'>('members'); // 현재 탭 상태 추가
   const bottomSheetRef = useRef<HTMLDivElement>(null);
   const startDragY = useRef<number | null>(null);
@@ -823,17 +823,44 @@ export default function HomePage() {
     }
   }, [isUserDataLoading, userGroups.length, selectedGroupId]); // userGroups 대신 userGroups.length 사용
 
-  // Bottom Sheet 상태를 클래스 이름으로 변환
+  // selectedGroupId 상태 변화 추적 및 데이터 초기화
+  useEffect(() => {
+    console.log('[HOME] selectedGroupId 상태 변화:', selectedGroupId);
+    
+    // selectedGroupId가 변경되면 데이터 로딩 상태 초기화
+    if (selectedGroupId) {
+      console.log('[HOME] 새로운 그룹 선택으로 데이터 로딩 상태 초기화');
+      dataFetchedRef.current.members = false;
+      dataFetchedRef.current.schedules = false;
+      dataFetchedRef.current.loading = false;
+      setIsFirstMemberSelectionComplete(false);
+      setFirstMemberSelected(false); // 첫 번째 멤버 선택 상태도 초기화
+    }
+  }, [selectedGroupId]);
+
+  // Bottom Sheet 상태를 클래스 이름으로 변환 - location/page.tsx와 동일하게 수정
   const getBottomSheetClassName = () => {
-    // 로딩 중일 때는 강제로 hidden 상태로 유지
-    if (authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) {
-      return 'bottom-sheet-hidden';
+    // 로딩 중일 때는 강제로 collapsed 상태로 유지
+    const loadingConditions = {
+      authLoading,
+      isMapLoading,
+      isUserDataLoading,
+      membersNotFetched: !dataFetchedRef.current.members,
+      schedulesNotFetched: !dataFetchedRef.current.schedules,
+      memberSelectionNotComplete: !isFirstMemberSelectionComplete
+    };
+    
+    const isLoading = authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete;
+    
+    if (isLoading) {
+      console.log('[HOME] 로딩 조건 확인:', loadingConditions);
+      return 'bottom-sheet-collapsed';
     }
     
     switch (bottomSheetState) {
-      case 'hidden': return 'bottom-sheet-hidden';
-      case 'peek': return 'bottom-sheet-peek';
-      default: return 'bottom-sheet-hidden';
+      case 'collapsed': return 'bottom-sheet-collapsed';
+      case 'expanded': return 'bottom-sheet-expanded';
+      default: return 'bottom-sheet-collapsed';
     }
   };
 
@@ -1064,7 +1091,7 @@ export default function HomePage() {
       const dragThreshold = 50;
       const velocityThreshold = 0.3;
       
-      let nextState: 'hidden' | 'peek' = bottomSheetState;
+      let nextState: 'collapsed' | 'expanded' = bottomSheetState;
     
     // 햅틱 피드백 함수
     const triggerHaptic = () => {
@@ -1079,17 +1106,17 @@ export default function HomePage() {
     
     // 위로 드래그 (Y 감소) - 상태 확장
       if (dragDeltaY < 0) {
-        if (bottomSheetState === 'hidden' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-        nextState = 'peek';
-          console.log('[DragEnd] 위로 드래그 감지 (hidden -> peek)');
+        if (bottomSheetState === 'collapsed' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
+        nextState = 'expanded';
+          console.log('[DragEnd] 위로 드래그 감지 (collapsed -> expanded)');
         triggerHaptic();
       }
     }
     // 아래로 드래그 (Y 증가) - 상태 축소
       else if (dragDeltaY > 0) {
-        if (bottomSheetState === 'peek' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-        nextState = 'hidden';
-          console.log('[DragEnd] 아래로 드래그 감지 (peek -> hidden)');
+        if (bottomSheetState === 'expanded' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
+        nextState = 'collapsed';
+          console.log('[DragEnd] 아래로 드래그 감지 (expanded -> collapsed)');
         triggerHaptic();
       }
     }
@@ -1114,7 +1141,7 @@ export default function HomePage() {
 
   const toggleBottomSheet = () => {
     setBottomSheetState(prev => {
-      const next = prev === 'hidden' ? 'peek' : 'hidden';
+      const next = prev === 'collapsed' ? 'expanded' : 'collapsed';
       console.log('[BOTTOM_SHEET] toggleBottomSheet 상태 변경:', prev, '→', next);
       return next;
     });
@@ -1147,9 +1174,17 @@ export default function HomePage() {
     const fetchAllGroupData = async () => {
       if (!isMounted) return;
 
-      // selectedGroupId가 없으면 실행하지 않음
+      console.log('[fetchAllGroupData] 실행 시작 - selectedGroupId:', selectedGroupId, 'userGroups:', userGroups.length);
+
+      // selectedGroupId가 없으면 빈 데이터로 완료 처리 (신규 사용자)
       if (!selectedGroupId) {
-        console.log('[fetchAllGroupData] selectedGroupId가 없어서 실행하지 않음');
+        console.log('[fetchAllGroupData] selectedGroupId가 없음 - 신규 사용자로 빈 데이터 설정');
+        setGroupMembers([]);
+        setGroupSchedules([]);
+        setFilteredSchedules([]);
+        dataFetchedRef.current.members = true;
+        dataFetchedRef.current.schedules = true;
+        setIsFirstMemberSelectionComplete(true);
         return;
       }
 
@@ -1325,8 +1360,11 @@ export default function HomePage() {
     const initializeUserAuth = async () => {
       // 인증 로딩 중이면 대기
       if (authLoading) {
+        console.log('[HOME] 인증 로딩 중...');
         return;
       }
+
+      console.log('[HOME] 인증 상태 확인:', { isLoggedIn, user: user?.mt_idx });
 
       // 로그인되지 않은 경우 signin 페이지로 리다이렉트
       if (!isLoggedIn) {
@@ -1642,41 +1680,32 @@ export default function HomePage() {
     };
   }, []);
 
-  // 컴포넌트 마운트 시 첫 번째 멤버 자동 선택 - 지도 초기화 후에 실행되도록 수정
+  // 첫 번째 멤버 자동 선택 - 중복 실행 방지 강화
   useEffect(() => {
-    // 지도가 초기화된 후에만 첫 번째 멤버 선택
     if (groupMembers.length > 0 && 
-        ((mapType === 'naver' && mapsInitialized.naver) || 
-         (mapType === 'google' && mapsInitialized.google))) {
-      console.log('지도 초기화 완료 후 첫 번째 멤버 선택:', groupMembers[0].name);
+        !groupMembers.some(m => m.isSelected) && 
+        !firstMemberSelected &&
+        dataFetchedRef.current.members && 
+        dataFetchedRef.current.schedules &&
+        ((mapType === 'naver' && mapsInitialized.naver && naverMap.current) || 
+         (mapType === 'google' && mapsInitialized.google && map.current))) {
       
-      // 약간의 지연 후 멤버 선택 (지도 렌더링이 완전히 완료되도록)
-      const timerId = setTimeout(() => {
-        handleMemberSelect(groupMembers[0].id);
-      }, 500);
+      console.log('[HOME] 첫 번째 멤버 자동 선택 시작:', groupMembers[0].name);
       
-      // 클린업 함수로 타이머 정리
-      return () => clearTimeout(timerId);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);  // 빈 의존성 배열로 변경하여 마운트 시 한 번만 실행
-
-  // 지도 초기화 상태 변경 감지를 위한 별도 useEffect
-  useEffect(() => {
-    // 지도가 초기화되고 멤버가 있고 아직 선택된 멤버가 없을 때만 실행
-    if ((mapType === 'naver' && mapsInitialized.naver) || 
-        (mapType === 'google' && mapsInitialized.google)) {
-      if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && !isFirstMemberSelectionComplete) {
-        console.log('지도 초기화 감지 - 첫 번째 멤버 선택:', groupMembers[0].name);
-        
-        const timerId = setTimeout(() => {
+      // 상태를 즉시 설정하여 중복 실행 방지
+      setFirstMemberSelected(true);
+      
+      setTimeout(() => {
+        // 다시 한 번 중복 체크
+        if (!groupMembers.some(m => m.isSelected)) {
+          console.log('[HOME] 첫 번째 멤버 자동 선택 실행:', groupMembers[0].id);
           handleMemberSelect(groupMembers[0].id);
-        }, 500);
-        
-        return () => clearTimeout(timerId);
-      }
+        } else {
+          console.log('[HOME] 이미 멤버가 선택되어 있음, 자동 선택 건너뛰기');
+        }
+      }, 300);
     }
-  }, [mapsInitialized.naver, mapsInitialized.google, mapType, groupMembers, isFirstMemberSelectionComplete]);
+  }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members, dataFetchedRef.current.schedules, mapsInitialized.naver, mapsInitialized.google, mapType]);
 
   // 공통 좌표 파싱 함수
   const parseCoordinate = (coord: any): number | null => {
@@ -1913,17 +1942,24 @@ export default function HomePage() {
               }
             }
             
-            // 멤버 선택 처리 (바텀시트 연동)
-            if (memberData && memberData.id) {
-              console.log('[createMarker] 네이버맵 멤버 마커 클릭 - 멤버 선택:', memberData.name);
-              handleMemberSelect(memberData.id);
-            }
-            
             // 새 InfoWindow 참조 저장 및 열기
             currentInfoWindowRef.current = memberInfoWindow;
+            // InfoWindow 열린 시간 기록
+            (memberInfoWindow as any)._openTime = Date.now();
+            
             try {
               memberInfoWindow.open(naverMap.current, newMarker);
               console.log('[네이버맵] InfoWindow 열기 성공');
+              
+              // InfoWindow가 열린 후 멤버 선택 처리 (바텀시트 연동) - location 페이지에서는 건너뛰기
+              if (memberData && memberData.id && !window.location.pathname.includes('/location')) {
+                setTimeout(() => {
+                  console.log('[createMarker] 네이버맵 멤버 마커 클릭 - 멤버 선택 (지연):', memberData.name);
+                  handleMemberSelect(memberData.id);
+                }, 100); // 100ms 지연
+              } else if (window.location.pathname.includes('/location')) {
+                console.log('[createMarker] location 페이지에서는 멤버 선택 건너뛰기:', memberData?.name);
+              }
             } catch (e) {
               console.error('[네이버맵] InfoWindow 열기 실패:', e);
             }
@@ -2086,10 +2122,12 @@ export default function HomePage() {
               }
             }
             
-            // 멤버 선택 처리 (바텀시트 연동)
-            if (memberData && memberData.id) {
-              console.log('[createMarker] 네이버맵 멤버 마커 클릭 - 멤버 선택:', memberData.name);
+            // 멤버 선택 처리 (바텀시트 연동) - location 페이지에서는 건너뛰기
+            if (memberData && memberData.id && !window.location.pathname.includes('/location')) {
+              console.log('[createMarker] 네이버맵 스케줄 마커 클릭 - 멤버 선택:', memberData.name);
               handleMemberSelect(memberData.id);
+            } else if (window.location.pathname.includes('/location')) {
+              console.log('[createMarker] location 페이지에서는 멤버 선택 건너뛰기:', memberData?.name);
             }
             
             // 새 InfoWindow 참조 저장 및 열기
@@ -2251,10 +2289,12 @@ export default function HomePage() {
               }
             }
             
-            // 멤버 선택 처리 (바텀시트 연동)
-            if (memberData && memberData.id) {
+            // 멤버 선택 처리 (바텀시트 연동) - location 페이지에서는 건너뛰기
+            if (memberData && memberData.id && !window.location.pathname.includes('/location')) {
               console.log('[createMarker] 구글맵 멤버 마커 클릭 - 멤버 선택:', memberData.name);
               handleMemberSelect(memberData.id);
+            } else if (window.location.pathname.includes('/location')) {
+              console.log('[createMarker] location 페이지에서는 멤버 선택 건너뛰기:', memberData?.name);
             }
             
             // 새 InfoWindow 참조 저장 및 열기
@@ -2510,126 +2550,7 @@ export default function HomePage() {
     startDragY.current = null;
     dragStartTime.current = null;
     
-    // 현재 열려있는 InfoWindow가 있으면 먼저 닫기
-    if (currentInfoWindowRef.current) {
-      try {
-        currentInfoWindowRef.current.close();
-        currentInfoWindowRef.current = null;
-        console.log('[handleMemberSelect] 현재 InfoWindow 닫기 완료');
-      } catch (e) {
-        console.warn('[handleMemberSelect] 현재 InfoWindow 닫기 실패:', e);
-        currentInfoWindowRef.current = null;
-      }
-    }
-    
-    // 멤버 선택 시 모든 InfoWindow 닫기
-    console.log('[handleMemberSelect] InfoWindow 닫기 시작');
-    
-    if (mapType === 'naver' && window.naver?.maps) {
-      // 네이버 지도의 모든 InfoWindow 닫기
-      const naverSelectors = [
-        '.iw_container',
-        '.iw_content', 
-        '.iw_inner',
-        '[class*="iw_"]',
-        '.infoWindow',
-        '.info-window'
-      ];
-      
-      let closedCount = 0;
-      naverSelectors.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        elements.forEach(element => {
-          try {
-            if (element.parentElement) {
-              element.parentElement.remove();
-              closedCount++;
-            } else {
-              element.remove();
-              closedCount++;
-            }
-          } catch (e) {
-            console.warn('[handleMemberSelect] InfoWindow 제거 실패:', e);
-          }
-        });
-      });
-      
-      // 추가적으로 visibility hidden 처리
-      const allInfoElements = document.querySelectorAll('[class*="info"], [class*="iw"], [id*="info"]');
-      allInfoElements.forEach(element => {
-        if (element instanceof HTMLElement) {
-          element.style.display = 'none';
-          element.style.visibility = 'hidden';
-          element.style.opacity = '0';
-        }
-      });
-      
-      console.log(`[handleMemberSelect] 네이버 지도 InfoWindow ${closedCount}개 닫음`);
-      
-    } else if (mapType === 'google' && window.google?.maps) {
-      // 구글 지도의 모든 InfoWindow 닫기
-      const googleSelectors = [
-        '.gm-style-iw',
-        '.gm-style-iw-c',
-        '.gm-style-iw-d',
-        '.gm-style-iw-t',
-        '[class*="gm-style-iw"]',
-        '.infoWindow',
-        '.info-window'
-      ];
-      
-      let closedCount = 0;
-      googleSelectors.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        elements.forEach(element => {
-          try {
-            (element as HTMLElement).style.display = 'none';
-            (element as HTMLElement).style.visibility = 'hidden';
-            (element as HTMLElement).style.opacity = '0';
-            closedCount++;
-          } catch (e) {
-            console.warn('[handleMemberSelect] 구글 InfoWindow 닫기 실패:', e);
-          }
-        });
-      });
-      
-      // 구글 지도 InfoWindow 완전 제거 시도
-      const iwContainers = document.querySelectorAll('.gm-style-iw-chr');
-      iwContainers.forEach(container => {
-        try {
-          if (container.parentElement) {
-            container.parentElement.remove();
-          }
-        } catch (e) {
-          console.warn('[handleMemberSelect] 구글 InfoWindow 컨테이너 제거 실패:', e);
-        }
-      });
-      
-      console.log(`[handleMemberSelect] 구글 지도 InfoWindow ${closedCount}개 닫음`);
-    }
-    
-    // 전역적으로 모든 InfoWindow 관련 요소 숨기기
-    setTimeout(() => {
-      const allPossibleInfoWindows = document.querySelectorAll(`
-        [class*="info"], 
-        [class*="Info"], 
-        [class*="iw"], 
-        [class*="gm-style-iw"], 
-        [id*="info"], 
-        [id*="Info"]
-      `);
-      
-      allPossibleInfoWindows.forEach(element => {
-        if (element instanceof HTMLElement) {
-          element.style.display = 'none';
-          element.style.visibility = 'hidden';
-          element.style.opacity = '0';
-          element.style.pointerEvents = 'none';
-        }
-      });
-      
-      console.log(`[handleMemberSelect] 전역 InfoWindow 정리 완료: ${allPossibleInfoWindows.length}개 요소`);
-    }, 50);
+    console.log('[handleMemberSelect] 멤버 선택 시작:', id);
     
     const updatedMembers = groupMembers.map(member => 
       member.id === id ? { ...member, isSelected: true } : { ...member, isSelected: false }
@@ -2647,6 +2568,7 @@ export default function HomePage() {
     // 첫번째 멤버 선택 완료 상태 설정
     if (!isFirstMemberSelectionComplete && selectedMember) {
       setIsFirstMemberSelectionComplete(true);
+      setFirstMemberSelected(true);
       console.log('[HOME] 첫번째 멤버 선택 완료:', selectedMember.name);
     }
     
@@ -2922,13 +2844,25 @@ export default function HomePage() {
       });
     }
     
-    // 선택된 멤버가 있으면 해당 위치로 지도 이동
+    // 선택된 멤버가 있으면 해당 위치로 지도 이동 및 InfoWindow 표시
     const selectedMember = members.find(member => member.isSelected);
     if (selectedMember) {
       const lat = parseCoordinate(selectedMember.location.lat);
       const lng = parseCoordinate(selectedMember.location.lng);
 
       if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+        // 기존 InfoWindow 닫기 (새로운 멤버 선택 시)
+        if (currentInfoWindowRef.current) {
+          try {
+            currentInfoWindowRef.current.close();
+            currentInfoWindowRef.current = null;
+            console.log('[updateMemberMarkers] 기존 InfoWindow 닫기 완료');
+          } catch (e) {
+            console.warn('[updateMemberMarkers] 기존 InfoWindow 닫기 실패:', e);
+            currentInfoWindowRef.current = null;
+          }
+        }
+
         if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
           // 네이버 지도 이동 및 줌 레벨 조정
           setTimeout(() => {
@@ -2938,6 +2872,143 @@ export default function HomePage() {
             naverMap.current.setZoom(17);
             console.log('네이버 지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
           }, 100);
+
+          // 선택된 멤버의 InfoWindow 자동 표시 (중복 방지)
+          setTimeout(() => {
+            const selectedMarkerIndex = members.findIndex(member => member.isSelected);
+            const selectedMarker = memberMarkers.current[selectedMarkerIndex];
+            
+            if (selectedMarker && window.naver?.maps?.InfoWindow) {
+              // InfoWindow가 이미 열려있는 경우 중복 생성 방지
+              if (currentInfoWindowRef.current) {
+                console.log('[updateMemberMarkers] InfoWindow가 이미 열려있음, 중복 생성 방지:', selectedMember.name);
+                return;
+              }
+              
+              console.log('[updateMemberMarkers] 선택된 멤버 InfoWindow 자동 표시:', selectedMember.name);
+
+              // 오늘 날짜의 멤버 스케줄들 가져오기
+              const today = new Date();
+              const todayDateStr = format(today, 'yyyy-MM-dd');
+              
+              const todaySchedules = selectedMember.schedules.filter(schedule => {
+                if (!schedule.date) return false;
+                try {
+                  const scheduleDate = new Date(schedule.date);
+                  const scheduleDateStr = format(scheduleDate, 'yyyy-MM-dd');
+                  return scheduleDateStr === todayDateStr;
+                } catch (e) {
+                  return false;
+                }
+              });
+
+              // 위치 정보 포맷팅
+              const gpsTime = selectedMember.mlt_gps_time ? new Date(selectedMember.mlt_gps_time) : null;
+              const gpsTimeStr = gpsTime ? format(gpsTime, 'MM/dd HH:mm') : '정보 없음';
+              
+              // 배터리 정보
+              const batteryLevel = selectedMember.mlt_battery || 0;
+              const batteryColor = batteryLevel > 50 ? '#22c55e' : batteryLevel > 20 ? '#f59e0b' : '#EC4899';
+              
+              // 속도 정보
+              const speed = selectedMember.mlt_speed || 0;
+
+              const memberInfoWindow = new window.naver.maps.InfoWindow({
+                content: `
+                  <style>
+                    @keyframes slideInFromBottom {
+                      0% {
+                        opacity: 0;
+                        transform: translateY(20px) scale(0.95);
+                      }
+                      100% {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                      }
+                    }
+                    .info-window-container {
+                      animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+                    }
+                    .close-button {
+                      transition: all 0.2s ease;
+                    }
+                    .close-button:hover {
+                      background: rgba(0, 0, 0, 0.2) !important;
+                      transform: scale(1.1);
+                    }
+                  </style>
+                  <div class="info-window-container" style="
+                    padding: 12px 16px;
+                    min-width: 200px;
+                    max-width: 280px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    position: relative;
+                  ">
+                    <!-- 닫기 버튼 -->
+                    <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                      position: absolute;
+                      top: 8px;
+                      right: 8px;
+                      background: rgba(0, 0, 0, 0.1);
+                      border: none;
+                      border-radius: 50%;
+                      width: 22px;
+                      height: 22px;
+                      font-size: 14px;
+                      cursor: pointer;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      color: #666;
+                    ">×</button>
+                    
+                    <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px;">
+                      👤 ${selectedMember.name}
+                    </h3>
+                    <div style="margin-bottom: 6px;">
+                      <p style="margin: 0; font-size: 12px; color: #64748b;">
+                        🔋 배터리: <span style="color: ${batteryColor}; font-weight: 500;">${batteryLevel}%</span>
+                      </p>
+                    </div>
+                    <div style="margin-bottom: 6px;">
+                      <p style="margin: 0; font-size: 12px; color: #64748b;">
+                        🚶 속도: ${speed.toFixed(1)}km/h
+                      </p>
+                    </div>
+                    <div style="margin-bottom: 6px;">
+                      <p style="margin: 0; font-size: 12px; color: #64748b;">
+                        📅 오늘 스케줄: ${todaySchedules.length}개
+                      </p>
+                    </div>
+                    <div>
+                      <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                        🕒 GPS 업데이트: ${gpsTimeStr}
+                      </p>
+                    </div>
+                  </div>
+                `,
+                borderWidth: 0,
+                backgroundColor: 'transparent',
+                disableAnchor: true,
+                pixelOffset: new window.naver.maps.Point(0, -10)
+              });
+
+              // InfoWindow 참조 저장 및 열기
+              currentInfoWindowRef.current = memberInfoWindow;
+              (memberInfoWindow as any)._openTime = Date.now();
+              (memberInfoWindow as any)._memberName = selectedMember.name; // 멤버 이름 저장
+              
+              try {
+                memberInfoWindow.open(naverMap.current, selectedMarker);
+                console.log('[updateMemberMarkers] 자동 InfoWindow 표시 완료:', selectedMember.name);
+              } catch (e) {
+                console.error('[updateMemberMarkers] InfoWindow 열기 실패:', e);
+              }
+            }
+          }, 200); // 지도 이동 후 InfoWindow 표시
         } else if (mapType === 'google' && map.current && googleMapsLoaded) {
           // 구글 지도 이동 및 줌 레벨 조정
           setTimeout(() => {
@@ -2947,6 +3018,139 @@ export default function HomePage() {
             map.current.setZoom(17);
             console.log('구글 지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
           }, 100);
+
+          // 구글 지도용 InfoWindow 자동 표시
+          setTimeout(() => {
+            const selectedMarkerIndex = members.findIndex(member => member.isSelected);
+            const selectedMarker = memberMarkers.current[selectedMarkerIndex];
+            
+                                      if (selectedMarker && window.google?.maps?.InfoWindow) {
+               // InfoWindow가 이미 열려있는 경우 중복 생성 방지
+               if (currentInfoWindowRef.current) {
+                 console.log('[updateMemberMarkers] 구글 InfoWindow가 이미 열려있음, 중복 생성 방지:', selectedMember.name);
+                 return;
+               }
+              
+                             console.log('[updateMemberMarkers] 구글 선택된 멤버 InfoWindow 자동 표시:', selectedMember.name);
+
+              // 오늘 날짜의 멤버 스케줄들 가져오기
+              const today = new Date();
+              const todayDateStr = format(today, 'yyyy-MM-dd');
+              
+              const todaySchedules = selectedMember.schedules.filter(schedule => {
+                if (!schedule.date) return false;
+                try {
+                  const scheduleDate = new Date(schedule.date);
+                  const scheduleDateStr = format(scheduleDate, 'yyyy-MM-dd');
+                  return scheduleDateStr === todayDateStr;
+                } catch (e) {
+                  return false;
+                }
+              });
+
+              // 위치 정보 포맷팅
+              const gpsTime = selectedMember.mlt_gps_time ? new Date(selectedMember.mlt_gps_time) : null;
+              const gpsTimeStr = gpsTime ? format(gpsTime, 'MM/dd HH:mm') : '정보 없음';
+              
+              // 배터리 정보
+              const batteryLevel = selectedMember.mlt_battery || 0;
+              const batteryColor = batteryLevel > 50 ? '#22c55e' : batteryLevel > 20 ? '#f59e0b' : '#EC4899';
+              
+              // 속도 정보
+              const speed = selectedMember.mlt_speed || 0;
+
+              const memberInfoWindow = new window.google.maps.InfoWindow({
+                content: `
+                  <style>
+                    @keyframes slideInFromBottom {
+                      0% {
+                        opacity: 0;
+                        transform: translateY(20px) scale(0.95);
+                      }
+                      100% {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                      }
+                    }
+                    .info-window-container {
+                      animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+                    }
+                    .close-button {
+                      transition: all 0.2s ease;
+                    }
+                    .close-button:hover {
+                      background: rgba(0, 0, 0, 0.2) !important;
+                      transform: scale(1.1);
+                    }
+                  </style>
+                  <div class="info-window-container" style="
+                    padding: 12px 16px;
+                    min-width: 200px;
+                    max-width: 280px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    position: relative;
+                  ">
+                    <!-- 닫기 버튼 -->
+                    <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                      position: absolute;
+                      top: 8px;
+                      right: 8px;
+                      background: rgba(0, 0, 0, 0.1);
+                      border: none;
+                      border-radius: 50%;
+                      width: 22px;
+                      height: 22px;
+                      font-size: 14px;
+                      cursor: pointer;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      color: #666;
+                    ">×</button>
+                    
+                    <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px;">
+                      👤 ${selectedMember.name}
+                    </h3>
+                    <div style="margin-bottom: 6px;">
+                      <p style="margin: 0; font-size: 12px; color: #64748b;">
+                        🔋 배터리: <span style="color: ${batteryColor}; font-weight: 500;">${batteryLevel}%</span>
+                      </p>
+                    </div>
+                    <div style="margin-bottom: 6px;">
+                      <p style="margin: 0; font-size: 12px; color: #64748b;">
+                        🚗 속도: <span style="color: #3b82f6; font-weight: 500;">${speed} km/h</span>
+                      </p>
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                      <p style="margin: 0; font-size: 12px; color: #64748b;">
+                        📅 오늘 스케줄: <span style="color: #059669; font-weight: 500;">${todaySchedules.length}개</span>
+                      </p>
+                    </div>
+                    <div style="border-top: 1px solid #e5e7eb; padding-top: 6px;">
+                      <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                        📍 GPS 업데이트: ${gpsTimeStr}
+                      </p>
+                    </div>
+                  </div>
+                `
+              });
+
+                             // InfoWindow 참조 저장 및 열기
+               currentInfoWindowRef.current = memberInfoWindow;
+               (memberInfoWindow as any)._openTime = Date.now();
+               (memberInfoWindow as any)._memberName = selectedMember.name; // 멤버 이름 저장
+               
+               try {
+                 memberInfoWindow.open(map.current, selectedMarker);
+                 console.log('[updateMemberMarkers] 구글 자동 InfoWindow 표시 완료:', selectedMember.name);
+               } catch (e) {
+                 console.error('[updateMemberMarkers] 구글 InfoWindow 열기 실패:', e);
+               }
+            }
+          }, 200); // 지도 이동 후 InfoWindow 표시
         }
       } else {
         console.warn('유효하지 않은 멤버 좌표:', selectedMember.name, selectedMember.location);
@@ -2992,12 +3196,16 @@ export default function HomePage() {
     ) {
       markersUpdating.current = true;
       console.log('[HOME] 그룹멤버 데이터 변경 감지 - 마커 업데이트:', groupMembers.length, '명');
-      updateMemberMarkers(groupMembers);
+      
+      // 약간의 지연을 주어 연속적인 상태 변경을 방지
       setTimeout(() => {
-        markersUpdating.current = false;
-      }, 100);
+        updateMemberMarkers(groupMembers);
+        setTimeout(() => {
+          markersUpdating.current = false;
+        }, 200);
+      }, 50);
     }
-  }, [groupMembers.length, mapType, mapsInitialized.naver, mapsInitialized.google]); // groupMembers 대신 groupMembers.length 사용
+  }, [groupMembers, mapType, mapsInitialized.naver, mapsInitialized.google]); // groupMembers 전체를 감지하여 선택 상태 변경도 포함
 
   // 지도 타입 변경 핸들러
   const handleMapTypeChange = () => {
@@ -3068,8 +3276,8 @@ export default function HomePage() {
   // 헤더와 컨트롤 버튼의 클래스를 상태에 따라 결정하는 함수 수정
   const getHeaderClassName = () => {
     switch (bottomSheetState) {
-      case 'hidden': return 'fixed bottom-[110px] left-4 z-10 opacity-100';
-      case 'peek': return 'fixed bottom-[110px] left-4 z-10 opacity-100';
+      case 'collapsed': return 'fixed bottom-[110px] left-4 z-10 opacity-100';
+      case 'expanded': return 'fixed bottom-[110px] left-4 z-10 opacity-100';
       default: return 'fixed bottom-[110px] left-4 z-10 opacity-100';
     }
   };
@@ -3077,8 +3285,8 @@ export default function HomePage() {
   // 컨트롤 버튼 클래스 별도 관리
   const getControlsClassName = () => {
     switch (bottomSheetState) {
-      case 'hidden': return 'fixed bottom-[110px] right-4 z-10';
-      case 'peek': return 'fixed bottom-[110px] right-4 z-10';
+      case 'collapsed': return 'fixed bottom-[110px] right-4 z-10';
+      case 'expanded': return 'fixed bottom-[110px] right-4 z-10';
       default: return 'fixed bottom-[110px] right-4 z-10';
     }
   };
@@ -3153,8 +3361,8 @@ export default function HomePage() {
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
     
-    // 바텀시트를 peek 상태로 변경
-    setBottomSheetState('peek');
+    // 바텀시트를 expanded 상태로 변경
+    setBottomSheetState('expanded');
     
     // 기존 데이터 초기화 - location/page.tsx와 동일한 패턴
     setGroupMembers([]);
@@ -3190,44 +3398,69 @@ export default function HomePage() {
     }
   }, [isGroupSelectorOpen]);
 
-  // 첫번째 멤버 자동 선택 - location/page.tsx와 동일한 패턴 추가
+  // 첫번째 멤버 자동 선택 - 더 간단하고 확실한 로직
   useEffect(() => {
-    if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && !firstMemberSelected && dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
+    if (groupMembers.length > 0 && !groupMembers.some(m => m.isSelected) && !firstMemberSelected) {
       console.log('[HOME] 첫번째 멤버 자동 선택 시작:', groupMembers[0].name);
       
       // 상태를 즉시 설정하여 중복 실행 방지
       setFirstMemberSelected(true);
       
-      setTimeout(() => {
-        console.log('[HOME] 첫번째 멤버 자동 선택 실행:', groupMembers[0].id);
-        handleMemberSelect(groupMembers[0].id);
-      }, 500);
+      // 지도가 준비되었는지 확인 후 실행
+      const autoSelectFirstMember = () => {
+        if ((mapType === 'naver' && naverMap.current && mapsInitialized.naver) || 
+            (mapType === 'google' && map.current && mapsInitialized.google)) {
+          console.log('[HOME] 지도 준비 완료, 첫번째 멤버 자동 선택 실행:', groupMembers[0].id);
+          handleMemberSelect(groupMembers[0].id);
+        } else {
+          console.log('[HOME] 지도 준비 중, 500ms 후 재시도');
+          setTimeout(autoSelectFirstMember, 500);
+        }
+      };
+      
+      // 약간의 지연 후 실행
+      setTimeout(autoSelectFirstMember, 300);
     }
-  }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members, dataFetchedRef.current.schedules]);
+  }, [groupMembers.length, firstMemberSelected, mapsInitialized.naver, mapsInitialized.google, mapType]);
+
+  // 페이지 진입 시 첫 번째 멤버 자동 선택 보장 (추가 보험)
+  useEffect(() => {
+    // 모든 데이터가 로드되고 지도가 준비된 후 첫 번째 멤버 자동 선택
+    if (groupMembers.length > 0 && 
+        !groupMembers.some(m => m.isSelected) && 
+        ((mapType === 'naver' && mapsInitialized.naver) || (mapType === 'google' && mapsInitialized.google)) &&
+        dataFetchedRef.current.members && 
+        dataFetchedRef.current.schedules) {
+      
+      console.log('[HOME] 페이지 진입 시 첫 번째 멤버 자동 선택 보장:', groupMembers[0].name);
+      
+      setTimeout(() => {
+        handleMemberSelect(groupMembers[0].id);
+      }, 800); // 충분한 지연 시간
+    }
+  }, [groupMembers.length, mapsInitialized.naver, mapsInitialized.google, mapType, dataFetchedRef.current.members, dataFetchedRef.current.schedules]);
 
 
-  // 개선된 바텀시트 애니메이션 variants - location/page.tsx에서 가져옴
+  // 개선된 바텀시트 애니메이션 variants - location/page.tsx와 동일한 구조로 수정
   const bottomSheetVariants = {
-    hidden: { 
-      top: '90vh', // 더 아래로 내려서 드래그 인식 개선 (90vh -> 95vh)
-      bottom: '0px', // 높이 고정을 위해 bottom 추가
+    collapsed: { 
+      translateY: '65%',
       opacity: 1,
       transition: {
         type: "spring",
-        stiffness: 400,
-        damping: 30,
-        mass: 0.6,
+        stiffness: 280,
+        damping: 35,
+        mass: 0.7,
         duration: 0.5
       }
     },
-    peek: {
-      top: '65vh', // 2단계이므로 더 크게 열림
-      bottom: '0px', // 높이 고정을 위해 bottom 추가
+    expanded: {
+      translateY: '-40px',
       opacity: 1,
       transition: {
         type: "spring",
-        stiffness: 400,
-        damping: 30,
+        stiffness: 260,
+        damping: 32,
         mass: 0.6,
         duration: 0.5
       }
@@ -3574,9 +3807,10 @@ export default function HomePage() {
         {!(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
           <motion.div 
             ref={bottomSheetRef}
+            initial={{ translateY: '100%' }}
             variants={bottomSheetVariants}
             animate={bottomSheetState}
-            className="fixed left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
+            className="fixed bottom-0 left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
             style={{ touchAction: isHorizontalSwipeRef.current === true ? 'pan-x' : 'pan-y' }}
               onTouchStart={handleDragStart}
               onTouchMove={handleDragMove}
@@ -3611,7 +3845,7 @@ export default function HomePage() {
                   style={{ touchAction: 'pan-x' }}
                 >
                   {/* 그룹 멤버 탭 */}
-                  <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
+                  <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '160px' }}>
                 <motion.div 
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -3623,18 +3857,9 @@ export default function HomePage() {
                       <div className="flex items-center space-x-2">
                         <FiUser className="w-5 h-5 text-indigo-600" />
                         <div>
-                          <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
-                          <p className="text-sm text-gray-600">멤버들의 위치를 확인하세요</p>
+                          <h2 className="text-base font-semibold text-gray-900">그룹 멤버</h2>
                         </div>
                       </div>
-                      {(isUserDataLoading || !dataFetchedRef.current.members) && (
-                        <motion.div
-                          variants={spinnerVariants}
-                          animate="animate"
-                        >
-                          <FiLoader className="text-indigo-500" size={18}/>
-                        </motion.div>
-                      )}
                     </div>
                     
                     <div className="flex items-center space-x-3">
@@ -3657,7 +3882,7 @@ export default function HomePage() {
                                 console.log('[그룹 드롭다운] 버튼 클릭, 현재 상태:', isGroupSelectorOpen);
                             setIsGroupSelectorOpen(!isGroupSelectorOpen);
                           }}
-                          className="group-selector flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium min-w-[140px] mobile-button"
+                                                        className="group-selector flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium min-w-[120px] mobile-button"
                           disabled={isUserDataLoading}
                           data-group-selector="true"
                         >
@@ -3668,21 +3893,12 @@ export default function HomePage() {
                             }
                           </span>
                           <div className="ml-2 flex-shrink-0">
-                            {isUserDataLoading ? (
-                              <motion.div
-                                variants={spinnerVariants}
-                                animate="animate"
-                              >
-                                <FiLoader className="text-gray-400" size={14} />
-                              </motion.div>
-                            ) : (
                               <motion.div
                                 animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
                                 transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                               >
-                                <FiChevronDown className="text-gray-400" size={14} />
+                                <FiChevronDown className="text-gray-400" size={12} />
                               </motion.div>
-                            )}
                           </div>
                         </motion.button>
 
@@ -3693,7 +3909,7 @@ export default function HomePage() {
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
                                 transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-                                className="absolute top-16 right-0 z-50 min-w-[200px] bg-white border border-indigo-200 rounded-xl shadow-xl overflow-hidden"
+                                className="absolute top-full right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-40 overflow-y-auto min-w-[160px]"
                                 onClick={(e) => {
                                   // 드롭다운 메뉴 내부 클릭 시 이벤트 버블링 방지
                                   e.stopPropagation();
@@ -3732,23 +3948,24 @@ export default function HomePage() {
                                           // 다른 그룹을 선택한 경우에만 handleGroupSelect 호출
                                           handleGroupSelect(group.sgt_idx);
                                         }}
-                                        className={`w-full px-4 py-3 text-left text-sm font-medium transition-colors duration-150 flex items-center justify-between ${
-                                          selectedGroupId === group.sgt_idx
-                                            ? 'bg-indigo-50 text-indigo-700 border-r-2 border-indigo-500'
-                                            : 'text-gray-700 hover:bg-gray-50'
-                                        }`}
+                                                                        className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
+                                  selectedGroupId === group.sgt_idx
+                                    ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                    : 'text-gray-700'
+                                }`}
                                       >
-                                        <div className="flex-1">
-                                          <div className="font-semibold truncate">{group.sgt_title}</div>
-                                          <div className="text-xs text-gray-500 mt-0.5">
-                                            멤버 {groupMemberCounts[group.sgt_idx] || 0}명
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex-1">
+                                            <div className="font-medium truncate">
+                                              {group.sgt_title} ({groupMemberCounts[group.sgt_idx] || 0}명)
+                                            </div>
                                           </div>
+                                          {selectedGroupId === group.sgt_idx && (
+                                            <svg className="w-3 h-3 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                          )}
                                         </div>
-                                        {selectedGroupId === group.sgt_idx && (
-                                          <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                          </svg>
-                                        )}
                                       </motion.button>
                                     ))
                                   ) : (
@@ -3801,15 +4018,6 @@ export default function HomePage() {
                           <FiUser className="w-6 h-6 text-white" />
                         </motion.div>
                       </div>
-                      
-                      <motion.div
-                        variants={loadingTextVariants}
-                        initial="hidden"
-                        animate="visible"
-                      >
-                        <p className="font-medium text-gray-900 mb-1">멤버 정보를 불러오는 중...</p>
-                        <p className="text-sm text-gray-600">잠시만 기다려주세요</p>
-                      </motion.div>
                     </motion.div>
                   ) : groupMembers.length > 0 ? (
                     <motion.div 
@@ -3851,7 +4059,7 @@ export default function HomePage() {
                               animate={member.isSelected ? "selected" : "animate"}
                             >
                               <motion.div
-                                className={`member-avatar w-13 h-13 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
+                                className={`member-avatar w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                                   member.isSelected ? 'selected' : ''
                                 }`}
                                 animate={member.isSelected ? "selected" : undefined}
@@ -3869,7 +4077,7 @@ export default function HomePage() {
                                   }}
                                 />
                               </motion.div>
-                              <span className={`block text-sm font-semibold mt-3 transition-colors duration-200 ${
+                              <span className={`block text-sm font-normal mt-1 transition-colors duration-200 ${
                                 member.isSelected ? 'text-indigo-700' : 'text-gray-700'
                               }`}>
                                 {member.name}
@@ -3897,7 +4105,7 @@ export default function HomePage() {
               </div>
 
                   {/* 멤버 일정 탭 */}
-                  <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
+                  <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '160px' }}>
                 <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -3906,14 +4114,14 @@ export default function HomePage() {
                 >
                       {/* 고정 헤더 부분 */}
                       <div className="sticky top-0 z-20 bg-gradient-to-r from-pink-50 to-rose-50 rounded-t-2xl pt-4 px-6 border-b border-pink-100/50 backdrop-blur-sm">
-                    <div className="flex justify-between items-center mb-3">
+                    <div className="flex justify-between items-center mb-1">
                       <div className="flex items-center space-x-2">
                         <FiCalendar className="w-5 h-5 text-pink-600" />
                         <div>
                           <h2 className="text-lg font-bold text-gray-900">
                             {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 일정` : '오늘의 일정'}
                           </h2>
-                          <p className="text-sm text-gray-600">예정된 일정을 확인하세요</p>
+                          {/* <p className="text-sm text-gray-600">예정된 일정을 확인하세요</p> */}
                         </div>
                       </div>
                       {groupMembers.some(m => m.isSelected) ? (
@@ -3944,7 +4152,7 @@ export default function HomePage() {
                     <div className="mb-1 overflow-hidden" data-calendar-swipe="true">
                           <div className="mb-1 relative min-h-[30px] overflow-x-hidden"> 
                           <motion.div
-                            className="flex space-x-2 pb-2 cursor-grab active:cursor-grabbing"
+                            className="flex space-x-2 cursor-grab active:cursor-grabbing"
                             style={{ x }} 
                             drag="x"
                                 dragConstraints={{ left: -280, right: 8 }}
@@ -4198,7 +4406,7 @@ export default function HomePage() {
               </div>
 
               {/* 점 인디케이터 - 바텀시트 하단에 고정 */}
-              <div className="flex-shrink-0 pb-3 pt-2 bg-white">
+              <div className="flex-shrink-0 pb-6 pt-2 bg-white">
                 <div className="flex justify-center items-center space-x-2 mb-2">
                   <motion.div
                     className={`rounded-full transition-all duration-300 ${
@@ -4217,16 +4425,6 @@ export default function HomePage() {
                     transition={{ duration: 0.3, delay: 0.1 }}
                   />
                 </div>
-
-                {/* 스와이프 힌트 */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 0.7 }}
-                  transition={{ delay: 0.8 }}
-                  className="text-center"
-                >
-                  <span className="text-xs text-gray-400 font-medium">← 좌우로 스와이프 →</span>
-                </motion.div>
               </div>
             </div>
           </motion.div>

@@ -30,14 +30,14 @@ const apiClient: CustomApiClient = axios.create({
 // 토큰 관리 유틸리티
 const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('smap_auth_token');
+    return localStorage.getItem('auth-token'); // 실제 사용하는 키로 변경
   }
   return null;
 };
 
 const removeToken = (): void => {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('smap_auth_token');
+    localStorage.removeItem('auth-token'); // 실제 사용하는 키로 변경
     localStorage.removeItem('smap_user_data');
   }
 };
@@ -54,8 +54,12 @@ apiClient.interceptors.request.use(
     
     // 인증이 필요한 요청에 토큰 추가
     const token = getToken();
+    console.log('[API CLIENT] 토큰 확인:', token ? '토큰 있음' : '토큰 없음');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('[API CLIENT] Authorization 헤더 추가됨');
+    } else {
+      console.log('[API CLIENT] 토큰이 없어서 Authorization 헤더 추가 안됨');
     }
     
     // 요청 로깅 (개발 환경에서만)
@@ -109,7 +113,7 @@ apiClient.interceptors.response.use(
         const newToken = refreshResponse.data.token;
         
         if (newToken) {
-          localStorage.setItem('smap_auth_token', newToken);
+          localStorage.setItem('auth-token', newToken); // 실제 사용하는 키로 변경
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return apiClient(originalRequest);
         }

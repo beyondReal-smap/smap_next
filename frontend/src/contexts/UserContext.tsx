@@ -84,12 +84,28 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // 사용자 정보가 부족한 경우 (예: email이나 phone이 없는 경우) 추가 API 호출
       if (!user.mt_email || !user.mt_hp) {
         try {
-          console.log('[UserContext] 추가 사용자 정보 조회 시도');
-          const response = await fetch('/api/members/me');
+          console.log('[UserContext] 추가 사용자 정보 조회 시도 - 현재 사용자:', user.mt_idx, user.mt_name);
+          
+          // 인증 토큰 포함하여 API 호출
+          const token = localStorage.getItem('auth-token');
+          const headers: HeadersInit = {
+            'Content-Type': 'application/json',
+          };
+          
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+          
+          const response = await fetch('/api/members/me', {
+            method: 'GET',
+            headers
+          });
+          
           if (response.ok) {
             const result = await response.json();
             if (result.success && result.data) {
               console.log('[UserContext] 추가 사용자 정보 조회 성공:', result.data);
+              console.log('[UserContext] 조회된 사용자 ID:', result.data.mt_idx, '현재 사용자 ID:', user.mt_idx);
               userInfoData = {
                 mt_idx: result.data.mt_idx,
                 name: result.data.mt_name || user.mt_name || '사용자',
@@ -130,13 +146,27 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!authLoading) {
       refreshUserData();
     }
-  }, [authLoading, isLoggedIn]); // user.mt_idx 제거하여 무한 재조회 방지
+  }, [authLoading, isLoggedIn, user?.mt_idx, refreshUserData]); // user.mt_idx 추가하여 사용자 변경 시 새로고침
+
+  // 사용자 변경 시 초기화 상태 리셋
+  useEffect(() => {
+    if (user?.mt_idx) {
+      console.log('[UserContext] 사용자 변경 감지, 초기화 상태 리셋:', user.mt_idx);
+      setIsInitialized(false);
+      setSelectedGroupId(null);
+    }
+  }, [user?.mt_idx]);
 
   // 그룹 데이터 로딩 완료 후 첫 번째 그룹 자동 선택 (한 번만)
   useEffect(() => {
-    if (!isInitialized && !isUserDataLoading && userGroups.length > 0 && selectedGroupId === null) {
-      console.log('[UserContext] 초기화: 첫 번째 그룹 자동 선택:', userGroups[0].sgt_title, 'ID:', userGroups[0].sgt_idx);
-      setSelectedGroupId(userGroups[0].sgt_idx);
+    if (!isInitialized && !isUserDataLoading) {
+      if (userGroups.length > 0 && selectedGroupId === null) {
+        console.log('[UserContext] 초기화: 첫 번째 그룹 자동 선택:', userGroups[0].sgt_title, 'ID:', userGroups[0].sgt_idx);
+        setSelectedGroupId(userGroups[0].sgt_idx);
+      } else if (userGroups.length === 0) {
+        console.log('[UserContext] 초기화: 그룹이 없는 신규 사용자');
+        setSelectedGroupId(null);
+      }
       setIsInitialized(true); // 초기화 완료 표시
     }
   }, [isInitialized, isUserDataLoading, userGroups.length]); // selectedGroupId 의존성 제거

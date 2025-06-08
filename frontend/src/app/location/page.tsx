@@ -183,6 +183,12 @@ body {
   border: 1px solid rgba(99, 102, 241, 0.1);
 }
 
+/* 네이버 지도 zoom 컨트롤 위치 조정 - 헤더보다 10px 아래 */
+.nmap_control_zoom {
+  top: 74px !important;
+  right: 10px !important;
+}
+
 @media (max-width: 640px) {
   .location-card {
     min-width: 240px;
@@ -1657,110 +1663,8 @@ export default function LocationPage() {
         }
       }
 
-      // 선택된 멤버의 InfoWindow 자동 표시
-      const selectedMarker = memberMarkers.find(marker => {
-        const memberIndex = memberMarkers.indexOf(marker);
-        return updatedMembers[memberIndex]?.isSelected;
-      });
-      
-      if (selectedMarker && newlySelectedMember) {
-        // 기존 InfoWindow 닫기
-        if (infoWindow) {
-          infoWindow.close();
-        }
-
-                             const lat = parseCoordinate(newlySelectedMember.location.lat);
-           const lng = parseCoordinate(newlySelectedMember.location.lng);
-
-        const memberInfoWindow = new window.naver.maps.InfoWindow({
-          content: `
-            <style>
-              @keyframes slideInFromBottom {
-                0% {
-                  opacity: 0;
-                  transform: translateY(20px) scale(0.95);
-                }
-                100% {
-                  opacity: 1;
-                  transform: translateY(0) scale(1);
-                }
-              }
-              .member-info-window-container {
-                animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-              }
-              .close-button {
-                transition: all 0.2s ease;
-              }
-              .close-button:hover {
-                background: rgba(0, 0, 0, 0.2) !important;
-                transform: scale(1.1);
-              }
-            </style>
-            <div class="member-info-window-container" style="
-              padding: 12px 16px;
-              min-width: 200px;
-              max-width: 280px;
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background: white;
-              border-radius: 12px;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-              position: relative;
-            ">
-              <!-- 닫기 버튼 -->
-              <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-                position: absolute;
-                top: 8px;
-                right: 8px;
-                background: rgba(0, 0, 0, 0.1);
-                border: none;
-                border-radius: 50%;
-                width: 22px;
-                height: 22px;
-                font-size: 14px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                color: #666;
-              ">×</button>
-
-              <div style="margin-bottom: 8px;">
-                <h3 style="
-                  margin: 0 0 4px 0;
-                  font-size: 14px;
-                  font-weight: 600;
-                  color: #111827;
-                  padding-right: 25px;
-                ">👤 ${newlySelectedMember.name}</h3>
-                <p style="
-                  margin: 0;
-                  font-size: 12px;
-                  color: #64748b;
-                ">선택된 멤버</p>
-              </div>
-              
-              <div style="margin-bottom: 6px;">
-                <p style="margin: 0; font-size: 12px; color: #64748b;">
-                  📍 위치: <span style="color: #4F46E5; font-weight: 500;">${lat?.toFixed(4)}, ${lng?.toFixed(4)}</span>
-                </p>
-              </div>
-              <div>
-                <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                  🗺️ 현재 위치 정보
-                </p>
-              </div>
-            </div>
-          `,
-          borderWidth: 0,
-          backgroundColor: 'transparent',
-          disableAnchor: true,
-          pixelOffset: new window.naver.maps.Point(0, -10)
-        });
-
-        memberInfoWindow.open(map, selectedMarker);
-        setInfoWindow(memberInfoWindow);
-        console.log('[handleMemberSelect] 자동 InfoWindow 표시:', newlySelectedMember.name);
-      }
+      // 선택된 멤버의 InfoWindow는 useEffect에서 처리하도록 변경
+      console.log('[handleMemberSelect] 멤버 선택 완료, InfoWindow는 마커 업데이트 후 자동 표시됩니다.');
       
     } else {
       // 아무도 선택되지 않은 경우
@@ -2266,6 +2170,14 @@ export default function LocationPage() {
     }
   }, [memberMarkers, groupMembers, isFirstMemberSelectionComplete, map]);
 
+  // groupMembers 상태 변경 시 마커 업데이트 (그룹 멤버 리스트에서 선택 시 InfoWindow 표시를 위해)
+  useEffect(() => {
+    if (map && window.naver && groupMembers.length > 0 && isMapReady) {
+      console.log('[useEffect] groupMembers 변경으로 인한 마커 업데이트:', groupMembers.length, '명');
+      updateMemberMarkers(groupMembers);
+    }
+  }, [groupMembers, map, isMapReady]);
+
   // 페이지 로드 애니메이션
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -2526,6 +2438,121 @@ export default function LocationPage() {
 
     setMemberMarkers(newMemberMarkers);
     console.log('[updateMemberMarkers] 멤버 마커 업데이트 완료:', newMemberMarkers.length, '개');
+
+    // 선택된 멤버가 있으면 InfoWindow 자동 표시 (중복 방지)
+    const selectedMember = members.find(member => member.isSelected);
+    const selectedMemberIndex = members.findIndex(member => member.isSelected);
+    const selectedMarker = newMemberMarkers[selectedMemberIndex];
+
+    if (selectedMember && selectedMarker && isFirstMemberSelectionComplete) {
+      // InfoWindow가 이미 열려있고 같은 멤버인 경우 중복 생성 방지
+      const isInfoWindowOpen = infoWindow && infoWindow.getMap();
+      const isSameMember = selectedMemberIdRef.current === selectedMember.id;
+      
+      if (isInfoWindowOpen && isSameMember) {
+        console.log('[updateMemberMarkers] InfoWindow가 이미 열려있음, 중복 생성 방지:', selectedMember.name);
+        return;
+      }
+      
+      console.log('[updateMemberMarkers] 선택된 멤버 InfoWindow 자동 표시:', selectedMember.name);
+      
+      // 기존 InfoWindow 닫기
+      if (infoWindow) {
+        infoWindow.close();
+      }
+
+      const lat = parseCoordinate(selectedMember.location.lat);
+      const lng = parseCoordinate(selectedMember.location.lng);
+
+      const memberInfoWindow = new window.naver.maps.InfoWindow({
+        content: `
+          <style>
+            @keyframes slideInFromBottom {
+              0% {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+              }
+              100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+            .member-info-window-container {
+              animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            }
+            .close-button {
+              transition: all 0.2s ease;
+            }
+            .close-button:hover {
+              background: rgba(0, 0, 0, 0.2) !important;
+              transform: scale(1.1);
+            }
+          </style>
+          <div class="member-info-window-container" style="
+            padding: 12px 16px;
+            min-width: 200px;
+            max-width: 280px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            position: relative;
+          ">
+            <!-- 닫기 버튼 -->
+            <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+              position: absolute;
+              top: 8px;
+              right: 8px;
+              background: rgba(0, 0, 0, 0.1);
+              border: none;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+              font-size: 14px;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #666;
+            ">×</button>
+
+            <div style="margin-bottom: 8px;">
+              <h3 style="
+                margin: 0 0 4px 0;
+                font-size: 14px;
+                font-weight: 600;
+                color: #111827;
+                padding-right: 25px;
+              ">👤 ${selectedMember.name}</h3>
+              <p style="
+                margin: 0;
+                font-size: 12px;
+                color: #64748b;
+              ">선택된 멤버</p>
+            </div>
+            
+            <div style="margin-bottom: 6px;">
+              <p style="margin: 0; font-size: 12px; color: #64748b;">
+                📍 위치: <span style="color: #4F46E5; font-weight: 500;">${lat?.toFixed(4)}, ${lng?.toFixed(4)}</span>
+              </p>
+            </div>
+            <div>
+              <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                🗺️ 현재 위치 정보
+              </p>
+            </div>
+          </div>
+        `,
+        borderWidth: 0,
+        backgroundColor: 'transparent',
+        disableAnchor: true,
+        pixelOffset: new window.naver.maps.Point(0, -10)
+      });
+
+      memberInfoWindow.open(map, selectedMarker);
+      setInfoWindow(memberInfoWindow);
+      console.log('[updateMemberMarkers] 자동 InfoWindow 표시 완료:', selectedMember.name);
+    }
   };
 
   // 지도에 장소 마커 표시
@@ -3841,7 +3868,7 @@ export default function LocationPage() {
                 {/* 그룹 멤버 섹션 */}
               <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
                   <div 
-                    className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
+                    className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100 h-[160px] overflow-y-auto hide-scrollbar"
                   >
                     <motion.div 
                       initial={{ opacity: 0, y: 30 }}
@@ -3860,8 +3887,7 @@ export default function LocationPage() {
                           <div className="flex items-center space-x-2">
                             <FiUser className="w-5 h-5 text-indigo-600" />
                             <div>                                                                                                               
-                              <h2 className="text-lg font-bold text-gray-900">그룹 멤버</h2>
-                              <p className="text-sm text-gray-600">멤버들의 장소를 확인하세요</p>
+                              <h2 className="text-base font-semibold text-gray-900">그룹 멤버</h2>
                             </div>
                           </div>
                          </div>
@@ -3882,18 +3908,18 @@ export default function LocationPage() {
                                 transition: { duration: 0.1, ease: "easeInOut" }
                               }}
                                onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
-                              className="group-selector flex items-center justify-between px-4 py-2 rounded-xl text-sm font-medium min-w-[140px] mobile-button"
+                              className="group-selector flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium min-w-[120px] mobile-button"
                                data-group-selector="true"
                              >
                                <span className="truncate text-gray-700">
                                  {userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'}
                                </span>
-                              <div className="ml-2 flex-shrink-0">
+                              <div className="ml-1.5 flex-shrink-0">
                                   <motion.div
                                     animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
                                     transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                                   >
-                                    <FiChevronDown className="text-gray-400" size={14} />
+                                    <FiChevronDown className="text-gray-400" size={12} />
                                   </motion.div>
                                </div>
                             </motion.button>
@@ -3905,14 +3931,14 @@ export default function LocationPage() {
                                   animate={{ opacity: 1, y: 0, scale: 1 }}
                                   exit={{ opacity: 0, y: -10, scale: 0.96 }}
                                   transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                                  className="absolute top-full right-0 z-50 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto min-w-[180px]"
+                                  className="absolute top-full right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-40 overflow-y-auto min-w-[160px]"
                                   data-group-dropdown-menu="true"
                                 >
                                   {userGroups.map((group) => (
                                     <button
                                      key={group.sgt_idx}
                                      onClick={() => handleGroupSelect(group.sgt_idx)}
-                                        className={`w-full px-4 py-2 text-left text-sm font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
+                                        className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
                                                                               selectedGroupId === group.sgt_idx 
                                               ? 'bg-indigo-50 text-indigo-700 font-medium' 
                                          : 'text-gray-700'
@@ -3920,13 +3946,12 @@ export default function LocationPage() {
                                    >
                                      <div className="flex items-center justify-between">
                                        <div className="flex-1">
-                                         <div className="font-semibold truncate">{group.sgt_title || `그룹 ${group.sgt_idx}`}</div>
-                                         <div className="text-xs text-gray-500 mt-0.5">
-                                           멤버 {groupMemberCounts[group.sgt_idx] || 0}명
+                                         <div className="font-medium truncate">
+                                           {group.sgt_title || `그룹 ${group.sgt_idx}`} ({groupMemberCounts[group.sgt_idx] || 0}명)
                                          </div>
                                        </div>
                                        {selectedGroupId === group.sgt_idx && (
-                                         <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                         <svg className="w-3 h-3 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                          </svg>
                                        )}
@@ -3970,7 +3995,7 @@ export default function LocationPage() {
                               className="flex flex-col items-center focus:outline-none mobile-button"
                             >
                                 <div
-                                  className={`member-avatar w-13 h-13 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
+                                  className={`member-avatar w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                                     member.isSelected ? 'selected' : ''
                                   }`}
                                 >
@@ -3990,7 +4015,7 @@ export default function LocationPage() {
                                     }}
                                   />
                                 </div>
-                              <span className={`block text-sm font-semibold mt-3 transition-colors duration-200 ${
+                              <span className={`block text-sm font-normal mt-1 transition-colors duration-200 ${
                                 member.isSelected ? 'text-indigo-700' : 'text-gray-700'
                               }`}>
                                {member.name}
@@ -4010,7 +4035,7 @@ export default function LocationPage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1, duration: 0.3 }}
-                    className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl p-4 border border-pink-100 h-[200px] overflow-y-auto hide-scrollbar"
+                    className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl p-4 border border-pink-100 h-[160px] overflow-y-auto hide-scrollbar"
                   >
                     <div className="flex justify-between items-center mb-4">
                       <div className="flex items-center space-x-3">
@@ -4055,7 +4080,7 @@ export default function LocationPage() {
                               animate="visible"
                               whileHover={!isSelected ? "hover" : undefined}
                               whileTap="tap"
-                              className={`flex-shrink-0 w-[220px] h-[80px] bg-white rounded-xl p-4 cursor-pointer transition-all duration-300 border shadow-sm ${
+                              className={`flex-shrink-0 w-[220px] h-[60px] bg-white rounded-xl p-4 cursor-pointer transition-all duration-300 border shadow-sm ${
                                 isSelected 
                                   ? 'border-amber-200 shadow-lg ring-1 ring-amber-100' 
                                   : 'border-gray-200 hover:border-amber-200 hover:shadow-md active:scale-[0.98]'
@@ -4077,7 +4102,7 @@ export default function LocationPage() {
                                 <div className="flex items-center min-w-0 flex-1">
                                   {/* 텍스트 정보 */}
                                   <div className="min-w-0 flex-1">
-                                    <h4 className="text-base font-semibold text-gray-900 truncate leading-tight">
+                                    <h4 className="text-sm font-normal text-gray-900 truncate leading-tight">
                                       {location.name || location.slt_title || '제목 없음'}
                                     </h4>
                                     {!hasValidCoords && (

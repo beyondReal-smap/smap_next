@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image'; // Image 컴포넌트 임포트
 import { motion, AnimatePresence } from 'framer-motion';
@@ -24,18 +24,69 @@ export default function SignInPage() {
   const [errorModalMessage, setErrorModalMessage] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // 컴포넌트 마운트 시 localStorage에서 최근 등록한 전화번호 불러오기
+  // 자동 입력 기능 제거됨 - 사용자가 직접 입력해야 함
+  // useEffect(() => {
+  //   try {
+  //     const lastRegisteredPhone = localStorage.getItem('lastRegisteredPhone');
+  //     if (lastRegisteredPhone) {
+  //       setPhoneNumber(lastRegisteredPhone);
+  //     }
+  //   } catch (error) {
+  //     console.error('localStorage 접근 실패:', error);
+  //   }
+  // }, []);
+
+  // URL 파라미터에서 에러 메시지 확인
   useEffect(() => {
-    try {
-      const lastRegisteredPhone = localStorage.getItem('lastRegisteredPhone');
-      if (lastRegisteredPhone) {
-        setPhoneNumber(lastRegisteredPhone);
+    const error = searchParams.get('error');
+    if (error) {
+      let errorMessage = '';
+      switch (error) {
+        case 'AccessDenied':
+          errorMessage = '비활성화된 계정입니다. 고객센터에 문의해주세요.';
+          break;
+        case 'OAuthSignin':
+          errorMessage = '소셜 로그인 중 오류가 발생했습니다.';
+          break;
+        case 'OAuthCallback':
+          errorMessage = '소셜 로그인 콜백 처리 중 오류가 발생했습니다.';
+          break;
+        case 'OAuthCreateAccount':
+          errorMessage = '계정 생성 중 오류가 발생했습니다.';
+          break;
+        case 'EmailCreateAccount':
+          errorMessage = '이메일 계정 생성 중 오류가 발생했습니다.';
+          break;
+        case 'Callback':
+          errorMessage = '로그인 처리 중 오류가 발생했습니다.';
+          break;
+        case 'OAuthAccountNotLinked':
+          errorMessage = '이미 다른 방법으로 가입된 이메일입니다.';
+          break;
+        case 'EmailSignin':
+          errorMessage = '이메일 로그인 중 오류가 발생했습니다.';
+          break;
+        case 'CredentialsSignin':
+          errorMessage = '로그인 정보가 올바르지 않습니다.';
+          break;
+        case 'SessionRequired':
+          errorMessage = '로그인이 필요합니다.';
+          break;
+        default:
+          errorMessage = '로그인 중 오류가 발생했습니다.';
       }
-    } catch (error) {
-      console.error('localStorage 접근 실패:', error);
+      
+      setErrorModalMessage(errorMessage);
+      setShowErrorModal(true);
+      
+      // URL에서 error 파라미터 제거
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('error');
+      window.history.replaceState({}, '', newUrl.toString());
     }
-  }, []);
+  }, [searchParams]);
 
   // 전화번호 포맷팅 함수 (register/page.tsx의 함수와 유사)
   const formatPhoneNumber = (value: string) => {
@@ -159,7 +210,14 @@ export default function SignInPage() {
             const userData = session.backendData.member;
             const token = session.backendData.token || '';
             
-            console.log('[GOOGLE LOGIN] 사용자 정보 저장:', userData);
+            console.log('[GOOGLE LOGIN] 새로운 사용자 정보:', userData.mt_name, 'ID:', userData.mt_idx);
+            
+            // 기존 데이터와 다른 사용자면 완전 초기화
+            const existingUserData = authService.getUserData();
+            if (existingUserData && existingUserData.mt_idx !== userData.mt_idx) {
+              console.log('[GOOGLE LOGIN] 다른 사용자 감지, 기존 데이터 초기화:', existingUserData.mt_idx, '->', userData.mt_idx);
+              authService.clearAuthData(); // 기존 데이터 완전 삭제
+            }
             
             // authService를 통해 저장하여 AuthContext가 인식하도록 함
             authService.setUserData(userData);

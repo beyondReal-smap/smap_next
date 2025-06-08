@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 
 // JWT 시크릿 키 (환경변수에서 가져오거나 기본값 사용)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+console.log('[AUTH] JWT_SECRET 설정됨, 길이:', JWT_SECRET.length);
 
 // JWT 토큰 페이로드 인터페이스
 interface JWTPayload {
@@ -20,13 +21,7 @@ interface JWTPayload {
   session_id?: string;
 }
 
-// 임시 하드코딩된 사용자 정보 (로그인 기능 구현 전까지 사용)
-const MOCK_USER = {
-  mt_idx: 1186,
-  mt_id: 'mock_user_1186',
-  mt_name: '테스트 사용자',
-  mt_email: 'test@example.com'
-};
+// 임시 하드코딩된 사용자 정보는 제거됨 - 실제 JWT 토큰만 사용
 
 /**
  * JWT 토큰 검증
@@ -34,23 +29,14 @@ const MOCK_USER = {
  */
 export function verifyJWT(token: string): JWTPayload | null {
   try {
-    // JWT 토큰이 없으면 mock 사용자 반환 (개발 환경용)
-    if (!token || token === 'mock' || process.env.NODE_ENV === 'development') {
-      console.log('[AUTH] Mock 토큰 모드 - 개발용 사용자 반환');
-      return {
-        mt_idx: 1186,
-        mt_id: '01029565435',
-        mt_name: '정다연',
-        mt_nickname: 'yeon',
-        mt_file1: '/images/female_1.png', // 프로필 이미지 경로
-        sgt_idx: 641,
-        sgdt_idx: 983,
-        sgdt_owner_chk: 'Y',
-        sgdt_leader_chk: 'N',
-        iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24)
-      };
+    // 토큰이 없으면 null 반환 (실제 JWT 토큰만 허용)
+    if (!token || token === 'mock') {
+      console.log('[AUTH] 토큰이 없음 - null 반환');
+      return null;
     }
+
+    console.log('[AUTH] JWT 토큰 검증 시작, 토큰 길이:', token.length);
+    console.log('[AUTH] JWT 토큰 시작 부분:', token.substring(0, 50) + '...');
 
     // 실제 JWT 토큰 검증
     const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
@@ -112,11 +98,7 @@ export function getCurrentUser(request: NextRequest): JWTPayload | null {
       return verifyJWT(cookieToken);
     }
     
-    // 개발 환경에서만 mock 사용자 반환 (실제 토큰이 없을 때만)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[AUTH] 개발 환경 - 인증 헤더 없음, mock 사용자 반환');
-      return verifyJWT('mock');
-    }
+    // 토큰이 없으면 null 반환
     return null;
   }
 

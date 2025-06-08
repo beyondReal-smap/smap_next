@@ -113,9 +113,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // 1. 먼저 authService에서 로그인 상태 확인
-        if (authService.isLoggedIn()) {
+        console.log('[AUTH CONTEXT] 초기 인증 상태 확인 시작');
+        
+        // 1. NextAuth 세션 먼저 확인 (최신 상태)
+        console.log('[AUTH CONTEXT] NextAuth 세션 확인');
+        const session = await getSession();
+        
+        if (session?.backendData?.member) {
+          console.log('[AUTH CONTEXT] NextAuth 세션에서 사용자 데이터 발견:', session.backendData.member.mt_name, 'ID:', session.backendData.member.mt_idx);
+          
+          // 기존 authService 데이터와 비교하여 다른 사용자면 초기화
+          const existingUserData = authService.getUserData();
+          if (existingUserData && existingUserData.mt_idx !== session.backendData.member.mt_idx) {
+            console.log('[AUTH CONTEXT] 다른 사용자 감지, 기존 데이터 초기화:', existingUserData.mt_idx, '->', session.backendData.member.mt_idx);
+            authService.clearAuthData(); // 기존 데이터 완전 삭제
+          }
+          
+          // NextAuth 세션의 데이터를 authService에 저장
+          const userData = session.backendData.member;
+          const token = session.backendData.token || '';
+          
+          console.log('[AUTH CONTEXT] 토큰 저장:', token ? '토큰 있음' : '토큰 없음');
+          
+          authService.setUserData(userData);
+          authService.setToken(token);
+          
+          // localStorage에도 직접 저장 (apiClient가 인식할 수 있도록)
+          if (typeof window !== 'undefined' && token) {
+            localStorage.setItem('auth-token', token);
+            console.log('[AUTH CONTEXT] localStorage에 토큰 저장 완료');
+          }
+          
+          dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+          // 최신 데이터로 갱신
+          await refreshUserData();
+          return;
+        }
+
+        // 2. NextAuth 세션이 없으면 authService에서 로그인 상태 확인
+        const isLoggedInFromService = authService.isLoggedIn();
+        console.log('[AUTH CONTEXT] authService.isLoggedIn():', isLoggedInFromService);
+        
+        if (isLoggedInFromService) {
           const userData = authService.getUserData();
+          console.log('[AUTH CONTEXT] authService.getUserData():', userData);
           if (userData) {
             console.log('[AUTH CONTEXT] authService에서 사용자 데이터 발견:', userData.mt_name);
             dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
@@ -123,26 +164,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             await refreshUserData();
             return;
           }
-        }
-
-        // 2. authService에 데이터가 없으면 NextAuth 세션 확인
-        console.log('[AUTH CONTEXT] authService에 데이터 없음, NextAuth 세션 확인');
-        const session = await getSession();
-        
-        if (session?.backendData?.member) {
-          console.log('[AUTH CONTEXT] NextAuth 세션에서 사용자 데이터 발견:', session.backendData.member.mt_name);
-          
-          // NextAuth 세션의 데이터를 authService에 저장
-          const userData = session.backendData.member;
-          const token = session.backendData.token || '';
-          
-          authService.setUserData(userData);
-          authService.setToken(token);
-          
-          dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
-          // 최신 데이터로 갱신
-          await refreshUserData();
-          return;
         }
 
         // 3. 둘 다 없으면 로그인되지 않은 상태
@@ -157,6 +178,53 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     initializeAuth();
   }, []);
+
+    // NextAuth 세션 변경 감지 (비활성화 - 무한 루프 방지)
+  // useEffect(() => {
+  //   const checkSessionChange = async () => {
+  //     try {
+  //       const session = await getSession();
+        
+  //       if (session?.backendData?.member) {
+  //         const sessionUserId = session.backendData.member.mt_idx;
+  //         const currentUserId = state.user?.mt_idx;
+          
+  //         // 세션의 사용자와 현재 사용자가 다르면 업데이트
+  //         if (currentUserId && sessionUserId !== currentUserId) {
+  //           console.log('[AUTH CONTEXT] 세션 사용자 변경 감지:', currentUserId, '->', sessionUserId);
+            
+  //           // 기존 데이터 초기화
+  //           authService.clearAuthData();
+            
+  //           // 새로운 사용자 데이터 설정
+  //           const userData = session.backendData.member;
+  //           const token = session.backendData.token || '';
+            
+  //           console.log('[AUTH CONTEXT] 세션 변경 - 토큰 저장:', token ? '토큰 있음' : '토큰 없음');
+            
+  //           authService.setUserData(userData);
+  //           authService.setToken(token);
+            
+  //           // localStorage에도 직접 저장 (apiClient가 인식할 수 있도록)
+  //           if (typeof window !== 'undefined' && token) {
+  //             localStorage.setItem('auth-token', token);
+  //             console.log('[AUTH CONTEXT] 세션 변경 - localStorage에 토큰 저장 완료');
+  //           }
+            
+  //           dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+  //           await refreshUserData();
+  //         }
+  //       }
+  //     } catch (error) {
+  //       console.error('[AUTH CONTEXT] 세션 변경 확인 실패:', error);
+  //     }
+  //   };
+
+  //   // 주기적으로 세션 변경 확인 (30초마다로 변경)
+  //   const interval = setInterval(checkSessionChange, 30000);
+    
+  //   return () => clearInterval(interval);
+  // }, [state.user?.mt_idx]);
 
   // 로그인
   const login = async (credentials: LoginRequest): Promise<void> => {

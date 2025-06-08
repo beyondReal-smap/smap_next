@@ -16,13 +16,28 @@ export async function GET(request: NextRequest) {
     // 현재 로그인한 사용자 ID 가져오기
     const currentUserId = getCurrentUserId(request);
     console.log('[Current User Groups API] 현재 사용자 ID:', currentUserId);
+    console.log('[Current User Groups API] 사용자 ID 타입:', typeof currentUserId);
+    console.log('[Current User Groups API] 사용자 ID === 1186:', currentUserId === 1186);
+    console.log('[Current User Groups API] 사용자 ID == 1186:', currentUserId == 1186);
 
     // Authorization 헤더에서 토큰 추출
     const authorization = request.headers.get('authorization');
     console.log('[Current User Groups API] Authorization 헤더:', authorization ? '토큰 있음' : '토큰 없음');
     
-    // 백엔드 API 호출 - 현재 사용자의 그룹 목록 조회
-    const backendUrl = 'https://118.67.130.71:8000/api/v1/groups/current-user';
+    // 쿠키에서도 토큰 확인
+    const cookieToken = request.cookies.get('auth-token')?.value;
+    console.log('[Current User Groups API] 쿠키 토큰:', cookieToken ? '있음' : '없음');
+    
+
+    
+    // 현재 사용자 ID가 없으면 빈 배열 반환 (신규 사용자)
+    if (!currentUserId) {
+      console.log('[Current User Groups API] 인증된 사용자 ID가 없음, 빈 배열 반환');
+      return NextResponse.json([]);
+    }
+
+    // 백엔드 API 호출 - 현재 사용자의 그룹 목록 조회 (올바른 엔드포인트 사용)
+    const backendUrl = `https://118.67.130.71:8000/api/v1/groups/member/${currentUserId}`;
     console.log('[Current User Groups API] 백엔드 호출:', backendUrl);
     
     const fetchOptions: RequestInit = {

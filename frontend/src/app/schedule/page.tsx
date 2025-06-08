@@ -3887,7 +3887,7 @@ export default function SchedulePage() {
                           <div className="p-6 bg-gray-100 rounded-full w-fit mx-auto mb-4">
                             <FiCalendar className="w-8 h-8 text-gray-400" />
                           </div>
-                          <p className="text-gray-500 text-lg font-medium">이 날에는 일정이 없습니다</p>
+                          <p className="text-gray-500 text-lg font-medium">일정이 없습니다</p>
                           <p className="text-gray-400 text-sm mt-1">새로운 일정을 추가해보세요</p>
                         </motion.div>
                       )}
