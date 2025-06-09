@@ -2215,9 +2215,8 @@ export default function HomePage() {
             }
             
             // 바텀시트에 가려지지 않도록 남쪽으로 오프셋 적용하여 지도 중심 이동
-            const offsetLat = validLat - 0.002;
-            const offsetPosition = new window.naver.maps.LatLng(offsetLat, validLng);
-            naverMap.current.panTo(offsetPosition, {
+                            const position = new window.naver.maps.LatLng(validLat, validLng);
+                naverMap.current.panTo(position, {
               duration: 800,
               easing: 'easeOutCubic'
             });
@@ -2564,9 +2563,8 @@ export default function HomePage() {
             }
             
             // 바텀시트에 가려지지 않도록 남쪽으로 오프셋 적용하여 지도 중심 이동
-            const offsetLat = validLat - 0.002;
-            const offsetPosition = { lat: offsetLat, lng: validLng };
-            map.current.panTo(offsetPosition);
+            const position = { lat: validLat, lng: validLng };
+            map.current.panTo(position);
             
             // 새 InfoWindow 참조 저장 및 열기
             currentInfoWindowRef.current = googleInfoWindow;
@@ -3002,13 +3000,12 @@ export default function HomePage() {
 
         if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
           // 네이버 지도 이동 및 줌 레벨 조정 (즉시 실행)
-            const offsetLat = lat - 0.001; // 남쪽으로 약 220m 아래쪽으로 offset
-          naverMap.current.panTo(new window.naver.maps.LatLng(offsetLat, lng), {
+                        naverMap.current.panTo(new window.naver.maps.LatLng(lat, lng), {
             duration: 300,
             easing: 'easeOutCubic'
           });
             naverMap.current.setZoom(17);
-            console.log('네이버 지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
+            console.log('네이버 지도 중심 이동:', selectedMember.name, { lat, lng });
 
           // 선택된 멤버의 InfoWindow 자동 표시 (중복 방지) - 짧은 지연
           setTimeout(() => {
@@ -3153,10 +3150,9 @@ export default function HomePage() {
           }, 100); // 지도 이동 후 InfoWindow 표시 (지연 시간 단축)
         } else if (mapType === 'google' && map.current && googleMapsLoaded) {
           // 구글 지도 이동 및 줌 레벨 조정 (즉시 실행)
-            const offsetLat = lat - 0.001; // 남쪽으로 약 220m 아래쪽으로 offset
-            map.current.panTo({ lat: offsetLat, lng });
+            map.current.panTo({ lat, lng });
             map.current.setZoom(17);
-            console.log('구글 지도 중심 이동 (offset 적용):', selectedMember.name, { original: { lat, lng }, offset: { lat: offsetLat, lng } });
+            console.log('구글 지도 중심 이동:', selectedMember.name, { lat, lng });
 
           // 구글 지도용 InfoWindow 자동 표시 (짧은 지연)
           setTimeout(() => {
@@ -3778,8 +3774,7 @@ export default function HomePage() {
     
     // 지도 타입에 따른 포커스 이동 (바텀시트에 가려지지 않도록 남쪽으로 오프셋 적용)
     if (mapType === 'naver' && naverMap.current) {
-      const offsetLat = lat - 0.002; // 남쪽으로 오프셋 적용
-      const location = new window.naver.maps.LatLng(offsetLat, lng);
+              const location = new window.naver.maps.LatLng(lat, lng);
       naverMap.current.panTo(location, {
         duration: 800,
         easing: 'easeOutCubic'
@@ -3793,8 +3788,7 @@ export default function HomePage() {
         window.naver.maps.Event.trigger(marker, 'click');
       }
     } else if (mapType === 'google' && map.current) {
-      const offsetLat = lat - 0.002; // 남쪽으로 오프셋 적용
-      const location = { lat: offsetLat, lng };
+              const location = { lat, lng };
       map.current.panTo(location);
       map.current.setZoom(16);
       
@@ -4222,7 +4216,7 @@ export default function HomePage() {
                </svg>
              ) : (
                // 그룹 멤버 아이콘 (채워진 스타일)
-               <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+               <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor">
                  <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
                </svg>
              )}
@@ -4242,7 +4236,7 @@ export default function HomePage() {
            {/* 펄스 효과 */}
            {!isSidebarOpen && (
              <motion.div
-               className="absolute inset-0 rounded-full bg-indigo-400"
+               className="absolute inset-0 rounded-full bg-indigo-700"
                animate={{
                  scale: [1, 1.3, 1],
                  opacity: [0.7, 0, 0.7]
@@ -4845,7 +4839,7 @@ export default function HomePage() {
                    initial="closed"
                    animate="open"
                    exit="closed"
-                   className="fixed left-0 top-0 bottom-0 w-80 bg-indigo-50 shadow-2xl border-r border-indigo-100/50 z-50 h-full flex flex-col"
+                   className="fixed left-0 top-0 bottom-0 w-80 bg-gradient-to-br from-indigo-50 to-pink-50 shadow-2xl border-r border-indigo-100/50 z-50 h-full flex flex-col"
                  >
                    <motion.div
                      variants={sidebarContentVariants}

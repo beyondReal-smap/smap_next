@@ -3,8 +3,8 @@
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/api/members/[id]/route": "app/api/members/[id]/route.js",
   "/api/groups/current-user/route": "app/api/groups/current-user/route.js",
-  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
   "/api/push-logs/[...slug]/route": "app/api/push-logs/[...slug]/route.js",
+  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
   "/api/member-location-logs/member-activity/route": "app/api/member-location-logs/member-activity/route.js",
   "/api/group-members/member/[groupId]/route": "app/api/group-members/member/[groupId]/route.js",
   "/api/groups/[groupId]/locations/route": "app/api/groups/[groupId]/locations/route.js",
@@ -13,7 +13,7 @@
   "/api/member-location-logs/[mt_idx]/map-markers/route": "app/api/member-location-logs/[mt_idx]/map-markers/route.js",
   "/location/page": "app/location/page.js",
   "/notice/page": "app/notice/page.js",
-  "/schedule/page": "app/schedule/page.js",
   "/home/page": "app/home/page.js",
+  "/schedule/page": "app/schedule/page.js",
   "/group/page": "app/group/page.js"
 }
