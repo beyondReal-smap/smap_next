@@ -339,4 +339,7 @@ class GroupService {
 
 // 싱글톤 인스턴스 생성
 const groupService = new GroupService();
+
+// 클래스와 인스턴스 모두 export
+export { GroupService };
 export default groupService; 

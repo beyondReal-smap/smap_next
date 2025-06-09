@@ -153,40 +153,87 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [cache, setCache] = useState<CacheData>(initialCache);
   const [isLoading, setIsLoading] = useState(false);
 
+  console.log('[DATA CACHE] 🚀 DataCacheProvider 초기화');
+
+  // 캐시 상태 변화 추적
+  React.useEffect(() => {
+    const cacheStats = {
+      userProfile: cache.userProfile ? '존재' : '없음',
+      userGroups: cache.userGroups.length,
+      groupMembers: Object.keys(cache.groupMembers).length,
+      scheduleData: Object.keys(cache.scheduleData).length,
+      locationData: Object.keys(cache.locationData).length,
+      groupPlaces: Object.keys(cache.groupPlaces).length,
+      dailyLocationCounts: Object.keys(cache.dailyLocationCounts).length,
+    };
+    
+    console.log('[DATA CACHE] 📊 캐시 상태 업데이트:', cacheStats);
+  }, [cache]);
+
   // 캐시 유효성 검사
   const isCacheValid = useCallback((type: string, groupId?: number, date?: string): boolean => {
     const now = Date.now();
     const duration = CACHE_DURATION[type as keyof typeof CACHE_DURATION] || 5 * 60 * 1000;
     
+    let isValid = false;
+    let lastUpdate = 0;
+    
     switch (type) {
       case 'userProfile':
-        return now - cache.lastUpdated.userProfile < duration;
+        lastUpdate = cache.lastUpdated.userProfile;
+        isValid = now - lastUpdate < duration;
+        break;
       case 'userGroups':
-        return now - cache.lastUpdated.userGroups < duration;
+        lastUpdate = cache.lastUpdated.userGroups;
+        isValid = now - lastUpdate < duration;
+        break;
       case 'groupMembers':
         if (!groupId) return false;
-        return now - (cache.lastUpdated.groupMembers[groupId] || 0) < duration;
+        lastUpdate = cache.lastUpdated.groupMembers[groupId] || 0;
+        isValid = now - lastUpdate < duration;
+        break;
       case 'scheduleData':
         if (!groupId) return false;
-        return now - (cache.lastUpdated.scheduleData[groupId] || 0) < duration;
+        lastUpdate = cache.lastUpdated.scheduleData[groupId] || 0;
+        isValid = now - lastUpdate < duration;
+        break;
       case 'locationData':
         if (!groupId || !date) return false;
-        return now - (cache.lastUpdated.locationData[groupId]?.[date] || 0) < duration;
+        lastUpdate = cache.lastUpdated.locationData[groupId]?.[date] || 0;
+        isValid = now - lastUpdate < duration;
+        break;
       case 'groupPlaces':
         if (!groupId) return false;
-        return now - (cache.lastUpdated.groupPlaces[groupId] || 0) < duration;
+        lastUpdate = cache.lastUpdated.groupPlaces[groupId] || 0;
+        isValid = now - lastUpdate < duration;
+        break;
       case 'dailyLocationCounts':
         if (!groupId) return false;
-        return now - (cache.lastUpdated.dailyLocationCounts[groupId] || 0) < duration;
+        lastUpdate = cache.lastUpdated.dailyLocationCounts[groupId] || 0;
+        isValid = now - lastUpdate < duration;
+        break;
       default:
         return false;
     }
+    
+    console.log(`[DATA CACHE] 캐시 유효성 검사: ${type}${groupId ? `(${groupId})` : ''}${date ? `[${date}]` : ''} - ${isValid ? '유효' : '만료'} (${Math.round((now - lastUpdate) / 1000)}초 경과)`);
+    return isValid;
   }, [cache.lastUpdated]);
 
   // 사용자 프로필
-  const getUserProfile = useCallback(() => cache.userProfile, [cache.userProfile]);
+  const getUserProfile = useCallback(() => {
+    const isValid = isCacheValid('userProfile');
+    if (isValid && cache.userProfile) {
+      console.log('[DATA CACHE] ✅ 사용자 프로필 캐시 히트:', cache.userProfile);
+      return cache.userProfile;
+    } else {
+      console.log('[DATA CACHE] ❌ 사용자 프로필 캐시 미스');
+      return null;
+    }
+  }, [cache.userProfile, isCacheValid]);
   
   const setUserProfile = useCallback((profile: UserProfile) => {
+    console.log('[DATA CACHE] 💾 사용자 프로필 캐시 저장:', profile);
     setCache(prev => ({
       ...prev,
       userProfile: profile,
@@ -198,9 +245,19 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   }, []);
 
   // 사용자 그룹
-  const getUserGroups = useCallback(() => cache.userGroups, [cache.userGroups]);
+  const getUserGroups = useCallback(() => {
+    const isValid = isCacheValid('userGroups');
+    if (isValid && cache.userGroups.length > 0) {
+      console.log('[DATA CACHE] ✅ 사용자 그룹 캐시 히트:', cache.userGroups.length, '개');
+      return cache.userGroups;
+    } else {
+      console.log('[DATA CACHE] ❌ 사용자 그룹 캐시 미스');
+      return [];
+    }
+  }, [cache.userGroups, isCacheValid]);
   
   const setUserGroups = useCallback((groups: GroupInfo[]) => {
+    console.log('[DATA CACHE] 💾 사용자 그룹 캐시 저장:', groups.length, '개');
     setCache(prev => ({
       ...prev,
       userGroups: groups,
@@ -213,10 +270,19 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // 그룹 멤버
   const getGroupMembers = useCallback((groupId: number): GroupMember[] => {
-    return cache.groupMembers[groupId] || [];
-  }, [cache.groupMembers]);
+    const isValid = isCacheValid('groupMembers', groupId);
+    const members = cache.groupMembers[groupId] || [];
+    if (isValid && members.length > 0) {
+      console.log(`[DATA CACHE] ✅ 그룹 멤버 캐시 히트 (${groupId}):`, members.length, '명');
+      return members;
+    } else {
+      console.log(`[DATA CACHE] ❌ 그룹 멤버 캐시 미스 (${groupId})`);
+      return [];
+    }
+  }, [cache.groupMembers, isCacheValid]);
   
   const setGroupMembers = useCallback((groupId: number, members: GroupMember[]) => {
+    console.log(`[DATA CACHE] 💾 그룹 멤버 캐시 저장 (${groupId}):`, members.length, '명');
     setCache(prev => ({
       ...prev,
       groupMembers: {
@@ -235,14 +301,25 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // 스케줄 데이터
   const getScheduleData = useCallback((groupId: number, date?: string): any[] => {
-    if (date) {
-      return cache.scheduleData[groupId]?.[date] || [];
+    const isValid = isCacheValid('scheduleData', groupId);
+    if (isValid && cache.scheduleData[groupId]) {
+      if (date) {
+        const schedules = cache.scheduleData[groupId]?.[date] || [];
+        console.log(`[DATA CACHE] ✅ 스케줄 데이터 캐시 히트 (${groupId}/${date}):`, schedules.length, '개');
+        return schedules;
+      }
+      // 날짜 지정이 없으면 전체 스케줄 반환
+      const allSchedules = Object.values(cache.scheduleData[groupId] || {}).flat();
+      console.log(`[DATA CACHE] ✅ 전체 스케줄 데이터 캐시 히트 (${groupId}):`, allSchedules.length, '개');
+      return allSchedules;
+    } else {
+      console.log(`[DATA CACHE] ❌ 스케줄 데이터 캐시 미스 (${groupId}/${date || 'all'})`);
+      return [];
     }
-    // 날짜 지정이 없으면 전체 스케줄 반환
-    return Object.values(cache.scheduleData[groupId] || {}).flat();
-  }, [cache.scheduleData]);
+  }, [cache.scheduleData, isCacheValid]);
   
   const setScheduleData = useCallback((groupId: number, date: string, schedules: any[]) => {
+    console.log(`[DATA CACHE] 💾 스케줄 데이터 캐시 저장 (${groupId}/${date}):`, schedules.length, '개');
     setCache(prev => ({
       ...prev,
       scheduleData: {
@@ -264,10 +341,19 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // 위치 데이터
   const getLocationData = useCallback((groupId: number, date: string) => {
-    return cache.locationData[groupId]?.[date] || null;
-  }, [cache.locationData]);
+    const isValid = isCacheValid('locationData', groupId, date);
+    const locationData = cache.locationData[groupId]?.[date];
+    if (isValid && locationData) {
+      console.log(`[DATA CACHE] ✅ 위치 데이터 캐시 히트 (${groupId}/${date}):`, locationData);
+      return locationData;
+    } else {
+      console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 (${groupId}/${date})`);
+      return null;
+    }
+  }, [cache.locationData, isCacheValid]);
   
   const setLocationData = useCallback((groupId: number, date: string, data: any) => {
+    console.log(`[DATA CACHE] 💾 위치 데이터 캐시 저장 (${groupId}/${date}):`, data);
     setCache(prev => ({
       ...prev,
       locationData: {
@@ -295,10 +381,19 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // 그룹 장소
   const getGroupPlaces = useCallback((groupId: number): any[] => {
-    return cache.groupPlaces[groupId] || [];
-  }, [cache.groupPlaces]);
+    const isValid = isCacheValid('groupPlaces', groupId);
+    const places = cache.groupPlaces[groupId] || [];
+    if (isValid && places.length > 0) {
+      console.log(`[DATA CACHE] ✅ 그룹 장소 캐시 히트 (${groupId}):`, places.length, '개');
+      return places;
+    } else {
+      console.log(`[DATA CACHE] ❌ 그룹 장소 캐시 미스 (${groupId})`);
+      return [];
+    }
+  }, [cache.groupPlaces, isCacheValid]);
   
   const setGroupPlaces = useCallback((groupId: number, places: any[]) => {
+    console.log(`[DATA CACHE] 💾 그룹 장소 캐시 저장 (${groupId}):`, places.length, '개');
     setCache(prev => ({
       ...prev,
       groupPlaces: {
@@ -317,10 +412,19 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // 일별 위치 카운트
   const getDailyLocationCounts = useCallback((groupId: number) => {
-    return cache.dailyLocationCounts[groupId] || null;
-  }, [cache.dailyLocationCounts]);
+    const isValid = isCacheValid('dailyLocationCounts', groupId);
+    const counts = cache.dailyLocationCounts[groupId];
+    if (isValid && counts) {
+      console.log(`[DATA CACHE] ✅ 일별 위치 카운트 캐시 히트 (${groupId}):`, counts);
+      return counts;
+    } else {
+      console.log(`[DATA CACHE] ❌ 일별 위치 카운트 캐시 미스 (${groupId})`);
+      return null;
+    }
+  }, [cache.dailyLocationCounts, isCacheValid]);
   
   const setDailyLocationCounts = useCallback((groupId: number, counts: any) => {
+    console.log(`[DATA CACHE] 💾 일별 위치 카운트 캐시 저장 (${groupId}):`, counts);
     setCache(prev => ({
       ...prev,
       dailyLocationCounts: {
@@ -339,6 +443,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // 캐시 무효화
   const invalidateCache = useCallback((type: string, groupId?: number, date?: string) => {
+    console.log(`[DATA CACHE] 🗑️ 캐시 무효화: ${type}${groupId ? `(${groupId})` : ''}${date ? `[${date}]` : ''}`);
     setCache(prev => {
       const newCache = { ...prev };
       
@@ -396,6 +501,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // 모든 캐시 삭제
   const clearAllCache = useCallback(() => {
+    console.log('[DATA CACHE] 🧹 모든 캐시 삭제');
     setCache(initialCache);
   }, []);
 

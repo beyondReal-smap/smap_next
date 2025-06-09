@@ -5,8 +5,9 @@ export const dynamic = 'force-dynamic';
 import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion, useMotionValue } from 'framer-motion';
+import { motion, useMotionValue, AnimatePresence } from 'framer-motion';
 import { useUser } from '@/contexts/UserContext';
+import { useDataCache } from '@/contexts/DataCacheContext';
 import axios from 'axios';
 import { format, addDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -24,7 +25,7 @@ import mapService, {
 } from '../../services/mapService';
 import memberService from '@/services/memberService';
 import scheduleService from '../../services/scheduleService';
-import groupService, { Group } from '@/services/groupService';
+import groupService from '@/services/groupService';
 import { useAuth } from '@/contexts/AuthContext';
 import authService from '@/services/authService';
 import notificationService from '@/services/notificationService';
@@ -407,36 +408,37 @@ const pageVariants = {
 
 const memberAvatarVariants = {
   initial: { 
-    scale: 0.9,
-    opacity: 0
+    opacity: 0, 
+    x: -20,
+    scale: 0.8
   },
   animate: (index: number) => ({
-    scale: 1,
     opacity: 1,
+    x: 0,
+    scale: 1,
     transition: {
-      delay: index * 0.04,
+      delay: index * 0.1,
       type: "spring",
       stiffness: 300,
-      damping: 25,
-      duration: 0.4
+      damping: 25
     }
   }),
   hover: {
-    scale: 1.02,
+    scale: 1.1,
+    y: -5,
     transition: {
       type: "spring",
       stiffness: 400,
-      damping: 20,
-      duration: 0.15
+      damping: 15
     }
   },
   selected: {
-    scale: 1.01,
+    scale: 1.15,
+    y: -8,
     transition: {
       type: "spring",
       stiffness: 400,
-      damping: 20,
-      duration: 0.15
+      damping: 15
     }
   }
 };
@@ -734,10 +736,13 @@ export default function HomePage() {
   const router = useRouter();
   // 인증 관련 상태 추가
   const { user, isLoggedIn, loading: authLoading } = useAuth();
-  // UserContext 사용
-  const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData } = useUser();
-  
-  const [userName, setUserName] = useState('사용자');
+      // UserContext 사용
+    const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData } = useUser();
+   
+    // 데이터 캐시 컨텍스트
+    const dataCacheContext = useDataCache();
+    
+    const [userName, setUserName] = useState('사용자');
   const [userLocation, setUserLocation] = useState<Location>({ lat: 37.5642, lng: 127.0016 }); // 기본: 서울
   const [locationName, setLocationName] = useState('서울시');
   const [recommendedPlaces, setRecommendedPlaces] = useState(RECOMMENDED_PLACES);
@@ -808,6 +813,11 @@ export default function HomePage() {
 
   // 달력 스와이프 관련 상태 - calendarBaseDate 제거, x만 유지
   const x = useMotionValue(0); // 드래그 위치를 위한 motionValue
+  const sidebarDateX = useMotionValue(0); // 사이드바 날짜 선택용 motionValue
+
+  // 사이드바 상태 추가
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   // useEffect를 사용하여 클라이언트 사이드에서 날짜 관련 상태 초기화
   useEffect(() => {
@@ -1286,10 +1296,16 @@ export default function HomePage() {
                 sgdt_idx: s.sgdt_idx
               })));
 
-              setGroupSchedules(rawSchedules); 
+              // 스케줄에 statusDetail 추가
+              const schedulesWithStatus = rawSchedules.map((schedule: Schedule) => ({
+                ...schedule,
+                statusDetail: getScheduleStatus(schedule)
+              }));
+              
+              setGroupSchedules(schedulesWithStatus); 
               setGroupMembers(prevMembers =>
                 prevMembers.map(member => {
-                  const memberSchedules = rawSchedules
+                  const memberSchedules = schedulesWithStatus
                     .filter((schedule: Schedule) => 
                       schedule.sgdt_idx !== null && 
                       schedule.sgdt_idx !== undefined && 
@@ -1306,6 +1322,7 @@ export default function HomePage() {
                       title: s.title,
                       date: s.date,
                       sgdt_idx: s.sgdt_idx,
+                      statusDetail: s.statusDetail?.name,
                       sst_location_lat: s.sst_location_lat,
                       sst_location_long: s.sst_location_long,
                       hasLocation: !!(s.sst_location_lat && s.sst_location_long)
@@ -1319,14 +1336,17 @@ export default function HomePage() {
                 })
               );
               const todayStr = format(new Date(), 'yyyy-MM-dd');
-              const todaySchedules = rawSchedules.filter((s: Schedule) => s.date && s.date.startsWith(todayStr));
+              const todaySchedules = schedulesWithStatus.filter((s: Schedule) => s.date && s.date.startsWith(todayStr));
               console.log('[fetchAllGroupData] 오늘의 스케줄:', {
                 todayStr,
                 totalTodaySchedules: todaySchedules.length,
-                schedulesWithLocation: todaySchedules.filter(s => s.sst_location_lat && s.sst_location_long).length
+                schedulesWithLocation: todaySchedules.filter(s => s.sst_location_lat && s.sst_location_long).length,
+                statusDetails: todaySchedules.map(s => ({ id: s.id, title: s.title, status: s.statusDetail?.name }))
               });
-              setFilteredSchedules(todaySchedules);
-              console.log('[fetchAllGroupData] 스케줄 데이터 로딩 완료:', rawSchedules.length, '개');
+              
+              // 초기에는 스케줄을 빈 배열로 설정 (첫 번째 멤버 선택 후 필터링됨)
+              setFilteredSchedules([]);
+              console.log('[fetchAllGroupData] 스케줄 데이터 로딩 완료 (초기 빈 배열 설정):', rawSchedules.length, '개');
             } else {
               console.warn('No schedule data from API for the group, or API call failed.');
               setGroupSchedules([]);
@@ -1367,14 +1387,14 @@ export default function HomePage() {
   useEffect(() => {
     // 네이버 지도를 기본으로 사용 (개발 환경에서도 네이버 지도 사용)
     setMapType('naver');
-  }, []);
-
-  // 컴포넌트 마운트 시 그룹 목록 불러오기
-  // useEffect(() => {
-  //   fetchUserGroups();
-  // }, []); // UserContext로 대체되어 제거
-
-  // 로그인 상태 확인 및 사용자 정보 초기화
+      }, []);
+ 
+    // 컴포넌트 마운트 시 그룹 목록 불러오기
+    // useEffect(() => {
+    //   fetchUserGroups();
+    // }, []); // UserContext로 대체되어 제거
+  
+    // 로그인 상태 확인 및 사용자 정보 초기화
   useEffect(() => {
     const initializeUserAuth = async () => {
       // 인증 로딩 중이면 대기
@@ -1969,11 +1989,6 @@ export default function HomePage() {
                     🚶 속도: ${speed.toFixed(1)}km/h
                   </p>
                 </div>
-                <div style="margin-bottom: 6px;">
-                  <p style="margin: 0; font-size: 12px; color: #64748b;">
-                    📅 오늘 스케줄: ${todaySchedules.length}개
-                  </p>
-                </div>
                 <div>
                   <p style="margin: 0; font-size: 11px; color: #9ca3af;">
                     🕒 GPS 업데이트: ${gpsTimeStr}
@@ -2350,11 +2365,6 @@ export default function HomePage() {
                     🚶 속도: ${speed.toFixed(1)}km/h
                   </p>
                 </div>
-                <div style="margin-bottom: 6px;">
-                  <p style="margin: 0; font-size: 12px; color: #64748b;">
-                    📅 오늘 스케줄: ${todaySchedules.length}개
-                  </p>
-                </div>
                 <div>
                   <p style="margin: 0; font-size: 11px; color: #9ca3af;">
                     🕒 GPS 업데이트: ${gpsTimeStr}
@@ -2700,15 +2710,8 @@ export default function HomePage() {
         selectedMember.mt_weather_date
       ));
       
-      // 현재 표시되고 있는 스케줄들의 날짜를 확인하여 해당 날짜 유지
+      // 현재 선택된 날짜를 사용 (초기 로딩 시에는 오늘 날짜)
       let targetDate = selectedDate;
-      if (filteredSchedules.length > 0) {
-        // 현재 표시되고 있는 스케줄이 있으면 그 날짜를 사용
-        const currentScheduleDate = filteredSchedules[0].date;
-        if (currentScheduleDate && typeof currentScheduleDate === 'string') {
-          targetDate = currentScheduleDate.split(' ')[0]; // 날짜 부분만 추출
-        }
-      }
       
       // sgdt_idx를 기준으로 그룹 스케줄에서 해당 멤버의 스케줄 필터링
       const memberSchedules = groupSchedules.filter(schedule => 
@@ -2738,28 +2741,9 @@ export default function HomePage() {
     } else {
       if (initialWeatherDataRef.current) setTodayWeather(initialWeatherDataRef.current);
       
-      // 현재 표시되고 있는 스케줄들의 날짜를 확인하여 해당 날짜 유지
-      let targetDate = selectedDate;
-      if (filteredSchedules.length > 0) {
-        // 현재 표시되고 있는 스케줄이 있으면 그 날짜를 사용
-        const currentScheduleDate = filteredSchedules[0].date;
-        if (currentScheduleDate && typeof currentScheduleDate === 'string') {
-          targetDate = currentScheduleDate.split(' ')[0]; // 날짜 부분만 추출
-        }
-      }
-      
-      const allSchedules = groupSchedules
-        .filter(s => typeof s.date === 'string' && s.date!.startsWith(targetDate))
-        .map(({memberId, ...rest}) => rest);
-      
-      console.log('[handleMemberSelect] 멤버 선택 해제 - 전체 스케줄:', {
-        totalGroupSchedules: groupSchedules.length,
-        filteredSchedules: allSchedules.length,
-        selectedDate,
-        targetDate // 실제 사용된 날짜
-      });
-      
-      setFilteredSchedules(allSchedules);
+      // 멤버가 선택되지 않은 경우 빈 배열로 설정 (첫 번째 멤버 선택 대기)
+      console.log('[handleMemberSelect] 멤버 선택 해제 - 빈 스케줄 배열 설정');
+      setFilteredSchedules([]);
     }
     updateMemberMarkers(updatedMembers);
     // 일정 마커는 filteredSchedules useEffect에서 자동으로 업데이트됨
@@ -2921,21 +2905,9 @@ export default function HomePage() {
       });
       setFilteredSchedules(memberSchedules);
     } else {
-      const allSchedules = groupSchedules
-        .filter(schedule => typeof schedule.date === 'string' && schedule.date!.startsWith(dateValue))
-        .map(({memberId, ...rest}) => rest);
-      
-      console.log('[handleDateSelect] 전체 그룹의 날짜별 스케줄:', {
-        selectedDate: dateValue,
-        filteredSchedules: allSchedules.length,
-        schedulesDetail: allSchedules.map(s => ({
-          id: s.id,
-          title: s.title,
-          date: s.date,
-          hasLocation: !!(s.sst_location_lat && s.sst_location_long)
-        }))
-      });
-      setFilteredSchedules(allSchedules);
+      // 멤버가 선택되지 않은 경우 빈 배열로 설정 (첫 번째 멤버 선택 대기)
+      console.log('[handleDateSelect] 선택된 멤버 없음 - 빈 스케줄 배열 설정');
+      setFilteredSchedules([]);
     }
   };
 
@@ -3153,11 +3125,6 @@ export default function HomePage() {
                         🚶 속도: ${speed.toFixed(1)}km/h
                       </p>
                     </div>
-                    <div style="margin-bottom: 6px;">
-                      <p style="margin: 0; font-size: 12px; color: #64748b;">
-                        📅 오늘 스케줄: ${todaySchedules.length}개
-                      </p>
-                    </div>
                     <div>
                       <p style="margin: 0; font-size: 11px; color: #9ca3af;">
                         🕒 GPS 업데이트: ${gpsTimeStr}
@@ -3304,11 +3271,6 @@ export default function HomePage() {
                     <div style="margin-bottom: 6px;">
                       <p style="margin: 0; font-size: 12px; color: #64748b;">
                         🚗 속도: <span style="color: #3b82f6; font-weight: 500;">${speed} km/h</span>
-                      </p>
-                    </div>
-                    <div style="margin-bottom: 8px;">
-                      <p style="margin: 0; font-size: 12px; color: #64748b;">
-                        📅 오늘 스케줄: <span style="color: #059669; font-weight: 500;">${todaySchedules.length}개</span>
                       </p>
                     </div>
                     <div style="border-top: 1px solid #e5e7eb; padding-top: 6px;">
@@ -3534,10 +3496,15 @@ export default function HomePage() {
     }, 1000); // 1초 후 초기 데이터 로딩 완료
 
     // 백업 타이머: 3초 후에는 강제로 지도 로딩도 완료 처리
-    const backupTimer = setTimeout(() => {
-      setIsMapLoading(false);
-      console.log('[HOME] 백업 타이머로 지도 로딩 강제 완료');
-    }, 3000);
+          const backupTimer = setTimeout(() => {
+        setIsMapLoading(false);
+        // 지도 초기화 상태도 강제로 설정
+        setMapsInitialized(prev => ({
+          naver: true,
+          google: true
+        }));
+        console.log('[HOME] 백업 타이머로 지도 로딩 및 초기화 강제 완료');
+      }, 3000);
 
     return () => {
       clearTimeout(timer);
@@ -3885,6 +3852,180 @@ export default function HomePage() {
     return '';
   };
 
+  // 멤버별 선택된 날짜 스케줄 통계 계산 함수
+  const getMemberTodayScheduleStats = (member: GroupMember) => {
+    console.log('[getMemberTodayScheduleStats] 시작:', {
+      memberName: member.name,
+      memberSgdtIdx: member.sgdt_idx,
+      selectedDate,
+      totalGroupSchedules: groupSchedules.length
+    });
+
+    const memberSchedules = groupSchedules.filter(schedule => {
+      // sgdt_idx 매칭 확인
+      const sgdtMatch = schedule.sgdt_idx !== null && 
+        schedule.sgdt_idx !== undefined && 
+        Number(schedule.sgdt_idx) === Number(member.sgdt_idx);
+      
+      // 날짜 매칭 확인 (더 정확한 비교)
+      let dateMatch = false;
+      if (schedule.date && typeof schedule.date === 'string') {
+        try {
+          const scheduleDate = new Date(schedule.date);
+          const selectedDateObj = new Date(selectedDate);
+          const scheduleDateStr = format(scheduleDate, 'yyyy-MM-dd');
+          dateMatch = scheduleDateStr === selectedDate;
+        } catch (e) {
+          // 날짜 형식이 맞지 않으면 문자열로 비교
+          dateMatch = schedule.date.startsWith(selectedDate);
+        }
+      }
+
+      return sgdtMatch && dateMatch;
+    });
+
+    console.log('[getMemberTodayScheduleStats] 필터링된 스케줄:', {
+      memberName: member.name,
+      filteredCount: memberSchedules.length,
+      schedules: memberSchedules.map(s => ({
+        id: s.id,
+        title: s.title,
+        date: s.date,
+        statusName: s.statusDetail?.name || 'no-status'
+      }))
+    });
+
+    const stats = {
+      total: memberSchedules.length,
+      completed: 0,
+      ongoing: 0,
+      upcoming: 0
+    };
+
+    memberSchedules.forEach(schedule => {
+      if (schedule.statusDetail) {
+        switch (schedule.statusDetail.name) {
+          case 'completed':
+            stats.completed++;
+            break;
+          case 'ongoing':
+            stats.ongoing++;
+            break;
+          case 'upcoming':
+            stats.upcoming++;
+            break;
+        }
+      } else {
+        console.warn('[getMemberTodayScheduleStats] statusDetail이 없는 스케줄:', schedule);
+      }
+    });
+
+    console.log('[getMemberTodayScheduleStats] 최종 통계:', {
+      memberName: member.name,
+      stats
+    });
+
+    return stats;
+  };
+
+    // 사이드바 토글 함수
+    const toggleSidebar = () => {
+      setIsSidebarOpen(!isSidebarOpen);
+    };
+  
+    // 사이드바 외부 클릭 시 닫기
+    useEffect(() => {
+      const handleSidebarClickOutside = (event: MouseEvent) => {
+        if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+          setIsSidebarOpen(false);
+        }
+      };
+  
+      if (isSidebarOpen) {
+        document.addEventListener('mousedown', handleSidebarClickOutside);
+      }
+  
+      return () => {
+        document.removeEventListener('mousedown', handleSidebarClickOutside);
+      };
+    }, [isSidebarOpen]);
+
+  // 사이드바 애니메이션 variants 개선
+  const sidebarVariants = {
+    closed: {
+      x: '-100%',
+      transition: {
+        type: 'tween',
+        ease: [0.25, 0.46, 0.45, 0.94],
+        duration: 0.4
+      }
+    },
+    open: {
+      x: 0,
+      transition: {
+        type: 'tween',
+        ease: [0.25, 0.46, 0.45, 0.94],
+        duration: 0.4
+      }
+    }
+  };
+
+  const sidebarOverlayVariants = {
+    closed: {
+      opacity: 0,
+      transition: {
+        duration: 0.3,
+        ease: "easeOut"
+      }
+    },
+    open: {
+      opacity: 1,
+      transition: {
+        duration: 0.3,
+        ease: "easeInOut"
+      }
+    }
+  };
+
+  const sidebarContentVariants = {
+    closed: {
+      opacity: 0,
+      y: 10,
+      transition: {
+        duration: 0.2,
+        ease: "easeOut"
+      }
+    },
+    open: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        delay: 0.2,
+        duration: 0.4,
+        ease: [0.25, 0.46, 0.45, 0.94],
+        staggerChildren: 0.06
+      }
+    }
+  };
+
+  const memberItemVariants = {
+    closed: { 
+      opacity: 0, 
+      x: -15,
+      scale: 0.95
+    },
+    open: { 
+      opacity: 1, 
+      x: 0,
+      scale: 1,
+      transition: {
+        type: "tween",
+        ease: [0.25, 0.46, 0.45, 0.94],
+        duration: 0.3
+      }
+    }
+  };
+
   return (
     <>
       <style jsx global>{mobileStyles}</style>
@@ -3916,12 +4057,12 @@ export default function HomePage() {
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 text-white stroke-2"
-                      fill="none"
+                      className="h-5 w-5 text-white"
                       viewBox="0 0 24 24"
-                      stroke="currentColor"
+                      fill="currentColor"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                      <path d="M11.47 3.841a.75.75 0 0 1 1.06 0l8.69 8.69a.75.75 0 1 0 1.06-1.061l-8.689-8.69a2.25 2.25 0 0 0-3.182 0l-8.69 8.69a.75.75 0 1 0 1.061 1.06l8.69-8.689Z" />
+                      <path d="m12 5.432 8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 0 1-.75-.75v-4.5a.75.75 0 0 0-.75-.75h-3a.75.75 0 0 0-.75.75V21a.75.75 0 0 1-.75.75H5.625a1.875 1.875 0 0 1-1.875-1.875v-6.198a2.29 2.29 0 0 0 .091-.086L12 5.432Z" />
                     </svg>
                   </motion.div>
                   <div>
@@ -3931,8 +4072,8 @@ export default function HomePage() {
                 </div>
               </div>
               
-              <div className="flex items-center space-x-2">
-                <motion.button
+                              <div className="flex items-center space-x-2">
+                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200 relative"
@@ -3953,8 +4094,8 @@ export default function HomePage() {
                     }
                   }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.25 9a6.75 6.75 0 0 1 13.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 1 1-7.48 0 24.585 24.585 0 0 1-4.831-1.244.75.75 0 0 1-.298-1.205A8.217 8.217 0 0 0 5.25 9.75V9Zm4.502 8.9a2.25 2.25 0 1 0 4.496 0 25.057 25.057 0 0 1-4.496 0Z" clipRule="evenodd" />
                   </svg>
                   {/* 읽지 않은 알림이 있을 때만 빨간색 점 표시 */}
                   {hasNewNotifications && (
@@ -3968,9 +4109,8 @@ export default function HomePage() {
                   className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200"
                   onClick={() => router.push('/setting')}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
+                    <path fillRule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 0 0-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 0 0-2.282.819l-.922 1.597a1.875 1.875 0 0 0 .432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 0 0 0 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 0 0-.432 2.385l.922 1.597a1.875 1.875 0 0 0 2.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.570.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 0 0 2.28-.819l.923-1.597a1.875 1.875 0 0 0-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 0 0 0-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 0 0-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 0 0-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 0 0-1.85-1.567h-1.843ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" clipRule="evenodd" />
                   </svg>
                 </motion.button>
               </div>
@@ -4033,14 +4173,90 @@ export default function HomePage() {
               className="map-control-button"
               aria-label="내 위치로 이동"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                <path fillRule="evenodd" d="m11.54 22.351.07.04.028.016a.76.76 0 0 0 .723 0l.028-.015.071-.041a16.975 16.975 0 0 0 1.144-.742 19.58 19.58 0 0 0 2.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 0 0-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 0 0 2.682 2.282 16.975 16.975 0 0 0 1.145.742ZM12 13.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clipRule="evenodd" />
               </svg>
             </button>
-          </div>
+                      </div>
 
-        {/* Bottom Sheet - 끌어올리거나 내릴 수 있는 패널 */}
+         {/* 플로팅 사이드바 토글 버튼 - 헤더 오른쪽 아래 */}
+         <motion.button
+           initial={{ opacity: 0, scale: 0.8, y: -20 }}
+           animate={{ opacity: 1, scale: 1, y: 0 }}
+           transition={{ 
+             duration: 0.4, 
+             ease: [0.22, 1, 0.36, 1],
+             delay: 0.6
+           }}
+           whileHover={{ 
+             scale: 1.08, 
+             y: -3,
+             boxShadow: "0 10px 30px rgba(99, 102, 241, 0.4)",
+             transition: { 
+               duration: 0.3,
+               ease: [0.25, 0.46, 0.45, 0.94]
+             }
+           }}
+           whileTap={{ scale: 0.95 }}
+           onClick={toggleSidebar}
+           className="fixed top-20 right-4 z-20 w-12 h-12 bg-gradient-to-br from-indigo-700 to-purple-600 rounded-full shadow-lg flex items-center justify-center"
+           style={{
+             background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+             boxShadow: '0 4px 15px rgba(99, 102, 241, 0.2), 0 2px 8px rgba(139, 92, 246, 0.15)'
+           }}
+         >
+           <motion.div
+             animate={{ 
+               rotate: isSidebarOpen ? 180 : 0,
+               scale: isSidebarOpen ? 0.9 : 1
+             }}
+             transition={{ 
+               duration: 0.4, 
+               ease: [0.25, 0.46, 0.45, 0.94] 
+             }}
+           >
+             {isSidebarOpen ? (
+               // 닫기 아이콘 (X)
+               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+               </svg>
+             ) : (
+               // 그룹 멤버 아이콘 (채워진 스타일)
+               <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                 <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
+               </svg>
+             )}
+           </motion.div>
+           
+           {/* 알림 배지 (그룹멤버 수) */}
+           {groupMembers.length > 0 && !isSidebarOpen && (
+             <motion.div
+               initial={{ scale: 0 }}
+               animate={{ scale: 1 }}
+               className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-pink-500 rounded-full flex items-center justify-center"
+             >
+               <span className="text-xs font-bold text-white">{groupMembers.length}</span>
+             </motion.div>
+           )}
+           
+           {/* 펄스 효과 */}
+           {!isSidebarOpen && (
+             <motion.div
+               className="absolute inset-0 rounded-full bg-indigo-400"
+               animate={{
+                 scale: [1, 1.3, 1],
+                 opacity: [0.7, 0, 0.7]
+               }}
+               transition={{
+                 duration: 2,
+                 repeat: Infinity,
+                 ease: "easeInOut"
+               }}
+             />
+           )}
+         </motion.button>
+
+         {/* Bottom Sheet - 끌어올리거나 내릴 수 있는 패널 */}
         <motion.div 
             ref={bottomSheetRef}
             initial={{ translateY: '100%' }}
@@ -4151,7 +4367,7 @@ export default function HomePage() {
                                           variants={spinnerVariants}
                                           animate="animate"
                                         >
-                                          <FiLoader className="text-indigo-500" size={16} />
+                                          <FiLoader className="text-indigo-700" size={16} />
                                         </motion.div>
                                         <span className="text-sm text-gray-600">로딩 중...</span>
                                       </div>
@@ -4607,7 +4823,379 @@ export default function HomePage() {
               </div>
             </div>
           </motion.div>
+
+         {/* 사이드바 */}
+         <AnimatePresence>
+           {isSidebarOpen && (
+             <>
+               {/* 오버레이 */}
+               <motion.div
+                 variants={sidebarOverlayVariants}
+                 initial="closed"
+                 animate="open"
+                 exit="closed"
+                 className="fixed inset-0 bg-black bg-opacity-50 z-40"
+                 onClick={() => setIsSidebarOpen(false)}
+               />
+               
+                                {/* 사이드바 */}
+                 <motion.div
+                   ref={sidebarRef}
+                   variants={sidebarVariants}
+                   initial="closed"
+                   animate="open"
+                   exit="closed"
+                   className="fixed left-0 top-0 bottom-0 w-80 bg-indigo-50 shadow-2xl border-r border-indigo-100/50 z-50 h-full flex flex-col"
+                 >
+                   <motion.div
+                     variants={sidebarContentVariants}
+                     initial="closed"
+                     animate="open"
+                     exit="closed"
+                     className="p-6 h-full flex flex-col relative z-10"
+                   >
+                   {/* 개선된 헤더 */}
+                   <div className="flex items-center justify-between mb-6">
+                     <div className="flex items-center space-x-3">
+                       <motion.div 
+                         className="p-2 bg-indigo-700 rounded-xl shadow-lg"
+                         whileHover={{ scale: 1.05, rotate: 5 }}
+                         whileTap={{ scale: 0.95 }}
+                       >
+                         <FiUser className="w-5 h-5 text-white" />
+                       </motion.div>
+                       <div>
+                         <h2 className="text-xl font-bold bg-gray-900 bg-clip-text text-transparent">
+                           그룹 멤버
+                         </h2>
+                         <p className="text-sm text-gray-600">멤버를 선택해보세요</p>
+                       </div>
+                     </div>
+                     <motion.button
+                       whileHover={{ scale: 1.05, rotate: 90 }}
+                       whileTap={{ scale: 0.95 }}
+                       onClick={() => setIsSidebarOpen(false)}
+                       className="p-2 hover:bg-white/60 rounded-xl transition-all duration-200 backdrop-blur-sm"
+                     >
+                       <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                       </svg>
+                     </motion.button>
+                   </div>
+
+                   {/* 그룹 목록 섹션 */}
+                   <div className="mb-5">
+                     <div className="flex items-center space-x-2 mb-3">
+                                               <div className="w-2 h-2 bg-indigo-700 rounded-full"></div>
+                       <h3 className="text-sm font-semibold text-gray-800">그룹 목록</h3>
+                     </div>
+                     
+                     <div className="relative">
+                       <motion.button
+                         whileHover={{ scale: 1.02, y: -1 }}
+                         whileTap={{ scale: 0.98 }}
+                         onClick={(e) => {
+                           e.stopPropagation();
+                           setIsGroupSelectorOpen(!isGroupSelectorOpen);
+                         }}
+                         className="w-full flex items-center justify-between px-4 py-3 bg-white/70 backdrop-blur-sm border border-indigo-200/50 rounded-xl text-sm font-medium hover:bg-white/90 hover:border-indigo-300/70 hover:shadow-md transition-all duration-200"
+                         disabled={isUserDataLoading}
+                       >
+                         <span className="truncate text-gray-700">
+                           {isUserDataLoading 
+                             ? '로딩 중...' 
+                             : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
+                           }
+                         </span>
+                         <div className="ml-2 flex-shrink-0">
+                           {isUserDataLoading ? (
+                             <FiLoader className="animate-spin text-gray-400" size={14} />
+                           ) : (
+                             <motion.div
+                               animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
+                               transition={{ duration: 0.2 }}
+                             >
+                               <FiChevronDown className="text-gray-400" size={14} />
+                             </motion.div>
+                           )}
+                         </div>
+                       </motion.button>
+
+                       <AnimatePresence>
+                         {isGroupSelectorOpen && userGroups.length > 0 && (
+                           <motion.div
+                             initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                             animate={{ opacity: 1, y: 0, scale: 1 }}
+                             exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                             transition={{ duration: 0.2 }}
+                             className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
+                           >
+                             {userGroups.map((group) => (
+                               <motion.button
+                                 key={group.sgt_idx}
+                                 whileHover={{ backgroundColor: "rgba(99, 102, 241, 0.05)" }}
+                                 onClick={() => {
+                                   if (selectedGroupId !== group.sgt_idx) {
+                                     handleGroupSelect(group.sgt_idx);
+                                   }
+                                   setIsGroupSelectorOpen(false);
+                                 }}
+                                 className={`w-full px-3 py-2 text-left text-xs focus:outline-none transition-colors ${
+                                   selectedGroupId === group.sgt_idx 
+                                     ? 'bg-indigo-50 text-indigo-700 font-semibold' 
+                                     : 'text-gray-900 hover:bg-indigo-50'
+                                 }`}
+                               >
+                                 <div className="flex items-center justify-between">
+                                   <span className="truncate">{group.sgt_title}</span>
+                                   {selectedGroupId === group.sgt_idx && (
+                                     <span className="text-indigo-700 ml-2">✓</span>
+                                   )}
+                                 </div>
+                                 <div className="text-xs text-gray-500 mt-0.5">
+                                   {groupMemberCounts[group.sgt_idx] || 0}명의 멤버
+                                 </div>
+                               </motion.button>
+                             ))}
+                           </motion.div>
+                         )}
+                       </AnimatePresence>
+                     </div>
+                   </div>
+
+                   {/* 날짜 선택 섹션 */}
+                   <div className="mb-5">
+                     <div className="flex items-center space-x-2 mb-3">
+                       <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+                       <h3 className="text-sm font-semibold text-gray-800">날짜 선택</h3>
+                     </div>
+                     <div className="relative overflow-hidden rounded-xl bg-white/60 backdrop-blur-sm p-3 border border-indigo-100/50">
+                       <motion.div
+                         className="flex space-x-2 cursor-grab active:cursor-grabbing"
+                         style={{ 
+                           x: sidebarDateX,
+                           touchAction: 'pan-x'
+                         }}
+                         drag="x"
+                         dragConstraints={{
+                           left: -(Math.max(0, (daysForCalendar.length * 76) - 240)),
+                           right: 0
+                         }}
+                         data-calendar-swipe="true"
+                         onDragStart={() => {
+                           isDraggingRef.current = true;
+                           console.log('📅 [Sidebar Calendar] Drag Start');
+                         }}
+                         onDragEnd={(e, info) => {
+                           console.log('📅 [Sidebar Calendar] Drag End - offset:', info.offset.x, 'velocity:', info.velocity.x);
+                           setTimeout(() => { isDraggingRef.current = false; }, 50);
+
+                           const swipeThreshold = 50;
+                           const velocityThreshold = 200;
+
+                           let shouldChangeDate = false;
+                           let direction: 'prev' | 'next' | null = null;
+
+                           // 스와이프 거리나 속도로 날짜 변경 판단
+                           if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
+                             direction = 'next';
+                             shouldChangeDate = true;
+                           } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
+                             direction = 'prev';
+                             shouldChangeDate = true;
+                           }
+
+                           if (shouldChangeDate && direction) {
+                             const currentIndex = daysForCalendar.findIndex(day => day.value === selectedDate);
+                             
+                             if (direction === 'next' && currentIndex < daysForCalendar.length - 1) {
+                               handleDateSelect(daysForCalendar[currentIndex + 1].value);
+                               console.log('📅 [Sidebar] 다음 날짜로 변경:', daysForCalendar[currentIndex + 1].value);
+                             } else if (direction === 'prev' && currentIndex > 0) {
+                               handleDateSelect(daysForCalendar[currentIndex - 1].value);
+                               console.log('📅 [Sidebar] 이전 날짜로 변경:', daysForCalendar[currentIndex - 1].value);
+                             }
+
+                             // 햅틱 피드백
+                             try {
+                               if ('vibrate' in navigator) {
+                                 navigator.vibrate([15]);
+                               }
+                             } catch (err) {
+                               console.debug('햅틱 차단');
+                             }
+                           }
+
+                           // 원래 위치로 복원
+                           sidebarDateX.set(0);
+                         }}
+                       >
+                         {daysForCalendar.map((day, index) => (
+                           <motion.button
+                             key={day.value}
+                             whileHover={{ scale: 1.05 }}
+                             whileTap={{ scale: 0.95 }}
+                             onClick={() => {
+                               if (!isDraggingRef.current) {
+                                 handleDateSelect(day.value);
+                               }
+                             }}
+                             data-calendar-swipe="true"
+                             className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-normal transition-all duration-300 min-w-[75px] focus:outline-none ${
+                               selectedDate === day.value
+                                 ? 'bg-indigo-700 text-white shadow-lg scale-105'
+                                 : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-md hover:scale-102 border border-indigo-100/50'
+                             }`}
+                           >
+                             {day.display}
+                           </motion.button>
+                         ))}
+                       </motion.div>
+                     </div>
+                   </div>
+
+                   {/* 그룹 멤버 목록 */}
+                   <div className="flex-1 min-h-0">
+                     <div className="flex items-center space-x-2 mb-4">
+                       <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
+                       <h3 className="text-sm font-semibold text-gray-800">멤버 목록</h3>
+                       <div className="flex-1 h-px bg-gradient-to-r from-emerald-200/50 to-transparent"></div>
+                       <span className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-full backdrop-blur-sm">
+                         {groupMembers.length}명
+                       </span>
+                     </div>
+                     <div className="h-full overflow-y-auto hide-scrollbar space-y-3">
+                       {groupMembers.length > 0 ? (
+                         <motion.div variants={sidebarContentVariants} className="space-y-2">
+                           {groupMembers.map((member, index) => {
+                             const stats = getMemberTodayScheduleStats(member);
+                             return (
+                               <motion.div
+                                 key={member.id}
+                                 variants={memberItemVariants}
+                                 whileHover={{ scale: 1.02, x: 3 }}
+                                 whileTap={{ scale: 0.98 }}
+                                 onClick={() => {
+                                   handleMemberSelect(member.id);
+                                   setIsSidebarOpen(false); // 멤버 선택 후 사이드바 닫기
+                                 }}
+                                 className={`p-4 rounded-xl cursor-pointer transition-all duration-300 backdrop-blur-sm ${
+                                   member.isSelected 
+                                     ? 'bg-gradient-to-br from-indigo-50/80 to-pink-50/80 border-2 border-indigo-300/50 shadow-lg shadow-indigo-100' 
+                                     : 'bg-white/60 hover:bg-white/90 border border-indigo-100/50 hover:border-indigo-200/70 hover:shadow-md'
+                                 }`}
+
+                               >
+                                 <div className="flex items-center space-x-4">
+                                   <div className="relative">
+                                     <motion.div 
+                                       className={`w-12 h-12 rounded-full overflow-hidden ${
+                                         member.isSelected 
+                                           ? 'ring-3 ring-indigo-400/50 shadow-lg shadow-indigo-200' 
+                                           : 'ring-2 ring-white/50'
+                                       }`}
+                                       whileHover={{ scale: 1.1, rotate: 5 }}
+                                       transition={{ type: "spring", stiffness: 300 }}
+                                     >
+                                     <img 
+                                       src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
+                                       alt={member.name} 
+                                       className="w-full h-full object-cover" 
+                                       onError={(e) => {
+                                         const target = e.target as HTMLImageElement;
+                                         target.src = getDefaultImage(member.mt_gender, member.original_index);
+                                       }}
+                                     />
+                                     </motion.div>
+                                     {member.isSelected && (
+                                                                               <motion.div 
+                                          className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-700 rounded-full flex items-center justify-center shadow-lg"
+                                         initial={{ scale: 0 }}
+                                         animate={{ scale: 1 }}
+                                         transition={{ type: "spring", stiffness: 500, delay: 0.1 }}
+                                       >
+                                         <div className="w-2 h-2 bg-white rounded-full"></div>
+                                       </motion.div>
+                                     )}
+                                   </div>
+                                   <div className="flex-1 min-w-0">
+                                                                            <div className="flex items-center justify-between">
+                                         <h4 className={`font-semibold text-sm ${member.isSelected ? 'text-indigo-900' : 'text-gray-900'} truncate`}>
+                                           {member.name}
+                                         </h4>
+                                         {/* 오늘 총 스케줄 수 */}
+                                         <div className="flex items-center space-x-1">
+                                           <span className="text-xs text-gray-500">📅</span>
+                                           <span className={`text-xs font-normal ${
+                                             member.isSelected ? 'text-gray-700' : 'text-gray-700'
+                                           }`}>
+                                             {stats.completed + stats.ongoing + stats.upcoming}개
+                                           </span>
+                                         </div>
+                                       </div>
+                                       {/* 스케줄 통계 표시 */}
+                                       <div className="flex items-center space-x-2">
+                                         <div className="flex items-center space-x-1" title="완료된 스케줄">
+                                           <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                                           <span className="text-xs text-gray-600">{stats.completed}</span>
+                                         </div>
+                                         <div className="flex items-center space-x-1" title="진행 중인 스케줄">
+                                           <div className="w-1.5 h-1.5 bg-orange-500 rounded-full"></div>
+                                           <span className="text-xs text-gray-600">{stats.ongoing}</span>
+                                         </div>
+                                         <div className="flex items-center space-x-1" title="예정된 스케줄">
+                                           <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                                           <span className="text-xs text-gray-600">{stats.upcoming}</span>
+                                         </div>
+                                       </div>
+                                       
+                                       {/* 스케줄 상태 범례 (선택된 멤버에만 표시) */}
+                                       {member.isSelected && (
+                                         <div className="mt-2 pt-2 border-t border-indigo-200/50">
+                                           <div className="flex items-center justify-between text-xs">
+                                             <div className="flex items-center space-x-1">
+                                               <div className="w-1 h-1 bg-green-500 rounded-full"></div>
+                                               <span className="text-gray-500">완료</span>
+                                             </div>
+                                             <div className="flex items-center space-x-1">
+                                               <div className="w-1 h-1 bg-orange-500 rounded-full"></div>
+                                               <span className="text-gray-500">진행중</span>
+                                             </div>
+                                             <div className="flex items-center space-x-1">
+                                               <div className="w-1 h-1 bg-blue-500 rounded-full"></div>
+                                               <span className="text-gray-500">예정</span>
+                                             </div>
+                                           </div>
+                                         </div>
+                                       )}
+                                   </div>
+                                   {/* {member.isSelected && (
+                                     <div className="flex-shrink-0">
+                                       <div className="w-2 h-2 bg-indigo-700 rounded-full animate-pulse"></div>
+                                     </div>
+                                   )} */}
+                                 </div>
+                               </motion.div>
+                             );
+                           })}
+                         </motion.div>
+                       ) : (
+                         <div className="text-center py-6">
+                           <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                             <FiUser className="w-6 h-6 text-gray-400" />
+                           </div>
+                           <p className="text-gray-500 font-medium text-sm">그룹 멤버가 없습니다</p>
+                           <p className="text-xs text-gray-400 mt-1">그룹을 선택하거나 멤버를 초대해보세요</p>
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                 </motion.div>
+               </motion.div>
+             </>
+           )}
+         </AnimatePresence>
       </motion.div>
     </>
   );
-} 
+}

@@ -336,15 +336,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await authService.login(credentials);
       
       if (response.success && response.data) {
-        const userProfile = await authService.getUserProfile(response.data.member.mt_idx);
-        dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
+        // authService.login()에서 이미 getUserProfile()이 호출되고 사용자 데이터가 저장됨
+        // 저장된 사용자 데이터를 가져와서 사용
+        const userProfile = authService.getUserData();
         
-        // 🚀 로그인 성공 시 백그라운드에서 데이터 프리로딩 실행
-        executeDataPreloading(userProfile.mt_idx).catch(error => {
-          console.error('[AUTH] 로그인 후 프리로딩 실패:', error);
-          // 프리로딩 실패는 로그인 성공에 영향을 주지 않음
-        });
-        
+        if (userProfile) {
+          dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
+          
+          // 🚀 로그인 성공 시 백그라운드에서 데이터 프리로딩 실행
+          executeDataPreloading(userProfile.mt_idx).catch(error => {
+            console.error('[AUTH] 로그인 후 프리로딩 실패:', error);
+            // 프리로딩 실패는 로그인 성공에 영향을 주지 않음
+          });
+        } else {
+          // authService에서 사용자 데이터 저장이 실패한 경우, 다시 시도
+          console.warn('[AUTH] authService에서 사용자 데이터를 찾을 수 없음, 재시도');
+          const userProfile = await authService.getUserProfile(response.data.member.mt_idx);
+          dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
+          
+          // 🚀 로그인 성공 시 백그라운드에서 데이터 프리로딩 실행
+          executeDataPreloading(userProfile.mt_idx).catch(error => {
+            console.error('[AUTH] 로그인 후 프리로딩 실패:', error);
+            // 프리로딩 실패는 로그인 성공에 영향을 주지 않음
+          });
+        }
       } else {
         throw new Error(response.message || '로그인에 실패했습니다.');
       }

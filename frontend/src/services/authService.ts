@@ -51,19 +51,30 @@ class AuthService {
       const memberResponse = await apiClient.get<Member>(`/members/${mt_idx}`);
       const member = memberResponse.data;
 
-      // 2. 사용자가 속한 그룹들 조회
-      const groups = await this.getUserGroups(mt_idx);
+      // 2. 사용자가 속한 그룹들 조회 (실패해도 기본 정보는 반환)
+      let groups: GroupWithMembers[] = [];
+      try {
+        groups = await this.getUserGroups(mt_idx);
+        console.log('[AUTH SERVICE] 그룹 조회 성공:', groups.length);
+      } catch (error) {
+        console.error('[AUTH SERVICE] 그룹 조회 실패, 빈 배열로 진행:', error);
+        // 그룹 조회 실패해도 사용자 기본 정보는 반환
+        groups = [];
+      }
 
       // 3. 소유 그룹과 참여 그룹 분리
       const ownedGroups = groups.filter(group => group.myRole.isOwner);
       const joinedGroups = groups.filter(group => !group.myRole.isOwner);
 
-      return {
+      const userProfile = {
         ...member,
         groups,
         ownedGroups,
         joinedGroups
       };
+
+      console.log('[AUTH SERVICE] 사용자 프로필 조회 완료:', userProfile.mt_name, '그룹:', groups.length);
+      return userProfile;
     } catch (error) {
       console.error('[AUTH SERVICE] 사용자 프로필 조회 실패:', error);
       throw new Error('사용자 정보를 불러올 수 없습니다.');
@@ -75,38 +86,19 @@ class AuthService {
    */
   async getUserGroups(mt_idx: number): Promise<GroupWithMembers[]> {
     try {
-      // 1. 사용자가 속한 그룹 상세 정보 조회
-      const groupDetailsResponse = await apiClient.get<GroupDetail[]>(`/group-details/member/${mt_idx}`);
-      const groupDetails = groupDetailsResponse.data.filter(
-        detail => detail.sgdt_show === 'Y' && detail.sgdt_exit === 'N' && detail.sgdt_discharge === 'N'
-      );
+      console.log('[AUTH SERVICE] getUserGroups 호출 - group-details API 호출 없이 빈 배열 반환');
+      
+      // group-details API 호출 제거 (사용자 요청)
+      // 현재는 홈 화면의 UserContext에서 실제 그룹 데이터를 제공하므로
+      // 로그인 시점에서는 빈 그룹 배열로 처리
+      
+      // 기존 코드 (제거됨):
+      // const groupDetailsResponse = await apiClient.get<GroupDetail[]>(`/group-details/member/${mt_idx}`);
+      // const groupDetails = groupDetailsResponse.data.filter(
+      //   detail => detail.sgdt_show === 'Y' && detail.sgdt_exit === 'N' && detail.sgdt_discharge === 'N'
+      // );
 
-      // 2. 각 그룹의 기본 정보와 멤버 정보 조회
-      const groupsWithMembers = await Promise.all(
-        groupDetails.map(async (detail) => {
-          const [groupResponse, membersResponse] = await Promise.all([
-            apiClient.get<Group>(`/groups/${detail.sgt_idx}`),
-            apiClient.get<(Member & GroupDetail)[]>(`/groups/${detail.sgt_idx}/members`)
-          ]);
-
-          const group = groupResponse.data;
-          const members = membersResponse.data;
-
-          return {
-            ...group,
-            members,
-            memberCount: members.length,
-            myRole: {
-              isOwner: detail.sgdt_owner_chk === 'Y',
-              isLeader: detail.sgdt_leader_chk === 'Y',
-              canInvite: detail.sgdt_leader_chk === 'Y' || detail.sgdt_owner_chk === 'Y',
-              canEdit: detail.sgdt_owner_chk === 'Y'
-            }
-          } as GroupWithMembers;
-        })
-      );
-
-      return groupsWithMembers;
+      return [];
     } catch (error) {
       console.error('[AUTH SERVICE] 사용자 그룹 조회 실패:', error);
       return [];
