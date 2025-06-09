@@ -74,7 +74,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       {/* 헤더 (조건부 렌더링) */}
       {!isNoHeader && (
         <header className="bg-white shadow-sm fixed top-0 left-0 right-0 z-10">

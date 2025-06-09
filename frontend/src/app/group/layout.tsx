@@ -9,8 +9,6 @@ export default function GroupLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <AppLayout>{children}</AppLayout>
-    </Suspense>
+    <AppLayout>{children}</AppLayout>
   );
 } 

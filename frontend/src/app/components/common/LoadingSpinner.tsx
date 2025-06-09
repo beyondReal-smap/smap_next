@@ -212,11 +212,13 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   if (fullScreen) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center fixed inset-0 z-[9999]">
-        <div className="mb-4">
-          {SpinnerComponents[type]}
-        </div>        
-        <p className={`mt-2 ${sizeClasses.text} font-medium text-gray-700`}>{message}</p>
+      <div className="min-h-screen flex flex-col items-center justify-center fixed inset-0 z-[9999]" style={{backgroundColor: 'rgba(0, 0, 0, 0.3)', backdropFilter: 'blur(1px)'}}>
+        <div className="bg-white bg-opacity-90 backdrop-blur-sm rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4 border border-gray-200">
+          <div className="mb-4">
+            {SpinnerComponents[type]}
+          </div>        
+          <p className={`mt-2 ${sizeClasses.text} font-medium text-gray-900`}>{message}</p>
+        </div>
       </div>
     );
   }

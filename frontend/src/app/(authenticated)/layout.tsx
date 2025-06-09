@@ -24,10 +24,8 @@ export default function AuthenticatedLayout({
   */
   
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <AppLayout>
-        {children}
-      </AppLayout>
-    </Suspense>
+    <AppLayout>
+      {children}
+    </AppLayout>
   );
 } 

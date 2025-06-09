@@ -465,6 +465,8 @@ const spinnerVariants = {
   }
 };
 
+// 초기 데이터 로딩 시뮬레이션 useEffect 추가
+
 
 
 
@@ -600,6 +602,7 @@ export default function LocationPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [isLoadingOtherLocations, setIsLoadingOtherLocations] = useState(false);
+  const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
   
   // 데이터 로딩 상태 추적을 위한 ref 추가
   const dataFetchedRef = useRef({ 
@@ -1329,7 +1332,6 @@ export default function LocationPage() {
 
     setIsFetchingGroupMembers(true);
     setIsFirstMemberSelectionComplete(false);
-    const startTime = Date.now();
 
     try {
       console.log('[fetchGroupMembersData] 시작, 그룹ID:', selectedGroupId);
@@ -1337,144 +1339,124 @@ export default function LocationPage() {
       console.log('[fetchGroupMembersData] 멤버 데이터 조회 완료:', membersData);
 
       if (membersData && membersData.length > 0) {
-        // 최소 로딩 시간을 보장하면서 데이터 처리
-        const elapsedTime = Date.now() - startTime;
-        const minLoadingTime = 1500;
-        const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
-
-        setTimeout(async () => {
-          const convertedMembers = membersData.map((member: any, index: number) => {
-            // 현재 로그인한 사용자인지 확인
-            const isCurrentUser = !!(user && member.mt_idx === user.mt_idx);
-            
-            return {
-              id: member.mt_idx.toString(),
-              name: member.mt_name || member.mt_nickname || '이름 없음',
-              photo: member.mt_file1,
-              isSelected: isCurrentUser, // 현재 로그인한 사용자를 선택
-              location: {
-                lat: parseFloat(String(member.mlt_lat || '37.5665')) || 37.5665,
-                lng: parseFloat(String(member.mlt_long || '126.9780')) || 126.9780
-              },
-              schedules: [],
-              savedLocations: [],
-              mt_gender: member.mt_gender,
-              original_index: index,
-              mlt_lat: member.mlt_lat,
-              mlt_long: member.mlt_long,
-              mlt_speed: member.mlt_speed,
-              mlt_battery: member.mlt_battery,
-              mlt_gps_time: member.mlt_gps_time,
-              sgdt_owner_chk: member.sgdt_owner_chk,
-              sgdt_leader_chk: member.sgdt_leader_chk,
-            };
-          });
+        // 데이터 즉시 처리
+        const convertedMembers = membersData.map((member: any, index: number) => {
+          // 현재 로그인한 사용자인지 확인
+          const isCurrentUser = !!(user && member.mt_idx === user.mt_idx);
           
-          // 현재 로그인한 사용자가 선택되지 않은 경우 첫 번째 멤버 선택
-          const hasSelectedUser = convertedMembers.some(member => member.isSelected);
-          if (!hasSelectedUser && convertedMembers.length > 0) {
-            convertedMembers[0].isSelected = true;
-          }
+          return {
+            id: member.mt_idx.toString(),
+            name: member.mt_name || member.mt_nickname || '이름 없음',
+            photo: member.mt_file1,
+            isSelected: isCurrentUser, // 현재 로그인한 사용자를 선택
+            location: {
+              lat: parseFloat(String(member.mlt_lat || '37.5665')) || 37.5665,
+              lng: parseFloat(String(member.mlt_long || '126.9780')) || 126.9780
+            },
+            schedules: [],
+            savedLocations: [],
+            mt_gender: member.mt_gender,
+            original_index: index,
+            mlt_lat: member.mlt_lat,
+            mlt_long: member.mlt_long,
+            mlt_speed: member.mlt_speed,
+            mlt_battery: member.mlt_battery,
+            mlt_gps_time: member.mlt_gps_time,
+            sgdt_owner_chk: member.sgdt_owner_chk,
+            sgdt_leader_chk: member.sgdt_leader_chk,
+          };
+        });
+        
+        // 현재 로그인한 사용자가 선택되지 않은 경우 첫 번째 멤버 선택
+        const hasSelectedUser = convertedMembers.some(member => member.isSelected);
+        if (!hasSelectedUser && convertedMembers.length > 0) {
+          convertedMembers[0].isSelected = true;
+        }
 
-          // selectedMemberIdRef 업데이트 - 선택된 멤버의 ID로 설정
-          const selectedMember = convertedMembers.find(member => member.isSelected);
-          if (selectedMember) {
-            setSelectedMemberIdRef({ current: selectedMember.id });
-          } else if (convertedMembers.length > 0) {
-            setSelectedMemberIdRef({ current: convertedMembers[0].id });
-          }
+        // selectedMemberIdRef 업데이트 - 선택된 멤버의 ID로 설정
+        const selectedMember = convertedMembers.find(member => member.isSelected);
+        if (selectedMember) {
+          setSelectedMemberIdRef({ current: selectedMember.id });
+        } else if (convertedMembers.length > 0) {
+          setSelectedMemberIdRef({ current: convertedMembers[0].id });
+        }
 
-          setGroupMembers(convertedMembers);
-          console.log('[fetchGroupMembersData] 그룹멤버 설정 완료:', convertedMembers.length, '명');
-          
-          // 멤버 데이터 로딩 완료 표시
-          dataFetchedRef.current.members = true;
-          
-          // 첫 번째 멤버의 장소 데이터 즉시 로드
-          if (convertedMembers.length > 0) {
-            console.log('[fetchGroupMembersData] 첫 번째 멤버 장소 데이터 로드 시작:', convertedMembers[0].name);
-            setTimeout(async () => {
-              try {
-                setIsLoadingOtherLocations(true);
-                const memberLocationsRaw = await locationService.getOtherMembersLocations(convertedMembers[0].id);
-                console.log("[fetchGroupMembersData] 첫 번째 멤버 장소 조회 완료:", memberLocationsRaw.length, '개');
-                
-                // LocationData 형식으로 변환
-                const convertedLocations = memberLocationsRaw.map(loc => ({
-                  id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
-                  name: loc.name || loc.slt_title || '제목 없음',
-                  address: loc.address || loc.slt_add || '주소 정보 없음',
-                  coordinates: [
-                    parseFloat(String(loc.slt_long || '0')) || 0,
-                    parseFloat(String(loc.slt_lat || '0')) || 0
-                  ] as [number, number],
-                  category: loc.category || '기타',
-                  memo: loc.memo || '',
-                  favorite: loc.favorite || false,
-                  notifications: loc.notifications !== undefined ? loc.notifications : ((loc as any).slt_enter_alarm === 'Y' || (loc as any).slt_enter_alarm === undefined)
-                }));
-                
-                // 상태 업데이트
-                setSelectedMemberSavedLocations(convertedLocations);
-                setOtherMembersSavedLocations(memberLocationsRaw);
-                setActiveView('selectedMemberPlaces');
-                
-                // 그룹멤버 상태에도 저장
-                setGroupMembers(prevMembers => 
-                  prevMembers.map((member, index) => 
-                    index === 0 
-                      ? { ...member, savedLocations: convertedLocations }
-                      : member
-                  )
-                );
-                
-              } catch (error) {
-                console.error('[fetchGroupMembersData] 첫 번째 멤버 장소 로드 실패:', error);
-                setSelectedMemberSavedLocations([]);
-                setOtherMembersSavedLocations([]);
-              } finally {
-                setIsLoadingOtherLocations(false);
-              }
-            }, 100); // 약간의 지연을 두어 상태 업데이트 완료 후 실행
-          }
+        setGroupMembers(convertedMembers);
+        console.log('[fetchGroupMembersData] 그룹멤버 설정 완료:', convertedMembers.length, '명');
+        
+        // 멤버 데이터 로딩 완료 표시
+        dataFetchedRef.current.members = true;
+        
+        // 첫 번째 멤버의 장소 데이터 즉시 로드
+        if (convertedMembers.length > 0) {
+          console.log('[fetchGroupMembersData] 첫 번째 멤버 장소 데이터 로드 시작:', convertedMembers[0].name);
+          (async () => {
+            try {
+              setIsLoadingOtherLocations(true);
+              const memberLocationsRaw = await locationService.getOtherMembersLocations(convertedMembers[0].id);
+              console.log("[fetchGroupMembersData] 첫 번째 멤버 장소 조회 완료:", memberLocationsRaw.length, '개');
+              
+              // LocationData 형식으로 변환
+              const convertedLocations = memberLocationsRaw.map(loc => ({
+                id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
+                name: loc.name || loc.slt_title || '제목 없음',
+                address: loc.address || loc.slt_add || '주소 정보 없음',
+                coordinates: [
+                  parseFloat(String(loc.slt_long || '0')) || 0,
+                  parseFloat(String(loc.slt_lat || '0')) || 0
+                ] as [number, number],
+                category: loc.category || '기타',
+                memo: loc.memo || '',
+                favorite: loc.favorite || false,
+                notifications: loc.notifications !== undefined ? loc.notifications : ((loc as any).slt_enter_alarm === 'Y' || (loc as any).slt_enter_alarm === undefined)
+              }));
+              
+              // 상태 업데이트
+              setSelectedMemberSavedLocations(convertedLocations);
+              setOtherMembersSavedLocations(memberLocationsRaw);
+              setActiveView('selectedMemberPlaces');
+              
+              // 그룹멤버 상태에도 저장
+              setGroupMembers(prevMembers => 
+                prevMembers.map((member, index) => 
+                  index === 0 
+                    ? { ...member, savedLocations: convertedLocations }
+                    : member
+                )
+              );
+              
+            } catch (error) {
+              console.error('[fetchGroupMembersData] 첫 번째 멤버 장소 로드 실패:', error);
+              setSelectedMemberSavedLocations([]);
+              setOtherMembersSavedLocations([]);
+            } finally {
+              setIsLoadingOtherLocations(false);
+            }
+          })(); // 즉시 실행
+        }
 
-          setIsFirstMemberSelectionComplete(true);
-          setIsFetchingGroupMembers(false);
-          setIsLoading(false);
-        }, remainingTime);
+        setIsFirstMemberSelectionComplete(true);
+        setIsFetchingGroupMembers(false);
+        setIsLoading(false);
       } else {
         console.warn('[fetchGroupMembersData] 그룹멤버 데이터가 없거나 비어있습니다.');
         
-        // 로딩 시간 보장
-        const elapsedTime = Date.now() - startTime;
-        const minLoadingTime = 1500;
-        const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
-
-        setTimeout(() => {
-          setGroupMembers([]); 
-          setIsFirstMemberSelectionComplete(true);
-          setIsFetchingGroupMembers(false);
-          setIsLoading(false);
-          // 멤버 데이터가 없어도 로딩 완료로 표시
-          dataFetchedRef.current.members = true;
-        }, remainingTime);
-      }
-    } catch (error) {
-      console.error('[fetchGroupMembersData] 오류:', error);
-      
-      // 오류 시에도 로딩 시간 보장
-      const elapsedTime = Date.now() - startTime;
-      const minLoadingTime = 1500;
-      const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
-
-      setTimeout(() => {
         setGroupMembers([]); 
         setIsFirstMemberSelectionComplete(true);
         setIsFetchingGroupMembers(false);
         setIsLoading(false);
-        // 오류 발생해도 로딩 완료로 표시하여 무한 로딩 방지
+        // 멤버 데이터가 없어도 로딩 완료로 표시
         dataFetchedRef.current.members = true;
-      }, remainingTime);
+      }
+    } catch (error) {
+      console.error('[fetchGroupMembersData] 오류:', error);
+      
+      setGroupMembers([]); 
+      setIsFirstMemberSelectionComplete(true);
+      setIsFetchingGroupMembers(false);
+      setIsLoading(false);
+      // 오류 발생해도 로딩 완료로 표시하여 무한 로딩 방지
+      dataFetchedRef.current.members = true;
     }
     
     console.log('[fetchGroupMembersData] 완료');
@@ -1542,18 +1524,27 @@ export default function LocationPage() {
   
     if (map && window.naver?.maps) {
       // 선택된 멤버의 위치로 지도 중심 이동 (바텀시트에 가려지지 않도록 아래쪽으로 오프셋)
-      console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember.name, '위치:', newlySelectedMember.location);
-      
-      // 좌표 파싱 및 검증
-      const lat = parseCoordinate(newlySelectedMember.location.lat);
-      const lng = parseCoordinate(newlySelectedMember.location.lng);
-      
-      console.log('[handleMemberSelect] 좌표 파싱 결과:', {
-        original: newlySelectedMember.location,
-        parsed: { lat, lng }
+      console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember.name, '위치 데이터:', {
+        mlt_lat: newlySelectedMember.mlt_lat,
+        mlt_long: newlySelectedMember.mlt_long,
+        location: newlySelectedMember.location
       });
       
-      if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+      // 좌표 파싱 및 검증 - 실시간 위치(mlt_lat, mlt_long) 우선 사용
+      const lat = parseCoordinate(newlySelectedMember.mlt_lat) || parseCoordinate(newlySelectedMember.location?.lat);
+      const lng = parseCoordinate(newlySelectedMember.mlt_long) || parseCoordinate(newlySelectedMember.location?.lng);
+      
+      console.log('[handleMemberSelect] 좌표 파싱 결과:', {
+        mlt_lat: newlySelectedMember.mlt_lat,
+        mlt_long: newlySelectedMember.mlt_long,
+        location: newlySelectedMember.location,
+        parsed: { lat, lng },
+        isValid: lat !== null && lng !== null && lat !== 0 && lng !== 0 && 
+                Math.abs(lat) <= 90 && Math.abs(lng) <= 180 // 유효한 좌표 범위 검증
+      });
+      
+      if (lat !== null && lng !== null && lat !== 0 && lng !== 0 && 
+          Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
         // 멤버 위치에서 아래쪽(남쪽)으로 offset을 준 위치를 지도 중심으로 설정
         const offsetLat = lat - 0.002; // 남쪽으로 약 220m 아래쪽으로 offset
         const offsetPosition = new window.naver.maps.LatLng(offsetLat, lng);
@@ -1745,6 +1736,25 @@ export default function LocationPage() {
     );
   };
 
+  // 초기 데이터 로딩 시뮬레이션 (home/page.tsx와 동일)
+  useEffect(() => {
+    // 1초 후 초기 데이터 로딩 완료
+    const timer = setTimeout(() => {
+      setIsInitialDataLoaded(true);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // 백업 타이머 - 5초 후 강제로 로딩 완료 (home/page.tsx와 동일)
+  useEffect(() => {
+    const backupTimer = setTimeout(() => {
+      setIsMapLoading(false);
+    }, 5000);
+
+    return () => clearTimeout(backupTimer);
+  }, []);
+
   // 네이버 지도 로드
   useEffect(() => {
     const loadNaverMaps = () => {
@@ -1761,11 +1771,8 @@ export default function LocationPage() {
       script.async = true;
       script.onload = () => {
         console.log('[네이버 지도 로드] 스크립트 로드 완료');
-        // 약간의 지연을 두고 지도 로딩 완료로 설정
-        setTimeout(() => {
         setIsMapLoading(false);
-          console.log('[네이버 지도 로드] 지도 로딩 상태 해제');
-        }, 100);
+        console.log('[네이버 지도 로드] 지도 로딩 상태 해제');
       };
       script.onerror = () => {
         console.error('네이버 지도 로드 실패');
@@ -1791,87 +1798,40 @@ export default function LocationPage() {
       hasMapContainer: !!mapContainer.current,
       hasNaverAPI: !!(window.naver && window.naver.maps),
       hasMap: !!map,
-      hasGroupMembers: groupMembers.length > 0,
-      hasUser: !!user,
-      userMtIdx: user?.mt_idx
+      hasGroupMembers: groupMembers.length > 0
     });
     
-    if (!isMapLoading && mapContainer.current && window.naver && window.naver.maps && !map && groupMembers.length > 0 && user) {
-      console.log('[지도 초기화] 시작 - 현재 로그인 사용자 위치로 초기화');
+    if (!isMapLoading && mapContainer.current && window.naver && window.naver.maps && !map && groupMembers.length > 0) {
+      console.log('[지도 초기화] 시작 - 첫 번째 그룹멤버 위치로 초기화');
       
       try {
-        // 현재 로그인한 사용자의 위치를 그룹멤버 데이터에서 찾아서 지도 초기화
+        // 첫 번째 그룹 멤버 위치로 지도 초기화
+        const firstMember = groupMembers[0];
         let initialCenter = new window.naver.maps.LatLng(37.5665, 126.9780); // 기본값
-        let initialZoom = 13;
-        let foundUserLocation = false;
+        let initialZoom = 16;
+        let foundMemberLocation = false;
         
-        // 그룹멤버 중 현재 로그인한 사용자 찾기
-        const currentUserMember = groupMembers.find(member => member.id === user.mt_idx.toString());
-        console.log('[지도 초기화] 그룹멤버 중 현재 사용자 찾기:', {
-          searchId: user.mt_idx.toString(),
-          found: !!currentUserMember,
-          memberName: currentUserMember?.name,
-          memberData: currentUserMember ? {
-            mlt_lat: currentUserMember.mlt_lat,
-            mlt_long: currentUserMember.mlt_long,
-            location: currentUserMember.location
-          } : null,
-          allMemberIds: groupMembers.map(m => ({ id: m.id, name: m.name }))
+        const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat);
+        const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng);
+        
+        console.log('[지도 초기화] 첫 번째 멤버 위치 확인:', {
+          memberName: firstMember.name,
+          lat,
+          lng,
+          hasValidCoords: lat !== null && lng !== null && lat !== 0 && lng !== 0
         });
         
-        if (currentUserMember) {
-          // mlt_lat, mlt_long 직접 사용 (더 정확한 실시간 위치)
-          const lat = parseCoordinate(currentUserMember.mlt_lat);
-          const lng = parseCoordinate(currentUserMember.mlt_long);
-          
-          console.log('[지도 초기화] 현재 사용자 위치 파싱:', {
-            original: { mlt_lat: currentUserMember.mlt_lat, mlt_long: currentUserMember.mlt_long },
-            parsed: { lat, lng }
-          });
-          
-          if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
-            // 바텀시트에 가려지지 않도록 아래쪽으로 offset 적용
-            const offsetLat = lat - 0.002;
-            initialCenter = new window.naver.maps.LatLng(offsetLat, lng);
-            initialZoom = 16;
-            foundUserLocation = true;
-            console.log('[지도 초기화] 현재 로그인 사용자 실시간 위치로 초기화:', currentUserMember.name, { 
-              lat: offsetLat, 
-              lng,
-              originalLat: lat 
-            });
-          } else {
-            // mlt_lat, mlt_long이 유효하지 않으면 location 정보 사용
-            const locationLat = parseCoordinate(currentUserMember.location?.lat);
-            const locationLng = parseCoordinate(currentUserMember.location?.lng);
-            
-            if (locationLat !== null && locationLng !== null && locationLat !== 0 && locationLng !== 0) {
-              const offsetLat = locationLat - 0.002;
-              initialCenter = new window.naver.maps.LatLng(offsetLat, locationLng);
-              initialZoom = 16;
-              foundUserLocation = true;
-              console.log('[지도 초기화] 현재 사용자 location 정보로 초기화:', currentUserMember.name, { lat: offsetLat, lng: locationLng });
-            }
-          }
+        if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+          // 바텀시트에 가려지지 않도록 아래쪽으로 offset 적용
+          const offsetLat = lat - 0.002;
+          initialCenter = new window.naver.maps.LatLng(offsetLat, lng);
+          initialZoom = 16;
+          foundMemberLocation = true;
+          console.log('[지도 초기화] 첫 번째 멤버 위치로 초기화:', firstMember.name, { lat: offsetLat, lng });
         }
         
-        // 백업: 첫 번째 그룹멤버의 위치
-        if (!foundUserLocation && groupMembers.length > 0) {
-          const firstMember = groupMembers[0];
-          const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat);
-          const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng);
-          
-          if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
-            const offsetLat = lat - 0.002;
-            initialCenter = new window.naver.maps.LatLng(offsetLat, lng);
-            initialZoom = 16;
-            foundUserLocation = true;
-            console.log('[지도 초기화] 첫 번째 멤버 위치로 초기화:', firstMember.name, { lat: offsetLat, lng });
-          }
-        }
-        
-        if (!foundUserLocation) {
-          console.log('[지도 초기화] 사용자 위치를 찾을 수 없어 기본 위치로 초기화:', { lat: 37.5665, lng: 126.9780 });
+        if (!foundMemberLocation) {
+          console.log('[지도 초기화] 멤버 위치를 찾을 수 없어 기본 위치로 초기화:', { lat: 37.5665, lng: 126.9780 });
         }
         
       const mapOptions = {
@@ -2005,12 +1965,21 @@ export default function LocationPage() {
         console.error('[지도 초기화] 오류:', error);
     }
     }
-  }, [isMapLoading, map, groupMembers, user]);
+  }, [isMapLoading, map, groupMembers]);
+
+
+
+  // 초기 데이터 로딩 완료 - 즉시 설정
+  useEffect(() => {
+    setIsInitialDataLoaded(true);
+  }, []);
 
   // 컴포넌트 마운트 시 그룹 데이터 먼저 로드
   useEffect(() => {
+    if (isInitialDataLoaded) {
       fetchUserGroups();
-  }, []);
+    }
+  }, [isInitialDataLoaded]);
 
   // 선택된 그룹이 변경될 때 멤버 데이터 불러오기 (무한 재조회 방지)
   useEffect(() => {
@@ -2069,8 +2038,8 @@ export default function LocationPage() {
             infoWindow.close();
           }
 
-                      const lat = parseCoordinate(firstMember.location.lat);
-            const lng = parseCoordinate(firstMember.location.lng);
+          const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat);
+          const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng);
             const photoForMarker = getSafeImageUrl(firstMember.photo, firstMember.mt_gender, firstMember.original_index);
             const borderColor = '#f59e0b'; // 선택된 멤버 색상
 
@@ -2187,11 +2156,23 @@ export default function LocationPage() {
 
   // groupMembers 상태 변경 시 마커 업데이트 (그룹 멤버 리스트에서 선택 시 InfoWindow 표시를 위해)
   useEffect(() => {
-    if (map && window.naver && groupMembers.length > 0 && isMapReady) {
+    if (map && window.naver && isMapReady) {
       console.log('[useEffect] groupMembers 변경으로 인한 마커 업데이트:', groupMembers.length, '명');
-      updateMemberMarkers(groupMembers);
+      if (groupMembers.length > 0) {
+        updateMemberMarkers(groupMembers);
+      } else {
+        // 멤버가 없으면 기존 마커들 제거
+        memberMarkers.forEach(marker => {
+          if (marker && marker.setMap) {
+            marker.setMap(null);
+          }
+        });
+        setMemberMarkers([]);
+      }
     }
   }, [groupMembers, map, isMapReady]);
+
+
 
   // 페이지 로드 애니메이션
   useEffect(() => {
@@ -2386,9 +2367,11 @@ export default function LocationPage() {
     // 모든 그룹멤버에 대해 마커 생성 (home/page.tsx 방식)
     if (members.length > 0) {
       members.forEach((member, index) => {
-        // 좌표 안전성 검사
-        const lat = parseCoordinate(member.location.lat);
-        const lng = parseCoordinate(member.location.lng);
+        // 좌표 안전성 검사 - 실시간 위치(mlt_lat, mlt_long) 우선 사용
+        const lat = parseCoordinate(member.mlt_lat) || parseCoordinate(member.location?.lat);
+        const lng = parseCoordinate(member.mlt_long) || parseCoordinate(member.location?.lng);
+
+
 
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
           const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
@@ -2402,37 +2385,23 @@ export default function LocationPage() {
             title: member.name,
         icon: {
           content: `
-                <div style="position: relative; text-align: center;">
-                  <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
-                    <img 
-                      src="${photoForMarker}" 
-                      alt="${member.name}" 
-                      style="width: 100%; height: 100%; object-fit: cover;" 
-                      data-gender="${member.mt_gender ?? ''}" 
-                      data-index="${member.original_index}"
-                      onerror="
-                        const genderStr = this.getAttribute('data-gender');
-                        const indexStr = this.getAttribute('data-index');
-                        const gender = genderStr ? parseInt(genderStr, 10) : null;
-                        const idx = indexStr ? parseInt(indexStr, 10) : 0;
-                        const imgNum = (idx % 4) + 1;
-                        let fallbackSrc = '/images/avatar' + ((idx % 3) + 1) + '.png';
-                        if (gender === 1) { fallbackSrc = '/images/male_' + imgNum + '.png'; }
-                        else if (gender === 2) { fallbackSrc = '/images/female_' + imgNum + '.png'; }
-                        console.log('[마커 이미지 오류] 기본 이미지로 대체:', fallbackSrc);
-                        this.src = fallbackSrc;
-                        this.onerror = null;
-                      "
-                    />
+            <div style="position: relative; text-align: center;">
+              <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                <img 
+                  src="${photoForMarker}" 
+                  alt="${member.name}" 
+                  style="width: 100%; height: 100%; object-fit: cover;" 
+                  onerror="this.src='/images/avatar1.png'"
+                />
               </div>
-                  <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
-                    ${member.name}
-          </div>
-                </div>
-              `,
-              size: new window.naver.maps.Size(36, 48),
-              anchor: new window.naver.maps.Point(18, 42)
-            },
+              <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px; font-weight: 500;">
+                ${member.name}
+              </div>
+            </div>
+          `,
+          size: new window.naver.maps.Size(60, 50),
+          anchor: new window.naver.maps.Point(30, 32)
+        },
             zIndex: member.isSelected ? 200 : 150 // 선택된 멤버가 위에 표시되도록
           });
 
@@ -2443,7 +2412,7 @@ export default function LocationPage() {
 
           newMemberMarkers.push(marker);
         } else {
-          console.warn('유효하지 않은 멤버 좌표:', member.name, member.location);
+          console.warn('[updateMemberMarkers] 유효하지 않은 멤버 좌표:', member.name);
         }
       });
 
@@ -2476,8 +2445,8 @@ export default function LocationPage() {
         infoWindow.close();
       }
 
-      const lat = parseCoordinate(selectedMember.location.lat);
-      const lng = parseCoordinate(selectedMember.location.lng);
+      const lat = parseCoordinate(selectedMember.mlt_lat) || parseCoordinate(selectedMember.location?.lat);
+      const lng = parseCoordinate(selectedMember.mlt_long) || parseCoordinate(selectedMember.location?.lng);
 
       const memberInfoWindow = new window.naver.maps.InfoWindow({
         content: `
@@ -2736,8 +2705,8 @@ export default function LocationPage() {
     
     if (members.length > 0) {
       members.forEach((member, index) => {
-        const lat = parseCoordinate(member.location.lat);
-        const lng = parseCoordinate(member.location.lng);
+        const lat = parseCoordinate(member.mlt_lat) || parseCoordinate(member.location?.lat);
+        const lng = parseCoordinate(member.mlt_long) || parseCoordinate(member.location?.lng);
 
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
           const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
@@ -2751,36 +2720,22 @@ export default function LocationPage() {
             title: member.name,
             icon: {
               content: `
-                <div  style="position: relative; text-align: center; ">
-                <div  style="position: relative; text-align: center; ">
-                  <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
+                <div style="position: relative; text-align: center;">
+                  <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
                     <img 
                       src="${photoForMarker}" 
                       alt="${member.name}" 
                       style="width: 100%; height: 100%; object-fit: cover;" 
-                      data-gender="${member.mt_gender ?? ''}" 
-                      data-index="${member.original_index}"
-                      onerror="
-                        const genderStr = this.getAttribute('data-gender');
-                        const indexStr = this.getAttribute('data-index');
-                        const gender = genderStr ? parseInt(genderStr, 10) : null;
-                        const idx = indexStr ? parseInt(indexStr, 10) : 0;
-                        const imgNum = (idx % 4) + 1;
-                        let fallbackSrc = '/images/avatar' + ((idx % 3) + 1) + '.png';
-                        if (gender === 1) { fallbackSrc = '/images/male_' + imgNum + '.png'; }
-                        else if (gender === 2) { fallbackSrc = '/images/female_' + imgNum + '.png'; }
-                        this.src = fallbackSrc;
-                        this.onerror = null;
-                      "
+                      onerror="this.src='/images/avatar1.png'"
                     />
                   </div>
-                  <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
+                  <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px; font-weight: 500;">
                     ${member.name}
                   </div>
                 </div>
               `,
-              size: new window.naver.maps.Size(36, 48),
-              anchor: new window.naver.maps.Point(18, 42)
+              size: new window.naver.maps.Size(60, 50),
+              anchor: new window.naver.maps.Point(30, 32)
             },
             zIndex: member.isSelected ? 200 : 150
           });
@@ -2818,86 +2773,12 @@ export default function LocationPage() {
           title: location.name,
           icon: {
             content: `
-              <div  style="position: relative; text-align: center;" >
-              <div style="
-                  width: 32px;
-                  height: 32px;
-                  background-color: white;
-                  border: 2px solid ${isMarkerSelected ? '#f59e0b' : '#6366f1'};
-                  border-radius: 50%;
-                  overflow: hidden;
-                display: flex;
-                align-items: center;
-                  justify-content: center;
-                  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-                  position: relative;
-                  z-index: ${isMarkerSelected ? '200' : '150'};
-                  transition: all 0.3s ease;
-                ">
-                  <svg width="16" height="16" fill="${isMarkerSelected ? '#f59e0b' : '#6366f1'}" viewBox="0 0 24 24">
-                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
-                  </svg>
-                </div>
-                
-                ${isMarkerSelected ? `
-                  <div style="
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    width: 40px;
-                    height: 40px;
-                    background: rgba(245, 158, 11, 0.2);
-                    border-radius: 50%;
-                    animation: selectedGlow 2s ease-in-out infinite;
-                    z-index: 140;
-                  "></div>
-                  ` : ''}
-                
-                <div style="
-                  position: absolute;
-                  bottom: -18px;
-                  left: 50%;
-                  transform: translateX(-50%);
-                  background-color: rgba(0,0,0,0.7);
-                      color: white;
-                  padding: 2px 5px;
-                  border-radius: 3px;
-                  white-space: nowrap;
-                      font-size: 10px;
-                  font-weight: 500;
-                  max-width: 80px;
-                  overflow: hidden;
-                  text-overflow: ellipsis;
-                ">
-                  ${location.name}
-            </div>
-          </div>
-              
-              <style>
-                @keyframes selectedGlow {
-                  0%, 100% { 
-                    transform: translate(-50%, -50%) scale(0.8); 
-                    opacity: 0.4; 
-                  }
-                  50% { 
-                    transform: translate(-50%, -50%) scale(1.2); 
-                    opacity: 0.1; 
-                  }
-                }
-              </style>
-              
-              <script>
-                setTimeout(() => {
-                  const markerEl = document.querySelector('[]');
-                  if (markerEl && markerEl.classList.contains('location-marker-animate-in')) {
-                    markerEl.classList.remove('location-marker-animate-in');
-                    markerEl.classList.add('marker-animated');
-                  }
-                }, 600);
-              </script>
+              <div style="width: 24px; height: 24px; background-color: white; border: 2px solid ${isMarkerSelected ? '#f59e0b' : '#6366f1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                <div style="width: 8px; height: 8px; background-color: ${isMarkerSelected ? '#f59e0b' : '#6366f1'}; border-radius: 50%;"></div>
+              </div>
             `,
-            anchor: new window.naver.maps.Point(16, 16)
+            size: new window.naver.maps.Size(24, 24),
+            anchor: new window.naver.maps.Point(12, 12)
           },
           zIndex: isMarkerSelected ? 200 : 150
         });
@@ -2953,23 +2834,25 @@ export default function LocationPage() {
       locations: selectedMemberSavedLocations?.map(loc => ({ name: loc.name, coordinates: loc.coordinates })) || []
     });
     
-    if (map && isMapReady && groupMembers.length > 0) {
-      console.log('[useEffect 통합 마커] 통합 마커 업데이트 시작');
-      updateAllMarkers(groupMembers, selectedMemberSavedLocations);
-    } else if (map && isMapReady) {
-      console.log('[useEffect 통합 마커] 기존 마커들 제거');
-      // 조건에 맞지 않으면 기존 마커들 제거
-      memberMarkers.forEach(marker => {
-        if (marker && marker.setMap) {
-          marker.setMap(null);
+    if (map && isMapReady) {
+      if (groupMembers.length > 0) {
+        console.log('[useEffect 통합 마커] 통합 마커 업데이트 시작');
+        updateAllMarkers(groupMembers, selectedMemberSavedLocations);
+      } else {
+        console.log('[useEffect 통합 마커] 기존 마커들 제거');
+        // 조건에 맞지 않으면 기존 마커들 제거
+        memberMarkers.forEach(marker => {
+          if (marker && marker.setMap) {
+            marker.setMap(null);
+          }
+        });
+        markers.forEach(marker => marker.setMap(null));
+        setMemberMarkers([]);
+        setMarkers([]);
+        if (infoWindow) {
+          infoWindow.close();
+          setInfoWindow(null);
         }
-      });
-      markers.forEach(marker => marker.setMap(null));
-      setMemberMarkers([]);
-      setMarkers([]);
-      if (infoWindow) {
-        infoWindow.close();
-        setInfoWindow(null);
       }
     }
   }, [selectedMemberSavedLocations, groupMembers, map, isMapReady]);
@@ -3508,18 +3391,16 @@ export default function LocationPage() {
         }
         variants={pageVariants}
         className="bg-white min-h-screen relative overflow-hidden"
-        style={{ 
-          backgroundColor: '#ffffff', 
-          background: '#ffffff', 
-          backgroundImage: 'none' 
-        }}
       >
-        {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
-        {!(isMapLoading || !dataFetchedRef.current.groups || !dataFetchedRef.current.members || !isFirstMemberSelectionComplete) && (
-          <motion.header 
+        {/* 개선된 헤더 - home/page.tsx 패턴 적용 */}
+        <motion.header 
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ 
+              duration: 0.5, 
+              ease: [0.22, 1, 0.36, 1],
+              delay: 0.1 
+            }}
             className="fixed top-0 left-0 right-0 z-20 glass-effect"
           >
             <div className="flex items-center justify-between h-16 px-4">
@@ -3577,7 +3458,6 @@ export default function LocationPage() {
               </div>
             </div>
           </motion.header>
-        )}
         
         {/* 지도 영역 - logs/page.tsx와 동일한 구조 */}
         <div 
@@ -3693,35 +3573,7 @@ export default function LocationPage() {
             </div>
           )}
           
-          {/* 지도 로딩 오버레이 - logs/page.tsx와 동일 */}
-          {(isMapLoading || !isMapInitialized) && (
-            <div className="absolute inset-0 flex items-center justify-center z-40" style={{backgroundColor: '#ffffff'}}>
-              <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
-                {/* 스피너 */}
-                <div className="relative">
-                  <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
-                  <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '2s' }}></div>
-                </div>
-                
-                {/* 로딩 텍스트 */}
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-gray-900 mb-1">
-                    지도를 초기화하는 중...
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    잠시만 기다려주세요
-                  </p>
-                </div>
-                
-                {/* 진행 표시 점들 */}
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
-                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                </div>
-              </div>
-            </div>
-          )}
+
         </div>
 
         {/* 개선된 위치 정보 패널 */}
@@ -3967,22 +3819,21 @@ export default function LocationPage() {
         </AnimatePresence>
 
         {/* 개선된 바텀시트 */}
-        {isMapReady && (
-          <motion.div
-          ref={bottomSheetRef}
+        <motion.div
+            ref={bottomSheetRef}
             initial={{ translateY: '100%' }}
             variants={bottomSheetVariants}
             animate={bottomSheetState}
             className="fixed bottom-0 left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
             style={{ touchAction: isHorizontalSwipe ? 'none' : 'pan-y' }}
-          onTouchStart={handleDragStart}
-          onTouchMove={handleDragMove}
-          onTouchEnd={handleDragEnd}
-          onMouseDown={handleDragStart}
-          onMouseMove={handleDragMove}
-          onMouseUp={handleDragEnd}
-          onMouseLeave={handleDragEnd}
-        >
+            onTouchStart={handleDragStart}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+            onMouseDown={handleDragStart}
+            onMouseMove={handleDragMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
+          >
             {/* 바텀시트 핸들 */}
             <motion.div 
               className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-3 cursor-grab active:cursor-grabbing"
@@ -4021,7 +3872,7 @@ export default function LocationPage() {
                       <motion.div 
                         initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                        transition={{ delay: 0.3, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
                         className="flex justify-between items-center mb-2"
                       >
                          <div className="flex items-center space-x-3">
@@ -4111,7 +3962,7 @@ export default function LocationPage() {
                      <motion.div 
                        initial={{ opacity: 0, y: 15 }}
                        animate={{ opacity: 1, y: 0 }}
-                       transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                       transition={{ delay: 0.3, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
                        className="flex flex-row flex-nowrap justify-start items-center gap-x-6 overflow-x-auto hide-scrollbar px-2 py-2"
                      >
                         {groupMembers.map((member, index) => {
@@ -4122,7 +3973,7 @@ export default function LocationPage() {
                             key={member.id} 
                             initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                            transition={{ delay: 0.3, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
                             className="flex flex-col items-center p-0 flex-shrink-0"
                           >
                             <button
@@ -4347,7 +4198,6 @@ export default function LocationPage() {
               </div>
             </div>
           </motion.div>
-        )}
 
       </motion.div>
 

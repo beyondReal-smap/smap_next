@@ -3474,39 +3474,10 @@ export default function SchedulePage() {
       <style jsx global>{pageStyles}</style>
       <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-20">
         
-        {/* 일정 로딩 오버레이 - logs/location 페이지와 동일 */}
-        {isInitialLoading && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{backgroundColor: '#ffffff'}}>
-            <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
-              {/* 스피너 */}
-              <div className="relative">
-                <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
-                <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '2s' }}></div>
-              </div>
-              
-              {/* 로딩 텍스트 */}
-              <div className="text-center">
-                <p className="text-lg font-semibold text-gray-900 mb-1">
-                  일정을 불러오는 중...
-                </p>
-                <p className="text-sm text-gray-600">
-                  잠시만 기다려주세요
-                </p>
-              </div>
-              
-              {/* 진행 표시 점들 */}
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
-                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
-        {!isInitialLoading && (
-          <motion.header 
+
+        {/* 개선된 헤더 */}
+        <motion.header 
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -3543,10 +3514,8 @@ export default function SchedulePage() {
               </div>
             </div>
           </motion.header>
-        )}
 
-        {/* 메인 컨텐츠 - 로딩 상태일 때 숨김 및 패딩 조정 */}
-        {!isInitialLoading && (
+        {/* 메인 컨텐츠 */}
           <motion.div
             initial="initial"
             animate="in"
@@ -5071,12 +5040,10 @@ export default function SchedulePage() {
               )}
             </AnimatePresence>
           </motion.div>
-        )}
       </div>
 
       {/* 플로팅 버튼 - 일정 추가 */}
-      {!isInitialLoading && (
-        <motion.button
+      <motion.button
           onClick={handleOpenAddEventModal}
           className="floating-button w-14 h-14 rounded-full flex items-center justify-center text-white"
           style={{
@@ -5105,7 +5072,6 @@ export default function SchedulePage() {
         >
           <FiPlus className="w-6 h-6" />
         </motion.button>
-      )}
 
       {/* 일정 추가/수정 모달 */}
       <AnimatePresence>

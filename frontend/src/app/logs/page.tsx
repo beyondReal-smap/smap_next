@@ -491,23 +491,12 @@ export default function LogsPage() {
   const isHorizontalSwipeRef = useRef<boolean | null>(null);
   const hasUserInteracted = useRef<boolean>(false); // 사용자 상호작용 추적
 
-  // 로그 페이지 뷰 상태 및 Ref
-  const [activeLogView, setActiveLogView] = useState<'members' | 'summary'>('summary');
-  const logSwipeContainerRef = useRef<HTMLDivElement>(null);
+  // 로그 페이지 뷰 상태
+  const [activeLogView, setActiveLogView] = useState<'members' | 'summary'>('members');
   
-  // activeLogView 변경 시 스와이프 컨테이너 스크롤 위치 조정
+  // activeLogView 변경 시 스와이프 컨테이너 스크롤 위치 조정 (초기 로드 시는 제외)
   useEffect(() => {
-    if (logSwipeContainerRef.current && activeLogView === 'summary') {
-      setTimeout(() => {
-        if (logSwipeContainerRef.current) {
-          const secondChild = logSwipeContainerRef.current.children[1] as HTMLElement;
-          if (secondChild) {
-            logSwipeContainerRef.current.scrollTo({ left: secondChild.offsetLeft, behavior: 'smooth' });
-            console.log('[UI] 위치기록 요약 섹션으로 자동 스크롤');
-          }
-        }
-      }, 100);
-    }
+    // 초기 로드 시 자동 스크롤하지 않도록 제거 - 사용자 의도적인 뷰 변경 시에만 스크롤
   }, [activeLogView]);
   const [locationSummary, setLocationSummary] = useState<LocationSummary>(DEFAULT_LOCATION_SUMMARY);
   const [currentLocationLogs, setCurrentLocationLogs] = useState<LocationLog[]>([]);
@@ -530,10 +519,10 @@ export default function LogsPage() {
   const [isSliderDragging, setIsSliderDragging] = useState(false); // 슬라이더 드래그 중인지 확인
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
 
-  // 바텀시트 variants - location/page.tsx와 동일한 구조로 수정
+  // 바텀시트 variants - home/page.tsx와 동일한 구조로 수정
   const bottomSheetVariants = {
     collapsed: { 
-      translateY: '65%',
+      translateY: '60%',
       opacity: 1,
       transition: {
         type: "spring",
@@ -635,10 +624,23 @@ export default function LogsPage() {
   }, []);
 
   useEffect(() => {
-    if (naverMapsLoaded && mapContainer.current && !map.current) {
+    if (naverMapsLoaded && mapContainer.current && !map.current && groupMembers.length > 0) {
       setIsMapLoading(true);
       try {
-        const initialCenter = new window.naver.maps.LatLng(37.5665, 126.9780);
+        // 첫 번째 멤버의 위치로 초기 중심점 설정
+        const firstMember = groupMembers[0];
+        const initialLat = firstMember.mlt_lat || firstMember.location.lat || 37.5665;
+        const initialLng = firstMember.mlt_long || firstMember.location.lng || 126.9780;
+        const latOffset = -0.002; // 바텀시트를 고려한 offset
+        const initialCenter = new window.naver.maps.LatLng(initialLat + latOffset, initialLng);
+        
+        console.log('[지도 초기화] 첫 번째 멤버 위치로 초기화:', {
+          memberName: firstMember.name,
+          lat: initialLat,
+          lng: initialLng,
+          adjustedLat: initialLat + latOffset
+        });
+        
         const mapOptions = {
             ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
             center: initialCenter,
@@ -648,7 +650,7 @@ export default function LogsPage() {
         };
         map.current = new window.naver.maps.Map(mapContainer.current, mapOptions);
         window.naver.maps.Event.addListener(map.current, 'init', () => {
-            console.log('Naver Map initialized for LogsPage');
+            console.log('Naver Map initialized for LogsPage with member location');
             setIsMapLoading(false);
             setIsMapInitializedLogs(true); // 지도 초기화 완료 상태 설정
             if(map.current) map.current.refresh(true);
@@ -711,7 +713,7 @@ export default function LogsPage() {
       }
       map.current = null;
     };
-  }, [naverMapsLoaded]);
+  }, [naverMapsLoaded, groupMembers]);
 
   const getRecentDays = useCallback(() => {
     const recentDays = Array.from({ length: 15 }, (_, i) => { // 오늘부터 14일전까지 (오늘 포함 15일)
@@ -814,15 +816,65 @@ export default function LogsPage() {
     
     const deltaY = clientY - startDragY.current;
     const deltaX = clientX - startDragX.current;
-    const deltaTime = performance.now() - dragStartTime.current;
-    
-    // 50ms 이상 지나고 10px 이상 움직였을 때만 방향 판단
-    if (deltaTime > 50 && (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10)) {
-      if (isHorizontalSwipeRef.current === null) {
-        const isHorizontal = Math.abs(deltaX) > Math.abs(deltaY) * 1.5; // 수평 스와이프 임계값 완화
-        isHorizontalSwipeRef.current = isHorizontal;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+    const directionThreshold = 10; // 방향 감지 임계값을 더 민감하게 조정
+
+    // 방향이 아직 결정되지 않았다면 결정
+    if (isHorizontalSwipeRef.current === null) {
+      if (absDeltaX > directionThreshold) {
+        isHorizontalSwipeRef.current = true;
+        console.log('[DragMove] 수평 스와이프 감지 (민감)');
+      } else if (absDeltaY > directionThreshold) {
+        isHorizontalSwipeRef.current = false;
+        console.log('[DragMove] 수직 드래그 감지');
       }
     }
+
+    // 좌우 스와이프: 탭 전환 (더 민감하게)
+    if (isHorizontalSwipeRef.current === true) {
+      const minSwipeDistance = 30; // 최소 스와이프 거리를 줄임
+      if (Math.abs(deltaX) < minSwipeDistance) return;
+
+      // 스와이프 방향에 따라 다음 탭 결정
+      let nextTab: 'members' | 'summary' = activeLogView;
+      
+      if (deltaX < 0) { // 왼쪽으로 스와이프 (음수) -> 다음 탭
+        if (activeLogView === 'members') {
+          nextTab = 'summary';
+        }
+      } else { // 오른쪽으로 스와이프 (양수) -> 이전 탭
+        if (activeLogView === 'summary') {
+          nextTab = 'members';
+        }
+      }
+
+      // 탭이 변경되면 즉시 적용하고 드래그 종료
+      if (nextTab !== activeLogView) {
+        console.log('[SWIPE] 좌우 스와이프로 탭 변경:', activeLogView, '→', nextTab);
+        setActiveLogView(nextTab);
+        
+        // 햅틱 피드백
+        try {
+          if ('vibrate' in navigator) {
+            navigator.vibrate([30, 10, 20]); // 더 강한 햅틱
+          }
+        } catch (error) {
+          console.debug('햅틱 피드백이 차단되었습니다:', error);
+        }
+        
+        // 드래그 종료 처리
+        startDragY.current = null;
+        startDragX.current = null;
+        isDraggingRef.current = false;
+        dragStartTime.current = null;
+        isHorizontalSwipeRef.current = null;
+      }
+      return;
+    }
+    
+    // 상하 드래그: 바텀시트 상태 변경은 handleDragEnd에서 처리
+    console.log('[DragMove] 수직 드래그 중:', deltaY);
   };
 
   const handleDragEnd = (e: React.TouchEvent | React.MouseEvent) => {
@@ -861,6 +913,71 @@ export default function LogsPage() {
         // 에러 발생 시 조용히 무시 (콘솔 노이즈 방지)
       }
     };
+
+    // 탭 동작인지 확인 (짧은 시간 + 작은 움직임)
+    const isTap = Math.abs(dragDeltaY) < 10 && Math.abs(dragDeltaX) < 10 && deltaTime < 200;
+    
+    console.log('[DragEnd] 드래그 종료:', {
+      deltaY: dragDeltaY,
+      deltaX: dragDeltaX,
+      deltaTime,
+      isTap,
+      isHorizontalSwipe: isHorizontalSwipeRef.current,
+      currentState: bottomSheetState,
+      currentTab: activeLogView
+    });
+
+    // 좌우 스와이프: 탭 전환 (home/page.tsx와 동일한 로직)
+    if (isHorizontalSwipeRef.current === true) {
+      const minSwipeDistance = 30; // 최소 스와이프 거리
+      if (Math.abs(dragDeltaX) < minSwipeDistance) {
+        // 초기화 후 종료
+        isDraggingRef.current = false;
+        startDragY.current = null;
+        startDragX.current = null;
+        dragStartTime.current = null;
+        isHorizontalSwipeRef.current = null;
+        (e.target as any)._startedAt = 0;
+        return;
+      }
+
+      // 스와이프 방향에 따라 다음 탭 결정
+      let nextTab: 'members' | 'summary' = activeLogView;
+      
+      if (dragDeltaX < 0) { // 왼쪽으로 스와이프 (음수) -> 다음 탭
+        if (activeLogView === 'members') {
+          nextTab = 'summary';
+        }
+      } else { // 오른쪽으로 스와이프 (양수) -> 이전 탭
+        if (activeLogView === 'summary') {
+          nextTab = 'members';
+        }
+      }
+
+      // 탭이 변경되면 즉시 적용하고 드래그 종료
+      if (nextTab !== activeLogView) {
+        console.log('[SWIPE] 좌우 스와이프로 탭 변경:', activeLogView, '→', nextTab);
+        setActiveLogView(nextTab);
+        
+        // 햅틱 피드백
+        try {
+          if ('vibrate' in navigator) {
+            navigator.vibrate([30, 10, 20]); // 더 강한 햅틱
+          }
+        } catch (error) {
+          console.debug('햅틱 피드백이 차단되었습니다:', error);
+        }
+        
+        // 드래그 종료 처리
+        isDraggingRef.current = false;
+        startDragY.current = null;
+        startDragX.current = null;
+        dragStartTime.current = null;
+        isHorizontalSwipeRef.current = null;
+        (e.target as any)._startedAt = 0;
+        return;
+      }
+    }
 
     // 상하 드래그에 대한 바텀시트 상태 변경 (collapsed/expanded만)
     if (isHorizontalSwipeRef.current === false || isHorizontalSwipeRef.current === null) {
@@ -957,6 +1074,7 @@ export default function LogsPage() {
     // 다른 멤버 선택 시 날짜를 오늘로 초기화
     const currentSelectedMember = groupMembers.find(m => m.isSelected);
     const isChangingMember = !currentSelectedMember || currentSelectedMember.id !== id;
+    const isSameMemberReselection = currentSelectedMember && currentSelectedMember.id === id;
     
     const today = format(new Date(), 'yyyy-MM-dd');
     let targetDate = selectedDate;
@@ -1009,17 +1127,28 @@ export default function LogsPage() {
     const selectedMember = updatedMembers.find(m => m.isSelected);
     console.log('[handleMemberSelect] Selected member:', selectedMember?.name);
     
-    // 선택된 멤버의 위치 데이터 로딩 (올바른 날짜 사용 - 지연 실행으로 상태 동기화 보장)
-    // setTimeout(() => {
-      setIsLocationDataLoading(true); // 데이터 로딩 직전에 로딩 상태 설정
+    // 선택된 멤버의 통합 지도 설정 및 위치 데이터 로딩
+    if (selectedMember) {
+      // 같은 멤버 재선택이 아닌 경우에만 로딩 상태 표시
+      if (!isSameMemberReselection) {
+        setIsLocationDataLoading(true); // 데이터 로딩 직전에 로딩 상태 설정
+        console.log('[handleMemberSelect] 새로운 멤버 선택 - 로딩 상태 활성화');
+      } else {
+        console.log('[handleMemberSelect] 같은 멤버 재선택 - 로딩 상태 건너뜀');
+      }
       
       // 새로운 요청 시작 전에 취소 플래그 리셋
       loadLocationDataExecutingRef.current.cancelled = false;
       loadLocationDataExecutingRef.current.executing = false;
       
-      console.log('[handleMemberSelect] 선택된 멤버의 위치 데이터 로딩:', id, targetDate);
-      loadLocationData(parseInt(id), targetDate);
-    // }, 50);
+      // 통합 지도 설정 및 위치 데이터 로딩
+      setTimeout(async () => {
+        if (selectedMember && map.current) {
+          console.log('[handleMemberSelect] 선택된 멤버 기반 통합 지도 설정 시작:', selectedMember.name);
+          await loadLocationDataWithMapPreset(parseInt(id), targetDate, selectedMember, isChangingMember);
+        }
+      }, 100); // 상태 업데이트 대기
+    }
     
     console.log('[handleMemberSelect] 멤버 선택 완료');
   };
@@ -1365,6 +1494,7 @@ export default function LogsPage() {
     setActiveLogView('members');
     setFirstMemberSelected(false);
     isDateChangedRef.current = true;
+    // 날짜 변경 시에만 로딩 상태 표시
     setIsLocationDataLoading(true);
     
     // 4. 날짜 상태 업데이트
@@ -1411,7 +1541,174 @@ export default function LogsPage() {
       }
     // }, 100); // 초기화 완료를 위한 지연
     
-    console.log('[LOGS] ===== 날짜 선택 완료 =====');
+          console.log('[LOGS] ===== 날짜 선택 완료 =====');
+    };
+
+
+
+  // 위치 데이터 로딩 후 지도 초기화를 수행하는 함수
+  const loadLocationDataWithMapPreset = async (mtIdx: number, date: string, member: GroupMember, forceToday: boolean = false) => {
+    if (!map.current || !member) return;
+
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const targetDate = forceToday ? today : date;
+    
+    console.log('[loadLocationDataWithMapPreset] 시작:', { 
+      memberName: member.name, 
+      mtIdx, 
+      targetDate, 
+      forceToday 
+    });
+
+    try {
+      // 먼저 모든 위치로그 데이터를 조회
+      await loadLocationDataWithMapInit(mtIdx, targetDate, member);
+      
+    } catch (error) {
+      console.error('[loadLocationDataWithMapPreset] 오류:', error);
+      
+      // 오류 시에도 멤버의 현재 위치로 지도 설정
+      const currentLat = member.mlt_lat || member.location.lat || 37.5665;
+      const currentLng = member.mlt_long || member.location.lng || 126.9780;
+      const latOffset = -0.002; // 바텀시트를 고려한 offset
+      const adjustedPosition = new window.naver.maps.LatLng(currentLat + latOffset, currentLng);
+      
+      map.current.setCenter(adjustedPosition);
+      map.current.setZoom(16);
+      
+      console.log('[loadLocationDataWithMapPreset] 오류 발생 - 현재 위치로 폴백:', {
+        currentLat, currentLng
+      });
+    }
+  };
+
+  // 위치 데이터 로딩 후 지도 초기화 수행하는 함수
+  const loadLocationDataWithMapInit = async (mtIdx: number, date: string, member: GroupMember) => {
+    if (!map.current || !member) return;
+
+    // 먼저 모든 위치로그 데이터를 조회
+    await loadLocationData(mtIdx, date);
+    
+    // 데이터 로딩 완료 후 지도 초기화
+    setTimeout(() => {
+      initializeMapAfterDataLoad(member, date);
+    }, 100); // 렌더링 완료 대기
+  };
+
+  // 데이터 로딩 완료 후 지도 초기화 함수 (시작위치가 있을 때만 이동)
+  const initializeMapAfterDataLoad = (member: GroupMember, date: string) => {
+    if (!map.current || !member) return;
+
+    console.log('[initializeMapAfterDataLoad] 데이터 로딩 완료 후 지도 초기화 시작:', member.name);
+
+    // mapMarkersData에서 첫 번째 위치 확인 - 시작위치가 있을 때만 이동
+    if (mapMarkersData && mapMarkersData.length > 0) {
+      const firstMarker = mapMarkersData[0];
+      const startLat = firstMarker.latitude || firstMarker.mlt_lat || 0;
+      const startLng = firstMarker.longitude || firstMarker.mlt_long || 0;
+      
+      if (startLat !== 0 && startLng !== 0) {
+        // 현재 지도 중심과 시작지점이 다를 때만 이동
+        const currentCenter = map.current.getCenter();
+        const currentLat = currentCenter.lat();
+        const currentLng = currentCenter.lng();
+        
+        const latOffset = -0.002; // 바텀시트를 고려한 offset
+        const targetLat = startLat + latOffset;
+        
+        // 현재 위치와 시작위치가 충분히 다를 때만 이동 (0.001도 이상 차이)
+        const latDiff = Math.abs(currentLat - targetLat);
+        const lngDiff = Math.abs(currentLng - startLng);
+        
+        if (latDiff > 0.001 || lngDiff > 0.001) {
+          const adjustedPosition = new window.naver.maps.LatLng(targetLat, startLng);
+          map.current.setCenter(adjustedPosition);
+          map.current.setZoom(16);
+          
+          console.log('[initializeMapAfterDataLoad] 시작지점으로 지도 중심 이동:', {
+            from: { lat: currentLat, lng: currentLng },
+            to: { lat: targetLat, lng: startLng },
+            startLat, startLng, date
+          });
+        } else {
+          console.log('[initializeMapAfterDataLoad] 현재 위치와 시작지점이 유사하여 이동하지 않음:', {
+            current: { lat: currentLat, lng: currentLng },
+            target: { lat: targetLat, lng: startLng }
+          });
+        }
+        
+        // 시작지점 InfoWindow 자동 표시 (마커 생성 대기)
+        setTimeout(() => {
+          // 마커가 생성될 때까지 기다렸다가 InfoWindow 표시
+          const checkMarkerAndShowInfo = () => {
+            if (startEndMarkers.current && startEndMarkers.current.length > 0) {
+              showStartPointInfoWindow(startLat, startLng, member.name, date);
+            } else {
+              // 마커가 아직 없으면 0.5초 후 다시 시도 (최대 3번)
+              setTimeout(() => {
+                if (startEndMarkers.current && startEndMarkers.current.length > 0) {
+                  showStartPointInfoWindow(startLat, startLng, member.name, date);
+                } else {
+                  // 마지막 시도: 마커 없이도 위치 기반으로 표시
+                  console.log('[initializeMapAfterDataLoad] 마커 없이 위치 기반 InfoWindow 표시');
+                  showStartPointInfoWindow(startLat, startLng, member.name, date);
+                }
+              }, 500);
+            }
+          };
+          checkMarkerAndShowInfo();
+        }, 800); // 지도 이동 및 마커 생성 완료 후 InfoWindow 표시
+        
+        return;
+      }
+    }
+    
+    console.log('[initializeMapAfterDataLoad] 위치 데이터가 없어 지도 중심 유지:', {
+      memberName: member.name, date, reason: '위치 데이터 없음'
+    });
+  };
+
+  // 시작지점 InfoWindow 표시 함수
+  const showStartPointInfoWindow = (lat: number, lng: number, memberName: string, date: string) => {
+    if (!map.current) return;
+
+    console.log('[showStartPointInfoWindow] 시작지점 InfoWindow 표시 시도:', {
+      lat, lng, memberName, date, 
+      hasStartEndMarkers: startEndMarkers.current?.length || 0
+    });
+
+    // 기존 시작지점 마커가 있는지 확인
+    let targetMarker = null;
+    if (startEndMarkers.current && startEndMarkers.current.length > 0) {
+      targetMarker = startEndMarkers.current[0]; // 첫 번째는 시작지점 마커
+      console.log('[showStartPointInfoWindow] 기존 시작지점 마커 사용');
+    } else {
+      // 마커가 없으면 임시로 위치 기반 InfoWindow 생성
+      console.log('[showStartPointInfoWindow] 마커가 없어서 위치 기반 InfoWindow 표시');
+    }
+    
+    // 시작점 InfoWindow 생성 (기존 스타일과 동일)
+    const startInfoWindow = new window.naver.maps.InfoWindow({
+      content: `<style>@keyframes slideInFromBottom { 0% { opacity: 0; transform: translateY(20px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); }} .info-window-container { animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);} .close-button { transition: all 0.2s ease;} .close-button:hover { background: rgba(0, 0, 0, 0.2) !important; transform: scale(1.1);}</style><div class="info-window-container" style="padding: 12px 16px; min-width: 200px; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); position: relative;"><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.1); border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #666;">×</button><h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #22c55e; padding-right: 25px; text-align: center;">📍 ${memberName}의 시작지점</h3><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">📅 날짜: <span style="color: #111827; font-weight: 500;">${date}</span></p></div><div style="margin-bottom: 0;"><p style="margin: 0; font-size: 11px; color: #9ca3af;">🌍 좌표: ${lat.toFixed(6)}, ${lng.toFixed(6)}</p></div></div>`,
+      borderWidth: 0,
+      backgroundColor: 'transparent',
+      disableAnchor: true,
+      pixelOffset: new window.naver.maps.Point(0, -10)
+    });
+
+    // InfoWindow 자동 표시 (마커가 있으면 마커에, 없으면 위치에)
+    if (targetMarker) {
+      startInfoWindow.open(map.current, targetMarker);
+      console.log('[showStartPointInfoWindow] 마커에 InfoWindow 표시 완료');
+    } else {
+      const position = new window.naver.maps.LatLng(lat, lng);
+      startInfoWindow.open(map.current, position);
+      console.log('[showStartPointInfoWindow] 위치에 InfoWindow 표시 완료');
+    }
+    
+    console.log('[showStartPointInfoWindow] 시작지점 InfoWindow 자동 표시 완료:', {
+      memberName, date, position: { lat, lng }, hasMarker: !!targetMarker
+    });
   };
 
   // 위치 로그 데이터 로딩 함수 (새로운 3개 API 포함)
@@ -1438,7 +1735,7 @@ export default function LogsPage() {
     loadLocationDataExecutingRef.current.cancelled = false; // 새로운 요청이므로 false로 설정
     console.log(`[loadLocationData] 실행 시작: ${executionKey}-${currentTime}`);
 
-    setIsLocationDataLoading(true); // 로딩 상태 시작
+    // 로딩 상태는 handleMemberSelect에서 이미 설정되었으므로 여기서는 설정하지 않음
     console.log('[loadLocationData] 위치 데이터 로딩 시작:', { mtIdx, date });
 
     try {
@@ -1493,20 +1790,6 @@ export default function LogsPage() {
       if (map.current) {
            await renderLocationDataOnMap(mapMarkers, stayTimes, locationLogSummary, currentMembers, map.current);
            console.log('[loadLocationData] 통합 지도 렌더링 함수 호출 완료');
-           
-           // 렌더링 완료 후 추가로 첫 번째 로그 마커로 지도 중심 확실히 이동
-           if (mapMarkers.length > 0) {
-             setTimeout(() => {
-               const firstMarker = mapMarkers[0];
-               const firstLogPosition = new window.naver.maps.LatLng(
-                 firstMarker.latitude || firstMarker.mlt_lat || 0, 
-                 firstMarker.longitude || firstMarker.mlt_long || 0
-               );
-               map.current?.setCenter(firstLogPosition);
-               map.current?.setZoom(16);
-               console.log('[loadLocationData] 최종 확인 - 첫 번째 로그 마커로 지도 중심 재설정 완료');
-             }, 200);
-           }
       }
 
     } catch (error) {
@@ -1650,12 +1933,12 @@ export default function LogsPage() {
               });
             } else if (isMoving && segmentTimeSeconds > 0) {
               movingTimeSeconds += segmentTimeSeconds;
-              console.log('[calculateLocationStats] 이동시간 추가:', {
-                segmentTimeSeconds: segmentTimeSeconds.toFixed(1) + '초',
-                distance: distance.toFixed(2) + 'm',
-                speedKmh: speedKmh.toFixed(1) + 'km/h',
-                totalMovingTime: (movingTimeSeconds / 60).toFixed(1) + '분'
-              });
+              // console.log('[calculateLocationStats] 이동시간 추가:', {
+              //   segmentTimeSeconds: segmentTimeSeconds.toFixed(1) + '초',
+              //   distance: distance.toFixed(2) + 'm',
+              //   speedKmh: speedKmh.toFixed(1) + 'km/h',
+              //   totalMovingTime: (movingTimeSeconds / 60).toFixed(1) + '분'
+              // });
             }
           }
         }
@@ -2319,49 +2602,7 @@ export default function LogsPage() {
     }
   }, [groupMembers, isMapInitializedLogs]); // selectedDate 제거 - 날짜 변경 시 지도 조정 중복 방지
 
-  // 로그 뷰 스크롤 이벤트 핸들러
-  const handleLogSwipeScroll = () => {
-    if (logSwipeContainerRef.current) {
-      const container = logSwipeContainerRef.current;
-      const scrollLeft = container.scrollLeft;
-      const containerWidth = container.offsetWidth;
-      const threshold = containerWidth * 0.3; // 30% 이상 스와이프하면 전환
 
-      const newView = scrollLeft < threshold ? 'members' : 'summary';
-      if (activeLogView !== newView) {
-        setActiveLogView(newView);
-        console.log('[LOG_SWIPE] 뷰 변경:', activeLogView, '→', newView, '(무조건 완료)');
-        
-        // 즉시 끝까지 스크롤하여 완료
-        setTimeout(() => {
-          if (logSwipeContainerRef.current) {
-            if (newView === 'members') {
-              logSwipeContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
-            } else {
-              const secondChild = logSwipeContainerRef.current.children[1] as HTMLElement;
-              if (secondChild) {
-                logSwipeContainerRef.current.scrollTo({ left: secondChild.offsetLeft, behavior: 'smooth' });
-              }
-            }
-          }
-        }, 50);
-      }
-    }
-  };
-
-  // activeLogView 변경 시 스크롤 위치 조정
-  useEffect(() => {
-    if (logSwipeContainerRef.current) {
-      if (activeLogView === 'members') {
-        logSwipeContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
-      } else {
-        const secondChild = logSwipeContainerRef.current.children[1] as HTMLElement;
-        if (secondChild) {
-          logSwipeContainerRef.current.scrollTo({ left: secondChild.offsetLeft, behavior: 'smooth' });
-        }
-      }
-    }
-  }, [activeLogView]);
 
   // 날짜 스크롤 자동 조정 함수
   const scrollToTodayDate = (reason?: string) => {
@@ -2505,6 +2746,20 @@ export default function LogsPage() {
                 hasValidLocation: currentMembers[0]?.location?.lat && currentMembers[0]?.location?.lng
               });
               setGroupMembers(currentMembers);
+
+              // 첫 번째 멤버의 오늘 날짜 데이터 기반 통합 지도 설정
+              if (currentMembers.length > 0 && map.current) {
+                const firstMember = currentMembers[0];
+                console.log('[LOGS] 첫 번째 멤버로 통합 지도 설정 시작:', firstMember.name);
+                
+                setTimeout(async () => {
+                  if (map.current && currentMembers.length > 0) {
+                    const today = format(new Date(), 'yyyy-MM-dd');
+                    await loadLocationDataWithMapPreset(parseInt(firstMember.id), today, firstMember, true);
+                    console.log('[LOGS] 첫 번째 멤버 기반 통합 지도 설정 완료');
+                  }
+                }, 200); // 지도 완전 초기화 대기
+              }
             } else {
               console.warn('❌ No member data from API, or API call failed.');
               setGroupMembers([]);
@@ -2652,7 +2907,8 @@ export default function LogsPage() {
     if (selectedMember && selectedDate && !loadLocationDataExecutingRef.current.executing) {
       console.log('[LOGS] 선택된 멤버 변경 감지 - 위치 데이터 로드:', selectedMember.name, selectedDate);
       
-      setIsLocationDataLoading(true);
+      // useEffect에서 자동 로드되는 경우에는 로딩 상태를 표시하지 않음 (사용자가 직접 선택한 것이 아니므로)
+      // setIsLocationDataLoading(true);
       loadLocationData(parseInt(selectedMember.id), selectedDate);
     }
   }, [groupMembers.map(m => m.isSelected).join(',')]);
@@ -2672,42 +2928,8 @@ export default function LogsPage() {
     // 2. 먼저 지도 중심 위치 계산 및 설정 (마커 생성 전에)
     console.log('[renderLocationDataOnMap] 지도 중심 위치 사전 계산 시작');
     let mapCenter = null;
-    let shouldSetZoom = false;
-    
-    if (locationMarkersData.length > 0) {
-      // 로그 데이터가 있으면 첫 번째 로그 위치를 중심으로 설정
-      const firstLogPoint = locationMarkersData[0];
-      mapCenter = new window.naver.maps.LatLng(
-        firstLogPoint.latitude || firstLogPoint.mlt_lat, 
-        firstLogPoint.longitude || firstLogPoint.mlt_long
-      );
-      shouldSetZoom = true;
-      console.log('[renderLocationDataOnMap] 첫 번째 로그 위치로 지도 중심 설정:', mapCenter);
-    } else {
-      // 로그 데이터가 없으면 선택된 멤버 위치를 중심으로 설정
-      const selectedMember = groupMembers.find(m => m.isSelected);
-      if (selectedMember && selectedMember.location && selectedMember.location.lat && selectedMember.location.lng) {
-        const memberLat = selectedMember.mlt_lat || selectedMember.location.lat || 37.5665;
-        const memberLng = selectedMember.mlt_long || selectedMember.location.lng || 126.9780;
-        mapCenter = new window.naver.maps.LatLng(memberLat, memberLng);
-        shouldSetZoom = true;
-        console.log('[renderLocationDataOnMap] 멤버 위치로 지도 중심 설정:', mapCenter);
-      } else {
-        // 기본 위치로 설정
-        mapCenter = new window.naver.maps.LatLng(37.5665, 126.9780);
-        shouldSetZoom = true;
-        console.log('[renderLocationDataOnMap] 기본 위치로 지도 중심 설정:', mapCenter);
-      }
-    }
-    
-    // 지도 중심과 줌 레벨을 먼저 설정
-    if (mapCenter) {
-      if (shouldSetZoom) {
-        mapInstance.setZoom(16);
-      }
-      mapInstance.setCenter(mapCenter);
-      console.log('[renderLocationDataOnMap] 지도 중심 사전 설정 완료');
-    }
+    // 지도 중심점은 presetMapCenterForMember에서 미리 설정되었으므로 건너뛰기
+    console.log('[renderLocationDataOnMap] 지도 중심점은 presetMapCenterForMember에서 미리 설정됨 - 건너뛰기');
 
     // 2. 멤버 마커 표시 (선택된 멤버만)
     console.log('[renderLocationDataOnMap] 멤버 마커 생성 시작');
@@ -2959,8 +3181,7 @@ export default function LogsPage() {
         className="bg-gradient-to-br from-purple-50 via-white to-pink-50 min-h-screen relative overflow-hidden"
       >
         {/* 통합 헤더 - 내용만 변경됨 */}
-        {!(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) && (
-          <motion.header 
+        <motion.header 
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ 
@@ -3118,7 +3339,6 @@ export default function LogsPage() {
               </motion.div>
             )}
           </motion.header>
-        )}
 
         {/* 지도 영역 */}
         <div 
@@ -3130,44 +3350,11 @@ export default function LogsPage() {
         >
           <div ref={mapContainer} className="w-full h-full" />
           
-          {/* 지도 로딩 오버레이 */}
-          {(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded || isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) && (
-            <div className="absolute inset-0 flex items-center justify-center z-40" style={{backgroundColor: '#ffffff'}}>
-              <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
-                {/* 스피너 */}
-                <div className="relative">
-                  <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
-                  <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '2s' }}></div>
-                </div>
-                
-                {/* 로딩 텍스트 */}
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-gray-900 mb-1">
-                    {isMapLoading || !isMapInitializedLogs ? '지도를 초기화하는 중...' :
-                     !isInitialDataLoaded ? '초기 데이터를 불러오는 중...' :
-                     isLocationDataLoading ? '위치 로그 데이터 로딩 중...' :
-                     isDailyCountsLoading ? '일별 위치 카운트 조회 중...' :
-                     isMemberActivityLoading ? '멤버 활동 데이터 조회 중...' : '데이터 로딩 중...'}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    잠시만 기다려주세요
-                  </p>
-                </div>
-                
-                {/* 진행 표시 점들 */}
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
-                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                </div>
-              </div>
-            </div>
-          )}
+
         </div>
 
         {/* Bottom Sheet - home/page.tsx와 동일한 framer-motion 적용 */}
-        {!(isMapLoading || !isMapInitializedLogs || !isInitialDataLoaded) && (
-          <motion.div 
+        <motion.div 
             ref={bottomSheetRef}
             initial={{ translateY: '100%' }}
             variants={bottomSheetVariants}
@@ -3189,24 +3376,27 @@ export default function LogsPage() {
               transition={{ duration: 0.2 }}
             />
 
-            {/* 바텀시트 내용 - 스크롤 가능하도록 수정 */}
+            {/* 바텀시트 내용 */}
             <div className="px-6 pb-2 overflow-y-auto max-h-full">
-              <div 
-                ref={logSwipeContainerRef}
-                className="flex overflow-x-auto snap-x snap-mandatory hide-scrollbar mb-2 gap-2 bg-white"
-                style={{
-                  minHeight: '200px',
-                  overflowY: 'visible',
-                  overscrollBehavior: 'none',
-                  WebkitOverflowScrolling: 'auto'
-                }}
-                onScroll={handleLogSwipeScroll}
-                onTouchEnd={handleLogSwipeScroll}
-                onMouseUp={handleLogSwipeScroll}
-              >
-                <div className="w-full flex-shrink-0 snap-start overflow-visible bg-white">
-                  <div 
-                    className="content-section members-section rounded-2xl p-4 border border-indigo-100 h-[190px] overflow-y-auto hide-scrollbar"
+              {/* 스와이프 가능한 콘텐츠 컨테이너 - home/page.tsx와 동일한 구조 */}
+              <div className="flex-grow min-h-0 relative overflow-hidden">
+                <motion.div
+                  className="flex w-[200%] h-full"
+                  animate={{
+                    x: activeLogView === 'members' ? '0%' : '-50%'
+                  }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 300,
+                    damping: 30,
+                    duration: 0.5
+                  }}
+                  style={{ touchAction: 'pan-x' }}
+                >
+                  {/* 그룹 멤버 탭 - home/page.tsx와 동일한 구조 */}
+                  <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
+                                      <div 
+                      className="content-section members-section rounded-2xl p-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
                     style={{
                       background: 'linear-gradient(to right, #eef2ff, #faf5ff) !important',
                       backgroundImage: 'linear-gradient(to right, #eef2ff, #faf5ff) !important'
@@ -3469,11 +3659,12 @@ export default function LogsPage() {
                   </div>
 
 
-                </div>
+                  </div>
 
-                <div className="w-full flex-shrink-0 snap-start overflow-hidden bg-white to-rose-50">
+                  {/* 위치기록 요약 탭 - home/page.tsx와 동일한 구조 */}
+                  <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
                   <div 
-                    className="content-section summary-section min-h-[190px] max-h-[190px] overflow-hidden flex flex-col bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl pt-3 px-3 pb-0"
+                    className="content-section summary-section min-h-[200px] max-h-[200px] overflow-hidden flex flex-col bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl pt-3 px-3 pb-3"
                   >
                     <div className="flex-1">
                       {/* 헤더 섹션 */}
@@ -3558,11 +3749,12 @@ export default function LogsPage() {
                       </div>
                     </div>
                   </div>
-                </div>
+                  </div>
+                </motion.div>
               </div>
 
               {/* 점 인디케이터 - 섹션과 네비게이션 바 사이 중앙 고정 */}
-              <div className="flex-shrink-0 pt-2 pb-6 bg-white -mt-7">
+              <div className="flex-shrink-0 pt-4 pb-6 bg-white -mt-7">
                 <div className="flex justify-center items-center space-x-2 mb-2">
                   <motion.div
                     className={`rounded-full transition-all duration-300 ${
@@ -3584,7 +3776,6 @@ export default function LogsPage() {
               </div>
             </div>
           </motion.div>
-        )}
       </motion.div>
     </>
   );

@@ -912,9 +912,7 @@ export default function RegisterPage() {
                     전화번호
                   </label>
                   <div className="relative register-input-container">
-                    <FiPhone className={`absolute left-5 top-1/2 transform -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${
-                      focusedField === 'phone' || registerData.mt_id ? 'text-indigo-600' : 'text-gray-400'
-                    }`} />
+                    <FiPhone className="absolute left-5 top-1/2 transform -translate-y-1/2 w-4 h-4 text-indigo-600 z-10 pointer-events-none" />
               <input
                       type="tel"
                       value={registerData.mt_id}
@@ -1084,11 +1082,7 @@ export default function RegisterPage() {
                     비밀번호
               </label>
                   <div className="relative register-input-container">
-                    <FiLock className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${
-                      passwordError ? 'text-red-400' : 
-                      registerData.mt_pwd && !passwordError ? 'text-green-500' : 
-                      focusedField === 'password' || registerData.mt_pwd ? 'text-indigo-600' : 'text-gray-400'
-                    }`} />
+                    <FiLock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-indigo-600 z-10 pointer-events-none" />
               <input
                       type={showPassword ? 'text' : 'password'}
                       value={registerData.mt_pwd}
@@ -1100,11 +1094,7 @@ export default function RegisterPage() {
                       onFocus={() => setFocusedField('password')}
                       onBlur={() => setFocusedField(null)}
                       placeholder="8자 이상, 대소문자, 숫자, 특수문자 포함"
-                      className={`w-full pl-8 pr-8 py-2.5 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
-                        passwordError ? 'border-red-300 focus:ring-red-500' :
-                        registerData.mt_pwd && !passwordError ? 'border-green-300 focus:ring-green-500' :
-                        'border-gray-200 focus:ring-indigo-600'
-                      }`}
+                      className="w-full pl-8 pr-8 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:ring-indigo-600 focus:border-transparent register-input"
                       style={{ outline: 'none' }}
                     />
                     <button
@@ -1158,11 +1148,7 @@ export default function RegisterPage() {
                     비밀번호 확인
               </label>
                   <div className="relative register-input-container">
-                    <FiLock className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${
-                      passwordConfirm && passwordConfirm !== registerData.mt_pwd ? 'text-red-400' :
-                      passwordConfirm && passwordConfirm === registerData.mt_pwd && registerData.mt_pwd ? 'text-green-500' :
-                      focusedField === 'passwordConfirm' || passwordConfirm ? 'text-indigo-600' : 'text-gray-400'
-                    }`} />
+                    <FiLock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-indigo-600 z-10 pointer-events-none" />
               <input
                       type={showPasswordConfirm ? 'text' : 'password'}
                       value={passwordConfirm}
@@ -1228,15 +1214,7 @@ export default function RegisterPage() {
                     이메일 (선택)
                   </label>
                   <div className="relative register-input-container">
-                    <FiMail className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${
-                      emailError 
-                        ? 'text-red-400' 
-                        : registerData.mt_email && !emailError 
-                          ? 'text-green-500' 
-                          : focusedField === 'email' || registerData.mt_email
-                            ? 'text-indigo-600'
-                            : 'text-gray-400'
-                    }`} />
+                    <FiMail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 text-indigo-600 z-10 pointer-events-none" />
                     <input
                       type="email"
                       value={registerData.mt_email}
@@ -1248,13 +1226,7 @@ export default function RegisterPage() {
                       onFocus={() => setFocusedField('email')}
                       onBlur={() => setFocusedField(null)}
                       placeholder="example@email.com"
-                      className={`w-full pl-8 pr-10 py-2.5 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
-                        emailError 
-                          ? 'border-red-300 focus:ring-red-500' 
-                          : registerData.mt_email && !emailError
-                            ? 'border-green-300 focus:ring-green-500'
-                            : 'border-gray-200 focus:ring-indigo-600'
-                      }`}
+                      className="w-full pl-8 pr-10 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:ring-indigo-600 focus:border-transparent register-input"
                       style={{ outline: 'none' }}
                     />
                     {registerData.mt_email && !emailError && (

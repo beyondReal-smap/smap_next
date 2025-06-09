@@ -298,16 +298,9 @@ function GroupPageContent() {
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
   const [groupMemberCounts, setGroupMemberCounts] = useState<{[key: number]: number}>({});
   const [groupStats, setGroupStats] = useState<GroupStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [membersLoading, setMembersLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
-  
-  // 단계별 로딩 상태 추적
-  const [loadingSteps, setLoadingSteps] = useState({
-    groups: false,
-    members: false,
-    ui: false
-  });
 
   // 모달 상태
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -338,14 +331,8 @@ function GroupPageContent() {
   // 그룹 목록 조회
   const fetchGroups = async () => {
     try {
-      setLoading(true);
-      const startTime = Date.now();
-      
       const data = await groupService.getCurrentUserGroups();
       setGroups(data);
-      
-      // 그룹 데이터 로딩 단계 완료
-      updateLoadingStep('groups', true);
 
       const memberCounts: {[key: number]: number} = {};
       for (const group of data) {
@@ -358,29 +345,9 @@ function GroupPageContent() {
         }
       }
       setGroupMemberCounts(memberCounts);
-      
-      // 멤버 수 계산 단계 완료
-      updateLoadingStep('members', true);
-      
-      // 로딩 애니메이션을 최소 1.5초간 보여주기 위해 지연 처리
-      const elapsedTime = Date.now() - startTime;
-      const minLoadingTime = 1500;
-      const remainingTime = Math.max(0, minLoadingTime - elapsedTime);
-      
-      setTimeout(() => {
-        updateLoadingStep('ui', true);
-        setLoading(false);
-      }, remainingTime);
     } catch (error) {
       console.error('그룹 목록 조회 오류:', error);
       setGroups([]);
-      // 오류 시에도 모든 단계 완료
-      updateLoadingStep('groups', true);
-      updateLoadingStep('members', true);
-      setTimeout(() => {
-        updateLoadingStep('ui', true);
-        setLoading(false);
-      }, 1500);
     }
   };
 
@@ -526,10 +493,12 @@ function GroupPageContent() {
     }
   };
 
-  // 초기 데이터 로드
+  // 초기 데이터 로드 - user 정보가 로드된 후에 실행
   useEffect(() => {
-    fetchGroups();
-  }, []);
+    if (user) {
+      fetchGroups();
+    }
+  }, [user]);
 
   // 선택된 그룹의 멤버 및 통계 조회
   useEffect(() => {
@@ -783,55 +752,17 @@ function GroupPageContent() {
     }
   }, [isSuccessModalOpen]);
 
-  // 로딩 단계 업데이트 함수
-  const updateLoadingStep = (step: 'groups' | 'members' | 'ui', completed: boolean) => {
-    setLoadingSteps(prev => ({
-      ...prev,
-      [step]: completed
-    }));
-  };
 
-  // 전체 로딩 완료 체크
-  const isLoadingComplete = loadingSteps.groups && loadingSteps.members && loadingSteps.ui;
 
   return (
     <>
       <style jsx global>{floatingButtonStyles}</style>
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 relative">
         
-        {/* 그룹 로딩 오버레이 - logs/location 페이지와 동일 */}
-        {loading && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{backgroundColor: '#ffffff'}}>
-            <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
-              {/* 스피너 */}
-              <div className="relative">
-                <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
-                <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '2s' }}></div>
-              </div>
-              
-              {/* 로딩 텍스트 */}
-              <div className="text-center">
-                <p className="text-lg font-semibold text-gray-900 mb-1">
-                  그룹을 불러오는 중...
-                </p>
-                <p className="text-sm text-gray-600">
-                  잠시만 기다려주세요
-                </p>
-              </div>
-              
-              {/* 진행 표시 점들 */}
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
-                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
-        {!loading && (
-          <motion.header 
+
+        {/* 개선된 헤더 */}
+        <motion.header 
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -901,10 +832,8 @@ function GroupPageContent() {
               </div>
             </div>
           </motion.header>
-        )}
 
-        {/* 메인 컨텐츠 - 로딩 상태일 때 숨김 및 패딩 조정 */}
-        {!loading && (
+        {/* 메인 컨텐츠 */}
           <div className="pb-safe pt-20">
             <AnimatePresence mode="wait">
               {currentView === 'list' ? (
@@ -973,59 +902,7 @@ function GroupPageContent() {
 
                   {/* 그룹 목록 */}
                   <div className="px-4 space-y-3">
-                    {loading ? (
-                      <motion.div 
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex flex-col items-center justify-center py-12"
-                      >
-                        {/* 배경 원형 파도 효과 */}
-                        <div className="relative flex items-center justify-center mb-6">
-                          {[...Array(3)].map((_, i) => (
-                            <motion.div
-                              key={i}
-                              className="absolute w-16 h-16 border border-indigo-200 rounded-full"
-                              animate={{
-                                scale: [1, 2, 1],
-                                opacity: [0.6, 0, 0.6],
-                              }}
-                              transition={{
-                                duration: 2,
-                                repeat: Infinity,
-                                delay: i * 0.6,
-                                ease: "easeInOut"
-                              }}
-                            />
-                          ))}
-                          
-                          {/* 중앙 그룹 아이콘 */}
-                          <motion.div
-                            className="relative w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center"
-                            animate={{
-                              scale: [1, 1.1, 1]
-                            }}
-                            transition={{
-                              duration: 2,
-                              repeat: Infinity,
-                              ease: "easeInOut"
-                            }}
-                          >
-                            <FaUsers className="w-8 h-8 text-white" />
-                          </motion.div>
-                        </div>
-                        
-                        {/* 로딩 텍스트 */}
-                        <motion.div 
-                          className="text-center"
-                          initial={{ y: 20, opacity: 0 }}
-                          animate={{ y: 0, opacity: 1 }}
-                          transition={{ delay: 0.5 }}
-                        >
-                          <h3 className="text-lg font-medium text-gray-900 mb-1">그룹을 불러오는 중...</h3>
-                          <p className="text-gray-500 text-sm">잠시만 기다려주세요</p>
-                        </motion.div>
-                      </motion.div>
-                    ) : filteredGroups.length > 0 ? (
+                    {filteredGroups.length > 0 ? (
                       <motion.div 
                         className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
                         variants={groupListContainerVariants}
@@ -1395,7 +1272,6 @@ function GroupPageContent() {
               ) : null}
             </AnimatePresence>
           </div>
-        )}
 
         {/* 모달들 */}
         <AnimatePresence>

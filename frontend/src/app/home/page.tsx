@@ -754,6 +754,7 @@ export default function HomePage() {
   const [mapType, setMapType] = useState<MapType>('google');
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
+  const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
   const [daysForCalendar, setDaysForCalendar] = useState<{ value: string; display: string; }[]>([]); // 달력 날짜 상태 추가
   
   // 별도의 컨테이너 사용 - 지도 타입 전환 시 DOM 충돌 방지
@@ -785,7 +786,7 @@ export default function HomePage() {
   const isDraggingRef = useRef(false);
   const isHorizontalSwipeRef = useRef<boolean | null>(null); // 수평 스와이프 감지용 ref 추가
 
-  const dataFetchedRef = useRef({ members: false, schedules: false, loading: false }); // dataFetchedRef를 객체로 변경
+  const dataFetchedRef = useRef({ members: false, schedules: false, loading: false, currentGroupId: null as number | null }); // dataFetchedRef를 객체로 변경
 
   // 마커 업데이트 중복 방지를 위한 ref
   const markersUpdating = useRef<boolean>(false);
@@ -1186,13 +1187,22 @@ export default function HomePage() {
         setFilteredSchedules([]);
         dataFetchedRef.current.members = true;
         dataFetchedRef.current.schedules = true;
+        dataFetchedRef.current.currentGroupId = null;
         setIsFirstMemberSelectionComplete(true);
         return;
       }
 
+      // 그룹이 변경되었으면 데이터 초기화
+      if (dataFetchedRef.current.currentGroupId !== selectedGroupId) {
+        console.log('[fetchAllGroupData] 그룹 변경 감지 - 데이터 초기화');
+        dataFetchedRef.current.members = false;
+        dataFetchedRef.current.schedules = false;
+        dataFetchedRef.current.currentGroupId = selectedGroupId;
+      }
+
       // 이미 데이터가 로드되었거나 로딩 중이면 중복 실행 방지 - 조건 강화
-      if (dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
-        console.log('[fetchAllGroupData] 이미 데이터가 로드되어 중복 실행 방지');
+      if (dataFetchedRef.current.members && dataFetchedRef.current.schedules && dataFetchedRef.current.currentGroupId === selectedGroupId) {
+        console.log('[fetchAllGroupData] 현재 그룹의 데이터가 이미 로드되어 중복 실행 방지');
         return;
       }
 
@@ -1341,7 +1351,14 @@ export default function HomePage() {
       }
     };
 
-    fetchAllGroupData();
+    // selectedGroupId가 있고, 현재 그룹의 데이터가 아직 로드되지 않았을 때만 실행
+    if (selectedGroupId && (
+      dataFetchedRef.current.currentGroupId !== selectedGroupId || 
+      !dataFetchedRef.current.members || 
+      !dataFetchedRef.current.schedules
+    )) {
+      fetchAllGroupData();
+    }
 
     return () => { isMounted = false; };
   }, [selectedGroupId]); // selectedGroupId를 의존성에 추가
@@ -1474,13 +1491,23 @@ export default function HomePage() {
       return;
     }
 
+    // 그룹멤버가 없으면 초기화하지 않음
+    if (groupMembers.length === 0) {
+      console.log('Google Maps 초기화: 그룹멤버 데이터 대기 중');
+      return;
+    }
+
     try {
       // 기존 구글 지도 인스턴스가 있으면 마커만 업데이트
       if (map.current) {
-        // 지도 중심 위치 및 마커 위치 업데이트
-        map.current.setCenter(userLocation);
+        // 첫 번째 그룹멤버 위치로 업데이트
+        const firstMember = groupMembers[0];
+        const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
+        const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
+        const centerLocation = { lat, lng };
+        map.current.setCenter(centerLocation);
         if (marker.current) {
-          marker.current.setPosition(userLocation);
+          marker.current.setPosition(centerLocation);
         }
         return;
       }
@@ -1488,10 +1515,19 @@ export default function HomePage() {
       console.log('Google Maps 초기화 시작');
       setIsMapLoading(true);
       
+      // 첫 번째 그룹멤버 위치를 지도 중심으로 설정
+      const firstMember = groupMembers[0];
+      const centerLat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
+      const centerLng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
+      const centerLocation = { lat: centerLat, lng: centerLng };
+      
+      console.log('Google Maps 초기화 - 첫 번째 멤버 위치:', firstMember.name, centerLocation);
+      
       // 지도 생성
       const mapOptions = {
         ...MAP_CONFIG.GOOGLE.DEFAULT_OPTIONS,
-        center: userLocation,
+        center: centerLocation,
+        zoom: 16, // 적절한 확대 레벨
         // 로고 및 UI 컨트롤 숨김 옵션 추가
         disableDefaultUI: true,
         zoomControl: false,
@@ -1502,9 +1538,9 @@ export default function HomePage() {
       
       map.current = new window.google.maps.Map(googleMapContainer.current, mapOptions);
 
-      // 사용자 위치에 마커 추가
+      // 첫 번째 그룹멤버 위치에 마커 추가
       marker.current = new window.google.maps.Marker({
-        position: userLocation,
+        position: centerLocation,
         map: map.current,
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
@@ -1537,11 +1573,20 @@ export default function HomePage() {
       return;
     }
 
+    // 그룹멤버가 없으면 초기화하지 않음
+    if (groupMembers.length === 0) {
+      console.log('Naver Maps 초기화: 그룹멤버 데이터 대기 중');
+      return;
+    }
+
     try {
       // 기존 네이버 지도 인스턴스가 있으면 마커만 업데이트
       if (naverMap.current) {
-        // 지도 중심 위치 및 마커 위치 업데이트
-        const latlng = new window.naver.maps.LatLng(userLocation.lat, userLocation.lng);
+        // 첫 번째 그룹멤버 위치로 업데이트
+        const firstMember = groupMembers[0];
+        const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
+        const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
+        const latlng = new window.naver.maps.LatLng(lat, lng);
         naverMap.current.setCenter(latlng);
         if (naverMarker.current) {
           naverMarker.current.setPosition(latlng);
@@ -1572,10 +1617,18 @@ export default function HomePage() {
       });
 
       try {
+        // 첫 번째 그룹멤버 위치를 지도 중심으로 설정
+        const firstMember = groupMembers[0];
+        const centerLat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
+        const centerLng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
+        
+        console.log('Naver Maps 초기화 - 첫 번째 멤버 위치:', firstMember.name, centerLat, centerLng);
+        
         // 지도 옵션에 MAP_CONFIG의 기본 설정 사용 + 로고 및 저작권 표시 숨김
         const mapOptions = {
           ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
-          center: new window.naver.maps.LatLng(userLocation.lat, userLocation.lng),
+          center: new window.naver.maps.LatLng(centerLat, centerLng),
+          zoom: 16, // 적절한 확대 레벨
           // 로고 및 저작권 정보 비표시 옵션 추가
           logoControl: false,
           logoControlOptions: {
@@ -1594,7 +1647,7 @@ export default function HomePage() {
             // 인증 실패가 아닌 경우에만 마커 생성
             try {
               naverMarker.current = new window.naver.maps.Marker({
-                position: new window.naver.maps.LatLng(userLocation.lat, userLocation.lng),
+                position: new window.naver.maps.LatLng(centerLat, centerLng),
                 map: naverMap.current,
                 icon: {
                   content: '<div style="width: 16px; height: 16px; background-color: #4F46E5; border: 2px solid #FFFFFF; border-radius: 50%;"></div>',
@@ -1661,7 +1714,7 @@ export default function HomePage() {
       
       initGoogleMap();
     }
-  }, [userLocation, mapType, googleMapsLoaded, naverMapsLoaded]);
+  }, [userLocation, mapType, googleMapsLoaded, naverMapsLoaded, groupMembers]);
   
   // 컴포넌트 언마운트 시 리소스 정리
   useEffect(() => {
@@ -3474,6 +3527,24 @@ export default function HomePage() {
     // 필요하다면 일정 간격으로 날씨 정보 업데이트 (setInterval, clearInterval)
   }, []); // 마운트 시 1회 실행
 
+  // 초기 데이터 로딩 시뮬레이션 - logs/page.tsx와 동일
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsInitialDataLoaded(true);
+    }, 1000); // 1초 후 초기 데이터 로딩 완료
+
+    // 백업 타이머: 3초 후에는 강제로 지도 로딩도 완료 처리
+    const backupTimer = setTimeout(() => {
+      setIsMapLoading(false);
+      console.log('[HOME] 백업 타이머로 지도 로딩 강제 완료');
+    }, 3000);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(backupTimer);
+    };
+  }, []);
+
   // 앱 초기/기본 날씨 로드 useEffect
   useEffect(() => {
     // 이 useEffect는 마운트 시 한 번만 실행되어 초기 날씨를 가져옵니다.
@@ -3519,7 +3590,7 @@ export default function HomePage() {
     setFilteredSchedules([]);
     setFirstMemberSelected(false);
     setIsFirstMemberSelectionComplete(false);
-    dataFetchedRef.current = { members: false, schedules: false, loading: false };
+            dataFetchedRef.current = { members: false, schedules: false, loading: false, currentGroupId: null };
     
     console.log('[handleGroupSelect] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작');
   };
@@ -3823,12 +3894,15 @@ export default function HomePage() {
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen relative overflow-hidden"
       >
-        {/* 개선된 헤더 - 로딩 상태일 때 숨김 */}
-        {!(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
-          <motion.header 
+        {/* 개선된 헤더 - logs/page.tsx 패턴 적용 */}
+        <motion.header 
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ 
+              duration: 0.5, 
+              ease: [0.22, 1, 0.36, 1],
+              delay: 0.1 
+            }}
             className="fixed top-0 left-0 right-0 z-50 glass-effect"
           >
             <div className="flex items-center justify-between h-16 px-4">
@@ -3902,47 +3976,16 @@ export default function HomePage() {
               </div>
             </div>
           </motion.header>
-        )}
 
         {/* 지도 영역 (화면 100% 차지, fixed 포지션으로 고정) */}
         <div 
           className="full-map-container" 
           style={{ 
-            paddingTop: (authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) 
-              ? '0px' 
-              : '64px',
+            paddingTop: '0px',
             position: 'relative'
           }}
         >
-          {/* 지도 로딩 오버레이 - logs/location 페이지와 동일 */}
-          {(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
-            <div className="absolute inset-0 flex items-center justify-center z-40" style={{backgroundColor: '#ffffff'}}>
-              <div className="bg-white rounded-2xl px-8 py-6 shadow-xl flex flex-col items-center space-y-4 max-w-xs mx-4">
-                {/* 스피너 */}
-                <div className="relative">
-                  <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" style={{ animationDuration: '2s' }}></div>
-                  <div className="absolute inset-0 w-12 h-12 border-4 border-transparent border-r-indigo-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '2s' }}></div>
-                </div>
-                
-                {/* 로딩 텍스트 */}
-                <div className="text-center">
-                  <p className="text-lg font-semibold text-gray-900 mb-1">
-                    홈 화면을 준비하는 중...
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    잠시만 기다려주세요
-                  </p>
-                </div>
-                
-                {/* 진행 표시 점들 */}
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></div>
-                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                </div>
-              </div>
-            </div>
-          )}
+
           
           <div 
             ref={googleMapContainer} 
@@ -3956,37 +3999,35 @@ export default function HomePage() {
           ></div>
         </div>
 
-        {/* 지도 헤더 - 바텀시트 상태에 따라 위치 변경 */}
-        {!(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
-          <div 
-            className={`${getHeaderClassName()} map-header`}
-          >
-            {isLocationEnabled && (
-              <span className="absolute top-1 right-1 inline-flex items-center justify-center w-2 h-2">
-                <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-pink-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
-              </span>
-            )}
+        {/* 지도 헤더 - 독립적 렌더링 */}
+        <motion.div 
+          initial={{ y: -100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ 
+            duration: 0.3, 
+            ease: [0.22, 1, 0.36, 1],
+            delay: 0.0 
+          }}
+          className="fixed bottom-[110px] left-4 z-10 opacity-100 map-header"
+        >
+            <span className="absolute top-1 right-1 inline-flex items-center justify-center w-2 h-2">
+              <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-pink-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-pink-500"></span>
+            </span>
             <div className="flex flex-col items-center w-full">
-              <span className="text-lg">{todayWeather.icon}</span>
-              {/* 온도 표시 - 최저기온은 파란색, 최고기온은 빨간색 */}
+              <span className="text-lg">🌤️</span>
+              {/* 고정된 온도 표시 */}
               <span className="text-sm font-medium">
-                {todayWeather.tempMin !== null && todayWeather.tempMax !== null ? (
-                  <>
-                    <span style={{ color: '#3b82f6' }}>{todayWeather.tempMin}°</span>
-                    <span className="mx-1">/</span>
-                    <span style={{ color: '#EC4899' }}>{todayWeather.tempMax}°</span>
-                  </>
-                ) : todayWeather.temp}
+                <span style={{ color: '#3b82f6' }}>18°</span>
+                <span className="mx-1">/</span>
+                <span style={{ color: '#EC4899' }}>25°</span>
               </span>
-              <span className="text-xs text-gray-500">{todayWeather.condition}</span>
+              <span className="text-xs text-gray-500">맑음</span>
             </div>
-          </div>
-        )}
+          </motion.div>
         
         {/* 지도 컨트롤 버튼들 - 바텀시트 상태에 따라 위치 변경 */}
-        {!(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
-          <div className={`${getControlsClassName()} map-controls`}>
+        <div className={`${getControlsClassName()} map-controls`}>
             <button 
               onClick={() => updateMapPosition()}
               className="map-control-button"
@@ -3998,11 +4039,9 @@ export default function HomePage() {
               </svg>
             </button>
           </div>
-        )}
 
         {/* Bottom Sheet - 끌어올리거나 내릴 수 있는 패널 */}
-        {!(authLoading || isMapLoading || isUserDataLoading || !dataFetchedRef.current.members || !dataFetchedRef.current.schedules || !isFirstMemberSelectionComplete) && (
-          <motion.div 
+        <motion.div 
             ref={bottomSheetRef}
             initial={{ translateY: '100%' }}
             variants={bottomSheetVariants}
@@ -4089,14 +4128,6 @@ export default function HomePage() {
                               : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
                             }
                           </span>
-                          <div className="ml-2 flex-shrink-0">
-                              <motion.div
-                                animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-                                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                              >
-                                <FiChevronDown className="text-gray-400" size={12} />
-                              </motion.div>
-                          </div>
                         </motion.button>
 
                             {/* 그룹 선택 드롭다운 메뉴 */}
@@ -4182,41 +4213,7 @@ export default function HomePage() {
                   </div>
 
                       {/* 멤버 목록 내용 */}
-                  {(isUserDataLoading || !dataFetchedRef.current.members) ? (
-                    <motion.div 
-                      variants={loadingVariants}
-                      initial="hidden"
-                      animate="visible"
-                      className="flex flex-col items-center justify-center py-8"
-                    >
-                      <div className="relative flex items-center justify-center mb-4">
-                        {[...Array(3)].map((_, i) => (
-                          <motion.div
-                            key={i}
-                            className="absolute w-12 h-12 border border-indigo-200 rounded-full"
-                            animate={{
-                              scale: [1, 1.8, 1],
-                              opacity: [0.4, 0, 0.4],
-                            }}
-                            transition={{
-                              duration: 1.5,
-                              repeat: Infinity,
-                              delay: i * 0.4,
-                              ease: [0.22, 1, 0.36, 1]
-                            }}
-                          />
-                        ))}
-                        
-                        <motion.div
-                          className="relative w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full flex items-center justify-center shadow-lg"
-                          variants={spinnerVariants}
-                          animate="animate"
-                        >
-                          <FiUser className="w-6 h-6 text-white" />
-                        </motion.div>
-                      </div>
-                    </motion.div>
-                  ) : groupMembers.length > 0 ? (
+                  {groupMembers.length > 0 ? (
                     <motion.div 
                       variants={staggerContainer}
                       initial="hidden"
@@ -4625,7 +4622,6 @@ export default function HomePage() {
               </div>
             </div>
           </motion.div>
-        )}
       </motion.div>
     </>
   );
