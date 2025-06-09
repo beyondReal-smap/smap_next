@@ -2,7 +2,7 @@ import apiClient from './apiClient';
 import { Member, Group, GroupDetail, GroupWithMembers, UserProfile, LoginRequest, LoginResponse } from '@/types/auth';
 
 class AuthService {
-  private readonly TOKEN_KEY = 'smap_auth_token';
+  private readonly TOKEN_KEY = 'auth-token';
   private readonly USER_KEY = 'smap_user_data';
 
   /**
@@ -172,7 +172,21 @@ class AuthService {
    */
   getToken(): string | null {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem(this.TOKEN_KEY);
+      // 새로운 토큰 키로 조회
+      let token = localStorage.getItem(this.TOKEN_KEY);
+      
+      // 만약 새로운 키에 토큰이 없고, 기존 키에 토큰이 있다면 마이그레이션
+      if (!token) {
+        const oldToken = localStorage.getItem('smap_auth_token');
+        if (oldToken) {
+          console.log('[AUTH SERVICE] 기존 토큰을 새로운 키로 마이그레이션');
+          localStorage.setItem(this.TOKEN_KEY, oldToken);
+          localStorage.removeItem('smap_auth_token'); // 기존 토큰 삭제
+          token = oldToken;
+        }
+      }
+      
+      return token;
     }
     return null;
   }

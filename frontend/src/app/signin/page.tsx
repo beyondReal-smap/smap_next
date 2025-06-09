@@ -8,6 +8,7 @@ import Image from 'next/image'; // Image 컴포넌트 임포트
 import { motion, AnimatePresence } from 'framer-motion';
 import { signIn, getSession } from 'next-auth/react';
 import authService from '@/services/authService';
+import { useAuth } from '@/contexts/AuthContext';
 
 // 아이콘 임포트 (react-icons 사용 예시)
 import { FcGoogle } from 'react-icons/fc';
@@ -25,6 +26,7 @@ export default function SignInPage() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { login } = useAuth();
 
   // 자동 입력 기능 제거됨 - 사용자가 직접 입력해야 함
   // useEffect(() => {
@@ -139,35 +141,22 @@ export default function SignInPage() {
     }
 
     try {
-      console.log('[SIGNIN] authService.login 호출 시작');
+      console.log('[SIGNIN] AuthContext login 호출 시작');
       
-      // authService를 통해 로그인 (Next.js API 라우터 경유)
-      const loginResponse = await authService.login({
+      // AuthContext를 통해 로그인
+      await login({
         mt_id: phoneNumber.replace(/-/g, ''), // 전화번호에서 하이픈 제거
         mt_pwd: password,
       });
 
-      console.log('[SIGNIN] 로그인 응답:', loginResponse);
-
-      if (!loginResponse.success) {
-        // 로그인 실패 - 모달 표시
-        const errorMessage = loginResponse.message || '아이디 또는 비밀번호가 올바르지 않습니다.';
-        setErrorModalMessage(errorMessage);
-        setShowErrorModal(true);
-        return;
-      }
-
-      // 로그인 성공
-      console.log('[SIGNIN] 로그인 성공:', loginResponse.data?.member);
+      console.log('[SIGNIN] AuthContext 로그인 성공');
       
-      // authService에서 이미 사용자 정보와 토큰을 저장했으므로 추가 저장 불필요
-
       // home/page.tsx로 이동
       router.push('/home');
 
     } catch (err: any) {
       console.error('[SIGNIN] 로그인 오류:', err);
-      const errorMessage = err.message || '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.';
+      const errorMessage = err.message || '아이디 또는 비밀번호가 올바르지 않습니다.';
       setErrorModalMessage(errorMessage);
       setShowErrorModal(true);
     } finally {
