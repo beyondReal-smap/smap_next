@@ -13,6 +13,7 @@ import { FiPlus, FiTrendingUp, FiClock, FiZap, FiPlayCircle, FiSettings, FiUser,
 import { API_KEYS, MAP_CONFIG } from '../../config'; 
 import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDataCache } from '@/contexts/DataCacheContext';
 import memberService from '@/services/memberService';
 
 import groupService, { Group } from '@/services/groupService';
@@ -437,6 +438,17 @@ export default function LogsPage() {
   const { user, isLoggedIn, loading: authLoading } = useAuth();
   // UserContext 사용
   const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData } = useUser();
+  // DataCacheContext 사용
+  const { 
+    getGroupMembers: getCachedGroupMembers, 
+    setGroupMembers: setCachedGroupMembers,
+    getLocationData: getCachedLocationData,
+    setLocationData: setCachedLocationData,
+    getDailyLocationCounts: getCachedDailyLocationCounts,
+    setDailyLocationCounts: setCachedDailyLocationCounts,
+    isCacheValid,
+    invalidateCache
+  } = useDataCache();
   
   // home/page.tsx와 동일한 상태들 추가
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
@@ -603,6 +615,13 @@ export default function LogsPage() {
       isMainInstance.current = true;
       globalPageExecuted = true;
       console.log(`[${instanceId.current}] 메인 인스턴스로 설정됨`);
+      
+      // 메인 인스턴스에서 첫 번째 그룹 자동 선택 (캐시 또는 API에서)
+      if (userGroups && userGroups.length > 0 && !selectedGroupId) {
+        const firstGroupId = userGroups[0].sgt_idx;
+        console.log(`[${instanceId.current}] 첫 번째 그룹 자동 선택:`, firstGroupId);
+        setSelectedGroupId(firstGroupId);
+      }
     } else {
       console.log(`[${instanceId.current}] 서브 인스턴스 - 실행하지 않음`);
     }
@@ -617,7 +636,7 @@ export default function LogsPage() {
         console.log('모든 인스턴스 제거됨 - 전역 플래그 리셋');
       }
     };
-  }, []);
+  }, [userGroups, selectedGroupId]);
 
   useEffect(() => {
     loadNaverMapsAPI();
@@ -1718,6 +1737,40 @@ export default function LogsPage() {
       return;
     }
 
+    // 캐시에서 먼저 확인
+    if (selectedGroupId) {
+      const cachedLocationData = getCachedLocationData(selectedGroupId, date);
+      const isCacheValid_Location = isCacheValid('locationData', selectedGroupId, date);
+      
+      if (cachedLocationData && isCacheValid_Location) {
+        console.log('[loadLocationData] 캐시에서 위치 데이터 사용:', date);
+        
+        // 캐시된 데이터를 상태에 설정
+        setDailySummaryData(cachedLocationData.dailySummary || []);
+        setStayTimesData(cachedLocationData.stayTimes || []);
+        setMapMarkersData(cachedLocationData.mapMarkers || []);
+        setLocationLogSummaryData(cachedLocationData.locationLogSummary || null);
+        
+        // 요약 데이터 계산 및 설정
+        const calculatedSummary = calculateLocationStats(cachedLocationData.mapMarkers || []);
+        setLocationSummary(calculatedSummary);
+        
+        // 캐시된 데이터로 지도 렌더링
+        if (map.current && cachedLocationData.mapMarkers) {
+          await renderLocationDataOnMap(
+            cachedLocationData.mapMarkers, 
+            cachedLocationData.stayTimes || [], 
+            cachedLocationData.locationLogSummary, 
+            groupMembers, 
+            map.current
+          );
+        }
+        
+        setIsLocationDataLoading(false);
+        return;
+      }
+    }
+
     // 중복 실행 방지 및 이전 요청 취소
     const executionKey = `${mtIdx}-${date}`;
     const currentTime = Date.now();
@@ -1756,6 +1809,19 @@ export default function LogsPage() {
       }
 
       console.log('[loadLocationData] 모든 API 응답 수신 완료');
+      
+      // 캐시에 저장
+      if (selectedGroupId) {
+        const locationDataForCache = {
+          mapMarkers,
+          stayTimes,
+          dailySummary,
+          locationLogSummary,
+          members: groupMembers
+        };
+        setCachedLocationData(selectedGroupId, date, locationDataForCache);
+        console.log('[loadLocationData] 데이터를 캐시에 저장:', date);
+      }
       
       // UI 상태 업데이트
       setCurrentLocationLogs(logs); // 필요시 사용
@@ -2326,6 +2392,10 @@ export default function LogsPage() {
     try {
       const response = await memberLocationLogService.getDailyLocationCounts(groupId, days);
       setDailyCountsData(response);
+      
+      // 캐시에 저장
+      setCachedDailyLocationCounts(groupId, response);
+      
       console.log('[LOGS] 일별 위치 기록 카운트 조회 완료:', response);
     } catch (error) {
       console.error('[LOGS] 일별 위치 기록 카운트 조회 실패:', error);
@@ -2695,9 +2765,61 @@ export default function LogsPage() {
         let currentMembers: GroupMember[] = groupMembers.length > 0 ? [...groupMembers] : [];
 
         if (!dataFetchedRef.current.members) {
-          const memberData = await memberService.getGroupMembers(groupIdToUse);
-          if (isMounted) { 
-            if (memberData && memberData.length > 0) { 
+          // 캐시에서 먼저 확인
+          const cachedMembers = getCachedGroupMembers(selectedGroupId);
+          const isCacheValid_Members = isCacheValid('groupMembers', selectedGroupId);
+          
+          if (cachedMembers && cachedMembers.length > 0 && isCacheValid_Members) {
+            console.log('[LOGS] 캐시에서 그룹 멤버 데이터 사용:', cachedMembers.length, '명');
+            
+            // 캐시된 데이터를 UI 형식으로 변환
+            currentMembers = cachedMembers.map((member: any, index: number) => {
+              const lat = member.mlt_lat !== null && member.mlt_lat !== undefined && member.mlt_lat !== 0
+                ? parseFloat(member.mlt_lat.toString())
+                : parseFloat(member.mt_lat || '37.5665');
+              const lng = member.mlt_long !== null && member.mlt_long !== undefined && member.mlt_long !== 0
+                ? parseFloat(member.mlt_long.toString())
+                : parseFloat(member.mt_long || '126.9780');
+              
+              return {
+                id: member.mt_idx.toString(),
+                name: member.mt_name || `멤버 ${index + 1}`,
+                photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
+                isSelected: index === 0,
+                location: { lat, lng },
+                schedules: [], 
+                mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
+                original_index: index,
+                mt_weather_sky: member.mt_weather_sky,
+                mt_weather_tmx: member.mt_weather_tmx,
+                mt_weather_tmn: member.mt_weather_tmn,
+                mt_weather_date: member.mt_weather_date,
+                mlt_lat: member.mlt_lat,
+                mlt_long: member.mlt_long,
+                mlt_speed: member.mlt_speed,
+                mlt_battery: member.mlt_battery,
+                mlt_gps_time: member.mlt_gps_time,
+                sgdt_owner_chk: member.sgdt_owner_chk,
+                sgdt_leader_chk: member.sgdt_leader_chk,
+                sgdt_idx: member.sgdt_idx
+              };
+            });
+            
+            setGroupMembers(currentMembers);
+          } else {
+            // 캐시에 없거나 만료된 경우 API 호출
+            console.log('[LOGS] 캐시 미스 - API에서 그룹 멤버 데이터 조회');
+            const memberData = await memberService.getGroupMembers(groupIdToUse);
+            
+                         if (isMounted && memberData && memberData.length > 0) { 
+               // 캐시에 저장 (타입 변환)
+               const cacheMembers = memberData.map((member: any) => ({
+                 ...member,
+                 sgdt_owner_chk: member.sgdt_owner_chk || '',
+                 sgdt_leader_chk: member.sgdt_leader_chk || ''
+               }));
+               setCachedGroupMembers(selectedGroupId, cacheMembers);
+              
               currentMembers = memberData.map((member: any, index: number) => {
                 // 위치 데이터 우선순위: mlt_lat/mlt_long (최신 GPS) > mt_lat/mt_long (기본 위치)
                 const lat = member.mlt_lat !== null && member.mlt_lat !== undefined && member.mlt_lat !== 0
@@ -2769,9 +2891,18 @@ export default function LogsPage() {
             // 그룹 멤버 조회 완료 후 날짜별 활동 로그 관련 API 호출
             console.log('[LOGS] 그룹 멤버 조회 완료 - 날짜별 활동 로그 API 호출 시작');
             
-            // 1. 최근 14일간 일별 카운트 조회
+            // 1. 최근 14일간 일별 카운트 조회 (캐시 우선)
             if (isMounted) {
-              await loadDailyLocationCounts(selectedGroupId, 14);
+              const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
+              const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
+              
+              if (cachedCounts && isCountsCacheValid) {
+                console.log('[LOGS] 캐시에서 일별 카운트 데이터 사용');
+                setDailyCountsData(cachedCounts);
+              } else {
+                console.log('[LOGS] 캐시 미스 - API에서 일별 카운트 데이터 조회');
+                await loadDailyLocationCounts(selectedGroupId, 14);
+              }
             }
             
             // 2. 현재 선택된 날짜의 멤버 활동 조회
@@ -2815,6 +2946,14 @@ export default function LogsPage() {
     // 그룹 변경 시 즉시 지도 초기화 (멤버 마커도 제거)
     clearMapMarkersAndPaths(true);
     console.log(`[${instanceId.current}] 그룹 변경으로 지도 초기화 완료`);
+    
+    // 이전 그룹 캐시 무효화 (선택적)
+    if (selectedGroupId) {
+      invalidateCache('groupMembers', selectedGroupId);
+      invalidateCache('locationData', selectedGroupId);
+      invalidateCache('dailyLocationCounts', selectedGroupId);
+      console.log(`[${instanceId.current}] 이전 그룹(${selectedGroupId}) 캐시 무효화 완료`);
+    }
     
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
@@ -3547,33 +3686,6 @@ export default function LogsPage() {
                       </div>
 
                       {/* 멤버 목록 내용 */}
-                      {(isUserDataLoading || !dataFetchedRef.current.members) ? (
-                        <motion.div 
-                          variants={loadingVariants}
-                          initial="hidden"
-                          animate="visible"
-                          className="flex flex-col items-center justify-center py-8"
-                        >
-                          <div className="relative flex items-center justify-center mb-4">
-                            {[...Array(3)].map((_, i) => (
-                              <motion.div
-                                key={i}
-                                className="absolute w-12 h-12 border border-indigo-200 rounded-full"
-                                animate={{
-                                  scale: [1, 1.8, 1],
-                                  opacity: [0.4, 0, 0.4],
-                                }}
-                                transition={{
-                                  duration: 1.5,
-                                  repeat: Infinity,
-                                  delay: i * 0.4,
-                                  ease: [0.22, 1, 0.36, 1]
-                                }}
-                              />
-                            ))}
-                              </div>
-                        </motion.div>
-                      ) : groupMembers.length > 0 ? (
                         <motion.div 
                           variants={staggerContainer}
                           initial="hidden"
@@ -3641,20 +3753,6 @@ export default function LogsPage() {
                         );
                       })}
                         </motion.div>
-                      ) : (
-                        <div className="text-center py-6 text-gray-500">
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: "spring", stiffness: 200 }}
-                            className="w-16 h-16 mx-auto mb-3 bg-gray-100 rounded-2xl flex items-center justify-center"
-                          >
-                            <FiUser className="w-8 h-8 text-gray-300" />
-                          </motion.div>
-                          <p className="font-medium">그룹에 참여한 멤버가 없습니다</p>
-                          <p className="text-sm mt-1">그룹에 멤버를 초대해보세요</p>
-                    </div>
-                      )}
                     </motion.div>
                   </div>
 

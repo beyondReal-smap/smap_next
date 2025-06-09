@@ -605,7 +605,7 @@ async def get_member_map_markers(
         logger.info(f"[GET] Map markers API 응답: member={mt_idx}, date={date}, 마커 수={len(map_markers)}개")
         
         # 600건 넘는 경우 경고 로그
-        if len(map_markers) > 600:
+        if len(map_markers) > 200:
             logger.warning(f"[GET] Map markers 경고: {len(map_markers)}건으로 600건 초과! 샘플링 로직 확인 필요")
         
         return {
@@ -875,40 +875,57 @@ async def get_member_activity_by_date(
         if not group_members:
             return {"member_activities": [], "date": date}
         
-        member_activities = []
+        # 모든 멤버의 데이터를 한 번의 쿼리로 조회 (성능 최적화)
+        member_ids = [member.mt_idx for member in group_members]
         
+        # 카운트 데이터를 한 번에 조회
+        count_query = text("""
+            SELECT mt_idx, COUNT(*) as log_count
+            FROM member_location_log_t 
+            WHERE mt_idx IN :member_ids
+            AND DATE(mlt_gps_time) = :target_date
+            GROUP BY mt_idx
+        """)
+        
+        count_results = db.execute(count_query, {
+            "member_ids": tuple(member_ids),
+            "target_date": target_date
+        }).fetchall()
+        
+        # 첫 번째와 마지막 로그 시간을 한 번에 조회
+        time_query = text("""
+            SELECT 
+                mt_idx,
+                MIN(mlt_gps_time) as first_log_time,
+                MAX(mlt_gps_time) as last_log_time
+            FROM member_location_log_t 
+            WHERE mt_idx IN :member_ids
+            AND DATE(mlt_gps_time) = :target_date
+            GROUP BY mt_idx
+        """)
+        
+        time_results = db.execute(time_query, {
+            "member_ids": tuple(member_ids),
+            "target_date": target_date
+        }).fetchall()
+        
+        # 결과를 딕셔너리로 변환
+        count_dict = {row.mt_idx: row.log_count for row in count_results}
+        time_dict = {row.mt_idx: {"first": row.first_log_time, "last": row.last_log_time} for row in time_results}
+        
+        member_activities = []
         for member in group_members:
-            # 해당 날짜의 위치 기록 카운트
-            count = db.query(MemberLocationLog).filter(
-                and_(
-                    MemberLocationLog.mlt_member_idx == member.mt_idx,
-                    func.date(MemberLocationLog.mlt_gps_time) == target_date
-                )
-            ).count()
-            
-            # 첫 번째와 마지막 위치 기록 시간
-            first_log = db.query(MemberLocationLog).filter(
-                and_(
-                    MemberLocationLog.mlt_member_idx == member.mt_idx,
-                    func.date(MemberLocationLog.mlt_gps_time) == target_date
-                )
-            ).order_by(MemberLocationLog.mlt_gps_time.asc()).first()
-            
-            last_log = db.query(MemberLocationLog).filter(
-                and_(
-                    MemberLocationLog.mlt_member_idx == member.mt_idx,
-                    func.date(MemberLocationLog.mlt_gps_time) == target_date
-                )
-            ).order_by(MemberLocationLog.mlt_gps_time.desc()).first()
+            count = count_dict.get(member.mt_idx, 0)
+            time_data = time_dict.get(member.mt_idx, {"first": None, "last": None})
             
             member_activities.append({
                 "member_id": member.mt_idx,
                 "member_name": member.mt_name,
-                "member_photo": getattr(member, 'mt_file1', None),  # Member 모델에는 mt_file1이 실제 photo 필드
+                "member_photo": getattr(member, 'mt_file1', None),
                 "member_gender": getattr(member, 'mt_gender', None),
                 "log_count": count,
-                "first_log_time": first_log.mlt_gps_time.isoformat() if first_log else None,
-                "last_log_time": last_log.mlt_gps_time.isoformat() if last_log else None,
+                "first_log_time": time_data["first"].isoformat() if time_data["first"] else None,
+                "last_log_time": time_data["last"].isoformat() if time_data["last"] else None,
                 "is_active": count > 0
             })
         

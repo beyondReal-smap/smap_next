@@ -675,8 +675,8 @@ def get_member_map_markers(
             'stay_long': float(row.stay_long) if row.stay_long else None
         })
     
-    # 데이터가 300건을 넘으면 균일하게 샘플링하여 300건으로 제한
-    max_markers = 300
+    # 데이터가 200건을 넘으면 균일하게 샘플링하여 200건으로 제한
+    max_markers = 200
     if len(results) > max_markers:
         print(f"[get_member_map_marker] 데이터 건수: {len(results)}건 -> {max_markers}건으로 샘플링")
         

@@ -6,6 +6,7 @@ import { SessionProvider } from 'next-auth/react';
 import { BottomNavBar } from './components/layout';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { UserProvider } from '@/contexts/UserContext';
+import { DataCacheProvider } from '@/contexts/DataCacheContext';
 import { useAuth } from '@/contexts/AuthContext';
 
 // 인증이 필요하지 않은 페이지들
@@ -68,14 +69,16 @@ export default function ClientLayout({
 
   return (
     <SessionProvider>
-      <AuthProvider>
-        <UserProvider>
-          <AuthGuard>
-            {children}
-            {!shouldHideNavBar && <BottomNavBar />}
-          </AuthGuard>
-        </UserProvider>
-      </AuthProvider>
+      <DataCacheProvider>
+        <AuthProvider>
+          <UserProvider>
+            <AuthGuard>
+              {children}
+              {!shouldHideNavBar && <BottomNavBar />}
+            </AuthGuard>
+          </UserProvider>
+        </AuthProvider>
+      </DataCacheProvider>
     </SessionProvider>
   );
 } 

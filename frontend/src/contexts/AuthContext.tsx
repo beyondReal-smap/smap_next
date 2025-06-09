@@ -4,6 +4,8 @@ import React, { createContext, useContext, useReducer, useEffect, ReactNode } fr
 import { AuthState, AuthAction, UserProfile, GroupWithMembers, LoginRequest } from '@/types/auth';
 import authService from '@/services/authService';
 import { getSession } from 'next-auth/react';
+import { useDataCache } from '@/contexts/DataCacheContext';
+import dataPreloadService from '@/services/dataPreloadService';
 
 // 초기 상태
 const initialState: AuthState = {
@@ -108,6 +110,95 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  
+  // DataCache 사용
+  const {
+    setUserProfile,
+    setUserGroups,
+    setGroupMembers,
+    setScheduleData,
+    setLocationData,
+    setGroupPlaces,
+    setDailyLocationCounts,
+    clearAllCache
+  } = useDataCache();
+
+  // 로그인 성공 시 데이터 프리로딩
+  const executeDataPreloading = async (userId: number) => {
+    try {
+      console.log('[AUTH] 🚀 데이터 프리로딩 시작:', userId);
+      
+      const preloadResult = await dataPreloadService.preloadAllData({
+        userId,
+        onProgress: (step: string, progress: number) => {
+          console.log(`[AUTH] 프리로딩 진행: ${step} (${progress}%)`);
+        },
+        onError: (error: Error, step: string) => {
+          console.error(`[AUTH] 프리로딩 실패: ${step}`, error);
+        }
+      });
+
+      // 프리로딩된 데이터를 캐시에 저장
+      if (preloadResult.userProfile) {
+        setUserProfile(preloadResult.userProfile);
+        console.log('[AUTH] ✅ 사용자 프로필 캐시 저장 완료');
+      }
+
+      if (preloadResult.userGroups.length > 0) {
+        setUserGroups(preloadResult.userGroups);
+        console.log('[AUTH] ✅ 사용자 그룹 캐시 저장 완료:', preloadResult.userGroups.length);
+      }
+
+      // 각 그룹별 데이터 캐시 저장
+      Object.keys(preloadResult.groupMembers).forEach(groupId => {
+        const members = preloadResult.groupMembers[groupId];
+        if (members) {
+          setGroupMembers(parseInt(groupId), members);
+          console.log(`[AUTH] ✅ 그룹 ${groupId} 멤버 캐시 저장 완료:`, members.length);
+        }
+      });
+
+      Object.keys(preloadResult.monthlySchedules).forEach(groupId => {
+        const schedules = preloadResult.monthlySchedules[groupId];
+        if (schedules) {
+          const today = new Date().toISOString().split('T')[0];
+          setScheduleData(parseInt(groupId), today, schedules);
+          console.log(`[AUTH] ✅ 그룹 ${groupId} 스케줄 캐시 저장 완료`);
+        }
+      });
+
+      Object.keys(preloadResult.groupPlaces).forEach(groupId => {
+        const places = preloadResult.groupPlaces[groupId];
+        if (places) {
+          setGroupPlaces(parseInt(groupId), places);
+          console.log(`[AUTH] ✅ 그룹 ${groupId} 장소 캐시 저장 완료:`, places.length);
+        }
+      });
+
+      Object.keys(preloadResult.todayLocationData).forEach(groupId => {
+        const locationData = preloadResult.todayLocationData[groupId];
+        if (locationData) {
+          const today = new Date().toISOString().split('T')[0];
+          setLocationData(parseInt(groupId), today, locationData);
+          console.log(`[AUTH] ✅ 그룹 ${groupId} 오늘 위치 데이터 캐시 저장 완료`);
+        }
+      });
+
+      Object.keys(preloadResult.dailyLocationCounts).forEach(groupId => {
+        const counts = preloadResult.dailyLocationCounts[groupId];
+        if (counts) {
+          setDailyLocationCounts(parseInt(groupId), counts);
+          console.log(`[AUTH] ✅ 그룹 ${groupId} 일별 카운트 캐시 저장 완료`);
+        }
+      });
+
+      console.log('[AUTH] 🎉 모든 데이터 프리로딩 및 캐시 저장 완료!');
+      
+    } catch (error) {
+      console.error('[AUTH] ❌ 데이터 프리로딩 실패:', error);
+      // 프리로딩 실패해도 로그인은 계속 진행
+    }
+  };
 
   // 초기 인증 상태 확인
   useEffect(() => {
@@ -147,6 +238,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
           // 최신 데이터로 갱신
           await refreshUserData();
+          
+          // 🚀 기존 로그인 사용자도 프리로딩 실행 (백그라운드)
+          executeDataPreloading(userData.mt_idx).catch(error => {
+            console.error('[AUTH] 기존 로그인 사용자 프리로딩 실패:', error);
+          });
+          
           return;
         }
 
@@ -162,6 +259,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
             // 최신 데이터로 갱신
             await refreshUserData();
+            
+            // 🚀 authService 로그인 사용자도 프리로딩 실행 (백그라운드)
+            executeDataPreloading(userData.mt_idx).catch(error => {
+              console.error('[AUTH] authService 로그인 사용자 프리로딩 실패:', error);
+            });
+            
             return;
           }
         }
@@ -235,6 +338,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.success && response.data) {
         const userProfile = await authService.getUserProfile(response.data.member.mt_idx);
         dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
+        
+        // 🚀 로그인 성공 시 백그라운드에서 데이터 프리로딩 실행
+        executeDataPreloading(userProfile.mt_idx).catch(error => {
+          console.error('[AUTH] 로그인 후 프리로딩 실패:', error);
+          // 프리로딩 실패는 로그인 성공에 영향을 주지 않음
+        });
+        
       } else {
         throw new Error(response.message || '로그인에 실패했습니다.');
       }
@@ -249,10 +359,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       await authService.logout();
+      
+      // 🗑️ 로그아웃 시 모든 캐시 삭제
+      clearAllCache();
+      console.log('[AUTH] 로그아웃 시 모든 캐시 삭제 완료');
+      
       dispatch({ type: 'LOGOUT' });
     } catch (error) {
       console.error('[AUTH CONTEXT] 로그아웃 실패:', error);
       // 로그아웃은 에러가 발생해도 상태를 초기화
+      clearAllCache(); // 에러 시에도 캐시는 삭제
       dispatch({ type: 'LOGOUT' });
     }
   };

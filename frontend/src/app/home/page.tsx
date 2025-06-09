@@ -4213,7 +4213,6 @@ export default function HomePage() {
                   </div>
 
                       {/* 멤버 목록 내용 */}
-                  {groupMembers.length > 0 ? (
                     <motion.div 
                       variants={staggerContainer}
                       initial="hidden"
@@ -4281,20 +4280,6 @@ export default function HomePage() {
                         );
                       })}
                     </motion.div>
-                  ) : (
-                    <div className="text-center py-6 text-gray-500">
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 200 }}
-                        className="w-16 h-16 mx-auto mb-3 bg-gray-100 rounded-2xl flex items-center justify-center"
-                      >
-                        <FiUser className="w-8 h-8 text-gray-300" />
-                      </motion.div>
-                      <p className="font-medium">그룹에 참여한 멤버가 없습니다</p>
-                      <p className="text-sm mt-1">그룹에 멤버를 초대해보세요</p>
-                    </div>
-                  )}
                 </motion.div>
               </div>
 

@@ -20,7 +20,7 @@ interface CustomApiClient extends AxiosInstance {
 // Axios 인스턴스 생성
 const apiClient: CustomApiClient = axios.create({
   baseURL: '', // 동적으로 설정
-  timeout: 30000, // 백엔드 서버가 원격에 있으므로 타임아웃 증가
+  timeout: 60000, // 복잡한 위치 데이터 조회를 위해 타임아웃을 60초로 증가
   headers: {
     'Content-Type': 'application/json',
   },
