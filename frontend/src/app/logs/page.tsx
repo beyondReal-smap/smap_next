@@ -7,9 +7,10 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format, addDays, subDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { motion, useMotionValue } from 'framer-motion';
+import { motion, useMotionValue, AnimatePresence } from 'framer-motion';
 import { PageContainer, Button } from '../components/layout';
 import { FiPlus, FiTrendingUp, FiClock, FiZap, FiPlayCircle, FiSettings, FiUser, FiLoader, FiChevronDown, FiActivity } from 'react-icons/fi';
+import { FaCrown } from 'react-icons/fa';
 import { API_KEYS, MAP_CONFIG } from '../../config'; 
 import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -134,6 +135,82 @@ const MOCK_LOGS = [
 ];
 
 // pageStyles with section styles from home/page.tsx
+// 사이드바 애니메이션 variants
+const sidebarVariants = {
+  closed: {
+    x: '-100%',
+    transition: {
+      type: 'tween',
+      ease: [0.25, 0.46, 0.45, 0.94],
+      duration: 0.4
+    }
+  },
+  open: {
+    x: 0,
+    transition: {
+      type: 'tween',
+      ease: [0.25, 0.46, 0.45, 0.94],
+      duration: 0.4
+    }
+  }
+};
+
+const sidebarOverlayVariants = {
+  closed: {
+    opacity: 0,
+    transition: {
+      duration: 0.3,
+      ease: "easeOut"
+    }
+  },
+  open: {
+    opacity: 1,
+    transition: {
+      duration: 0.3,
+      ease: "easeInOut"
+    }
+  }
+};
+
+const sidebarContentVariants = {
+  closed: {
+    opacity: 0,
+    y: 10,
+    transition: {
+      duration: 0.2,
+      ease: "easeOut"
+    }
+  },
+  open: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: 0.2,
+      duration: 0.4,
+      ease: [0.25, 0.46, 0.45, 0.94],
+      staggerChildren: 0.06
+    }
+  }
+};
+
+const memberItemVariants = {
+  closed: { 
+    opacity: 0, 
+    x: -15,
+    scale: 0.95
+  },
+  open: { 
+    opacity: 1, 
+    x: 0,
+    scale: 1,
+    transition: {
+      type: "tween",
+      ease: [0.25, 0.46, 0.45, 0.94],
+      duration: 0.3
+    }
+  }
+};
+
 const pageStyles = `
 @keyframes slideUp {
   from {
@@ -505,6 +582,10 @@ export default function LogsPage() {
 
   // 로그 페이지 뷰 상태
   const [activeLogView, setActiveLogView] = useState<'members' | 'summary'>('members');
+
+  // 사이드바 상태 추가
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
   
   // activeLogView 변경 시 스와이프 컨테이너 스크롤 위치 조정 (초기 로드 시는 제외)
   useEffect(() => {
@@ -525,6 +606,9 @@ export default function LogsPage() {
   const [memberActivityData, setMemberActivityData] = useState<MemberActivityResponse | null>(null);
   const [isDailyCountsLoading, setIsDailyCountsLoading] = useState(false);
   const [isMemberActivityLoading, setIsMemberActivityLoading] = useState(false);
+  
+  // 멤버별 로그 분포 상태 (14일간의 활동 여부)
+  const [memberLogDistribution, setMemberLogDistribution] = useState<Record<string, boolean[]>>({});
   
   const [sliderValue, setSliderValue] = useState(0); // 슬라이더 초기 값 (0-100) - 시작은 0으로
   const [sortedLocationData, setSortedLocationData] = useState<MapMarker[]>([]); // 정렬된 위치 로그 데이터
@@ -566,16 +650,12 @@ export default function LogsPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // 첫 진입 시 헤더 애니메이션 제어
+  // 첫 진입 시 헤더는 계속 유지
   useEffect(() => {
     if (isInitialDataLoaded && !isMapLoading && isMapInitializedLogs) {
-      // 2초 후 헤더 숨기고 동시에 날짜선택 섹션 표시
-      const headerTimer = setTimeout(() => {
-        setShowHeader(false);
-        setShowDateSelection(true); // 동시에 실행
-      }, 2000);
-
-      return () => clearTimeout(headerTimer);
+      // 헤더는 계속 표시 상태로 유지
+      setShowHeader(true);
+      setShowDateSelection(true);
     }
   }, [isInitialDataLoaded, isMapLoading, isMapInitializedLogs]);
 
@@ -789,6 +869,57 @@ export default function LogsPage() {
     
     return recentDays;
   }, [groupMembers, dailyCountsData]);
+
+  // 멤버별 14일간 로그 분포 계산 함수
+  const calculateMemberLogDistribution = useCallback((groupMembers: GroupMember[], dailyCountsData: any) => {
+    if (!dailyCountsData?.member_daily_counts || !groupMembers.length) {
+      return {};
+    }
+
+    const distribution: Record<string, boolean[]> = {};
+    const today = new Date();
+    
+    groupMembers.forEach(member => {
+      const memberLogs: boolean[] = [];
+      const memberMtIdx = parseInt(member.id);
+      
+      // 해당 멤버의 일별 카운트 데이터 찾기
+      const memberData = dailyCountsData.member_daily_counts.find(
+        (memberCount: any) => memberCount.member_id === memberMtIdx
+      );
+      
+      // 14일간 (오늘부터 13일 전까지)
+      for (let i = 13; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+        const shortDateStr = format(date, 'MM.dd'); // MM.dd
+        
+        let hasLogs = false;
+        if (memberData?.daily_counts) {
+          // 날짜 형식이 MM.dd 또는 YYYY-MM-DD 둘 다 확인
+          const dayData = memberData.daily_counts.find(
+            (day: any) => day.formatted_date === shortDateStr || day.formatted_date === dateStr
+          );
+          hasLogs = dayData && dayData.count > 0;
+        }
+        
+        memberLogs.push(hasLogs);
+      }
+      
+      distribution[member.id] = memberLogs;
+    });
+    
+    return distribution;
+  }, []);
+
+  // dailyCountsData 변경 시 멤버별 로그 분포 업데이트
+  useEffect(() => {
+    if (dailyCountsData && groupMembers.length > 0) {
+      const distribution = calculateMemberLogDistribution(groupMembers, dailyCountsData);
+      setMemberLogDistribution(distribution);
+    }
+  }, [dailyCountsData, groupMembers, calculateMemberLogDistribution]);
 
   // home/page.tsx와 동일한 드래그 핸들러들
   const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
@@ -3037,7 +3168,29 @@ export default function LogsPage() {
     }
   }, [isGroupSelectorOpen]);
 
+  // 사이드바 토글 함수
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
+  // 사이드바 외부 클릭 처리
+  useEffect(() => {
+    const handleSidebarClickOutside = (event: MouseEvent) => {
+      if (isSidebarOpen && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    if (isSidebarOpen) {
+      document.addEventListener('mousedown', handleSidebarClickOutside);
+    } else {
+      document.removeEventListener('mousedown', handleSidebarClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleSidebarClickOutside);
+    };
+  }, [isSidebarOpen]);
 
   // 첫번째 멤버 자동 선택 및 위치 데이터 로딩 - 메인 인스턴스에서만
   // 첫번째 멤버 자동 선택 - 위의 통합 useEffect에서 처리하므로 제거
@@ -3409,117 +3562,7 @@ export default function LogsPage() {
             )}
 
                         {/* 날짜 선택 내용 */}
-            {showDateSelection && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="h-full px-4 flex flex-col justify-center"
-              >
-                <motion.div 
-                  className="flex items-center space-x-2"
-                  initial={{ opacity: 0, x: -30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.4, delay: 0.1 }}
-                >
-                  <motion.div
-                    initial={{ rotate: 0, scale: 0 }}
-                    animate={{ rotate: 360, scale: 1 }}
-                    transition={{ 
-                      duration: 0.6, 
-                      delay: 0.2,
-                      type: "spring",
-                      stiffness: 200
-                    }}
-                  >
-                    <FiClock className="w-4 h-4" style={{ color: '#0113A3' }} />
-                  </motion.div>
-                  <h3 className="text-base font-bold text-gray-900">날짜 선택</h3>
-                  <motion.div 
-                    className="text-xs text-gray-500"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ 
-                      duration: 0.3, 
-                      delay: 0.3,
-                      type: "spring",
-                      stiffness: 150
-                    }}
-                  >
-                    {(() => {
-                      const selectedMember = groupMembers.find(m => m.isSelected);
-                      const recentDays = getRecentDays();
-                      const daysWithLogs = recentDays.filter(day => day.hasLogs).length;
-                      
-                      return `(${daysWithLogs}일 기록 있음)`;
-                      
-                    })()}
-                  </motion.div>
-                </motion.div>
-                <motion.div 
-                  ref={dateScrollContainerRef} 
-                  className="flex space-x-2 overflow-x-auto hide-scrollbar"
-                  style={{ scrollBehavior: 'auto' }}
-                  variants={staggerContainer}
-                  initial="initial"
-                  animate="animate"
-                >
-                  {getRecentDays().map((day, idx) => {
-                    const isSelected = selectedDate === day.value;
-                    const isToday = idx === getRecentDays().length - 1; // 오늘인지 확인
 
-                    return (
-                      <motion.button 
-                        key={idx} 
-                        custom={idx}
-                        variants={{
-                          initial: { opacity: 0, y: 10 },
-                          animate: { 
-                            opacity: 1, 
-                            y: 0,
-                            transition: { duration: 0.3, delay: 0.4 + (idx * 0.02) }
-                          },
-                          hover: { 
-                            y: day.hasLogs || isSelected ? -2 : 0,
-                            boxShadow: day.hasLogs || isSelected ? "0 3px 6px rgba(0,0,0,0.1)" : "0 1px 2px rgba(0,0,0,0.1)",
-                            transition: { duration: 0.2 }
-                          },
-                          tap: { 
-                            y: -1,
-                            transition: { duration: 0.1 }
-                          }
-                        }}
-                        initial="initial"
-                        animate="animate"
-                        whileHover="hover"
-                        whileTap="tap"
-                        onClick={() => day.hasLogs && handleDateSelect(day.value)}
-                        disabled={!day.hasLogs && !isSelected}
-                        className={`px-2.5 py-1 rounded-lg flex-shrink-0 focus:outline-none text-xs min-w-[65px] h-7 flex flex-col justify-center items-center border transition-all duration-300 ${
-                          isSelected
-                            ? `text-white font-semibold shadow-md ${!day.hasLogs ? 'opacity-70' : ''}` + ` border-[#0113A3]`
-                            : day.hasLogs
-                            ? 'bg-white text-gray-700 border-gray-200 font-medium shadow-sm'
-                            : 'bg-gray-50 text-gray-400 line-through cursor-not-allowed border-gray-100 font-medium'
-                        }`}
-                        style={isSelected ? { backgroundColor: '#0113A3' } : {}}
-                      >
-                        <motion.div 
-                          className="text-center text-xs whitespace-nowrap font-medium"
-                          animate={isSelected ? {
-                            opacity: [0.8, 1, 0.8],
-                            transition: { duration: 2, repeat: Infinity, ease: "easeInOut" }
-                          } : {}}
-                        >
-                          {day.display}
-                        </motion.div>
-                      </motion.button>
-                    );
-                  })}
-                </motion.div>
-              </motion.div>
-            )}
           </motion.header>
 
         {/* 지도 영역 */}
@@ -3923,6 +3966,460 @@ export default function LogsPage() {
             </div>
           </motion.div>
       </motion.div>
+
+      {/* 플로팅 사이드바 토글 버튼 */}
+      <motion.button
+        initial={{ y: 100, opacity: 0, scale: 0.8 }}
+        animate={{ 
+          y: 0, 
+          opacity: 1, 
+          scale: 1,
+          transition: {
+            delay: 1.5,
+            type: "spring",
+            stiffness: 120,
+            damping: 25,
+            duration: 1.2
+          }
+        }}
+        whileHover={{ 
+          scale: 1.1,
+          y: -2,
+          transition: { duration: 0.2 }
+        }}
+        whileTap={{ scale: 0.9 }}
+        onClick={toggleSidebar}
+        className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
+        style={{
+          background: '#0113A3',
+          boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)'
+        }}
+      >
+        {isSidebarOpen ? (
+          // 닫기 아이콘 (X)
+          <svg className="w-6 h-6 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          // 그룹 멤버 아이콘 (채워진 스타일)
+          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
+          </svg>
+        )}
+        
+        {/* 알림 배지 (그룹멤버 수) */}
+        {groupMembers.length > 0 && !isSidebarOpen && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="absolute -top-1 -right-1 w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center"
+          >
+            <span className="text-xs font-bold text-white">{groupMembers.length}</span>
+          </motion.div>
+        )}
+        
+        {/* 펄스 효과 */}
+        {!isSidebarOpen && (
+          <motion.div
+            className="absolute inset-0 rounded-full"
+            style={{ background: '#0113A3' }}
+            animate={{
+              scale: [1, 1.4, 1],
+              opacity: [0.6, 0, 0.6]
+            }}
+            transition={{
+              duration: 2.5,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
+        )}
+      </motion.button>
+
+      {/* 사이드바 오버레이 */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            variants={sidebarOverlayVariants}
+            initial="closed"
+            animate="open"
+            exit="closed"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* 사이드바 */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            ref={sidebarRef}
+            variants={sidebarVariants}
+            initial="closed"
+            animate="open"
+            exit="closed"
+            className="fixed left-0 top-0 w-80 shadow-2xl border-r z-50 flex flex-col"
+            style={{ 
+              background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
+              borderColor: 'rgba(1, 19, 163, 0.1)',
+              bottom: '60px',
+              height: 'calc(100vh - 60px)'
+            }}
+          >
+            <motion.div
+              variants={sidebarContentVariants}
+              initial="closed"
+              animate="open"
+              exit="closed"
+              className="p-6 h-full flex flex-col relative z-10"
+            >
+              {/* 헤더 */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <motion.div 
+                    className="p-2 rounded-xl shadow-lg"
+                    style={{ backgroundColor: '#0113A3' }}
+                    whileHover={{ scale: 1.05, rotate: 5 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <FiUser className="w-5 h-5 text-white" />
+                  </motion.div>
+                  <div>
+                    <h2 className="text-xl font-bold bg-gray-900 bg-clip-text text-transparent">
+                      그룹 멤버
+                    </h2>
+                    <p className="text-sm text-gray-600">멤버를 선택해보세요</p>
+                  </div>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05, rotate: 90 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setIsSidebarOpen(false)}
+                  className="p-2 hover:bg-white/60 rounded-xl transition-all duration-200 backdrop-blur-sm"
+                >
+                  <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </motion.button>
+              </div>
+
+              {/* 그룹 목록 섹션 */}
+              <div className="mb-5">
+                <div className="flex items-center space-x-2 mb-3">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#0113A3' }}></div>
+                  <h3 className="text-base font-semibold text-gray-800">그룹 목록</h3>
+                </div>
+                
+                <div className="relative">
+                  <motion.button
+                    whileHover={{ scale: 1.02, y: -1 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsGroupSelectorOpen(!isGroupSelectorOpen);
+                    }}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-white/70 backdrop-blur-sm border rounded-xl text-sm font-medium hover:bg-white/90 hover:shadow-md transition-all duration-200"
+                    style={{ 
+                      borderColor: 'rgba(1, 19, 163, 0.2)',
+                      '--hover-border-color': 'rgba(1, 19, 163, 0.4)'
+                    } as React.CSSProperties}
+                    disabled={isUserDataLoading}
+                  >
+                    <span className="truncate text-gray-700">
+                      {isUserDataLoading 
+                        ? '로딩 중...' 
+                        : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
+                      }
+                    </span>
+                    <div className="ml-2 flex-shrink-0">
+                      {isUserDataLoading ? (
+                        <FiLoader className="animate-spin text-gray-400" size={14} />
+                      ) : (
+                        <motion.div
+                          animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <FiChevronDown className="text-gray-400" size={14} />
+                        </motion.div>
+                      )}
+                    </div>
+                  </motion.button>
+
+                  <AnimatePresence>
+                    {isGroupSelectorOpen && userGroups.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
+                      >
+                        {userGroups.map((group) => (
+                          <motion.button
+                            key={group.sgt_idx}
+                            whileHover={{ backgroundColor: "rgba(99, 102, 241, 0.05)" }}
+                            onClick={() => {
+                              if (selectedGroupId !== group.sgt_idx) {
+                                handleGroupSelect(group.sgt_idx);
+                              }
+                              setIsGroupSelectorOpen(false);
+                            }}
+                            className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
+                              selectedGroupId === group.sgt_idx
+                                ? 'font-medium'
+                                : 'text-gray-700'
+                            }`}
+                            style={selectedGroupId === group.sgt_idx ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' } : {}}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="font-medium truncate">
+                                  {group.sgt_title} ({groupMemberCounts[group.sgt_idx] || 0}명)
+                                </div>
+                              </div>
+                              {selectedGroupId === group.sgt_idx && (
+                                <svg className="w-3 h-3 flex-shrink-0" style={{ color: '#0113A3' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </motion.button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+                              </div>
+
+                {/* 날짜 선택 섹션 */}
+                <div className="border-b border-gray-100 pb-4 mb-4">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
+                    <h3 className="text-base font-semibold text-gray-800">날짜 선택</h3>
+                    <div className="flex-1 h-px bg-gradient-to-r from-blue-200/50 to-transparent"></div>
+                    <span className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-full backdrop-blur-sm">
+                      {(() => {
+                        const recentDays = getRecentDays();
+                        const daysWithLogs = recentDays.filter(day => day.hasLogs).length;
+                        return `${daysWithLogs}일 기록`;
+                      })()}
+                    </span>
+                  </div>
+                  
+                  <div 
+                    ref={dateScrollContainerRef} 
+                    className="flex space-x-2 overflow-x-auto hide-scrollbar pb-2"
+                    style={{ scrollBehavior: 'auto' }}
+                  >
+                    {getRecentDays().map((day, idx) => {
+                      const isSelected = selectedDate === day.value;
+                      const isToday = idx === getRecentDays().length - 1;
+
+                      return (
+                        <motion.button 
+                          key={idx} 
+                          whileHover={{ 
+                            y: day.hasLogs || isSelected ? -2 : 0,
+                            scale: day.hasLogs || isSelected ? 1.05 : 1,
+                            transition: { duration: 0.2 }
+                          }}
+                          whileTap={{ 
+                            y: -1,
+                            scale: 0.95,
+                            transition: { duration: 0.1 }
+                          }}
+                          onClick={() => day.hasLogs && handleDateSelect(day.value)}
+                          disabled={!day.hasLogs && !isSelected}
+                          className={`px-3 py-2 rounded-xl flex-shrink-0 focus:outline-none text-xs min-w-[70px] h-10 flex flex-col justify-center items-center border transition-all duration-300 backdrop-blur-sm ${
+                            isSelected
+                              ? `text-white font-semibold shadow-lg ${!day.hasLogs ? 'opacity-70' : ''}` 
+                              : day.hasLogs
+                              ? 'bg-white/80 text-gray-700 border-gray-200 font-medium shadow-sm hover:bg-white hover:shadow-md'
+                              : 'bg-gray-50/50 text-gray-400 line-through cursor-not-allowed border-gray-100 font-medium'
+                          }`}
+                          style={isSelected 
+                            ? { 
+                                backgroundColor: '#0113A3', 
+                                borderColor: '#0113A3',
+                                boxShadow: '0 4px 12px rgba(1, 19, 163, 0.25)'
+                              } 
+                            : {}
+                          }
+                        >
+                          <div className="text-center text-xs whitespace-nowrap font-medium">
+                            {day.display}
+                          </div>
+                          {isSelected && (
+                            <motion.div 
+                              className="w-1 h-1 bg-white rounded-full mt-1"
+                              animate={{
+                                opacity: [0.5, 1, 0.5],
+                                scale: [0.8, 1.2, 0.8],
+                              }}
+                              transition={{ 
+                                duration: 2, 
+                                repeat: Infinity, 
+                                ease: "easeInOut" 
+                              }}
+                            />
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 멤버 목록 */}
+              <div className="flex-1 min-h-0">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
+                  <h3 className="text-base font-semibold text-gray-800">멤버 목록</h3>
+                  <div className="flex-1 h-px bg-gradient-to-r from-emerald-200/50 to-transparent"></div>
+                  <span className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-full backdrop-blur-sm">
+                    {groupMembers.length}명
+                  </span>
+                </div>
+                <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-16">
+                  {groupMembers.length > 0 ? (
+                    <motion.div variants={sidebarContentVariants} className="space-y-2">
+                      {groupMembers.map((member, index) => (
+                        <motion.div
+                          key={member.id}
+                          variants={memberItemVariants}
+                          whileHover={{ scale: 1.02, x: 3 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            handleMemberSelect(member.id);
+                            // 사이드바는 닫지 않고 유지하여 장소 리스트를 볼 수 있도록 함
+                          }}
+                          className={`p-4 rounded-xl cursor-pointer transition-all duration-300 backdrop-blur-sm ${
+                            member.isSelected 
+                              ? 'border-2 shadow-lg' 
+                              : 'bg-white/60 hover:bg-white/90 border hover:shadow-md'
+                          }`}
+                          style={member.isSelected 
+                            ? { 
+                                background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.8), rgba(253, 244, 255, 0.8))',
+                                borderColor: 'rgba(1, 19, 163, 0.3)',
+                                boxShadow: '0 10px 25px rgba(1, 19, 163, 0.1)'
+                              }
+                            : { 
+                                borderColor: 'rgba(1, 19, 163, 0.1)'
+                              }
+                          }
+                        >
+                          <div className="flex items-center space-x-4">
+                            <div className="relative">
+                              <motion.div 
+                                className={`w-12 h-12 rounded-full overflow-hidden ${
+                                  member.isSelected 
+                                    ? 'ring-3 shadow-lg' 
+                                    : 'ring-2 ring-white/50'
+                                }`}
+                                style={member.isSelected 
+                                  ? { 
+                                      '--tw-ring-color': 'rgba(1, 19, 163, 0.3)',
+                                      boxShadow: '0 10px 25px rgba(1, 19, 163, 0.2)'
+                                    } as React.CSSProperties
+                                  : {}
+                                }
+                                whileHover={{ scale: 1.1, rotate: 5 }}
+                                transition={{ type: "spring", stiffness: 300 }}
+                              >
+                                <img 
+                                  src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}
+                                  alt={member.name} 
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
+                                    target.src = defaultImg;
+                                  }}
+                                />
+                              </motion.div>
+                              
+                              {/* 리더/오너 왕관 표시 */}
+                              {member.sgdt_owner_chk === 'Y' && (
+                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg">
+                                  <FaCrown className="w-2.5 h-2.5 text-white" />
+                                </div>
+                              )}
+                              {member.sgdt_owner_chk !== 'Y' && member.sgdt_leader_chk === 'Y' && (
+                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center shadow-lg">
+                                  <FaCrown className="w-2.5 h-2.5 text-white" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between">
+                                <h4 className={`font-normal text-sm ${member.isSelected ? 'text-gray-900' : 'text-gray-900'} truncate`}>
+                                  {member.name}
+                                </h4>
+                                {/* 활동 로그 표시 */}
+                                <div className="flex items-center space-x-1">
+                                  <span className="text-xs text-gray-500">📊</span>
+                                  <span className={`text-xs font-normal ${
+                                    member.isSelected ? 'text-gray-700' : 'text-gray-700'
+                                  }`}>
+                                    활동로그
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {/* 2주간 로그 분포 시각화 */}
+                              <div className="mt-2">
+                                <div className="flex items-center space-x-1 mb-1">
+                                  <span className="text-xs text-gray-400">2주간 활동</span>
+                                  <div className="flex-1 h-px bg-gray-200"></div>
+                                </div>
+                                <div className="grid grid-cols-14 gap-1">
+                                  {(memberLogDistribution[member.id] || Array(14).fill(false)).map((hasLog, dayIndex) => (
+                                    <div
+                                      key={dayIndex}
+                                      className={`w-2 h-2 rounded-full text-center flex items-center justify-center transition-all duration-200 ${
+                                        hasLog 
+                                          ? 'bg-green-400 text-white' 
+                                          : 'bg-gray-200 text-gray-400'
+                                      }`}
+                                      title={(() => {
+                                        const date = new Date();
+                                        date.setDate(date.getDate() - (13 - dayIndex));
+                                        return `${format(date, 'MM.dd')} - ${hasLog ? '활동 있음' : '활동 없음'}`;
+                                      })()}
+                                    >
+                                      <span className="text-xs font-bold" style={{ fontSize: '6px' }}>
+                                        {hasLog ? '✓' : '✗'}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                                  <span>2주전</span>
+                                  <span>오늘</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <FiUser className="w-6 h-6 text-gray-400" />
+                      </div>
+                      <p className="text-gray-500 font-medium text-sm">그룹 멤버가 없습니다</p>
+                      <p className="text-xs text-gray-400 mt-1">그룹을 선택하거나 멤버를 초대해보세요</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 } 
