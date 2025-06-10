@@ -2911,6 +2911,8 @@ export default function LogsPage() {
             }
             
             console.log('[LOGS] 날짜별 활동 로그 API 호출 완료');
+            
+
           }
         }
 
@@ -3051,6 +3053,50 @@ export default function LogsPage() {
       loadLocationData(parseInt(selectedMember.id), selectedDate);
     }
   }, [groupMembers.map(m => m.isSelected).join(',')]);
+
+  // dailyCountsData가 로드된 후 데이터가 있는 가장 최근 날짜를 자동 선택
+  useEffect(() => {
+    if (dailyCountsData && groupMembers.length > 0) {
+      const selectedMember = groupMembers.find(m => m.isSelected);
+      if (selectedMember) {
+        const recentDays = Array.from({ length: 15 }, (_, i) => {
+          const date = subDays(new Date(), 14 - i);
+          return format(date, 'yyyy-MM-dd');
+        });
+        
+        // 최근 날짜부터 역순으로 확인하여 데이터가 있는 날짜 찾기
+        for (let i = recentDays.length - 1; i >= 0; i--) {
+          const dateString = recentDays[i];
+          const memberMtIdx = parseInt(selectedMember.id);
+          const memberData = dailyCountsData.member_daily_counts.find(
+            member => member.member_id === memberMtIdx
+          );
+          
+          if (memberData) {
+            const shortDateString = format(new Date(dateString), 'MM.dd');
+            const dayData = memberData.daily_counts.find(
+              day => day.formatted_date === shortDateString || day.formatted_date === dateString
+            );
+            
+            if (dayData && dayData.count > 0) {
+              console.log(`[LOGS] 데이터가 있는 날짜 자동 선택: ${dateString} (${dayData.count}건)`);
+              setSelectedDate(dateString);
+              break;
+            }
+          }
+        }
+      }
+    }
+  }, [dailyCountsData, groupMembers]);
+
+  // selectedDate가 변경될 때 위치 데이터 자동 로드
+  useEffect(() => {
+    const selectedMember = groupMembers.find(m => m.isSelected);
+    if (selectedMember && selectedDate && !loadLocationDataExecutingRef.current.executing) {
+      console.log('[LOGS] 선택된 날짜 변경 감지 - 위치 데이터 로드:', selectedMember.name, selectedDate);
+      loadLocationData(parseInt(selectedMember.id), selectedDate);
+    }
+  }, [selectedDate]);
 
   // --- 새로운 통합 지도 렌더링 함수 ---
   const renderLocationDataOnMap = async (locationMarkersData: MapMarker[], stayTimesData: StayTime[], locationLogSummaryData: LocationLogSummary | null, groupMembers: GroupMember[], mapInstance: any) => {
