@@ -69,43 +69,54 @@ export async function GET(
     const { searchParams: errorSearchParams } = new URL(request.url);
     const errorDate = errorSearchParams.get('date') || '2025-06-04';
 
+    // 더 많은 모의 데이터 생성 (특히 2025-06-09에 대해)
+    const mockMarkers = [];
+    const baseTime = new Date(`${errorDate} 09:00:00`);
+    const markerCount = errorDate === '2025-06-09' ? 50 : 10; // 06-09는 50개, 다른 날은 10개
+    
+    for (let i = 0; i < markerCount; i++) {
+      const timeOffset = i * 10; // 10분 간격
+      const currentTime = new Date(baseTime.getTime() + timeOffset * 60 * 1000);
+      const timeString = currentTime.toISOString().slice(0, 19).replace('T', ' ');
+      
+      // 서울 시내 위치들 (강남, 홍대, 명동 등)
+      const locations = [
+        { lat: 37.5665, lng: 126.9780 }, // 서울역
+        { lat: 37.5173, lng: 127.0473 }, // 강남역
+        { lat: 37.5563, lng: 126.9723 }, // 명동
+        { lat: 37.5563, lng: 126.9229 }, // 홍대
+        { lat: 37.5447, lng: 127.0557 }, // 역삼역
+        { lat: 37.5015, lng: 127.0395 }, // 교대역
+        { lat: 37.5270, lng: 127.0276 }, // 잠실역
+        { lat: 37.5208, lng: 126.9240 }, // 여의도
+      ];
+      
+      const randomLocation = locations[i % locations.length];
+      const latVariation = (Math.random() - 0.5) * 0.01; // ±0.005도 변화
+      const lngVariation = (Math.random() - 0.5) * 0.01;
+      
+      mockMarkers.push({
+        mlt_idx: i + 1,
+        mt_idx: parseInt(mt_idx),
+        mlt_gps_time: timeString,
+        mlt_speed: Math.random() * 5 + 1, // 1-6 km/h
+        mlt_lat: randomLocation.lat + latVariation,
+        mlt_long: randomLocation.lng + lngVariation,
+        mlt_accuacy: Math.random() * 20 + 10, // 10-30m
+        mt_health_work: 0,
+        mlt_battery: Math.floor(Math.random() * 30 + 70), // 70-100%
+        mlt_fine_location: 'Y',
+        mlt_location_chk: 'Y',
+        mlt_wdate: timeString,
+        stay_lat: null,
+        stay_long: null
+      });
+    }
+
     const mockData = {
       result: "Y",
-      data: [
-        {
-          mlt_idx: 1,
-          mt_idx: parseInt(mt_idx),
-          mlt_gps_time: `${errorDate} 09:30:00`,
-          mlt_speed: 2.5,
-          mlt_lat: 37.5665,
-          mlt_long: 126.9780,
-          mlt_accuacy: 15.0,
-          mt_health_work: 0,
-          mlt_battery: 85,
-          mlt_fine_location: 'Y',
-          mlt_location_chk: 'Y',
-          mlt_wdate: `${errorDate} 09:30:00`,
-          stay_lat: null,
-          stay_long: null
-        },
-        {
-          mlt_idx: 2,
-          mt_idx: parseInt(mt_idx),
-          mlt_gps_time: `${errorDate} 10:15:00`,
-          mlt_speed: 1.8,
-          mlt_lat: 37.5670,
-          mlt_long: 126.9785,
-          mlt_accuacy: 12.0,
-          mt_health_work: 0,
-          mlt_battery: 82,
-          mlt_fine_location: 'Y',
-          mlt_location_chk: 'Y',
-          mlt_wdate: `${errorDate} 10:15:00`,
-          stay_lat: null,
-          stay_long: null
-        }
-      ],
-      total_markers: 2
+      data: mockMarkers,
+      total_markers: mockMarkers.length
     };
 
     console.log('[API] 백엔드 연결 실패, 모의 데이터 반환');

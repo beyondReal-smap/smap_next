@@ -590,6 +590,7 @@ export default function LogsPage() {
   // 사이드바 날짜 스크롤 관련 상태 추가
   const sidebarDateX = useMotionValue(0); // 사이드바 날짜 선택용 motionValue
   const sidebarDraggingRef = useRef(false); // 사이드바 드래그용 ref
+  const lastScrolledIndexRef = useRef<number>(-1); // 마지막으로 스크롤한 날짜 인덱스 추적
   
   // activeLogView 변경 시 스와이프 컨테이너 스크롤 위치 조정 (초기 로드 시는 제외)
   useEffect(() => {
@@ -819,8 +820,17 @@ export default function LogsPage() {
   }, [naverMapsLoaded, groupMembers]);
 
   const getRecentDays = useCallback(() => {
-    const recentDays = Array.from({ length: 15 }, (_, i) => { // 오늘부터 14일전까지 (오늘 포함 15일)
-      const date = subDays(new Date(), 14 - i);
+    // 디버깅용 로그 추가
+    const today = new Date();
+    const todayString = format(today, 'yyyy-MM-dd');
+    
+    if (!window.getRecentDaysDebugLogged) {
+      console.log(`[getRecentDays] 오늘 날짜: ${todayString}, 선택된 날짜: ${selectedDate}`);
+      window.getRecentDaysDebugLogged = true;
+    }
+    
+    const recentDays = Array.from({ length: 14 }, (_, i) => { // 오늘부터 13일전까지 (오늘 포함 14일)
+      const date = subDays(new Date(), 13 - i);
       const dateString = format(date, 'yyyy-MM-dd');
       
       // 선택된 멤버 찾기
@@ -857,9 +867,9 @@ export default function LogsPage() {
       
       let displayString = format(date, 'MM.dd(E)', { locale: ko }); // 예: "05.07(수)"
       
-      if (i === 14) {
+      if (i === 13) {
         displayString = `오늘(${format(date, 'E', { locale: ko })})`;
-      } else if (i === 13) {
+      } else if (i === 12) {
         displayString = `어제(${format(date, 'E', { locale: ko })})`;
       } 
 
@@ -870,6 +880,17 @@ export default function LogsPage() {
         count: dayCount,
       };
     });
+    
+    // 디버깅용: 생성된 날짜 범위와 선택된 날짜 포함 여부 확인
+    if (!window.getRecentDaysDebugLogged) {
+      const dateRange = recentDays.map(day => day.value);
+      const isSelectedDateInRange = dateRange.includes(selectedDate);
+      console.log(`[getRecentDays] 생성된 날짜 범위:`, dateRange);
+      console.log(`[getRecentDays] 선택된 날짜 ${selectedDate}가 범위에 포함됨:`, isSelectedDateInRange);
+      if (!isSelectedDateInRange) {
+        console.log(`[getRecentDays] ⚠️ 선택된 날짜가 네모 캘린더 범위를 벗어남!`);
+      }
+    }
     
     return recentDays;
   }, [groupMembers, dailyCountsData]);
@@ -1639,7 +1660,15 @@ export default function LogsPage() {
 
   const handleDateSelect = (date: string) => {
     console.log('[LOGS] ===== 날짜 선택 시작 =====');
+    console.log('[LOGS] 호출자:', new Error().stack?.split('\n')[1]); // 호출 경로 추적
     console.log('[LOGS] 새 날짜:', date, '현재 날짜:', selectedDate);
+    console.log('[LOGS] 날짜 비교:', { 
+      newDate: date, 
+      currentDate: selectedDate, 
+      areEqual: selectedDate === date,
+      newDateType: typeof date,
+      currentDateType: typeof selectedDate
+    });
     
     // 같은 날짜를 재선택한 경우 무시
     if (selectedDate === date) {
@@ -1879,10 +1908,14 @@ export default function LogsPage() {
 
   // 위치 로그 데이터 로딩 함수 (새로운 3개 API 포함)
   const loadLocationData = async (mtIdx: number, date: string) => {
+    console.log(`[loadLocationData] 🎯 함수 호출됨: mtIdx=${mtIdx}, date=${date}`);
+    
     if (!mtIdx || !date || !map.current) {
-      console.log('[loadLocationData] mtIdx, date 또는 map이 없어 실행하지 않음:', { mtIdx, date, mapReady: !!map.current });
+      console.log('[loadLocationData] ❌ 필수 조건 미충족 - 실행 중단:', { mtIdx, date, mapReady: !!map.current });
       return;
     }
+    
+    console.log(`[loadLocationData] ✅ 필수 조건 충족 - 위치 데이터 로딩 시작`);
 
     // 캐시에서 먼저 확인
     if (selectedGroupId) {
@@ -1922,10 +1955,20 @@ export default function LogsPage() {
     const executionKey = `${mtIdx}-${date}`;
     const currentTime = Date.now();
     
-    // 이전 요청이 있으면 취소
+    // 동일한 요청이 이미 실행 중인 경우 건너뛰기
+    if (loadLocationDataExecutingRef.current.executing && loadLocationDataExecutingRef.current.currentRequest === executionKey) {
+      console.log(`[loadLocationData] 🔄 동일한 요청이 이미 실행 중 - 건너뛰기: ${executionKey}`);
+      return;
+    }
+    
+    // 모든 이전 요청 강제 완료 처리 (취소가 아닌 완료)
     if (loadLocationDataExecutingRef.current.executing) {
-      console.log(`[loadLocationData] 이전 요청 취소: ${loadLocationDataExecutingRef.current.currentRequest}`);
-      loadLocationDataExecutingRef.current.cancelled = true;
+      console.log(`[loadLocationData] 🛑 이전 요청 강제 완료 처리: ${loadLocationDataExecutingRef.current.currentRequest}`);
+      loadLocationDataExecutingRef.current.executing = false;
+      loadLocationDataExecutingRef.current.cancelled = false;
+      loadLocationDataExecutingRef.current.currentRequest = undefined;
+      // 잠시 대기
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
     
     // 새로운 요청 시작
@@ -1933,7 +1976,7 @@ export default function LogsPage() {
     loadLocationDataExecutingRef.current.currentRequest = executionKey;
     loadLocationDataExecutingRef.current.lastExecution = currentTime;
     loadLocationDataExecutingRef.current.cancelled = false; // 새로운 요청이므로 false로 설정
-    console.log(`[loadLocationData] 실행 시작: ${executionKey}-${currentTime}`);
+    console.log(`[loadLocationData] 🚀 실행 시작: ${executionKey}-${currentTime}`);
 
     // 로딩 상태는 handleMemberSelect에서 이미 설정되었으므로 여기서는 설정하지 않음
     console.log('[loadLocationData] 위치 데이터 로딩 시작:', { mtIdx, date });
@@ -1949,11 +1992,12 @@ export default function LogsPage() {
         memberLocationLogService.getLocationLogSummary(mtIdx, date) // UI 표시용 (PHP 로직)
       ]);
 
-      // 요청이 취소되었는지 다시 확인
-      if (loadLocationDataExecutingRef.current.cancelled) {
-        console.log(`[loadLocationData] 요청이 취소됨 - 결과 무시: ${executionKey}`);
-        return;
-      }
+      // 요청이 취소되었는지 다시 확인 - 비활성화 (항상 결과 사용)
+      // if (loadLocationDataExecutingRef.current.cancelled) {
+      //   console.log(`[loadLocationData] 요청이 취소됨 - 결과 무시: ${executionKey}`);
+      //   return;
+      // }
+      console.log(`[loadLocationData] ✅ API 응답 완료 - 결과 처리 시작: ${executionKey}`);
 
       console.log('[loadLocationData] 모든 API 응답 수신 완료');
       
@@ -2043,23 +2087,18 @@ export default function LogsPage() {
        }
 
     } finally {
-      // 현재 요청이 취소되지 않은 경우에만 상태 정리
-      if (!loadLocationDataExecutingRef.current.cancelled) {
-        setIsLocationDataLoading(false); // 로딩 상태 종료
-        loadLocationDataExecutingRef.current.executing = false;
-        loadLocationDataExecutingRef.current.currentRequest = undefined;
-        console.log(`[loadLocationData] 모든 처리 및 실행 완료: ${executionKey}-${currentTime}`);
-      } else {
-        console.log(`[loadLocationData] 취소된 요청 정리 완료: ${executionKey}-${currentTime}`);
-        // 취소된 요청이라도 executing은 false로 설정하여 다음 요청이 진행될 수 있도록 함
-        loadLocationDataExecutingRef.current.executing = false;
-        setIsLocationDataLoading(false); // 취소 시에도 로딩 상태 종료
-       }
-       // 날짜 변경 플래그 리셋 (loadLocationData 완료 시점에 리셋)
-       if (isDateChangingRef.current) {
-         isDateChangingRef.current = false;
-         console.log('[loadLocationData] 날짜 변경 플래그 리셋');
-       }
+      // 항상 상태 정리 (취소 로직 제거)
+      setIsLocationDataLoading(false); // 로딩 상태 종료
+      loadLocationDataExecutingRef.current.executing = false;
+      loadLocationDataExecutingRef.current.currentRequest = undefined;
+      loadLocationDataExecutingRef.current.cancelled = false; // 항상 false로 리셋
+      console.log(`[loadLocationData] 🎉 모든 처리 및 실행 완료: ${executionKey}-${currentTime}`);
+      
+      // 날짜 변경 플래그 리셋 (loadLocationData 완료 시점에 리셋)
+      if (isDateChangingRef.current) {
+        isDateChangingRef.current = false;
+        console.log('[loadLocationData] 날짜 변경 플래그 리셋');
+      }
     }
   };
 
@@ -2831,6 +2870,102 @@ export default function LogsPage() {
     }
   };
 
+  // 특정 날짜로 스크롤하는 함수 (사이드바 Motion 기반)
+  const scrollToSelectedDate = (targetDate: string, reason?: string) => {
+    // 사이드바가 열려있고 Motion 날짜 선택기가 있는 경우
+    if (isSidebarOpen && sidebarDateX) {
+      const recentDays = getRecentDays();
+      const targetIndex = recentDays.findIndex(day => day.value === targetDate);
+      const currentIndex = recentDays.findIndex(day => day.value === selectedDate);
+      
+      if (targetIndex !== -1) {
+        // 🎯 개선된 스마트 스크롤 로직: 누적 이동 거리 고려
+        const isAdjacentDate = Math.abs(targetIndex - currentIndex) <= 1;
+        const lastScrolledIndex = lastScrolledIndexRef.current;
+        
+        // 마지막 스크롤 위치로부터의 누적 거리 계산
+        const cumulativeDistance = lastScrolledIndex !== -1 ? Math.abs(targetIndex - lastScrolledIndex) : 0;
+        const shouldForceScroll = cumulativeDistance >= 1.5; // 3칸 이상 벗어나면 강제 스크롤
+        
+        const shouldSkipScroll = isAdjacentDate && currentIndex !== -1 && !shouldForceScroll;
+        
+        if (shouldSkipScroll) {
+          console.log('[날짜 스크롤] 인접한 날짜 - 스크롤 생략:', {
+            targetDate,
+            currentDate: selectedDate,
+            targetIndex,
+            currentIndex,
+            lastScrolledIndex,
+            cumulativeDistance,
+            distance: Math.abs(targetIndex - currentIndex)
+          });
+        } else {
+          // 각 버튼의 너비 + gap을 고려하여 위치 계산
+          const buttonWidth = 85; // min-w-[80px] + gap
+          const containerWidth = 200; // 사이드바 날짜 컨테이너 너비
+          const totalWidth = recentDays.length * buttonWidth;
+          const targetPosition = buttonWidth * targetIndex;
+          
+          // 중앙 정렬을 위한 오프셋 계산
+          const centerOffset = containerWidth / 2 - buttonWidth / 2;
+          let finalPosition = -(targetPosition - centerOffset);
+          
+          // 경계 값 체크
+          const maxScroll = Math.max(0, totalWidth - containerWidth);
+          finalPosition = Math.max(-maxScroll, Math.min(0, finalPosition));
+          
+          // Motion Value로 부드러운 이동
+          sidebarDateX.set(finalPosition);
+          
+          // 스크롤 실행 시 마지막 스크롤 위치 업데이트
+          lastScrolledIndexRef.current = targetIndex;
+          
+          console.log('[날짜 스크롤] 사이드바 날짜로 이동 완료:', targetDate, reason ? `(${reason})` : '', { 
+            targetIndex, 
+            currentIndex,
+            lastScrolledIndex,
+            cumulativeDistance,
+            finalPosition,
+            distance: Math.abs(targetIndex - currentIndex),
+            shouldForceScroll
+          });
+        }
+        
+        // 선택된 날짜 버튼에 고급스러운 시각적 강조 효과 추가 (항상 실행)
+        const effectDelay = shouldSkipScroll ? 50 : 300; // 인접한 날짜는 즉시 강조
+        setTimeout(() => {
+          if (dateScrollContainerRef.current) {
+            const buttons = dateScrollContainerRef.current.querySelectorAll('button');
+            const targetButton = buttons[targetIndex];
+            if (targetButton) {
+              targetButton.style.transform = 'scale(1.08) translateY(-2px)';
+              targetButton.style.boxShadow = '0 12px 35px -8px rgba(1, 19, 163, 0.35), 0 0 0 3px rgba(1, 19, 163, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15)';
+              targetButton.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+              targetButton.style.filter = 'brightness(1.1) saturate(1.2)';
+              
+              setTimeout(() => {
+                targetButton.style.transform = '';
+                targetButton.style.boxShadow = '';
+                targetButton.style.transition = 'all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                targetButton.style.filter = '';
+                
+                // 트랜지션 완료 후 초기화
+                setTimeout(() => {
+                  targetButton.style.transition = '';
+                }, 400);
+              }, 600);
+            }
+          }
+        }, effectDelay);
+        
+      } else {
+        console.log('[날짜 스크롤] 날짜를 찾을 수 없음:', targetDate);
+      }
+    } else {
+      console.log('[날짜 스크롤] 사이드바가 닫혀있거나 Motion 객체가 없음');
+    }
+  };
+
   // 날짜 버튼 초기 스크롤 위치 설정 (초기 로드 시에만)
   const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
   const scrollExecutedRef = useRef(false);
@@ -3016,18 +3151,11 @@ export default function LogsPage() {
               });
               setGroupMembers(currentMembers);
 
-              // 첫 번째 멤버의 오늘 날짜 데이터 기반 통합 지도 설정
+              // 첫 번째 멤버의 데이터 기반 통합 지도 설정 - 자동 날짜 선택 후 처리됨
               if (currentMembers.length > 0 && map.current) {
                 const firstMember = currentMembers[0];
                 console.log('[LOGS] 첫 번째 멤버로 통합 지도 설정 시작:', firstMember.name);
-                
-                setTimeout(async () => {
-                  if (map.current && currentMembers.length > 0) {
-                    const today = format(new Date(), 'yyyy-MM-dd');
-                    await loadLocationDataWithMapPreset(parseInt(firstMember.id), today, firstMember, true);
-                    console.log('[LOGS] 첫 번째 멤버 기반 통합 지도 설정 완료');
-                  }
-                }, 200); // 지도 완전 초기화 대기
+                // 자동 날짜 선택 로직이 데이터가 있는 날짜를 찾아서 위치 데이터를 로딩할 예정
               }
             } else {
               console.warn('❌ No member data from API, or API call failed.');
@@ -3035,11 +3163,14 @@ export default function LogsPage() {
             } 
             dataFetchedRef.current.members = true;
 
-            // 그룹 멤버 조회 완료 후 날짜별 활동 로그 관련 API 호출
+            // 그룹 멤버 조회 완료 후 날짜별 활동 로그 관련 API 호출 (병렬 처리)
             console.log('[LOGS] 그룹 멤버 조회 완료 - 날짜별 활동 로그 API 호출 시작');
             
-            // 1. 최근 14일간 일별 카운트 조회 (캐시 우선)
+            // 1, 2번을 병렬로 실행하여 성능 최적화
             if (isMounted) {
+              const promises = [];
+              
+              // 1. 최근 14일간 일별 카운트 조회 (캐시 우선)
               const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
               const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
               
@@ -3048,13 +3179,18 @@ export default function LogsPage() {
                 setDailyCountsData(cachedCounts);
               } else {
                 console.log('[LOGS] 캐시 미스 - API에서 일별 카운트 데이터 조회');
-                await loadDailyLocationCounts(selectedGroupId, 14);
+                promises.push(loadDailyLocationCounts(selectedGroupId, 14));
               }
-            }
-            
-            // 2. 현재 선택된 날짜의 멤버 활동 조회
-            if (isMounted && selectedDate) {
-              await loadMemberActivityByDate(selectedGroupId, selectedDate);
+              
+              // 2. 현재 선택된 날짜의 멤버 활동 조회
+              if (selectedDate) {
+                promises.push(loadMemberActivityByDate(selectedGroupId, selectedDate));
+              }
+              
+              // 병렬 실행
+              if (promises.length > 0) {
+                await Promise.all(promises);
+              }
             }
             
             console.log('[LOGS] 날짜별 활동 로그 API 호출 완료');
@@ -3194,7 +3330,14 @@ export default function LogsPage() {
       
       // 오늘이 맨 오른쪽에 있으므로 최대한 왼쪽으로 스크롤
       sidebarDateX.set(-maxScroll);
-      console.log('[사이드바 날짜] 오늘 날짜로 스크롤 완료', { totalWidth, containerWidth, maxScroll });
+      
+      // 오늘 날짜 인덱스를 마지막 스크롤 위치로 설정
+      const todayIndex = recentDays.findIndex(day => day.value === format(new Date(), 'yyyy-MM-dd'));
+      if (todayIndex !== -1) {
+        lastScrolledIndexRef.current = todayIndex;
+      }
+      
+      console.log('[사이드바 날짜] 오늘 날짜로 스크롤 완료', { totalWidth, containerWidth, maxScroll, todayIndex });
     }
   };
 
@@ -3242,17 +3385,14 @@ export default function LogsPage() {
   // 첫번째 멤버 자동 선택 및 위치 데이터 로딩 - 메인 인스턴스에서만
   // 첫번째 멤버 자동 선택 - 위의 통합 useEffect에서 처리하므로 제거
 
-  // 선택된 멤버가 변경될 때 위치 데이터 자동 로드
-  useEffect(() => {
-    const selectedMember = groupMembers.find(m => m.isSelected);
-    if (selectedMember && selectedDate && !loadLocationDataExecutingRef.current.executing) {
-      console.log('[LOGS] 선택된 멤버 변경 감지 - 위치 데이터 로드:', selectedMember.name, selectedDate);
-      
-      // useEffect에서 자동 로드되는 경우에는 로딩 상태를 표시하지 않음 (사용자가 직접 선택한 것이 아니므로)
-      // setIsLocationDataLoading(true);
-      loadLocationData(parseInt(selectedMember.id), selectedDate);
-    }
-  }, [groupMembers.map(m => m.isSelected).join(',')]);
+  // 선택된 멤버가 변경될 때 위치 데이터 자동 로드 - 비활성화 (중복 호출 방지)
+  // useEffect(() => {
+  //   const selectedMember = groupMembers.find(m => m.isSelected);
+  //   if (selectedMember && selectedDate && !loadLocationDataExecutingRef.current.executing) {
+  //     console.log('[LOGS] 선택된 멤버 변경 감지 - 위치 데이터 로드:', selectedMember.name, selectedDate);
+  //     loadLocationData(parseInt(selectedMember.id), selectedDate);
+  //   }
+  // }, [groupMembers.map(m => m.isSelected).join(',')]);
 
   // dailyCountsData가 로드된 후 데이터가 있는 가장 최근 날짜를 자동 선택
   useEffect(() => {
@@ -3279,8 +3419,30 @@ export default function LogsPage() {
             );
             
             if (dayData && dayData.count > 0) {
-              console.log(`[LOGS] 데이터가 있는 날짜 자동 선택: ${dateString} (${dayData.count}건)`);
+              console.log(`[LOGS] ✅ 데이터가 있는 날짜 자동 선택: ${dateString} (${dayData.count}건)`);
+              console.log(`[LOGS] 🔄 selectedDate 상태 변경: ${selectedDate} → ${dateString}`);
               setSelectedDate(dateString);
+              
+              // 즉시 위치 데이터 로딩 트리거 (단일 호출)
+              setTimeout(async () => {
+                const mtIdx = parseInt(selectedMember.id);
+                console.log(`[LOGS] 🚀 자동 선택된 날짜의 위치 데이터 즉시 로딩 시작`);
+                console.log(`[LOGS] 📋 로딩 파라미터: 멤버=${selectedMember.name}(${mtIdx}), 날짜=${dateString}`);
+                
+                // 실행 상태 완전 리셋
+                loadLocationDataExecutingRef.current.executing = false;
+                loadLocationDataExecutingRef.current.cancelled = false;
+                loadLocationDataExecutingRef.current.currentRequest = undefined;
+                
+                // API 호출 전 상태 확인
+                console.log(`[LOGS] 🔍 API 호출 직전 상태 확인:`);
+                console.log(`[LOGS] - selectedMember: ${selectedMember.name} (ID: ${mtIdx})`);
+                console.log(`[LOGS] - selectedDate: ${selectedDate} → ${dateString}`);
+                console.log(`[LOGS] - selectedGroupId: ${selectedGroupId}`);
+                
+                await loadLocationData(mtIdx, dateString);
+              }, 300);
+              
               break;
             }
           }
@@ -3289,14 +3451,13 @@ export default function LogsPage() {
     }
   }, [dailyCountsData, groupMembers]);
 
-  // selectedDate가 변경될 때 위치 데이터 자동 로드
-  useEffect(() => {
-    const selectedMember = groupMembers.find(m => m.isSelected);
-    if (selectedMember && selectedDate && !loadLocationDataExecutingRef.current.executing) {
-      console.log('[LOGS] 선택된 날짜 변경 감지 - 위치 데이터 로드:', selectedMember.name, selectedDate);
-      loadLocationData(parseInt(selectedMember.id), selectedDate);
-    }
-  }, [selectedDate]);
+    // selectedDate가 변경될 때 위치 데이터 자동 로드 (자동 선택 후 보조 로직) - 비활성화
+  // useEffect(() => {
+  //   const selectedMember = groupMembers.find(m => m.isSelected);
+  //   if (selectedMember && selectedDate && groupMembers.length > 0) {
+  //     console.log('[LOGS] selectedDate useEffect - 보조 로딩 비활성화됨');
+  //   }
+  // }, [selectedDate]);
 
   // --- 새로운 통합 지도 렌더링 함수 ---
   const renderLocationDataOnMap = async (locationMarkersData: MapMarker[], stayTimesData: StayTime[], locationLogSummaryData: LocationLogSummary | null, groupMembers: GroupMember[], mapInstance: any) => {
@@ -4245,6 +4406,7 @@ export default function LogsPage() {
                   </div>
                   <div className="relative overflow-hidden rounded-xl bg-white/60 backdrop-blur-sm p-3 border" style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}>
                     <motion.div
+                      ref={dateScrollContainerRef}
                       className="flex space-x-2 cursor-grab active:cursor-grabbing"
                       style={{ 
                         x: sidebarDateX,
@@ -4330,7 +4492,7 @@ export default function LogsPage() {
                             }
                           }}
                           data-calendar-swipe="true"
-                          className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-normal transition-all duration-300 min-w-[75px] focus:outline-none ${
+                          className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-normal transition-all duration-300 min-w-[80px] focus:outline-none ${
                             selectedDate === day.value
                               ? 'text-white shadow-lg scale-105'
                               : day.hasLogs
@@ -4450,36 +4612,239 @@ export default function LogsPage() {
                                 </div>
                               </div>
                               
-                              {/* 2주간 로그 분포 시각화 */}
+                              {/* 2주간 로그 분포 시각화 - 오늘 기준 2줄로 표현 */}
                               <div className="mt-2">
-                                <div className="flex items-center space-x-1 mb-1">
+                                <div className="flex items-center space-x-1 mb-2">
                                   <span className="text-xs text-gray-400">2주간 활동</span>
                                   <div className="flex-1 h-px bg-gray-200"></div>
+                                  <span className="text-xs text-gray-500">
+                                    {(() => {
+                                      const activeDays = (memberLogDistribution[member.id] || Array(14).fill(false)).filter(Boolean).length;
+                                      return `${activeDays}/14일`;
+                                    })()}
+                                  </span>
                                 </div>
-                                <div className="grid grid-cols-14 gap-1">
-                                  {(memberLogDistribution[member.id] || Array(14).fill(false)).map((hasLog, dayIndex) => (
-                                    <div
-                                      key={dayIndex}
-                                      className={`w-2 h-2 rounded-full text-center flex items-center justify-center transition-all duration-200 ${
-                                        hasLog 
-                                          ? 'bg-green-400 text-white' 
-                                          : 'bg-gray-200 text-gray-400'
-                                      }`}
-                                      title={(() => {
-                                        const date = new Date();
-                                        date.setDate(date.getDate() - (13 - dayIndex));
-                                        return `${format(date, 'MM.dd')} - ${hasLog ? '활동 있음' : '활동 없음'}`;
-                                      })()}
-                                    >
-                                      <span className="text-xs font-bold" style={{ fontSize: '6px' }}>
-                                        {hasLog ? '✓' : '✗'}
-                                      </span>
-                                    </div>
-                                  ))}
+                                
+                                {/* 지난주 (오늘 기준 13일전~7일전) */}
+                                <div className="mb-2">
+                                  <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                                    <span>지난주</span>
+                                    <span className="text-xs text-gray-300">7일전</span>
+                                  </div>
+                                  <div className="grid grid-cols-7 gap-1.5">
+                                    {Array.from({ length: 7 }, (_, index) => {
+                                      const dayIndex = 13 - index; // 13일전부터 7일전까지
+                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[13 - dayIndex];
+                                      const date = new Date();
+                                      date.setDate(date.getDate() - dayIndex);
+                                      const isToday = dayIndex === 0;
+                                      
+                                      const dateString = format(date, 'yyyy-MM-dd');
+                                      const isSelected = dateString === selectedDate && member.isSelected;
+                                      
+                                      // 디버깅용 로그 (첫 번째 항목만)
+                                      if (index === 0 && member.id === groupMembers.find(m => m.isSelected)?.id) {
+                                        console.log(`[네모 캘린더] 지난주 비교:`, {
+                                          dateString,
+                                          selectedDate,
+                                          isSelected,
+                                          dayIndex,
+                                          hasLog
+                                        });
+                                      }
+                                      
+                                      return (
+                                        <div
+                                          key={`week1-${index}`}
+                                          className={`w-3.5 h-3.5 transition-all duration-200 ${
+                                            isSelected
+                                              ? 'bg-gradient-to-br from-pink-500 to-rose-500 border border-pink-600 ring-2 ring-pink-300 shadow-md'
+                                              : hasLog 
+                                                ? 'bg-indigo-400/80 border border-indigo-500/30 cursor-pointer hover:bg-indigo-500/90 hover:scale-110' 
+                                                : 'bg-gray-50 border border-gray-200/50'
+                                          } ${isToday && !isSelected ? 'ring-1 ring-indigo-300' : ''}`}
+                                          title={`${format(date, 'MM.dd(E)', { locale: ko })} - ${hasLog ? '활동 있음' : '활동 없음'}${isToday ? ' (오늘)' : ''}${isSelected ? ' (선택됨)' : hasLog ? ' (클릭하여 이동)' : ''}`}
+                                          onClick={hasLog ? (e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            
+                                            const dateString = format(date, 'yyyy-MM-dd');
+                                            console.log(`[활동 캘린더] 지난주 ${format(date, 'MM.dd(E)', { locale: ko })} 클릭 - 날짜 변경: ${dateString}`);
+                                            console.log(`[활동 캘린더] 현재 선택된 날짜: ${selectedDate} → 새 날짜: ${dateString}`);
+                                            
+                                            // 클릭된 네모에 고급스러운 시각적 피드백
+                                            const clickedElement = e.currentTarget as HTMLElement;
+                                            clickedElement.style.transform = 'scale(1.2) translateY(-1px)';
+                                            clickedElement.style.boxShadow = '0 8px 25px -5px rgba(236, 72, 153, 0.4), 0 0 0 3px rgba(236, 72, 153, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
+                                            clickedElement.style.zIndex = '1000';
+                                            clickedElement.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
+                                            
+                                            // 날짜 변경
+                                            handleDateSelect(dateString);
+                                            
+                                            // 사이드바를 열고 메인 날짜 선택기로 스크롤 (스마트 타이밍)
+                                            if (!isSidebarOpen) {
+                                              setIsSidebarOpen(true);
+                                              // 사이드바가 열린 후 스크롤
+                                              setTimeout(() => {
+                                                scrollToSelectedDate(dateString, '네모 캘린더 클릭');
+                                              }, 500); // 사이드바 애니메이션 완료 후
+                                            } else {
+                                              // 이미 사이드바가 열려있으면 즉시 스크롤 (자연스러운 전환)
+                                              scrollToSelectedDate(dateString, '네모 캘린더 클릭');
+                                            }
+                                            
+                                            // 시각적 피드백 원복 (고급스러운 애니메이션)
+                                            setTimeout(() => {
+                                              clickedElement.style.transform = '';
+                                              clickedElement.style.boxShadow = '';
+                                              clickedElement.style.zIndex = '';
+                                              clickedElement.style.transition = 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                                              
+                                              // 트랜지션 완료 후 초기화
+                                              setTimeout(() => {
+                                                clickedElement.style.transition = '';
+                                              }, 300);
+                                            }, 250);
+                                            
+                                            // 햅틱 피드백 강화
+                                            try {
+                                              if ('vibrate' in navigator) {
+                                                navigator.vibrate([10, 50, 10]);
+                                              }
+                                            } catch (err) {
+                                              console.debug('햅틱 피드백 차단');
+                                            }
+                                          } : undefined}
+                                        />
+                                      );
+                                    })}
+                                  </div>
                                 </div>
-                                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                                  <span>2주전</span>
-                                  <span>오늘</span>
+                                
+                                {/* 이번주 (오늘 기준 6일전~오늘) */}
+                                <div className="mb-2">
+                                  <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                                    <span>이번주</span>
+                                    <span className="text-xs text-indigo-600 font-medium">오늘까지</span>
+                                  </div>
+                                  <div className="grid grid-cols-7 gap-1.5">
+                                    {Array.from({ length: 7 }, (_, index) => {
+                                      const dayIndex = 6 - index; // 6일전부터 오늘까지
+                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[13 - dayIndex];
+                                      const date = new Date();
+                                      date.setDate(date.getDate() - dayIndex);
+                                      const isToday = dayIndex === 0;
+                                      
+                                      const dateString = format(date, 'yyyy-MM-dd');
+                                      const isSelected = dateString === selectedDate && member.isSelected;
+                                      
+                                      // 디버깅용 로그 (첫 번째 항목만)
+                                      if (index === 0 && member.id === groupMembers.find(m => m.isSelected)?.id) {
+                                        console.log(`[네모 캘린더] 이번주 비교:`, {
+                                          dateString,
+                                          selectedDate,
+                                          isSelected,
+                                          dayIndex,
+                                          hasLog,
+                                          isToday
+                                        });
+                                      }
+                                      
+                                      return (
+                                        <div
+                                          key={`week2-${index}`}
+                                          className={`w-3.5 h-3.5 transition-all duration-200 ${
+                                            isSelected
+                                              ? 'bg-gradient-to-br from-pink-500 to-rose-500 border border-pink-600 ring-2 ring-pink-300 shadow-md'
+                                              : isToday 
+                                                ? hasLog 
+                                                  ? 'bg-gradient-to-br from-indigo-500 to-purple-500 border border-indigo-600/50 ring-2 ring-indigo-200 shadow-sm' 
+                                                  : 'bg-gradient-to-br from-gray-200 to-gray-300 border border-gray-300 ring-2 ring-indigo-200'
+                                                : hasLog 
+                                                  ? 'bg-indigo-500/90 border border-indigo-600/40 cursor-pointer hover:bg-indigo-600 hover:scale-110' 
+                                                  : 'bg-gray-50 border border-gray-200/50'
+                                          }`}
+                                          title={`${format(date, 'MM.dd(E)', { locale: ko })} - ${hasLog ? '활동 있음' : '활동 없음'}${isToday ? ' (오늘)' : ''}${isSelected ? ' (선택됨)' : hasLog && !isToday ? ' (클릭하여 이동)' : ''}`}
+                                          onClick={hasLog && !isToday ? (e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            
+                                            const dateString = format(date, 'yyyy-MM-dd');
+                                            console.log(`[활동 캘린더] 이번주 ${format(date, 'MM.dd(E)', { locale: ko })} 클릭 - 날짜 변경: ${dateString}`);
+                                            console.log(`[활동 캘린더] 현재 선택된 날짜: ${selectedDate} → 새 날짜: ${dateString}`);
+                                            
+                                            // 클릭된 네모에 고급스러운 시각적 피드백
+                                            const clickedElement = e.currentTarget as HTMLElement;
+                                            clickedElement.style.transform = 'scale(1.2) translateY(-1px)';
+                                            clickedElement.style.boxShadow = '0 8px 25px -5px rgba(236, 72, 153, 0.4), 0 0 0 3px rgba(236, 72, 153, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
+                                            clickedElement.style.zIndex = '1000';
+                                            clickedElement.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
+                                            
+                                            // 날짜 변경
+                                            handleDateSelect(dateString);
+                                            
+                                            // 사이드바를 열고 메인 날짜 선택기로 스크롤 (스마트 타이밍)
+                                            if (!isSidebarOpen) {
+                                              setIsSidebarOpen(true);
+                                              // 사이드바가 열린 후 스크롤
+                                              setTimeout(() => {
+                                                scrollToSelectedDate(dateString, '네모 캘린더 클릭');
+                                              }, 500); // 사이드바 애니메이션 완료 후
+                                            } else {
+                                              // 이미 사이드바가 열려있으면 즉시 스크롤 (자연스러운 전환)
+                                              scrollToSelectedDate(dateString, '네모 캘린더 클릭');
+                                            }
+                                            
+                                            // 시각적 피드백 원복 (고급스러운 애니메이션)
+                                            setTimeout(() => {
+                                              clickedElement.style.transform = '';
+                                              clickedElement.style.boxShadow = '';
+                                              clickedElement.style.zIndex = '';
+                                              clickedElement.style.transition = 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                                              
+                                              // 트랜지션 완료 후 초기화
+                                              setTimeout(() => {
+                                                clickedElement.style.transition = '';
+                                              }, 300);
+                                            }, 250);
+                                            
+                                            // 햅틱 피드백 강화
+                                            try {
+                                              if ('vibrate' in navigator) {
+                                                navigator.vibrate([10, 50, 10]);
+                                              }
+                                            } catch (err) {
+                                              console.debug('햅틱 피드백 차단');
+                                            }
+                                          } : undefined}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                                
+                                {/* 요일 레이블 */}
+                                <div className="grid grid-cols-7 gap-1.5">
+                                  {(() => {
+                                    const today = new Date();
+                                    const todayDay = today.getDay(); // 0(일) ~ 6(토)
+                                    const days = ['일', '월', '화', '수', '목', '금', '토'];
+                                    
+                                    return Array.from({ length: 7 }, (_, index) => {
+                                      // 오늘 기준으로 요일 배열 생성
+                                      const dayIndex = (todayDay - 6 + index + 7) % 7;
+                                      const isToday = index === 6; // 마지막이 오늘
+                                      
+                                      return (
+                                        <div key={index} className="w-3.5 flex justify-center">
+                                          <span className={`text-xs ${isToday ? 'text-indigo-600 font-semibold' : 'text-gray-400'}`} style={{ fontSize: '9px' }}>
+                                            {days[dayIndex]}
+                                          </span>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
                                 </div>
                               </div>
                             </div>
