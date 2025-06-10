@@ -3730,19 +3730,19 @@ export default function LogsPage() {
     if (sortedTimePoints.length > 1) {
         const pathCoordinates = sortedTimePoints.map(point => new window.naver.maps.LatLng(point.lat, point.lng));
         
-        // 무지개 색상 배열 (빨주노초파남보)
+        // 글로시 무지개 색상 배열 (빨주노초파남보)
         const rainbowColors = [
-            '#FF0000', // 빨강
-            '#FF8000', // 주황
-            '#FFFF00', // 노랑
-            '#80FF00', // 연두
-            '#00FF00', // 초록
-            '#00FF80', // 청록
-            '#00FFFF', // 파랑
-            '#0080FF', // 남색
-            '#0000FF', // 진파랑
-            '#8000FF', // 자주
-            '#FF00FF', // 보라
+            '#FF6B6B', // 글로시 빨강
+            '#FF9F43', // 글로시 주황  
+            '#FFC947', // 글로시 노랑
+            '#54D62C', // 글로시 연두
+            '#00C9FF', // 글로시 하늘색
+            '#7B68EE', // 글로시 라벤더
+            '#FF6EC7', // 글로시 핑크
+            '#FF8A80', // 글로시 코랄
+            '#69F0AE', // 글로시 민트
+            '#40C4FF', // 글로시 블루
+            '#B388FF', // 글로시 퍼플
         ];
         
         // 각 구간마다 다른 색상의 폴리라인 생성
@@ -3762,8 +3762,8 @@ export default function LogsPage() {
                 map: mapInstance,
                 path: segmentPath,
                 strokeColor: interpolatedColor,
-                strokeOpacity: 0.9,
-                strokeWeight: 4,
+                strokeOpacity: 0.85,
+                strokeWeight: 5,
                 strokeStyle: 'solid'
             });
             
