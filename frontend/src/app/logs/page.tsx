@@ -605,8 +605,8 @@ export default function LogsPage() {
   const isHorizontalSwipeRef = useRef<boolean | null>(null);
   const hasUserInteracted = useRef<boolean>(false); // 사용자 상호작용 추적
 
-  // 로그 페이지 뷰 상태
-  const [activeLogView, setActiveLogView] = useState<'members' | 'summary'>('members');
+  // 로그 페이지 뷰 상태 - 이제 summary만 사용
+  const [activeLogView, setActiveLogView] = useState<'summary'>('summary');
 
   // 사이드바 상태 추가
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -660,7 +660,7 @@ export default function LogsPage() {
       }
     },
     expanded: {
-      translateY: '-40px',
+      translateY: '-70px',
       opacity: 1,
       transition: {
         type: "spring",
@@ -1047,40 +1047,7 @@ export default function LogsPage() {
       const minSwipeDistance = 30; // 최소 스와이프 거리를 줄임
       if (Math.abs(deltaX) < minSwipeDistance) return;
 
-      // 스와이프 방향에 따라 다음 탭 결정
-      let nextTab: 'members' | 'summary' = activeLogView;
-      
-      if (deltaX < 0) { // 왼쪽으로 스와이프 (음수) -> 다음 탭
-        if (activeLogView === 'members') {
-          nextTab = 'summary';
-        }
-      } else { // 오른쪽으로 스와이프 (양수) -> 이전 탭
-        if (activeLogView === 'summary') {
-          nextTab = 'members';
-        }
-      }
-
-      // 탭이 변경되면 즉시 적용하고 드래그 종료
-      if (nextTab !== activeLogView) {
-        console.log('[SWIPE] 좌우 스와이프로 탭 변경:', activeLogView, '→', nextTab);
-        setActiveLogView(nextTab);
-        
-        // 햅틱 피드백
-        try {
-          if ('vibrate' in navigator) {
-            navigator.vibrate([30, 10, 20]); // 더 강한 햅틱
-          }
-        } catch (error) {
-          console.debug('햅틱 피드백이 차단되었습니다:', error);
-        }
-        
-        // 드래그 종료 처리
-        startDragY.current = null;
-        startDragX.current = null;
-        isDraggingRef.current = false;
-        dragStartTime.current = null;
-        isHorizontalSwipeRef.current = null;
-      }
+      // 좌우 스와이프는 더 이상 지원하지 않음 (단일 탭)
       return;
     }
     
@@ -1152,42 +1119,14 @@ export default function LogsPage() {
         return;
       }
 
-      // 스와이프 방향에 따라 다음 탭 결정
-      let nextTab: 'members' | 'summary' = activeLogView;
-      
-      if (dragDeltaX < 0) { // 왼쪽으로 스와이프 (음수) -> 다음 탭
-        if (activeLogView === 'members') {
-          nextTab = 'summary';
-        }
-      } else { // 오른쪽으로 스와이프 (양수) -> 이전 탭
-        if (activeLogView === 'summary') {
-          nextTab = 'members';
-        }
-      }
-
-      // 탭이 변경되면 즉시 적용하고 드래그 종료
-      if (nextTab !== activeLogView) {
-        console.log('[SWIPE] 좌우 스와이프로 탭 변경:', activeLogView, '→', nextTab);
-        setActiveLogView(nextTab);
-        
-        // 햅틱 피드백
-        try {
-          if ('vibrate' in navigator) {
-            navigator.vibrate([30, 10, 20]); // 더 강한 햅틱
-          }
-        } catch (error) {
-          console.debug('햅틱 피드백이 차단되었습니다:', error);
-        }
-        
-        // 드래그 종료 처리
-        isDraggingRef.current = false;
-        startDragY.current = null;
-        startDragX.current = null;
-        dragStartTime.current = null;
-        isHorizontalSwipeRef.current = null;
-        (e.target as any)._startedAt = 0;
-        return;
-      }
+      // 좌우 스와이프는 더 이상 지원하지 않음 (단일 탭)
+      isDraggingRef.current = false;
+      startDragY.current = null;
+      startDragX.current = null;
+      dragStartTime.current = null;
+      isHorizontalSwipeRef.current = null;
+      (e.target as any)._startedAt = 0;
+      return;
     }
 
     // 상하 드래그에 대한 바텀시트 상태 변경 (collapsed/expanded만)
@@ -1390,7 +1329,7 @@ export default function LogsPage() {
     
     setGroupMembers(updatedMembers);
     // updateMemberMarkers는 useEffect에서 처리되도록 제거
-    setActiveLogView('members');
+    // setActiveLogView('members'); // 이제 summary만 사용하므로 제거
     
     // 멤버 선택 시 날짜 스크롤 위치 조정
     if (isChangingMember) {
@@ -1729,7 +1668,7 @@ export default function LogsPage() {
     clearMapMarkersAndPaths(true);
     
     // 3. 추가 상태 초기화 (확실히 하기 위해)
-    setActiveLogView('members');
+    // setActiveLogView('members'); // 이제 summary만 사용하므로 제거
     setFirstMemberSelected(false);
     isDateChangedRef.current = true;
     // 날짜 변경 시에만 로딩 상태 표시
@@ -2919,7 +2858,7 @@ export default function LogsPage() {
         isDateChangedRefValue: isDateChangedRef.current
       });
       // updateMemberMarkers(groupMembers, isDateChange); // loadLocationData에서 처리하도록 주석 처리
-      setActiveLogView('members'); // 멤버 선택/지도 업데이트 시 members 뷰 활성화
+      // setActiveLogView('members'); // 이제 summary만 사용하므로 제거
       
       // 자동 재생성 방지 플래그가 설정되어 있으면 리셋
       if (isDateChangingRef.current) {
@@ -3997,241 +3936,10 @@ export default function LogsPage() {
               {/* 스와이프 가능한 콘텐츠 컨테이너 - home/page.tsx와 동일한 구조 */}
               <div className="flex-grow min-h-0 relative overflow-hidden">
                 <motion.div
-                  className="flex w-[200%] h-full"
-                  animate={{
-                    x: activeLogView === 'members' ? '0%' : '-50%'
-                  }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 300,
-                    damping: 30,
-                    duration: 0.5
-                  }}
-                  style={{ touchAction: 'pan-x' }}
-                >
-                  {/* 그룹 멤버 탭 - home/page.tsx와 동일한 구조 */}
-                  <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
-                                      <div 
-                      className="content-section members-section rounded-2xl p-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
-                    style={{
-                      background: 'linear-gradient(to right, #eef2ff, #faf5ff) !important',
-                      backgroundImage: 'linear-gradient(to right, #eef2ff, #faf5ff) !important',
-                      borderColor: '#0113A3',
-                      borderWidth: '1px'
-                    }}
-                  >
-                    <motion.div 
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3, duration: 0.6 }}
-                      className="hide-scrollbar flex-1"
-                    >
-                                              <div className="flex justify-between items-center mb-2">
-                          <div className="flex items-center space-x-3">
-                            <div className="flex items-center space-x-2">
-                              <FiUser className="w-5 h-5" style={{ color: '#0113A3' }} />
-                              <div>
-                                <h2 className="text-base font-semibold text-gray-900">그룹 멤버</h2>
-                              </div>
-                            </div>
-                              </div>
-                        
-                        <div className="flex items-center space-x-3">
-                          {/* 그룹 선택 드롭다운 */}
-                          <div className="relative" ref={groupDropdownRef}>
-                            <motion.button
-                              whileHover={{ scale: 1.02, y: -1 }}
-                              whileTap={{ scale: 0.98 }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                console.log('[그룹 드롭다운] 버튼 클릭, 현재 상태:', isGroupSelectorOpen);
-                                setIsGroupSelectorOpen(!isGroupSelectorOpen);
-                              }}
-                              className="flex items-center justify-between px-4 py-3 bg-white/70 backdrop-blur-sm border rounded-xl text-sm font-medium hover:bg-white/90 hover:shadow-md transition-all duration-200"
-                              style={{ 
-                                borderColor: 'rgba(1, 19, 163, 0.2)',
-                                '--hover-border-color': 'rgba(1, 19, 163, 0.4)'
-                              } as React.CSSProperties}
-                              disabled={isUserDataLoading}
-                              data-group-selector="true"
-                            >
-                              <span className="truncate text-gray-700">
-                                {isUserDataLoading 
-                                  ? '로딩 중...' 
-                                  : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
-                                }
-                              </span>
-                              <div className="ml-2 flex-shrink-0">
-                                {isUserDataLoading ? (
-                                  <FiLoader className="animate-spin text-gray-400" size={14} />
-                                ) : (
-                                  <motion.div
-                                    animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-                                    transition={{ duration: 0.2 }}
+                  className="flex w-full h-full"
                                   >
-                                    <FiChevronDown className="text-gray-400" size={14} />
-                                  </motion.div>
-                                )}
-                              </div>
-                            </motion.button>
-
-                            {/* 그룹 선택 드롭다운 메뉴 */}
-                            {isGroupSelectorOpen && (
-                              <motion.div
-                                initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                                transition={{ duration: 0.2 }}
-                                className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                }}
-                              >
-                                <div className="py-2">
-                                  {isUserDataLoading ? (
-                                    <div className="px-4 py-3 text-center">
-                                      <div className="flex items-center justify-center space-x-2">
-                                        <motion.div
-                                          variants={spinnerVariants}
-                                          animate="animate"
-                                        >
-                                          <FiLoader className="" style={{ color: '#0113A3' }} size={16} />
-                                        </motion.div>
-                                        <span className="text-sm text-gray-600">로딩 중...</span>
-                      </div>
-                                    </div>
-                                  ) :                                   userGroups.length > 0 ? (
-                                    userGroups.map((group) => (
-                                      <motion.button
-                                        key={group.sgt_idx}
-                                        whileHover={{ backgroundColor: "rgba(99, 102, 241, 0.05)" }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          console.log('[그룹 드롭다운] 그룹 선택:', group.sgt_title);
-                                          
-                                          if (selectedGroupId === group.sgt_idx) {
-                                            console.log('[그룹 드롭다운] 현재 선택된 그룹 재클릭 - 드롭다운 닫기');
-                                            setIsGroupSelectorOpen(false);
-                                            return;
-                                          }
-                                          
-                                          handleGroupSelect(group.sgt_idx);
-                                        }}
-                                        className={`w-full px-3 py-2 text-left text-xs focus:outline-none transition-colors ${
-                                          selectedGroupId === group.sgt_idx 
-                                            ? 'font-semibold' 
-                                            : 'text-gray-900 hover:bg-blue-50'
-                                        }`}
-                                        style={selectedGroupId === group.sgt_idx 
-                                          ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' }
-                                          : {}
-                                        }
-                                      >
-                                        <div className="flex items-center justify-between">
-                                          <span className="truncate">{group.sgt_title}</span>
-                                          {selectedGroupId === group.sgt_idx && (
-                                            <span className="ml-2" style={{ color: '#0113A3' }}>✓</span>
-                                          )}
-                                        </div>
-                                        <div className="text-xs text-gray-500 mt-0.5">
-                                          {groupMemberCounts[group.sgt_idx] || 0}명의 멤버
-                                        </div>
-                                      </motion.button>
-                                    ))
-                                  ) : (
-                                    <div className="px-4 py-6 text-center">
-                                      <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-2">
-                                        <FiUser className="w-6 h-6 text-gray-400" />
-                                      </div>
-                                      <p className="text-sm text-gray-600 font-medium">참여한 그룹이 없습니다</p>
-                                      <p className="text-xs text-gray-500 mt-1">새로운 그룹을 만들어보세요</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </motion.div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 멤버 목록 내용 */}
-                        <motion.div 
-                          variants={staggerContainer}
-                          initial="hidden"
-                          animate="visible"
-                          className="flex flex-row flex-nowrap justify-start items-center gap-x-6 overflow-x-auto hide-scrollbar px-2 py-2"
-                        >
-                          {(() => {
-                            const hasSelectedMember = groupMembers.some(member => member.isSelected);
-                            if (!hasSelectedMember && groupMembers.length > 0 && dataFetchedRef.current.members) {
-                              console.log('[멤버 렌더링] 선택된 멤버가 없음, 첫 번째 멤버 자동 선택:', groupMembers[0].name);
-                              setTimeout(() => {
-                                handleMemberSelect(groupMembers[0].id, null);
-                              }, 50);
-                            }
-                            return null;
-                          })()}
-                          {groupMembers.map((member, index) => {
-                        return (
-                              <motion.div 
-                                key={member.id} 
-                                custom={index}
-                                variants={memberAvatarVariants}
-                                initial="initial"
-                                animate="animate"
-                                whileHover="hover"
-                                className="flex flex-col items-center p-0 flex-shrink-0"
-                              >
-                                <motion.button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleMemberSelect(member.id, e);
-                                  }}
-                                  onTouchStart={(e) => e.stopPropagation()}
-                                  onTouchMove={(e) => e.stopPropagation()}
-                                  onTouchEnd={(e) => e.stopPropagation()}
-                                  className="flex flex-col items-center focus:outline-none mobile-button"
-                                  animate={member.isSelected ? "selected" : "animate"}
-                                >
-                                  <motion.div
-                                    className={`member-avatar w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
-                                      member.isSelected ? 'selected' : ''
-                                    }`}
-                                    animate={member.isSelected ? "selected" : undefined}
-                                  >
-                                    <img 
-                                      src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
-                                      alt={member.name} 
-                                      className="w-full h-full object-cover rounded-xl" 
-                                      onError={(e) => {
-                                        const target = e.target as HTMLImageElement;
-                                        const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
-                                        console.log(`[이미지 오류] ${member.name}의 이미지 로딩 실패, 기본 이미지로 대체:`, defaultImg);
-                                        target.src = defaultImg;
-                                        target.onerror = null;
-                                      }}
-                                    />
-                                  </motion.div>
-                                  <span className={`block text-sm font-normal mt-1 transition-colors duration-200 ${
-                                    member.isSelected ? '' : 'text-gray-700'
-                                  }`}
-                                  style={member.isSelected ? { color: '#0113A3' } : {}}>
-                                {member.name}
-                              </span>
-                                </motion.button>
-                              </motion.div>
-                        );
-                      })}
-                        </motion.div>
-                    </motion.div>
-                  </div>
-
-
-                  </div>
-
-                  {/* 위치기록 요약 탭 - home/page.tsx와 동일한 구조 */}
-                  <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
+                  {/* 위치기록 요약만 표시 (그룹멤버 탭 제거됨) */}
+                  <div className="w-full h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
                   <div 
                     className="content-section summary-section min-h-[200px] max-h-[200px] overflow-hidden flex flex-col bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl pt-3 px-3 pb-3"
                   >
@@ -4322,28 +4030,7 @@ export default function LogsPage() {
                 </motion.div>
               </div>
 
-              {/* 점 인디케이터 - 섹션과 네비게이션 바 사이 중앙 고정 */}
-              <div className="flex-shrink-0 pt-4 pb-6 bg-white -mt-7">
-                <div className="flex justify-center items-center space-x-2 mb-2">
-                  <motion.div
-                    className={`rounded-full transition-all duration-300 ${
-                      activeLogView === 'members' ? 'w-6 h-2' : 'bg-gray-300 w-2 h-2'
-                    }`}
-                    style={activeLogView === 'members' ? { backgroundColor: '#0113A3' } : {}}
-                    initial={{ scale: 0.8 }}
-                    animate={{ scale: 1 }}
-                    transition={{ duration: 0.3 }}
-                  />
-                  <motion.div
-                    className={`rounded-full transition-all duration-300 ${
-                      activeLogView === 'summary' ? 'bg-pink-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
-                    }`}
-                    initial={{ scale: 0.8 }}
-                    animate={{ scale: 1 }}
-                    transition={{ duration: 0.3, delay: 0.1 }}
-                  />
-                </div>
-              </div>
+              {/* 탭 인디케이터 제거됨 - 이제 단일 탭만 사용 */}
             </div>
           </motion.div>
       </motion.div>
