@@ -46,8 +46,8 @@ const floatingButtonStyles = `
   bottom: 80px;
   right: 20px;
   z-index: 40;
-  background: #4f46e5;
-  box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
+  background: #0113A3;
+  box-shadow: 0 8px 25px rgba(1, 19, 163, 0.3);
   transition: all 0.2s ease;
   touch-action: manipulation;
   user-select: none;
@@ -55,7 +55,7 @@ const floatingButtonStyles = `
 
 .floating-button:hover {
   transform: scale(1.1);
-  box-shadow: 0 12px 35px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 12px 35px rgba(1, 19, 163, 0.4);
 }
 
 .glass-effect {
@@ -757,7 +757,7 @@ function GroupPageContent() {
   return (
     <>
       <style jsx global>{floatingButtonStyles}</style>
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 relative">
+      <div className="min-h-screen relative" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}>
         
 
 
@@ -770,14 +770,14 @@ function GroupPageContent() {
           >
             <div className="flex items-center justify-between h-16 px-4">
               {currentView === 'list' ? (
-                <div className="flex items-center space-x-3">
+                <motion.div 
+                  className="flex items-center space-x-3"
+                  initial={{ x: -20, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 0.2, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                >
                   <div className="flex items-center space-x-3">
-                    <motion.div
-                      initial={{ rotate: -180, scale: 0 }}
-                      animate={{ rotate: 0, scale: 1 }}
-                      transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                      className="p-2 bg-indigo-600 rounded-xl"
-                    >
+                    <div className="p-2 rounded-xl" style={{ backgroundColor: '#0113A3' }}>
                       <svg 
                     className="w-5 h-5 text-white" 
                     viewBox="0 0 24 24"
@@ -785,13 +785,13 @@ function GroupPageContent() {
                   >
                     <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
                   </svg>
-                    </motion.div>
+                    </div>
                     <div>
                       <h1 className="text-lg font-bold text-gray-900">그룹</h1>
                       <p className="text-xs text-gray-500">나의 소중한 그룹을 관리해보세요</p>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ) : (
                 <div className="flex items-center space-x-3">
                   <motion.button 
@@ -802,27 +802,17 @@ function GroupPageContent() {
                   >
                     <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
                   </motion.button>
-                  <div className="flex items-center space-x-3">
-                    <motion.div
-                      initial={{ rotate: -180, scale: 0 }}
-                      animate={{ rotate: 0, scale: 1 }}
-                      transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                      className="p-2 bg-indigo-600 rounded-xl"
-                    >
-                      <svg 
-                        className="w-5 h-5 text-white" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                    </motion.div>
+                  <motion.div 
+                    className="flex items-center space-x-3"
+                    initial={{ x: 20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: 0.2, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  >
                     <div>
                       <h1 className="text-lg font-bold text-gray-900">그룹 상세</h1>
                       <p className="text-xs text-gray-500">멤버들과 함께하는 즐거운 공간</p>
                     </div>
-                  </div>
+                  </motion.div>
                 </div>
               )}
               
@@ -833,7 +823,7 @@ function GroupPageContent() {
           </motion.header>
 
         {/* 메인 컨텐츠 */}
-          <div className="pb-safe pt-20">
+          <div className="pb-safe pt-20 h-screen flex flex-col">
             <AnimatePresence mode="wait">
               {currentView === 'list' ? (
                 <motion.div
@@ -858,7 +848,11 @@ function GroupPageContent() {
                         onChange={handleSearchChange}
                         onFocus={() => setIsSearchFocused(true)}
                         onBlur={() => setIsSearchFocused(false)}
-                        className="w-full pl-12 pr-4 py-4 bg-white border border-indigo-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
+                        className="w-full pl-12 pr-4 py-4 bg-white border rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
+                        style={{ 
+                          borderColor: 'rgba(1, 19, 163, 0.2)',
+                          '--tw-ring-color': '#0113A3'
+                        } as React.CSSProperties}
                       />
                     </motion.div>
                   </div>
@@ -867,7 +861,8 @@ function GroupPageContent() {
                   <div className="px-4 mb-4">
                     <div className="grid grid-cols-2 gap-3">
                       <motion.div 
-                        className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-4 text-white shadow-lg"
+                        className="rounded-2xl p-4 text-white shadow-lg"
+                        style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
                         variants={cardVariants}
                         initial="hidden"
                         animate="visible"
@@ -875,10 +870,10 @@ function GroupPageContent() {
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="text-indigo-100 text-sm">총 그룹</p>
+                            <p className="text-blue-100 text-sm">총 그룹</p>
                             <p className="text-2xl font-bold">{groups.length}개</p>
                           </div>
-                          <FaLayerGroup className="w-8 h-8 text-indigo-200" />
+                          <FaLayerGroup className="w-8 h-8 text-blue-200" />
                         </div>
                       </motion.div>
                       <motion.div 
@@ -901,7 +896,6 @@ function GroupPageContent() {
 
                   {/* 그룹 목록 */}
                   <div className="px-4 space-y-3">
-                    {filteredGroups.length > 0 ? (
                       <motion.div 
                         className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
                         variants={groupListContainerVariants}
@@ -919,7 +913,8 @@ function GroupPageContent() {
                               <motion.div
                                 key={group.sgt_idx}
                                 onClick={() => handleGroupSelect(group as ExtendedGroup)}
-                                className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-xl p-4 cursor-pointer"
+                                className="rounded-xl p-4 cursor-pointer"
+                                style={{ background: 'linear-gradient(to right, rgba(240, 249, 255, 0.8), rgba(219, 234, 254, 0.8))' }}
                                 variants={groupCardVariants}
                                 initial="hidden"
                                 animate="visible"
@@ -942,7 +937,7 @@ function GroupPageContent() {
                                       <p className="text-gray-600 text-sm line-clamp-2 mb-2">
                                         {group.sgt_memo || group.sgt_content || '그룹 설명이 없습니다'}
                                       </p>
-                                      <div className="flex items-center space-x-4 text-xs text-indigo-500">
+                                      <div className="flex items-center space-x-4 text-xs" style={{ color: '#0113A3' }}>
                                         <span className="flex items-center">
                                           <FaUsers className="w-3 h-3 mr-1" />
                                           {memberCount}명
@@ -962,21 +957,6 @@ function GroupPageContent() {
                           })}
                         </div>
                       </motion.div>
-                    ) : (
-                      <motion.div 
-                        className="text-center py-12"
-                        variants={cardVariants}
-                        initial="hidden"
-                        animate="visible"
-                        custom={2}
-                      >
-                        <div className="p-6 bg-gray-100 rounded-full w-fit mx-auto mb-4">
-                          <FaSearch className="w-8 h-8 text-gray-400" />
-                        </div>
-                        <p className="text-gray-500 text-lg font-medium">검색 결과가 없습니다</p>
-                        <p className="text-gray-400 text-sm mt-1">다른 키워드로 검색해보세요</p>
-                      </motion.div>
-                    )}
                   </div>
 
                   {/* 플로팅 추가 버튼 */}
@@ -1002,11 +982,15 @@ function GroupPageContent() {
                     duration: 0.5,
                     ease: [0.25, 0.46, 0.45, 0.94]
                   }}
+                  className="flex flex-col flex-1 min-h-0"
                 >
-                  {/* 그룹 헤더 카드 */}
-                  <div className="mx-4 mt-4 mb-4">
+                  {/* 고정 영역: 그룹 헤더 카드 + 통계 카드들 */}
+                  <div className="flex-shrink-0">
+                    {/* 그룹 헤더 카드 */}
+                    <div className="mx-4 mb-4">
                     <motion.div 
-                      className="bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg relative"
+                      className="rounded-2xl p-6 text-white shadow-lg relative"
+                      style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
                       initial={{ y: 30, opacity: 0, scale: 0.9 }}
                       animate={{ y: 0, opacity: 1, scale: 1 }}
                       transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -1044,7 +1028,7 @@ function GroupPageContent() {
                                     setIsEditModalOpen(true);
                                     setShowGroupActions(false);
                                   }}
-                                  className="w-full px-4 py-3 text-left hover:bg-indigo-50 flex items-center text-gray-700"
+                                  className="w-full px-4 py-3 text-left hover:bg-blue-50 flex items-center text-gray-700"
                                 >
                                   <FaEdit className="w-4 h-4 mr-3" />
                                   그룹 수정
@@ -1077,13 +1061,13 @@ function GroupPageContent() {
                           </div>
                           <div className="flex-1">
                             <h2 className="text-xl font-bold mb-1">{selectedGroup.sgt_title}</h2>
-                            <p className="text-indigo-100 text-sm">
+                            <p className="text-blue-100 text-sm">
                               {selectedGroup.sgt_memo || selectedGroup.sgt_content || '그룹 설명이 없습니다'}
                             </p>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center justify-between text-sm text-indigo-200">
+                      <div className="flex items-center justify-between text-sm text-blue-200">
                         <span>코드: {selectedGroup.sgt_code || 'N/A'}</span>
                         <span>생성일: {new Date(selectedGroup.sgt_wdate).toLocaleDateString()}</span>
                       </div>
@@ -1158,16 +1142,19 @@ function GroupPageContent() {
                       </motion.div>
                     </div>
                   </div>
+                  </div>
 
-                  {/* 그룹 멤버 섹션 */}
-                  <div className="px-4">
+                  {/* 스크롤 영역: 그룹 멤버 섹션 */}
+                  <div className="flex-1 min-h-0 overflow-y-auto">
+                    <div className="px-4 pb-20">
                     <motion.div 
-                      className="bg-white rounded-2xl shadow-sm border border-indigo-100 overflow-hidden"
+                      className="bg-white rounded-2xl shadow-sm border overflow-hidden"
+                      style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}
                       initial={{ y: 30, opacity: 0, scale: 0.95 }}
                       animate={{ y: 0, opacity: 1, scale: 1 }}
                       transition={{ delay: 0.5, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
                     >
-                      <div className="p-4 border-b border-indigo-100">
+                      <div className="p-4 border-b" style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}>
                         <div className="flex items-center justify-between">
                           <h3 className="text-lg font-normal text-gray-900">그룹 멤버</h3>
                           <motion.button
@@ -1186,7 +1173,7 @@ function GroupPageContent() {
                         {membersLoading ? (
                           <div className="flex items-center justify-center py-8">
                             <div className="text-center">
-                              <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                              <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-2" style={{ borderColor: '#0113A3', borderTopColor: 'transparent' }}></div>
                               <p className="text-sm text-gray-600">그룹원을 불러오는 중...</p>
                             </div>
                           </div>
@@ -1197,11 +1184,15 @@ function GroupPageContent() {
                                 <motion.div 
                                   key={member.mt_idx} 
                                   onClick={() => handleMemberClick(member)}
-                                  className={`flex items-center p-3 bg-indigo-50 rounded-xl ${
+                                  className={`flex items-center p-3 rounded-xl ${
                                     isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' 
-                                      ? 'cursor-pointer hover:bg-indigo-100 hover:shadow-md' 
+                                      ? 'cursor-pointer hover:shadow-md' 
                                       : ''
                                   }`}
+                                  style={{ 
+                                    backgroundColor: 'rgba(1, 19, 163, 0.05)',
+                                    '--hover-bg': 'rgba(1, 19, 163, 0.1)'
+                                  } as React.CSSProperties}
                                   initial={{ x: -20, opacity: 0 }}
                                   animate={{ x: 0, opacity: 1 }}
                                   transition={{ delay: 0.6 + index * 0.1 }}
@@ -1209,7 +1200,7 @@ function GroupPageContent() {
                                   whileTap={isCurrentUserGroupOwner() && member.sgdt_owner_chk !== 'Y' ? { scale: 0.98 } : {}}
                                 >
                                   <div className="relative mr-3">
-                                    <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center border-3 border-indigo-200">
+                                    <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center border-3" style={{ borderColor: 'rgba(1, 19, 163, 0.2)' }}>
                                       <img
                                         src={getSafeImageUrl(member.photo || null, member.mt_gender, member.original_index)}
                                         alt={member.mt_name}
@@ -1246,7 +1237,7 @@ function GroupPageContent() {
                                         )}
                                       </div>
                                     </div>
-                                    <p className="text-sm text-indigo-600 mt-1">
+                                    <p className="text-sm mt-1" style={{ color: '#0113A3' }}>
                                       {member.sgdt_owner_chk === 'Y' ? '그룹 관리자' : 
                                        member.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
                                     </p>
@@ -1255,8 +1246,8 @@ function GroupPageContent() {
                               ))
                             ) : (
                               <div className="text-center py-8">
-                                <div className="p-4 bg-indigo-100 rounded-full w-fit mx-auto mb-3">
-                                  <FaUsers className="w-6 h-6 text-indigo-400" />
+                                <div className="p-4 rounded-full w-fit mx-auto mb-3" style={{ backgroundColor: 'rgba(1, 19, 163, 0.1)' }}>
+                                  <FaUsers className="w-6 h-6" style={{ color: 'rgba(1, 19, 163, 0.6)' }} />
                                 </div>
                                 <p className="text-gray-500 font-medium">그룹원이 없습니다</p>
                                 <p className="text-gray-400 text-sm mt-1">새로운 멤버를 초대해보세요</p>
@@ -1266,6 +1257,7 @@ function GroupPageContent() {
                         )}
                       </div>
                     </motion.div>
+                    </div>
                   </div>
                 </motion.div>
               ) : null}
@@ -1299,7 +1291,7 @@ function GroupPageContent() {
                   
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-normal text-indigo-700 mb-2">
+                      <label className="block text-sm font-normal mb-2" style={{ color: '#0113A3' }}>
                         그룹명 <span className="text-rose-500">*</span>
                       </label>
                       <input
@@ -1307,14 +1299,15 @@ function GroupPageContent() {
                         value={newGroup.name}
                         onChange={(e) => setNewGroup(prev => ({ ...prev, name: e.target.value }))}
                         placeholder="예: 가족, 친구, 직장"
-                        className="w-full px-4 py-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
+                        className="w-full px-4 py-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 text-base"
+                        style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
                         maxLength={50}
                       />
                       <p className="text-xs text-gray-500 mt-1">{newGroup.name.length}/50</p>
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-normal text-indigo-700 mb-2">
+                      <label className="block text-sm font-normal mb-2" style={{ color: '#0113A3' }}>
                         그룹 설명
                       </label>
                       <textarea
@@ -1322,7 +1315,8 @@ function GroupPageContent() {
                         onChange={(e) => setNewGroup(prev => ({ ...prev, description: e.target.value }))}
                         placeholder="그룹에 대한 간단한 설명을 입력해주세요"
                         rows={3}
-                        className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base"
+                        className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 resize-none text-base"
+                        style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
                         maxLength={100}
                       />
                       <p className="text-xs text-gray-500 mt-1">{newGroup.description.length}/100</p>
@@ -1342,7 +1336,8 @@ function GroupPageContent() {
                     <motion.button
                       onClick={handleSaveGroup}
                       disabled={newGroup.name.trim() === '' || isCreatingGroup}
-                      className="flex-1 py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                      className="flex-1 py-4 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                      style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -1456,7 +1451,7 @@ function GroupPageContent() {
                   
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-normal text-indigo-700 mb-2">
+                      <label className="block text-sm font-normal mb-2" style={{ color: '#0113A3' }}>
                         그룹명 <span className="text-rose-500">*</span>
                       </label>
                       <input
@@ -1464,14 +1459,15 @@ function GroupPageContent() {
                         value={editGroup.name}
                         onChange={(e) => setEditGroup(prev => ({ ...prev, name: e.target.value }))}
                         placeholder="예: 가족, 친구, 직장"
-                        className="w-full px-4 py-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base"
+                        className="w-full px-4 py-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 text-base"
+                        style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
                         maxLength={50}
                       />
                       <p className="text-xs text-gray-500 mt-1">{editGroup.name.length}/50</p>
                     </div>
                     
                     <div>
-                      <label className="block text-sm font-normal text-indigo-700 mb-2">
+                      <label className="block text-sm font-normal mb-2" style={{ color: '#0113A3' }}>
                         그룹 설명
                       </label>
                       <textarea
@@ -1479,7 +1475,8 @@ function GroupPageContent() {
                         onChange={(e) => setEditGroup(prev => ({ ...prev, description: e.target.value }))}
                         placeholder="그룹에 대한 간단한 설명을 입력해주세요"
                         rows={3}
-                        className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none text-base"
+                        className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 resize-none text-base"
+                        style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
                         maxLength={100}
                       />
                       <p className="text-xs text-gray-500 mt-1">{editGroup.description.length}/100</p>
@@ -1499,7 +1496,8 @@ function GroupPageContent() {
                     <motion.button
                       onClick={handleUpdateGroup}
                       disabled={editGroup.name.trim() === '' || isUpdatingGroup}
-                      className="flex-1 py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                      className="flex-1 py-4 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                      style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
@@ -1596,7 +1594,7 @@ function GroupPageContent() {
               >
                 <div className="p-6 pb-8">
                   <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'rgba(1, 19, 163, 0.1)' }}>
                       <img
                         src={getSafeImageUrl(selectedMember.photo || null, selectedMember.mt_gender, selectedMember.original_index)}
                         alt={selectedMember.mt_name}
@@ -1734,10 +1732,10 @@ function GroupPageContent() {
 export default function GroupPageWithSuspense() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(to bottom right, rgba(1, 19, 163, 0.1), rgba(168, 85, 247, 0.05), rgba(236, 72, 153, 0.1))' }}>
         <div className="text-center px-6">
-          <HiUserGroup className="w-16 h-16 text-indigo-500 mx-auto mb-4 animate-pulse" />
-          <p className="text-indigo-600 font-medium">로딩 중...</p>
+          <HiUserGroup className="w-16 h-16 mx-auto mb-4 animate-pulse" style={{ color: '#0113A3' }} />
+          <p className="font-medium" style={{ color: '#0113A3' }}>로딩 중...</p>
         </div>
       </div>
     }> 

@@ -3499,7 +3499,8 @@ export default function HomePage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen relative overflow-hidden"
+        className="min-h-screen relative overflow-hidden"
+        style={{ background: 'linear-gradient(to bottom right, #f0f9ff, white, #fdf4ff)' }}
       >
         {/* 개선된 헤더 - logs/page.tsx 패턴 적용 */}
         <motion.header 
@@ -3515,12 +3516,7 @@ export default function HomePage() {
             <div className="flex items-center justify-between h-16 px-4">
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-3">
-                  <motion.div
-                    initial={{ rotate: -180, scale: 0 }}
-                    animate={{ rotate: 0, scale: 1 }}
-                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                    className="p-2 bg-indigo-600 rounded-xl"
-                  >
+                  <div className="p-2 rounded-xl" style={{ backgroundColor: '#0113A3' }}>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       className="h-5 w-5 text-white"
@@ -3530,7 +3526,7 @@ export default function HomePage() {
                       <path d="M11.47 3.841a.75.75 0 0 1 1.06 0l8.69 8.69a.75.75 0 1 0 1.06-1.061l-8.689-8.69a2.25 2.25 0 0 0-3.182 0l-8.69 8.69a.75.75 0 1 0 1.061 1.06l8.69-8.689Z" />
                       <path d="m12 5.432 8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 0 1-.75-.75v-4.5a.75.75 0 0 0-.75-.75h-3a.75.75 0 0 0-.75.75V21a.75.75 0 0 1-.75.75H5.625a1.875 1.875 0 0 1-1.875-1.875v-6.198a2.29 2.29 0 0 0 .091-.086L12 5.432Z" />
                     </svg>
-                  </motion.div>
+                  </div>
                   <div>
                     <h1 className="text-base font-semibold text-gray-900">홈</h1>
                     <p className="text-xs text-gray-500">그룹 멤버들과 실시간으로 소통해보세요</p>
@@ -3640,10 +3636,10 @@ export default function HomePage() {
            }}
            whileTap={{ scale: 0.9 }}
            onClick={toggleSidebar}
-           className="fixed bottom-20 right-4 z-40 w-14 h-14 bg-indigo-600 rounded-full shadow-lg flex items-center justify-center text-white"
+           className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
            style={{
-             background: '#4f46e5',
-             boxShadow: '0 8px 25px rgba(79, 70, 229, 0.3)'
+             background: '#0113A3',
+             boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)'
            }}
          >
            {isSidebarOpen ? (
@@ -3672,7 +3668,8 @@ export default function HomePage() {
            {/* 펄스 효과 */}
            {!isSidebarOpen && (
              <motion.div
-               className="absolute inset-0 rounded-full bg-indigo-500"
+               className="absolute inset-0 rounded-full"
+               style={{ background: '#0113A3' }}
                animate={{
                  scale: [1, 1.4, 1],
                  opacity: [0.6, 0, 0.6]
@@ -3709,7 +3706,13 @@ export default function HomePage() {
                    initial="closed"
                    animate="open"
                    exit="closed"
-                   className="fixed left-0 top-0 bottom-0 w-80 bg-gradient-to-br from-indigo-50 to-pink-50 shadow-2xl border-r border-indigo-100/50 z-50 h-full flex flex-col"
+                   className="fixed left-0 top-0 w-80 shadow-2xl border-r z-50 flex flex-col"
+                   style={{ 
+                     background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
+                     borderColor: 'rgba(1, 19, 163, 0.1)',
+                     bottom: '60px', // 네비게이션 바 높이만큼 여유 공간
+                     height: 'calc(100vh - 60px)'
+                   }}
                  >
                    <motion.div
                      variants={sidebarContentVariants}
@@ -3722,7 +3725,8 @@ export default function HomePage() {
                    <div className="flex items-center justify-between mb-6">
                      <div className="flex items-center space-x-3">
                        <motion.div 
-                         className="p-2 bg-indigo-700 rounded-xl shadow-lg"
+                         className="p-2 rounded-xl shadow-lg"
+                         style={{ backgroundColor: '#0113A3' }}
                          whileHover={{ scale: 1.05, rotate: 5 }}
                          whileTap={{ scale: 0.95 }}
                        >
@@ -3750,7 +3754,7 @@ export default function HomePage() {
                    {/* 그룹 목록 섹션 */}
                    <div className="mb-5">
                      <div className="flex items-center space-x-2 mb-3">
-                                               <div className="w-2 h-2 bg-indigo-700 rounded-full"></div>
+                                               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#0113A3' }}></div>
                        <h3 className="text-base font-semibold text-gray-800">그룹 목록</h3>
                      </div>
                      
@@ -3762,7 +3766,11 @@ export default function HomePage() {
                            e.stopPropagation();
                            setIsGroupSelectorOpen(!isGroupSelectorOpen);
                          }}
-                         className="w-full flex items-center justify-between px-4 py-3 bg-white/70 backdrop-blur-sm border border-indigo-200/50 rounded-xl text-sm font-medium hover:bg-white/90 hover:border-indigo-300/70 hover:shadow-md transition-all duration-200"
+                         className="w-full flex items-center justify-between px-4 py-3 bg-white/70 backdrop-blur-sm border rounded-xl text-sm font-medium hover:bg-white/90 hover:shadow-md transition-all duration-200"
+                         style={{ 
+                           borderColor: 'rgba(1, 19, 163, 0.2)',
+                           '--hover-border-color': 'rgba(1, 19, 163, 0.4)'
+                         } as React.CSSProperties}
                          disabled={isUserDataLoading}
                        >
                          <span className="truncate text-gray-700">
@@ -3806,14 +3814,18 @@ export default function HomePage() {
                                  }}
                                  className={`w-full px-3 py-2 text-left text-xs focus:outline-none transition-colors ${
                                    selectedGroupId === group.sgt_idx 
-                                     ? 'bg-indigo-50 text-indigo-700 font-semibold' 
-                                     : 'text-gray-900 hover:bg-indigo-50'
+                                     ? 'font-semibold' 
+                                     : 'text-gray-900 hover:bg-blue-50'
                                  }`}
+                                 style={selectedGroupId === group.sgt_idx 
+                                   ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' }
+                                   : {}
+                                 }
                                >
                                  <div className="flex items-center justify-between">
                                    <span className="truncate">{group.sgt_title}</span>
                                    {selectedGroupId === group.sgt_idx && (
-                                     <span className="text-indigo-700 ml-2">✓</span>
+                                     <span className="ml-2" style={{ color: '#0113A3' }}>✓</span>
                                    )}
                                  </div>
                                  <div className="text-xs text-gray-500 mt-0.5">
@@ -3833,7 +3845,7 @@ export default function HomePage() {
                        <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
                        <h3 className="text-base font-semibold text-gray-800">날짜 선택</h3>
                      </div>
-                     <div className="relative overflow-hidden rounded-xl bg-white/60 backdrop-blur-sm p-3 border border-indigo-100/50">
+                     <div className="relative overflow-hidden rounded-xl bg-white/60 backdrop-blur-sm p-3 border" style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}>
                        <motion.div
                          className="flex space-x-2 cursor-grab active:cursor-grabbing"
                          style={{ 
@@ -3900,14 +3912,26 @@ export default function HomePage() {
                              whileHover={{ scale: 1.05 }}
                              whileTap={{ scale: 0.95 }}
                              onClick={() => {
+                               // 햅틱 피드백
+                               try {
+                                 if ('vibrate' in navigator) {
+                                   navigator.vibrate([10]);
+                                 }
+                               } catch (err) {
+                                 console.debug('햅틱 피드백 차단');
+                               }
                                handleDateSelect(day.value);
                              }}
                              data-calendar-swipe="true"
                              className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-normal transition-all duration-300 min-w-[75px] focus:outline-none ${
                                selectedDate === day.value
-                                 ? 'bg-indigo-700 text-white shadow-lg scale-105'
-                                 : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-md hover:scale-102 border border-indigo-100/50'
+                                 ? 'text-white shadow-lg scale-105'
+                                 : 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-md hover:scale-102 border'
                              }`}
+                             style={selectedDate === day.value 
+                               ? { backgroundColor: '#0113A3' }
+                               : { borderColor: 'rgba(1, 19, 163, 0.1)' }
+                             }
                            >
                              {day.display}
                            </motion.button>
@@ -3926,7 +3950,7 @@ export default function HomePage() {
                          {groupMembers.length}명
                        </span>
                      </div>
-                     <div className="h-full overflow-y-auto hide-scrollbar space-y-3">
+                     <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-16">
                        {groupMembers.length > 0 ? (
                          <motion.div variants={sidebarContentVariants} className="space-y-2">
                            {groupMembers.map((member, index) => {
@@ -3943,9 +3967,19 @@ export default function HomePage() {
                                  }}
                                  className={`p-4 rounded-xl cursor-pointer transition-all duration-300 backdrop-blur-sm ${
                                    member.isSelected 
-                                     ? 'bg-gradient-to-br from-indigo-50/80 to-pink-50/80 border-2 border-indigo-300/50 shadow-lg shadow-indigo-100' 
-                                     : 'bg-white/60 hover:bg-white/90 border border-indigo-100/50 hover:border-indigo-200/70 hover:shadow-md'
+                                     ? 'border-2 shadow-lg' 
+                                     : 'bg-white/60 hover:bg-white/90 border hover:shadow-md'
                                  }`}
+                                 style={member.isSelected 
+                                   ? { 
+                                       background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.8), rgba(253, 244, 255, 0.8))',
+                                       borderColor: 'rgba(1, 19, 163, 0.3)',
+                                       boxShadow: '0 10px 25px rgba(1, 19, 163, 0.1)'
+                                     }
+                                   : { 
+                                       borderColor: 'rgba(1, 19, 163, 0.1)'
+                                     }
+                                 }
 
                                >
                                  <div className="flex items-center space-x-4">
@@ -3953,9 +3987,16 @@ export default function HomePage() {
                                      <motion.div 
                                        className={`w-12 h-12 rounded-full overflow-hidden ${
                                          member.isSelected 
-                                           ? 'ring-3 ring-indigo-400/50 shadow-lg shadow-indigo-200' 
+                                           ? 'ring-3 shadow-lg' 
                                            : 'ring-2 ring-white/50'
                                        }`}
+                                       style={member.isSelected 
+                                         ? { 
+                                             '--tw-ring-color': 'rgba(1, 19, 163, 0.3)',
+                                             boxShadow: '0 10px 25px rgba(1, 19, 163, 0.2)'
+                                           } as React.CSSProperties
+                                         : {}
+                                       }
                                        whileHover={{ scale: 1.1, rotate: 5 }}
                                        transition={{ type: "spring", stiffness: 300 }}
                                      >
@@ -4015,7 +4056,7 @@ export default function HomePage() {
                                    </div>
                                    {/* {member.isSelected && (
                                      <div className="flex-shrink-0">
-                                       <div className="w-2 h-2 bg-indigo-700 rounded-full animate-pulse"></div>
+                                       <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: '#0113A3' }}></div>
                                      </div>
                                    )} */}
                                  </div>
