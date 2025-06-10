@@ -179,7 +179,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const locationData = preloadResult.todayLocationData[groupId];
         if (locationData) {
           const today = new Date().toISOString().split('T')[0];
-          setLocationData(parseInt(groupId), today, locationData);
+          setLocationData(parseInt(groupId), today, userId.toString(), locationData);
           console.log(`[AUTH] ✅ 그룹 ${groupId} 오늘 위치 데이터 캐시 저장 완료`);
         }
       });
