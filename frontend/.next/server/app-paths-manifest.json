@@ -1,8 +1,12 @@
 {
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/schedule/page": "app/schedule/page.js",
+  "/api/groups/current-user/route": "app/api/groups/current-user/route.js",
+  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
+  "/api/push-logs/[...slug]/route": "app/api/push-logs/[...slug]/route.js",
+  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
+  "/api/locations/other-members/[memberId]/route": "app/api/locations/other-members/[memberId]/route.js",
   "/home/page": "app/home/page.js",
-  "/location/page": "app/location/page.js",
   "/logs/page": "app/logs/page.js",
+  "/location/page": "app/location/page.js",
+  "/schedule/page": "app/schedule/page.js",
   "/group/page": "app/group/page.js"
 }
