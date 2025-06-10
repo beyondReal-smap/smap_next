@@ -3875,7 +3875,7 @@ export default function LocationPage() {
           
           {/* 커스텀 줌 컨트롤 */}
           {map && (
-            <div className="absolute top-[200px] right-[10px] z-30 flex flex-col space-y-1">
+            <div className="absolute top-[100px] right-[10px] z-30 flex flex-col space-y-1">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

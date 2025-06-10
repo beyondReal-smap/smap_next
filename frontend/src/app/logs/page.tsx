@@ -3317,7 +3317,7 @@ export default function LogsPage() {
         initial="initial"
         animate="in"
         exit="out"
-        className="bg-gradient-to-br from-purple-50 via-white to-pink-50 min-h-screen relative overflow-hidden"
+        className="min-h-screen relative overflow-hidden" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #ffffff, #fdf4ff)' }}
       >
         {/* 통합 헤더 - 내용만 변경됨 */}
         <motion.header 
@@ -3328,7 +3328,7 @@ export default function LogsPage() {
               ease: [0.22, 1, 0.36, 1],
               delay: 0.1 
             }}
-            className="fixed top-0 left-0 right-0 z-20 bg-gradient-to-r from-purple-50/90 via-white/95 to-pink-50/90 backdrop-blur-sm border-b border-purple-100/50 h-16"
+            className="fixed top-0 left-0 right-0 z-20 backdrop-blur-sm border-b h-16" style={{ background: 'linear-gradient(to right, rgba(240, 249, 255, 0.9), rgba(255, 255, 255, 0.95), rgba(253, 244, 255, 0.9))', borderColor: 'rgba(1, 19, 163, 0.1)' }}
           >
             {/* 헤더 내용 */}
             {showHeader && (
@@ -3341,11 +3341,8 @@ export default function LogsPage() {
               >
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-3">
-                  <motion.div
-                    initial={{ rotate: -180, scale: 0 }}
-                    animate={{ rotate: 0, scale: 1 }}
-                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                    className="p-2 bg-indigo-600 rounded-xl"
+                  <div
+                    className="p-2 rounded-xl" style={{ backgroundColor: '#0113A3' }}
                   >
                     <svg 
                     className="w-5 h-5 text-white" 
@@ -3355,7 +3352,7 @@ export default function LogsPage() {
                     <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75-6.75a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
                     <path d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z" />
                   </svg>
-                  </motion.div>
+                  </div>
                   <div>
                     <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
                     <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
@@ -3390,7 +3387,7 @@ export default function LogsPage() {
                       stiffness: 200
                     }}
                   >
-                    <FiClock className="w-4 h-4 text-purple-600" />
+                    <FiClock className="w-4 h-4" style={{ color: '#0113A3' }} />
                   </motion.div>
                   <h3 className="text-base font-bold text-gray-900">날짜 선택</h3>
                   <motion.div 
@@ -3455,11 +3452,12 @@ export default function LogsPage() {
                         disabled={!day.hasLogs && !isSelected}
                         className={`px-2.5 py-1 rounded-lg flex-shrink-0 focus:outline-none text-xs min-w-[65px] h-7 flex flex-col justify-center items-center border transition-all duration-300 ${
                           isSelected
-                            ? `bg-purple-600 text-white font-semibold shadow-md border-purple-600 ${!day.hasLogs ? 'opacity-70' : ''}`
+                            ? `text-white font-semibold shadow-md ${!day.hasLogs ? 'opacity-70' : ''}` + ` border-[#0113A3]`
                             : day.hasLogs
-                            ? 'bg-white text-gray-700 hover:bg-purple-50 hover:border-purple-300 border-gray-200 font-medium shadow-sm'
+                            ? 'bg-white text-gray-700 border-gray-200 font-medium shadow-sm'
                             : 'bg-gray-50 text-gray-400 line-through cursor-not-allowed border-gray-100 font-medium'
                         }`}
+                        style={isSelected ? { backgroundColor: '#0113A3' } : {}}
                       >
                         <motion.div 
                           className="text-center text-xs whitespace-nowrap font-medium"
@@ -3537,7 +3535,9 @@ export default function LogsPage() {
                       className="content-section members-section rounded-2xl p-4 border border-indigo-100 h-[200px] overflow-y-auto hide-scrollbar"
                     style={{
                       background: 'linear-gradient(to right, #eef2ff, #faf5ff) !important',
-                      backgroundImage: 'linear-gradient(to right, #eef2ff, #faf5ff) !important'
+                      backgroundImage: 'linear-gradient(to right, #eef2ff, #faf5ff) !important',
+                      borderColor: '#0113A3',
+                      borderWidth: '1px'
                     }}
                   >
                     <motion.div 
@@ -3549,7 +3549,7 @@ export default function LogsPage() {
                                               <div className="flex justify-between items-center mb-2">
                           <div className="flex items-center space-x-3">
                             <div className="flex items-center space-x-2">
-                              <FiUser className="w-5 h-5 text-indigo-600" />
+                              <FiUser className="w-5 h-5" style={{ color: '#0113A3' }} />
                               <div>
                                 <h2 className="text-base font-semibold text-gray-900">그룹 멤버</h2>
                               </div>
@@ -3625,7 +3625,7 @@ export default function LogsPage() {
                                           variants={spinnerVariants}
                                           animate="animate"
                                         >
-                                          <FiLoader className="text-indigo-500" size={16} />
+                                          <FiLoader className="" style={{ color: '#0113A3' }} size={16} />
                                         </motion.div>
                                         <span className="text-sm text-gray-600">로딩 중...</span>
                       </div>
@@ -3650,9 +3650,10 @@ export default function LogsPage() {
                                         }}
                                         className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
                                           selectedGroupId === group.sgt_idx
-                                            ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                            ? 'font-medium'
                                             : 'text-gray-700'
                                         }`}
+                                        style={selectedGroupId === group.sgt_idx ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' } : {}}
                                       >
                                         <div className="flex items-center justify-between">
                                           <div className="flex-1">
@@ -3661,7 +3662,7 @@ export default function LogsPage() {
                                             </div>
                                           </div>
                                           {selectedGroupId === group.sgt_idx && (
-                                            <svg className="w-3 h-3 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg className="w-3 h-3 flex-shrink-0" style={{ color: '#0113A3' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                             </svg>
                                           )}
@@ -3743,8 +3744,9 @@ export default function LogsPage() {
                                     />
                                   </motion.div>
                                   <span className={`block text-sm font-normal mt-1 transition-colors duration-200 ${
-                                    member.isSelected ? 'text-indigo-700' : 'text-gray-700'
-                                  }`}>
+                                    member.isSelected ? '' : 'text-gray-700'
+                                  }`}
+                                  style={member.isSelected ? { color: '#0113A3' } : {}}>
                                 {member.name}
                               </span>
                                 </motion.button>
@@ -3855,8 +3857,9 @@ export default function LogsPage() {
                 <div className="flex justify-center items-center space-x-2 mb-2">
                   <motion.div
                     className={`rounded-full transition-all duration-300 ${
-                      activeLogView === 'members' ? 'bg-indigo-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
+                      activeLogView === 'members' ? 'w-6 h-2' : 'bg-gray-300 w-2 h-2'
                     }`}
+                    style={activeLogView === 'members' ? { backgroundColor: '#0113A3' } : {}}
                     initial={{ scale: 0.8 }}
                     animate={{ scale: 1 }}
                     transition={{ duration: 0.3 }}
