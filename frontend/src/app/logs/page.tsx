@@ -587,6 +587,10 @@ export default function LogsPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   
+  // 사이드바 날짜 스크롤 관련 상태 추가
+  const sidebarDateX = useMotionValue(0); // 사이드바 날짜 선택용 motionValue
+  const sidebarDraggingRef = useRef(false); // 사이드바 드래그용 ref
+  
   // activeLogView 변경 시 스와이프 컨테이너 스크롤 위치 조정 (초기 로드 시는 제외)
   useEffect(() => {
     // 초기 로드 시 자동 스크롤하지 않도록 제거 - 사용자 의도적인 뷰 변경 시에만 스크롤
@@ -920,6 +924,18 @@ export default function LogsPage() {
       setMemberLogDistribution(distribution);
     }
   }, [dailyCountsData, groupMembers, calculateMemberLogDistribution]);
+
+  // 사이드바 날짜 선택 부분 초기 스크롤 설정
+  useEffect(() => {
+    if (isSidebarOpen && dateScrollContainerRef.current) {
+      // 사이드바가 열리고 DOM이 렌더링된 후 오늘 날짜로 스크롤
+      const timer = setTimeout(() => {
+        scrollToTodayDate('사이드바 날짜 초기화');
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isSidebarOpen]);
 
   // home/page.tsx와 동일한 드래그 핸들러들
   const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
@@ -3168,9 +3184,31 @@ export default function LogsPage() {
     }
   }, [isGroupSelectorOpen]);
 
+  // 사이드바 날짜 스크롤 함수
+  const scrollSidebarDateToToday = () => {
+    if (sidebarDateX) {
+      const recentDays = getRecentDays();
+      const totalWidth = recentDays.length * 85; // 각 버튼 width (min-w-[75px] + gap)
+      const containerWidth = 200; // 컨테이너 width
+      const maxScroll = Math.max(0, totalWidth - containerWidth);
+      
+      // 오늘이 맨 오른쪽에 있으므로 최대한 왼쪽으로 스크롤
+      sidebarDateX.set(-maxScroll);
+      console.log('[사이드바 날짜] 오늘 날짜로 스크롤 완료', { totalWidth, containerWidth, maxScroll });
+    }
+  };
+
   // 사이드바 토글 함수
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
+    
+    // 사이드바가 열릴 때 날짜 스크롤을 오늘 날짜로 이동
+    if (!isSidebarOpen) {
+      setTimeout(() => {
+        scrollSidebarDateToToday();
+        scrollToTodayDate('사이드바 열림');
+      }, 100); // 사이드바 애니메이션 시작 후 바로 실행
+    }
   };
 
   // 사이드바 외부 클릭 처리
@@ -3190,6 +3228,15 @@ export default function LogsPage() {
     return () => {
       document.removeEventListener('mousedown', handleSidebarClickOutside);
     };
+  }, [isSidebarOpen]);
+
+  // 사이드바가 열릴 때 날짜 스크롤 초기화
+  useEffect(() => {
+    if (isSidebarOpen) {
+      setTimeout(() => {
+        scrollSidebarDateToToday();
+      }, 150);
+    }
   }, [isSidebarOpen]);
 
   // 첫번째 멤버 자동 선택 및 위치 데이터 로딩 - 메인 인스턴스에서만
@@ -3649,23 +3696,18 @@ export default function LogsPage() {
                           {/* 그룹 선택 드롭다운 */}
                           <div className="relative" ref={groupDropdownRef}>
                             <motion.button
-                              whileHover={{ 
-                                scale: 1.02, 
-                                y: -2,
-                                borderColor: "#6366f1",
-                                boxShadow: "0 4px 12px rgba(99, 102, 241, 0.15)",
-                                transition: { duration: 0.2, ease: "easeOut" }
-                              }}
-                              whileTap={{ 
-                                scale: 0.98,
-                                transition: { duration: 0.1, ease: "easeInOut" }
-                              }}
+                              whileHover={{ scale: 1.02, y: -1 }}
+                              whileTap={{ scale: 0.98 }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 console.log('[그룹 드롭다운] 버튼 클릭, 현재 상태:', isGroupSelectorOpen);
                                 setIsGroupSelectorOpen(!isGroupSelectorOpen);
                               }}
-                              className="group-selector flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium min-w-[120px] mobile-button"
+                              className="flex items-center justify-between px-4 py-3 bg-white/70 backdrop-blur-sm border rounded-xl text-sm font-medium hover:bg-white/90 hover:shadow-md transition-all duration-200"
+                              style={{ 
+                                borderColor: 'rgba(1, 19, 163, 0.2)',
+                                '--hover-border-color': 'rgba(1, 19, 163, 0.4)'
+                              } as React.CSSProperties}
                               disabled={isUserDataLoading}
                               data-group-selector="true"
                             >
@@ -3677,21 +3719,16 @@ export default function LogsPage() {
                               </span>
                               <div className="ml-2 flex-shrink-0">
                                 {isUserDataLoading ? (
-                                  <motion.div
-                                    variants={spinnerVariants}
-                                    animate="animate"
-                                  >
-                                    <FiLoader className="text-gray-400" size={14} />
-                                  </motion.div>
+                                  <FiLoader className="animate-spin text-gray-400" size={14} />
                                 ) : (
                                   <motion.div
                                     animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-                                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                                    transition={{ duration: 0.2 }}
                                   >
-                                    <FiChevronDown className="text-gray-400" size={12} />
+                                    <FiChevronDown className="text-gray-400" size={14} />
                                   </motion.div>
                                 )}
-                          </div>
+                              </div>
                             </motion.button>
 
                             {/* 그룹 선택 드롭다운 메뉴 */}
@@ -3700,8 +3737,8 @@ export default function LogsPage() {
                                 initial={{ opacity: 0, y: -10, scale: 0.95 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                                transition={{ duration: 0.15, ease: [0.22, 1, 0.36, 1] }}
-                                className="absolute top-full mt-1 right-0 z-50 min-w-[160px] bg-white border border-gray-200 rounded-lg shadow-xl max-h-40 overflow-y-auto"
+                                transition={{ duration: 0.2 }}
+                                className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                 }}
@@ -3719,11 +3756,11 @@ export default function LogsPage() {
                                         <span className="text-sm text-gray-600">로딩 중...</span>
                       </div>
                                     </div>
-                                  ) : userGroups.length > 0 ? (
+                                  ) :                                   userGroups.length > 0 ? (
                                     userGroups.map((group) => (
                                       <motion.button
                                         key={group.sgt_idx}
-                                        whileHover={{ backgroundColor: '#f8fafc' }}
+                                        whileHover={{ backgroundColor: "rgba(99, 102, 241, 0.05)" }}
                                         whileTap={{ scale: 0.98 }}
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -3737,24 +3774,24 @@ export default function LogsPage() {
                                           
                                           handleGroupSelect(group.sgt_idx);
                                         }}
-                                        className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
-                                          selectedGroupId === group.sgt_idx
-                                            ? 'font-medium'
-                                            : 'text-gray-700'
+                                        className={`w-full px-3 py-2 text-left text-xs focus:outline-none transition-colors ${
+                                          selectedGroupId === group.sgt_idx 
+                                            ? 'font-semibold' 
+                                            : 'text-gray-900 hover:bg-blue-50'
                                         }`}
-                                        style={selectedGroupId === group.sgt_idx ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' } : {}}
+                                        style={selectedGroupId === group.sgt_idx 
+                                          ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' }
+                                          : {}
+                                        }
                                       >
                                         <div className="flex items-center justify-between">
-                                          <div className="flex-1">
-                                            <div className="font-medium truncate">
-                                              {group.sgt_title} ({groupMemberCounts[group.sgt_idx] || 0}명)
-                                            </div>
-                                          </div>
+                                          <span className="truncate">{group.sgt_title}</span>
                                           {selectedGroupId === group.sgt_idx && (
-                                            <svg className="w-3 h-3 flex-shrink-0" style={{ color: '#0113A3' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
+                                            <span className="ml-2" style={{ color: '#0113A3' }}>✓</span>
                                           )}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                          {groupMemberCounts[group.sgt_idx] || 0}명의 멤버
                                         </div>
                                       </motion.button>
                                     ))
@@ -4104,7 +4141,7 @@ export default function LogsPage() {
                 </motion.button>
               </div>
 
-              {/* 그룹 목록 섹션 */}
+                            {/* 그룹 목록 섹션 */}
               <div className="mb-5">
                 <div className="flex items-center space-x-2 mb-3">
                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#0113A3' }}></div>
@@ -4165,24 +4202,24 @@ export default function LogsPage() {
                               }
                               setIsGroupSelectorOpen(false);
                             }}
-                            className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
-                              selectedGroupId === group.sgt_idx
-                                ? 'font-medium'
-                                : 'text-gray-700'
+                            className={`w-full px-3 py-2 text-left text-xs focus:outline-none transition-colors ${
+                              selectedGroupId === group.sgt_idx 
+                                ? 'font-semibold' 
+                                : 'text-gray-900 hover:bg-blue-50'
                             }`}
-                            style={selectedGroupId === group.sgt_idx ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' } : {}}
+                            style={selectedGroupId === group.sgt_idx 
+                              ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' }
+                              : {}
+                            }
                           >
                             <div className="flex items-center justify-between">
-                              <div className="flex-1">
-                                <div className="font-medium truncate">
-                                  {group.sgt_title} ({groupMemberCounts[group.sgt_idx] || 0}명)
-                                </div>
-                              </div>
+                              <span className="truncate">{group.sgt_title}</span>
                               {selectedGroupId === group.sgt_idx && (
-                                <svg className="w-3 h-3 flex-shrink-0" style={{ color: '#0113A3' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
+                                <span className="ml-2" style={{ color: '#0113A3' }}>✓</span>
                               )}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {groupMemberCounts[group.sgt_idx] || 0}명의 멤버
                             </div>
                           </motion.button>
                         ))}
@@ -4190,12 +4227,12 @@ export default function LogsPage() {
                     )}
                   </AnimatePresence>
                 </div>
-                              </div>
+              </div>
 
                 {/* 날짜 선택 섹션 */}
-                <div className="border-b border-gray-100 pb-4 mb-4">
+                <div className="mb-5">
                   <div className="flex items-center space-x-2 mb-3">
-                    <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full"></div>
+                    <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
                     <h3 className="text-base font-semibold text-gray-800">날짜 선택</h3>
                     <div className="flex-1 h-px bg-gradient-to-r from-blue-200/50 to-transparent"></div>
                     <span className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-full backdrop-blur-sm">
@@ -4206,67 +4243,112 @@ export default function LogsPage() {
                       })()}
                     </span>
                   </div>
-                  
-                  <div 
-                    ref={dateScrollContainerRef} 
-                    className="flex space-x-2 overflow-x-auto hide-scrollbar pb-2"
-                    style={{ scrollBehavior: 'auto' }}
-                  >
-                    {getRecentDays().map((day, idx) => {
-                      const isSelected = selectedDate === day.value;
-                      const isToday = idx === getRecentDays().length - 1;
+                  <div className="relative overflow-hidden rounded-xl bg-white/60 backdrop-blur-sm p-3 border" style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}>
+                    <motion.div
+                      className="flex space-x-2 cursor-grab active:cursor-grabbing"
+                      style={{ 
+                        x: sidebarDateX,
+                        touchAction: 'pan-x'
+                      }}
+                      drag="x"
+                      dragConstraints={{
+                        left: -(Math.max(0, (getRecentDays().length * 85) - 200)),
+                        right: 0
+                      }}
+                      data-calendar-swipe="true"
+                      onDragStart={() => {
+                        sidebarDraggingRef.current = true;
+                        console.log('📅 [Sidebar Calendar] Drag Start');
+                      }}
+                      onDragEnd={(e, info) => {
+                        console.log('📅 [Sidebar Calendar] Drag End - offset:', info.offset.x, 'velocity:', info.velocity.x);
+                        setTimeout(() => { sidebarDraggingRef.current = false; }, 50);
 
-                      return (
-                        <motion.button 
-                          key={idx} 
-                          whileHover={{ 
-                            y: day.hasLogs || isSelected ? -2 : 0,
-                            scale: day.hasLogs || isSelected ? 1.05 : 1,
-                            transition: { duration: 0.2 }
-                          }}
-                          whileTap={{ 
-                            y: -1,
-                            scale: 0.95,
-                            transition: { duration: 0.1 }
-                          }}
-                          onClick={() => day.hasLogs && handleDateSelect(day.value)}
-                          disabled={!day.hasLogs && !isSelected}
-                          className={`px-3 py-2 rounded-xl flex-shrink-0 focus:outline-none text-xs min-w-[70px] h-10 flex flex-col justify-center items-center border transition-all duration-300 backdrop-blur-sm ${
-                            isSelected
-                              ? `text-white font-semibold shadow-lg ${!day.hasLogs ? 'opacity-70' : ''}` 
-                              : day.hasLogs
-                              ? 'bg-white/80 text-gray-700 border-gray-200 font-medium shadow-sm hover:bg-white hover:shadow-md'
-                              : 'bg-gray-50/50 text-gray-400 line-through cursor-not-allowed border-gray-100 font-medium'
-                          }`}
-                          style={isSelected 
-                            ? { 
-                                backgroundColor: '#0113A3', 
-                                borderColor: '#0113A3',
-                                boxShadow: '0 4px 12px rgba(1, 19, 163, 0.25)'
-                              } 
-                            : {}
+                        const swipeThreshold = 50;
+                        const velocityThreshold = 200;
+
+                        let shouldChangeDate = false;
+                        let direction: 'prev' | 'next' | null = null;
+
+                        // 스와이프 거리나 속도로 날짜 변경 판단
+                        if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
+                          direction = 'next';
+                          shouldChangeDate = true;
+                        } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
+                          direction = 'prev';
+                          shouldChangeDate = true;
+                        }
+
+                        if (shouldChangeDate && direction) {
+                          const recentDays = getRecentDays();
+                          const currentIndex = recentDays.findIndex(day => day.value === selectedDate);
+                          
+                          if (direction === 'next' && currentIndex < recentDays.length - 1) {
+                            const nextDay = recentDays[currentIndex + 1];
+                            if (nextDay.hasLogs) {
+                              handleDateSelect(nextDay.value);
+                              console.log('📅 [Sidebar] 다음 날짜로 변경:', nextDay.value);
+                            }
+                          } else if (direction === 'prev' && currentIndex > 0) {
+                            const prevDay = recentDays[currentIndex - 1];
+                            if (prevDay.hasLogs) {
+                              handleDateSelect(prevDay.value);
+                              console.log('📅 [Sidebar] 이전 날짜로 변경:', prevDay.value);
+                            }
                           }
+
+                          // 햅틱 피드백
+                          try {
+                            if ('vibrate' in navigator) {
+                              navigator.vibrate([15]);
+                            }
+                          } catch (err) {
+                            console.debug('햅틱 차단');
+                          }
+                        }
+
+                        // 원래 위치로 복원
+                        sidebarDateX.set(0);
+                      }}
+                    >
+                      {getRecentDays().map((day, index) => (
+                        <motion.button
+                          key={day.value}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => {
+                            // 햅틱 피드백
+                            try {
+                              if ('vibrate' in navigator) {
+                                navigator.vibrate([10]);
+                              }
+                            } catch (err) {
+                              console.debug('햅틱 피드백 차단');
+                            }
+                            if (day.hasLogs) {
+                              handleDateSelect(day.value);
+                            }
+                          }}
+                          data-calendar-swipe="true"
+                          className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-normal transition-all duration-300 min-w-[75px] focus:outline-none ${
+                            selectedDate === day.value
+                              ? 'text-white shadow-lg scale-105'
+                              : day.hasLogs
+                              ? 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-md hover:scale-102 border'
+                              : 'bg-gray-50/50 text-gray-400 line-through cursor-not-allowed border-gray-100'
+                          }`}
+                          style={selectedDate === day.value 
+                            ? { backgroundColor: '#0113A3' }
+                            : day.hasLogs
+                            ? { borderColor: 'rgba(1, 19, 163, 0.1)' }
+                            : { borderColor: 'rgba(156, 163, 175, 0.1)' }
+                          }
+                          disabled={!day.hasLogs && selectedDate !== day.value}
                         >
-                          <div className="text-center text-xs whitespace-nowrap font-medium">
-                            {day.display}
-                          </div>
-                          {isSelected && (
-                            <motion.div 
-                              className="w-1 h-1 bg-white rounded-full mt-1"
-                              animate={{
-                                opacity: [0.5, 1, 0.5],
-                                scale: [0.8, 1.2, 0.8],
-                              }}
-                              transition={{ 
-                                duration: 2, 
-                                repeat: Infinity, 
-                                ease: "easeInOut" 
-                              }}
-                            />
-                          )}
+                          {day.display}
                         </motion.button>
-                      );
-                    })}
+                      ))}
+                    </motion.div>
                   </div>
                 </div>
 

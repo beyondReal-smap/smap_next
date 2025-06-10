@@ -4817,45 +4817,64 @@ export default function LocationPage() {
                 {/* 그룹 선택 드롭다운 */}
                 <div className="mb-6">
                   <div className="flex items-center space-x-2 mb-3">
-                    <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
-                    <h3 className="text-base font-semibold text-gray-800">그룹 선택</h3>
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#0113A3' }}></div>
+                    <h3 className="text-base font-semibold text-gray-800">그룹 목록</h3>
                   </div>
                   <div className="relative" ref={groupDropdownRef}>
                     <motion.button
-                      whileHover={{ scale: 1.02, borderColor: "#0113A3" }}
+                      whileHover={{ scale: 1.02, y: -1 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
-                      className="w-full p-3 bg-white/80 backdrop-blur-sm border rounded-xl flex items-center justify-between text-left transition-all duration-200"
-                      style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}
+                      className="w-full flex items-center justify-between px-4 py-3 bg-white/70 backdrop-blur-sm border rounded-xl text-sm font-medium hover:bg-white/90 hover:shadow-md transition-all duration-200"
+                      style={{ 
+                        borderColor: 'rgba(1, 19, 163, 0.2)',
+                        '--hover-border-color': 'rgba(1, 19, 163, 0.4)'
+                      } as React.CSSProperties}
+                      disabled={isLoadingGroups}
                     >
-                      <span className="text-gray-700 font-medium">
-                        {userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'}
+                      <span className="truncate text-gray-700">
+                        {isLoadingGroups 
+                          ? '로딩 중...' 
+                          : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
+                        }
                       </span>
-                      <motion.div
-                        animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <FiChevronDown className="text-gray-400" size={16} />
-                      </motion.div>
+                      <div className="ml-2 flex-shrink-0">
+                        {isLoadingGroups ? (
+                          <FiLoader className="animate-spin text-gray-400" size={14} />
+                        ) : (
+                          <motion.div
+                            animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
+                            transition={{ duration: 0.2 }}
+                          >
+                            <FiChevronDown className="text-gray-400" size={14} />
+                          </motion.div>
+                        )}
+                      </div>
                     </motion.button>
 
                     <AnimatePresence>
                       {isGroupSelectorOpen && userGroups.length > 0 && (
                         <motion.div
-                          initial={{ opacity: 0, y: -10, scale: 0.96 }}
+                          initial={{ opacity: 0, y: -10, scale: 0.95 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: -10, scale: 0.96 }}
-                          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                          className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50"
+                          exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                          transition={{ duration: 0.2 }}
+                          className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
                         >
                           {userGroups.map((group) => (
-                            <button
+                            <motion.button
                               key={group.sgt_idx}
-                              onClick={() => handleGroupSelect(group.sgt_idx)}
-                              className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors duration-150 first:rounded-t-xl last:rounded-b-xl ${
+                              whileHover={{ backgroundColor: "rgba(99, 102, 241, 0.05)" }}
+                              onClick={() => {
+                                if (selectedGroupId !== group.sgt_idx) {
+                                  handleGroupSelect(group.sgt_idx);
+                                }
+                                setIsGroupSelectorOpen(false);
+                              }}
+                              className={`w-full px-3 py-2 text-left text-xs focus:outline-none transition-colors ${
                                 selectedGroupId === group.sgt_idx 
-                                  ? 'font-medium' 
-                                  : 'text-gray-700'
+                                  ? 'font-semibold' 
+                                  : 'text-gray-900 hover:bg-blue-50'
                               }`}
                               style={selectedGroupId === group.sgt_idx 
                                 ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' }
@@ -4863,21 +4882,15 @@ export default function LocationPage() {
                               }
                             >
                               <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <div className="font-medium truncate">
-                                    {group.sgt_title || `그룹 ${group.sgt_idx}`}
-                                  </div>
-                                  <div className="text-sm text-gray-500">
-                                    {groupMemberCounts[group.sgt_idx] || 0}명의 멤버
-                                  </div>
-                                </div>
+                                <span className="truncate">{group.sgt_title}</span>
                                 {selectedGroupId === group.sgt_idx && (
-                                  <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" style={{ color: '#0113A3' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                  </svg>
+                                  <span className="ml-2" style={{ color: '#0113A3' }}>✓</span>
                                 )}
                               </div>
-                            </button>
+                              <div className="text-xs text-gray-500 mt-0.5">
+                                {groupMemberCounts[group.sgt_idx] || 0}명의 멤버
+                              </div>
+                            </motion.button>
                           ))}
                         </motion.div>
                       )}
