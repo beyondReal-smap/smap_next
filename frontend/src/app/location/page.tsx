@@ -2129,7 +2129,7 @@ export default function LocationPage() {
                 
                 <div style="margin-bottom: 6px;">
                   <p style="margin: 0; font-size: 12px; color: #64748b;">
-                    📍 위치: <span style="color: #4F46E5; font-weight: 500;">${lat?.toFixed(4)}, ${lng?.toFixed(4)}</span>
+                    📍 위치: <span style="color: #0113A3; font-weight: 500;">${lat?.toFixed(4)}, ${lng?.toFixed(4)}</span>
                   </p>
                 </div>
                 <div>
@@ -2377,7 +2377,7 @@ export default function LocationPage() {
           const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
           const position = new window.naver.maps.LatLng(lat, lng);
           // 선택된 멤버는 핑크색 외곽선, 일반 멤버는 인디고 외곽선 (home/page.tsx 스타일)
-          const borderColor = member.isSelected ? '#EC4899' : '#4F46E5';
+          const borderColor = member.isSelected ? '#EC4899' : '#0113A3';
       
       const marker = new window.naver.maps.Marker({
             position: position,
@@ -2517,7 +2517,7 @@ export default function LocationPage() {
             
             <div style="margin-bottom: 6px;">
               <p style="margin: 0; font-size: 12px; color: #64748b;">
-                📍 위치: <span style="color: #4F46E5; font-weight: 500;">${lat?.toFixed(4)}, ${lng?.toFixed(4)}</span>
+                📍 위치: <span style="color: #0113A3; font-weight: 500;">${lat?.toFixed(4)}, ${lng?.toFixed(4)}</span>
               </p>
             </div>
             <div>
@@ -2711,7 +2711,7 @@ export default function LocationPage() {
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
           const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
           const position = new window.naver.maps.LatLng(lat, lng);
-          const borderColor = member.isSelected ? '#EC4899' : '#4F46E5';
+          const borderColor = member.isSelected ? '#EC4899' : '#0113A3';
       
       
           const marker = new window.naver.maps.Marker({
@@ -3598,7 +3598,7 @@ export default function LocationPage() {
                         "새 장소 등록")
                 } 
               </h3>
-                  <p className="text-xs font-medium text-indigo-600 mt-1">
+                  <p className="text-xs font-medium mt-1" style={{ color: '#0113A3' }}>
                     {isEditingPanel ? "장소 정보를 확인하고 관리하세요" : "지도를 클릭하거나 검색하세요"}
                   </p>
                 </motion.div>
@@ -3680,7 +3680,8 @@ export default function LocationPage() {
                         );
                       }
                     }}
-                    className="flex-1 py-3 px-4 bg-gradient-to-r from-red-500 to-red-600 text-white font-medium rounded-xl shadow-lg mobile-button"
+                    className="flex-1 py-3 px-4 text-white font-medium rounded-xl shadow-lg mobile-button"
+                    style={{ backgroundColor: '#0113A3' }}
                   >
                     <div className="flex items-center justify-center">
                       <FiTrash2 className="mr-2" size={16} />
@@ -3736,7 +3737,7 @@ export default function LocationPage() {
                         exit={{ opacity: 0, height: 0 }}
                         className="mb-4"
                       >
-                        <p className="text-xs font-medium text-indigo-600 mb-2 px-1">검색 결과</p>
+                        <p className="text-xs font-medium mb-2 px-1" style={{ color: '#0113A3' }}>검색 결과</p>
                         <div className="max-h-32 overflow-y-auto bg-gray-50 rounded-xl border border-gray-100"> 
                       <ul className="divide-y divide-gray-200"> 
                             {locationSearchResults.map((place, index) => (
@@ -3759,9 +3760,9 @@ export default function LocationPage() {
                   </AnimatePresence>
 
                 <div className="mt-3 mb-3"> 
-                  <p className="text-xs font-medium text-indigo-600 mb-1">선택한 위치 주소</p>
+                  <p className="text-xs font-medium mb-1" style={{ color: '#0113A3' }}>선택한 위치 주소</p>
                   <div className="flex text-sm font-medium text-gray-700 min-h-[20px]">
-                    <span className="opacity-0 pointer-events-none select-none text-xs font-medium text-indigo-600 mb-1">
+                    <span className="opacity-0 pointer-events-none select-none text-xs font-medium mb-1" style={{ color: '#0113A3' }}>
                       장소 태그 (이름)
                     </span>
                     <span className="ml-[-7ch]"> 
@@ -3777,7 +3778,7 @@ export default function LocationPage() {
                   <input
                     type="text"
                     id="panelLocationName"
-                      className="search-input w-full py-3 px-4 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:border-gray-500 text-sm"
                     placeholder="이 장소에 대한 나만의 이름을 지어주세요."
                     value={newLocation.name}
                     onChange={(e) => setNewLocation(prev => ({ ...prev, name: e.target.value }))}
@@ -3940,7 +3941,7 @@ export default function LocationPage() {
                                          </div>
                                        </div>
                                        {selectedGroupId === group.sgt_idx && (
-                                         <svg className="w-3 h-3 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                         <svg className="w-3 h-3 text-indigo-600 flex-shrink-0" style={{ color: '#0113A3' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                          </svg>
                                        )}
@@ -4172,6 +4173,7 @@ export default function LocationPage() {
                   initial={{ scale: 0.8 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.3 }}
+                  style={activeView === 'selectedMemberPlaces' ? { backgroundColor: '#0113A3' } : {}}
                 />
                 <motion.div
                   className={`rounded-full transition-all duration-300 ${

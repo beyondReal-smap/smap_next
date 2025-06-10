@@ -1732,7 +1732,7 @@ function GroupPageContent() {
 export default function GroupPageWithSuspense() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(to bottom right, rgba(1, 19, 163, 0.1), rgba(168, 85, 247, 0.05), rgba(236, 72, 153, 0.1))' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}>
         <div className="text-center px-6">
           <HiUserGroup className="w-16 h-16 mx-auto mb-4 animate-pulse" style={{ color: '#0113A3' }} />
           <p className="font-medium" style={{ color: '#0113A3' }}>로딩 중...</p>

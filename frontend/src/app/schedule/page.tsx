@@ -79,7 +79,7 @@ html, body {
 }
 
 .gradient-bg {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0113A3 0%, #001a8a 100%);
 }
 
 .glass-effect {
@@ -104,7 +104,7 @@ html, body {
 }
 
 .calendar-day.selected {
-  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+  background: linear-gradient(135deg, #0113A3 0%, #001a8a 100%);
   color: white;
   transform: scale(1.1);
   font-weight: 600;
@@ -138,8 +138,8 @@ html, body {
   bottom: 80px;
   right: 20px;
   z-index: 40;
-  background: #4f46e5;
-  box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
+  background: #0113A3;
+      box-shadow: 0 8px 25px rgba(1, 19, 163, 0.3);
   transition: all 0.2s ease;
   touch-action: manipulation;
   user-select: none;
@@ -154,7 +154,7 @@ html, body {
 
 .floating-button:hover {
   transform: scale(1.1);
-  box-shadow: 0 12px 35px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 12px 35px rgba(1, 19, 163, 0.4);
 }
 `;
 
@@ -366,7 +366,7 @@ const MOCK_SCHEDULE_EVENTS: ScheduleEvent[] = [
     title: '주간 전체 회의',
     content: '각 팀별 진행 상황 공유 및 주요 안건 논의',
     groupName: '전체팀',
-    groupColor: 'bg-indigo-500',
+    groupColor: 'bg-blue-600',
     memberName: '최현우',
     memberPhoto: '/images/avatar4.png',
   },
@@ -531,7 +531,7 @@ function MobileCalendar({
           className={`
             h-10 w-full rounded-lg flex items-center justify-center text-basic font-bold calendar-day mobile-button
             ${isSelected ? 'calendar-day selected' : ''}
-            ${isToday && !isSelected ? 'bg-indigo-200 text-indigo-800 font-semibold' : ''}
+            ${isToday && !isSelected ? 'font-semibold' : ''}
             ${!isSelected && !isToday ? 'hover:bg-gray-100 text-gray-800' : ''}
             ${hasEvent ? 'calendar-day has-event' : ''}
           `}
@@ -570,7 +570,8 @@ function MobileCalendar({
           </motion.h2>
           <motion.button
             onClick={handleToday}
-            className="text-sm text-indigo-600 hover:text-indigo-700 mobile-button"
+            className="text-sm mobile-button"
+            style={{ color: '#0113A3' }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             disabled={isAnimating}
@@ -3490,7 +3491,8 @@ export default function SchedulePage() {
                     initial={{ rotate: -180, scale: 0 }}
                     animate={{ rotate: 0, scale: 1 }}
                     transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                    className="p-2 bg-indigo-600 rounded-xl"
+                    className="p-2 rounded-xl"
+                    style={{ backgroundColor: '#0113A3' }}
                   >
                     <svg 
                     className="w-5 h-5 text-white" 
@@ -3589,7 +3591,8 @@ export default function SchedulePage() {
                 <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
                   {/* 헤더 */}
                   <motion.div 
-                    className="px-6 py-4 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white"
+                    className="px-6 py-4 text-white"
+                    style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -3599,7 +3602,7 @@ export default function SchedulePage() {
                         <h3 className="text-lg font-bold">
                           {format(selectedDay.toDate(), 'MM월 dd일 (E)', { locale: ko })}
                         </h3>
-                        <p className="text-indigo-100 text-sm">
+                        <p className="text-blue-100 text-sm">
                           {isMonthChanging ? '일정 로딩 중...' : `${eventsForSelectedDay.length}개의 일정`}
                         </p>
                       </div>
