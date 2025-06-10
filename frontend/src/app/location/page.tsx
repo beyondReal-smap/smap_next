@@ -1558,18 +1558,24 @@ export default function LocationPage() {
       });
       console.log('[handleMemberSelect] 기존 멤버 마커 지도에서 제거 완료');
     }
-    // 2. 마커 상태 배열 비우기 (setMemberMarkers는 updateMemberMarkers 함수 내에서 처리되도록 변경 가능성 검토)
-    // setMemberMarkers([]); // 일단 여기서 상태를 비우는 것보다, updateMemberMarkers가 책임지도록 할 수 있음
 
-        // 선택된 장소 관련 상태 초기화
-    setSelectedLocationId(null);
-    selectedLocationIdRef.current = null;
-    setSelectedMemberSavedLocations(null);
+    // 2. 선택된 장소 관련 상태 초기화 (이미 선택된 멤버가 아닌 경우에만)
+    const currentlySelectedMember = groupMembers.find(m => m.isSelected);
+    const isSelectingSameMember = currentlySelectedMember?.id === memberId;
     
-    // 기존 장소 마커들 제거
-    if (markers.length > 0) {
-      markers.forEach(marker => marker.setMap(null));
-      setMarkers([]);
+    if (!isSelectingSameMember) {
+      console.log('[handleMemberSelect] 다른 멤버 선택 - 장소 상태 초기화');
+      setSelectedLocationId(null);
+      selectedLocationIdRef.current = null;
+      setSelectedMemberSavedLocations(null);
+      
+      // 기존 장소 마커들 제거
+      if (markers.length > 0) {
+        markers.forEach(marker => marker.setMap(null));
+        setMarkers([]);
+      }
+    } else {
+      console.log('[handleMemberSelect] 같은 멤버 재선택 - 장소 상태 유지');
     }
     
     selectedMemberIdRef.current = memberId;
@@ -1602,40 +1608,63 @@ export default function LocationPage() {
         location: newlySelectedMember.location,
         parsed: { lat, lng },
         isValid: lat !== null && lng !== null && lat !== 0 && lng !== 0 && 
-                Math.abs(lat) <= 90 && Math.abs(lng) <= 180 // 유효한 좌표 범위 검증
+                Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && 
+                Math.abs(lat) >= 33 && Math.abs(lat) <= 43 && // 한국 위도 범위
+                Math.abs(lng) >= 124 && Math.abs(lng) <= 132 // 한국 경도 범위
       });
       
+      // 더 엄격한 좌표 검증 (한국 영토 범위 내에서만)
       if (lat !== null && lng !== null && lat !== 0 && lng !== 0 && 
-          Math.abs(lat) <= 90 && Math.abs(lng) <= 180) {
-        // 멤버 위치를 지도 중심으로 설정
-        const position = new window.naver.maps.LatLng(lat, lng);
+          Math.abs(lat) <= 90 && Math.abs(lng) <= 180 &&
+          lat >= 33 && lat <= 43 && lng >= 124 && lng <= 132) { // 한국 영토 범위
         
-        console.log('[handleMemberSelect] 지도 중심 이동 실행:', {
+        // 현재 지도 중심과 선택된 멤버 위치 거리 계산
+        const currentCenter = map.getCenter();
+        const currentLat = currentCenter.lat();
+        const currentLng = currentCenter.lng();
+        const distance = Math.sqrt(Math.pow(lat - currentLat, 2) + Math.pow(lng - currentLng, 2));
+        
+        console.log('[handleMemberSelect] 지도 이동 필요성 체크:', {
           member: newlySelectedMember.name,
-          position: { lat, lng },
-          mapInstance: !!map
+          currentCenter: { lat: currentLat, lng: currentLng },
+          newPosition: { lat, lng },
+          distance: distance,
+          shouldMove: distance > 0.01 // 거리 임계값: 약 1km
         });
         
-        // 부드러운 이동을 위해 panTo 사용
-        map.panTo(position, {
-          duration: 1000,
-          easing: 'easeOutCubic'
-        });
-        
-        // 줌 레벨 설정
-        const currentZoom = map.getZoom();
-        if (currentZoom < 15) {
-          setTimeout(() => {
-            map.setZoom(16, {
-              duration: 500,
-              easing: 'easeOutQuad'
-            });
-          }, 200);
+        // 현재 위치와 멤버 위치가 충분히 다른 경우에만 이동
+        if (distance > 0.01) { // 약 1km 이상 차이날 때만 이동
+          const position = new window.naver.maps.LatLng(lat, lng);
+          
+          console.log('[handleMemberSelect] 지도 중심 이동 실행:', {
+            member: newlySelectedMember.name,
+            position: { lat, lng },
+            mapInstance: !!map
+          });
+          
+          // 부드러운 이동을 위해 panTo 사용
+          map.panTo(position, {
+            duration: 800,
+            easing: 'easeOutCubic'
+          });
+          
+          // 적절한 줌 레벨 설정 (너무 가깝지 않게)
+          const currentZoom = map.getZoom();
+          if (currentZoom < 14) {
+            setTimeout(() => {
+              map.setZoom(15, {
+                duration: 400,
+                easing: 'easeOutQuad'
+              });
+            }, 400);
+          }
+          
+          console.log('[handleMemberSelect] 지도 중심 이동 완료');
+        } else {
+          console.log('[handleMemberSelect] 현재 위치와 가까워 지도 이동 생략');
         }
-        
-        console.log('[handleMemberSelect] 지도 중심 이동 완료');
       } else {
-        console.warn('[handleMemberSelect] 유효하지 않은 좌표:', { lat, lng });
+        console.warn('[handleMemberSelect] 유효하지 않은 좌표 또는 한국 범위 밖:', { lat, lng });
       }
       
       // 첫번째 멤버 선택 완료 상태 설정
@@ -2724,9 +2753,6 @@ export default function LocationPage() {
         selectedLocationIdRef.current = location.id;
         
         console.log('[마커 클릭] 장소 선택됨:', location.id, location.name, '이전 선택:', previousSelectedId);
-        
-        // 모든 마커의 색상을 즉시 업데이트
-        updateMarkerColors(location.id);
       });
 
       newMarkers.push(marker);
@@ -2848,12 +2874,71 @@ export default function LocationPage() {
           title: location.name,
           icon: {
             content: `
-              <div style="width: 24px; height: 24px; background-color: white; border: 2px solid ${isMarkerSelected ? '#f59e0b' : '#6366f1'}; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
-                <div style="width: 8px; height: 8px; background-color: ${isMarkerSelected ? '#f59e0b' : '#6366f1'}; border-radius: 50%;"></div>
+              <div style="position: relative; text-align: center;">
+                <div style="
+                  width: ${isMarkerSelected ? '32px' : '24px'};
+                  height: ${isMarkerSelected ? '32px' : '24px'};
+                  background-color: white;
+                  border: 2px solid ${isMarkerSelected ? '#ec4899' : '#6366f1'};
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                  transition: all 0.3s ease;
+                ">
+                  <svg width="${isMarkerSelected ? '16' : '12'}" height="${isMarkerSelected ? '16' : '12'}" fill="${isMarkerSelected ? '#ec4899' : '#6366f1'}" viewBox="0 0 24 24">
+                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
+                  </svg>
+                </div>
+                ${isMarkerSelected ? `
+                  <div style="
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 40px;
+                    height: 40px;
+                    background: rgba(236, 72, 153, 0.2);
+                    border-radius: 50%;
+                    animation: selectedGlow 2s ease-in-out infinite;
+                    z-index: -1;
+                  "></div>
+                  <style>
+                    @keyframes selectedGlow {
+                      0%, 100% { 
+                        transform: translate(-50%, -50%) scale(0.8);
+                        opacity: 0.4; 
+                      }
+                      50% {
+                        transform: translate(-50%, -50%) scale(1.2);
+                        opacity: 0.1; 
+                      }
+                    }
+                  </style>
+                ` : ''}
+                <div style="
+                  position: absolute;
+                  bottom: -18px;
+                  left: 50%;
+                  transform: translateX(-50%);
+                  background-color: rgba(0,0,0,0.7);
+                  color: white;
+                  padding: 2px 5px;
+                  border-radius: 3px;
+                  white-space: nowrap;
+                  font-size: 10px;
+                  font-weight: 500;
+                  max-width: 80px;
+                  overflow: hidden;
+                  text-overflow: ellipsis;
+                ">
+                  ${location.name}
+                </div>
               </div>
             `,
-            size: new window.naver.maps.Size(24, 24),
-            anchor: new window.naver.maps.Point(12, 12)
+            size: new window.naver.maps.Size(isMarkerSelected ? 32 : 24, isMarkerSelected ? 32 : 24),
+            anchor: new window.naver.maps.Point(isMarkerSelected ? 16 : 12, isMarkerSelected ? 16 : 12)
           },
           zIndex: isMarkerSelected ? 200 : 150
         });
@@ -2881,9 +2966,6 @@ export default function LocationPage() {
         selectedLocationIdRef.current = location.id;
         
           console.log('[updateAllMarkers] 장소 선택됨:', location.id, location.name, '이전 선택:', previousSelectedId);
-          
-          // 모든 마커의 색상을 즉시 업데이트
-          updateMarkerColors(location.id);
         });
 
         newLocationMarkers.push(marker);
@@ -3218,7 +3300,8 @@ export default function LocationPage() {
       `,
       borderWidth: 0,
       backgroundColor: 'transparent',
-      disableAnchor: true
+      disableAnchor: true,
+      pixelOffset: new window.naver.maps.Point(0, -25) // InfoWindow를 마커 위로 25px 띄움
     });
     
     // InfoWindow가 닫힐 때 상태 업데이트
@@ -3244,9 +3327,6 @@ export default function LocationPage() {
     selectedLocationIdRef.current = locationId;
     
     console.log('[handleLocationCardClick] 장소 선택됨:', locationId, location.name || location.slt_title, '이전 선택:', previousSelectedId);
-    
-    // 모든 마커의 색상을 즉시 업데이트
-    updateMarkerColors(locationId);
     
     // 지도와 좌표가 유효한 경우에만 지도 이동 및 마커 처리
     if (!map || !window.naver || lat === 0 || lng === 0) {
@@ -3429,222 +3509,129 @@ export default function LocationPage() {
           infoWindow.close();
         }
         
-        // 선택된 장소 상태 업데이트 (마커 색상 변경을 위해)
-        setSelectedLocationId(location.id);
+        // 1. 선택 상태 업데이트 (마커 재생성 방지를 위해 ref만 업데이트)
+        const previousSelectedId = selectedLocationIdRef.current;
         selectedLocationIdRef.current = location.id;
         
-        // 마커 색상 업데이트
-        updateMarkerColors(location.id);
+        console.log('[handleLocationSelect] 장소 선택됨:', location.id, location.name, '이전 선택:', previousSelectedId);
         
-        // 해당 장소의 마커를 찾아서 InfoWindow 표시
-        console.log('[handleLocationSelect] 마커 찾기 시작:', {
-          찾는좌표: [lat, lng],
-          현재마커수: markers.length,
-          마커들좌표: markers.map(m => {
-            const pos = m.getPosition();
-            return [pos.lat(), pos.lng()];
-          })
+        // 2. 마커 상태 확인 및 업데이트
+        console.log('[handleLocationSelect] 마커 상태 확인:', {
+          hasLocations: !!selectedMemberSavedLocations,
+          locationsCount: selectedMemberSavedLocations?.length || 0,
+          markersCount: markers.length,
+          groupMembersCount: groupMembers.length,
+          hasMap: !!map
         });
         
-        let targetMarker = markers.find(marker => {
-          const markerPosition = marker.getPosition();
-          const latDiff = Math.abs(markerPosition.lat() - lat);
-          const lngDiff = Math.abs(markerPosition.lng() - lng);
-          console.log('[handleLocationSelect] 마커 좌표 비교:', {
-            마커좌표: [markerPosition.lat(), markerPosition.lng()],
-            찾는좌표: [lat, lng],
-            차이: [latDiff, lngDiff],
-            일치: latDiff < 0.0001 && lngDiff < 0.0001
-          });
-          return latDiff < 0.0001 && lngDiff < 0.0001;
-        });
-        
-        console.log('[handleLocationSelect] 마커 찾기 결과:', {
-          찾음: !!targetMarker,
-          마커타입: targetMarker ? typeof targetMarker : 'undefined'
-        });
-        
-        // 마커를 찾지 못한 경우 새로 생성
-        if (!targetMarker) {
-          console.log('[handleLocationSelect] 기존 마커를 찾을 수 없어 새 마커 생성:', location.name);
-          
-          const position = new window.naver.maps.LatLng(lat, lng);
-          targetMarker = new window.naver.maps.Marker({
-            position,
-            map,
-            title: location.name,
-            icon: {
-              content: `
-                <div style="position: relative; text-align: center;">
-                  <div style="
-                    width: 32px;
-                    height: 32px;
-                    background-color: white;
-                    border: 2px solid #ec4899;
-                    border-radius: 50%;
-                    overflow: hidden;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-                    position: relative;
-                    z-index: 200;
-                    transition: all 0.3s ease;
-                  ">
-                    <svg width="16" height="16" fill="#ec4899" viewBox="0 0 24 24">
-                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
-                    </svg>
-                  </div>
-                  
-                  <div style="
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%);
-                    width: 40px;
-                    height: 40px;
-                    background: rgba(236, 72, 153, 0.2);
-                    border-radius: 50%;
-                    animation: selectedGlow 2s ease-in-out infinite;
-                    z-index: 140;
-                  "></div>
-                  
-                  <div style="
-                    position: absolute;
-                    bottom: -18px;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    background-color: rgba(0,0,0,0.7);
-                    color: white;
-                    padding: 2px 5px;
-                    border-radius: 3px;
-                    white-space: nowrap;
-                    font-size: 10px;
-                    font-weight: 500;
-                    max-width: 80px;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                  ">
-                    ${location.name}
-                  </div>
-                </div>
+        if (selectedMemberSavedLocations && selectedMemberSavedLocations.length > 0) {
+          if (markers.length > 0) {
+            // 기존 마커들의 스타일 직접 업데이트 (재생성 없이)
+            console.log('[handleLocationSelect] 기존 마커 스타일 업데이트');
+            markers.forEach((marker, index) => {
+              const markerLocation = selectedMemberSavedLocations[index];
+              if (markerLocation) {
+                const isSelected = location.id === markerLocation.id;
                 
-                <style>
-                  @keyframes selectedGlow {
-                    0%, 100% { 
-                      transform: translate(-50%, -50%) scale(0.8);
-                      opacity: 0.4; 
-                    }
-                    50% {
-                      transform: translate(-50%, -50%) scale(1.2);
-                      opacity: 0.1; 
-                    }
-                  }
-                </style>
-              `,
-              anchor: new window.naver.maps.Point(16, 16)
-            },
-            zIndex: 200
-          });
-          
-          // 새 마커를 markers 배열에 추가
-          setMarkers(prev => [...prev, targetMarker]);
-          
-          console.log('[handleLocationSelect] 새 마커 생성 완료:', {
-            마커위치: [lat, lng],
-            마커객체: !!targetMarker,
-            지도에표시됨: targetMarker.getMap() === map,
-            zIndex: targetMarker.getZIndex()
-          });
-        } else {
-          console.log('[handleLocationSelect] 기존 마커 사용:', {
-            마커위치: [targetMarker.getPosition().lat(), targetMarker.getPosition().lng()],
-            지도에표시됨: targetMarker.getMap() === map,
-            zIndex: targetMarker.getZIndex()
-          });
+                // 마커 아이콘 업데이트
+                marker.setIcon({
+                  content: `
+                    <div style="position: relative; text-align: center;">
+                      <div style="
+                        width: ${isSelected ? '32px' : '24px'};
+                        height: ${isSelected ? '32px' : '24px'};
+                        background-color: white;
+                        border: 2px solid ${isSelected ? '#ec4899' : '#6366f1'};
+                        border-radius: 50%;
+                        overflow: hidden;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                        position: relative;
+                        z-index: ${isSelected ? '200' : '150'};
+                        transition: all 0.3s ease;
+                      ">
+                        <svg width="${isSelected ? '16' : '12'}" height="${isSelected ? '16' : '12'}" fill="${isSelected ? '#ec4899' : '#6366f1'}" viewBox="0 0 24 24">
+                          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
+                        </svg>
+                      </div>
+                      
+                      ${isSelected ? `
+                        <div style="
+                          position: absolute;
+                          top: 50%;
+                          left: 50%;
+                          transform: translate(-50%, -50%);
+                          width: 40px;
+                          height: 40px;
+                          background: rgba(236, 72, 153, 0.2);
+                          border-radius: 50%;
+                          animation: selectedGlow 2s ease-in-out infinite;
+                          z-index: 140;
+                        "></div>
+                      ` : ''}
+                      
+                      <div style="
+                        position: absolute;
+                        bottom: ${isSelected ? '-20px' : '-18px'};
+                        left: 50%;
+                        transform: translateX(-50%);
+                        background-color: rgba(0,0,0,0.7);
+                        color: white;
+                        padding: 2px 5px;
+                        border-radius: 3px;
+                        white-space: nowrap;
+                        font-size: 10px;
+                        font-weight: 500;
+                        max-width: 80px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                      ">
+                        ${markerLocation.name}
+                      </div>
+                    </div>
+                    
+                    <style>
+                      @keyframes selectedGlow {
+                        0%, 100% { 
+                          transform: translate(-50%, -50%) scale(0.8); 
+                          opacity: 0.4; 
+                        }
+                        50% { 
+                          transform: translate(-50%, -50%) scale(1.2); 
+                          opacity: 0.1; 
+                        }
+                      }
+                    </style>
+                  `,
+                  anchor: new window.naver.maps.Point(isSelected ? 16 : 12, isSelected ? 16 : 12)
+                });
+                
+                // z-index 업데이트
+                marker.setZIndex(isSelected ? 200 : 150);
+              }
+            });
+          } else {
+            // 마커가 없는 경우 새로 생성
+            console.log('[handleLocationSelect] 마커가 없어 새로 생성');
+            if (groupMembers.length > 0) {
+              updateAllMarkers(groupMembers, selectedMemberSavedLocations);
+            }
+          }
         }
         
-        // InfoWindow content 문자열 생성
-        const infoWindowContent = `
-          <style>
-            @keyframes slideInFromBottom {
-              0% {
-                opacity: 0;
-                transform: translateY(20px) scale(0.95);
-              }
-              100% {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-              }
-            }
-            .location-info-window-container {
-              animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-            }
-            .close-button {
-              transition: all 0.2s ease;
-            }
-            .close-button:hover {
-              background: rgba(0, 0, 0, 0.2) !important;
-              transform: scale(1.1);
-            }
-          </style>
-          <div class="location-info-window-container" style="
-            padding: 12px 16px;
-            min-width: 200px;
-            max-width: 280px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            position: relative;
-          ">
-            <!-- 닫기 버튼 -->
-            <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-              position: absolute;
-              top: 8px;
-              right: 8px;
-              background: rgba(0, 0, 0, 0.1);
-              border: none;
-              border-radius: 50%;
-              width: 22px;
-              height: 22px;
-              font-size: 14px;
-              cursor: pointer;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              color: #666;
-            ">×</button>
-            
-            <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px;">
-              📍 ${location.name}
-            </h3>
-            <div style="margin-bottom: 6px;">
-              <p style="margin: 0; font-size: 12px; color: #64748b;">
-                <span style="color: #64748b; font-weight: 500; word-break: keep-all;">${location.address}</span>
-              </p>
-            </div>
-          </div>
-        `;
-        
-        // 새 InfoWindow 생성 및 표시
-        const newInfoWindow = new window.naver.maps.InfoWindow({
-          content: infoWindowContent,
-          borderWidth: 0,
-          backgroundColor: 'transparent',
-          disableAnchor: true
-        });
-        
-        // InfoWindow가 닫힐 때 상태 업데이트
-        window.naver.maps.Event.addListener(newInfoWindow, 'close', () => {
-          console.log('[InfoWindow] 닫힘 이벤트 발생');
-          setInfoWindow(null);
-        });
-        
-        newInfoWindow.open(map, targetMarker);
+        // 3. InfoWindow 생성 및 표시 (지도 위치에 표시)
+        const newInfoWindow = createLocationInfoWindow(location.name, location.address);
+        newInfoWindow.open(map, targetPosition);
         setInfoWindow(newInfoWindow);
         
-        console.log('[handleLocationSelect] InfoWindow 표시 완료:', location.name);
+        // 4. 상태 업데이트는 마지막에 (마커 업데이트 완료 후)
+        setTimeout(() => {
+          setSelectedLocationId(location.id);
+        }, 100);
+        
+
         
         // 햅틱 피드백
         try {
