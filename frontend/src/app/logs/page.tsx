@@ -24,7 +24,8 @@ import memberLocationLogService, { LocationLog, LocationSummary as APILocationSu
 declare global {
   interface Window {
     naver: any;
-  getRecentDaysDebugLogged?: boolean;
+    gradientPolylines?: any[];
+    getRecentDaysDebugLogged?: boolean;
     // google: any; // google은 logs 페이지에서 아직 사용하지 않으므로 주석 처리 또는 필요시 추가
   }
 }
@@ -502,6 +503,29 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
 const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
   // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
   return photoUrl ?? getDefaultImage(gender, index);
+};
+
+// 색상 보간 함수
+const interpolateColor = (color1: string, color2: string, factor: number): string => {
+  // 16진수 색상을 RGB로 변환
+  const hex1 = color1.replace('#', '');
+  const hex2 = color2.replace('#', '');
+  
+  const r1 = parseInt(hex1.substr(0, 2), 16);
+  const g1 = parseInt(hex1.substr(2, 2), 16);
+  const b1 = parseInt(hex1.substr(4, 2), 16);
+  
+  const r2 = parseInt(hex2.substr(0, 2), 16);
+  const g2 = parseInt(hex2.substr(2, 2), 16);
+  const b2 = parseInt(hex2.substr(4, 2), 16);
+  
+  // 보간 계산
+  const r = Math.round(r1 + factor * (r2 - r1));
+  const g = Math.round(g1 + factor * (g2 - g1));
+  const b = Math.round(b1 + factor * (b2 - b1));
+  
+  // RGB를 16진수로 변환
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 };
 
 // 전역 실행 제어 - 한 번만 실행되도록 보장
@@ -1419,90 +1443,9 @@ export default function LogsPage() {
   // --- 새로운 통합 지도 렌더링 함수 ---
 
   const updateMemberMarkers = (members: GroupMember[], isDateChange: boolean = false) => {
-    console.log('[🔥 updateMemberMarkers] 함수 호출됨:', {
-      membersLength: members.length,
-      isDateChange,
-      mapExists: !!map.current,
-      naverMapsExists: !!window.naver?.maps,
-      memberNames: members.map(m => m.name),
-      memberLocations: members.map(m => m.location)
-    });
-    
-    // 지도 초기화 체크 로직 개선
-    if (!map.current) {
-      console.warn('❌ Map is not initialized');
-      return;
-    }
-    
-    if (!window.naver?.maps) {
-      console.warn('❌ Naver Maps API is not loaded');
-      return;
-    }
-    
-    // 기존 마커 제거
-    memberNaverMarkers.current.forEach(marker => marker.setMap(null));
-    memberNaverMarkers.current = [];
-    
-    const selectedMembers = members.filter(member => member.isSelected);
-    
-    console.log('[updateMemberMarkers] 마커 생성 시작:', {
-      totalMembers: members.length,
-      selectedMembers: selectedMembers.length,
-      memberNames: members.map(m => m.name),
-      selectedNames: selectedMembers.map(m => m.name),
-      selectedMemberLocations: selectedMembers.map(m => m.location)
-    });
-    
-    // 선택된 멤버가 있는 경우에만 마커 생성 및 지도 이동
-    if (selectedMembers.length > 0) {
-      console.log('[🔥 updateMemberMarkers] 마커 생성 시작:', selectedMembers.length, '개');
-      selectedMembers.forEach((member, index) => {
-        console.log(`[🔥 updateMemberMarkers] 멤버 ${index + 1} 마커 생성:`, {
-          name: member.name,
-          location: member.location,
-          isSelected: member.isSelected
-        });
-        try {
-          const position = new window.naver.maps.LatLng(member.location.lat, member.location.lng);
-          console.log(`[🔥 updateMemberMarkers] 네이버맵 LatLng 생성:`, position);
-          // 안전한 이미지 URL 사용
-          const safeImageUrl = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
-          // 선택된 멤버는 핑크색 border, 그렇지 않으면 인디고 border
-          const borderColor = member.isSelected ? '#EC4899' : '#4F46E5';
-          const marker = new window.naver.maps.Marker({
-            position: position,
-            map: map.current,
-            icon: {
-              content: `<div style="position: relative; text-align: center;">
-                <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
-                  <img src="${safeImageUrl}" alt="${member.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='${getDefaultImage(member.mt_gender, member.original_index)}'" />
-                </div>
-                <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
-                  ${member.name}
-                </div>
-              </div>`,
-              size: new window.naver.maps.Size(36, 48),
-              anchor: new window.naver.maps.Point(18, 42)
-            },
-            zIndex: member.isSelected ? 200 : 150 // 선택된 멤버가 위에 표시되도록
-          });
-          memberNaverMarkers.current.push(marker);
-          console.log(`[✅ updateMemberMarkers] 멤버 ${member.name} 마커 생성 완료 (총 ${memberNaverMarkers.current.length}개)`);
-        } catch (error) {
-          console.error(`[❌ updateMemberMarkers] 멤버 ${member.name} 마커 생성 실패:`, error);
-        }
-      });
-
-      // 멤버 마커 생성 완료 - 지도 중심 이동은 renderLocationDataOnMap에서 처리
-      console.log('[updateMemberMarkers] 멤버 마커 생성 완료 - 지도 중심 이동은 별도 처리됨');
-      
-      // 날짜 변경 플래그 리셋
-      if (isDateChange) {
-        isDateChangedRef.current = false;
-        setPreviousDate(selectedDate);
-        console.log('[LogsPage] 날짜 변경 플래그 리셋 완료');
-      }
-    }
+    // 그룹멤버 마커는 더 이상 사용하지 않음
+    console.log('[updateMemberMarkers] 그룹멤버 마커 기능이 비활성화됨');
+    return;
   };
 
   // 지도 마커와 경로 즉시 초기화 함수 - 완전 강화 버전
@@ -1569,6 +1512,15 @@ export default function LogsPage() {
         locationLogPolyline.current.setMap(null);
         locationLogPolyline.current = null;
       }
+      
+      // 그라데이션 경로들 정리
+      if (window.gradientPolylines) {
+        window.gradientPolylines.forEach((polyline: any) => {
+          try { polyline.setMap(null); } catch (e) { console.error('Error removing gradient polyline:', e); }
+        });
+        window.gradientPolylines = [];
+      }
+      
              // 혹시 모를 다른 경로들도 정리
        if (window.naver?.maps && map.current) {
          const overlays = map.current.overlays;
@@ -3596,47 +3548,9 @@ export default function LogsPage() {
     // 지도 중심점은 presetMapCenterForMember에서 미리 설정되었으므로 건너뛰기
     console.log('[renderLocationDataOnMap] 지도 중심점은 presetMapCenterForMember에서 미리 설정됨 - 건너뛰기');
 
-    // 2. 멤버 마커 표시 (선택된 멤버만)
-    console.log('[renderLocationDataOnMap] 멤버 마커 생성 시작');
-    const selectedMember = groupMembers.find(m => m.isSelected);
-    if (selectedMember) {
-      try {
-        // 사용 가능한 최신 위치 데이터 확인 (mlt_lat/mlt_long 우선)
-        const lat = selectedMember.mlt_lat !== null && selectedMember.mlt_lat !== undefined && selectedMember.mlt_lat !== 0
-          ? parseFloat(selectedMember.mlt_lat.toString())
-          : parseFloat(selectedMember.location.lat.toString() || '37.5665'); // 기본값
-        const lng = selectedMember.mlt_long !== null && selectedMember.mlt_long !== undefined && selectedMember.mlt_long !== 0
-          ? parseFloat(selectedMember.mlt_long.toString())
-          : parseFloat(selectedMember.location.lng.toString() || '126.9780'); // 기본값
-
-        const position = new window.naver.maps.LatLng(lat, lng);
-        const safeImageUrl = getSafeImageUrl(selectedMember.photo, selectedMember.mt_gender, selectedMember.original_index);
-        const marker = new window.naver.maps.Marker({
-          position: position,
-          map: mapInstance,
-          icon: {
-            content: `<div style="position: relative; text-align: center;">
-              <div style="width: 32px; height: 32px; background-color: white; border: 2px solid #EC4899; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">
-                <img src="${safeImageUrl}" alt="${selectedMember.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='${getDefaultImage(selectedMember.mt_gender, selectedMember.original_index)}'" />
-              </div>
-              <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.7); color: white; padding: 2px 5px; border-radius: 3px; white-space: nowrap; font-size: 10px;">
-                ${selectedMember.name}
-              </div>
-            </div>`,
-            size: new window.naver.maps.Size(36, 48),
-            anchor: new window.naver.maps.Point(18, 42)
-          },
-          zIndex: 200
-        });
-        memberNaverMarkers.current = [marker]; // 기존 멤버 마커 교체
-        console.log(`[renderLocationDataOnMap] 멤버 ${selectedMember.name} 마커 생성 완료`);
-      } catch (error) {
-        console.error(`[renderLocationDataOnMap] 멤버 ${selectedMember.name} 마커 생성 실패:`, error);
-      }
-    } else {
-        memberNaverMarkers.current = []; // 선택된 멤버 없으면 멤버 마커 초기화
-        console.log('[renderLocationDataOnMap] 선택된 멤버 없음 - 멤버 마커 생성 건너뜀');
-    }
+    // 2. 멤버 마커는 더 이상 사용하지 않음
+    memberNaverMarkers.current = []; // 멤버 마커 초기화
+    console.log('[renderLocationDataOnMap] 멤버 마커 기능 비활성화됨');
 
     // 3. 위치 로그와 체류지점을 시간 순서로 통합 및 정렬
     console.log('[renderLocationDataOnMap] 위치 로그 및 체류지점 통합/정렬 시작');
@@ -3798,26 +3712,92 @@ export default function LogsPage() {
     });
     console.log('[renderLocationDataOnMap] 위치 로그 마커 생성 완료:', locationLogMarkers.current.length, '개');
 
-    // 7. 경로(Polyline) 생성
-    console.log('[renderLocationDataOnMap] 경로 및 화살표 생성 시작');
+    // 7. 무지개 그라데이션 경로(Polyline) 생성
+    console.log('[renderLocationDataOnMap] 무지개 그라데이션 경로 및 화살표 생성 시작');
     if (locationLogPolyline.current) { // 혹시 남아있는 이전 경로 정리
         try { locationLogPolyline.current.setMap(null); } catch (e) { console.error('[renderLocationDataOnMap] Error setting old polyline map to null:', e); }
         locationLogPolyline.current = null;
     }
+    
+    // 기존 그라데이션 경로들 정리
+    if (window.gradientPolylines) {
+        window.gradientPolylines.forEach((polyline: any) => {
+            try { polyline.setMap(null); } catch (e) { console.error('Error removing gradient polyline:', e); }
+        });
+    }
+    window.gradientPolylines = [];
+    
     if (sortedTimePoints.length > 1) {
         const pathCoordinates = sortedTimePoints.map(point => new window.naver.maps.LatLng(point.lat, point.lng));
-        locationLogPolyline.current = new window.naver.maps.Polyline({ map: mapInstance, path: pathCoordinates, strokeColor: '#3b82f6', strokeOpacity: 0.8, strokeWeight: 3, strokeStyle: 'solid' });
-        // 각 마커 사이에 방향을 나타내는 화살표 추가 (모든 마커 사이에 1개씩)
-         for (let i = 0; i < sortedTimePoints.length - 1; i += 3) { // 3개 지점마다 화살표
-            const currentPoint = sortedTimePoints[i]; const nextPoint = sortedTimePoints[i + 1];
-            const midLat = (currentPoint.lat + nextPoint.lat) / 2; const midLng = (currentPoint.lng + nextPoint.lng) / 2;
-            const deltaLat = nextPoint.lat - currentPoint.lat; const deltaLng = nextPoint.lng - currentPoint.lng;
+        
+        // 무지개 색상 배열 (빨주노초파남보)
+        const rainbowColors = [
+            '#FF0000', // 빨강
+            '#FF8000', // 주황
+            '#FFFF00', // 노랑
+            '#80FF00', // 연두
+            '#00FF00', // 초록
+            '#00FF80', // 청록
+            '#00FFFF', // 파랑
+            '#0080FF', // 남색
+            '#0000FF', // 진파랑
+            '#8000FF', // 자주
+            '#FF00FF', // 보라
+        ];
+        
+        // 각 구간마다 다른 색상의 폴리라인 생성
+        for (let i = 0; i < pathCoordinates.length - 1; i++) {
+            const progress = i / (pathCoordinates.length - 1);
+            const colorIndex = Math.floor(progress * (rainbowColors.length - 1));
+            const nextColorIndex = Math.min(colorIndex + 1, rainbowColors.length - 1);
+            const segmentProgress = (progress * (rainbowColors.length - 1)) - colorIndex;
+            
+            // 두 색상 간 보간
+            const color1 = rainbowColors[colorIndex];
+            const color2 = rainbowColors[nextColorIndex];
+            const interpolatedColor = interpolateColor(color1, color2, segmentProgress);
+            
+            const segmentPath = [pathCoordinates[i], pathCoordinates[i + 1]];
+            const segmentPolyline = new window.naver.maps.Polyline({
+                map: mapInstance,
+                path: segmentPath,
+                strokeColor: interpolatedColor,
+                strokeOpacity: 0.9,
+                strokeWeight: 4,
+                strokeStyle: 'solid'
+            });
+            
+            window.gradientPolylines.push(segmentPolyline);
+        }
+        
+        // 방향 화살표 추가 (3개 지점마다)
+         for (let i = 0; i < sortedTimePoints.length - 1; i += 3) {
+            const currentPoint = sortedTimePoints[i]; 
+            const nextPoint = sortedTimePoints[i + 1];
+            const midLat = (currentPoint.lat + nextPoint.lat) / 2; 
+            const midLng = (currentPoint.lng + nextPoint.lng) / 2;
+            const deltaLat = nextPoint.lat - currentPoint.lat; 
+            const deltaLng = nextPoint.lng - currentPoint.lng;
             const angle = Math.atan2(deltaLng, deltaLat) * (180 / Math.PI);
-            const arrowMarker = new window.naver.maps.Marker({ position: new window.naver.maps.LatLng(midLat, midLng), map: mapInstance, icon: { content: `<div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 10px solid white; border-top: none; transform: rotate(${angle}deg); transform-origin: center center; opacity: 0.9; cursor: pointer; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));"></div>`, anchor: new window.naver.maps.Point(5, 5) }, zIndex: 50 });
-            arrowMarkers.current.push(arrowMarker); // 화살표 마커를 배열에 저장
+            
+            // 화살표 색상도 해당 위치의 무지개 색상으로
+            const progress = i / (sortedTimePoints.length - 1);
+            const colorIndex = Math.floor(progress * (rainbowColors.length - 1));
+            const arrowColor = rainbowColors[colorIndex];
+            
+            const arrowMarker = new window.naver.maps.Marker({ 
+                position: new window.naver.maps.LatLng(midLat, midLng), 
+                map: mapInstance, 
+                icon: { 
+                    content: `<div style="width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 10px solid ${arrowColor}; border-top: none; transform: rotate(${angle}deg); transform-origin: center center; opacity: 0.9; cursor: pointer; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));"></div>`, 
+                    anchor: new window.naver.maps.Point(5, 5) 
+                }, 
+                zIndex: 50 
+            });
+            arrowMarkers.current.push(arrowMarker);
         }
     }
-     console.log('[renderLocationDataOnMap] 경로 연결선 및 화살표 생성 완료');
+     console.log('[renderLocationDataOnMap] 무지개 그라데이션 경로 연결선 및 화살표 생성 완료');
 
     // 8. 지도 렌더링 완료 - 중심 이동은 이미 완료됨
     console.log('[renderLocationDataOnMap] 지도 렌더링 완료 - 중심 이동은 사전에 완료됨');
