@@ -20,11 +20,11 @@ import {
   FiXCircle,
   FiInfo,
   FiUser,
-  FiAlertTriangle
+  FiAlertTriangle,
+  FiMenu
 } from 'react-icons/fi';
-import { FaSearch as FaSearchSolid } from 'react-icons/fa';
+import { FaSearch as FaSearchSolid, FaTrash, FaCrown } from 'react-icons/fa';
 import dynamic from 'next/dynamic';
-import { FaTrash } from 'react-icons/fa';
 
 
 // 커스텀 알림 상태 추가 (react-toastify 관련 없음)
@@ -325,31 +325,7 @@ const memberItemVariants = {
   }
 };
 
-// 바텀시트 variants - 올라갈 때도 부드럽게 개선
-const bottomSheetVariants = {
-  collapsed: { 
-    translateY: '60%',
-    opacity: 1,
-    transition: {
-      type: "spring",
-      stiffness: 280,
-      damping: 35,
-      mass: 0.7,
-      duration: 0.5
-    }
-  },
-  expanded: {
-    translateY: '-40px',
-    opacity: 1,
-    transition: {
-      type: "spring",
-      stiffness: 260,
-      damping: 32,
-      mass: 0.6,
-      duration: 0.5
-    }
-  }
-};
+
 
 const memberAvatarVariants = {
   initial: { 
@@ -606,6 +582,7 @@ interface GroupMember {
   location: HomeLocation;
   schedules: HomeSchedule[];
   savedLocations: LocationData[];
+  savedLocationCount?: number; // 장소 개수 (미리 로드)
   mt_gender?: number | null;
   original_index: number;
   
@@ -710,7 +687,6 @@ export default function LocationPage() {
   const [selectedLocationIdRef, setSelectedLocationIdRef] = useState<React.MutableRefObject<string | null>>({ current: null });
   
   // UI 상태
-  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'expanded'>('expanded');
   const [activeView, setActiveView] = useState<'selectedMemberPlaces' | 'otherMembersPlaces'>('selectedMemberPlaces');
   const [isLocationInfoPanelOpen, setIsLocationInfoPanelOpen] = useState(false);
   const [isEditingPanel, setIsEditingPanel] = useState(false);
@@ -720,6 +696,9 @@ export default function LocationPage() {
   // 사이드바 상태 추가
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  
+  // 그룹 드롭다운 ref 추가
+  const groupDropdownRef = useRef<HTMLDivElement>(null);
   
   // 검색 관련 상태
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
@@ -751,12 +730,14 @@ export default function LocationPage() {
   const [swipeThreshold] = useState(50); // 스와이프 감지 임계값
   
   // Refs
-  const bottomSheetRef = useRef<HTMLDivElement>(null);
   const infoPanelRef = useRef<HTMLDivElement>(null);
   const swipeContainerRef = useRef<HTMLDivElement>(null);
 
   // 멤버 선택 관련 상태
   const [firstMemberSelected, setFirstMemberSelected] = useState(false);
+  
+  // 장소 선택 시 멤버 위치로 지도 이동 방지 플래그
+  const isLocationSelectingRef = useRef(false);
   
   // 모달 상태 추가
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1319,29 +1300,8 @@ export default function LocationPage() {
           }
         };
 
-        // 간소화된 바텀시트 상태 결정 로직 (DOM 계산 제거)
-        let nextState: 'collapsed' | 'expanded' = bottomSheetState;
-
-        // 위로 드래그 (Y 감소) - 확장
-        if (dragDeltaY < 0 && bottomSheetState === 'collapsed' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
-            nextState = 'expanded';
-            console.log('[DragEnd] 위로 드래그 감지 (collapsed -> expanded)');
-            triggerHaptic();
-        }
-        // 아래로 드래그 (Y 증가) - 축소
-        else if (dragDeltaY > 0 && bottomSheetState === 'expanded' && (Math.abs(dragDeltaY) > dragThresholdEnd || velocityY > velocityThreshold)) {
-            nextState = 'collapsed';
-            console.log('[DragEnd] 아래로 드래그 감지 (expanded -> collapsed)');
-            triggerHaptic();
-        }
-
-        // 즉시 상태 업데이트 (무거운 계산 제거)
-        if (nextState !== bottomSheetState) {
-            setBottomSheetState(nextState);
-            console.log('[DragEnd] 세로 드래그 완료 -> 최종 상태:', nextState);
-        } else {
-            console.log('[DragEnd] 임계값 미달, 현재 상태 유지:', bottomSheetState);
-        }
+        // 바텀시트 제거로 인한 드래그 로직 간소화
+        console.log('[DragEnd] 드래그 완료');
     }
     // _startedAt 초기화 (이벤트 객체에 직접 접근은 불안정할 수 있음)
     (e.target as any)._startedAt = 0; // 시작 시간 초기화
@@ -1360,7 +1320,6 @@ export default function LocationPage() {
     
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
-    setBottomSheetState('expanded');
     
     // *** 기존 마커 및 데이터 초기화 강화 ***
     // 1. 현재 지도에 있는 모든 멤버 마커 즉시 제거
@@ -1419,22 +1378,41 @@ export default function LocationPage() {
       console.log('[fetchGroupMembersData] 멤버 데이터 조회 완료:', membersData);
 
       if (membersData && membersData.length > 0) {
+        // 먼저 모든 멤버의 장소 개수를 가져오기
+        const memberLocationCounts: { [key: string]: number } = {};
+        
+        // 모든 멤버의 장소 개수를 병렬로 가져오기
+        await Promise.all(
+          membersData.map(async (member: any) => {
+            try {
+              const memberLocations = await locationService.getOtherMembersLocations(member.mt_idx.toString());
+              memberLocationCounts[member.mt_idx.toString()] = memberLocations.length;
+              console.log(`[fetchGroupMembersData] ${member.mt_name || member.mt_nickname}의 장소 개수:`, memberLocations.length);
+            } catch (error) {
+              console.error(`[fetchGroupMembersData] ${member.mt_name || member.mt_nickname}의 장소 개수 가져오기 실패:`, error);
+              memberLocationCounts[member.mt_idx.toString()] = 0;
+            }
+          })
+        );
+
         // 데이터 즉시 처리
         const convertedMembers = membersData.map((member: any, index: number) => {
           // 현재 로그인한 사용자인지 확인
           const isCurrentUser = !!(user && member.mt_idx === user.mt_idx);
+          const memberId = member.mt_idx.toString();
           
           return {
-            id: member.mt_idx.toString(),
+            id: memberId,
             name: member.mt_name || member.mt_nickname || '이름 없음',
             photo: member.mt_file1,
-            isSelected: isCurrentUser, // 현재 로그인한 사용자를 선택
+            isSelected: index === 0, // 첫 번째 멤버를 선택
             location: {
               lat: parseFloat(String(member.mlt_lat || '37.5665')) || 37.5665,
               lng: parseFloat(String(member.mlt_long || '126.9780')) || 126.9780
             },
             schedules: [],
-            savedLocations: [],
+            savedLocations: [], // 나중에 선택할 때 로드
+            savedLocationCount: memberLocationCounts[memberId] || 0, // 장소 개수 미리 설정
             mt_gender: member.mt_gender,
             original_index: index,
             mlt_lat: member.mlt_lat,
@@ -1456,9 +1434,9 @@ export default function LocationPage() {
         // selectedMemberIdRef 업데이트 - 선택된 멤버의 ID로 설정
         const selectedMember = convertedMembers.find(member => member.isSelected);
         if (selectedMember) {
-          setSelectedMemberIdRef({ current: selectedMember.id });
+          selectedMemberIdRef.current = selectedMember.id;
         } else if (convertedMembers.length > 0) {
-          setSelectedMemberIdRef({ current: convertedMembers[0].id });
+          selectedMemberIdRef.current = convertedMembers[0].id;
         }
 
         setGroupMembers(convertedMembers);
@@ -1500,7 +1478,7 @@ export default function LocationPage() {
               setGroupMembers(prevMembers => 
                 prevMembers.map((member, index) => 
                   index === 0 
-                    ? { ...member, savedLocations: convertedLocations }
+                    ? { ...member, savedLocations: convertedLocations, savedLocationCount: convertedLocations.length }
                     : member
                 )
               );
@@ -1603,12 +1581,16 @@ export default function LocationPage() {
     setGroupMembers(updatedMembers); // 이 호출이 updateMemberMarkers를 트리거 (useEffect를 통해)
   
     if (map && window.naver?.maps) {
-      // 선택된 멤버의 위치로 지도 중심 이동 (바텀시트에 가려지지 않도록 아래쪽으로 오프셋)
-      console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember.name, '위치 데이터:', {
-        mlt_lat: newlySelectedMember.mlt_lat,
-        mlt_long: newlySelectedMember.mlt_long,
-        location: newlySelectedMember.location
-      });
+      // 장소 선택 중인 경우 지도 이동 방지
+      if (isLocationSelectingRef.current) {
+        console.log('[handleMemberSelect] 장소 선택 중이므로 지도 이동 건너뜀');
+      } else {
+        // 선택된 멤버의 위치로 지도 중심 이동 (바텀시트에 가려지지 않도록 아래쪽으로 오프셋)
+        console.log('[handleMemberSelect] 멤버 선택:', newlySelectedMember.name, '위치 데이터:', {
+          mlt_lat: newlySelectedMember.mlt_lat,
+          mlt_long: newlySelectedMember.mlt_long,
+          location: newlySelectedMember.location
+        });
       
       // 좌표 파싱 및 검증 - 실시간 위치(mlt_lat, mlt_long) 우선 사용
       const lat = parseCoordinate(newlySelectedMember.mlt_lat) || parseCoordinate(newlySelectedMember.location?.lat);
@@ -1722,11 +1704,11 @@ export default function LocationPage() {
           setOtherMembersSavedLocations(memberLocationsRaw);
           setActiveView('selectedMemberPlaces');
           
-          // 그룹멤버 상태의 savedLocations도 업데이트 (다음에는 API 호출 없이 사용하기 위해)
+          // 그룹멤버 상태의 savedLocations와 savedLocationCount도 업데이트 (다음에는 API 호출 없이 사용하기 위해)
           setGroupMembers(prevMembers => 
             prevMembers.map(member => 
               member.id === memberId 
-                ? { ...member, savedLocations: convertedLocations }
+                ? { ...member, savedLocations: convertedLocations, savedLocationCount: convertedLocations.length }
                 : member
             )
           );
@@ -1751,6 +1733,7 @@ export default function LocationPage() {
 
       // 선택된 멤버의 InfoWindow는 useEffect에서 처리하도록 변경
       console.log('[handleMemberSelect] 멤버 선택 완료, InfoWindow는 마커 업데이트 후 자동 표시됩니다.');
+      }
       
     } else {
       // 아무도 선택되지 않은 경우
@@ -2010,9 +1993,6 @@ export default function LocationPage() {
         
         setIsLocationInfoPanelOpen(true);
         setIsEditingPanel(false);
-        
-        // 바텀시트를 collapsed 상태로 변경 (핸들이 보이는 정도로 내림)
-        setBottomSheetState('collapsed');
         
         // 주소 변환
         if (window.naver.maps.Service) {
@@ -2831,11 +2811,31 @@ export default function LocationPage() {
     // 새 장소 마커들 생성
     const newLocationMarkers: NaverMarker[] = [];
     
+    console.log('[updateAllMarkers] 장소 마커 생성 시작:', {
+      hasLocations: !!locations,
+      locationsLength: locations?.length || 0,
+      locations: locations?.map(loc => ({
+        id: loc.id,
+        name: loc.name,
+        coordinates: loc.coordinates,
+        isValidCoords: loc.coordinates[0] !== 0 && loc.coordinates[1] !== 0
+      })) || []
+    });
+    
     if (locations && locations.length > 0) {
       locations.forEach((location, index) => {
         const [lng, lat] = location.coordinates;
         
-        if (lat === 0 && lng === 0) return;
+        console.log(`[updateAllMarkers] 장소 ${index + 1}/${locations.length}:`, {
+          name: location.name,
+          coordinates: [lng, lat],
+          isValidCoords: lat !== 0 && lng !== 0
+        });
+        
+        if (lat === 0 && lng === 0) {
+          console.log(`[updateAllMarkers] 장소 ${location.name} 건너뜀: 유효하지 않은 좌표`);
+          return;
+        }
         
         const position = new window.naver.maps.LatLng(lat, lng);
         const isMarkerSelected = selectedLocationIdRef.current === location.id;
@@ -2887,7 +2887,12 @@ export default function LocationPage() {
         });
 
         newLocationMarkers.push(marker);
+        console.log(`[updateAllMarkers] 장소 마커 생성 완료: ${location.name}`);
       });
+      
+      console.log('[updateAllMarkers] 모든 장소 마커 생성 완료:', newLocationMarkers.length, '개');
+    } else {
+      console.log('[updateAllMarkers] 장소 데이터가 없거나 비어있음');
     }
 
     // 상태 업데이트
@@ -2905,12 +2910,23 @@ export default function LocationPage() {
       hasMap: !!map,
       isMapReady,
       groupMembersCount: groupMembers.length,
-      locations: selectedMemberSavedLocations?.map(loc => ({ name: loc.name, coordinates: loc.coordinates })) || []
+      selectedMemberIdRef: selectedMemberIdRef.current,
+      locations: selectedMemberSavedLocations?.map(loc => ({ 
+        id: loc.id, 
+        name: loc.name, 
+        coordinates: loc.coordinates,
+        hasValidCoords: loc.coordinates[0] !== 0 && loc.coordinates[1] !== 0
+      })) || []
     });
     
     if (map && isMapReady) {
       if (groupMembers.length > 0) {
         console.log('[useEffect 통합 마커] 통합 마커 업데이트 시작');
+        console.log('[useEffect 통합 마커] 전달할 데이터:', {
+          멤버수: groupMembers.length,
+          장소수: selectedMemberSavedLocations?.length || 0,
+          장소데이터: selectedMemberSavedLocations
+        });
         updateAllMarkers(groupMembers, selectedMemberSavedLocations);
       } else {
         console.log('[useEffect 통합 마커] 기존 마커들 제거');
@@ -2928,6 +2944,12 @@ export default function LocationPage() {
           setInfoWindow(null);
         }
       }
+    } else {
+      console.log('[useEffect 통합 마커] 조건 미충족:', {
+        hasMap: !!map,
+        isMapReady,
+        groupMembersLength: groupMembers.length
+      });
     }
   }, [selectedMemberSavedLocations, groupMembers, map, isMapReady]);
 
@@ -3368,6 +3390,311 @@ export default function LocationPage() {
     setIsSidebarOpen(!isSidebarOpen);
   };
 
+  // 장소 선택 핸들러 (사이드바에서 장소 클릭 시)
+  const handleLocationSelect = (location: LocationData) => {
+    console.log('[handleLocationSelect] 장소 선택:', location.name);
+    
+    // 장소 선택 중임을 표시하여 다른 로직의 지도 이동 방지
+    isLocationSelectingRef.current = true;
+    
+    // 지도에서 해당 장소로 이동 (사이드바 닫기 전에 먼저 실행)
+    if (map && location.coordinates) {
+      const [lng, lat] = location.coordinates;
+      
+      if (lat && lng && lat !== 0 && lng !== 0) {
+        console.log('[handleLocationSelect] 지도 이동:', { lat, lng });
+        
+        // 즉시 지도 중심 이동 (강제) - 여러 번 호출하여 확실히 이동
+        const targetPosition = new window.naver.maps.LatLng(lat, lng);
+        map.setCenter(targetPosition);
+        
+        // 추가로 panTo도 사용하여 더 확실하게 이동
+        setTimeout(() => {
+          map.panTo(targetPosition);
+        }, 50);
+        
+        // 한 번 더 setCenter 호출 (다른 로직의 간섭 방지)
+        setTimeout(() => {
+          map.setCenter(targetPosition);
+        }, 200);
+        
+        // 줌 레벨 조정 (장소를 잘 볼 수 있도록)
+        const currentZoom = map.getZoom();
+        if (currentZoom < 16) {
+          map.setZoom(17);
+        }
+        
+        // 기존 InfoWindow 즉시 닫기
+        if (infoWindow) {
+          infoWindow.close();
+        }
+        
+        // 선택된 장소 상태 업데이트 (마커 색상 변경을 위해)
+        setSelectedLocationId(location.id);
+        selectedLocationIdRef.current = location.id;
+        
+        // 마커 색상 업데이트
+        updateMarkerColors(location.id);
+        
+        // 해당 장소의 마커를 찾아서 InfoWindow 표시
+        console.log('[handleLocationSelect] 마커 찾기 시작:', {
+          찾는좌표: [lat, lng],
+          현재마커수: markers.length,
+          마커들좌표: markers.map(m => {
+            const pos = m.getPosition();
+            return [pos.lat(), pos.lng()];
+          })
+        });
+        
+        let targetMarker = markers.find(marker => {
+          const markerPosition = marker.getPosition();
+          const latDiff = Math.abs(markerPosition.lat() - lat);
+          const lngDiff = Math.abs(markerPosition.lng() - lng);
+          console.log('[handleLocationSelect] 마커 좌표 비교:', {
+            마커좌표: [markerPosition.lat(), markerPosition.lng()],
+            찾는좌표: [lat, lng],
+            차이: [latDiff, lngDiff],
+            일치: latDiff < 0.0001 && lngDiff < 0.0001
+          });
+          return latDiff < 0.0001 && lngDiff < 0.0001;
+        });
+        
+        console.log('[handleLocationSelect] 마커 찾기 결과:', {
+          찾음: !!targetMarker,
+          마커타입: targetMarker ? typeof targetMarker : 'undefined'
+        });
+        
+        // 마커를 찾지 못한 경우 새로 생성
+        if (!targetMarker) {
+          console.log('[handleLocationSelect] 기존 마커를 찾을 수 없어 새 마커 생성:', location.name);
+          
+          const position = new window.naver.maps.LatLng(lat, lng);
+          targetMarker = new window.naver.maps.Marker({
+            position,
+            map,
+            title: location.name,
+            icon: {
+              content: `
+                <div style="position: relative; text-align: center;">
+                  <div style="
+                    width: 32px;
+                    height: 32px;
+                    background-color: white;
+                    border: 2px solid #ec4899;
+                    border-radius: 50%;
+                    overflow: hidden;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                    position: relative;
+                    z-index: 200;
+                    transition: all 0.3s ease;
+                  ">
+                    <svg width="16" height="16" fill="#ec4899" viewBox="0 0 24 24">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
+                    </svg>
+                  </div>
+                  
+                  <div style="
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    width: 40px;
+                    height: 40px;
+                    background: rgba(236, 72, 153, 0.2);
+                    border-radius: 50%;
+                    animation: selectedGlow 2s ease-in-out infinite;
+                    z-index: 140;
+                  "></div>
+                  
+                  <div style="
+                    position: absolute;
+                    bottom: -18px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background-color: rgba(0,0,0,0.7);
+                    color: white;
+                    padding: 2px 5px;
+                    border-radius: 3px;
+                    white-space: nowrap;
+                    font-size: 10px;
+                    font-weight: 500;
+                    max-width: 80px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                  ">
+                    ${location.name}
+                  </div>
+                </div>
+                
+                <style>
+                  @keyframes selectedGlow {
+                    0%, 100% { 
+                      transform: translate(-50%, -50%) scale(0.8);
+                      opacity: 0.4; 
+                    }
+                    50% {
+                      transform: translate(-50%, -50%) scale(1.2);
+                      opacity: 0.1; 
+                    }
+                  }
+                </style>
+              `,
+              anchor: new window.naver.maps.Point(16, 16)
+            },
+            zIndex: 200
+          });
+          
+          // 새 마커를 markers 배열에 추가
+          setMarkers(prev => [...prev, targetMarker]);
+          
+          console.log('[handleLocationSelect] 새 마커 생성 완료:', {
+            마커위치: [lat, lng],
+            마커객체: !!targetMarker,
+            지도에표시됨: targetMarker.getMap() === map,
+            zIndex: targetMarker.getZIndex()
+          });
+        } else {
+          console.log('[handleLocationSelect] 기존 마커 사용:', {
+            마커위치: [targetMarker.getPosition().lat(), targetMarker.getPosition().lng()],
+            지도에표시됨: targetMarker.getMap() === map,
+            zIndex: targetMarker.getZIndex()
+          });
+        }
+        
+        // InfoWindow content 문자열 생성
+        const infoWindowContent = `
+          <style>
+            @keyframes slideInFromBottom {
+              0% {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+              }
+              100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+              }
+            }
+            .location-info-window-container {
+              animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            }
+            .close-button {
+              transition: all 0.2s ease;
+            }
+            .close-button:hover {
+              background: rgba(0, 0, 0, 0.2) !important;
+              transform: scale(1.1);
+            }
+          </style>
+          <div class="location-info-window-container" style="
+            padding: 12px 16px;
+            min-width: 200px;
+            max-width: 280px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            position: relative;
+          ">
+            <!-- 닫기 버튼 -->
+            <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+              position: absolute;
+              top: 8px;
+              right: 8px;
+              background: rgba(0, 0, 0, 0.1);
+              border: none;
+              border-radius: 50%;
+              width: 22px;
+              height: 22px;
+              font-size: 14px;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: #666;
+            ">×</button>
+            
+            <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px;">
+              📍 ${location.name}
+            </h3>
+            <div style="margin-bottom: 6px;">
+              <p style="margin: 0; font-size: 12px; color: #64748b;">
+                <span style="color: #64748b; font-weight: 500; word-break: keep-all;">${location.address}</span>
+              </p>
+            </div>
+          </div>
+        `;
+        
+        // 새 InfoWindow 생성 및 표시
+        const newInfoWindow = new window.naver.maps.InfoWindow({
+          content: infoWindowContent,
+          borderWidth: 0,
+          backgroundColor: 'transparent',
+          disableAnchor: true
+        });
+        
+        // InfoWindow가 닫힐 때 상태 업데이트
+        window.naver.maps.Event.addListener(newInfoWindow, 'close', () => {
+          console.log('[InfoWindow] 닫힘 이벤트 발생');
+          setInfoWindow(null);
+        });
+        
+        newInfoWindow.open(map, targetMarker);
+        setInfoWindow(newInfoWindow);
+        
+        console.log('[handleLocationSelect] InfoWindow 표시 완료:', location.name);
+        
+        // 햅틱 피드백
+        try {
+          if ('vibrate' in navigator) {
+            navigator.vibrate(50);
+          }
+        } catch (error) {
+          console.debug('햅틱 피드백이 차단되었습니다:', error);
+        }
+        
+        // 지도 이동 완료 후 사이드바 닫기 (더 긴 지연으로 다른 로직의 간섭 방지)
+        setTimeout(() => {
+          setIsSidebarOpen(false);
+        }, 800); // 더 긴 지연으로 설정
+        
+        // 지속적으로 지도 중심을 해당 장소로 유지 (다른 로직의 간섭 방지)
+        const keepLocationCentered = () => {
+          for (let i = 0; i < 5; i++) {
+            setTimeout(() => {
+              if (map) {
+                const currentCenter = map.getCenter();
+                if (Math.abs(currentCenter.lat() - lat) > 0.001 || Math.abs(currentCenter.lng() - lng) > 0.001) {
+                  console.log(`[handleLocationSelect] 지도 중심 재설정 ${i + 1}회차:`, { 
+                    expected: { lat, lng }, 
+                    current: { lat: currentCenter.lat(), lng: currentCenter.lng() } 
+                  });
+                  map.setCenter(targetPosition);
+                }
+              }
+            }, 200 * (i + 1)); // 200ms, 400ms, 600ms, 800ms, 1000ms 간격으로 체크
+          }
+          
+          // 장소 선택 완료, 플래그 해제
+          setTimeout(() => {
+            isLocationSelectingRef.current = false;
+          }, 1200);
+        };
+        
+        keepLocationCentered();
+        
+      } else {
+        console.warn('[handleLocationSelect] 유효하지 않은 좌표:', { lat, lng });
+        setIsSidebarOpen(false);
+      }
+    } else {
+      console.warn('[handleLocationSelect] 지도 또는 좌표가 없습니다:', { map: !!map, coordinates: location.coordinates });
+      setIsSidebarOpen(false);
+    }
+  };
+
   // 사이드바 외부 클릭 처리
   useEffect(() => {
     const handleSidebarClickOutside = (event: MouseEvent) => {
@@ -3502,10 +3829,7 @@ export default function LocationPage() {
             <div className="flex items-center justify-between h-16 px-4">
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-3">
-                  <motion.div
-                    initial={{ rotate: -180, scale: 0 }}
-                    animate={{ rotate: 0, scale: 1 }}
-                    transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
+                  <div
                     className="p-2 rounded-xl"
                     style={{ backgroundColor: '#0113A3' }}
                   >
@@ -3517,7 +3841,7 @@ export default function LocationPage() {
                   >
                     <path fillRule="evenodd" d="m11.54 22.351.07.04.028.016a.76.76 0 0 0 .723 0l.028-.015.071-.041a16.975 16.975 0 0 0 1.144-.742 19.58 19.58 0 0 0 2.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 0 0-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 0 0 2.682 2.282 16.975 16.975 0 0 0 1.145.742ZM12 13.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clipRule="evenodd" />
                   </svg>
-                  </motion.div>
+                  </div>
                   <div>
                     <h1 className="text-lg font-bold text-gray-900">내 장소</h1>
                     <p className="text-xs text-gray-500">그룹 멤버들과 장소를 공유해보세요</p>
@@ -3533,8 +3857,7 @@ export default function LocationPage() {
                   onClick={() => {
                     setIsLocationInfoPanelOpen(true);
                     setIsEditingPanel(false);
-                    // 바텀시트를 collapsed 상태로 변경 (핸들이 보이도록)
-                    setBottomSheetState('collapsed');
+
                     // 새 장소 입력을 위한 기본값 설정
                     setNewLocation({
                       name: '',
@@ -3735,8 +4058,7 @@ export default function LocationPage() {
                   setIsLocationInfoPanelOpen(false);
                   if (tempMarker.current) tempMarker.current.setMap(null);
                   setIsEditingPanel(false);
-                  // 패널 닫을 때 바텀시트를 다시 expanded 상태로 복원
-                  setBottomSheetState('expanded');
+                  // 패널 닫기
                     }} 
                     className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-all duration-200"
                   > 
@@ -3889,8 +4211,7 @@ export default function LocationPage() {
                     setIsLocationInfoPanelOpen(false);
                     if (tempMarker.current) tempMarker.current.setMap(null);
                     setIsEditingPanel(false);
-                    // 패널 닫을 때 바텀시트를 다시 expanded 상태로 복원
-                    setBottomSheetState('expanded');
+                    // 패널 닫기
                       }}
                       className="flex-1 py-3 px-4 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-medium rounded-xl shadow-lg mobile-button"
                     >
@@ -4211,393 +4532,8 @@ export default function LocationPage() {
           )}
         </AnimatePresence>
 
-        {/* 개선된 바텀시트 */}
-        <motion.div
-            ref={bottomSheetRef}
-            initial={{ translateY: '100%' }}
-            variants={bottomSheetVariants}
-            animate={bottomSheetState}
-            className="fixed bottom-0 left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
-            style={{ touchAction: isHorizontalSwipe ? 'none' : 'pan-y' }}
-            onTouchStart={handleDragStart}
-            onTouchMove={handleDragMove}
-            onTouchEnd={handleDragEnd}
-            onMouseDown={handleDragStart}
-            onMouseMove={handleDragMove}
-            onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
-          >
-            {/* 바텀시트 핸들 */}
-            <motion.div 
-              className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-3 cursor-grab active:cursor-grabbing"
-              whileHover={{ scale: 1.2, backgroundColor: '#0113A3' }}
-              transition={{ duration: 0.2 }}
-            />
-            
-            <div className="px-6 pb-2 overflow-y-auto max-h-full">
-              {/* 스와이프 가능한 콘텐츠 컨테이너 */}
-              <div className="flex-grow min-h-0 relative overflow-hidden">
-                <motion.div
-                  className="flex w-[200%] h-full"
-                  animate={{
-                    x: activeView === 'selectedMemberPlaces' ? '0%' : '-50%'
-                  }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 300,
-                    damping: 30,
-                    duration: 0.5
-                  }}
-                  style={{ touchAction: 'pan-x' }}
-                >
-                {/* 그룹 멤버 섹션 */}
-              <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
-                  <div 
-                    className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-4 border border-indigo-100 h-[160px] overflow-y-auto hide-scrollbar"
-                  >
-                    <motion.div 
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3, duration: 0.6 }}
-                      className="hide-scrollbar flex-1"
-                    >
-                      {/* 헤더와 드롭다운 */}
-                      <motion.div 
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-                        className="flex justify-between items-center mb-2"
-                      >
-                         <div className="flex items-center space-x-3">
-                          <div className="flex items-center space-x-2">
-                            <FiUser className="w-5 h-5" style={{ color: '#0113A3' }} />
-                            <div>                                                                                                               
-                              <h2 className="text-base font-semibold text-gray-900">그룹 멤버</h2>
-                            </div>
-                          </div>
-                         </div>
-                         
-                        <div className="flex items-center space-x-3">
-                           {/* 그룹 선택 드롭다운 */}
-                           <div className="relative" data-group-dropdown-container="true">
-                            <motion.button
-                              whileHover={{ 
-                                scale: 1.02, 
-                                y: -2,
-                                borderColor: "#0113A3",
-                                boxShadow: "0 4px 12px rgba(1, 19, 163, 0.15)",
-                                transition: { duration: 0.2, ease: "easeOut" }
-                              }}
-                              whileTap={{ 
-                                scale: 0.98,
-                                transition: { duration: 0.1, ease: "easeInOut" }
-                              }}
-                               onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
-                              className="group-selector flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-medium min-w-[120px] mobile-button"
-                               data-group-selector="true"
-                             >
-                               <span className="truncate text-gray-700">
-                                 {userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'}
-                               </span>
-                              <div className="ml-1.5 flex-shrink-0">
-                                  <motion.div
-                                    animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-                                    transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                                  >
-                                    <FiChevronDown className="text-gray-400" size={12} />
-                                  </motion.div>
-                               </div>
-                            </motion.button>
 
-                            <AnimatePresence>
-                             {isGroupSelectorOpen && userGroups.length > 0 && (
-                                <motion.div
-                                  initial={{ opacity: 0, y: -10, scale: 0.96 }}
-                                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                                  exit={{ opacity: 0, y: -10, scale: 0.96 }}
-                                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                                  className="absolute top-full right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-40 overflow-y-auto min-w-[160px]"
-                                  data-group-dropdown-menu="true"
-                                >
-                                  {userGroups.map((group) => (
-                                    <button
-                                     key={group.sgt_idx}
-                                     onClick={() => handleGroupSelect(group.sgt_idx)}
-                                        className={`w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-gray-50 transition-colors duration-150 mobile-button ${
-                                          selectedGroupId === group.sgt_idx 
-                                            ? 'font-medium' 
-                                            : 'text-gray-700'
-                                        }`}
-                                        style={selectedGroupId === group.sgt_idx 
-                                          ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' }
-                                          : {}
-                                        }
-                                   >
-                                     <div className="flex items-center justify-between">
-                                       <div className="flex-1">
-                                         <div className="font-medium truncate">
-                                           {group.sgt_title || `그룹 ${group.sgt_idx}`} ({groupMemberCounts[group.sgt_idx] || 0}명)
-                                         </div>
-                                       </div>
-                                       {selectedGroupId === group.sgt_idx && (
-                                         <svg className="w-3 h-3 text-indigo-600 flex-shrink-0" style={{ color: '#0113A3' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                         </svg>
-                                       )}
-                                     </div>
-                                    </button>
-                                 ))}
-                                </motion.div>
-                             )}
-                            </AnimatePresence>
-                           </div>
 
-                         </div>
-                      </motion.div>
-
-                     {/* 멤버 목록 */}
-                     <motion.div 
-                       initial={{ opacity: 0, y: 15 }}
-                       animate={{ opacity: 1, y: 0 }}
-                       transition={{ delay: 0.3, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-                       className="flex flex-row flex-nowrap justify-start items-center gap-x-6 overflow-x-auto hide-scrollbar px-2 py-2"
-                     >
-                        {groupMembers.map((member, index) => {
-                          const fallbackImage = getDefaultImage(member.mt_gender, member.original_index);
-                          
-                          return (
-                          <motion.div 
-                            key={member.id} 
-                            initial={{ opacity: 0, y: 15 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-                            className="flex flex-col items-center p-0 flex-shrink-0"
-                          >
-                            <button
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 handleMemberSelect(member.id);
-                               }}
-                               onTouchStart={(e) => e.stopPropagation()}
-                               onTouchMove={(e) => e.stopPropagation()}
-                               onTouchEnd={(e) => e.stopPropagation()}
-                              className="flex flex-col items-center focus:outline-none mobile-button"
-                            >
-                                <div
-                                  className={`member-avatar w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
-                                    member.isSelected ? 'selected' : ''
-                                  }`}
-                                >
-                                  <img 
-                                    src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}
-                                alt={member.name} 
-                                  className="w-full h-full object-cover rounded-xl" 
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                      const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
-                                      console.log(`[이미지 오류] ${member.name}의 이미지 로딩 실패, 기본 이미지로 대체:`, defaultImg);
-                                      target.src = defaultImg;
-                                      target.onerror = () => {}; // 무한 루프 방지
-                                    }}
-                                    onLoad={() => {
-                                      console.log(`[이미지 성공] ${member.name}의 이미지 로딩 완료:`, member.photo);
-                                    }}
-                                  />
-                                </div>
-                              <span className={`block text-sm font-normal mt-1 transition-colors duration-200 ${
-                                member.isSelected ? 'text-indigo-700' : 'text-gray-700'
-                              }`}
-                              style={member.isSelected ? { color: '#0113A3' } : {}}
-                              >
-                               {member.name}
-                             </span>
-                            </button>
-                          </motion.div>
-                          );
-                        })}
-                      </motion.div>
-                    </motion.div>
-                  </div>
-              </div>
-
-                {/* 다른 멤버들의 장소 뷰 */}
-              <div className="w-1/2 h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch' }}>
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1, duration: 0.3 }}
-                    className="bg-gradient-to-r from-pink-50 to-rose-50 rounded-2xl p-4 border border-pink-100 h-[160px] overflow-y-auto hide-scrollbar"
-                  >
-                    <div className="flex justify-between items-center mb-4">
-                      <div className="flex items-center space-x-3">
-                        <FiMapPin className="w-5 h-5 text-pink-500" />
-                        <div>
-                          <h2 className="text-base font-semibold text-gray-900">
-                            {groupMembers.find((m: GroupMember) => m.isSelected)?.name ?
-                              `${groupMembers.find((m: GroupMember) => m.isSelected)?.name}의 장소` : 
-                              '다른 멤버들의 장소'
-                            }
-                  </h2>
-                          <p className="text-sm text-gray-600">장소들을 확인하세요</p>
-                        </div>
-
-                      </div>
-                    </div>
-
-                  {otherMembersSavedLocations.length > 0 ? (
-                      <motion.div 
-                        variants={staggerContainer}
-                        initial="hidden"
-                        animate="visible"
-                        className="flex overflow-x-auto space-x-3 pb-2 hide-scrollbar -mx-1 px-1"
-                      >
-                        {otherMembersSavedLocations.map((location, index) => {
-                          const lat = parseFloat(String(location.slt_lat || '0')) || 0;
-                          const lng = parseFloat(String(location.slt_long || '0')) || 0;
-                          
-                          console.log('[장소 렌더링]', location.name || location.slt_title, 'lat:', lat, 'lng:', lng);
-                          
-                          // 좌표가 없어도 장소 카드는 표시하되, 지도 이동만 제한
-                          const locationId = location.slt_idx ? location.slt_idx.toString() : location.id;
-                          const isSelected = selectedLocationIdRef.current === locationId;
-                          const hasValidCoords = lat !== 0 || lng !== 0;
-                        
-                        return (
-                            <motion.div 
-                            key={location.slt_idx || location.id} 
-                              custom={index}
-                              variants={locationCardVariants}
-                              initial="hidden"
-                              animate="visible"
-                              whileHover={!isSelected ? "hover" : undefined}
-                              whileTap="tap"
-                              className={`flex-shrink-0 w-[220px] h-[60px] bg-white rounded-xl p-4 cursor-pointer transition-all duration-300 border shadow-sm ${
-                                isSelected 
-                                  ? 'border-amber-200 shadow-lg ring-1 ring-amber-100' 
-                                  : 'border-gray-200 hover:border-amber-200 hover:shadow-md active:scale-[0.98]'
-                              } ${!hasValidCoords ? 'opacity-70 border-dashed border-orange-200 bg-orange-50/30' : ''}`}
-                              style={{
-                                background: isSelected 
-                                  ? 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)'
-                                  : 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
-                                boxShadow: isSelected 
-                                  ? '0 4px 20px rgba(245, 158, 11, 0.15)' 
-                                  : '0 2px 8px rgba(0, 0, 0, 0.04)'
-                              }}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleLocationCardClick(location);
-                              }}
-                            >
-                                                                                            <div className="flex items-center justify-between h-full">
-                                <div className="flex items-center min-w-0 flex-1">
-                                  {/* 텍스트 정보 */}
-                                  <div className="min-w-0 flex-1">
-                                    <h4 className="text-sm font-normal text-gray-900 truncate leading-tight">
-                                      {location.name || location.slt_title || '제목 없음'}
-                                    </h4>
-                                    {!hasValidCoords && (
-                                      <p className="text-xs text-orange-500 mt-1">위치정보 없음</p>
-                                    )}
-                                  </div>
-                                </div>
-                                
-                                {/* 액션 버튼들 */}
-                                <div className="flex items-center space-x-1.5 flex-shrink-0 ml-2">
-                                  <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleNotificationToggle(location);
-                                    }}
-                                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
-                                      (location.notifications === true || location.slt_enter_alarm === 'Y')
-                                        ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' 
-                                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                    }`}
-                                    title={`알림 ${(location.notifications === true || location.slt_enter_alarm === 'Y') ? '끄기' : '켜기'}`}
-                                  >
-                                    {(location.notifications === true || location.slt_enter_alarm === 'Y') ? (
-                                      <FiBell size={13} />
-                                    ) : (
-                                      <FiBellOff size={13} />
-                                    )}
-                                  </motion.button>
-                                  
-                                  <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleHideLocation(location);
-                                    }}
-                                    className="w-8 h-8 rounded-lg bg-red-100 text-red-500 hover:bg-red-200 hover:text-red-600 flex items-center justify-center transition-all duration-200"
-                                    title="장소 삭제"
-                                  >
-                                    <FiTrash2 size={13} />
-                                  </motion.button>
-                                </div>
-                              </div>
-                </motion.div>
-                        );
-                      })}
-              </motion.div>
-                    ) : (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex flex-col items-center justify-center text-center"
-                      >
-                        <div className="w-12 h-12 bg-pink-100 rounded-full flex items-center justify-center mb-3">
-                          <FiMapPin className="w-6 h-6 text-pink-500" />
-                        </div>
-                        <p className="text-sm font-medium text-gray-600 mb-1">
-                          {groupMembers.find((m: GroupMember) => m.isSelected)?.name ?
-                            `${groupMembers.find((m: GroupMember) => m.isSelected)?.name}님의 장소가 없습니다` : 
-                            '저장된 장소가 없습니다'
-                          }
-                        </p>
-                        <p className="text-xs text-gray-400">새로운 장소를 추가해보세요</p>
-                      </motion.div>
-                  )}
-                  </motion.div>
-                    </div>
-                  </motion.div>
-
-              {/* 점 인디케이터 */}
-              <div className="flex justify-center items-center space-x-2 mb-2">
-                <motion.div
-                  className={`rounded-full transition-all duration-300 ${
-                    activeView === 'selectedMemberPlaces' ? 'bg-indigo-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
-                  }`}
-                  initial={{ scale: 0.8 }}
-                  animate={{ scale: 1 }}
-                  transition={{ duration: 0.3 }}
-                  style={activeView === 'selectedMemberPlaces' ? { backgroundColor: '#0113A3' } : {}}
-                />
-                <motion.div
-                  className={`rounded-full transition-all duration-300 ${
-                    activeView === 'otherMembersPlaces' ? 'bg-pink-600 w-6 h-2' : 'bg-gray-300 w-2 h-2'
-                  }`}
-                  initial={{ scale: 0.8 }}
-                  animate={{ scale: 1 }}
-                  transition={{ duration: 0.3, delay: 0.1 }}
-                />
-              </div>
-
-              {/* 좌우 스와이프 힌트 */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 0.7 }}
-                transition={{ delay: 0.8 }}
-                className="text-center mt-2"
-              >
-                <span className="text-xs text-gray-400 font-medium">← 좌우로 스와이프 →</span>
-              </motion.div>
-              </div>
-            </div>
-          </motion.div>
 
       </motion.div>
 
@@ -4820,6 +4756,306 @@ export default function LocationPage() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 사이드바 */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <>
+            {/* 오버레이 */}
+            <motion.div
+              variants={sidebarOverlayVariants}
+              initial="closed"
+              animate="open"
+              exit="closed"
+              className="fixed inset-0 bg-black bg-opacity-50 z-40"
+              onClick={() => setIsSidebarOpen(false)}
+            />
+            
+            {/* 사이드바 */}
+            <motion.div
+              ref={sidebarRef}
+              variants={sidebarVariants}
+              initial="closed"
+              animate="open"
+              exit="closed"
+              className="fixed left-0 top-0 w-80 shadow-2xl border-r z-50 flex flex-col"
+              style={{ 
+                background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
+                borderColor: 'rgba(1, 19, 163, 0.1)',
+                bottom: '60px', // 네비게이션 바 높이만큼 여유 공간
+                height: 'calc(100vh - 60px)'
+              }}
+            >
+              <motion.div
+                variants={sidebarContentVariants}
+                initial="closed"
+                animate="open"
+                exit="closed"
+                className="p-6 h-full flex flex-col relative z-10"
+              >
+                {/* 개선된 헤더 */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center space-x-3">
+                    <motion.div 
+                      className="p-2 rounded-xl shadow-lg"
+                      style={{ backgroundColor: '#0113A3' }}
+                      whileHover={{ scale: 1.05, rotate: 5 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <FiUser className="w-5 h-5 text-white" />
+                    </motion.div>
+                    <div>
+                      <h2 className="text-xl font-bold bg-gray-900 bg-clip-text text-transparent">
+                        그룹 멤버
+                      </h2>
+                      <p className="text-sm text-gray-600">멤버를 선택해보세요</p>
+                    </div>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.05, rotate: 90 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="p-2 hover:bg-white/60 rounded-xl transition-all duration-200 backdrop-blur-sm"
+                  >
+                    <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </motion.button>
+                </div>
+
+                {/* 그룹 선택 드롭다운 */}
+                <div className="mb-6">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+                    <h3 className="text-base font-semibold text-gray-800">그룹 선택</h3>
+                  </div>
+                  <div className="relative" ref={groupDropdownRef}>
+                    <motion.button
+                      whileHover={{ scale: 1.02, borderColor: "#0113A3" }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
+                      className="w-full p-3 bg-white/80 backdrop-blur-sm border rounded-xl flex items-center justify-between text-left transition-all duration-200"
+                      style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}
+                    >
+                      <span className="text-gray-700 font-medium">
+                        {userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'}
+                      </span>
+                      <motion.div
+                        animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <FiChevronDown className="text-gray-400" size={16} />
+                      </motion.div>
+                    </motion.button>
+
+                    <AnimatePresence>
+                      {isGroupSelectorOpen && userGroups.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10, scale: 0.96 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -10, scale: 0.96 }}
+                          transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                          className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50"
+                        >
+                          {userGroups.map((group) => (
+                            <button
+                              key={group.sgt_idx}
+                              onClick={() => handleGroupSelect(group.sgt_idx)}
+                              className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors duration-150 first:rounded-t-xl last:rounded-b-xl ${
+                                selectedGroupId === group.sgt_idx 
+                                  ? 'font-medium' 
+                                  : 'text-gray-700'
+                              }`}
+                              style={selectedGroupId === group.sgt_idx 
+                                ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' }
+                                : {}
+                              }
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="font-medium truncate">
+                                    {group.sgt_title || `그룹 ${group.sgt_idx}`}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {groupMemberCounts[group.sgt_idx] || 0}명의 멤버
+                                  </div>
+                                </div>
+                                {selectedGroupId === group.sgt_idx && (
+                                  <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" style={{ color: '#0113A3' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                {/* 멤버 목록 */}
+                <div className="flex-1 min-h-0">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
+                    <h3 className="text-base font-semibold text-gray-800">멤버 목록</h3>
+                    <div className="flex-1 h-px bg-gradient-to-r from-emerald-200/50 to-transparent"></div>
+                    <span className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-full backdrop-blur-sm">
+                      {groupMembers.length}명
+                    </span>
+                  </div>
+                  <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-16">
+                    {groupMembers.length > 0 ? (
+                      <motion.div variants={sidebarContentVariants} className="space-y-2">
+                        {groupMembers.map((member, index) => (
+                          <motion.div
+                            key={member.id}
+                            variants={memberItemVariants}
+                            whileHover={{ scale: 1.02, x: 3 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              handleMemberSelect(member.id);
+                              // 사이드바는 닫지 않고 유지하여 장소 리스트를 볼 수 있도록 함
+                            }}
+                            className={`p-4 rounded-xl cursor-pointer transition-all duration-300 backdrop-blur-sm ${
+                              member.isSelected 
+                                ? 'border-2 shadow-lg' 
+                                : 'bg-white/60 hover:bg-white/90 border hover:shadow-md'
+                            }`}
+                            style={member.isSelected 
+                              ? { 
+                                  background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.8), rgba(253, 244, 255, 0.8))',
+                                  borderColor: 'rgba(1, 19, 163, 0.3)',
+                                  boxShadow: '0 10px 25px rgba(1, 19, 163, 0.1)'
+                                }
+                              : { 
+                                  borderColor: 'rgba(1, 19, 163, 0.1)'
+                                }
+                            }
+                          >
+                            <div className="flex items-center space-x-4">
+                              <div className="relative">
+                                <motion.div 
+                                  className={`w-12 h-12 rounded-full overflow-hidden ${
+                                    member.isSelected 
+                                      ? 'ring-3 shadow-lg' 
+                                      : 'ring-2 ring-white/50'
+                                  }`}
+                                  style={member.isSelected 
+                                    ? { 
+                                        '--tw-ring-color': 'rgba(1, 19, 163, 0.3)',
+                                        boxShadow: '0 10px 25px rgba(1, 19, 163, 0.2)'
+                                      } as React.CSSProperties
+                                    : {}
+                                  }
+                                  whileHover={{ scale: 1.1, rotate: 5 }}
+                                  transition={{ type: "spring", stiffness: 300 }}
+                                >
+                                  <img 
+                                    src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}
+                                    alt={member.name} 
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const target = e.target as HTMLImageElement;
+                                      const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
+                                      target.src = defaultImg;
+                                    }}
+                                  />
+                                </motion.div>
+                                
+                                {/* 리더/오너 왕관 표시 */}
+                                {member.sgdt_owner_chk === 'Y' && (
+                                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg">
+                                    <FaCrown className="w-2.5 h-2.5 text-white" />
+                                  </div>
+                                )}
+                                {member.sgdt_owner_chk !== 'Y' && member.sgdt_leader_chk === 'Y' && (
+                                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center shadow-lg">
+                                    <FaCrown className="w-2.5 h-2.5 text-white" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between">
+                                  <h4 className={`font-normal text-sm ${member.isSelected ? 'text-gray-900' : 'text-gray-900'} truncate`}>
+                                    {member.name}
+                                  </h4>
+                                  {/* 총 장소 수 */}
+                                  <div className="flex items-center space-x-1">
+                                    <span className="text-xs text-gray-500">📍</span>
+                                    <span className={`text-xs font-normal ${
+                                      member.isSelected ? 'text-gray-700' : 'text-gray-700'
+                                    }`}>
+                                      {member.savedLocationCount ?? member.savedLocations?.length ?? 0}개
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                {/* 선택된 멤버의 장소 리스트 표시 */}
+                                {member.isSelected && member.savedLocations && member.savedLocations.length > 0 && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="mt-3"
+                                  >
+                                    <div className="max-h-48 overflow-y-auto hide-scrollbar space-y-2 pr-1">
+                                      {member.savedLocations.map((location, locationIndex) => (
+                                        <motion.div
+                                          key={location.id}
+                                          initial={{ opacity: 0, x: -10 }}
+                                          animate={{ opacity: 1, x: 0 }}
+                                          transition={{ delay: locationIndex * 0.1 }}
+                                          className="flex items-center space-x-2 p-2 bg-white/40 rounded-lg backdrop-blur-sm border border-white/30 hover:bg-white/60 transition-colors cursor-pointer"
+                                          whileHover={{ scale: 1.02 }}
+                                          whileTap={{ scale: 0.98 }}
+                                          onClick={() => handleLocationSelect(location)}
+                                        >
+                                          <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 flex-shrink-0"></div>
+                                          <span className="text-xs text-gray-600 truncate flex-1">
+                                            {location.name}
+                                          </span>
+                                          <span className="text-xs text-gray-400 flex-shrink-0">
+                                            {location.category}
+                                          </span>
+                                          <div className="w-3 h-3 flex items-center justify-center flex-shrink-0">
+                                            <svg className="w-2.5 h-2.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
+                                          </div>
+                                        </motion.div>
+                                      ))}
+                                    </div>
+                                    {member.savedLocations.length > 5 && (
+                                      <div className="text-xs text-gray-400 text-center pt-2 border-t border-gray-200/50 mt-2">
+                                        총 {member.savedLocations.length}개의 장소
+                                      </div>
+                                    )}
+                                  </motion.div>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <FiUser className="w-6 h-6 text-gray-400" />
+                        </div>
+                        <p className="text-gray-500 font-medium text-sm">그룹 멤버가 없습니다</p>
+                        <p className="text-xs text-gray-400 mt-1">그룹을 선택하거나 멤버를 초대해보세요</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </>
