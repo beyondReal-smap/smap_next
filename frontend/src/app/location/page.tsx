@@ -2471,7 +2471,7 @@ export default function LocationPage() {
         icon: {
           content: `
             <div style="position: relative; text-align: center;">
-              <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+              <div style="width: 28px; height: 28px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
                 <img 
                   src="${photoForMarker}" 
                   alt="${member.name}" 
@@ -2654,8 +2654,8 @@ export default function LocationPage() {
           content: `
             <div style="position: relative; text-align: center;">
               <div style="
-                width: 32px;
-                height: 32px;
+                width: 28px;
+                height: 28px;
                 background-color: white;
                 border: 2px solid ${isMarkerSelected ? '#ec4899' : '#6366f1'};
                 border-radius: 50%;
@@ -2802,7 +2802,7 @@ export default function LocationPage() {
             icon: {
               content: `
                 <div style="position: relative; text-align: center;">
-                  <div style="width: 32px; height: 32px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                  <div style="width: 28px; height: 28px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
                     <img 
                       src="${photoForMarker}" 
                       alt="${member.name}" 
@@ -2876,8 +2876,8 @@ export default function LocationPage() {
             content: `
               <div style="position: relative; text-align: center;">
                 <div style="
-                  width: ${isMarkerSelected ? '32px' : '24px'};
-                  height: ${isMarkerSelected ? '32px' : '24px'};
+                  width: ${isMarkerSelected ? '28px' : '24px'};
+                  height: ${isMarkerSelected ? '28px' : '24px'};
                   background-color: white;
                   border: 2px solid ${isMarkerSelected ? '#ec4899' : '#6366f1'};
                   border-radius: 50%;
@@ -3064,8 +3064,8 @@ export default function LocationPage() {
           content: `
             <div style="position: relative; text-align: center;">
               <div style="
-                width: 32px;
-                height: 32px;
+                width: 28px;
+                height: 28px;
                 background-color: white;
                 border: 2px solid ${isSelected ? '#f59e0b' : '#6366f1'};
                 border-radius: 50%;
@@ -3156,8 +3156,8 @@ export default function LocationPage() {
             content: `
               <div style="position: relative; text-align: center;">
                 <div style="
-                  width: 32px;
-                  height: 32px;
+                  width: 28px;
+                  height: 28px;
                   background-color: white;
                   border: 2px solid ${isSelected ? '#ec4899' : '#6366f1'};
                   border-radius: 50%;
@@ -3538,8 +3538,8 @@ export default function LocationPage() {
                   content: `
                     <div style="position: relative; text-align: center;">
                       <div style="
-                        width: ${isSelected ? '32px' : '24px'};
-                        height: ${isSelected ? '32px' : '24px'};
+                        width: ${isSelected ? '28px' : '24px'};
+                        height: ${isSelected ? '28px' : '24px'};
                         background-color: white;
                         border: 2px solid ${isSelected ? '#ec4899' : '#6366f1'};
                         border-radius: 50%;
@@ -3987,28 +3987,29 @@ export default function LocationPage() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -30, scale: 0.96 }}
               transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className="location-info-panel fixed top-20 left-4 right-4 z-30 rounded-2xl p-4 shadow-2xl"
+              className="location-info-panel fixed top-20 left-4 right-4 z-30 rounded-2xl p-3 shadow-2xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
-              <div className="flex justify-between items-center mb-1 pb-1">
+              <div className="flex justify-between items-center mb-2">
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.1 }}
+                  className="flex-1 pr-2"
                 >
-                  <h3 className="text-lg font-bold text-gray-800">
+                  <h3 className="text-base font-bold text-gray-800 leading-tight">
                 {isEditingPanel ? "장소 정보" : 
                       (groupMembers.find(m => m.isSelected)?.name ? 
                         `${groupMembers.find(m => m.isSelected)?.name}의 새 장소 등록` : 
                         "새 장소 등록")
                 } 
               </h3>
-                  <p className="text-xs font-medium mt-1" style={{ color: '#0113A3' }}>
+                  <p className="text-xs font-medium mt-0.5" style={{ color: '#0113A3' }}>
                     {isEditingPanel ? "장소 정보를 확인하고 관리하세요" : "지도를 클릭하거나 검색하세요"}
                   </p>
                 </motion.div>
                 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1 flex-shrink-0">
                 {isEditingPanel && (
                     <motion.button
                       whileHover={{ scale: 1.02 }}
@@ -4027,14 +4028,14 @@ export default function LocationPage() {
                         }
                       }
                       }}
-                      className={`p-2 rounded-lg transition-all duration-200 ${
+                      className={`p-1.5 rounded-lg transition-all duration-200 ${
                         newLocation.notifications 
                           ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-100 border border-emerald-200' 
                           : 'bg-rose-50 text-rose-500 hover:bg-rose-100 border border-rose-200'
                     }`}
                     aria-label={newLocation.notifications ? '알림 끄기' : '알림 켜기'}
                   >
-                      {newLocation.notifications ? <FiBell size={16} /> : <FiBellOff size={16} />}
+                      {newLocation.notifications ? <FiBell size={14} /> : <FiBellOff size={14} />}
                     </motion.button>
                   )}
                   
@@ -4047,9 +4048,9 @@ export default function LocationPage() {
                   setIsEditingPanel(false);
                   // 패널 닫기
                     }} 
-                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                    className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-all duration-200"
                   > 
-                  <FiX size={20}/>
+                  <FiX size={18}/>
                   </motion.button>
               </div>
             </div>
@@ -4060,13 +4061,13 @@ export default function LocationPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
                 >
-                <div className="mb-4"> 
-                  <p className="text-base font-semibold text-gray-800 truncate">{newLocation.name}</p>
-                  <p className="text-sm text-gray-600 mt-1 break-words">{newLocation.address || '주소 정보 없음'}</p>
+                <div className="mb-3"> 
+                  <p className="text-sm font-semibold text-gray-800 truncate">{newLocation.name}</p>
+                  <p className="text-xs text-gray-600 mt-0.5 break-words leading-tight">{newLocation.address || '주소 정보 없음'}</p>
                 </div>
                 
                 {/* 편집 모드 액션 버튼들 */}
-                <motion.div className="flex space-x-3 mt-6"> 
+                <motion.div className="flex space-x-2 mt-3"> 
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -4084,11 +4085,11 @@ export default function LocationPage() {
                         );
                       }
                     }}
-                    className="flex-1 py-3 px-4 text-white font-medium rounded-xl shadow-lg mobile-button"
+                    className="flex-1 py-2 px-3 text-white font-medium rounded-lg shadow-md mobile-button text-sm"
                     style={{ backgroundColor: '#0113A3' }}
                   >
                     <div className="flex items-center justify-center">
-                      <FiTrash2 className="mr-2" size={16} />
+                      <FiTrash2 className="mr-1.5" size={14} />
                       삭제
                     </div>
                   </motion.button>
@@ -4100,7 +4101,7 @@ export default function LocationPage() {
                       if (tempMarker.current) tempMarker.current.setMap(null);
                       setIsEditingPanel(false);
                     }}
-                    className="flex-1 py-3 px-4 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-medium rounded-xl shadow-lg mobile-button"
+                    className="flex-1 py-2 px-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-medium rounded-lg shadow-md mobile-button text-sm"
                   >
                     닫기
                   </motion.button>
@@ -4112,11 +4113,11 @@ export default function LocationPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
                 >
-                  <div className="relative mb-3">
+                  <div className="relative mb-2">
                   <input
                     type="text"
                     placeholder="지번, 도로명, 건물명으로 검색"
-                      className="search-input w-full py-3 pl-12 pr-4 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
+                      className="search-input w-full py-2.5 pl-10 pr-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-blue-900 text-sm"
                     value={locationSearchQuery}
                     onChange={(e) => setLocationSearchQuery(e.target.value)}
                     onKeyDown={(e) => {
@@ -4126,9 +4127,9 @@ export default function LocationPage() {
                     }}
                   />
                   {isSearchingLocationForPanel ? (
-                      <FiLoader className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 animate-spin" />
+                      <FiLoader className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 animate-spin" size={16} />
                   ) : (
-                      <FaSearchSolid className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer" onClick={handlePanelAddressSearch} />
+                      <FaSearchSolid className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer" size={16} onClick={handlePanelAddressSearch} />
                   )}
                 </div>
 
@@ -4139,10 +4140,10 @@ export default function LocationPage() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="mb-4"
+                        className="mb-2"
                       >
-                        <p className="text-xs font-medium mb-2 px-1" style={{ color: '#0113A3' }}>검색 결과</p>
-                        <div className="max-h-32 overflow-y-auto bg-gray-50 rounded-xl border border-gray-100"> 
+                        <p className="text-xs font-medium mb-1 px-1" style={{ color: '#0113A3' }}>검색 결과</p>
+                        <div className="max-h-24 overflow-y-auto bg-gray-50 rounded-lg border border-gray-100"> 
                       <ul className="divide-y divide-gray-200"> 
                             {locationSearchResults.map((place, index) => (
                               <motion.li 
@@ -4150,11 +4151,11 @@ export default function LocationPage() {
                                 initial={{ opacity: 0, x: -20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: index * 0.05 }}
-                                className="p-3 cursor-pointer hover:bg-gray-100 transition-colors duration-200" 
+                                className="p-2 cursor-pointer hover:bg-gray-100 transition-colors duration-200" 
                                 onClick={() => handleSelectLocationForPanel(place)}
                               > 
-                                <p className="font-semibold text-gray-800 truncate text-xs">{place.place_name}</p> 
-                                <p className="text-gray-600 truncate text-xs">{place.road_address_name || place.address_name}</p> 
+                                <p className="font-semibold text-gray-800 truncate text-xs leading-tight">{place.place_name}</p> 
+                                <p className="text-gray-600 truncate text-xs leading-tight mt-0.5">{place.road_address_name || place.address_name}</p> 
                               </motion.li>
                         ))}
                       </ul>
@@ -4163,9 +4164,9 @@ export default function LocationPage() {
                 )}
                   </AnimatePresence>
 
-                <div className="mt-3 mb-3"> 
+                <div className="mt-2 mb-2"> 
                   <p className="text-xs font-medium mb-1" style={{ color: '#0113A3' }}>선택한 위치 주소</p>
-                  <div className="flex text-sm font-medium text-gray-700 min-h-[20px]">
+                  <div className="flex text-xs font-medium text-gray-700 min-h-[16px] leading-tight">
                     <span className="opacity-0 pointer-events-none select-none text-xs font-medium mb-1" style={{ color: '#0113A3' }}>
                       장소 태그 (이름)
                     </span>
@@ -4177,12 +4178,12 @@ export default function LocationPage() {
                   </div>
                 </div>
 
-                <div className="mb-4 mt-4"> 
-                    <label htmlFor="panelLocationName" className="block text-xs font-medium text-indigo-600 mb-2">장소 태그 (이름)</label>
+                <div className="mb-3"> 
+                    <label htmlFor="panelLocationName" className="block text-xs font-medium mb-1" style={{ color: '#0113A3' }}>장소 태그 (이름)</label>
                   <input
                     type="text"
                     id="panelLocationName"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:border-gray-500 text-sm"
+                      className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-blue-900 text-sm"
                     placeholder="이 장소에 대한 나만의 이름을 지어주세요."
                     value={newLocation.name}
                     onChange={(e) => setNewLocation(prev => ({ ...prev, name: e.target.value }))}
@@ -4190,7 +4191,7 @@ export default function LocationPage() {
                 </div>
 
                   {/* 액션 버튼들 */}
-                  <motion.div className="flex space-x-3"> 
+                  <motion.div className="flex space-x-2"> 
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
@@ -4200,7 +4201,7 @@ export default function LocationPage() {
                     setIsEditingPanel(false);
                     // 패널 닫기
                       }}
-                      className="flex-1 py-3 px-4 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-medium rounded-xl shadow-lg mobile-button"
+                      className="flex-1 py-2 px-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white font-medium rounded-lg shadow-md mobile-button text-sm"
                     >
                       닫기
                     </motion.button>
@@ -4208,7 +4209,8 @@ export default function LocationPage() {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={handleConfirmPanelAction}
-                      className="flex-1 py-3 px-4 bg-indigo-700 text-white font-medium rounded-xl shadow-lg mobile-button"
+                      className="flex-1 py-2 px-3 text-white font-medium rounded-lg shadow-md mobile-button text-sm"
+                      style={{ backgroundColor: '#0113A3' }}
                     >
                       내 장소 등록
                     </motion.button>
