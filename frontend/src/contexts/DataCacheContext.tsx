@@ -45,11 +45,14 @@ interface ScheduleData {
 interface LocationData {
   [groupId: string]: {
     [date: string]: {
-      mapMarkers: any[];
-      stayTimes: any[];
-      summary: any;
-      members: GroupMember[];
-      lastUpdated: number;
+      [memberId: string]: {
+        mapMarkers: any[];
+        stayTimes: any[];
+        dailySummary: any[];
+        locationLogSummary: any;
+        members: GroupMember[];
+        lastUpdated: number;
+      };
     };
   };
 }
@@ -71,7 +74,7 @@ interface CacheData {
     userGroups: number;
     groupMembers: { [groupId: string]: number };
     scheduleData: { [groupId: string]: number };
-    locationData: { [groupId: string]: { [date: string]: number } };
+    locationData: { [groupId: string]: { [date: string]: { [memberId: string]: number } } };
     groupPlaces: { [groupId: string]: number };
     dailyLocationCounts: { [groupId: string]: number };
   };
@@ -97,8 +100,8 @@ interface DataCacheContextType {
   setScheduleData: (groupId: number, date: string, schedules: any[]) => void;
   
   // 위치 데이터
-  getLocationData: (groupId: number, date: string) => any | null;
-  setLocationData: (groupId: number, date: string, data: any) => void;
+  getLocationData: (groupId: number, date: string, memberId?: string) => any | null;
+  setLocationData: (groupId: number, date: string, memberId: string, data: any) => void;
   
   // 그룹 장소
   getGroupPlaces: (groupId: number) => any[];
@@ -199,7 +202,11 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
         break;
       case 'locationData':
         if (!groupId || !date) return false;
-        lastUpdate = cache.lastUpdated.locationData[groupId]?.[date] || 0;
+        // memberId가 없으면 해당 그룹/날짜의 모든 멤버 데이터가 유효한지 확인
+        const memberUpdates = cache.lastUpdated.locationData[groupId]?.[date];
+        if (!memberUpdates) return false;
+        const allMemberUpdates = Object.values(memberUpdates);
+        lastUpdate = allMemberUpdates.length > 0 ? Math.max(...allMemberUpdates) : 0;
         isValid = now - lastUpdate < duration;
         break;
       case 'groupPlaces':
@@ -340,20 +347,37 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   }, []);
 
   // 위치 데이터
-  const getLocationData = useCallback((groupId: number, date: string) => {
+  const getLocationData = useCallback((groupId: number, date: string, memberId?: string) => {
     const isValid = isCacheValid('locationData', groupId, date);
-    const locationData = cache.locationData[groupId]?.[date];
-    if (isValid && locationData) {
-      console.log(`[DATA CACHE] ✅ 위치 데이터 캐시 히트 (${groupId}/${date}):`, locationData);
-      return locationData;
-    } else {
-      console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 (${groupId}/${date})`);
+    if (!isValid) {
+      console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 만료됨 (${groupId}/${date}${memberId ? `/${memberId}` : ''})`);
       return null;
+    }
+
+    const locationData = cache.locationData[groupId]?.[date];
+    if (!locationData) {
+      console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 데이터 없음 (${groupId}/${date}${memberId ? `/${memberId}` : ''})`);
+      return null;
+    }
+
+    if (memberId) {
+      const memberData = locationData[memberId];
+      if (memberData) {
+        console.log(`[DATA CACHE] ✅ 위치 데이터 캐시 히트 (${groupId}/${date}/${memberId}):`, memberData);
+        return memberData;
+      } else {
+        console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 멤버 데이터 없음 (${groupId}/${date}/${memberId})`);
+        return null;
+      }
+    } else {
+      // memberId가 없으면 전체 날짜 데이터 반환
+      console.log(`[DATA CACHE] ✅ 위치 데이터 캐시 히트 - 전체 날짜 (${groupId}/${date}):`, locationData);
+      return locationData;
     }
   }, [cache.locationData, isCacheValid]);
   
-  const setLocationData = useCallback((groupId: number, date: string, data: any) => {
-    console.log(`[DATA CACHE] 💾 위치 데이터 캐시 저장 (${groupId}/${date}):`, data);
+  const setLocationData = useCallback((groupId: number, date: string, memberId: string, data: any) => {
+    console.log(`[DATA CACHE] 💾 위치 데이터 캐시 저장 (${groupId}/${date}/${memberId}):`, data);
     setCache(prev => ({
       ...prev,
       locationData: {
@@ -361,8 +385,11 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
         [groupId]: {
           ...prev.locationData[groupId],
           [date]: {
-            ...data,
-            lastUpdated: Date.now(),
+            ...prev.locationData[groupId]?.[date],
+            [memberId]: {
+              ...data,
+              lastUpdated: Date.now(),
+            },
           },
         },
       },
@@ -372,7 +399,10 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
           ...prev.lastUpdated.locationData,
           [groupId]: {
             ...prev.lastUpdated.locationData[groupId],
-            [date]: Date.now(),
+            [date]: {
+              ...prev.lastUpdated.locationData[groupId]?.[date],
+              [memberId]: Date.now(),
+            },
           },
         },
       },
