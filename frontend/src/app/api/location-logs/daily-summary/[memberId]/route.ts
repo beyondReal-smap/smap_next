@@ -32,10 +32,30 @@ async function fetchWithFallback(url: string, options: RequestInit = {}) {
 // 백엔드 응답을 안전하게 변환하는 함수
 function transformDailySummaryResponse(backendData: any) {
   console.log('[Daily Summary API] 백엔드 원본 데이터:', backendData);
+  console.log('[Daily Summary API] 데이터 타입 분석:', {
+    isArray: Array.isArray(backendData),
+    hasResult: 'result' in backendData,
+    resultValue: backendData.result,
+    hasData: 'data' in backendData,
+    dataType: typeof backendData.data,
+    isDataArray: Array.isArray(backendData.data),
+    dataLength: Array.isArray(backendData.data) ? backendData.data.length : 'N/A',
+    keys: Object.keys(backendData)
+  });
   
   try {
-    // 배열 형태의 응답 처리
+    // 1. 백엔드에서 이미 올바른 형식으로 온 경우 (result: "Y" 포함)
+    if (backendData.result === "Y" && backendData.data && Array.isArray(backendData.data)) {
+      console.log('[Daily Summary API] 케이스 1: 백엔드에서 올바른 형식');
+      return {
+        ...backendData,
+        data: backendData.data.map(transformSingleDayData)
+      };
+    }
+    
+    // 2. 배열 형태의 응답 처리
     if (Array.isArray(backendData)) {
+      console.log('[Daily Summary API] 케이스 2: 배열 형태 응답');
       return {
         result: "Y",
         data: backendData.map(transformSingleDayData),
@@ -45,16 +65,9 @@ function transformDailySummaryResponse(backendData: any) {
       };
     }
     
-    // 객체 형태의 응답 처리 (백엔드에서 이미 올바른 형식으로 온 경우)
-    if (backendData.result === "Y" && backendData.data && Array.isArray(backendData.data)) {
-      return {
-        ...backendData,
-        data: backendData.data.map(transformSingleDayData)
-      };
-    }
-    
-    // 다른 객체 형태의 응답 처리
+    // 3. data 필드가 배열인 경우
     if (backendData.data && Array.isArray(backendData.data)) {
+      console.log('[Daily Summary API] 케이스 3: data 필드가 배열');
       return {
         result: "Y",
         data: backendData.data.map(transformSingleDayData),
@@ -64,7 +77,20 @@ function transformDailySummaryResponse(backendData: any) {
       };
     }
     
-    // 단일 객체 응답 처리
+    // 4. data 필드가 있지만 배열이 아닌 경우
+    if (backendData.data && !Array.isArray(backendData.data)) {
+      console.log('[Daily Summary API] 케이스 4: data 필드가 단일 객체');
+      return {
+        result: "Y",
+        data: [transformSingleDayData(backendData.data)],
+        total_days: 1,
+        success: true,
+        message: "일일 요약 조회 성공"
+      };
+    }
+    
+    // 5. 단일 객체 응답 처리 (data 필드 없음)
+    console.log('[Daily Summary API] 케이스 5: 단일 객체 응답');
     return {
       result: "Y",
       data: [transformSingleDayData(backendData)],
@@ -85,17 +111,18 @@ function transformDailySummaryResponse(backendData: any) {
 }
 
 function transformSingleDayData(dayData: any) {
-  return {
-    date: dayData.date || new Date().toISOString().split('T')[0],
-    total_distance: Number(dayData.total_distance) || 0,
-    total_time: formatTimeString(dayData.total_time),
-    step_count: Number(dayData.step_count) || Number(dayData.steps) || 0,
-    avg_speed: Number(dayData.avg_speed) || Number(dayData.average_speed) || 0,
-    max_speed: Number(dayData.max_speed) || 0,
-    avg_battery: Number(dayData.avg_battery) || Number(dayData.average_battery) || 0,
-    min_battery: Number(dayData.min_battery) || 0,
-    max_battery: Number(dayData.max_battery) || 100
+  console.log('[Daily Summary API] 단일 데이터 변환:', dayData);
+  
+  // 백엔드 CRUD에서 반환하는 실제 필드명에 맞게 처리
+  const result = {
+    mlt_idx: dayData.mlt_idx || 0,
+    log_date: dayData.log_date || dayData.date || new Date().toISOString().split('T')[0],
+    start_time: dayData.start_time || '',
+    end_time: dayData.end_time || ''
   };
+  
+  console.log('[Daily Summary API] 변환된 데이터:', result);
+  return result;
 }
 
 function formatTimeString(timeValue: any): string {
@@ -133,13 +160,16 @@ export async function GET(
     
     const backendUrl = `https://118.67.130.71:8000/api/v1/logs/member-location-logs`;
     
+    // act 값을 백엔드에서 실제 지원하는 값으로 설정
     const requestBody = {
-      act: 'get_daily_summary',
+      act: startDate && endDate ? 'get_daily_summary_by_range' : 'get_daily_summary',
       mt_idx: parseInt(memberId),
       date: date,
       start_date: startDate,
       end_date: endDate
     };
+    
+    console.log('[Daily Summary API] 백엔드 요청 데이터:', requestBody);
     
     const response = await fetchWithFallback(backendUrl, {
       method: 'POST',

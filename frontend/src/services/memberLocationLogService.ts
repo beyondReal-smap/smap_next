@@ -789,18 +789,34 @@ class MemberLocationLogService {
     try {
       console.log('[MemberLocationLogService] 멤버 활동 조회 시작:', { groupId, date });
       
-      const response = await apiClient.get<MemberActivityResponse>(`/member-location-logs/member-activity?group_id=${groupId}&date=${date}`);
+      const response = await apiClient.get<ApiResponse<MemberActivityResponse>>(`/member-location-logs/member-activity?group_id=${groupId}&date=${date}`);
+      const result = response.data;
       
       console.log('[MemberLocationLogService] 멤버 활동 조회 응답:', {
         status: response.status,
-        dataLength: response.data?.member_activities?.length || 0
+        result: result.result,
+        dataLength: result.data?.member_activities?.length || 0
+      });
+
+      // 응답 구조 디버깅
+      console.log('[MemberLocationLogService] 멤버 활동 응답 구조 분석:', {
+        hasResult: 'result' in result,
+        resultValue: result.result,
+        isResultY: result.result === 'Y',
+        hasData: 'data' in result,
+        dataType: typeof result.data,
+        dataKeys: result.data ? Object.keys(result.data) : [],
       });
       
-      if (response.data && response.data.member_activities && Array.isArray(response.data.member_activities)) {
-        console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용:', response.data.member_activities.length, '개');
-        return response.data;
+      if (result.result === 'Y' && result.data) {
+        console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용 (멤버 활동)');
+        return result.data;
       } else {
         console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');
+        console.log('[MemberLocationLogService] 검증 실패 세부사항:', {
+          resultValue: result.result,
+          isResultY: result.result === 'Y',
+        });
         return mockData;
       }
     } catch (error) {

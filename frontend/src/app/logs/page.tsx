@@ -1859,9 +1859,79 @@ export default function LogsPage() {
       console.log('[showStartPointInfoWindow] 마커가 없어서 위치 기반 InfoWindow 표시');
     }
     
-    // 시작점 InfoWindow 생성 (기존 스타일과 동일)
+    // 시작점 InfoWindow 생성 (모바일 Safari 호환성 강화)
     const startInfoWindow = new window.naver.maps.InfoWindow({
-      content: `<style>@keyframes slideInFromBottom { 0% { opacity: 0; transform: translateY(20px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); }} .info-window-container { animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);} .close-button { transition: all 0.2s ease;} .close-button:hover { background: rgba(0, 0, 0, 0.2) !important; transform: scale(1.1);}</style><div class="info-window-container" style="padding: 12px 16px; min-width: 200px; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); position: relative;"><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.1); border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #666;">×</button><h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #22c55e; padding-right: 25px; text-align: center;">📍 ${memberName}의 시작지점</h3><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">📅 날짜: <span style="color: #111827; font-weight: 500;">${date}</span></p></div><div style="margin-bottom: 0;"><p style="margin: 0; font-size: 11px; color: #9ca3af;">🌍 좌표: ${lat.toFixed(6)}, ${lng.toFixed(6)}</p></div></div>`,
+      content: `<style>
+        @keyframes slideInFromBottom { 
+          0% { opacity: 0; transform: translateY(20px) scale(0.95); } 
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        } 
+        .info-window-container { 
+          animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+          -webkit-text-size-adjust: 100% !important;
+          -webkit-font-smoothing: antialiased;
+        } 
+        .close-button { 
+          transition: all 0.2s ease;
+        } 
+        .close-button:hover { 
+          background: rgba(0, 0, 0, 0.2) !important; 
+          transform: scale(1.1);
+        }
+        /* 모바일 Safari 텍스트 색상 강제 설정 */
+        .info-window-container * {
+          color-scheme: light !important;
+          -webkit-text-fill-color: initial !important;
+        }
+      </style><div class="info-window-container" style="
+        padding: 12px 16px; 
+        min-width: 200px; 
+        max-width: 280px; 
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        background: white !important; 
+        border-radius: 12px; 
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); 
+        position: relative;
+        color-scheme: light !important;
+      "><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+        position: absolute; 
+        top: 8px; 
+        right: 8px; 
+        background: rgba(0, 0, 0, 0.1); 
+        border: none; 
+        border-radius: 50%; 
+        width: 22px; 
+        height: 22px; 
+        font-size: 14px; 
+        cursor: pointer; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        color: #666 !important;
+        -webkit-text-fill-color: #666 !important;
+      ">×</button><h3 style="
+        margin: 0 0 8px 0; 
+        font-size: 14px; 
+        font-weight: 600; 
+        color: #22c55e !important; 
+        padding-right: 25px; 
+        text-align: center;
+        -webkit-text-fill-color: #22c55e !important;
+      ">📍 ${memberName}의 시작지점</h3><div style="margin-bottom: 6px;"><p style="
+        margin: 0; 
+        font-size: 12px; 
+        color: #64748b !important;
+        -webkit-text-fill-color: #64748b !important;
+      ">📅 날짜: <span style="
+        color: #111827 !important; 
+        font-weight: 500;
+        -webkit-text-fill-color: #111827 !important;
+      ">${date}</span></p></div><div style="margin-bottom: 0;"><p style="
+        margin: 0; 
+        font-size: 11px; 
+        color: #9ca3af !important;
+        -webkit-text-fill-color: #9ca3af !important;
+      ">🌍 좌표: ${lat.toFixed(6)}, ${lng.toFixed(6)}</p></div></div>`,
       borderWidth: 0,
       backgroundColor: 'transparent',
       disableAnchor: true,
@@ -2527,51 +2597,61 @@ export default function LogsPage() {
     const transportIcon = getTransportIcon(speed);
     const transportText = getTransportText(speed);
 
-    // InfoWindow 내용 생성 (지도 마커와 동일한 스타일)
+    // InfoWindow 내용 생성 (모바일 Safari 호환성 강화)
     const infoContent = `
-      <div style="
+      <style>
+        /* 모바일 Safari 텍스트 색상 강제 설정 */
+        .current-position-info * {
+          color-scheme: light !important;
+          -webkit-text-fill-color: initial !important;
+          -webkit-text-size-adjust: 100% !important;
+        }
+      </style>
+      <div class="current-position-info" style="
         padding: 8px;
-        background: white;
+        background: white !important;
         border-radius: 6px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.12);
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         min-width: 140px;
         max-width: 160px;
+        color-scheme: light !important;
       ">
         <div style="
           background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-          color: white;
+          color: white !important;
           padding: 4px 6px;
           border-radius: 4px;
           margin: -8px -8px 6px -8px;
           font-weight: 600;
           font-size: 11px;
           text-align: center;
+          -webkit-text-fill-color: white !important;
         ">
           ${targetIndex + 1} / ${totalMarkers}
         </div>
         <div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;">
           <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(59, 130, 246, 0.1); padding: 2px 4px; border-radius: 4px; margin: 2px 0;">
-            <span style="color: #666;">이동 수단:</span>
+            <span style="color: #666 !important; -webkit-text-fill-color: #666 !important;">이동 수단:</span>
             <span style="font-weight: 600; font-size: 11px; display: flex; align-items: center; gap: 2px;">
-              ${transportIcon} <span style="font-size: 9px; color: #3b82f6;">${transportText}</span>
+              ${transportIcon} <span style="font-size: 9px; color: #3b82f6 !important; -webkit-text-fill-color: #3b82f6 !important;">${transportText}</span>
             </span>
           </div>
           <div style="display: flex; justify-content: space-between;">
-            <span style="color: #666;">⏰ 시간:</span>
-            <span style="font-weight: 600; font-size: 10px;">${timeOnly}</span>
+            <span style="color: #666 !important; -webkit-text-fill-color: #666 !important;">⏰ 시간:</span>
+            <span style="font-weight: 600; font-size: 10px; color: #111827 !important; -webkit-text-fill-color: #111827 !important;">${timeOnly}</span>
           </div>
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: #666;">🚀 속도:</span>
-            <span style="font-weight: 600; font-size: 10px;">${speed.toFixed(1)}km/h</span>
+            <span style="color: #666 !important; -webkit-text-fill-color: #666 !important;">🚀 속도:</span>
+            <span style="font-weight: 600; font-size: 10px; color: #111827 !important; -webkit-text-fill-color: #111827 !important;">${speed.toFixed(1)}km/h</span>
           </div>
           <div style="display: flex; justify-content: space-between;">
-            <span style="color: #666;">📍 정확도:</span>
-            <span style="font-weight: 600; font-size: 10px;">${accuracy.toFixed(0)}m</span>
+            <span style="color: #666 !important; -webkit-text-fill-color: #666 !important;">📍 정확도:</span>
+            <span style="font-weight: 600; font-size: 10px; color: #111827 !important; -webkit-text-fill-color: #111827 !important;">${accuracy.toFixed(0)}m</span>
           </div>
           <div style="display: flex; justify-content: space-between;">
-            <span style="color: #666;">🔋 배터리:</span>
-            <span style="font-weight: 600; font-size: 10px;">${battery}%</span>
+            <span style="color: #666 !important; -webkit-text-fill-color: #666 !important;">🔋 배터리:</span>
+            <span style="font-weight: 600; font-size: 10px; color: #111827 !important; -webkit-text-fill-color: #111827 !important;">${battery}%</span>
           </div>
         </div>
       </div>
@@ -2652,18 +2732,18 @@ export default function LogsPage() {
       if (lat && lng) {
         const center = new window.naver.maps.LatLng(Number(lat), Number(lng));
         
-        console.log(`[경로따라가기] 지도 중심 이동 시도: ${percentage.toFixed(1)}% - ${targetIndex + 1}/${totalMarkers}`, {
-          lat: Number(lat),
-          lng: Number(lng),
-          center: { lat: Number(lat), lng: Number(lng) }
-        });
+        // console.log(`[경로따라가기] 지도 중심 이동 시도: ${percentage.toFixed(1)}% - ${targetIndex + 1}/${totalMarkers}`, {
+        //   lat: Number(lat),
+        //   lng: Number(lng),
+        //   center: { lat: Number(lat), lng: Number(lng) }
+        // });
         
         // 1. 마커를 먼저 생성/업데이트 (즉시 반응)
         createOrUpdateCurrentPositionMarker(Number(lat), Number(lng), targetIndex, totalMarkers);
         
         // 2. 지도 중심을 부드럽게 이동
         map.current.setCenter(center);
-        console.log('[경로따라가기] 지도 중심 이동 완료:', { lat: Number(lat), lng: Number(lng) });
+        // console.log('[경로따라가기] 지도 중심 이동 완료:', { lat: Number(lat), lng: Number(lng) });
       }
     }
   };
@@ -3872,8 +3952,85 @@ export default function LogsPage() {
       const startPosition = new window.naver.maps.LatLng(startPoint.lat, startPoint.lng);
       const startIcon = new window.naver.maps.Marker({ position: startPosition, map: mapInstance, icon: { content: `<div style="width: 20px; height: 20px; background: #22c55e; border: 3px solid white; border-radius: 50%; box-shadow: 0 3px 6px rgba(0,0,0,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; color: white;">S</div>`, anchor: new window.naver.maps.Point(13, 13) }, zIndex: 300 });
 
-      // 시작점 InfoWindow
-      const startInfoWindow = new window.naver.maps.InfoWindow({ content: `<style>@keyframes slideInFromBottom { 0% { opacity: 0; transform: translateY(20px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); }} .info-window-container { animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);} .close-button { transition: all 0.2s ease;} .close-button:hover { background: rgba(0, 0, 0, 0.2) !important; transform: scale(1.1);}</style><div class="info-window-container" style="padding: 12px 16px; min-width: 200px; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); position: relative;"><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.1); border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #666;">×</button><h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #22c55e; padding-right: 25px; text-align: center;">🚀 시작 지점</h3><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🕒 시간: <span style="color: #111827; font-weight: 500;">${startPoint.time ? startPoint.time.split(' ')[1] || startPoint.time : '정보 없음'}</span></p></div><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🚶 속도: <span style="color: #111827; font-weight: 500;">${startPoint.type === 'location' ? ((startPoint.data.mlt_speed || 0) * 3.6).toFixed(1) : 0} km/h</span></p></div><div style="margin-bottom: 0;"><p style="margin: 0; font-size: 11px; color: #9ca3af;">🌍 좌표: ${startPoint.lat ? startPoint.lat.toFixed(6) : '0.000000'}, ${startPoint.lng ? startPoint.lng.toFixed(6) : '0.000000'}</p></div></div>`, borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true, pixelOffset: new window.naver.maps.Point(0, -10) });
+      // 시작점 InfoWindow (모바일 Safari 호환성 강화)
+      const startInfoWindow = new window.naver.maps.InfoWindow({ 
+        content: `<style>
+          @keyframes slideInFromBottom { 
+            0% { opacity: 0; transform: translateY(20px) scale(0.95); } 
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+          } 
+          .info-window-container { 
+            animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            -webkit-text-size-adjust: 100% !important;
+            -webkit-font-smoothing: antialiased;
+          } 
+          .close-button { transition: all 0.2s ease; } 
+          .close-button:hover { background: rgba(0, 0, 0, 0.2) !important; transform: scale(1.1); }
+          /* 모바일 Safari 텍스트 색상 강제 설정 */
+          .info-window-container * {
+            color-scheme: light !important;
+            -webkit-text-fill-color: initial !important;
+          }
+        </style><div class="info-window-container" style="
+          padding: 12px 16px; 
+          min-width: 200px; 
+          max-width: 280px; 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+          background: white !important; 
+          border-radius: 12px; 
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); 
+          position: relative;
+          color-scheme: light !important;
+        "><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+          position: absolute; 
+          top: 8px; 
+          right: 8px; 
+          background: rgba(0, 0, 0, 0.1); 
+          border: none; 
+          border-radius: 50%; 
+          width: 22px; 
+          height: 22px; 
+          font-size: 14px; 
+          cursor: pointer; 
+          display: flex; 
+          align-items: center; 
+          justify-content: center; 
+          color: #666 !important;
+          -webkit-text-fill-color: #666 !important;
+        ">×</button><h3 style="
+          margin: 0 0 8px 0; 
+          font-size: 14px; 
+          font-weight: 600; 
+          color: #22c55e !important; 
+          padding-right: 25px; 
+          text-align: center;
+          -webkit-text-fill-color: #22c55e !important;
+        ">🚀 시작 지점</h3><div style="margin-bottom: 6px;"><p style="
+          margin: 0; 
+          font-size: 12px; 
+          color: #64748b !important;
+          -webkit-text-fill-color: #64748b !important;
+        ">🕒 시간: <span style="
+          color: #111827 !important; 
+          font-weight: 500;
+          -webkit-text-fill-color: #111827 !important;
+        ">${startPoint.time ? startPoint.time.split(' ')[1] || startPoint.time : '정보 없음'}</span></p></div><div style="margin-bottom: 6px;"><p style="
+          margin: 0; 
+          font-size: 12px; 
+          color: #64748b !important;
+          -webkit-text-fill-color: #64748b !important;
+        ">🚶 속도: <span style="
+          color: #111827 !important; 
+          font-weight: 500;
+          -webkit-text-fill-color: #111827 !important;
+        ">${startPoint.type === 'location' ? ((startPoint.data.mlt_speed || 0) * 3.6).toFixed(1) : 0} km/h</span></p></div><div style="margin-bottom: 0;"><p style="
+          margin: 0; 
+          font-size: 11px; 
+          color: #9ca3af !important;
+          -webkit-text-fill-color: #9ca3af !important;
+        ">🌍 좌표: ${startPoint.lat ? startPoint.lat.toFixed(6) : '0.000000'}, ${startPoint.lng ? startPoint.lng.toFixed(6) : '0.000000'}</p></div></div>`, 
+        borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true, pixelOffset: new window.naver.maps.Point(0, -10) 
+      });
       window.naver.maps.Event.addListener(startIcon, 'click', () => { if (startInfoWindow.getMap()) { startInfoWindow.close(); } else { startInfoWindow.open(mapInstance, startIcon); } });
       startEndMarkers.current.push(startIcon);
 
@@ -3882,8 +4039,85 @@ export default function LogsPage() {
         const endPosition = new window.naver.maps.LatLng(endPoint.lat, endPoint.lng);
         const endIcon = new window.naver.maps.Marker({ position: endPosition, map: mapInstance, icon: { content: `<div style="width: 20px; height: 20px; background: #ef4444; border: 3px solid white; border-radius: 50%; box-shadow: 0 3px 6px rgba(0,0,0,0.4); cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px; color: white;">E</div>`, anchor: new window.naver.maps.Point(13, 13) }, zIndex: 300 });
 
-        // 종료점 InfoWindow
-        const endInfoWindow = new window.naver.maps.InfoWindow({ content: `<style>@keyframes slideInFromBottom { 0% { opacity: 0; transform: translateY(20px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); }} .info-window-container { animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);} .close-button { transition: all 0.2s ease;} .close-button:hover { background: rgba(0, 0, 0, 0.2) !important; transform: scale(1.1);}</style><div class="info-window-container" style="padding: 12px 16px; min-width: 200px; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); position: relative;"><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.1); border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #666;">×</button><h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #ef4444; padding-right: 25px; text-align: center;">🏁 종료 지점</h3><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🕒 시간: <span style="color: #111827; font-weight: 500;">${endPoint.time ? endPoint.time.split(' ')[1] || endPoint.time : '정보 없음'}</span></p></div><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🚶 속도: <span style="color: #111827; font-weight: 500;">${endPoint.type === 'location' ? ((endPoint.data.mlt_speed || 0) * 3.6).toFixed(1) : 0} km/h</span></p></div><div style="margin-bottom: 0;"><p style="margin: 0; font-size: 11px; color: #9ca3af;">🌍 좌표: ${endPoint.lat ? endPoint.lat.toFixed(6) : '0.000000'}, ${endPoint.lng ? endPoint.lng.toFixed(6) : '0.000000'}</p></div></div>`, borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true, pixelOffset: new window.naver.maps.Point(0, -10) });
+        // 종료점 InfoWindow (모바일 Safari 호환성 강화)
+        const endInfoWindow = new window.naver.maps.InfoWindow({ 
+          content: `<style>
+            @keyframes slideInFromBottom { 
+              0% { opacity: 0; transform: translateY(20px) scale(0.95); } 
+              100% { opacity: 1; transform: translateY(0) scale(1); }
+            } 
+            .info-window-container { 
+              animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+              -webkit-text-size-adjust: 100% !important;
+              -webkit-font-smoothing: antialiased;
+            } 
+            .close-button { transition: all 0.2s ease; } 
+            .close-button:hover { background: rgba(0, 0, 0, 0.2) !important; transform: scale(1.1); }
+            /* 모바일 Safari 텍스트 색상 강제 설정 */
+            .info-window-container * {
+              color-scheme: light !important;
+              -webkit-text-fill-color: initial !important;
+            }
+          </style><div class="info-window-container" style="
+            padding: 12px 16px; 
+            min-width: 200px; 
+            max-width: 280px; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            background: white !important; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); 
+            position: relative;
+            color-scheme: light !important;
+          "><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+            position: absolute; 
+            top: 8px; 
+            right: 8px; 
+            background: rgba(0, 0, 0, 0.1); 
+            border: none; 
+            border-radius: 50%; 
+            width: 22px; 
+            height: 22px; 
+            font-size: 14px; 
+            cursor: pointer; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            color: #666 !important;
+            -webkit-text-fill-color: #666 !important;
+          ">×</button><h3 style="
+            margin: 0 0 8px 0; 
+            font-size: 14px; 
+            font-weight: 600; 
+            color: #ef4444 !important; 
+            padding-right: 25px; 
+            text-align: center;
+            -webkit-text-fill-color: #ef4444 !important;
+          ">🏁 종료 지점</h3><div style="margin-bottom: 6px;"><p style="
+            margin: 0; 
+            font-size: 12px; 
+            color: #64748b !important;
+            -webkit-text-fill-color: #64748b !important;
+          ">🕒 시간: <span style="
+            color: #111827 !important; 
+            font-weight: 500;
+            -webkit-text-fill-color: #111827 !important;
+          ">${endPoint.time ? endPoint.time.split(' ')[1] || endPoint.time : '정보 없음'}</span></p></div><div style="margin-bottom: 6px;"><p style="
+            margin: 0; 
+            font-size: 12px; 
+            color: #64748b !important;
+            -webkit-text-fill-color: #64748b !important;
+          ">🚶 속도: <span style="
+            color: #111827 !important; 
+            font-weight: 500;
+            -webkit-text-fill-color: #111827 !important;
+          ">${endPoint.type === 'location' ? ((endPoint.data.mlt_speed || 0) * 3.6).toFixed(1) : 0} km/h</span></p></div><div style="margin-bottom: 0;"><p style="
+            margin: 0; 
+            font-size: 11px; 
+            color: #9ca3af !important;
+            -webkit-text-fill-color: #9ca3af !important;
+          ">🌍 좌표: ${endPoint.lat ? endPoint.lat.toFixed(6) : '0.000000'}, ${endPoint.lng ? endPoint.lng.toFixed(6) : '0.000000'}</p></div></div>`, 
+          borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true, pixelOffset: new window.naver.maps.Point(0, -10) 
+        });
         window.naver.maps.Event.addListener(endIcon, 'click', () => { if (endInfoWindow.getMap()) { endInfoWindow.close(); } else { endInfoWindow.open(mapInstance, endIcon); } });
         startEndMarkers.current.push(endIcon);
       }
@@ -3918,7 +4152,91 @@ export default function LogsPage() {
             else if (stayData.stay_duration && typeof stayData.stay_duration === 'string') { const timeParts = stayData.stay_duration.split(':'); if (timeParts.length >= 2) { if (timeParts.length === 3) { const hours = parseInt(timeParts[0]) || 0; const minutes = parseInt(timeParts[1]) || 0; const seconds = parseFloat(timeParts[2]) || 0; durationMinutes = hours * 60 + minutes + seconds / 60; } else if (timeParts.length === 2) { const minutes = parseInt(timeParts[0]) || 0; const seconds = parseFloat(timeParts[1]) || 0; durationMinutes = minutes + seconds / 60; } } }
             const markerStyle = getMarkerStyle(durationMinutes); const markerNumber = index + 1;
             const marker = new window.naver.maps.Marker({ position: position, map: mapInstance, icon: { content: `<div style="position: relative; width: ${markerStyle.size}px; height: ${markerStyle.size}px; background: ${markerStyle.bgColor}; border: 3px solid white; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: ${markerStyle.size > 32 ? '14px' : '12px'}; color: ${markerStyle.textColor};">${markerNumber}<div style="position: absolute; top: -20px; right: -20px; background: #1f2937; color: white; border-radius: 8px; padding: 2px 4px; font-size: 10px; font-weight: normal; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${formatDuration(durationMinutes)}</div></div>`, anchor: new window.naver.maps.Point(markerStyle.size/2, markerStyle.size/2) }, zIndex: 200 + index });
-            const infoWindow = new window.naver.maps.InfoWindow({ content: `<style>@keyframes slideInFromBottom { 0% { opacity: 0; transform: translateY(20px) scale(0.95); } 100% { opacity: 1; transform: translateY(0) scale(1); }} .info-window-container { animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);} .close-button { transition: all 0.2s ease;} .close-button:hover { background: rgba(0, 0, 0, 0.2) !important; transform: scale(1.1);}</style><div class="info-window-container" style="padding: 12px 16px; min-width: 200px; max-width: 280px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); position: relative;"><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.1); border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #666;">×</button><h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px; text-align: center;">🏠 체류 지점 #${markerNumber}</h3><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🕐 시작: <span style="color: #111827; font-weight: 500;">${stayData.start_time.split(' ')[1]}</span></p></div><div style="margin-bottom: 6px;"><p style="margin: 0; font-size: 12px; color: #64748b;">🕐 종료: <span style="color: #111827; font-weight: 500;">${stayData.end_time.split(' ')[1]}</span></p></div><div style="margin-bottom: 0;"><p style="margin: 0; font-size: 12px; color: #64748b;">⏱️ 체류시간: <span style="color: ${markerStyle.bgColor}; font-weight: bold; background: ${markerStyle.bgColor}20; padding: 4px 8px; border-radius: 8px;">${formatDuration(durationMinutes)}</span></p></div></div>`, borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true, pixelOffset: new window.naver.maps.Point(0, -10) });
+            const infoWindow = new window.naver.maps.InfoWindow({ 
+              content: `<style>
+                @keyframes slideInFromBottom { 
+                  0% { opacity: 0; transform: translateY(20px) scale(0.95); } 
+                  100% { opacity: 1; transform: translateY(0) scale(1); }
+                } 
+                .info-window-container { 
+                  animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+                  -webkit-text-size-adjust: 100% !important;
+                  -webkit-font-smoothing: antialiased;
+                } 
+                .close-button { transition: all 0.2s ease; } 
+                .close-button:hover { background: rgba(0, 0, 0, 0.2) !important; transform: scale(1.1); }
+                /* 모바일 Safari 텍스트 색상 강제 설정 */
+                .info-window-container * {
+                  color-scheme: light !important;
+                  -webkit-text-fill-color: initial !important;
+                }
+              </style><div class="info-window-container" style="
+                padding: 12px 16px; 
+                min-width: 200px; 
+                max-width: 280px; 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+                background: white !important; 
+                border-radius: 12px; 
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); 
+                position: relative;
+                color-scheme: light !important;
+              "><button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                position: absolute; 
+                top: 8px; 
+                right: 8px; 
+                background: rgba(0, 0, 0, 0.1); 
+                border: none; 
+                border-radius: 50%; 
+                width: 22px; 
+                height: 22px; 
+                font-size: 14px; 
+                cursor: pointer; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                color: #666 !important;
+                -webkit-text-fill-color: #666 !important;
+              ">×</button><h3 style="
+                margin: 0 0 8px 0; 
+                font-size: 14px; 
+                font-weight: 600; 
+                color: #111827 !important; 
+                padding-right: 25px; 
+                text-align: center;
+                -webkit-text-fill-color: #111827 !important;
+              ">🏠 체류 지점 #${markerNumber}</h3><div style="margin-bottom: 6px;"><p style="
+                margin: 0; 
+                font-size: 12px; 
+                color: #64748b !important;
+                -webkit-text-fill-color: #64748b !important;
+              ">🕐 시작: <span style="
+                color: #111827 !important; 
+                font-weight: 500;
+                -webkit-text-fill-color: #111827 !important;
+              ">${stayData.start_time.split(' ')[1]}</span></p></div><div style="margin-bottom: 6px;"><p style="
+                margin: 0; 
+                font-size: 12px; 
+                color: #64748b !important;
+                -webkit-text-fill-color: #64748b !important;
+              ">🕐 종료: <span style="
+                color: #111827 !important; 
+                font-weight: 500;
+                -webkit-text-fill-color: #111827 !important;
+              ">${stayData.end_time.split(' ')[1]}</span></p></div><div style="margin-bottom: 0;"><p style="
+                margin: 0; 
+                font-size: 12px; 
+                color: #64748b !important;
+                -webkit-text-fill-color: #64748b !important;
+              ">⏱️ 체류시간: <span style="
+                color: ${markerStyle.bgColor} !important; 
+                font-weight: bold; 
+                background: ${markerStyle.bgColor}20; 
+                padding: 4px 8px; 
+                border-radius: 8px;
+                -webkit-text-fill-color: ${markerStyle.bgColor} !important;
+              ">${formatDuration(durationMinutes)}</span></p></div></div>`, 
+              borderWidth: 0, backgroundColor: 'transparent', disableAnchor: true, pixelOffset: new window.naver.maps.Point(0, -10) 
+            });
             window.naver.maps.Event.addListener(marker, 'click', () => { if (infoWindow.getMap()) { infoWindow.close(); } else { infoWindow.open(mapInstance, marker); } });
             stayTimeMarkers.current.push(marker);
         });
@@ -3992,7 +4310,33 @@ export default function LogsPage() {
           });
           
           const infoWindow = new window.naver.maps.InfoWindow({ 
-            content: `<div style="padding: 8px; background: white; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 140px; max-width: 160px;"><div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 4px 6px; border-radius: 4px; margin: -8px -8px 6px -8px; font-weight: 600; font-size: 11px; text-align: center;">${index + 1} / ${sortedLocationMarkers.length}</div><div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;"><div style="display: flex; justify-content: space-between; align-items: center; background: rgba(59, 130, 246, 0.1); padding: 2px 4px; border-radius: 4px; margin: 2px 0;"><span style="color: #666;">이동 수단:</span><span style="font-weight: 600; font-size: 11px; display: flex; align-items: center; gap: 2px;">${transportIcon} <span style="font-size: 9px; color: #3b82f6;">${transportText}</span></span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">⏰ 시간:</span><span style="font-weight: 600; font-size: 10px;">${timeOnly}</span></div><div style="display: flex; justify-content: space-between; align-items: center;"><span style="color: #666;">🚀 속도:</span><span style="font-weight: 600; font-size: 10px;">${speed.toFixed(1)}km/h</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">📍 정확도:</span><span style="font-weight: 600; font-size: 10px;">${accuracy.toFixed(0)}m</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">🔋 배터리:</span><span style="font-weight: 600; font-size: 10px;">${battery}%</span></div></div></div>`, 
+            content: `<style>
+              /* 모바일 Safari 텍스트 색상 강제 설정 */
+              .location-log-info * {
+                color-scheme: light !important;
+                -webkit-text-fill-color: initial !important;
+                -webkit-text-size-adjust: 100% !important;
+              }
+            </style><div class="location-log-info" style="
+              padding: 8px; 
+              background: white !important; 
+              border-radius: 6px; 
+              box-shadow: 0 2px 8px rgba(0,0,0,0.12); 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+              min-width: 140px; 
+              max-width: 160px;
+              color-scheme: light !important;
+            "><div style="
+              background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); 
+              color: white !important; 
+              padding: 4px 6px; 
+              border-radius: 4px; 
+              margin: -8px -8px 6px -8px; 
+              font-weight: 600; 
+              font-size: 11px; 
+              text-align: center;
+              -webkit-text-fill-color: white !important;
+            ">${index + 1} / ${sortedLocationMarkers.length}</div><div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;"><div style="display: flex; justify-content: space-between; align-items: center; background: rgba(59, 130, 246, 0.1); padding: 2px 4px; border-radius: 4px; margin: 2px 0;"><span style="color: #666 !important; -webkit-text-fill-color: #666 !important;">이동 수단:</span><span style="font-weight: 600; font-size: 11px; display: flex; align-items: center; gap: 2px;">${transportIcon} <span style="font-size: 9px; color: #3b82f6 !important; -webkit-text-fill-color: #3b82f6 !important;">${transportText}</span></span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666 !important; -webkit-text-fill-color: #666 !important;">⏰ 시간:</span><span style="font-weight: 600; font-size: 10px; color: #111827 !important; -webkit-text-fill-color: #111827 !important;">${timeOnly}</span></div><div style="display: flex; justify-content: space-between; align-items: center;"><span style="color: #666 !important; -webkit-text-fill-color: #666 !important;">🚀 속도:</span><span style="font-weight: 600; font-size: 10px; color: #111827 !important; -webkit-text-fill-color: #111827 !important;">${speed.toFixed(1)}km/h</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666 !important; -webkit-text-fill-color: #666 !important;">📍 정확도:</span><span style="font-weight: 600; font-size: 10px; color: #111827 !important; -webkit-text-fill-color: #111827 !important;">${accuracy.toFixed(0)}m</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666 !important; -webkit-text-fill-color: #666 !important;">🔋 배터리:</span><span style="font-weight: 600; font-size: 10px; color: #111827 !important; -webkit-text-fill-color: #111827 !important;">${battery}%</span></div></div></div>`, 
             backgroundColor: 'transparent', 
             borderColor: 'transparent', 
             borderWidth: 0, 

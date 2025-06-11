@@ -851,7 +851,7 @@ async def get_member_activity_by_date(
     """
     try:
         from datetime import datetime
-        from sqlalchemy import func, and_
+        from sqlalchemy import func, and_, text
         from ....models.member import Member
         from ....models.group import Group
         from ....models.member_location_log import MemberLocationLog
