@@ -401,7 +401,10 @@ class MemberLocationLogService {
       console.log('[MemberLocationLogService] 날짜별 요약 조회 응답:', {
         status: response.status,
         dataLength: result.data?.length || 0,
-        totalDays: result.total_days
+        totalDays: result.total_days,
+        result: result.result,
+        hasData: Array.isArray(result.data),
+        rawResponse: result
       });
       
       if (result.result === 'Y' && Array.isArray(result.data)) {
@@ -409,6 +412,13 @@ class MemberLocationLogService {
         return result.data;
       } else {
         console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');
+        console.warn('[MemberLocationLogService] 검증 실패 세부사항:', {
+          resultValue: result.result,
+          isResultY: result.result === 'Y',
+          dataType: typeof result.data,
+          isDataArray: Array.isArray(result.data),
+          dataContent: result.data
+        });
         return mockData;
       }
     } catch (error) {
@@ -472,7 +482,10 @@ class MemberLocationLogService {
       console.log('[MemberLocationLogService] 체류시간 분석 조회 응답:', {
         status: response.status,
         dataLength: result.data?.length || 0,
-        totalStays: result.total_stays
+        totalStays: result.total_stays,
+        result: result.result,
+        hasData: Array.isArray(result.data),
+        rawResponse: result
       });
       
       if (result.result === 'Y' && Array.isArray(result.data)) {
@@ -480,6 +493,13 @@ class MemberLocationLogService {
         return result.data;
       } else {
         console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');
+        console.warn('[MemberLocationLogService] 검증 실패 세부사항:', {
+          resultValue: result.result,
+          isResultY: result.result === 'Y',
+          dataType: typeof result.data,
+          isDataArray: Array.isArray(result.data),
+          dataContent: result.data
+        });
         return mockData;
       }
     } catch (error) {

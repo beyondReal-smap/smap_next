@@ -34,7 +34,7 @@ function transformLocationSummaryResponse(backendData: any) {
   console.log('[Location Summary API] 백엔드 원본 데이터:', backendData);
   
   try {
-    // PHP 기반 API 응답 형식 처리
+    // PHP 기반 API 응답 형식 처리 (이미 올바른 형식인 경우)
     if (backendData.result === "Y" && backendData.data) {
       return backendData; // 이미 올바른 형식
     }

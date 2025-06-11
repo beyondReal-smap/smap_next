@@ -1,11 +1,1 @@
-{
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/member-location-logs/member-activity/route": "app/api/member-location-logs/member-activity/route.js",
-  "/api/location-logs/daily/[memberId]/route": "app/api/location-logs/daily/[memberId]/route.js",
-  "/api/location-logs/stay-times/[memberId]/route": "app/api/location-logs/stay-times/[memberId]/route.js",
-  "/api/location-logs/daily-summary/[memberId]/route": "app/api/location-logs/daily-summary/[memberId]/route.js",
-  "/api/location-logs/summary/[memberId]/route": "app/api/location-logs/summary/[memberId]/route.js",
-  "/api/member-location-logs/[mt_idx]/map-markers/route": "app/api/member-location-logs/[mt_idx]/map-markers/route.js",
-  "/api/location-logs/location-summary/[memberId]/route": "app/api/location-logs/location-summary/[memberId]/route.js",
-  "/logs/page": "app/logs/page.js"
-}
+{}

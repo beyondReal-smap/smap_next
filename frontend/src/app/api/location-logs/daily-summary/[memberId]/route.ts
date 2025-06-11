@@ -37,30 +37,47 @@ function transformDailySummaryResponse(backendData: any) {
     // 배열 형태의 응답 처리
     if (Array.isArray(backendData)) {
       return {
+        result: "Y",
         data: backendData.map(transformSingleDayData),
+        total_days: backendData.length,
         success: true,
         message: "일일 요약 조회 성공"
       };
     }
     
-    // 객체 형태의 응답 처리
-    if (backendData.data && Array.isArray(backendData.data)) {
+    // 객체 형태의 응답 처리 (백엔드에서 이미 올바른 형식으로 온 경우)
+    if (backendData.result === "Y" && backendData.data && Array.isArray(backendData.data)) {
       return {
         ...backendData,
         data: backendData.data.map(transformSingleDayData)
       };
     }
     
+    // 다른 객체 형태의 응답 처리
+    if (backendData.data && Array.isArray(backendData.data)) {
+      return {
+        result: "Y",
+        data: backendData.data.map(transformSingleDayData),
+        total_days: backendData.data.length,
+        success: true,
+        message: "일일 요약 조회 성공"
+      };
+    }
+    
     // 단일 객체 응답 처리
     return {
+      result: "Y",
       data: [transformSingleDayData(backendData)],
+      total_days: 1,
       success: true,
       message: "일일 요약 조회 성공"
     };
   } catch (error) {
     console.error('[Daily Summary API] 응답 변환 중 오류:', error);
     return {
+      result: "N",
       data: [],
+      total_days: 0,
       success: false,
       message: "일일 요약 조회 실패"
     };
