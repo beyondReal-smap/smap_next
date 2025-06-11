@@ -186,25 +186,41 @@ body {
 
 /* 네이버 지도 zoom 컨트롤 위치 조정 - 헤더 아래로 이동 */
 .nmap_control_zoom {
-  top: 200px !important;
+  top: 180px !important;
   right: 10px !important;
 }
 
 /* 네이버 지도 줌 컨트롤 강제 위치 조정 */
 div[class*="nmap_control_zoom"] {
-  top: 200px !important;
+  top: 180px !important;
   right: 10px !important;
 }
 
 /* 네이버 지도 컨트롤 전체 */
 .nmap_control {
-  top: 200px !important;
+  top: 195px !important;
 }
 
-/* 줌 컨트롤 버튼들 */
+/* 줌 컨트롤 버튼들 - 간격 제거 */
 .nmap_control_zoom .nmap_control_zoom_in,
 .nmap_control_zoom .nmap_control_zoom_out {
   position: relative !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* 줌 인 버튼 (위쪽) */
+.nmap_control_zoom .nmap_control_zoom_in {
+  border-top-left-radius: 4px !important;
+  border-top-right-radius: 4px !important;
+  border-bottom: none !important;
+}
+
+/* 줌 아웃 버튼 (아래쪽) */
+.nmap_control_zoom .nmap_control_zoom_out {
+  border-bottom-left-radius: 4px !important;
+  border-bottom-right-radius: 4px !important;
+  border-top: 1px solid #ddd !important;
 }
 
 @media (max-width: 640px) {
@@ -250,14 +266,14 @@ const pageVariants = {
   }
 };
 
-// 사이드바 애니메이션 variants
+// 사이드바 애니메이션 variants (모바일 사파리 최적화)
 const sidebarVariants = {
   closed: {
     x: '-100%',
     transition: {
       type: 'tween',
       ease: [0.25, 0.46, 0.45, 0.94],
-      duration: 0.4
+      duration: 0.3
     }
   },
   open: {
@@ -265,7 +281,7 @@ const sidebarVariants = {
     transition: {
       type: 'tween',
       ease: [0.25, 0.46, 0.45, 0.94],
-      duration: 0.4
+      duration: 0.3
     }
   }
 };
@@ -274,14 +290,14 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.3,
+      duration: 0.25,
       ease: "easeOut"
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.3,
+      duration: 0.25,
       ease: "easeInOut"
     }
   }
@@ -290,20 +306,18 @@ const sidebarOverlayVariants = {
 const sidebarContentVariants = {
   closed: {
     opacity: 0,
-    y: 10,
     transition: {
-      duration: 0.2,
+      duration: 0.15,
       ease: "easeOut"
     }
   },
   open: {
     opacity: 1,
-    y: 0,
     transition: {
-      delay: 0.2,
-      duration: 0.4,
+      delay: 0.1,
+      duration: 0.25,
       ease: [0.25, 0.46, 0.45, 0.94],
-      staggerChildren: 0.06
+      staggerChildren: 0.03
     }
   }
 };
@@ -311,8 +325,8 @@ const sidebarContentVariants = {
 const memberItemVariants = {
   closed: { 
     opacity: 0, 
-    x: -15,
-    scale: 0.95
+    x: -10,
+    scale: 0.98
   },
   open: { 
     opacity: 1, 
@@ -321,7 +335,7 @@ const memberItemVariants = {
     transition: {
       type: "tween",
       ease: [0.25, 0.46, 0.45, 0.94],
-      duration: 0.3
+      duration: 0.2
     }
   }
 };
@@ -753,6 +767,74 @@ export default function LocationPage() {
   const [isLocationDeleteModalOpen, setIsLocationDeleteModalOpen] = useState(false);
   const [locationToDelete, setLocationToDelete] = useState<LocationData | OtherMemberLocationRaw | null>(null);
   const [isDeletingLocation, setIsDeletingLocation] = useState(false);
+
+  // 컴팩트 토스트 모달 상태 추가
+  const [toastModal, setToastModal] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'loading';
+    title: string;
+    message: string;
+    progress?: number;
+    autoClose?: boolean;
+  }>({
+    isOpen: false,
+    type: 'success',
+    title: '',
+    message: '',
+    progress: 0,
+    autoClose: true
+  });
+
+  // InfoWindow에서 삭제 버튼 클릭 시 호출되는 전역 함수
+  useEffect(() => {
+    (window as any).handleLocationDeleteFromInfoWindow = (locationId: string) => {
+      console.log('[InfoWindow 삭제] 장소 삭제 요청:', locationId);
+      
+      // 해당 장소 찾기
+      let targetLocation: LocationData | OtherMemberLocationRaw | null = null;
+      
+      // 선택된 멤버의 장소에서 찾기
+      if (selectedMemberSavedLocations) {
+        targetLocation = selectedMemberSavedLocations.find(loc => loc.id === locationId) || null;
+      }
+      
+      // 다른 멤버들의 장소에서 찾기
+      if (!targetLocation) {
+        targetLocation = otherMembersSavedLocations.find(loc => 
+          (loc.id === locationId) || (loc.slt_idx?.toString() === locationId)
+        ) || null;
+      }
+      
+      if (targetLocation) {
+        // InfoWindow 닫기
+        if (infoWindow) {
+          infoWindow.close();
+          setInfoWindow(null);
+        }
+        
+        // 삭제 모달 열기
+        openLocationDeleteModal(targetLocation);
+      } else {
+        console.error('[InfoWindow 삭제] 장소를 찾을 수 없음:', locationId);
+        openModal('오류', '삭제할 장소를 찾을 수 없습니다.', 'error');
+      }
+    };
+
+    // 컴포넌트 언마운트 시 전역 함수 정리
+    return () => {
+      delete (window as any).handleLocationDeleteFromInfoWindow;
+    };
+  }, [selectedMemberSavedLocations, otherMembersSavedLocations, infoWindow]);
+
+  // 사이드바 업데이트 확인용 useEffect (디버깅)
+  useEffect(() => {
+    console.log('[사이드바 업데이트] groupMembers 변경됨:', groupMembers.map(m => ({
+      name: m.name,
+      isSelected: m.isSelected,
+      savedLocationsCount: m.savedLocations?.length || 0,
+      savedLocationCount: m.savedLocationCount
+    })));
+  }, [groupMembers]);
   
   // 뒤로가기 핸들러
   const handleBack = () => {
@@ -786,6 +868,60 @@ export default function LocationPage() {
     setIsModalOpen(false);
     // 모달이 닫힐 때 onConfirm 콜백이 남아있지 않도록 초기화 (선택적)
     // setModalContent(null); // 이렇게 하면 onConfirm도 null이 됨
+  };
+
+  // 컴팩트 토스트 모달 함수들
+  const showToastModal = (
+    type: 'success' | 'error' | 'loading',
+    title: string,
+    message: string,
+    autoClose: boolean = true,
+    duration: number = 3000
+  ) => {
+    setToastModal({
+      isOpen: true,
+      type,
+      title,
+      message,
+      progress: 0,
+      autoClose
+    });
+
+    if (autoClose && type !== 'loading') {
+      // 프로그레스 바 애니메이션
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += (100 / duration) * 50; // 50ms마다 업데이트
+        if (progress >= 100) {
+          clearInterval(interval);
+          setToastModal(prev => ({ ...prev, isOpen: false }));
+        } else {
+          setToastModal(prev => ({ ...prev, progress }));
+        }
+      }, 50);
+    }
+  };
+
+  const hideToastModal = () => {
+    setToastModal(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // 선택된 멤버 위치로 지도 중심 이동 함수
+  const moveToSelectedMember = () => {
+    const selectedMember = groupMembers.find(m => m.isSelected);
+    if (selectedMember && map) {
+      const lat = parseCoordinate(selectedMember.mlt_lat) || parseCoordinate(selectedMember.location?.lat);
+      const lng = parseCoordinate(selectedMember.mlt_long) || parseCoordinate(selectedMember.location?.lng);
+      
+      if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+        const position = new window.naver.maps.LatLng(lat, lng);
+        map.panTo(position, {
+          duration: 800,
+          easing: 'easeOutCubic'
+        });
+        console.log('[지도 이동] 선택된 멤버 위치로 이동:', selectedMember.name, { lat, lng });
+      }
+    }
   };
 
   // 알림 토글 핸들러 (바로 실행, 3초 후 자동 닫기)
@@ -1066,16 +1202,19 @@ export default function LocationPage() {
       
       setOtherMembersSavedLocations(prev => [...prev, newLocationForOtherMembers]);
       
-      // 3. 그룹멤버 상태에도 추가
+      // 3. 그룹멤버 상태에도 추가 (사이드바 목록과 개수 업데이트)
       setGroupMembers(prevMembers => 
-        prevMembers.map(member => 
-          member.id === currentMemberId 
-            ? { 
-                ...member, 
-                savedLocations: [...member.savedLocations, newLocationForUI] 
-              }
-            : member
-        )
+        prevMembers.map(member => {
+          if (member.id === currentMemberId) {
+            const updatedSavedLocations = [...member.savedLocations, newLocationForUI];
+            return {
+              ...member, 
+              savedLocations: updatedSavedLocations,
+              savedLocationCount: updatedSavedLocations.length
+            };
+          }
+          return member;
+        })
       );
 
       // 멤버별 장소 생성 서비스 사용 (백그라운드에서 실제 저장)
@@ -1108,31 +1247,44 @@ export default function LocationPage() {
           );
           
           setGroupMembers(prevMembers => 
-            prevMembers.map(member => 
-              member.id === currentMemberId 
-                ? { 
-                    ...member, 
-                    savedLocations: member.savedLocations.map(loc =>
-                      loc.id === newLocationForUI.id 
-                        ? { ...loc, id: realId }
-                        : loc
-                    )
-                  }
-                : member
-            )
+            prevMembers.map(member => {
+              if (member.id === currentMemberId) {
+                const updatedSavedLocations = member.savedLocations.map(loc =>
+                  loc.id === newLocationForUI.id 
+                    ? { ...loc, id: realId }
+                    : loc
+                );
+                return {
+                  ...member, 
+                  savedLocations: updatedSavedLocations,
+                  savedLocationCount: updatedSavedLocations.length
+                };
+              }
+              return member;
+            })
           );
           
           console.log('[handleConfirmPanelAction] 임시 ID를 실제 ID로 교체 완료:', realId);
         }
         
-        openModal('장소 등록 완료', '장소가 성공적으로 등록되었습니다.', 'success');
+        showToastModal('success', '등록 완료', `"${newLocation.name}" 장소가 등록되었습니다.`);
+        
+        // 선택된 멤버 위치로 지도 이동
+        setTimeout(() => {
+          moveToSelectedMember();
+        }, 500);
         
       } catch (error) {
         console.error('[handleConfirmPanelAction] 멤버별 장소 생성 에러:', error);
         
         // 백엔드 에러 발생 시 UI는 그대로 유지 (이미 추가되어 있음)
         console.log('[handleConfirmPanelAction] 백엔드 에러 발생했지만 UI는 이미 업데이트됨');
-        openModal('장소 등록 완료', '장소가 등록되었습니다. (일부 에러 발생했지만 정상 처리)', 'success');
+        showToastModal('success', '등록 완료', `"${newLocation.name}" 장소가 등록되었습니다.`);
+        
+        // 선택된 멤버 위치로 지도 이동
+        setTimeout(() => {
+          moveToSelectedMember();
+        }, 500);
       }
       
       setIsLocationInfoPanelOpen(false);
@@ -1164,7 +1316,12 @@ export default function LocationPage() {
       }, 100);
     } catch (error) {
         console.error('[handleConfirmPanelAction] 장소 등록 오류:', error);
-        openModal('장소 등록 완료', '장소가 등록되었습니다. (네트워크 에러 발생했지만 정상 처리)', 'success');
+        showToastModal('success', '등록 완료', `"${newLocation.name}" 장소가 등록되었습니다.`);
+        
+        // 선택된 멤버 위치로 지도 이동
+        setTimeout(() => {
+          moveToSelectedMember();
+        }, 500);
         
         setIsLocationInfoPanelOpen(false);
         if (tempMarker.current) {
@@ -2744,7 +2901,7 @@ export default function LocationPage() {
         });
 
         // 통일된 정보창 생성
-        const newInfoWindow = createLocationInfoWindow(location.name, location.address);
+        const newInfoWindow = createLocationInfoWindow(location.name, location.address, location);
         newInfoWindow.open(map, marker);
         setInfoWindow(newInfoWindow);
 
@@ -2958,7 +3115,7 @@ export default function LocationPage() {
             easing: 'easeOutCubic'
           });
 
-          const newInfoWindow = createLocationInfoWindow(location.name, location.address);
+          const newInfoWindow = createLocationInfoWindow(location.name, location.address, location);
         newInfoWindow.open(map, marker);
         setInfoWindow(newInfoWindow);
 
@@ -3235,8 +3392,8 @@ export default function LocationPage() {
   }, [selectedLocationId]); // selectedLocationId가 변경될 때만 실행
 
 
-  // 통일된 정보창 생성 함수 - home/page.tsx 스타일 적용
-  const createLocationInfoWindow = (locationName: string, locationAddress: string) => {
+  // 통일된 정보창 생성 함수 - home/page.tsx 스타일 적용 + 삭제 버튼 추가
+  const createLocationInfoWindow = (locationName: string, locationAddress: string, locationData?: OtherMemberLocationRaw | LocationData) => {
     const newInfoWindow = new window.naver.maps.InfoWindow({
       content: `
         <style>
@@ -3253,11 +3410,36 @@ export default function LocationPage() {
           .location-info-window-container {
             animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
           }
-          .close-button {
+          .info-button {
             transition: all 0.2s ease;
+            border: none;
+            border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: 8px;
+          }
+          .close-button {
+            background: rgba(0, 0, 0, 0.1);
+            color: #666;
+            right: 8px;
           }
           .close-button:hover {
             background: rgba(0, 0, 0, 0.2) !important;
+            transform: scale(1.1);
+          }
+          .delete-button {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+            right: 35px;
+          }
+          .delete-button:hover {
+            background: rgba(239, 68, 68, 0.2) !important;
             transform: scale(1.1);
           }
         </style>
@@ -3271,25 +3453,19 @@ export default function LocationPage() {
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
           position: relative;
         ">
-          <!-- 닫기 버튼 -->
-          <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: rgba(0, 0, 0, 0.1);
-            border: none;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-            font-size: 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #666;
-          ">×</button>
+          <!-- 삭제 버튼 -->
+          ${locationData ? `
+          <button class="info-button delete-button" onclick="window.handleLocationDeleteFromInfoWindow && window.handleLocationDeleteFromInfoWindow('${locationData.id || (locationData as any).slt_idx}'); event.stopPropagation();" title="장소 삭제">
+            🗑️
+          </button>
+          ` : ''}
           
-          <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px;">
+          <!-- 닫기 버튼 -->
+          <button class="info-button close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" title="닫기">
+            ×
+          </button>
+          
+          <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: ${locationData ? '60px' : '30px'};">
             📍 ${locationName}
           </h3>
           <div style="margin-bottom: 6px;">
@@ -3357,7 +3533,7 @@ export default function LocationPage() {
       const locationName = location.name || location.slt_title || '제목 없음';
       const locationAddress = location.address || location.slt_add || '주소 정보 없음';
       
-      const newInfoWindow = createLocationInfoWindow(locationName, locationAddress);
+      const newInfoWindow = createLocationInfoWindow(locationName, locationAddress, location);
       newInfoWindow.open(map, markers[markerIndex]);
       setInfoWindow(newInfoWindow);
     }
@@ -3403,25 +3579,31 @@ export default function LocationPage() {
     if (!locationToDelete) return;
     
     setIsDeletingLocation(true);
+    const locationName = 'slt_title' in locationToDelete ? locationToDelete.slt_title : locationToDelete.name;
+    
+    // 삭제 중 토스트 표시
+    showToastModal('loading', '장소 삭제 중', `"${locationName}" 장소를 삭제하고 있습니다...`, false);
     
     try {
       const locationId = 'slt_idx' in locationToDelete ? locationToDelete.slt_idx?.toString() : locationToDelete.id;
       const sltIdx = 'slt_idx' in locationToDelete ? locationToDelete.slt_idx : null;
-      const locationName = 'slt_title' in locationToDelete ? locationToDelete.slt_title : locationToDelete.name;
       
       console.log('[장소 삭제] 시작:', locationId, 'slt_idx:', sltIdx, locationName);
       
-      // DB에서 숨김 처리 (slt_idx가 있는 경우에만)
-      if (sltIdx) {
+      // DB에서 실제 삭제 (locationId를 slt_idx로 사용)
+      if (locationId && !isNaN(parseInt(locationId, 10))) {
         try {
-          const sltIdxNumber = typeof sltIdx === 'string' ? parseInt(sltIdx, 10) : sltIdx;
-          await locationService.hideLocation(sltIdxNumber);
-          console.log('[장소 삭제] DB 처리 성공 (숨김 처리):', sltIdxNumber);
+          const deleteId = parseInt(locationId, 10);
+          await locationService.deleteLocation(deleteId);
+          console.log('[장소 삭제] DB 처리 성공 (실제 삭제):', deleteId);
         } catch (dbError) {
           console.error('[장소 삭제] DB 처리 실패:', dbError);
-          openModal('장소 삭제 실패', '장소 삭제 중 오류가 발생했습니다. 다시 시도해주세요.', 'error');
+          hideToastModal();
+          showToastModal('error', '삭제 실패', '장소 삭제 중 오류가 발생했습니다.');
           return;
         }
+      } else {
+        console.warn('[장소 삭제] DB 삭제 건너뜀 - 유효한 locationId가 없음:', locationId);
       }
       
       // UI 업데이트 로직
@@ -3435,10 +3617,15 @@ export default function LocationPage() {
         setOtherMembersSavedLocations(prev => prev.filter(loc => loc.slt_idx !== locationToDelete.slt_idx));
       }
       
-      setGroupMembers(prevMembers => prevMembers.map(member => ({
-        ...member,
-        savedLocations: member.savedLocations.filter(loc => loc.id !== locationId)
-      })));
+      // groupMembers 상태 업데이트 (사이드바 목록과 개수 업데이트)
+      setGroupMembers(prevMembers => prevMembers.map(member => {
+        const updatedSavedLocations = member.savedLocations.filter(loc => loc.id !== locationId);
+        return {
+          ...member,
+          savedLocations: updatedSavedLocations,
+          savedLocationCount: updatedSavedLocations.length
+        };
+      }));
       
       if (selectedLocationId === locationId) {
         setSelectedLocationId(null);
@@ -3455,12 +3642,19 @@ export default function LocationPage() {
       // 삭제 모달 닫기
       closeLocationDeleteModal();
       
-      // 성공 모달 표시 (3초 자동 닫기)
-      openModal('장소 삭제 완료', `'${locationName}' 장소가 삭제되었습니다.`, 'success', undefined, true);
+      // 성공 토스트 표시
+      hideToastModal();
+      showToastModal('success', '삭제 완료', `"${locationName}" 장소가 삭제되었습니다.`);
+      
+      // 선택된 멤버 위치로 지도 이동
+      setTimeout(() => {
+        moveToSelectedMember();
+      }, 500);
       
     } catch (error) {
       console.error('장소 삭제 처리 중 전체 오류:', error);
-      openModal('장소 삭제 실패', '장소 삭제 처리 중 예기치 않은 오류가 발생했습니다.', 'error');
+      hideToastModal();
+      showToastModal('error', '삭제 실패', '장소 삭제 처리 중 예기치 않은 오류가 발생했습니다.');
     } finally {
       setIsDeletingLocation(false);
     }
@@ -3623,7 +3817,7 @@ export default function LocationPage() {
         }
         
         // 3. InfoWindow 생성 및 표시 (지도 위치에 표시)
-        const newInfoWindow = createLocationInfoWindow(location.name, location.address);
+        const newInfoWindow = createLocationInfoWindow(location.name, location.address, location);
         newInfoWindow.open(map, targetPosition);
         setInfoWindow(newInfoWindow);
         
@@ -3885,7 +4079,7 @@ export default function LocationPage() {
           
           {/* 커스텀 줌 컨트롤 */}
           {map && (
-            <div className="absolute top-[100px] right-[10px] z-30 flex flex-col space-y-1">
+            <div className="absolute top-[80px] right-[10px] z-30 flex flex-col space-y-1">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -4328,7 +4522,14 @@ export default function LocationPage() {
                 background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                 borderColor: 'rgba(1, 19, 163, 0.1)',
                 bottom: '60px',
-                height: 'calc(100vh - 60px)'
+                height: 'calc(100vh - 60px)',
+                // 모바일 사파리 최적화
+                transform: 'translateZ(0)',
+                willChange: 'transform',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+                WebkitPerspective: 1000,
+                WebkitTransform: 'translateZ(0)'
               }}
             >
               <motion.div
@@ -4671,7 +4872,7 @@ export default function LocationPage() {
         )}
       </AnimatePresence>
 
-      {/* 장소 삭제 확인 모달 */}
+      {/* 컴팩트한 장소 삭제 확인 모달 */}
       <AnimatePresence>
         {isLocationDeleteModalOpen && locationToDelete && (
           <motion.div 
@@ -4682,26 +4883,26 @@ export default function LocationPage() {
             onClick={closeLocationDeleteModal}
           >
             <motion.div 
-              className="bg-white rounded-3xl w-full max-w-md mx-auto"
+              className="bg-white rounded-2xl w-full max-w-sm mx-auto shadow-2xl"
               variants={{
                 hidden: { 
                   opacity: 0, 
-                  y: 100,
-                  scale: 0.95
+                  y: 50,
+                  scale: 0.9
                 },
                 visible: { 
                   opacity: 1, 
                   y: 0,
                   scale: 1,
                   transition: {
-                    duration: 0.3,
+                    duration: 0.25,
                     ease: [0.25, 0.46, 0.45, 0.94]
                   }
                 },
                 exit: { 
                   opacity: 0, 
-                  y: 100,
-                  scale: 0.95,
+                  y: 50,
+                  scale: 0.9,
                   transition: {
                     duration: 0.2,
                     ease: [0.55, 0.06, 0.68, 0.19]
@@ -4713,47 +4914,117 @@ export default function LocationPage() {
               exit="exit"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-6 pb-8">
-                <div className="text-center mb-6">
-                  <FaTrash className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                  <h3 className="text-xl font-bold text-gray-900">장소 삭제</h3>
-                  <p className="text-gray-600 mt-2 mb-4">
+              <div className="p-5">
+                <div className="text-center mb-4">
+                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <FaTrash className="w-5 h-5 text-red-500" />
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">장소 삭제</h3>
+                  <p className="text-sm text-gray-600">
                     <span className="font-medium text-red-600">
                       "{'slt_title' in locationToDelete ? locationToDelete.slt_title : locationToDelete.name}"
-                    </span> 장소를 정말 삭제하시겠습니까?
+                    </span>
+                    <br />장소를 삭제하시겠습니까?
                   </p>
                 </div>
                 
-                <div className="space-y-3">
-                  <motion.button
-                    onClick={handleLocationDelete}
-                    disabled={isDeletingLocation}
-                    className="w-full py-4 bg-red-500 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    {isDeletingLocation ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                        삭제 중...
-                      </>
-                    ) : (
-                      '장소 삭제'
-                    )}
-                  </motion.button>
-                  
+                <div className="flex space-x-3">
                   <motion.button
                     onClick={closeLocationDeleteModal}
                     disabled={isDeletingLocation}
-                    className="w-full py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium disabled:opacity-50"
+                    className="flex-1 py-3 border border-gray-300 rounded-xl text-gray-700 font-medium disabled:opacity-50 text-sm"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
                     취소
                   </motion.button>
+                  
+                  <motion.button
+                    onClick={handleLocationDelete}
+                    disabled={isDeletingLocation}
+                    className="flex-1 py-3 bg-red-500 text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isDeletingLocation ? (
+                      <>
+                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                        삭제 중
+                      </>
+                    ) : (
+                      '삭제'
+                    )}
+                  </motion.button>
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 컴팩트 토스트 모달 */}
+      <AnimatePresence>
+        {toastModal.isOpen && (
+          <motion.div 
+            className="fixed bottom-20 left-4 z-[130] w-1/2 max-w-sm"
+            initial={{ opacity: 0, x: -100, scale: 0.9 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -100, scale: 0.9 }}
+            transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden w-full">
+              <div className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    toastModal.type === 'success' ? 'bg-green-100' :
+                    toastModal.type === 'error' ? 'bg-red-100' : 'bg-blue-100'
+                  }`}>
+                    {toastModal.type === 'success' && (
+                      <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                    {toastModal.type === 'error' && (
+                      <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
+                    {toastModal.type === 'loading' && (
+                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-semibold text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis">{toastModal.title}</h4>
+                    <p className="text-xs text-gray-600 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{toastModal.message}</p>
+                  </div>
+                  {toastModal.autoClose && toastModal.type !== 'loading' && (
+                    <button
+                      onClick={hideToastModal}
+                      className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors flex-shrink-0"
+                    >
+                      <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {/* 프로그레스 바 */}
+              {toastModal.autoClose && toastModal.type !== 'loading' && (
+                <div className="h-1 bg-gray-100">
+                  <motion.div 
+                    className={`h-full ${
+                      toastModal.type === 'success' ? 'bg-green-500' :
+                      toastModal.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                    }`}
+                    initial={{ width: '100%' }}
+                    animate={{ width: `${100 - (toastModal.progress || 0)}%` }}
+                    transition={{ duration: 0.1, ease: 'linear' }}
+                  />
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -4770,6 +5041,13 @@ export default function LocationPage() {
               exit="closed"
               className="fixed inset-0 bg-black bg-opacity-50 z-40"
               onClick={() => setIsSidebarOpen(false)}
+              style={{
+                // 모바일 사파리 최적화
+                transform: 'translateZ(0)',
+                willChange: 'opacity',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden'
+              }}
             />
             
             {/* 사이드바 */}

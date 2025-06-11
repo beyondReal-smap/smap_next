@@ -3510,14 +3510,14 @@ export default function HomePage() {
       };
     }, [isSidebarOpen]);
 
-  // 사이드바 애니메이션 variants 개선
+  // 사이드바 애니메이션 variants (모바일 사파리 최적화)
   const sidebarVariants = {
     closed: {
       x: '-100%',
       transition: {
         type: 'tween',
         ease: [0.25, 0.46, 0.45, 0.94],
-        duration: 0.4
+        duration: 0.3
       }
     },
     open: {
@@ -3525,7 +3525,7 @@ export default function HomePage() {
       transition: {
         type: 'tween',
         ease: [0.25, 0.46, 0.45, 0.94],
-        duration: 0.4
+        duration: 0.3
       }
     }
   };
@@ -3534,14 +3534,14 @@ export default function HomePage() {
     closed: {
       opacity: 0,
       transition: {
-        duration: 0.3,
+        duration: 0.25,
         ease: "easeOut"
       }
     },
     open: {
       opacity: 1,
       transition: {
-        duration: 0.3,
+        duration: 0.25,
         ease: "easeInOut"
       }
     }
@@ -3550,20 +3550,18 @@ export default function HomePage() {
   const sidebarContentVariants = {
     closed: {
       opacity: 0,
-      y: 10,
       transition: {
-        duration: 0.2,
+        duration: 0.15,
         ease: "easeOut"
       }
     },
     open: {
       opacity: 1,
-      y: 0,
       transition: {
-        delay: 0.2,
-        duration: 0.4,
+        delay: 0.1,
+        duration: 0.25,
         ease: [0.25, 0.46, 0.45, 0.94],
-        staggerChildren: 0.06
+        staggerChildren: 0.03
       }
     }
   };
@@ -3571,8 +3569,8 @@ export default function HomePage() {
   const memberItemVariants = {
     closed: { 
       opacity: 0, 
-      x: -15,
-      scale: 0.95
+      x: -10,
+      scale: 0.98
     },
     open: { 
       opacity: 1, 
@@ -3581,7 +3579,7 @@ export default function HomePage() {
       transition: {
         type: "tween",
         ease: [0.25, 0.46, 0.45, 0.94],
-        duration: 0.3
+        duration: 0.2
       }
     }
   };
@@ -3798,6 +3796,13 @@ export default function HomePage() {
                  exit="closed"
                  className="fixed inset-0 bg-black bg-opacity-50 z-40"
                  onClick={() => setIsSidebarOpen(false)}
+                 style={{
+                   // 모바일 사파리 최적화
+                   transform: 'translateZ(0)',
+                   willChange: 'opacity',
+                   backfaceVisibility: 'hidden',
+                   WebkitBackfaceVisibility: 'hidden'
+                 }}
                />
                
                                 {/* 사이드바 */}
@@ -3812,7 +3817,14 @@ export default function HomePage() {
                      background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                      borderColor: 'rgba(1, 19, 163, 0.1)',
                      bottom: '60px', // 네비게이션 바 높이만큼 여유 공간
-                     height: 'calc(100vh - 60px)'
+                     height: 'calc(100vh - 60px)',
+                     // 모바일 사파리 최적화
+                     transform: 'translateZ(0)',
+                     willChange: 'transform',
+                     backfaceVisibility: 'hidden',
+                     WebkitBackfaceVisibility: 'hidden',
+                     WebkitPerspective: 1000,
+                     WebkitTransform: 'translateZ(0)'
                    }}
                  >
                    <motion.div

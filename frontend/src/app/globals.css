@@ -150,3 +150,48 @@ p {
 .hide-scrollbar::-webkit-scrollbar-thumb {
   display: none !important;
 }
+
+/* 모바일 사파리 애니메이션 최적화 */
+* {
+  -webkit-transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000;
+}
+
+/* Framer Motion 컴포넌트 최적화 */
+[data-framer-component] {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  -webkit-transform: translateZ(0);
+}
+
+/* 사이드바 및 모달 최적화 */
+.sidebar-optimized,
+.modal-optimized,
+.overlay-optimized {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  -webkit-transform: translateZ(0);
+}
+
+/* 터치 스크롤 최적화 */
+.touch-scroll {
+  -webkit-overflow-scrolling: touch;
+  overflow-scrolling: touch;
+}
+
+/* 모바일 사파리 깜빡임 방지 */
+.no-flicker {
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  perspective: 1000;
+}

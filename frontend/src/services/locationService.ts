@@ -133,6 +133,21 @@ const locationService = {
     }
   },
 
+  // 장소 완전 삭제 (실제 삭제 API 호출)
+  deleteLocation: async (sltIdx: number): Promise<void> => {
+    try {
+      console.log(`[locationService] 장소 삭제 API 호출 - slt_idx: ${sltIdx}`);
+      
+      // Next.js API 라우트를 통해 삭제 요청 (프록시 방식)
+      const response = await apiClient.delete(`/locations/${sltIdx}`);
+      console.log(`[locationService] 장소 삭제 성공:`, response.status, response.data);
+      
+    } catch (error) {
+      console.error('Error deleting location:', error);
+      throw error;
+    }
+  },
+
   // 새 장소 생성
   createLocation: async (locationData: any): Promise<any> => {
     try {
