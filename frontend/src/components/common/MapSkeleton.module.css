@@ -130,25 +130,38 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 10;
 }
 
 .loadingSpinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   padding: 20px;
   background: white;
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  max-width: 200px;
+  min-width: 200px;
+  transform: translate(0, 0); /* 정확한 중앙 정렬을 위한 보정 */
 }
 
 .spinnerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 48px;
   margin-bottom: 12px;
   color: #667eea;
+  width: 48px;
+  height: 48px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .spinnerDots {
-  animation: spinnerRotate 2s linear infinite;
+  animation: spinnerRotate 8s linear infinite; /* 2s → 4s로 느리게 */
   transform-origin: 20px 20px;
 }
 
@@ -393,6 +406,8 @@
   
   .spinnerIcon {
     font-size: 36px;
+    width: 36px;
+    height: 36px;
   }
   
   .loadingText {

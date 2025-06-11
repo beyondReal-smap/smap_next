@@ -5254,8 +5254,9 @@ export default function LogsPage() {
                                   </div>
                                   <div className="grid grid-cols-7 gap-1.5">
                                     {Array.from({ length: 7 }, (_, index) => {
-                                      const dayIndex = 13 - index; // 13일전부터 7일전까지 (역순)
-                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[dayIndex];
+                                      const dayIndex = 13 - index; // 13일전부터 7일전까지 (정순 배열: 13, 12, 11, 10, 9, 8, 7)
+                                      const arrayIndex = 13 - dayIndex; // memberLogDistribution 배열의 실제 인덱스 (0, 1, 2, 3, 4, 5, 6)
+                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[arrayIndex];
                                       const date = new Date();
                                       date.setDate(date.getDate() - dayIndex);
                                       const isToday = dayIndex === 0;
@@ -5358,8 +5359,9 @@ export default function LogsPage() {
                                   </div>
                                   <div className="grid grid-cols-7 gap-1.5">
                                     {Array.from({ length: 7 }, (_, index) => {
-                                      const dayIndex = 6 - index; // 6일전부터 오늘까지 (역순)
-                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[7 + dayIndex];
+                                      const dayIndex = 6 - index; // 6일전부터 오늘까지 (정순: 6, 5, 4, 3, 2, 1, 0)
+                                      const arrayIndex = 13 - dayIndex; // memberLogDistribution 배열의 실제 인덱스 (7, 8, 9, 10, 11, 12, 13)
+                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[arrayIndex];
                                       const date = new Date();
                                       date.setDate(date.getDate() - dayIndex);
                                       const isToday = dayIndex === 0;
