@@ -1,0 +1,372 @@
+/* 지도 스켈레톤 UI 스타일 */
+.mapSkeleton {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  overflow: hidden;
+}
+
+.mapContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.mapArea {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(45deg, #e8f4f8 25%, #f0f8ff 25%, #f0f8ff 50%, #e8f4f8 50%, #e8f4f8 75%, #f0f8ff 75%);
+  background-size: 20px 20px;
+  animation: mapBackground 8s ease-in-out infinite;
+}
+
+/* 지도 그리드 패턴 */
+.mapGrid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 2px;
+  opacity: 0.3;
+}
+
+.gridItem {
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  border-radius: 4px;
+  animation: shimmer 2s infinite;
+}
+
+.gridItem:nth-child(odd) {
+  animation-delay: 0.1s;
+}
+
+.gridItem:nth-child(even) {
+  animation-delay: 0.3s;
+}
+
+/* 가짜 마커들 */
+.markerContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+
+.marker1 {
+  top: 30%;
+  left: 40%;
+  animation: markerFloat1 3s ease-in-out infinite;
+}
+
+.marker2 {
+  top: 60%;
+  left: 65%;
+  animation: markerFloat2 3s ease-in-out infinite 0.5s;
+}
+
+.marker3 {
+  top: 80%;
+  left: 30%;
+  animation: markerFloat3 3s ease-in-out infinite 1s;
+}
+
+.markerIcon {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  position: relative;
+}
+
+.markerIcon::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+}
+
+.markerPulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  background: rgba(102, 126, 234, 0.3);
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* 로딩 오버레이 */
+.loadingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loadingSpinner {
+  text-align: center;
+  padding: 20px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  max-width: 200px;
+}
+
+.spinnerIcon {
+  font-size: 48px;
+  animation: spin 2s linear infinite;
+  margin-bottom: 12px;
+}
+
+.loadingText {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
+  font-weight: 500;
+}
+
+.loadingProgress {
+  width: 100%;
+  height: 4px;
+  background: #f0f0f0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2px;
+  animation: progress 2s ease-in-out infinite;
+}
+
+/* 지도 컨트롤들 */
+.controls {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mapTypeControl,
+.zoomControl,
+.locationControl {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.controlButton {
+  width: 40px;
+  height: 40px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: shimmer 2s infinite;
+}
+
+/* 멤버 리스트 (home 페이지용) */
+.memberList {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow: hidden;
+}
+
+.memberListHeader {
+  margin-bottom: 12px;
+}
+
+.headerText {
+  width: 80px;
+  height: 16px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  border-radius: 8px;
+  animation: shimmer 2s infinite;
+}
+
+.memberItems {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.memberItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.memberAvatar {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+  border-radius: 50%;
+  animation: shimmer 2s infinite;
+}
+
+.memberInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.memberName {
+  width: 60px;
+  height: 14px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  border-radius: 4px;
+  animation: shimmer 2s infinite;
+}
+
+.memberStatus {
+  width: 40px;
+  height: 12px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  border-radius: 4px;
+  animation: shimmer 2s infinite 0.2s;
+}
+
+/* 애니메이션 정의 */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.3);
+    opacity: 0.3;
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes markerFloat1 {
+  0%, 100% {
+    transform: translate(-50%, -50%) translateY(0px);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-5px);
+  }
+}
+
+@keyframes markerFloat2 {
+  0%, 100% {
+    transform: translate(-50%, -50%) translateY(0px);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-3px);
+  }
+}
+
+@keyframes markerFloat3 {
+  0%, 100% {
+    transform: translate(-50%, -50%) translateY(0px);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-7px);
+  }
+}
+
+@keyframes mapBackground {
+  0%, 100% {
+    background-position: 0 0;
+  }
+  50% {
+    background-position: 10px 10px;
+  }
+}
+
+/* 반응형 대응 */
+@media (max-width: 768px) {
+  .controls {
+    top: 12px;
+    right: 12px;
+  }
+  
+  .controlButton {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .memberList {
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    padding: 12px;
+  }
+  
+  .spinnerIcon {
+    font-size: 36px;
+  }
+  
+  .loadingText {
+    font-size: 12px;
+  }
+} 

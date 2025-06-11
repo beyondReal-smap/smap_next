@@ -8,6 +8,8 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { UserProvider } from '@/contexts/UserContext';
 import { DataCacheProvider } from '@/contexts/DataCacheContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMapPreloader } from '@/hooks/useMapPreloader';
+import { useServiceWorker } from '@/hooks/useServiceWorker';
 
 // 인증이 필요하지 않은 페이지들
 const PUBLIC_ROUTES = ['/signin', '/register', '/'];
@@ -54,6 +56,10 @@ export default function ClientLayout({
   const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
 
+  // 지도 API 프리로딩 및 서비스 워커 등록
+  useMapPreloader();
+  useServiceWorker();
+
   // 네비게이션 바를 숨길 페이지들
   const hideNavBarPages = ['/signin', '/register'];
   const shouldHideNavBar = hideNavBarPages.includes(pathname);
@@ -61,6 +67,7 @@ export default function ClientLayout({
   // 클라이언트 측에서만 마운트
   useEffect(() => {
     setIsMounted(true);
+    console.log('[ClientLayout] 🚀 앱 초기화 완료 - 지도 API 프리로딩 및 서비스 워커 활성화');
   }, []);
 
   if (!isMounted) {

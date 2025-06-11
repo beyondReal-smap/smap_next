@@ -21,6 +21,7 @@ import groupService, { Group } from '@/services/groupService';
 import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker, LocationLogSummary, DailyCountsResponse, MemberActivityResponse, MemberDailyCount } from '@/services/memberLocationLogService';
 import ErrorDisplay from './components/ErrorDisplay';
 import ErrorToast from './components/ErrorToast';
+import { MapSkeleton } from '@/components/common/MapSkeleton';
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
 declare global {
@@ -736,8 +737,9 @@ export default function LogsPage() {
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      console.log('Naver Maps API loaded for LogsPage.');
+      console.log('[LOGS] Naver Maps API 로드 완료 - 즉시 지도 로딩 완료');
       setNaverMapsLoaded(true);
+      setIsMapLoading(false); // API 로드 완료 시 즉시 로딩 상태 해제
     };
     script.onerror = () => {
       console.error('Failed to load Naver Maps API for LogsPage.');
@@ -4538,6 +4540,15 @@ export default function LogsPage() {
             position: 'relative' // 로딩 오버레이를 위한 relative 포지션
           }}
         >
+          {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
+          {isMapLoading && (
+            <MapSkeleton 
+              showControls={true} 
+              showMemberList={false}
+              className="absolute top-0 left-0 w-full h-full z-5" 
+            />
+          )}
+
           <div ref={mapContainer} className="w-full h-full" />
           
           {/* 플로팅 통합 정보 카드 - jin의 기록 + 위치기록 요약 한 줄 */}
@@ -4728,11 +4739,11 @@ export default function LogsPage() {
           opacity: 1, 
           scale: 1,
           transition: {
-            delay: 1.5,
+            delay: 0.5,
             type: "spring",
             stiffness: 120,
             damping: 25,
-            duration: 1.2
+            duration: 0.8
           }
         }}
         whileHover={{ 

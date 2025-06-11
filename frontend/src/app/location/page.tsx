@@ -40,6 +40,7 @@ import memberService from '@/services/memberService';
 import locationService, { OtherMemberLocationRaw } from '@/services/locationService';
 import groupService, { Group } from '@/services/groupService';
 import { useAuth } from '@/contexts/AuthContext';
+import { MapSkeleton } from '@/components/common/MapSkeleton';
 
 // 모바일 최적화된 CSS 스타일
 const mobileStyles = `
@@ -3871,6 +3872,15 @@ export default function LocationPage() {
             position: 'relative'
           }}
         >
+          {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
+          {isMapLoading && (
+            <MapSkeleton 
+              showControls={true} 
+              showMemberList={false}
+              className="absolute top-0 left-0 w-full h-full z-5" 
+            />
+          )}
+
           <div ref={mapContainer} className="w-full h-full" />
           
           {/* 커스텀 줌 컨트롤 */}
@@ -4229,11 +4239,11 @@ export default function LocationPage() {
             opacity: 1, 
             scale: 1,
             transition: {
-              delay: 1.5,
+              delay: 0.5,
               type: "spring",
               stiffness: 120,
               damping: 25,
-              duration: 1.2
+              duration: 0.8
             }
           }}
           whileHover={{ 

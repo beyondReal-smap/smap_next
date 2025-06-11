@@ -14,6 +14,7 @@ import { ko } from 'date-fns/locale';
 import { PageContainer, Card, Button } from '../components/layout';
 import { Loader } from '@googlemaps/js-api-loader';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { MapSkeleton } from '@/components/common/MapSkeleton';
 import { FiLoader, FiChevronDown, FiUser, FiCalendar } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 import config, { API_KEYS, detectLanguage, MAP_CONFIG } from '../../config';
@@ -1002,69 +1003,141 @@ export default function HomePage() {
     initializeUserAuth();
   }, [authLoading, isLoggedIn, user, router]);
 
-  // Google Maps API 로드 함수
+  // Google Maps API 로드 함수 (프리로딩 최적화)
   const loadGoogleMapsAPI = async () => {
     // 이미 로드된 경우 중복 로드 방지
     if (apiLoadStatus.google || window.google?.maps) {
-      console.log('Google Maps API가 이미 로드되어 있습니다.');
+      console.log('[HOME] 🚀 Google Maps API 프리로딩 완료 - 즉시 사용 가능');
       setGoogleMapsLoaded(true);
       apiLoadStatus.google = true;
+      setIsMapLoading(false); // 프리로드 완료시 즉시 로딩 상태 해제
       return;
     }
 
-    try {
-      console.log('Google Maps API 로드 시작');
-      // Loader를 사용하여 비동기적으로 API 로드
-      await googleMapsLoader.load();
-      console.log('Google Maps API가 성공적으로 로드되었습니다.');
-      apiLoadStatus.google = true;
-      setGoogleMapsLoaded(true);
-    } catch (error) {
-      console.error('Google Maps API 로드 오류:', error);
+    // 프리로드된 스크립트가 있는지 확인
+    const preloadedScript = document.getElementById('google-maps-preload');
+    if (preloadedScript) {
+      console.log('[HOME] 프리로드된 구글 지도 스크립트 발견 - 로드 완료 대기');
+      // 프리로드된 스크립트가 완료될 때까지 짧은 간격으로 체크
+      const checkInterval = setInterval(() => {
+        if (window.google?.maps) {
+          console.log('[HOME] 프리로드된 Google Maps API 로드 완료');
+          clearInterval(checkInterval);
+          apiLoadStatus.google = true;
+          setGoogleMapsLoaded(true);
+          setIsMapLoading(false);
+        }
+      }, 50);
+      
+      // 최대 3초 대기 후 백업 로딩
+      setTimeout(() => {
+        if (!window.google?.maps) {
+          clearInterval(checkInterval);
+          console.log('[HOME] 구글 지도 프리로드 대기 시간 초과 - 백업 로딩 실행');
+          performGoogleBackupLoading();
+        }
+      }, 3000);
+      return;
+    }
+
+    // 프리로드가 없을 경우 즉시 백업 로딩
+    console.log('[HOME] 프리로드 스크립트 없음 - Google Maps 백업 로딩 시작');
+    performGoogleBackupLoading();
+
+    async function performGoogleBackupLoading() {
+      try {
+        console.log('[HOME] Google Maps API 백업 로드 시작');
+        // Loader를 사용하여 비동기적으로 API 로드
+        await googleMapsLoader.load();
+        console.log('[HOME] Google Maps API 백업 로드 성공');
+        apiLoadStatus.google = true;
+        setGoogleMapsLoaded(true);
+        setIsMapLoading(false);
+      } catch (error) {
+        console.error('[HOME] Google Maps API 백업 로드 실패:', error);
+        setIsMapLoading(false);
+        setMapType('naver'); // 로드 실패 시 네이버 지도로 전환
+      }
     }
   };
 
-  // Naver Maps API 로드 함수
+  // Naver Maps API 로드 함수 (프리로딩 최적화)
   const loadNaverMapsAPI = () => {
     // 이미 로드된 경우 중복 로드 방지
     if (apiLoadStatus.naver || window.naver?.maps) {
-      console.log('Naver Maps API가 이미 로드되어 있습니다.');
+      console.log('[HOME] 🚀 Naver Maps API 프리로딩 완료 - 즉시 사용 가능');
       setNaverMapsLoaded(true);
       apiLoadStatus.naver = true;
+      setIsMapLoading(false); // 프리로드 완료시 즉시 로딩 상태 해제
       return;
     }
 
-    console.log('Naver Maps API 로드 시작');
-    // 네이버 지도 API 로드용 URL 생성
-    const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
-    naverMapUrl.searchParams.append('ncpKeyId', NAVER_MAPS_CLIENT_ID);
-    naverMapUrl.searchParams.append('submodules', 'panorama,geocoder,drawing,visualization');
+    console.log('[HOME] Naver Maps API 프리로딩 대기 중 - 백업 로딩 확인');
     
-    // script 요소 생성 및 로드
-    const script = document.createElement('script');
-    script.src = naverMapUrl.toString();
-    script.async = true;
-    script.defer = true;
-    script.id = 'naver-maps-script';
-    
-    script.onload = () => {
-      console.log('Naver Maps API가 성공적으로 로드되었습니다.');
-      apiLoadStatus.naver = true;
-      setNaverMapsLoaded(true);
-    };
-    
-    script.onerror = () => {
-      console.error('네이버 지도 스크립트 로드 실패');
-      setMapType('google'); // 로드 실패 시 구글 지도로 전환
-    };
-    
-    // 중복 로드 방지를 위해 기존 스크립트 제거
-    const existingScript = document.getElementById('naver-maps-script');
-    if (existingScript) {
-      existingScript.remove();
+    // 프리로드된 스크립트가 있는지 확인
+    const preloadedScript = document.getElementById('naver-maps-preload');
+    if (preloadedScript) {
+      console.log('[HOME] 프리로드된 네이버 지도 스크립트 발견 - 로드 완료 대기');
+      // 프리로드된 스크립트가 완료될 때까지 짧은 간격으로 체크
+      const checkInterval = setInterval(() => {
+        if (window.naver?.maps) {
+          console.log('[HOME] 프리로드된 Naver Maps API 로드 완료');
+          clearInterval(checkInterval);
+          apiLoadStatus.naver = true;
+          setNaverMapsLoaded(true);
+          setIsMapLoading(false);
+        }
+      }, 50); // 50ms마다 체크
+      
+      // 최대 3초 대기 후 백업 로딩
+      setTimeout(() => {
+        if (!window.naver?.maps) {
+          clearInterval(checkInterval);
+          console.log('[HOME] 프리로드 대기 시간 초과 - 백업 로딩 실행');
+          performBackupLoading();
+        }
+      }, 3000);
+      return;
     }
-    
-    document.head.appendChild(script);
+
+    // 프리로드가 없을 경우 즉시 백업 로딩
+    console.log('[HOME] 프리로드 스크립트 없음 - 백업 로딩 시작');
+    performBackupLoading();
+
+    function performBackupLoading() {
+      // 네이버 지도 API 로드용 URL 생성
+      const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
+      naverMapUrl.searchParams.append('ncpKeyId', NAVER_MAPS_CLIENT_ID);
+      naverMapUrl.searchParams.append('submodules', 'panorama,geocoder,drawing,visualization');
+      
+      // script 요소 생성 및 로드
+      const script = document.createElement('script');
+      script.src = naverMapUrl.toString();
+      script.async = true;
+      script.defer = true;
+      script.id = 'naver-maps-backup';
+      
+      script.onload = () => {
+        console.log('[HOME] Naver Maps API 백업 로드 성공');
+        apiLoadStatus.naver = true;
+        setNaverMapsLoaded(true);
+        setIsMapLoading(false);
+      };
+      
+      script.onerror = () => {
+        console.error('[HOME] 네이버 지도 백업 로드 실패');
+        setIsMapLoading(false);
+        setMapType('google'); // 로드 실패 시 구글 지도로 전환
+      };
+      
+      // 중복 로드 방지를 위해 기존 스크립트 제거
+      const existingScript = document.getElementById('naver-maps-backup');
+      if (existingScript) {
+        existingScript.remove();
+      }
+      
+      document.head.appendChild(script);
+    }
   };
 
   // Google 지도 초기화 (로고 제거 옵션 추가)
@@ -2294,8 +2367,7 @@ export default function HomePage() {
       console.log('[handleMemberSelect] 멤버 선택 해제 - 빈 스케줄 배열 설정');
       setFilteredSchedules([]);
     }
-    updateMemberMarkers(updatedMembers);
-    // 일정 마커는 filteredSchedules useEffect에서 자동으로 업데이트됨
+    // 마커 업데이트는 useEffect에서 자동으로 처리됨 (groupMembers 변경 감지)
   };
 
   // 선택된 날짜 변경 핸들러 (filteredSchedules 업데이트)
@@ -2555,7 +2627,7 @@ export default function HomePage() {
             duration: 300,
             easing: 'easeOutCubic'
           });
-            naverMap.current.setZoom(17);
+            naverMap.current.setZoom(16);
             console.log('네이버 지도 중심 이동:', selectedMember.name, { lat, lng });
 
           // 선택된 멤버의 InfoWindow 자동 표시 (중복 방지) - 짧은 지연
@@ -2702,7 +2774,7 @@ export default function HomePage() {
         } else if (mapType === 'google' && map.current && googleMapsLoaded) {
           // 구글 지도 이동 및 줌 레벨 조정 (즉시 실행)
             map.current.panTo({ lat, lng });
-            map.current.setZoom(17);
+            map.current.setZoom(16);
             console.log('구글 지도 중심 이동:', selectedMember.name, { lat, lng });
 
           // 구글 지도용 InfoWindow 자동 표시 (짧은 지연)
@@ -2872,7 +2944,7 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapType, mapsInitialized.google, mapsInitialized.naver]);
 
-  // 그룹멤버 데이터 변경 시 마커 업데이트 - 중복 방지 로직 추가
+  // 그룹멤버 데이터 변경 시 마커 업데이트 - Location 페이지와 동일한 방식
   useEffect(() => {
     // 마커 업데이트 중복 방지
     if (markersUpdating.current) {
@@ -2888,15 +2960,22 @@ export default function HomePage() {
       markersUpdating.current = true;
       console.log('[HOME] 그룹멤버 데이터 변경 감지 - 마커 업데이트:', groupMembers.length, '명');
       
-      // 즉시 마커 업데이트 실행
-      updateMemberMarkers(groupMembers);
+      // 300ms 지연으로 마커 업데이트 실행 (깜빡임 방지)
+      const updateTimer = setTimeout(() => {
+        updateMemberMarkers(groupMembers);
+        
+        // 마커 업데이트 완료 후 플래그 해제
+        setTimeout(() => {
+          markersUpdating.current = false;
+        }, 500);
+      }, 300);
       
-      // 짧은 지연 후 플래그 해제
-      setTimeout(() => {
+      return () => {
+        clearTimeout(updateTimer);
         markersUpdating.current = false;
-      }, 100);
+      };
     }
-  }, [groupMembers, mapType, mapsInitialized.naver, mapsInitialized.google]); // groupMembers 전체를 감지하여 선택 상태 변경도 포함
+  }, [groupMembers, mapType, mapsInitialized.naver, mapsInitialized.google]);
 
   // filteredSchedules 변경 시 일정 마커 업데이트
   useEffect(() => {
@@ -2936,14 +3015,14 @@ export default function HomePage() {
           if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
             const naverLatLng = new window.naver.maps.LatLng(latitude, longitude);
             naverMap.current.setCenter(naverLatLng);
-            naverMap.current.setZoom(14);
+            naverMap.current.setZoom(16);
             
             if (naverMarker.current) {
               naverMarker.current.setPosition(naverLatLng);
             }
           } else if (mapType === 'google' && map.current && googleMapsLoaded) {
             map.current.panTo({ lat: latitude, lng: longitude });
-            map.current.setZoom(14);
+            map.current.setZoom(16);
             
             if (marker.current) {
               marker.current.setPosition({ lat: latitude, lng: longitude });
@@ -2997,22 +3076,22 @@ export default function HomePage() {
   
 
 
-  // 초기 데이터 로딩 시뮬레이션 - logs/page.tsx와 동일
+  // 초기 데이터 로딩 최적화 - 지연 시간 단축
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsInitialDataLoaded(true);
-    }, 1000); // 1초 후 초기 데이터 로딩 완료
+    }, 300); // 300ms로 단축하여 빠른 초기화
 
-    // 백업 타이머: 3초 후에는 강제로 지도 로딩도 완료 처리
-          const backupTimer = setTimeout(() => {
-        setIsMapLoading(false);
-        // 지도 초기화 상태도 강제로 설정
-        setMapsInitialized(prev => ({
-          naver: true,
-          google: true
-        }));
-        console.log('[HOME] 백업 타이머로 지도 로딩 및 초기화 강제 완료');
-      }, 3000);
+    // 백업 타이머: 1.5초 후에는 강제로 지도 로딩도 완료 처리
+    const backupTimer = setTimeout(() => {
+      setIsMapLoading(false);
+      // 지도 초기화 상태도 강제로 설정
+      setMapsInitialized(prev => ({
+        naver: true,
+        google: true
+      }));
+      console.log('[HOME] 백업 타이머로 지도 로딩 및 초기화 강제 완료 (1.5초)');
+    }, 1500); // 3초 → 1.5초로 단축
 
     return () => {
       clearTimeout(timer);
@@ -3064,9 +3143,9 @@ export default function HomePage() {
     }
   }, [isGroupSelectorOpen]);
 
-  // 첫번째 멤버 자동 선택 - 개선된 로직
+  // 첫번째 멤버 자동 선택 - 직접 상태 업데이트 방식
   useEffect(() => {
-    // 조건: 멤버가 있고, 선택된 멤버가 없을 때 (데이터 로딩 완료 체크 제거)
+    // 조건: 멤버가 있고, 선택된 멤버가 없을 때
     if (groupMembers.length > 0 && 
         !groupMembers.some(m => m.isSelected) && 
         !firstMemberSelected &&
@@ -3082,16 +3161,31 @@ export default function HomePage() {
       // 중복 실행 방지
       setFirstMemberSelected(true);
       
-      // 즉시 첫번째 멤버 선택 (지도 대기 없이)
+      // 첫번째 멤버 직접 선택 (handleMemberSelect 호출 없이)
       const firstMember = groupMembers[0];
       console.log('[HOME] 첫번째 멤버 자동 선택 실행:', firstMember.name, firstMember.id);
       
-      // 약간의 지연 후 실행하여 렌더링 완료 보장
-      setTimeout(() => {
-        handleMemberSelect(firstMember.id);
-      }, 200);
+      // 직접 상태 업데이트 (마커 중복 업데이트 방지)
+      const updatedMembers = groupMembers.map(member => ({
+        ...member,
+        isSelected: member.id === firstMember.id
+      }));
+      
+      setGroupMembers(updatedMembers);
+      
+      // 첫번째 멤버의 스케줄 필터링
+      const memberSchedules = groupSchedules.filter(schedule => 
+        schedule.sgdt_idx !== null && 
+        schedule.sgdt_idx !== undefined && 
+        Number(schedule.sgdt_idx) === Number(firstMember.sgdt_idx) &&
+        typeof schedule.date === 'string' && 
+        schedule.date!.startsWith(selectedDate)
+      );
+      
+      setFilteredSchedules(memberSchedules);
+      console.log('[HOME] 첫번째 멤버 자동 선택 완료:', firstMember.name, '스케줄:', memberSchedules.length, '개');
     }
-  }, [groupMembers, firstMemberSelected, selectedGroupId]);
+  }, [groupMembers, firstMemberSelected, selectedGroupId, groupSchedules, selectedDate]);
 
   // 컴포넌트 마운트 시 초기 상태 체크 (안전장치)
   useEffect(() => {
@@ -3587,8 +3681,15 @@ export default function HomePage() {
             position: 'relative'
           }}
         >
+          {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
+          {isMapLoading && (
+            <MapSkeleton 
+              showControls={true} 
+              showMemberList={false}
+              className="absolute top-0 left-0 w-full h-full z-5" 
+            />
+          )}
 
-          
           <div 
             ref={googleMapContainer} 
             className="w-full h-full absolute top-0 left-0" 
@@ -3622,11 +3723,11 @@ export default function HomePage() {
              opacity: 1, 
              scale: 1,
              transition: {
-               delay: 1.5,
+               delay: 0.5,
                type: "spring",
                stiffness: 120,
                damping: 25,
-               duration: 1.2
+               duration: 0.8
              }
            }}
            whileHover={{ 
