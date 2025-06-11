@@ -5021,9 +5021,9 @@ export default function LocationPage() {
                                           <span className="text-xs text-gray-600 truncate flex-1">
                                             {location.name}
                                           </span>
-                                          <span className="text-xs text-gray-400 flex-shrink-0">
+                                          {/* <span className="text-xs text-gray-400 flex-shrink-0">
                                             {location.category}
-                                          </span>
+                                          </span> */}
                                           <div className="w-3 h-3 flex items-center justify-center flex-shrink-0">
                                             <svg className="w-2.5 h-2.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

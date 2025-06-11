@@ -2713,7 +2713,7 @@ export default function LogsPage() {
     // 마커에 InfoWindow 참조 저장 (정리할 때 함께 제거하기 위해)
     currentPositionMarker.current.infoWindow = infoWindow;
 
-    console.log(`[현재위치마커] 위치 업데이트: (${lat}, ${lng}) - ${targetIndex + 1}/${totalMarkers}`);
+    // console.log(`[현재위치마커] 위치 업데이트: (${lat}, ${lng}) - ${targetIndex + 1}/${totalMarkers}`);
   };
 
   // 슬라이더 값에 따라 경로 진행 상황 업데이트
