@@ -32,10 +32,21 @@ async function fetchWithFallback(url: string, options: RequestInit = {}) {
 // 백엔드 응답을 안전하게 변환하는 함수
 function transformStayTimesResponse(backendData: any) {
   console.log('[Stay Times API] 백엔드 원본 데이터:', backendData);
+  console.log('[Stay Times API] 데이터 타입 분석:', {
+    isArray: Array.isArray(backendData),
+    hasResult: 'result' in backendData,
+    resultValue: backendData.result,
+    hasData: 'data' in backendData,
+    dataType: typeof backendData.data,
+    isDataArray: Array.isArray(backendData.data),
+    dataLength: Array.isArray(backendData.data) ? backendData.data.length : 'N/A',
+    keys: Object.keys(backendData)
+  });
   
   try {
-    // 배열 형태의 응답 처리
+    // 1. 배열 형태의 응답 처리
     if (Array.isArray(backendData)) {
+      console.log('[Stay Times API] 케이스 1: 배열 형태 응답');
       return {
         result: "Y",
         data: backendData.map(transformSingleStayData),
@@ -45,16 +56,18 @@ function transformStayTimesResponse(backendData: any) {
       };
     }
     
-    // 객체 형태의 응답 처리 (백엔드에서 이미 올바른 형식으로 온 경우)
+    // 2. 객체 형태의 응답 처리 (백엔드에서 이미 올바른 형식으로 온 경우)
     if (backendData.result === "Y" && backendData.data && Array.isArray(backendData.data)) {
+      console.log('[Stay Times API] 케이스 2: 백엔드에서 올바른 형식');
       return {
         ...backendData,
         data: backendData.data.map(transformSingleStayData)
       };
     }
     
-    // 다른 객체 형태의 응답 처리
+    // 3. data 필드가 배열인 경우 (result 필드 없어도 처리)
     if (backendData.data && Array.isArray(backendData.data)) {
+      console.log('[Stay Times API] 케이스 3: data 필드가 배열 (result 무시)');
       return {
         result: "Y",
         data: backendData.data.map(transformSingleStayData),
@@ -64,7 +77,53 @@ function transformStayTimesResponse(backendData: any) {
       };
     }
     
-    // 단일 객체 응답 처리
+    // 4. 백엔드에서 result 필드 없이 다른 형식으로 온 경우 (Vercel 환경 대응)
+    if (backendData && typeof backendData === 'object' && !Array.isArray(backendData) && !backendData.result) {
+      console.log('[Stay Times API] 케이스 4: result 필드 없는 객체 응답 (Vercel 환경)');
+      
+      // 가능한 데이터 필드들을 확인
+      const possibleDataFields = ['data', 'stay_times', 'stays', 'results'];
+      let foundData = null;
+      
+      for (const field of possibleDataFields) {
+        if (backendData[field]) {
+          foundData = backendData[field];
+          break;
+        }
+      }
+      
+      if (foundData) {
+        if (Array.isArray(foundData)) {
+          return {
+            result: "Y",
+            data: foundData.map(transformSingleStayData),
+            total_stays: foundData.length,
+            success: true,
+            message: "체류시간 분석 조회 성공 (Vercel 환경)"
+          };
+        } else {
+          return {
+            result: "Y",
+            data: [transformSingleStayData(foundData)],
+            total_stays: 1,
+            success: true,
+            message: "체류시간 분석 조회 성공 (Vercel 환경)"
+          };
+        }
+      }
+      
+      // 데이터 필드를 찾지 못한 경우 전체 객체를 단일 데이터로 처리
+      return {
+        result: "Y",
+        data: [transformSingleStayData(backendData)],
+        total_stays: 1,
+        success: true,
+        message: "체류시간 분석 조회 성공 (전체 객체 처리)"
+      };
+    }
+    
+    // 5. 단일 객체 응답 처리
+    console.log('[Stay Times API] 케이스 5: 단일 객체 응답');
     return {
       result: "Y",
       data: [transformSingleStayData(backendData)],

@@ -65,15 +65,60 @@ function transformDailySummaryResponse(backendData: any) {
       };
     }
     
-    // 3. data 필드가 배열인 경우
+    // 3. data 필드가 배열인 경우 (result 필드 없어도 처리)
     if (backendData.data && Array.isArray(backendData.data)) {
-      console.log('[Daily Summary API] 케이스 3: data 필드가 배열');
+      console.log('[Daily Summary API] 케이스 3: data 필드가 배열 (result 무시)');
       return {
         result: "Y",
         data: backendData.data.map(transformSingleDayData),
         total_days: backendData.data.length,
         success: true,
         message: "일일 요약 조회 성공"
+      };
+    }
+    
+    // 3.5. 백엔드에서 result 필드 없이 다른 형식으로 온 경우 (Vercel 환경 대응)
+    if (backendData && typeof backendData === 'object' && !Array.isArray(backendData) && !backendData.result) {
+      console.log('[Daily Summary API] 케이스 3.5: result 필드 없는 객체 응답 (Vercel 환경)');
+      
+      // 가능한 데이터 필드들을 확인
+      const possibleDataFields = ['data', 'summary', 'daily_summary', 'results'];
+      let foundData = null;
+      
+      for (const field of possibleDataFields) {
+        if (backendData[field]) {
+          foundData = backendData[field];
+          break;
+        }
+      }
+      
+      if (foundData) {
+        if (Array.isArray(foundData)) {
+          return {
+            result: "Y",
+            data: foundData.map(transformSingleDayData),
+            total_days: foundData.length,
+            success: true,
+            message: "일일 요약 조회 성공 (Vercel 환경)"
+          };
+        } else {
+          return {
+            result: "Y",
+            data: [transformSingleDayData(foundData)],
+            total_days: 1,
+            success: true,
+            message: "일일 요약 조회 성공 (Vercel 환경)"
+          };
+        }
+      }
+      
+      // 데이터 필드를 찾지 못한 경우 전체 객체를 단일 데이터로 처리
+      return {
+        result: "Y",
+        data: [transformSingleDayData(backendData)],
+        total_days: 1,
+        success: true,
+        message: "일일 요약 조회 성공 (전체 객체 처리)"
       };
     }
     
