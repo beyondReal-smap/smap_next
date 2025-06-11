@@ -19,6 +19,8 @@ import memberService from '@/services/memberService';
 
 import groupService, { Group } from '@/services/groupService';
 import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker, LocationLogSummary, DailyCountsResponse, MemberActivityResponse, MemberDailyCount } from '@/services/memberLocationLogService';
+import ErrorDisplay from './components/ErrorDisplay';
+import ErrorToast from './components/ErrorToast';
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
 declare global {
@@ -562,7 +564,7 @@ export default function LogsPage() {
   const groupDropdownRef = useRef<HTMLDivElement>(null);
   
   // 데이터 fetch 상태 관리
-  const dataFetchedRef = useRef({ members: false });
+  const dataFetchedRef = useRef<{ members: boolean; dailyCounts: boolean }>({ members: false, dailyCounts: false });
   
   // 컴포넌트 인스턴스별 실행 제어
   const instanceId = useRef(Math.random().toString(36).substr(2, 9));
@@ -596,8 +598,7 @@ export default function LogsPage() {
   const [showDateSelection, setShowDateSelection] = useState(false);
 
   // home/page.tsx와 동일한 바텀시트 상태 관리
-  const [bottomSheetState, setBottomSheetState] = useState<'collapsed' | 'expanded'>('expanded');
-  const bottomSheetRef = useRef<HTMLDivElement>(null);
+
   const startDragY = useRef<number | null>(null);
   const startDragX = useRef<number | null>(null);
   const dragStartTime = useRef<number | null>(null);
@@ -644,33 +645,67 @@ export default function LogsPage() {
   const [sliderValue, setSliderValue] = useState(0); // 슬라이더 초기 값 (0-100) - 시작은 0으로
   const [sortedLocationData, setSortedLocationData] = useState<MapMarker[]>([]); // 정렬된 위치 로그 데이터
   const [isSliderDragging, setIsSliderDragging] = useState(false); // 슬라이더 드래그 중인지 확인
+  
+  // 초기 진입 감지 플래그
+  const [isInitialEntry, setIsInitialEntry] = useState(true);
+  
+  // 에러 상태 관리
+  const [dataError, setDataError] = useState<{
+    type: 'network' | 'no_data' | 'unknown';
+    message: string;
+    retryable: boolean;
+  } | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
 
-  // 바텀시트 variants - home/page.tsx와 동일한 구조로 수정
-  const bottomSheetVariants = {
-    collapsed: { 
-      translateY: '60%',
-      opacity: 1,
-      transition: {
-        type: "spring",
-        stiffness: 280,
-        damping: 35,
-        mass: 0.7,
-        duration: 0.5
-      }
-    },
-    expanded: {
-      translateY: '-70px',
-      opacity: 1,
-      transition: {
-        type: "spring",
-        stiffness: 260,
-        damping: 32,
-        mass: 0.6,
-        duration: 0.5
-      }
+  // 에러 처리 헬퍼 함수
+  const handleDataError = (error: any, context: string) => {
+    console.error(`[${context}] 데이터 로딩 오류:`, error);
+    
+    let errorType: 'network' | 'no_data' | 'unknown' = 'unknown';
+    let errorMessage = '데이터를 불러오는 중 오류가 발생했습니다.';
+    let retryable = true;
+
+    if (error?.response?.status === 404) {
+      errorType = 'no_data';
+      errorMessage = '해당 날짜의 데이터가 없습니다.';
+      retryable = false;
+    } else if (error?.code === 'NETWORK_ERROR' || error?.message?.includes('network')) {
+      errorType = 'network';
+      errorMessage = '네트워크 연결을 확인해주세요.';
+      retryable = true;
+    } else if (error?.response?.status >= 500) {
+      errorType = 'network';
+      errorMessage = '서버에 일시적인 문제가 발생했습니다.';
+      retryable = true;
+    }
+
+    setDataError({
+      type: errorType,
+      message: errorMessage,
+      retryable
+    });
+  };
+
+  // 재시도 함수
+  const retryDataLoad = async () => {
+    if (retryCount >= maxRetries) {
+      console.log('[RETRY] 최대 재시도 횟수 초과');
+      return;
+    }
+
+    setRetryCount(prev => prev + 1);
+    setDataError(null);
+    
+    const selectedMember = groupMembers.find(m => m.isSelected);
+    if (selectedMember && selectedDate) {
+      console.log(`[RETRY] 데이터 재시도 (${retryCount + 1}/${maxRetries}):`, selectedMember.name, selectedDate);
+      await loadLocationData(parseInt(selectedMember.id), selectedDate);
     }
   };
+
+
 
   // 초기 데이터 로딩 시뮬레이션
   useEffect(() => {
@@ -1100,9 +1135,7 @@ export default function LogsPage() {
       deltaX: dragDeltaX,
       deltaTime,
       isTap,
-      isHorizontalSwipe: isHorizontalSwipeRef.current,
-      currentState: bottomSheetState,
-      currentTab: activeLogView
+      isHorizontalSwipe: isHorizontalSwipeRef.current
     });
 
     // 좌우 스와이프: 탭 전환 (home/page.tsx와 동일한 로직)
@@ -1129,38 +1162,7 @@ export default function LogsPage() {
       return;
     }
 
-    // 상하 드래그에 대한 바텀시트 상태 변경 (collapsed/expanded만)
-    if (isHorizontalSwipeRef.current === false || isHorizontalSwipeRef.current === null) {
-      const startTime = (e.target as any)._startedAt || performance.now() - 200;
-      const duration = performance.now() - startTime;
-      const velocityY = duration > 0 ? Math.abs(dragDeltaY) / duration : 0;
-      
-      const dragThreshold = 50;
-      const velocityThreshold = 0.3;
-      
-      let nextState: 'collapsed' | 'expanded' = bottomSheetState;
-    
-      // 위로 드래그 (Y 감소) - 확장
-      if (dragDeltaY < 0 && bottomSheetState === 'collapsed' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-        nextState = 'expanded';
-        console.log('[DragEnd] 위로 드래그 감지 (collapsed -> expanded)');
-          triggerHaptic();
-        }
-      // 아래로 드래그 (Y 증가) - 축소
-      else if (dragDeltaY > 0 && bottomSheetState === 'expanded' && (Math.abs(dragDeltaY) > dragThreshold || velocityY > velocityThreshold)) {
-        nextState = 'collapsed';
-        console.log('[DragEnd] 아래로 드래그 감지 (expanded -> collapsed)');
-          triggerHaptic();
-      }
-      
-      // 상태 업데이트
-      if (nextState !== bottomSheetState) {
-        setBottomSheetState(nextState);
-        console.log('[DragEnd] 상태 변경:', bottomSheetState, '->', nextState);
-      } else {
-        console.log('[DragEnd] 임계값 미달, 현재 상태 유지:', bottomSheetState);
-      }
-    }
+    // 바텀시트가 제거되어 상하 드래그 처리 불필요
     
     // 초기화
     isDraggingRef.current = false;
@@ -1171,13 +1173,7 @@ export default function LogsPage() {
     (e.target as any)._startedAt = 0;
   };
 
-  const toggleBottomSheet = () => {
-    setBottomSheetState(prev => {
-      const next = prev === 'collapsed' ? 'expanded' : 'collapsed';
-      console.log('[BOTTOM_SHEET] toggleBottomSheet 상태 변경:', prev, '→', next);
-      return next;
-    });
-  };
+
 
   // 멤버의 최근 활동 날짜를 찾는 함수
   const findMemberRecentActiveDate = (memberId: string): string => {
@@ -1251,6 +1247,10 @@ export default function LogsPage() {
       console.log('[handleMemberSelect] 경로 추가 제거 완료');
     }
     
+    // 위치기록 요약 즉시 초기화
+    setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+    console.log('[handleMemberSelect] 위치기록 요약 초기화 완료');
+    
     // 지도 강제 새로고침
     if (map.current) {
       map.current.refresh(true);
@@ -1272,32 +1272,16 @@ export default function LogsPage() {
     let targetDate = selectedDate;
     
     if (isChangingMember) {
-      // 사용자가 직접 날짜를 선택한 경우가 아닐 때만 최근 활동 날짜로 변경
-      if (!isUserDateSelectionRef.current) {
-        // 새로운 멤버의 최근 활동 날짜 찾기
-        const memberRecentDate = findMemberRecentActiveDate(id);
-        targetDate = memberRecentDate;
-        
-        if (selectedDate !== memberRecentDate) {
-          setSelectedDate(memberRecentDate);
-          console.log('[handleMemberSelect] 새로운 멤버 선택으로 날짜를 최근 활동 날짜로 변경:', selectedDate, '→', memberRecentDate);
-        }
-      } else {
-        // 사용자가 직접 선택한 날짜 유지
-        targetDate = selectedDate;
-        console.log('[handleMemberSelect] 사용자가 직접 선택한 날짜 유지:', selectedDate);
-        
-        // 해당 멤버에게 선택된 날짜의 데이터가 있는지 확인
-        const memberHasDataForDate = memberLogDistribution[id]?.[0] !== undefined; // 간단한 확인
-        if (!memberHasDataForDate) {
-          console.log('[handleMemberSelect] 선택된 날짜에 멤버 데이터 없음 - 최근 활동 날짜로 폴백');
-          const memberRecentDate = findMemberRecentActiveDate(id);
-          targetDate = memberRecentDate;
-          setSelectedDate(memberRecentDate);
-        }
-        
-        // 플래그 리셋 (다음 멤버 선택 시를 위해)
-        isUserDateSelectionRef.current = false;
+      // 항상 현재 선택된 날짜를 유지 (최근 활동 날짜로 변경하지 않음)
+      targetDate = selectedDate;
+      console.log('[handleMemberSelect] 멤버 변경 시 현재 선택된 날짜 유지:', selectedDate);
+      
+      // 사용자 날짜 선택 플래그가 설정되어 있다면 리셋
+      if (isUserDateSelectionRef.current) {
+        setTimeout(() => {
+          isUserDateSelectionRef.current = false;
+          console.log('[handleMemberSelect] 사용자 날짜 선택 플래그 리셋 (지연)');
+        }, 2000);
       }
     }
     
@@ -1313,8 +1297,7 @@ export default function LogsPage() {
       console.log('[handleMemberSelect] 멤버 재선택으로 자동 재생성 방지 플래그 리셋');
     }
     
-    // 현재 바텀시트 상태 유지
-    const currentBottomSheetState = bottomSheetState;
+
     
     const updatedMembers = groupMembers.map(member => {
       const isSelected = member.id === id;
@@ -1331,15 +1314,14 @@ export default function LogsPage() {
     // updateMemberMarkers는 useEffect에서 처리되도록 제거
     // setActiveLogView('members'); // 이제 summary만 사용하므로 제거
     
-    // 멤버 선택 시 날짜 스크롤 위치 조정
+    // 멤버 선택 시 날짜 스크롤 위치 조정 - 현재 선택된 날짜 유지
     if (isChangingMember) {
-      setTimeout(() => scrollToSelectedDate(targetDate, '멤버 선택'), 100);
+      setTimeout(() => scrollToSelectedDate(selectedDate, '멤버 선택 - 현재 날짜 유지'), 100);
     } else {
-      setTimeout(() => scrollToTodayDate('멤버 선택'), 100);
+      setTimeout(() => scrollToSelectedDate(selectedDate, '멤버 재선택 - 현재 날짜 유지'), 100);
     }
     
-    // 바텀시트 상태 유지
-    setBottomSheetState(currentBottomSheetState);
+
     
     // 선택 상태 변경 확인을 위한 로그
     const selectedMember = updatedMembers.find(m => m.isSelected);
@@ -1586,13 +1568,13 @@ export default function LogsPage() {
       console.log('[clearMapMarkersAndPaths] 멤버 마커는 보존함 (위치 로그 정리와 별개)');
     }
 
-    // 9. 모든 React 상태 즉시 초기화
+    // 9. 모든 React 상태 즉시 초기화 (위치기록 요약 제외 - 명시적으로만 초기화)
     setCurrentLocationLogs([]);
     setDailySummaryData([]);
     setStayTimesData([]);
     setMapMarkersData([]);
     setLocationLogSummaryData(null);
-    setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+    // setLocationSummary(DEFAULT_LOCATION_SUMMARY); // 자동 초기화 제거 - handleMemberSelect/handleDateSelect에서만 처리
     setSortedLocationData([]);
     setSliderValue(0);
     setIsSliderDragging(false);
@@ -1629,7 +1611,7 @@ export default function LogsPage() {
     isUserDateSelectionRef.current = true;
     console.log('[handleDateSelect] 사용자 직접 날짜 선택 플래그 ON');
     
-    // 현재 선택된 멤버 정보 확인
+    // 현재 선택된 멤버 정보 확인 (활동 캘린더에서 전달받은 멤버 정보 우선 사용)
     const currentSelectedMember = groupMembers.find(m => m.isSelected);
     const currentMemberId = currentSelectedMember?.id || null;
     const hasCurrentData = currentLocationLogs.length > 0 || mapMarkersData.length > 0;
@@ -1674,6 +1656,10 @@ export default function LogsPage() {
     // 날짜 변경 시에만 로딩 상태 표시
     setIsLocationDataLoading(true);
     
+    // 위치기록 요약 즉시 초기화
+    setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+    console.log('[handleDateSelect] 위치기록 요약 초기화 완료');
+    
     // 4. 날짜 상태 업데이트
     setPreviousDate(selectedDate);
     setSelectedDate(date);
@@ -1696,45 +1682,42 @@ export default function LogsPage() {
       //   updateMemberMarkers(groupMembers, true); // 날짜 변경임을 명시
       // }
       
-      // 선택된 멤버가 있으면 위치 데이터 로딩
-      const selectedMember = groupMembers.find(m => m.isSelected);
-      if (selectedMember) {
-        console.log('[LOGS] 선택된 멤버 새 데이터 로딩:', selectedMember.name, date);
-        
-        // 플래그 리셋하고 데이터 로딩
-        isDateChangingRef.current = false;
-        console.log('[handleDateSelect] 자동 재생성 방지 플래그 OFF - 새 데이터 로딩 시작');
-        
-        // 사용자 날짜 선택 플래그는 데이터 로딩 후에 리셋 (멤버 선택 시 유지되도록)
-        
-        // 실제 데이터 로딩 수행
-        const memberId = parseInt(selectedMember.id);
-        
-        // 데이터 로딩 직전에 로딩 상태 활성화
-        setIsLocationDataLoading(true);
-        
-        // loadLocationDataWithMapPreset 호출하여 지도 설정과 함께 데이터 로딩
-        loadLocationDataWithMapPreset(memberId, date, selectedMember, false).then(() => {
-          console.log('[handleDateSelect] 통합 데이터 로딩 완료');
-        }).catch((error) => {
-          console.error('[handleDateSelect] 데이터 로딩 오류:', error);
+      // 선택된 멤버가 있으면 위치 데이터 로딩 (정확한 최신 멤버 정보 재확인)
+      setTimeout(() => {
+        const currentSelectedMember = groupMembers.find(m => m.isSelected);
+        if (currentSelectedMember) {
+          console.log('[LOGS] 선택된 멤버 새 데이터 로딩:', currentSelectedMember.name, date);
+          
+          // 플래그 리셋하고 데이터 로딩
+          isDateChangingRef.current = false;
+          console.log('[handleDateSelect] 자동 재생성 방지 플래그 OFF - 새 데이터 로딩 시작');
+          
+          // 실제 데이터 로딩 수행
+          const memberId = parseInt(currentSelectedMember.id);
+          
+          // 데이터 로딩 직전에 로딩 상태 활성화
+          setIsLocationDataLoading(true);
+          
+          // loadLocationDataWithMapPreset 호출하여 지도 설정과 함께 데이터 로딩
+          loadLocationDataWithMapPreset(memberId, date, currentSelectedMember, false).then(() => {
+            console.log('[handleDateSelect] 통합 데이터 로딩 완료');
+          }).catch((error) => {
+            console.error('[handleDateSelect] 데이터 로딩 오류:', error);
+            setIsLocationDataLoading(false);
+          });
+        } else {
+          // 선택된 멤버가 없으면 로딩 해제하고 플래그 리셋
+          isDateChangingRef.current = false;
           setIsLocationDataLoading(false);
-        });
-      } else {
-        // 선택된 멤버가 없으면 로딩 해제하고 플래그 리셋
-        isDateChangingRef.current = false;
-        setIsLocationDataLoading(false);
-        console.log('[handleDateSelect] 선택된 멤버 없음 - 플래그 리셋 및 로딩 해제');
-      }
+          console.log('[handleDateSelect] 선택된 멤버 없음 - 플래그 리셋 및 로딩 해제');
+        }
+      }, 10); // 10ms 지연으로 멤버 변경 상태 반영 대기
     
-    // 날짜 선택 시 사이드바 자동 닫기
-    if (isSidebarOpen) {
-      setIsSidebarOpen(false);
-      console.log('[handleDateSelect] 날짜 선택으로 사이드바 자동 닫기');
-    }
-    // }, 100); // 초기화 완료를 위한 지연
+    // 날짜 선택 시 사이드바 즉시 닫기
+    setIsSidebarOpen(false);
+    console.log('[handleDateSelect] 날짜 선택으로 사이드바 즉시 닫기');
     
-          console.log('[LOGS] ===== 날짜 선택 완료 =====');
+    console.log('[LOGS] ===== 날짜 선택 완료 =====');
     };
 
 
@@ -1781,10 +1764,8 @@ export default function LogsPage() {
     // 먼저 모든 위치로그 데이터를 조회
     await loadLocationData(mtIdx, date);
     
-    // 데이터 로딩 완료 후 지도 초기화
-    setTimeout(() => {
-      initializeMapAfterDataLoad(member, date);
-    }, 100); // 렌더링 완료 대기
+    // 데이터 로딩 완료 후 지도 초기화는 loadLocationData 내부에서 자동으로 처리됨
+    console.log('[loadLocationDataWithMapInit] 데이터 로딩 완료 - 지도 초기화는 자동 처리');
   };
 
   // 데이터 로딩 완료 후 지도 초기화 함수 (시작위치가 있을 때만 이동)
@@ -1932,14 +1913,41 @@ export default function LogsPage() {
         setLocationSummary(calculatedSummary);
         
         // 캐시된 데이터로 지도 렌더링
-        if (map.current && cachedLocationData.mapMarkers) {
-          await renderLocationDataOnMap(
-            cachedLocationData.mapMarkers, 
-            cachedLocationData.stayTimes || [], 
-            cachedLocationData.locationLogSummary, 
-            groupMembers, 
-            map.current
-          );
+        console.log('[loadLocationData] 캐시된 데이터로 지도 렌더링 시작:', {
+          mapMarkers: cachedLocationData.mapMarkers?.length || 0,
+          stayTimes: cachedLocationData.stayTimes?.length || 0,
+          mapReady: !!map.current,
+          naverMapsReady: !!window.naver?.maps
+        });
+        
+        if (map.current && window.naver?.maps && cachedLocationData.mapMarkers) {
+          // 캐시 데이터도 지연 처리하여 상태 업데이트 완료 후 렌더링
+          setTimeout(async () => {
+            try {
+              await renderLocationDataOnMap(
+                cachedLocationData.mapMarkers, 
+                cachedLocationData.stayTimes || [], 
+                cachedLocationData.locationLogSummary, 
+                groupMembers, 
+                map.current
+              );
+              console.log('[loadLocationData] 캐시된 데이터 지도 렌더링 완료');
+              
+              // 렌더링 완료 후 지도 새로고침
+              if (map.current) {
+                map.current.refresh(true);
+                console.log('[loadLocationData] 캐시 데이터 지도 새로고침 완료');
+              }
+            } catch (renderError) {
+              console.error('[loadLocationData] 캐시 데이터 지도 렌더링 오류:', renderError);
+            }
+          }, 100); // 100ms 지연
+        } else {
+          console.warn('[loadLocationData] 캐시 데이터 지도 렌더링 건너뜀:', {
+            mapReady: !!map.current,
+            naverMapsReady: !!window.naver?.maps,
+            hasMapMarkers: !!cachedLocationData.mapMarkers
+          });
         }
         
         setIsLocationDataLoading(false);
@@ -2003,6 +2011,10 @@ export default function LogsPage() {
 
       console.log('[loadLocationData] 모든 API 응답 수신 완료');
       
+      // 성공 시 에러 상태 초기화
+      setDataError(null);
+      setRetryCount(0);
+      
       // 캐시에 저장 (멤버별로 구분하여 저장)
       if (selectedGroupId) {
         const locationDataForCache = {
@@ -2024,9 +2036,9 @@ export default function LogsPage() {
       setLocationLogSummaryData(locationLogSummary);
 
        // 요약 데이터 설정 (마커 데이터 기반 계산 결과 사용)
-       const calculatedSummary = calculateLocationStats(logs);
+       const calculatedSummary = calculateLocationStats(mapMarkers);
        console.log('[loadLocationData] 마커 데이터 기반 계산 결과:', calculatedSummary);
-       console.log('[loadLocationData] 로그 데이터 개수:', logs.length);
+       console.log('[loadLocationData] 마커 데이터 개수:', mapMarkers.length);
        
        setLocationSummary(calculatedSummary);
        console.log('[loadLocationData] locationSummary 상태 업데이트 완료:', calculatedSummary);
@@ -2044,15 +2056,43 @@ export default function LogsPage() {
 
       // 모든 데이터가 준비되면 통합 지도 렌더링 함수 호출
       console.log('[loadLocationData] 통합 지도 렌더링 함수 호출 준비');
+      console.log('[loadLocationData] 렌더링 데이터 확인:', {
+        mapMarkers: mapMarkers.length,
+        stayTimes: stayTimes.length,
+        mapReady: !!map.current,
+        naverMapsReady: !!window.naver?.maps
+      });
+      
       const currentMembers = groupMembers; // 최신 멤버 상태 전달
 
-      if (map.current) {
-           await renderLocationDataOnMap(mapMarkers, stayTimes, locationLogSummary, currentMembers, map.current);
-           console.log('[loadLocationData] 통합 지도 렌더링 함수 호출 완료');
+      if (map.current && window.naver?.maps) {
+        // 지도 렌더링을 약간 지연시켜 상태 업데이트가 완료된 후 실행
+        setTimeout(async () => {
+          try {
+            await renderLocationDataOnMap(mapMarkers, stayTimes, locationLogSummary, currentMembers, map.current);
+            console.log('[loadLocationData] 통합 지도 렌더링 함수 호출 완료');
+            
+            // 렌더링 완료 후 지도 새로고침
+            if (map.current) {
+              map.current.refresh(true);
+              console.log('[loadLocationData] 지도 새로고침 완료');
+            }
+          } catch (renderError) {
+            console.error('[loadLocationData] 지도 렌더링 오류:', renderError);
+          }
+        }, 100); // 100ms 지연
+      } else {
+        console.warn('[loadLocationData] 지도가 준비되지 않아 렌더링 건너뜀:', {
+          mapReady: !!map.current,
+          naverMapsReady: !!window.naver?.maps
+        });
       }
 
     } catch (error) {
       console.error('[loadLocationData] 위치 데이터 로딩 오류:', error);
+      
+      // 에러 처리
+      handleDataError(error, 'loadLocationData');
       
       // 오류 시 기본값으로 설정 및 지도 정리
       setCurrentLocationLogs([]);
@@ -2109,14 +2149,9 @@ export default function LogsPage() {
         console.log('[loadLocationData] 날짜 변경 플래그 리셋');
       }
       
-      // 멤버 선택이 완료된 후에만 사용자 날짜 선택 플래그 리셋
-      // (데이터 로딩이 성공한 경우에만)
-      if (isUserDateSelectionRef.current && lastLoadedMemberRef.current === mtIdx.toString()) {
-        setTimeout(() => {
-          isUserDateSelectionRef.current = false;
-          console.log('[loadLocationData] 사용자 날짜 선택 플래그 리셋 (다음 멤버 선택을 위해)');
-        }, 1000); // 1초 후 리셋하여 멤버 선택 시 날짜가 유지되도록 충분한 시간 제공
-      }
+      // 사용자 날짜 선택 플래그는 멤버 선택에서만 리셋하도록 변경
+      // (loadLocationData에서는 리셋하지 않음)
+      console.log('[loadLocationData] 사용자 날짜 선택 플래그 유지 (멤버 선택에서만 리셋)');
     }
   };
 
@@ -2264,20 +2299,31 @@ export default function LogsPage() {
     setIsSliderDragging(true);
     updateSliderValue(e);
     
+    // 기존 이벤트 리스너가 있다면 먼저 제거
+    const cleanup = () => {
+      document.removeEventListener('mousemove', handleGlobalMove);
+      document.removeEventListener('mouseup', handleGlobalEnd);
+      document.removeEventListener('touchmove', handleGlobalMove);
+      document.removeEventListener('touchend', handleGlobalEnd);
+    };
+    
     // 글로벌 이벤트 리스너 추가 (드래그가 슬라이더 영역을 벗어나도 추적)
     const handleGlobalMove = (globalE: MouseEvent | TouchEvent) => {
+      if (!isSliderDragging) {
+        cleanup();
+        return;
+      }
       updateSliderValue(globalE);
     };
     
     const handleGlobalEnd = () => {
       setIsSliderDragging(false);
-      document.removeEventListener('mousemove', handleGlobalMove);
-      document.removeEventListener('mouseup', handleGlobalEnd);
-      document.removeEventListener('touchmove', handleGlobalMove);
-      document.removeEventListener('touchend', handleGlobalEnd);
+      cleanup();
       console.log('[슬라이더] 드래그 종료');
     };
     
+    // 기존 리스너 정리 후 새로 추가
+    cleanup();
     document.addEventListener('mousemove', handleGlobalMove, { passive: false });
     document.addEventListener('mouseup', handleGlobalEnd);
     document.addEventListener('touchmove', handleGlobalMove, { passive: false });
@@ -2306,33 +2352,41 @@ export default function LogsPage() {
   };
 
   const updateSliderValue = (e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => {
-    if (!sliderRef.current) return;
+    if (!sliderRef.current || !isSliderDragging) return;
 
-    const rect = sliderRef.current.getBoundingClientRect();
-    let clientX: number;
-    
-    // 이벤트 타입에 따라 clientX 추출
-    if ('touches' in e && e.touches.length > 0) {
-      clientX = e.touches[0].clientX;
-    } else if ('changedTouches' in e && e.changedTouches.length > 0) {
-      clientX = e.changedTouches[0].clientX;
-    } else {
-      clientX = (e as MouseEvent).clientX;
-    }
-    
-    const percentage = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
-    
-    // 성능 최적화: 값이 크게 변하지 않으면 업데이트 건너뛰기
-    const currentValue = sliderValue;
-    if (Math.abs(percentage - currentValue) < 0.5) return;
-    
-    // 즉시 상태 업데이트 (배치 처리 방지)
-    setSliderValue(percentage);
-    
-    // 경로 진행률 업데이트도 즉시 실행
-    requestAnimationFrame(() => {
+    try {
+      const rect = sliderRef.current.getBoundingClientRect();
+      let clientX: number;
+      
+      // 이벤트 타입에 따라 clientX 추출
+      if ('touches' in e && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+      } else if ('changedTouches' in e && e.changedTouches.length > 0) {
+        clientX = e.changedTouches[0].clientX;
+      } else {
+        clientX = (e as MouseEvent).clientX;
+      }
+      
+      // 유효하지 않은 clientX 값 체크
+      if (isNaN(clientX) || !isFinite(clientX)) return;
+      
+      const percentage = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+      
+      // 유효하지 않은 percentage 값 체크
+      if (isNaN(percentage) || !isFinite(percentage)) return;
+      
+      // 성능 최적화: 값이 크게 변하지 않으면 업데이트 건너뛰기
+      const currentValue = sliderValue;
+      if (Math.abs(percentage - currentValue) < 0.2) return; // 더 민감하게 반응
+      
+      // 상태 업데이트 (React의 배치 처리에 맡김)
+      setSliderValue(percentage);
+      
+      // 경로 진행률 업데이트 (즉시 실행)
       updatePathProgress(percentage);
-    });
+    } catch (error) {
+      console.error('[updateSliderValue] 에러 발생:', error);
+    }
   };
 
   // 현재 위치 마커 생성/업데이트 함수
@@ -2518,14 +2572,12 @@ export default function LogsPage() {
           center: { lat: Number(lat), lng: Number(lng) }
         });
         
-        // 1. 지도 중심을 즉시 이동 (애니메이션 없이)
-        map.current.setCenter(center);
-        map.current.setZoom(16);
-        console.log('[경로따라가기] 지도 중심 즉시 이동 (애니메이션 없음)');
-        
-        // 2. 지도 중심 이동 완료 후 마커 생성/업데이트
+        // 1. 마커를 먼저 생성/업데이트 (즉시 반응)
         createOrUpdateCurrentPositionMarker(Number(lat), Number(lng), targetIndex, totalMarkers);
-        map.current.refresh(true);
+        
+        // 2. 지도 중심을 부드럽게 이동
+        map.current.setCenter(center);
+        console.log('[경로따라가기] 지도 중심 이동 완료:', { lat: Number(lat), lng: Number(lng) });
       }
     }
   };
@@ -2600,6 +2652,7 @@ export default function LogsPage() {
       console.log('[LOGS] 일별 위치 기록 카운트 조회 완료:', response);
     } catch (error) {
       console.error('[LOGS] 일별 위치 기록 카운트 조회 실패:', error);
+      handleDataError(error, 'loadDailyLocationCounts');
       setDailyCountsData(null);
     } finally {
       setIsDailyCountsLoading(false);
@@ -2619,6 +2672,7 @@ export default function LogsPage() {
       console.log('[LOGS] 멤버 활동 조회 완료:', response);
     } catch (error) {
       console.error('[LOGS] 멤버 활동 조회 실패:', error);
+      handleDataError(error, 'loadMemberActivityByDate');
       setMemberActivityData(null);
     } finally {
       setIsMemberActivityLoading(false);
@@ -2629,6 +2683,14 @@ export default function LogsPage() {
   useEffect(() => {
     console.log('[UI] locationSummary 상태 변경됨:', locationSummary);
   }, [locationSummary]);
+
+  // 에러 상태 초기화 (성공적인 데이터 로딩 시)
+  useEffect(() => {
+    if (groupMembers.length > 0 || dailyCountsData || memberActivityData) {
+      setDataError(null);
+      setRetryCount(0);
+    }
+  }, [groupMembers, dailyCountsData, memberActivityData]);
 
   // 새로운 API 데이터가 변경될 때마다 콘솔에 출력
   useEffect(() => {
@@ -2889,27 +2951,16 @@ export default function LogsPage() {
       const currentIndex = recentDays.findIndex(day => day.value === selectedDate);
       
       if (targetIndex !== -1) {
-        // 🎯 개선된 스마트 스크롤 로직: 누적 이동 거리 고려
-        const isAdjacentDate = Math.abs(targetIndex - currentIndex) <= 1;
-        const lastScrolledIndex = lastScrolledIndexRef.current;
+        // 🎯 항상 정확한 위치로 스크롤 (스크롤 생략 로직 제거)
+        console.log('[날짜 스크롤] 선택된 날짜로 스크롤 시작:', {
+          targetDate,
+          currentDate: selectedDate,
+          targetIndex,
+          currentIndex,
+          reason
+        });
         
-        // 마지막 스크롤 위치로부터의 누적 거리 계산
-        const cumulativeDistance = lastScrolledIndex !== -1 ? Math.abs(targetIndex - lastScrolledIndex) : 0;
-        const shouldForceScroll = cumulativeDistance >= 1.5; // 3칸 이상 벗어나면 강제 스크롤
-        
-        const shouldSkipScroll = isAdjacentDate && currentIndex !== -1 && !shouldForceScroll;
-        
-        if (shouldSkipScroll) {
-          console.log('[날짜 스크롤] 인접한 날짜 - 스크롤 생략:', {
-            targetDate,
-            currentDate: selectedDate,
-            targetIndex,
-            currentIndex,
-            lastScrolledIndex,
-            cumulativeDistance,
-            distance: Math.abs(targetIndex - currentIndex)
-          });
-        } else {
+        {
           // 각 버튼의 너비 + gap을 고려하여 위치 계산
           const buttonWidth = 85; // min-w-[80px] + gap
           const containerWidth = 200; // 사이드바 날짜 컨테이너 너비
@@ -2933,16 +2984,13 @@ export default function LogsPage() {
           console.log('[날짜 스크롤] 사이드바 날짜로 이동 완료:', targetDate, reason ? `(${reason})` : '', { 
             targetIndex, 
             currentIndex,
-            lastScrolledIndex,
-            cumulativeDistance,
             finalPosition,
-            distance: Math.abs(targetIndex - currentIndex),
-            shouldForceScroll
+            distance: Math.abs(targetIndex - currentIndex)
           });
         }
         
         // 선택된 날짜 버튼에 고급스러운 시각적 강조 효과 추가 (항상 실행)
-        const effectDelay = shouldSkipScroll ? 50 : 300; // 인접한 날짜는 즉시 강조
+        const effectDelay = 100; // 즉시 강조
         setTimeout(() => {
           if (dateScrollContainerRef.current) {
             const buttons = dateScrollContainerRef.current.querySelectorAll('button');
@@ -3101,74 +3149,82 @@ export default function LogsPage() {
           } else {
             // 캐시에 없거나 만료된 경우 API 호출
             console.log('[LOGS] 캐시 미스 - API에서 그룹 멤버 데이터 조회');
-            const memberData = await memberService.getGroupMembers(groupIdToUse);
             
-                         if (isMounted && memberData && memberData.length > 0) { 
-               // 캐시에 저장 (타입 변환)
-               const cacheMembers = memberData.map((member: any) => ({
-                 ...member,
-                 sgdt_owner_chk: member.sgdt_owner_chk || '',
-                 sgdt_leader_chk: member.sgdt_leader_chk || ''
-               }));
-               setCachedGroupMembers(selectedGroupId, cacheMembers);
-              
-              currentMembers = memberData.map((member: any, index: number) => {
-                // 위치 데이터 우선순위: mlt_lat/mlt_long (최신 GPS) > mt_lat/mt_long (기본 위치)
-                const lat = member.mlt_lat !== null && member.mlt_lat !== undefined && member.mlt_lat !== 0
-                  ? parseFloat(member.mlt_lat.toString())
-                  : parseFloat(member.mt_lat || '37.5665'); // 서울시청 기본 좌표
-                const lng = member.mlt_long !== null && member.mlt_long !== undefined && member.mlt_long !== 0
-                  ? parseFloat(member.mlt_long.toString())
-                  : parseFloat(member.mt_long || '126.9780');
+            try {
+              const memberData = await memberService.getGroupMembers(groupIdToUse);
+            
+              if (isMounted && memberData && memberData.length > 0) { 
+                // 캐시에 저장 (타입 변환)
+                const cacheMembers = memberData.map((member: any) => ({
+                  ...member,
+                  sgdt_owner_chk: member.sgdt_owner_chk || '',
+                  sgdt_leader_chk: member.sgdt_leader_chk || ''
+                }));
+                setCachedGroupMembers(selectedGroupId, cacheMembers);
                 
-                console.log(`[LOGS] 멤버 ${member.mt_name} 위치 설정:`, {
-                  mlt_lat: member.mlt_lat,
-                  mlt_long: member.mlt_long,
-                  mt_lat: member.mt_lat,
-                  mt_long: member.mt_long,
-                  final_lat: lat,
-                  final_lng: lng
+                currentMembers = memberData.map((member: any, index: number) => {
+                  // 위치 데이터 우선순위: mlt_lat/mlt_long (최신 GPS) > mt_lat/mt_long (기본 위치)
+                  const lat = member.mlt_lat !== null && member.mlt_lat !== undefined && member.mlt_lat !== 0
+                    ? parseFloat(member.mlt_lat.toString())
+                    : parseFloat(member.mt_lat || '37.5665'); // 서울시청 기본 좌표
+                  const lng = member.mlt_long !== null && member.mlt_long !== undefined && member.mlt_long !== 0
+                    ? parseFloat(member.mlt_long.toString())
+                    : parseFloat(member.mt_long || '126.9780');
+                  
+                  console.log(`[LOGS] 멤버 ${member.mt_name} 위치 설정:`, {
+                    mlt_lat: member.mlt_lat,
+                    mlt_long: member.mlt_long,
+                    mt_lat: member.mt_lat,
+                    mt_long: member.mt_long,
+                    final_lat: lat,
+                    final_lng: lng
+                  });
+                  
+                  return {
+                    id: member.mt_idx.toString(),
+                    name: member.mt_name || `멤버 ${index + 1}`,
+                    photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
+                    isSelected: index === 0, // 첫 번째 멤버만 자동 선택
+                    location: { lat, lng },
+                    schedules: [], 
+                    mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
+                    original_index: index,
+                    mt_weather_sky: member.mt_weather_sky,
+                    mt_weather_tmx: member.mt_weather_tmx,
+                    mt_weather_tmn: member.mt_weather_tmn,
+                    mt_weather_date: member.mt_weather_date,
+                    mlt_lat: member.mlt_lat,
+                    mlt_long: member.mlt_long,
+                    mlt_speed: member.mlt_speed,
+                    mlt_battery: member.mlt_battery,
+                    mlt_gps_time: member.mlt_gps_time,
+                    sgdt_owner_chk: member.sgdt_owner_chk,
+                    sgdt_leader_chk: member.sgdt_leader_chk,
+                    sgdt_idx: member.sgdt_idx
+                  };
                 });
                 
-                return {
-                  id: member.mt_idx.toString(),
-                  name: member.mt_name || `멤버 ${index + 1}`,
-                  photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
-                  isSelected: index === 0, // 첫 번째 멤버만 자동 선택
-                  location: { lat, lng },
-                schedules: [], 
-                mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
-                original_index: index,
-                mt_weather_sky: member.mt_weather_sky,
-                mt_weather_tmx: member.mt_weather_tmx,
-                mt_weather_tmn: member.mt_weather_tmn,
-                mt_weather_date: member.mt_weather_date,
-                mlt_lat: member.mlt_lat,
-                mlt_long: member.mlt_long,
-                mlt_speed: member.mlt_speed,
-                mlt_battery: member.mlt_battery,
-                mlt_gps_time: member.mlt_gps_time,
-                sgdt_owner_chk: member.sgdt_owner_chk,
-                sgdt_leader_chk: member.sgdt_leader_chk,
-                sgdt_idx: member.sgdt_idx
-              };
-              });
-              
-              console.log('[🔥 LOGS] setGroupMembers 호출:', {
-                currentMembersLength: currentMembers.length,
-                firstMember: currentMembers[0],
-                hasValidLocation: currentMembers[0]?.location?.lat && currentMembers[0]?.location?.lng
-              });
-              setGroupMembers(currentMembers);
+                console.log('[🔥 LOGS] setGroupMembers 호출:', {
+                  currentMembersLength: currentMembers.length,
+                  firstMember: currentMembers[0],
+                  hasValidLocation: currentMembers[0]?.location?.lat && currentMembers[0]?.location?.lng
+                });
+                setGroupMembers(currentMembers);
 
-              // 첫 번째 멤버의 데이터 기반 통합 지도 설정 - 자동 날짜 선택 후 처리됨
-              if (currentMembers.length > 0 && map.current) {
-                const firstMember = currentMembers[0];
-                console.log('[LOGS] 첫 번째 멤버로 통합 지도 설정 시작:', firstMember.name);
-                // 자동 날짜 선택 로직이 데이터가 있는 날짜를 찾아서 위치 데이터를 로딩할 예정
+                // 첫 번째 멤버의 데이터 기반 통합 지도 설정 - 자동 날짜 선택 후 처리됨
+                if (currentMembers.length > 0 && map.current) {
+                  const firstMember = currentMembers[0];
+                  console.log('[LOGS] 첫 번째 멤버로 통합 지도 설정 시작:', firstMember.name);
+                  // 자동 날짜 선택 로직이 데이터가 있는 날짜를 찾아서 위치 데이터를 로딩할 예정
+                }
+              } else {
+                console.warn('❌ No member data from API, or API call failed.');
+                setGroupMembers([]);
+                handleDataError(new Error('그룹 멤버 데이터가 없습니다.'), 'fetchAllGroupData');
               }
-            } else {
-              console.warn('❌ No member data from API, or API call failed.');
+            } catch (memberError) {
+              console.error('[LOGS] 그룹 멤버 조회 API 오류:', memberError);
+              handleDataError(memberError, 'fetchAllGroupData');
               setGroupMembers([]);
             } 
             dataFetchedRef.current.members = true;
@@ -3180,16 +3236,22 @@ export default function LogsPage() {
             if (isMounted) {
               const promises = [];
               
-              // 1. 최근 14일간 일별 카운트 조회 (캐시 우선)
-              const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
-              const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
-              
-              if (cachedCounts && isCountsCacheValid) {
-                console.log('[LOGS] 캐시에서 일별 카운트 데이터 사용');
-                setDailyCountsData(cachedCounts);
+              // 1. 최근 14일간 일별 카운트 조회 (캐시 우선, 한 번만 실행)
+              if (!dailyCountsData || !dataFetchedRef.current.dailyCounts) {
+                const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
+                const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
+                
+                if (cachedCounts && isCountsCacheValid) {
+                  console.log('[LOGS] 캐시에서 일별 카운트 데이터 사용');
+                  setDailyCountsData(cachedCounts);
+                  dataFetchedRef.current.dailyCounts = true;
+                } else {
+                  console.log('[LOGS] 캐시 미스 - API에서 일별 카운트 데이터 조회 (한 번만)');
+                  promises.push(loadDailyLocationCounts(selectedGroupId, 14));
+                  dataFetchedRef.current.dailyCounts = true;
+                }
               } else {
-                console.log('[LOGS] 캐시 미스 - API에서 일별 카운트 데이터 조회');
-                promises.push(loadDailyLocationCounts(selectedGroupId, 14));
+                console.log('[LOGS] 일별 카운트 데이터 이미 로드됨 - 건너뛰기');
               }
               
               // 2. 현재 선택된 날짜의 멤버 활동 조회
@@ -3199,7 +3261,12 @@ export default function LogsPage() {
               
               // 병렬 실행
               if (promises.length > 0) {
-                await Promise.all(promises);
+                try {
+                  await Promise.all(promises);
+                } catch (promiseError) {
+                  console.error('[LOGS] 병렬 API 호출 중 일부 실패:', promiseError);
+                  // 일부 실패해도 계속 진행
+                }
               }
             }
             
@@ -3212,6 +3279,8 @@ export default function LogsPage() {
 
       } catch (error) {
         console.error('[LOGS PAGE] 그룹 데이터(멤버 또는 스케줄) 조회 오류:', error);
+        handleDataError(error, 'fetchAllGroupData');
+        
         if (isMounted && !dataFetchedRef.current.members) {
           dataFetchedRef.current.members = true;
         }
@@ -3256,7 +3325,7 @@ export default function LogsPage() {
     // 기존 데이터 초기화
     setGroupMembers([]);
     setFirstMemberSelected(false);
-    dataFetchedRef.current = { members: false };
+            dataFetchedRef.current = { members: false, dailyCounts: false };
     fetchDataExecutingRef.current = false;
     hasExecuted.current = false; // 실행 플래그도 리셋
     loadLocationDataExecutingRef.current.executing = false; // loadLocationData 실행 플래그도 리셋
@@ -3351,15 +3420,81 @@ export default function LogsPage() {
     }
   };
 
+  // 선택된 멤버로 스크롤하는 함수
+  const scrollToSelectedMember = (reason?: string) => {
+    const selectedMember = groupMembers.find(m => m.isSelected);
+    if (selectedMember && sidebarRef.current) {
+      const memberElement = sidebarRef.current.querySelector(`#member-${selectedMember.id}`);
+      if (memberElement) {
+        memberElement.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center',
+          inline: 'nearest'
+        });
+        console.log(`[scrollToSelectedMember] 선택된 멤버(${selectedMember.name})로 스크롤 - ${reason || '일반'}`);
+      } else {
+        console.log(`[scrollToSelectedMember] 멤버 요소를 찾을 수 없음: member-${selectedMember.id}`);
+      }
+    } else {
+      console.log('[scrollToSelectedMember] 선택된 멤버가 없거나 사이드바 ref가 없음');
+    }
+  };
+
+  // 사이드바 날짜를 선택된 날짜로 스크롤하는 함수
+  const scrollSidebarDateToSelected = (targetDate?: string) => {
+    const dateToScroll = targetDate || selectedDate;
+    if (sidebarDateX && dateToScroll) {
+      const recentDays = getRecentDays();
+      const targetIndex = recentDays.findIndex(day => day.value === dateToScroll);
+      
+      if (targetIndex !== -1) {
+        const itemWidth = 85; // 각 버튼 width (min-w-[75px] + gap)
+        const containerWidth = 200; // 컨테이너 width
+        const totalWidth = recentDays.length * itemWidth;
+        const maxScroll = Math.max(0, totalWidth - containerWidth);
+        
+        // 선택된 날짜가 중앙에 오도록 스크롤 위치 계산
+        const targetScroll = Math.min(maxScroll, Math.max(0, (targetIndex * itemWidth) - (containerWidth / 2) + (itemWidth / 2)));
+        
+        sidebarDateX.set(-targetScroll);
+        lastScrolledIndexRef.current = targetIndex;
+        
+        console.log(`[사이드바 날짜] 선택된 날짜(${dateToScroll})로 스크롤 완료`, { 
+          targetIndex, 
+          targetScroll, 
+          totalWidth, 
+          containerWidth, 
+          maxScroll 
+        });
+      } else {
+        // 선택된 날짜가 범위에 없으면 오늘 날짜로 폴백
+        scrollSidebarDateToToday();
+        console.log(`[사이드바 날짜] 선택된 날짜(${dateToScroll})가 범위에 없어 오늘 날짜로 폴백`);
+      }
+    }
+  };
+
   // 사이드바 토글 함수
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
     
-    // 사이드바가 열릴 때 날짜 스크롤을 오늘 날짜로 이동
+    // 사이드바가 열릴 때 선택된 멤버로 스크롤하고 선택된 날짜로 스크롤 조정
     if (!isSidebarOpen) {
       setTimeout(() => {
-        scrollSidebarDateToToday();
-        scrollToTodayDate('사이드바 열림');
+        // 사이드바 날짜 스크롤을 선택된 날짜로 조정
+        scrollSidebarDateToSelected();
+        
+        // 메인 날짜 선택기도 선택된 날짜로 스크롤
+        if (selectedDate) {
+          scrollToSelectedDate(selectedDate, '사이드바 열림');
+        } else {
+          scrollToTodayDate('사이드바 열림');
+        }
+        
+        // 선택된 멤버로 스크롤 (날짜 스크롤 후에 실행)
+        setTimeout(() => {
+          scrollToSelectedMember('사이드바 열림');
+        }, 200);
       }, 100); // 사이드바 애니메이션 시작 후 바로 실행
     }
   };
@@ -3404,62 +3539,108 @@ export default function LogsPage() {
   //   }
   // }, [groupMembers.map(m => m.isSelected).join(',')]);
 
-  // dailyCountsData가 로드된 후 데이터가 있는 가장 최근 날짜를 자동 선택
+  // dailyCountsData가 로드된 후 초기 진입 시에만 최근 활동 날짜로 자동 선택
   useEffect(() => {
-    if (dailyCountsData && groupMembers.length > 0) {
+    if (dailyCountsData && groupMembers.length > 0 && isInitialEntry) {
       const selectedMember = groupMembers.find(m => m.isSelected);
       if (selectedMember) {
-        const recentDays = Array.from({ length: 15 }, (_, i) => {
-          const date = subDays(new Date(), 14 - i);
-          return format(date, 'yyyy-MM-dd');
-        });
+        console.log(`[LOGS] 초기 진입 - dailyCountsData 로드 완료: ${selectedMember.name}`);
         
-        // 최근 날짜부터 역순으로 확인하여 데이터가 있는 날짜 찾기
-        for (let i = recentDays.length - 1; i >= 0; i--) {
-          const dateString = recentDays[i];
-          const memberMtIdx = parseInt(selectedMember.id);
-          const memberData = dailyCountsData.member_daily_counts.find(
-            member => member.member_id === memberMtIdx
-          );
+        // 초기 진입 시에만 최근 활동 날짜로 자동 변경
+        const memberMtIdx = parseInt(selectedMember.id);
+        const memberData = dailyCountsData.member_daily_counts.find(
+          member => member.member_id === memberMtIdx
+        );
+        
+        if (memberData) {
+          // 최근 15일 동안 활동이 있는 가장 최근 날짜 찾기
+          const recentDays = Array.from({ length: 15 }, (_, i) => {
+            const date = subDays(new Date(), 14 - i);
+            return format(date, 'yyyy-MM-dd');
+          });
           
-          if (memberData) {
+          let foundRecentDate = null;
+          for (let i = recentDays.length - 1; i >= 0; i--) {
+            const dateString = recentDays[i];
             const shortDateString = format(new Date(dateString), 'MM.dd');
             const dayData = memberData.daily_counts.find(
-              day => day.formatted_date === shortDateString || day.formatted_date === dateString
+              day => day.formatted_date === shortDateString
             );
             
             if (dayData && dayData.count > 0) {
-              console.log(`[LOGS] ✅ 데이터가 있는 날짜 자동 선택: ${dateString} (${dayData.count}건)`);
-              console.log(`[LOGS] 🔄 selectedDate 상태 변경: ${selectedDate} → ${dateString}`);
-              setSelectedDate(dateString);
-              
-              // 즉시 위치 데이터 로딩 트리거 (단일 호출)
-              setTimeout(async () => {
-                const mtIdx = parseInt(selectedMember.id);
-                console.log(`[LOGS] 🚀 자동 선택된 날짜의 위치 데이터 즉시 로딩 시작`);
-                console.log(`[LOGS] 📋 로딩 파라미터: 멤버=${selectedMember.name}(${mtIdx}), 날짜=${dateString}`);
-                
-                // 실행 상태 완전 리셋
-                loadLocationDataExecutingRef.current.executing = false;
-                loadLocationDataExecutingRef.current.cancelled = false;
-                loadLocationDataExecutingRef.current.currentRequest = undefined;
-                
-                // API 호출 전 상태 확인
-                console.log(`[LOGS] 🔍 API 호출 직전 상태 확인:`);
-                console.log(`[LOGS] - selectedMember: ${selectedMember.name} (ID: ${mtIdx})`);
-                console.log(`[LOGS] - selectedDate: ${selectedDate} → ${dateString}`);
-                console.log(`[LOGS] - selectedGroupId: ${selectedGroupId}`);
-                
-                await loadLocationData(mtIdx, dateString);
-              }, 300);
-              
+              foundRecentDate = dateString;
+              console.log(`[LOGS] 초기 진입 - 최근 활동 날짜 발견: ${dateString} (${dayData.count}건)`);
               break;
             }
+          }
+          
+          if (foundRecentDate && foundRecentDate !== selectedDate) {
+            console.log(`[LOGS] 초기 진입 - 날짜 자동 변경: ${selectedDate} → ${foundRecentDate}`);
+            setSelectedDate(foundRecentDate);
+          } else {
+            console.log(`[LOGS] 초기 진입 - 현재 날짜(${selectedDate}) 유지`);
+          }
+        }
+        
+        // 초기 진입 플래그 해제
+        setIsInitialEntry(false);
+      }
+    } else if (dailyCountsData && groupMembers.length > 0 && !isInitialEntry) {
+      // 초기 진입 이후에는 자동 날짜 변경 없이 현재 날짜 데이터만 확인
+      const selectedMember = groupMembers.find(m => m.isSelected);
+      if (selectedMember) {
+        console.log(`[LOGS] 일반 사용 - 현재 날짜(${selectedDate}) 데이터 확인`);
+        
+        const memberMtIdx = parseInt(selectedMember.id);
+        const memberData = dailyCountsData.member_daily_counts.find(
+          member => member.member_id === memberMtIdx
+        );
+        
+        if (memberData) {
+          const shortDateString = format(new Date(selectedDate), 'MM.dd');
+          const dayData = memberData.daily_counts.find(
+            day => day.formatted_date === shortDateString
+          );
+          
+          if (dayData && dayData.count > 0) {
+            console.log(`[LOGS] ✅ 현재 선택된 날짜(${selectedDate})에 데이터 있음: ${dayData.count}건`);
+          } else {
+            console.log(`[LOGS] ⚠️ 현재 선택된 날짜(${selectedDate})에 데이터 없음`);
           }
         }
       }
     }
-  }, [dailyCountsData, groupMembers]);
+  }, [dailyCountsData, groupMembers, isInitialEntry, selectedDate]);
+
+  // 날짜나 멤버 변경 시 위치기록 요약 초기화 - 완전히 비활성화 (handleMemberSelect/handleDateSelect에서 직접 처리)
+  useEffect(() => {
+    const selectedMember = groupMembers.find(m => m.isSelected);
+    console.log('[useEffect] 날짜/멤버 변경 감지:', {
+      selectedDate,
+      selectedMember: selectedMember?.name,
+      currentSummary: locationSummary,
+      isLocationDataLoading
+    });
+    
+    // 자동 초기화 비활성화 - handleMemberSelect와 handleDateSelect에서 명시적으로 처리
+    // if (isLocationDataLoading && 
+    //     (locationSummary.distance !== '0 km' || locationSummary.time !== '0분' || locationSummary.steps !== '0 걸음')) {
+    //   setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+    //   console.log('[useEffect] 위치기록 요약 초기화 완료 (새 데이터 로딩 시작)');
+    // }
+  }, [selectedDate, groupMembers.find(m => m.isSelected)?.id, isLocationDataLoading]);
+
+  // 컴포넌트 언마운트 시 이벤트 리스너 정리
+  useEffect(() => {
+    return () => {
+      // 모든 글로벌 이벤트 리스너 정리
+      const events = ['mousemove', 'mouseup', 'touchmove', 'touchend'];
+      events.forEach(event => {
+        document.removeEventListener(event, () => {});
+      });
+      console.log('[useEffect] 컴포넌트 언마운트 - 이벤트 리스너 정리');
+    };
+  }, []);
 
     // selectedDate가 변경될 때 위치 데이터 자동 로드 (자동 선택 후 보조 로직) - 비활성화
   // useEffect(() => {
@@ -3472,20 +3653,45 @@ export default function LogsPage() {
   // --- 새로운 통합 지도 렌더링 함수 ---
   const renderLocationDataOnMap = async (locationMarkersData: MapMarker[], stayTimesData: StayTime[], locationLogSummaryData: LocationLogSummary | null, groupMembers: GroupMember[], mapInstance: any) => {
     if (!mapInstance || !window.naver?.maps) {
-      console.log('[renderLocationDataOnMap] 지도가 준비되지 않음');
+      console.log('[renderLocationDataOnMap] 지도가 준비되지 않음:', {
+        mapInstance: !!mapInstance,
+        naverMaps: !!window.naver?.maps
+      });
       return;
     }
 
     console.log('[renderLocationDataOnMap] 통합 지도 렌더링 시작');
+    console.log('[renderLocationDataOnMap] 입력 데이터 확인:', {
+      locationMarkersData: locationMarkersData?.length || 0,
+      stayTimesData: stayTimesData?.length || 0,
+      locationLogSummaryData: !!locationLogSummaryData,
+      groupMembers: groupMembers?.length || 0
+    });
 
     // 1. 지도 완전히 정리 (멤버 마커 포함)
     clearMapMarkersAndPaths(true);
 
-    // 2. 먼저 지도 중심 위치 계산 및 설정 (마커 생성 전에)
-    console.log('[renderLocationDataOnMap] 지도 중심 위치 사전 계산 시작');
+    // 2. 지도 중심 위치를 시작위치로 설정 (마커 생성 전에)
+    console.log('[renderLocationDataOnMap] 지도 중심 위치 계산 시작');
     let mapCenter = null;
-    // 지도 중심점은 presetMapCenterForMember에서 미리 설정되었으므로 건너뛰기
-    console.log('[renderLocationDataOnMap] 지도 중심점은 presetMapCenterForMember에서 미리 설정됨 - 건너뛰기');
+    
+    // 위치 데이터가 있으면 시작위치로 지도 중심 설정
+    if (locationMarkersData.length > 0) {
+      const firstMarker = locationMarkersData[0];
+      const startLat = firstMarker.latitude || firstMarker.mlt_lat;
+      const startLng = firstMarker.longitude || firstMarker.mlt_long;
+      
+      if (startLat && startLng) {
+        mapCenter = new window.naver.maps.LatLng(Number(startLat), Number(startLng));
+        mapInstance.setCenter(mapCenter);
+        mapInstance.setZoom(16);
+        console.log('[renderLocationDataOnMap] 지도 중심을 시작위치로 설정:', {
+          lat: startLat, lng: startLng
+        });
+      }
+    } else {
+      console.log('[renderLocationDataOnMap] 위치 데이터 없음 - 지도 중심 유지');
+    }
 
     // 2. 멤버 마커는 더 이상 사용하지 않음
     memberNaverMarkers.current = []; // 멤버 마커 초기화
@@ -3614,40 +3820,90 @@ export default function LogsPage() {
     // 6. 위치 로그 마커들 생성
     console.log('[renderLocationDataOnMap] 위치 로그 마커 생성 시작:', sortedLocationMarkers.length, '개');
     locationLogMarkers.current = []; // 기존 위치 로그 마커 초기화
+    
+    if (sortedLocationMarkers.length === 0) {
+      console.warn('[renderLocationDataOnMap] 위치 로그 마커 데이터가 없음');
+    }
+    
     sortedLocationMarkers.forEach((markerData, index) => {
-        const lat = markerData.latitude || markerData.mlt_lat || 0; const lng = markerData.longitude || markerData.mlt_long || 0;
-        const speedMs = markerData.speed || markerData.mlt_speed || 0; const speed = speedMs * 3.6;
-        const accuracy = markerData.accuracy || markerData.mlt_accuacy || 0; const battery = markerData.battery_level || markerData.mlt_battery || 0;
-        const timestamp = markerData.timestamp || markerData.mlt_gps_time || '정보 없음';
-        const timeOnly = timestamp === '정보 없음' ? '정보 없음' : timestamp.includes('T') ? timestamp.split('T')[1]?.substring(0, 8) || timestamp : timestamp.includes(' ') ? timestamp.split(' ')[1] || timestamp : timestamp;
-        const position = new window.naver.maps.LatLng(Number(lat), Number(lng));
-        let markerColor = '#3b82f6'; // 기본 파란색
-        if (speed > 5) markerColor = '#ef4444'; else if (speed > 2) markerColor = '#f59e0b'; else if (speed > 0.5) markerColor = '#10b981';
+        try {
+          const lat = markerData.latitude || markerData.mlt_lat || 0; 
+          const lng = markerData.longitude || markerData.mlt_long || 0;
+          
+          // 유효한 좌표인지 확인
+          if (!lat || !lng || lat === 0 || lng === 0) {
+            console.warn(`[renderLocationDataOnMap] 마커 ${index}: 유효하지 않은 좌표 (${lat}, ${lng})`);
+            return;
+          }
+          
+          const speedMs = markerData.speed || markerData.mlt_speed || 0; 
+          const speed = speedMs * 3.6;
+          const accuracy = markerData.accuracy || markerData.mlt_accuacy || 0; 
+          const battery = markerData.battery_level || markerData.mlt_battery || 0;
+          const timestamp = markerData.timestamp || markerData.mlt_gps_time || '정보 없음';
+          const timeOnly = timestamp === '정보 없음' ? '정보 없음' : timestamp.includes('T') ? timestamp.split('T')[1]?.substring(0, 8) || timestamp : timestamp.includes(' ') ? timestamp.split(' ')[1] || timestamp : timestamp;
+          
+          const position = new window.naver.maps.LatLng(Number(lat), Number(lng));
+          let markerColor = '#3b82f6'; // 기본 파란색
+          if (speed > 5) markerColor = '#ef4444'; else if (speed > 2) markerColor = '#f59e0b'; else if (speed > 0.5) markerColor = '#10b981';
+          
+          if (index < 5) { // 처음 5개 마커만 상세 로깅
+            console.log(`[renderLocationDataOnMap] 마커 ${index} 생성:`, {
+              lat, lng, speed: speed.toFixed(1), timestamp: timeOnly
+            });
+          }
 
-        // 속도에 따른 이동 수단 아이콘 결정
-        const getTransportIcon = (speed: number) => {
-          if (speed >= 30) return '🚗'; // 30km/h 이상: 자동차
-          else if (speed >= 15) return '🏃'; // 15-30km/h: 달리기/자전거
-          else if (speed >= 3) return '🚶'; // 3-15km/h: 걷기
-          else if (speed >= 1) return '🧍'; // 1-3km/h: 천천히 걷기
-          else return '⏸️'; // 1km/h 미만: 정지
-        };
-        
-        const getTransportText = (speed: number) => {
-          if (speed >= 30) return '차량 이동';
-          else if (speed >= 15) return '빠른 이동';
-          else if (speed >= 3) return '걷기';
-          else if (speed >= 1) return '천천히 이동';
-          else return '정지 상태';
-        };
-        
-        const transportIcon = getTransportIcon(speed);
-        const transportText = getTransportText(speed);
-        
-        const marker = new window.naver.maps.Marker({ position: position, map: mapInstance, icon: { content: `<div style="width: 8px; height: 8px; background: ${markerColor}; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); cursor: pointer;"></div>`, anchor: new window.naver.maps.Point(6, 6) }, zIndex: 100 + index });
-        const infoWindow = new window.naver.maps.InfoWindow({ content: `<div style="padding: 8px; background: white; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 140px; max-width: 160px;"><div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 4px 6px; border-radius: 4px; margin: -8px -8px 6px -8px; font-weight: 600; font-size: 11px; text-align: center;">${index + 1} / ${sortedLocationMarkers.length}</div><div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;"><div style="display: flex; justify-content: space-between; align-items: center; background: rgba(59, 130, 246, 0.1); padding: 2px 4px; border-radius: 4px; margin: 2px 0;"><span style="color: #666;">이동 수단:</span><span style="font-weight: 600; font-size: 11px; display: flex; align-items: center; gap: 2px;">${transportIcon} <span style="font-size: 9px; color: #3b82f6;">${transportText}</span></span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">⏰ 시간:</span><span style="font-weight: 600; font-size: 10px;">${timeOnly}</span></div><div style="display: flex; justify-content: space-between; align-items: center;"><span style="color: #666;">🚀 속도:</span><span style="font-weight: 600; font-size: 10px;">${speed.toFixed(1)}km/h</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">📍 정확도:</span><span style="font-weight: 600; font-size: 10px;">${accuracy.toFixed(0)}m</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">🔋 배터리:</span><span style="font-weight: 600; font-size: 10px;">${battery}%</span></div></div></div>`, backgroundColor: 'transparent', borderColor: 'transparent', borderWidth: 0, anchorSize: new window.naver.maps.Size(0, 0), pixelOffset: new window.naver.maps.Point(0, -10) });
-        window.naver.maps.Event.addListener(marker, 'click', () => { if (infoWindow.getMap()) { infoWindow.close(); } else { infoWindow.open(mapInstance, marker); } });
-        locationLogMarkers.current.push(marker);
+          // 속도에 따른 이동 수단 아이콘 결정
+          const getTransportIcon = (speed: number) => {
+            if (speed >= 30) return '🚗'; // 30km/h 이상: 자동차
+            else if (speed >= 15) return '🏃'; // 15-30km/h: 달리기/자전거
+            else if (speed >= 3) return '🚶'; // 3-15km/h: 걷기
+            else if (speed >= 1) return '🧍'; // 1-3km/h: 천천히 걷기
+            else return '⏸️'; // 1km/h 미만: 정지
+          };
+          
+          const getTransportText = (speed: number) => {
+            if (speed >= 30) return '차량 이동';
+            else if (speed >= 15) return '빠른 이동';
+            else if (speed >= 3) return '걷기';
+            else if (speed >= 1) return '천천히 이동';
+            else return '정지 상태';
+          };
+          
+          const transportIcon = getTransportIcon(speed);
+          const transportText = getTransportText(speed);
+          
+          const marker = new window.naver.maps.Marker({ 
+            position: position, 
+            map: mapInstance, 
+            icon: { 
+              content: `<div style="width: 8px; height: 8px; background: ${markerColor}; border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); cursor: pointer;"></div>`, 
+              anchor: new window.naver.maps.Point(6, 6) 
+            }, 
+            zIndex: 100 + index 
+          });
+          
+          const infoWindow = new window.naver.maps.InfoWindow({ 
+            content: `<div style="padding: 8px; background: white; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-width: 140px; max-width: 160px;"><div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 4px 6px; border-radius: 4px; margin: -8px -8px 6px -8px; font-weight: 600; font-size: 11px; text-align: center;">${index + 1} / ${sortedLocationMarkers.length}</div><div style="display: flex; flex-direction: column; gap: 3px; font-size: 11px;"><div style="display: flex; justify-content: space-between; align-items: center; background: rgba(59, 130, 246, 0.1); padding: 2px 4px; border-radius: 4px; margin: 2px 0;"><span style="color: #666;">이동 수단:</span><span style="font-weight: 600; font-size: 11px; display: flex; align-items: center; gap: 2px;">${transportIcon} <span style="font-size: 9px; color: #3b82f6;">${transportText}</span></span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">⏰ 시간:</span><span style="font-weight: 600; font-size: 10px;">${timeOnly}</span></div><div style="display: flex; justify-content: space-between; align-items: center;"><span style="color: #666;">🚀 속도:</span><span style="font-weight: 600; font-size: 10px;">${speed.toFixed(1)}km/h</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">📍 정확도:</span><span style="font-weight: 600; font-size: 10px;">${accuracy.toFixed(0)}m</span></div><div style="display: flex; justify-content: space-between;"><span style="color: #666;">🔋 배터리:</span><span style="font-weight: 600; font-size: 10px;">${battery}%</span></div></div></div>`, 
+            backgroundColor: 'transparent', 
+            borderColor: 'transparent', 
+            borderWidth: 0, 
+            anchorSize: new window.naver.maps.Size(0, 0), 
+            pixelOffset: new window.naver.maps.Point(0, -10) 
+          });
+          
+          window.naver.maps.Event.addListener(marker, 'click', () => { 
+            if (infoWindow.getMap()) { 
+              infoWindow.close(); 
+            } else { 
+              infoWindow.open(mapInstance, marker); 
+            } 
+          });
+          
+          locationLogMarkers.current.push(marker);
+        } catch (markerError) {
+          console.error(`[renderLocationDataOnMap] 마커 ${index} 생성 오류:`, markerError);
+        }
     });
     console.log('[renderLocationDataOnMap] 위치 로그 마커 생성 완료:', locationLogMarkers.current.length, '개');
 
@@ -3738,8 +3994,19 @@ export default function LogsPage() {
     }
      console.log('[renderLocationDataOnMap] 무지개 그라데이션 경로 연결선 및 화살표 생성 완료');
 
-    // 8. 지도 렌더링 완료 - 중심 이동은 이미 완료됨
-    console.log('[renderLocationDataOnMap] 지도 렌더링 완료 - 중심 이동은 사전에 완료됨');
+    // 8. 지도 렌더링 완료 후 시작위치로 중심 재설정
+    console.log('[renderLocationDataOnMap] 지도 렌더링 완료 - 시작위치로 중심 재설정');
+    
+    // 시작위치로 지도 중심 재설정 (마커 생성 후 확실히 적용)
+    if (locationMarkersData.length > 0 && mapCenter) {
+      setTimeout(() => {
+        if (mapInstance && mapCenter) {
+          mapInstance.setCenter(mapCenter);
+          mapInstance.setZoom(16);
+          console.log('[renderLocationDataOnMap] 시작위치로 지도 중심 재설정 완료');
+        }
+      }, 100);
+    }
 
     // 9. 지도 새로고침 (지연 후 실행)
     setTimeout(() => {
@@ -3821,7 +4088,7 @@ export default function LogsPage() {
         >
           <div ref={mapContainer} className="w-full h-full" />
           
-          {/* 플로팅 날짜/멤버 정보 버튼 */}
+          {/* 플로팅 통합 정보 카드 - jin의 기록 + 위치기록 요약 한 줄 */}
           <AnimatePresence>
             {groupMembers.some(m => m.isSelected) && selectedDate && (
               <motion.div
@@ -3834,70 +4101,94 @@ export default function LogsPage() {
                   damping: 25,
                   duration: 0.6 
                 }}
-                                 className="absolute top-20 left-1/2 transform -translate-x-1/2 z-20"
+                className="absolute top-20 left-0 right-0 z-20 flex justify-center px-4"
               >
-                                 <motion.div
+                <motion.div
                    whileHover={{ 
-                     scale: 1.05, 
+                     scale: 1.02, 
                      y: -2,
                      boxShadow: "0 12px 35px rgba(1, 19, 163, 0.25)"
                    }}
                    whileTap={{ scale: 0.98 }}
                    onClick={() => setIsSidebarOpen(true)}
-                   className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-lg border border-white/30 cursor-pointer"
+                   className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-lg border border-white/30 cursor-pointer max-w-full"
                    style={{
                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(249, 250, 251, 0.95) 100%)',
                      boxShadow: '0 8px 25px rgba(1, 19, 163, 0.15), 0 0 0 1px rgba(1, 19, 163, 0.05)',
                    }}
                  >
-                  <div className="flex items-center space-x-3">
-                    {/* 선택된 멤버 아바타 */}
-                    <div className="relative">
-                      <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-white shadow-sm">
-                                                 <img 
-                           src={(() => {
-                             const member = groupMembers.find(m => m.isSelected);
-                             return member ? getSafeImageUrl(member.photo || null, member.mt_gender, member.original_index) : '';
-                           })()}
-                           alt={groupMembers.find(m => m.isSelected)?.name || ''} 
-                           className="w-full h-full object-cover"
-                           onError={(e) => {
-                             const target = e.target as HTMLImageElement;
-                             const member = groupMembers.find(m => m.isSelected);
-                             if (member) {
-                               const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
-                               target.src = defaultImg;
-                             }
-                           }}
-                         />
+                  <div className="flex items-center justify-between space-x-4">
+                    {/* 왼쪽: 멤버 정보 */}
+                    <div className="flex items-center space-x-3 flex-shrink-0">
+                      {/* 선택된 멤버 아바타 */}
+                      <div className="relative">
+                        <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-white shadow-sm">
+                          <img 
+                             src={(() => {
+                               const member = groupMembers.find(m => m.isSelected);
+                               return member ? getSafeImageUrl(member.photo || null, member.mt_gender, member.original_index) : '';
+                             })()}
+                             alt={groupMembers.find(m => m.isSelected)?.name || ''} 
+                             className="w-full h-full object-cover"
+                             onError={(e) => {
+                               const target = e.target as HTMLImageElement;
+                               const member = groupMembers.find(m => m.isSelected);
+                               if (member) {
+                                 const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
+                                 target.src = defaultImg;
+                               }
+                             }}
+                           />
+                        </div>
+                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
                       </div>
-                      <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
+                      
+                      {/* 멤버 이름과 날짜 정보 */}
+                      <div className="flex flex-col">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-semibold text-gray-800">
+                            {groupMembers.find(m => m.isSelected)?.name}
+                          </span>
+                          <span className="text-xs text-gray-500">의 기록</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <span className="text-xs font-medium" style={{ color: '#0113A3' }}>
+                            📅 {format(new Date(selectedDate), 'MM월 dd일 (E)', { locale: ko })}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* 로딩 상태 표시 */}
+                      {isLocationDataLoading && (
+                        <div className="ml-1">
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          >
+                            <FiLoader className="w-4 h-4 text-blue-500" />
+                          </motion.div>
+                        </div>
+                      )}
                     </div>
-                    
-                    {/* 멤버 이름과 날짜 정보 */}
-                    <div className="flex flex-col">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-semibold text-gray-800">
-                          {groupMembers.find(m => m.isSelected)?.name}
-                        </span>
-                        <span className="text-xs text-gray-500">의 기록</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <span className="text-xs font-medium" style={{ color: '#0113A3' }}>
-                          📅 {format(new Date(selectedDate), 'MM월 dd일 (E)', { locale: ko })}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {/* 로딩 상태 표시 */}
-                    {isLocationDataLoading && (
-                      <div className="ml-2">
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        >
-                          <FiLoader className="w-4 h-4 text-blue-500" />
-                        </motion.div>
+
+                    {/* 오른쪽: 위치기록 요약 (로딩 중이 아닐 때만 표시) */}
+                    {!isLocationDataLoading && (
+                      <div className="flex items-center space-x-3 text-xs flex-shrink-0">
+                        {/* 거리 */}
+                        <div className="flex flex-col items-center space-y-1">
+                          <FiTrendingUp className="w-3 h-3 text-amber-500" />
+                          <span className="font-medium text-gray-700 whitespace-nowrap">{locationSummary.distance}</span>
+                        </div>
+                        {/* 시간 */}
+                        <div className="flex flex-col items-center space-y-1">
+                          <FiClock className="w-3 h-3 text-blue-500" />
+                          <span className="font-medium text-gray-700 whitespace-nowrap">{locationSummary.time}</span>
+                        </div>
+                        {/* 걸음수 */}
+                        <div className="flex flex-col items-center space-y-1">
+                          <FiZap className="w-3 h-3 text-green-500" />
+                          <span className="font-medium text-gray-700 whitespace-nowrap">{locationSummary.steps}</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3906,133 +4197,75 @@ export default function LogsPage() {
             )}
           </AnimatePresence>
 
-        </div>
-
-        {/* Bottom Sheet - home/page.tsx와 동일한 framer-motion 적용 */}
-        <motion.div 
-            ref={bottomSheetRef}
-            initial={{ translateY: '100%' }}
-            variants={bottomSheetVariants}
-            animate={bottomSheetState}
-            className="fixed bottom-0 left-0 right-0 z-30 bg-white rounded-t-3xl shadow-2xl max-h-[85vh] overflow-hidden"
-            style={{ touchAction: isHorizontalSwipeRef.current === true ? 'pan-x' : 'pan-y' }}
-            onTouchStart={handleDragStart}
-            onTouchMove={handleDragMove}
-            onTouchEnd={handleDragEnd}
-            onMouseDown={handleDragStart}
-            onMouseMove={handleDragMove}
-            onMouseUp={handleDragEnd}
-            onMouseLeave={handleDragEnd}
-          >
-            {/* 바텀시트 핸들 - location/page.tsx와 동일한 스타일 */}
-            <motion.div 
-              className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mt-3 mb-3 cursor-grab active:cursor-grabbing"
-              whileHover={{ scale: 1.2, backgroundColor: '#6366f1' }}
-              transition={{ duration: 0.2 }}
-            />
-
-            {/* 바텀시트 내용 */}
-            <div className="px-6 pb-2 overflow-y-auto max-h-full">
-              {/* 스와이프 가능한 콘텐츠 컨테이너 - home/page.tsx와 동일한 구조 */}
-              <div className="flex-grow min-h-0 relative overflow-hidden">
+          {/* 플로팅 경로따라가기 컨트롤 - 왼쪽 중단 (네비게이션 바 위) */}
+          <AnimatePresence>
+            {groupMembers.some(m => m.isSelected) && selectedDate && sortedLocationData.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                transition={{ 
+                  type: "spring", 
+                  stiffness: 300, 
+                  damping: 25,
+                  duration: 0.6,
+                  delay: 0.4
+                }}
+                className="absolute bottom-20 left-4 z-20"
+              >
                 <motion.div
-                  className="flex w-full h-full"
-                                  >
-                  {/* 위치기록 요약만 표시 (그룹멤버 탭 제거됨) */}
-                  <div className="w-full h-full pb-2 overflow-y-auto hide-scrollbar flex-shrink-0 flex flex-col" style={{ WebkitOverflowScrolling: 'touch', height: '200px' }}>
-                  <div 
-                    className="content-section summary-section min-h-[200px] max-h-[200px] overflow-hidden flex flex-col bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl pt-3 px-3 pb-3"
-                  >
-                    <div className="flex-1">
-                      {/* 헤더 섹션 */}
-                      <div className="mb-2">
-                        <h2 className="text-base font-bold text-gray-900 flex items-center">
-                          <FiActivity className="w-4 h-4 text-amber-500 mr-2" />
-                        {groupMembers.find(m => m.isSelected)?.name ? `${groupMembers.find(m => m.isSelected)?.name}의 위치기록 요약` : "위치기록 요약"}
-                      </h2>
-                      </div>
-
-                                            {/* 통계 카드들 */}
-                      <div className="grid grid-cols-3 gap-2 mb-2 h-[68px]">
-                        {isLocationDataLoading ? (
-                          <div className="col-span-3 bg-white/60 backdrop-blur-sm rounded-lg p-2 border border-amber-100 flex items-center justify-center h-full">
-                            <div className="flex items-center space-x-2">
-                              <FiLoader className="w-4 h-4 text-amber-500 animate-spin" />
-                              <span className="text-xs text-gray-600">요약 데이터를 불러오는 중...</span>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            {(() => {
-                              console.log('[UI 렌더링] 위치기록 요약 카드 렌더링:', {
-                                locationSummary,
-                                isLocationDataLoading,
-                                activeLogView
-                              });
-                              return null;
-                            })()}
-                            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2 text-center border border-amber-100 h-full flex flex-col justify-center">
-                              <FiTrendingUp className="w-4 h-4 text-amber-500 mx-auto mb-1" />
-                              <p className="text-xs text-gray-500">이동거리</p>
-                              <p className="text-xs font-bold text-gray-800">{locationSummary.distance}</p>
-                            </div>
-                            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2 text-center border border-amber-100 h-full flex flex-col justify-center">
-                              <FiClock className="w-4 h-4 text-amber-500 mx-auto mb-1" />
-                              <p className="text-xs text-gray-500">이동시간</p>
-                              <p className="text-xs font-bold text-gray-800">{locationSummary.time}</p>
-                            </div>
-                            <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2 text-center border border-amber-100 h-full flex flex-col justify-center">
-                              <FiZap className="w-4 h-4 text-amber-500 mx-auto mb-1" />
-                              <p className="text-xs text-gray-500">걸음 수</p>
-                              <p className="text-xs font-bold text-gray-800">{locationSummary.steps}</p>
-                            </div>
-                          </>
-                        )}
-                      </div>
-
-                      {/* 경로 따라가기 섹션 */}
-                      <div className="bg-white/60 backdrop-blur-sm rounded-lg py-2 px-3 border border-amber-100">
-                        <div className="flex items-center">
-                          <FiPlayCircle className="w-4 h-4 text-amber-500 mr-1" />
-                          <h4 className="text-sm font-medium text-gray-800">경로 따라가기</h4>
-                        </div>
-                        <div className="px-2 py-1">
-                          <div 
-                            ref={sliderRef}
-                            className="relative w-full h-2.5 bg-gray-200 rounded-full cursor-pointer select-none touch-none"
-                            style={{ 
-                              touchAction: 'none',
-                              userSelect: 'none',
-                              WebkitUserSelect: 'none',
-                              WebkitTouchCallout: 'none'
-                            }}
-                            onMouseDown={handleSliderStart}
-                            onTouchStart={handleSliderStart}
-                          >
-                            <div 
-                              className={`absolute top-0 left-0 h-2.5 bg-amber-500 rounded-full pointer-events-none ${
-                                isSliderDragging ? '' : 'transition-all duration-150 ease-out'
-                              }`}
-                              style={{ width: `${sliderValue}%` }} 
-                            ></div>
-                            <div 
-                              className={`absolute top-1/2 w-5 h-5 bg-amber-500 rounded-full border-2 border-white shadow transform -translate-y-1/2 cursor-grab active:cursor-grabbing pointer-events-none ${
-                                isSliderDragging ? 'scale-110' : 'transition-all duration-150 ease-out hover:scale-105'
-                              }`}
-                              style={{ left: `calc(${sliderValue}% - 10px)` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  className="bg-white/95 backdrop-blur-sm rounded-2xl p-3 shadow-lg border border-white/30 min-w-[220px]"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(249, 250, 251, 0.95) 100%)',
+                    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                  }}
+                >
+                  <div className="flex items-center mb-2">
+                    <FiPlayCircle className="w-4 h-4 text-blue-500 mr-2" />
+                    <h3 className="text-sm font-bold text-gray-900">경로 따라가기</h3>
+                  </div>
+                  
+                  <div className="px-1">
+                    <div 
+                      ref={sliderRef}
+                      className="relative w-full h-3 bg-gray-200 rounded-full cursor-pointer select-none touch-none"
+                      style={{ 
+                        touchAction: 'none',
+                        userSelect: 'none',
+                        WebkitUserSelect: 'none',
+                        WebkitTouchCallout: 'none'
+                      }}
+                      onMouseDown={handleSliderStart}
+                      onTouchStart={handleSliderStart}
+                    >
+                      <div 
+                        className={`absolute top-0 left-0 h-3 bg-blue-500 rounded-full pointer-events-none ${
+                          isSliderDragging ? '' : 'transition-all duration-150 ease-out'
+                        }`}
+                        style={{ width: `${sliderValue}%` }} 
+                      ></div>
+                      <div 
+                        className={`absolute top-1/2 w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg transform -translate-y-1/2 cursor-grab active:cursor-grabbing pointer-events-none ${
+                          isSliderDragging ? 'scale-110' : 'transition-all duration-150 ease-out hover:scale-105'
+                        }`}
+                        style={{ left: `calc(${sliderValue}% - 12px)` }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>시작</span>
+                      <span>{Math.round(sliderValue)}%</span>
+                      <span>종료</span>
                     </div>
                   </div>
-                  </div>
                 </motion.div>
-              </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-              {/* 탭 인디케이터 제거됨 - 이제 단일 탭만 사용 */}
-            </div>
-          </motion.div>
+        </div>
+
+
       </motion.div>
 
       {/* 플로팅 사이드바 토글 버튼 */}
@@ -4348,7 +4581,10 @@ export default function LogsPage() {
                           key={day.value}
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
                             // 햅틱 피드백
                             try {
                               if ('vibrate' in navigator) {
@@ -4357,7 +4593,9 @@ export default function LogsPage() {
                             } catch (err) {
                               console.debug('햅틱 피드백 차단');
                             }
+                            
                             if (day.hasLogs) {
+                              console.log('[사이드바 날짜] 날짜 선택:', day.value);
                               handleDateSelect(day.value);
                             }
                           }}
@@ -4400,6 +4638,7 @@ export default function LogsPage() {
                       {groupMembers.map((member, index) => (
                         <motion.div
                           key={member.id}
+                          id={`member-${member.id}`}
                           variants={memberItemVariants}
                           whileHover={{ scale: 1.02, x: 3 }}
                           whileTap={{ scale: 0.98 }}
@@ -4549,29 +4788,22 @@ export default function LogsPage() {
                                             clickedElement.style.zIndex = '1000';
                                             clickedElement.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
                                             
-                                            // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택
+                                            // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택 후 날짜 변경
                                             if (!member.isSelected) {
-                                              console.log(`[활동 캘린더] 먼저 멤버 ${member.name} 선택`);
+                                              console.log(`[활동 캘린더] 멤버 ${member.name} 선택 + 날짜 변경: ${selectedDate} → ${dateString}`);
                                               handleMemberSelect(member.id);
-                                              // 멤버 선택 후 약간의 지연을 두고 날짜 선택
+                                              // 멤버 선택 후 날짜 변경
                                               setTimeout(() => {
                                                 handleDateSelect(dateString);
                                               }, 100);
                                             } else {
-                                              // 이미 선택된 멤버인 경우 바로 날짜 변경
-                                              handleDateSelect(dateString);
-                                            }
-                                            
-                                            // 사이드바를 열고 메인 날짜 선택기로 스크롤 (스마트 타이밍)
-                                            if (!isSidebarOpen) {
-                                              setIsSidebarOpen(true);
-                                              // 사이드바가 열린 후 스크롤
-                                              setTimeout(() => {
-                                                scrollToSelectedDate(dateString, '네모 캘린더 클릭');
-                                              }, 500); // 사이드바 애니메이션 완료 후
-                                            } else {
-                                              // 이미 사이드바가 열려있으면 즉시 스크롤 (자연스러운 전환)
-                                              scrollToSelectedDate(dateString, '네모 캘린더 클릭');
+                                              // 이미 선택된 멤버인 경우에만 날짜 변경
+                                              if (dateString !== selectedDate) {
+                                                console.log(`[활동 캘린더] 같은 멤버 - 날짜만 변경: ${selectedDate} → ${dateString}`);
+                                                handleDateSelect(dateString);
+                                              } else {
+                                                console.log(`[활동 캘린더] 같은 멤버, 같은 날짜 - 변경 없음`);
+                                              }
                                             }
                                             
                                             // 시각적 피드백 원복 (고급스러운 애니메이션)
@@ -4661,29 +4893,22 @@ export default function LogsPage() {
                                             clickedElement.style.zIndex = '1000';
                                             clickedElement.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
                                             
-                                            // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택
+                                            // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택 후 날짜 변경
                                             if (!member.isSelected) {
-                                              console.log(`[활동 캘린더] 먼저 멤버 ${member.name} 선택`);
+                                              console.log(`[활동 캘린더] 멤버 ${member.name} 선택 + 날짜 변경: ${selectedDate} → ${dateString}`);
                                               handleMemberSelect(member.id);
-                                              // 멤버 선택 후 약간의 지연을 두고 날짜 선택
+                                              // 멤버 선택 후 날짜 변경
                                               setTimeout(() => {
                                                 handleDateSelect(dateString);
                                               }, 100);
                                             } else {
-                                              // 이미 선택된 멤버인 경우 바로 날짜 변경
-                                              handleDateSelect(dateString);
-                                            }
-                                            
-                                            // 사이드바를 열고 메인 날짜 선택기로 스크롤 (스마트 타이밍)
-                                            if (!isSidebarOpen) {
-                                              setIsSidebarOpen(true);
-                                              // 사이드바가 열린 후 스크롤
-                                              setTimeout(() => {
-                                                scrollToSelectedDate(dateString, '네모 캘린더 클릭');
-                                              }, 500); // 사이드바 애니메이션 완료 후
-                                            } else {
-                                              // 이미 사이드바가 열려있으면 즉시 스크롤 (자연스러운 전환)
-                                              scrollToSelectedDate(dateString, '네모 캘린더 클릭');
+                                              // 이미 선택된 멤버인 경우에만 날짜 변경
+                                              if (dateString !== selectedDate) {
+                                                console.log(`[활동 캘린더] 같은 멤버 - 날짜만 변경: ${selectedDate} → ${dateString}`);
+                                                handleDateSelect(dateString);
+                                              } else {
+                                                console.log(`[활동 캘린더] 같은 멤버, 같은 날짜 - 변경 없음`);
+                                              }
                                             }
                                             
                                             // 시각적 피드백 원복 (고급스러운 애니메이션)
@@ -4757,6 +4982,18 @@ export default function LogsPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 에러 토스트 */}
+      <ErrorToast
+        error={dataError}
+        onRetry={retryDataLoad}
+        onDismiss={() => setDataError(null)}
+        retryCount={retryCount}
+        maxRetries={maxRetries}
+        isLoading={isLocationDataLoading}
+        autoHide={true}
+        duration={7000}
+      />
     </>
   );
 } 
