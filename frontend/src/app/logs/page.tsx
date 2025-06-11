@@ -1992,15 +1992,43 @@ export default function LogsPage() {
         return;
       }
 
-      // 모든 API를 병렬로 호출 (PHP 로직 기반 요약 API 포함)
-      const [logs, summary, dailySummary, stayTimes, mapMarkers, locationLogSummary] = await Promise.all([
-        memberLocationLogService.getDailyLocationLogs(mtIdx, date), // 사용하지 않을 수 있지만 함께 호출
-        memberLocationLogService.getDailyLocationSummary(mtIdx, date), // 사용하지 않을 수 있지만 함께 호출
-        memberLocationLogService.getDailySummaryByRange(mtIdx, date, date), // UI 표시용
-        memberLocationLogService.getStayTimes(mtIdx, date), // 지도 표시용
-        memberLocationLogService.getMapMarkers(mtIdx, date), // 지도 표시용 (주요 위치 데이터)
-        memberLocationLogService.getLocationLogSummary(mtIdx, date) // UI 표시용 (PHP 로직)
+      // 타임아웃 설정 (30초)
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('API 요청 타임아웃 (30초)')), 30000);
+      });
+
+      // 모든 API를 병렬로 호출 (타임아웃과 함께)
+      const apiPromises = Promise.all([
+        memberLocationLogService.getDailyLocationLogs(mtIdx, date).catch(err => {
+          console.warn('[loadLocationData] getDailyLocationLogs 실패:', err);
+          return []; // 실패 시 빈 배열 반환
+        }),
+        memberLocationLogService.getDailyLocationSummary(mtIdx, date).catch(err => {
+          console.warn('[loadLocationData] getDailyLocationSummary 실패:', err);
+          return null; // 실패 시 null 반환
+        }),
+        memberLocationLogService.getDailySummaryByRange(mtIdx, date, date).catch(err => {
+          console.warn('[loadLocationData] getDailySummaryByRange 실패:', err);
+          return []; // 실패 시 빈 배열 반환
+        }),
+        memberLocationLogService.getStayTimes(mtIdx, date).catch(err => {
+          console.warn('[loadLocationData] getStayTimes 실패:', err);
+          return []; // 실패 시 빈 배열 반환
+        }),
+        memberLocationLogService.getMapMarkers(mtIdx, date).catch(err => {
+          console.warn('[loadLocationData] getMapMarkers 실패:', err);
+          return []; // 실패 시 빈 배열 반환
+        }),
+        memberLocationLogService.getLocationLogSummary(mtIdx, date).catch(err => {
+          console.warn('[loadLocationData] getLocationLogSummary 실패:', err);
+          return null; // 실패 시 null 반환
+        })
       ]);
+
+      const [logs, summary, dailySummary, stayTimes, mapMarkers, locationLogSummary] = await Promise.race([
+        apiPromises,
+        timeoutPromise
+      ]) as any[];
 
       // API 응답 완료 후 요청이 여전히 유효한지 확인
       if (loadLocationDataExecutingRef.current.cancelled || loadLocationDataExecutingRef.current.currentRequest !== executionKey) {
@@ -2009,7 +2037,35 @@ export default function LogsPage() {
       }
       console.log(`[loadLocationData] ✅ API 응답 완료 - 결과 처리 시작: ${executionKey}`);
 
-      console.log('[loadLocationData] 모든 API 응답 수신 완료');
+      // 데이터 검증 및 로깅
+      console.log('[loadLocationData] API 응답 데이터 검증:', {
+        logs: Array.isArray(logs) ? logs.length : 'null/error',
+        summary: summary ? 'ok' : 'null/error',
+        dailySummary: Array.isArray(dailySummary) ? dailySummary.length : 'null/error',
+        stayTimes: Array.isArray(stayTimes) ? stayTimes.length : 'null/error',
+        mapMarkers: Array.isArray(mapMarkers) ? mapMarkers.length : 'null/error',
+        locationLogSummary: locationLogSummary ? 'ok' : 'null/error'
+      });
+
+      // 기타 데이터 검증 및 기본값 설정
+      const validatedData = {
+        logs: Array.isArray(logs) ? logs : [],
+        summary: summary || null,
+        dailySummary: Array.isArray(dailySummary) ? dailySummary : [],
+        stayTimes: Array.isArray(stayTimes) ? stayTimes : [],
+        mapMarkers: Array.isArray(mapMarkers) ? mapMarkers : [],
+        locationLogSummary: locationLogSummary || null
+      };
+
+      // 핵심 데이터 검증 로깅
+      if (!Array.isArray(mapMarkers) || mapMarkers.length === 0) {
+        console.warn('[loadLocationData] 핵심 데이터(mapMarkers)가 비어있거나 유효하지 않음:', {
+          isArray: Array.isArray(mapMarkers),
+          length: mapMarkers?.length || 0
+        });
+      }
+
+      console.log('[loadLocationData] 데이터 검증 완료 - 유효한 데이터로 처리 진행');
       
       // 성공 시 에러 상태 초기화
       setDataError(null);
@@ -2018,10 +2074,10 @@ export default function LogsPage() {
       // 캐시에 저장 (멤버별로 구분하여 저장)
       if (selectedGroupId) {
         const locationDataForCache = {
-          mapMarkers,
-          stayTimes,
-          dailySummary,
-          locationLogSummary,
+          mapMarkers: validatedData.mapMarkers,
+          stayTimes: validatedData.stayTimes,
+          dailySummary: validatedData.dailySummary,
+          locationLogSummary: validatedData.locationLogSummary,
           members: groupMembers
         };
         setCachedLocationData(selectedGroupId, date, mtIdx.toString(), locationDataForCache);
@@ -2029,16 +2085,16 @@ export default function LogsPage() {
       }
       
       // UI 상태 업데이트
-      setCurrentLocationLogs(logs); // 필요시 사용
-      setDailySummaryData(dailySummary);
-      setStayTimesData(stayTimes);
-      setMapMarkersData(mapMarkers); // 지도 렌더링 함수로 전달
-      setLocationLogSummaryData(locationLogSummary);
+      setCurrentLocationLogs(validatedData.logs); // 필요시 사용
+      setDailySummaryData(validatedData.dailySummary);
+      setStayTimesData(validatedData.stayTimes);
+      setMapMarkersData(validatedData.mapMarkers); // 지도 렌더링 함수로 전달
+      setLocationLogSummaryData(validatedData.locationLogSummary);
 
        // 요약 데이터 설정 (마커 데이터 기반 계산 결과 사용)
-       const calculatedSummary = calculateLocationStats(mapMarkers);
+       const calculatedSummary = calculateLocationStats(validatedData.mapMarkers);
        console.log('[loadLocationData] 마커 데이터 기반 계산 결과:', calculatedSummary);
-       console.log('[loadLocationData] 마커 데이터 개수:', mapMarkers.length);
+       console.log('[loadLocationData] 마커 데이터 개수:', validatedData.mapMarkers.length);
        
        setLocationSummary(calculatedSummary);
        console.log('[loadLocationData] locationSummary 상태 업데이트 완료:', calculatedSummary);
@@ -2057,8 +2113,8 @@ export default function LogsPage() {
       // 모든 데이터가 준비되면 통합 지도 렌더링 함수 호출
       console.log('[loadLocationData] 통합 지도 렌더링 함수 호출 준비');
       console.log('[loadLocationData] 렌더링 데이터 확인:', {
-        mapMarkers: mapMarkers.length,
-        stayTimes: stayTimes.length,
+        mapMarkers: validatedData.mapMarkers.length,
+        stayTimes: validatedData.stayTimes.length,
         mapReady: !!map.current,
         naverMapsReady: !!window.naver?.maps
       });
@@ -2069,7 +2125,13 @@ export default function LogsPage() {
         // 지도 렌더링을 약간 지연시켜 상태 업데이트가 완료된 후 실행
         setTimeout(async () => {
           try {
-            await renderLocationDataOnMap(mapMarkers, stayTimes, locationLogSummary, currentMembers, map.current);
+            await renderLocationDataOnMap(
+              validatedData.mapMarkers, 
+              validatedData.stayTimes, 
+              validatedData.locationLogSummary, 
+              currentMembers, 
+              map.current
+            );
             console.log('[loadLocationData] 통합 지도 렌더링 함수 호출 완료');
             
             // 렌더링 완료 후 지도 새로고침
@@ -2079,6 +2141,11 @@ export default function LogsPage() {
             }
           } catch (renderError) {
             console.error('[loadLocationData] 지도 렌더링 오류:', renderError);
+            // 렌더링 실패 시에도 멤버 마커는 표시
+            const selectedMember = groupMembers.find(m => m.isSelected);
+            if (selectedMember && map.current) {
+              updateMemberMarkers([selectedMember], false);
+            }
           }
         }, 100); // 100ms 지연
       } else {
@@ -2090,6 +2157,23 @@ export default function LogsPage() {
 
     } catch (error) {
       console.error('[loadLocationData] 위치 데이터 로딩 오류:', error);
+      
+      // 네트워크 오류나 타임아웃인 경우 자동 재시도 (최대 2회)
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isNetworkError = errorMessage.includes('타임아웃') || 
+                            errorMessage.includes('Network') || 
+                            errorMessage.includes('fetch');
+      
+      if (isNetworkError && retryCount < 2) {
+        console.log(`[loadLocationData] 네트워크 오류 감지 - 자동 재시도 (${retryCount + 1}/2):`, errorMessage);
+        setRetryCount(prev => prev + 1);
+        
+        // 2초 후 재시도
+        setTimeout(() => {
+          loadLocationData(mtIdx, date);
+        }, 2000);
+        return;
+      }
       
       // 에러 처리
       handleDataError(error, 'loadLocationData');
@@ -2134,6 +2218,8 @@ export default function LogsPage() {
       loadLocationDataExecutingRef.current.executing = false;
       loadLocationDataExecutingRef.current.currentRequest = undefined;
       loadLocationDataExecutingRef.current.cancelled = false; // 항상 false로 리셋
+      
+      console.log(`[loadLocationData] 🔄 로딩 상태 정리 완료: ${executionKey}`);
       
       // 성공적으로 완료된 경우 마지막 로딩된 멤버 정보 업데이트
       if (!loadLocationDataExecutingRef.current.cancelled && loadLocationDataExecutingRef.current.currentRequest === executionKey) {
@@ -2691,6 +2777,28 @@ export default function LogsPage() {
       setRetryCount(0);
     }
   }, [groupMembers, dailyCountsData, memberActivityData]);
+
+  // 로딩 상태 안전장치 - 30초 후 강제 종료
+  useEffect(() => {
+    if (isLocationDataLoading) {
+      const timeoutId = setTimeout(() => {
+        console.warn('[안전장치] 로딩이 30초 이상 지속되어 강제 종료');
+        setIsLocationDataLoading(false);
+        loadLocationDataExecutingRef.current.executing = false;
+        loadLocationDataExecutingRef.current.currentRequest = undefined;
+        loadLocationDataExecutingRef.current.cancelled = false;
+        
+        // 타임아웃 에러 표시
+        setDataError({
+          type: 'network',
+          message: '데이터 로딩 시간이 초과되었습니다. 다시 시도해주세요.',
+          retryable: true
+        });
+      }, 30000);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isLocationDataLoading]);
 
   // 새로운 API 데이터가 변경될 때마다 콘솔에 출력
   useEffect(() => {
