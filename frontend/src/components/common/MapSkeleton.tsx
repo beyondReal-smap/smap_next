@@ -48,20 +48,30 @@ export const MapSkeleton: React.FC<MapSkeletonProps> = ({
             <div className={styles.loadingSpinner}>
               <div className={styles.spinnerIcon}>
                 <svg className="w-10 h-10" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* 외부 정사각형 */}
-                  <rect x="2" y="2" width="36" height="36" rx="4" stroke="currentColor" strokeWidth="2" opacity="0.3"/>
-                  
-                  {/* 중간 원형 */}
-                  <circle cx="20" cy="20" r="12" stroke="currentColor" strokeWidth="2" opacity="0.6" strokeDasharray="8 4"/>
-                  
-                  {/* 내부 삼각형 */}
-                  <polygon points="20,8 28,24 12,24" fill="currentColor" opacity="0.4"/>
-                  
-                  {/* 중심 육각형 */}
-                  <polygon points="20,12 24,16 24,24 20,28 16,24 16,16" stroke="currentColor" strokeWidth="1.5" fill="none" opacity="0.8"/>
-                  
-                  {/* 중심점 */}
-                  <circle cx="20" cy="20" r="2" fill="currentColor"/>
+                  {/* 구글 스타일 점들이 돌아가는 로딩 애니메이션 */}
+                  <g className={styles.spinnerDots}>
+                    {/* 12개의 점을 원형으로 배치 */}
+                    {[...Array(12)].map((_, i) => {
+                      const angle = (i * 30) * Math.PI / 180; // 30도씩
+                      const x = 20 + Math.cos(angle) * 12;
+                      const y = 20 + Math.sin(angle) * 12;
+                      return (
+                        <circle
+                          key={i}
+                          cx={x}
+                          cy={y}
+                          r="2"
+                          fill="currentColor"
+                          opacity="0.3"
+                          className={styles.spinnerDot}
+                          style={{ 
+                            animationDelay: `${i * 0.1}s`,
+                            transformOrigin: '20px 20px'
+                          }}
+                        />
+                      );
+                    })}
+                  </g>
                 </svg>
               </div>
               <div className={styles.loadingText}>지도를 불러오는 중...</div>

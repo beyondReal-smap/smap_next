@@ -1715,9 +1715,11 @@ export default function LogsPage() {
         }
       }, 10); // 10ms 지연으로 멤버 변경 상태 반영 대기
     
-    // 날짜 선택 시 사이드바 즉시 닫기
-    setIsSidebarOpen(false);
-    console.log('[handleDateSelect] 날짜 선택으로 사이드바 즉시 닫기');
+    // 날짜 선택 완료 후 잠시 후 사이드바 자동 닫기 (사용자가 결과를 확인할 시간 제공)
+    setTimeout(() => {
+      setIsSidebarOpen(false);
+      console.log('[handleDateSelect] 날짜 선택 완료 - 2초 후 사이드바 자동 닫기');
+    }, 2000); // 2초 후 자동 닫기
     
     console.log('[LOGS] ===== 날짜 선택 완료 =====');
     };
@@ -2535,7 +2537,7 @@ export default function LogsPage() {
       
       // 성능 최적화: 값이 크게 변하지 않으면 업데이트 건너뛰기
       const currentValue = sliderValue;
-      if (Math.abs(percentage - currentValue) < 0.2) return; // 더 민감하게 반응
+      if (Math.abs(percentage - currentValue) < 0.05) return; // 더욱 민감하게 반응 (0.2 → 0.05)
       
       // 상태 업데이트 (React의 배치 처리에 맡김)
       setSliderValue(percentage);
@@ -3246,8 +3248,11 @@ export default function LogsPage() {
     if (!isMainInstance.current) return;
     
     if (!isUserDataLoading && userGroups.length > 0 && !selectedGroupId) {
-      setSelectedGroupId(userGroups[0].sgt_idx);
-      console.log(`[${instanceId.current}] UserContext에서 첫 번째 그룹 자동 선택:`, userGroups[0].sgt_title);
+      // 약간의 지연을 주어 UserContext 상태가 완전히 안정화된 후 그룹 선택
+      setTimeout(() => {
+        setSelectedGroupId(userGroups[0].sgt_idx);
+        console.log(`[${instanceId.current}] UserContext에서 첫 번째 그룹 자동 선택:`, userGroups[0].sgt_title);
+      }, 100);
     }
   }, [isUserDataLoading, userGroups, selectedGroupId]);
 
@@ -3274,6 +3279,12 @@ export default function LogsPage() {
       // selectedGroupId가 없으면 실행하지 않음
       if (!selectedGroupId) {
         console.log(`[${instanceId.current}] selectedGroupId가 없어서 실행하지 않음`);
+        return;
+      }
+
+      // UserContext 로딩이 완료되었는지 추가 확인
+      if (isUserDataLoading || userGroups.length === 0) {
+        console.log(`[${instanceId.current}] UserContext 아직 로딩 중 - 실행 대기`);
         return;
       }
 
@@ -3486,7 +3497,35 @@ export default function LogsPage() {
       isMounted = false; 
       fetchDataExecutingRef.current = false;
     };
-  }, [selectedGroupId]);
+  }, [selectedGroupId, isUserDataLoading, userGroups]);
+
+  // 초기 로딩 실패 시 자동 재시도 로직
+  useEffect(() => {
+    if (!isMainInstance.current) return;
+    
+    // 조건: selectedGroupId는 있지만 groupMembers가 없고, UserContext 로딩이 완료된 상태
+    if (selectedGroupId && 
+        groupMembers.length === 0 && 
+        !isUserDataLoading && 
+        userGroups.length > 0 && 
+        !fetchDataExecutingRef.current && 
+        !hasExecuted.current) {
+      
+      console.log(`[${instanceId.current}] 초기 로딩 실패 감지 - 자동 재시도 시작`);
+      
+      // 3초 후 재시도
+      const retryTimer = setTimeout(() => {
+        if (groupMembers.length === 0 && selectedGroupId) {
+          console.log(`[${instanceId.current}] 3초 후 자동 재시도 실행`);
+          hasExecuted.current = false; // 재시도를 위해 플래그 리셋
+          dataFetchedRef.current.members = false;
+          fetchDataExecutingRef.current = false;
+        }
+      }, 3000);
+      
+      return () => clearTimeout(retryTimer);
+    }
+  }, [selectedGroupId, groupMembers.length, isUserDataLoading, userGroups.length]);
 
   // 그룹 선택 핸들러 - 메인 인스턴스에서만
   const handleGroupSelect = async (groupId: number) => {
@@ -4739,11 +4778,11 @@ export default function LogsPage() {
           opacity: 1, 
           scale: 1,
           transition: {
-            delay: 0.5,
+            delay: 0.2,
             type: "spring",
             stiffness: 120,
             damping: 25,
-            duration: 0.8
+            duration: 1.0
           }
         }}
         whileHover={{ 
@@ -4830,6 +4869,16 @@ export default function LogsPage() {
               bottom: '60px',
               height: 'calc(100vh - 60px)'
             }}
+            drag="x"
+            dragConstraints={{ left: -320, right: 0 }}
+            dragElastic={0.2}
+            onDragEnd={(e, info) => {
+              // 왼쪽으로 스와이프하면 사이드바 닫기
+              if (info.offset.x < -100 || info.velocity.x < -300) {
+                setIsSidebarOpen(false);
+                console.log('[사이드바] 왼쪽 스와이프로 닫기');
+              }
+            }}
           >
             <motion.div
               variants={sidebarContentVariants}
@@ -4853,7 +4902,7 @@ export default function LogsPage() {
                     <h2 className="text-xl font-bold bg-gray-900 bg-clip-text text-transparent">
                       그룹 멤버
                     </h2>
-                    <p className="text-sm text-gray-600">멤버를 선택해보세요</p>
+                    <p className="text-sm text-gray-600">멤버를 선택하거나 ← 스와이프로 닫기</p>
                   </div>
                 </div>
                 <motion.button
@@ -5205,8 +5254,8 @@ export default function LogsPage() {
                                   </div>
                                   <div className="grid grid-cols-7 gap-1.5">
                                     {Array.from({ length: 7 }, (_, index) => {
-                                      const dayIndex = 13 - index; // 13일전부터 7일전까지
-                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[13 - dayIndex];
+                                      const dayIndex = 13 - index; // 13일전부터 7일전까지 (역순)
+                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[dayIndex];
                                       const date = new Date();
                                       date.setDate(date.getDate() - dayIndex);
                                       const isToday = dayIndex === 0;
@@ -5241,8 +5290,7 @@ export default function LogsPage() {
                                             e.stopPropagation();
                                             
                                             const dateString = format(date, 'yyyy-MM-dd');
-                                            console.log(`[활동 캘린더] 지난주 ${format(date, 'MM.dd(E)', { locale: ko })} 클릭 - 멤버: ${member.name}, 날짜 변경: ${dateString}`);
-                                            console.log(`[활동 캘린더] 현재 선택된 날짜: ${selectedDate} → 새 날짜: ${dateString}`);
+                                            console.log(`[활동 캘린더] 지난주 ${format(date, 'MM.dd(E)', { locale: ko })} 클릭 - 멤버: ${member.name}, 날짜: ${dateString}`);
                                             
                                             // 클릭된 네모에 고급스러운 시각적 피드백
                                             const clickedElement = e.currentTarget as HTMLElement;
@@ -5251,22 +5299,27 @@ export default function LogsPage() {
                                             clickedElement.style.zIndex = '1000';
                                             clickedElement.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
                                             
-                                            // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택 후 날짜 변경
-                                            if (!member.isSelected) {
-                                              console.log(`[활동 캘린더] 멤버 ${member.name} 선택 + 날짜 변경: ${selectedDate} → ${dateString}`);
-                                              handleMemberSelect(member.id);
-                                              // 멤버 선택 후 날짜 변경
-                                              setTimeout(() => {
-                                                handleDateSelect(dateString);
-                                              }, 100);
-                                            } else {
-                                              // 이미 선택된 멤버인 경우에만 날짜 변경
-                                              if (dateString !== selectedDate) {
-                                                console.log(`[활동 캘린더] 같은 멤버 - 날짜만 변경: ${selectedDate} → ${dateString}`);
-                                                handleDateSelect(dateString);
+                                            // 멤버가 다르거나 날짜가 다른 경우 처리
+                                            if (!member.isSelected || dateString !== selectedDate) {
+                                              console.log(`[활동 캘린더] 지난주 변경: ${selectedDate} → ${dateString}, 멤버: ${member.name} (선택됨: ${member.isSelected})`);
+                                              
+                                              // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택
+                                              if (!member.isSelected) {
+                                                console.log(`[활동 캘린더] 멤버 선택 후 날짜 변경`);
+                                                handleMemberSelect(member.id);
+                                                // 멤버 선택 완료 후 날짜 변경 (날짜가 다른 경우에만)
+                                                if (dateString !== selectedDate) {
+                                                  setTimeout(() => {
+                                                    handleDateSelect(dateString);
+                                                  }, 150);
+                                                }
                                               } else {
-                                                console.log(`[활동 캘린더] 같은 멤버, 같은 날짜 - 변경 없음`);
+                                                // 이미 선택된 멤버인 경우 날짜만 변경
+                                                console.log(`[활동 캘린더] 선택된 멤버 - 날짜만 변경`);
+                                                handleDateSelect(dateString);
                                               }
+                                            } else {
+                                              console.log(`[활동 캘린더] 같은 멤버, 같은 날짜 - 변경 없음`);
                                             }
                                             
                                             // 시각적 피드백 원복 (고급스러운 애니메이션)
@@ -5305,8 +5358,8 @@ export default function LogsPage() {
                                   </div>
                                   <div className="grid grid-cols-7 gap-1.5">
                                     {Array.from({ length: 7 }, (_, index) => {
-                                      const dayIndex = 6 - index; // 6일전부터 오늘까지
-                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[13 - dayIndex];
+                                      const dayIndex = 6 - index; // 6일전부터 오늘까지 (역순)
+                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[7 + dayIndex];
                                       const date = new Date();
                                       date.setDate(date.getDate() - dayIndex);
                                       const isToday = dayIndex === 0;
@@ -5346,8 +5399,7 @@ export default function LogsPage() {
                                             e.stopPropagation();
                                             
                                             const dateString = format(date, 'yyyy-MM-dd');
-                                            console.log(`[활동 캘린더] 이번주 ${format(date, 'MM.dd(E)', { locale: ko })} 클릭 - 멤버: ${member.name}, 날짜 변경: ${dateString}`);
-                                            console.log(`[활동 캘린더] 현재 선택된 날짜: ${selectedDate} → 새 날짜: ${dateString}`);
+                                            console.log(`[활동 캘린더] 이번주 ${format(date, 'MM.dd(E)', { locale: ko })} 클릭 - 멤버: ${member.name}, 날짜: ${dateString}`);
                                             
                                             // 클릭된 네모에 고급스러운 시각적 피드백
                                             const clickedElement = e.currentTarget as HTMLElement;
@@ -5356,22 +5408,27 @@ export default function LogsPage() {
                                             clickedElement.style.zIndex = '1000';
                                             clickedElement.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
                                             
-                                            // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택 후 날짜 변경
-                                            if (!member.isSelected) {
-                                              console.log(`[활동 캘린더] 멤버 ${member.name} 선택 + 날짜 변경: ${selectedDate} → ${dateString}`);
-                                              handleMemberSelect(member.id);
-                                              // 멤버 선택 후 날짜 변경
-                                              setTimeout(() => {
-                                                handleDateSelect(dateString);
-                                              }, 100);
-                                            } else {
-                                              // 이미 선택된 멤버인 경우에만 날짜 변경
-                                              if (dateString !== selectedDate) {
-                                                console.log(`[활동 캘린더] 같은 멤버 - 날짜만 변경: ${selectedDate} → ${dateString}`);
-                                                handleDateSelect(dateString);
+                                            // 멤버가 다르거나 날짜가 다른 경우 처리
+                                            if (!member.isSelected || dateString !== selectedDate) {
+                                              console.log(`[활동 캘린더] 이번주 변경: ${selectedDate} → ${dateString}, 멤버: ${member.name} (선택됨: ${member.isSelected})`);
+                                              
+                                              // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택
+                                              if (!member.isSelected) {
+                                                console.log(`[활동 캘린더] 멤버 선택 후 날짜 변경`);
+                                                handleMemberSelect(member.id);
+                                                // 멤버 선택 완료 후 날짜 변경 (날짜가 다른 경우에만)
+                                                if (dateString !== selectedDate) {
+                                                  setTimeout(() => {
+                                                    handleDateSelect(dateString);
+                                                  }, 150);
+                                                }
                                               } else {
-                                                console.log(`[활동 캘린더] 같은 멤버, 같은 날짜 - 변경 없음`);
+                                                // 이미 선택된 멤버인 경우 날짜만 변경
+                                                console.log(`[활동 캘린더] 선택된 멤버 - 날짜만 변경`);
+                                                handleDateSelect(dateString);
                                               }
+                                            } else {
+                                              console.log(`[활동 캘린더] 같은 멤버, 같은 날짜 - 변경 없음`);
                                             }
                                             
                                             // 시각적 피드백 원복 (고급스러운 애니메이션)

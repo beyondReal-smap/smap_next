@@ -3723,11 +3723,11 @@ export default function HomePage() {
              opacity: 1, 
              scale: 1,
              transition: {
-               delay: 0.5,
+               delay: 0.2,
                type: "spring",
                stiffness: 120,
                damping: 25,
-               duration: 0.8
+               duration: 1.0
              }
            }}
            whileHover={{ 

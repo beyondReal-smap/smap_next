@@ -143,8 +143,17 @@
 
 .spinnerIcon {
   font-size: 48px;
-  animation: spin 2s linear infinite;
   margin-bottom: 12px;
+  color: #667eea;
+}
+
+.spinnerDots {
+  animation: spinnerRotate 2s linear infinite;
+  transform-origin: 20px 20px;
+}
+
+.spinnerDot {
+  animation: spinnerFade 1.2s ease-in-out infinite;
 }
 
 .loadingText {
@@ -340,6 +349,26 @@
   }
   50% {
     background-position: 10px 10px;
+  }
+}
+
+@keyframes spinnerRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spinnerFade {
+  0%, 70%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.2);
   }
 }
 
