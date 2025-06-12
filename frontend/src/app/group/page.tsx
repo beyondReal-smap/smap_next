@@ -43,7 +43,7 @@ export const dynamic = 'force-dynamic';
 const floatingButtonStyles = `
 .floating-button {
   position: fixed;
-  bottom: 80px;
+  bottom: -195px;
   right: 20px;
   z-index: 40;
   background: #0113A3;

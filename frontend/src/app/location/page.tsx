@@ -3394,6 +3394,16 @@ export default function LocationPage() {
 
   // 통일된 정보창 생성 함수 - home/page.tsx 스타일 적용 + 삭제 버튼 추가
   const createLocationInfoWindow = (locationName: string, locationAddress: string, locationData?: OtherMemberLocationRaw | LocationData) => {
+    // 안전한 방법으로 locationId 추출
+    const getLocationId = (data: OtherMemberLocationRaw | LocationData) => {
+      if ('slt_idx' in data && data.slt_idx) {
+        return data.slt_idx.toString();
+      }
+      return data.id;
+    };
+
+    const locationId = locationData ? getLocationId(locationData) : '';
+
     const newInfoWindow = new window.naver.maps.InfoWindow({
       content: `
         <style>
@@ -3455,7 +3465,7 @@ export default function LocationPage() {
         ">
           <!-- 삭제 버튼 -->
           ${locationData ? `
-          <button class="info-button delete-button" onclick="window.handleLocationDeleteFromInfoWindow && window.handleLocationDeleteFromInfoWindow('${locationData.id || (locationData as any).slt_idx}'); event.stopPropagation();" title="장소 삭제">
+          <button class="info-button delete-button" onclick="console.log('삭제 버튼 클릭:', '${locationId}'); if(window.handleLocationDeleteFromInfoWindow) { window.handleLocationDeleteFromInfoWindow('${locationId}'); } else { console.error('삭제 함수가 정의되지 않음'); } event.stopPropagation();" title="장소 삭제">
             🗑️
           </button>
           ` : ''}
