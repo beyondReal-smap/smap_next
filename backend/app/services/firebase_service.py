@@ -3,6 +3,7 @@ from firebase_admin import credentials, messaging
 from typing import Optional
 import logging
 import os
+import json
 from app.config import Config
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,19 @@ class FirebaseService:
         except ValueError:
             # 초기화되지 않은 경우 새로 초기화
             try:
+                # 방법 1: 환경변수에서 JSON 문자열로 인증서 정보 가져오기
+                firebase_credentials_json = os.getenv('FIREBASE_CREDENTIALS_JSON')
+                if firebase_credentials_json:
+                    try:
+                        cred_dict = json.loads(firebase_credentials_json)
+                        cred = credentials.Certificate(cred_dict)
+                        firebase_admin.initialize_app(cred)
+                        logger.info("Firebase Admin SDK initialized with credentials from environment variable")
+                        return True
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Invalid JSON in FIREBASE_CREDENTIALS_JSON: {e}")
+                
+                # 방법 2: 파일 경로에서 인증서 파일 읽기
                 cred_path = Config.FIREBASE_CREDENTIALS_PATH
                 if os.path.exists(cred_path):
                     cred = credentials.Certificate(cred_path)
@@ -40,8 +54,41 @@ class FirebaseService:
                     return True
                 else:
                     logger.warning(f"Firebase credentials file not found: {cred_path}")
-                    logger.warning("Firebase 푸시 알림 기능이 비활성화됩니다.")
-                    return False
+                
+                # 방법 3: 개별 환경변수로 인증서 정보 구성
+                project_id = os.getenv('FIREBASE_PROJECT_ID')
+                private_key = os.getenv('FIREBASE_PRIVATE_KEY')
+                client_email = os.getenv('FIREBASE_CLIENT_EMAIL')
+                
+                if project_id and private_key and client_email:
+                    # 개행 문자 처리
+                    private_key = private_key.replace('\\n', '\n')
+                    
+                    cred_dict = {
+                        "type": "service_account",
+                        "project_id": project_id,
+                        "private_key": private_key,
+                        "client_email": client_email,
+                        "client_id": os.getenv('FIREBASE_CLIENT_ID', ''),
+                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                        "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email}"
+                    }
+                    
+                    cred = credentials.Certificate(cred_dict)
+                    firebase_admin.initialize_app(cred)
+                    logger.info("Firebase Admin SDK initialized with individual environment variables")
+                    return True
+                
+                logger.warning("Firebase 인증 정보를 찾을 수 없습니다.")
+                logger.warning("다음 중 하나의 방법으로 Firebase를 설정해주세요:")
+                logger.warning("1. FIREBASE_CREDENTIALS_JSON 환경변수에 서비스 계정 JSON 설정")
+                logger.warning("2. Firebase 인증서 파일을 지정된 경로에 배치")
+                logger.warning("3. FIREBASE_PROJECT_ID, FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL 환경변수 설정")
+                logger.warning("Firebase 푸시 알림 기능이 비활성화됩니다.")
+                return False
+                
             except Exception as e:
                 logger.warning(f"Failed to initialize Firebase: {e}")
                 logger.warning("Firebase 푸시 알림 기능이 비활성화됩니다.")
@@ -50,7 +97,7 @@ class FirebaseService:
     def send_push_notification(self, token: str, title: str, content: str) -> str:
         """FCM 푸시 알림 전송"""
         if not self._firebase_available:
-            raise Exception("Firebase가 초기화되지 않았습니다. 인증서 파일을 확인해주세요.")
+            raise Exception("Firebase가 초기화되지 않았습니다. Firebase 인증 정보를 확인해주세요.")
             
         try:
             message = messaging.Message(

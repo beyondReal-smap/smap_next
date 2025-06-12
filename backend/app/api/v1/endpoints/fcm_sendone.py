@@ -64,19 +64,17 @@ def send_fcm_push_notification(
         logger.debug(f"파싱된 파라미터: {args}")
 
         logger.debug("회원 정보 조회 중")
-        # 이메일 또는 아이디로 회원 조회
-        member = Member.find_by_email(db, args['mt_id'])
-        if not member:
-            member = Member.find_by_id(db, args['mt_id'])
+        # mt_idx로 회원 조회
+        member = Member.find_by_idx(db, args['mt_idx'])
         
         logger.debug(f"조회된 회원 정보: {member}")
 
         if not member:
-            logger.debug("존재하지 않는 아이디로 푸시 발송 실패")
+            logger.debug("존재하지 않는 회원 인덱스로 푸시 발송 실패")
             return create_response(
                 FAILURE, 
                 "푸시발송(단건) 실패", 
-                "존재하지 않는 아이디입니다."
+                "존재하지 않는 회원입니다."
             )
 
         if not member.mt_token_id:

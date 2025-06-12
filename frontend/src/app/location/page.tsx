@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
@@ -749,6 +749,11 @@ export default function LocationPage() {
   // Refs
   const infoPanelRef = useRef<HTMLDivElement>(null);
   const swipeContainerRef = useRef<HTMLDivElement>(null);
+  
+  // InfoWindow 삭제 기능을 위한 추가 refs
+  const selectedMemberSavedLocationsRef = useRef<LocationData[] | null>(null);
+  const otherMembersSavedLocationsRef = useRef<OtherMemberLocationRaw[]>([]);
+  const infoWindowRef = useRef<NaverInfoWindow | null>(null);
 
   // 멤버 선택 관련 상태
   const [firstMemberSelected, setFirstMemberSelected] = useState(false);
@@ -787,46 +792,7 @@ export default function LocationPage() {
     autoClose: true
   });
 
-  // InfoWindow에서 삭제 버튼 클릭 시 호출되는 전역 함수
-  useEffect(() => {
-    (window as any).handleLocationDeleteFromInfoWindow = (locationId: string) => {
-      console.log('[InfoWindow 삭제] 장소 삭제 요청:', locationId);
-      
-      // 해당 장소 찾기
-      let targetLocation: LocationData | OtherMemberLocationRaw | null = null;
-      
-      // 선택된 멤버의 장소에서 찾기
-      if (selectedMemberSavedLocations) {
-        targetLocation = selectedMemberSavedLocations.find(loc => loc.id === locationId) || null;
-      }
-      
-      // 다른 멤버들의 장소에서 찾기
-      if (!targetLocation) {
-        targetLocation = otherMembersSavedLocations.find(loc => 
-          (loc.id === locationId) || (loc.slt_idx?.toString() === locationId)
-        ) || null;
-      }
-      
-      if (targetLocation) {
-        // InfoWindow 닫기
-        if (infoWindow) {
-          infoWindow.close();
-          setInfoWindow(null);
-        }
-        
-        // 삭제 모달 열기
-        openLocationDeleteModal(targetLocation);
-      } else {
-        console.error('[InfoWindow 삭제] 장소를 찾을 수 없음:', locationId);
-        openModal('오류', '삭제할 장소를 찾을 수 없습니다.', 'error');
-      }
-    };
 
-    // 컴포넌트 언마운트 시 전역 함수 정리
-    return () => {
-      delete (window as any).handleLocationDeleteFromInfoWindow;
-    };
-  }, [selectedMemberSavedLocations, otherMembersSavedLocations, infoWindow]);
 
   // 사이드바 업데이트 확인용 useEffect (디버깅)
   useEffect(() => {
@@ -907,6 +873,19 @@ export default function LocationPage() {
   const hideToastModal = () => {
     setToastModal(prev => ({ ...prev, isOpen: false }));
   };
+
+  // ref들을 최신 상태로 동기화
+  useEffect(() => {
+    selectedMemberSavedLocationsRef.current = selectedMemberSavedLocations;
+  }, [selectedMemberSavedLocations]);
+
+  useEffect(() => {
+    otherMembersSavedLocationsRef.current = otherMembersSavedLocations;
+  }, [otherMembersSavedLocations]);
+
+  useEffect(() => {
+    infoWindowRef.current = infoWindow;
+  }, [infoWindow]);
 
   // 선택된 멤버 위치로 지도 중심 이동 함수
   const moveToSelectedMember = () => {
@@ -3457,7 +3436,7 @@ export default function LocationPage() {
         ">
           <!-- 삭제 버튼 -->
           ${locationData ? `
-          <button class="info-button delete-button" onclick="window.handleLocationDeleteFromInfoWindow && window.handleLocationDeleteFromInfoWindow('${locationData.id || (locationData as any).slt_idx}'); event.stopPropagation();" title="장소 삭제">
+          <button class="info-button delete-button" onclick="window.handleLocationDeleteFromInfoWindow && window.handleLocationDeleteFromInfoWindow('${('slt_idx' in locationData && locationData.slt_idx) ? locationData.slt_idx.toString() : locationData.id}'); event.stopPropagation();" title="장소 삭제">
             🗑️
           </button>
           ` : ''}
@@ -3575,6 +3554,55 @@ export default function LocationPage() {
       setIsLocationDeleteModalOpen(false);
     }
   };
+
+  // InfoWindow에서 삭제 버튼 클릭 시 호출되는 전역 함수 - useCallback으로 안정화
+  const handleLocationDeleteFromInfoWindow = useCallback((locationId: string) => {
+    console.log('[InfoWindow 삭제] 장소 삭제 요청:', locationId);
+    
+    // 해당 장소 찾기 - 최신 상태를 직접 참조
+    let targetLocation: LocationData | OtherMemberLocationRaw | null = null;
+    
+    // 선택된 멤버의 장소에서 찾기
+    const currentSelectedLocations = selectedMemberSavedLocationsRef.current;
+    if (currentSelectedLocations) {
+      targetLocation = currentSelectedLocations.find((loc: LocationData) => loc.id === locationId) || null;
+    }
+    
+    // 다른 멤버들의 장소에서 찾기
+    if (!targetLocation) {
+      const currentOtherLocations = otherMembersSavedLocationsRef.current;
+      targetLocation = currentOtherLocations.find((loc: OtherMemberLocationRaw) => 
+        (loc.id === locationId) || (loc.slt_idx?.toString() === locationId)
+      ) || null;
+    }
+    
+    if (targetLocation) {
+      // InfoWindow 닫기
+      const currentInfoWindow = infoWindowRef.current;
+      if (currentInfoWindow) {
+        currentInfoWindow.close();
+        setInfoWindow(null);
+      }
+      
+      // 삭제 모달 열기
+      openLocationDeleteModal(targetLocation);
+    } else {
+      console.error('[InfoWindow 삭제] 장소를 찾을 수 없음:', locationId);
+      openModal('오류', '삭제할 장소를 찾을 수 없습니다.', 'error');
+    }
+  }, []);
+
+  // 전역 함수 등록 - 별도의 useEffect로 분리하여 안정성 확보
+  useEffect(() => {
+    (window as any).handleLocationDeleteFromInfoWindow = handleLocationDeleteFromInfoWindow;
+
+    // 컴포넌트 언마운트 시 전역 함수 정리
+    return () => {
+      if ((window as any).handleLocationDeleteFromInfoWindow === handleLocationDeleteFromInfoWindow) {
+        delete (window as any).handleLocationDeleteFromInfoWindow;
+      }
+    };
+  }, [handleLocationDeleteFromInfoWindow]);
 
   // 실제 장소 삭제 처리
   const handleLocationDelete = async () => {
@@ -4961,7 +4989,7 @@ export default function LocationPage() {
       <AnimatePresence>
         {toastModal.isOpen && (
           <motion.div 
-            className="fixed bottom-20 left-4 z-[130] w-1/2 max-w-sm"
+            className="fixed bottom-20 left-4 z-[130] w-3/4 max-w-sm"
             initial={{ opacity: 0, x: -100, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: -100, scale: 0.9 }}

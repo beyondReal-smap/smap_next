@@ -2,10 +2,10 @@ import apiClient from './apiClient';
 
 export interface PushNotificationRequest {
   plt_type: string;
-  sst_idx: number;
+  sst_idx: string;  // 백엔드 스키마에 맞춰 string으로 변경
   plt_condition: string;
   plt_memo: string;
-  mt_id: string;
+  mt_idx: number;   // mt_id 대신 mt_idx 사용
   plt_title: string;
   plt_content: string;
 }
@@ -91,12 +91,7 @@ class PushNotificationService {
     return member.mt_nickname || member.mt_name;
   }
 
-  /**
-   * 멤버 ID 가져오기 (mt_id 또는 mt_email)
-   */
-  private getMemberId(member: GroupMemberInfo): string {
-    return member.mt_id || member.mt_email || member.mt_idx.toString();
-  }
+
 
   /**
    * 일정 생성 시 푸시 알림 처리
@@ -121,7 +116,7 @@ class PushNotificationService {
             groupMembers,
             {
               plt_type: '2',
-              sst_idx: scheduleId,
+              sst_idx: scheduleId.toString(),
               plt_condition: '그룹원이 자신의 일정 입력',
               plt_memo: '해당 그룹의 그룹오너/리더에게 일정이 생성되었다는 푸시알림',
               plt_title: translations.txt_schedule_created,
@@ -135,7 +130,7 @@ class PushNotificationService {
           targetMember,
           {
             plt_type: '2',
-            sst_idx: scheduleId,
+            sst_idx: scheduleId.toString(),
             plt_condition: '그룹오너가 그룹원 일정 입력',
             plt_memo: '해당 그룹원에게 일정이 생성되었다는 푸시알림',
             plt_title: translations.txt_schedule_created,
@@ -171,7 +166,7 @@ class PushNotificationService {
             groupMembers,
             {
               plt_type: '2',
-              sst_idx: scheduleId,
+              sst_idx: scheduleId.toString(),
               plt_condition: '그룹원이 자신의 일정 수정',
               plt_memo: '해당 그룹의 그룹오너/리더에게 일정이 수정되었다는 푸시알림',
               plt_title: translations.txt_schedule_updated,
@@ -187,7 +182,7 @@ class PushNotificationService {
           targetMember,
           {
             plt_type: '2',
-            sst_idx: scheduleId,
+            sst_idx: scheduleId.toString(),
             plt_condition: '그룹오너가 그룹원 일정 수정',
             plt_memo: '해당 그룹원에게 일정이 수정되었다는 푸시알림',
             plt_title: translations.txt_schedule_updated,
@@ -225,7 +220,7 @@ class PushNotificationService {
             groupMembers,
             {
               plt_type: '2',
-              sst_idx: scheduleId,
+              sst_idx: scheduleId.toString(),
               plt_condition: '그룹원이 자신의 일정 삭제',
               plt_memo: '해당 그룹의 그룹오너/리더에게 일정이 삭제되었다는 푸시알림',
               plt_title: translations.txt_schedule_deleted,
@@ -241,7 +236,7 @@ class PushNotificationService {
           targetMember,
           {
             plt_type: '2',
-            sst_idx: scheduleId,
+            sst_idx: scheduleId.toString(),
             plt_condition: '그룹오너가 그룹원 일정 삭제',
             plt_memo: '해당 그룹원에게 일정이 삭제되었다는 푸시알림',
             plt_title: translations.txt_schedule_deleted,
@@ -261,7 +256,7 @@ class PushNotificationService {
    */
   private async notifyOwnersAndLeaders(
     groupMembers: GroupMemberInfo[],
-    baseNotification: Omit<PushNotificationRequest, 'mt_id'>
+    baseNotification: Omit<PushNotificationRequest, 'mt_idx'>
   ): Promise<void> {
     const ownersAndLeaders = groupMembers.filter(
       member => member.sgdt_owner_chk === 'Y' || member.sgdt_leader_chk === 'Y'
@@ -272,7 +267,7 @@ class PushNotificationService {
     for (const member of ownersAndLeaders) {
       const notification: PushNotificationRequest = {
         ...baseNotification,
-        mt_id: this.getMemberId(member),
+        mt_idx: member.mt_idx,
       };
 
       await this.sendPushNotification(notification);
@@ -284,13 +279,13 @@ class PushNotificationService {
    */
   private async notifyTargetMember(
     targetMember: GroupMemberInfo,
-    baseNotification: Omit<PushNotificationRequest, 'mt_id'>
+    baseNotification: Omit<PushNotificationRequest, 'mt_idx'>
   ): Promise<void> {
     console.log('[PUSH SERVICE] 👤 특정 멤버에게 알림 전송:', this.getMemberDisplayName(targetMember));
 
     const notification: PushNotificationRequest = {
       ...baseNotification,
-      mt_id: this.getMemberId(targetMember),
+      mt_idx: targetMember.mt_idx,
     };
 
     await this.sendPushNotification(notification);

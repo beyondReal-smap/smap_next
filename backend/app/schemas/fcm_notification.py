@@ -7,7 +7,7 @@ class FCMSendRequest(BaseModel):
     sst_idx: str   # 일정idx
     plt_condition: str  # 전송조건
     plt_memo: str  # 전송조건설명
-    mt_id: str     # 아이디
+    mt_idx: int    # 회원 인덱스 (mt_id 대신 mt_idx 사용)
     plt_title: str # 제목
     plt_content: str # 내용
 

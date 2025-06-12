@@ -18,7 +18,7 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key-here')
     
     # Firebase 설정
-    FIREBASE_CREDENTIALS_PATH = os.getenv('FIREBASE_CREDENTIALS_PATH', '/app/com-dmonster-smap-firebase-adminsdk-2zx5p-2610556cf5.json')
+    FIREBASE_CREDENTIALS_PATH = os.getenv('FIREBASE_CREDENTIALS_PATH', 'backend/com-dmonster-smap-firebase-adminsdk-2zx5p-2610556cf5.json')
     
     # 비밀번호 해시화 설정 (PHP PASSWORD_DEFAULT와 유사)
     PASSWORD_DEFAULT = "2y"  # bcrypt 알고리즘 식별자
