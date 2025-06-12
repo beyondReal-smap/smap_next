@@ -310,28 +310,24 @@ class ScheduleService {
     try {
       console.log('[SCHEDULE SERVICE] 🔥 스케줄 수정 시작:', scheduleData);
       
-      // 새로운 필드들을 포함한 요청 데이터 구성
+      // 백엔드 API 스키마에 맞는 요청 데이터 구성
       const requestData = {
-        sst_idx: scheduleData.sst_idx,
-        title: scheduleData.sst_title,
-        date: scheduleData.sst_sdate,
-        endDate: scheduleData.sst_edate,
-        location: scheduleData.sst_location_title,
-        memo: scheduleData.sst_memo,
-        // 새로운 필드들 추가
+        sst_title: scheduleData.sst_title,
+        sst_sdate: scheduleData.sst_sdate,
+        sst_edate: scheduleData.sst_edate,
         sst_all_day: scheduleData.sst_all_day,
+        sst_location_title: scheduleData.sst_location_title,
+        sst_location_add: scheduleData.sst_location_add,
+        sst_location_lat: scheduleData.sst_location_lat,
+        sst_location_long: scheduleData.sst_location_long,
+        sst_memo: scheduleData.sst_memo,
         sst_repeat_json: scheduleData.sst_repeat_json,
         sst_repeat_json_v: scheduleData.sst_repeat_json_v,
-        sst_alram: scheduleData.sst_alram ? 'Y' : 'N',
         sst_alram_t: scheduleData.sst_alram_t,
         sst_schedule_alarm_chk: scheduleData.sst_schedule_alarm_chk,
         sst_pick_type: scheduleData.sst_pick_type,
         sst_pick_result: scheduleData.sst_pick_result,
-        sst_location_add: scheduleData.sst_location_add,
-        sst_location_lat: scheduleData.sst_location_lat,
-        sst_location_long: scheduleData.sst_location_long,
-        sst_content: scheduleData.sst_memo, // memo와 content 동일하게 처리
-        // 타겟 멤버 정보 추가
+        // 타겟 멤버 정보
         targetMemberId: scheduleData.targetMemberId,
         sgdt_idx: scheduleData.sgdt_idx,
       };

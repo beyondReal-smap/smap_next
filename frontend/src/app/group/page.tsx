@@ -770,12 +770,7 @@ function GroupPageContent() {
           >
             <div className="flex items-center justify-between h-16 px-4">
               {currentView === 'list' ? (
-                <motion.div 
-                  className="flex items-center space-x-3"
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: 0.2, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-                >
+                <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 rounded-xl" style={{ backgroundColor: '#0113A3' }}>
                       <svg 
@@ -791,7 +786,7 @@ function GroupPageContent() {
                       <p className="text-xs text-gray-500">나의 소중한 그룹을 관리해보세요</p>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               ) : (
                 <div className="flex items-center space-x-3">
                   <motion.button 
@@ -802,17 +797,12 @@ function GroupPageContent() {
                   >
                     <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
                   </motion.button>
-                  <motion.div 
-                    className="flex items-center space-x-3"
-                    initial={{ x: 20, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: 0.2, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-                  >
+                  <div className="flex items-center space-x-3">
                     <div>
                       <h1 className="text-lg font-bold text-gray-900">그룹 상세</h1>
                       <p className="text-xs text-gray-500">멤버들과 함께하는 즐거운 공간</p>
                     </div>
-                  </motion.div>
+                  </div>
                 </div>
               )}
               

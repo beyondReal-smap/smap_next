@@ -31,6 +31,7 @@ export default function BottomNavBar() {
   return (
     <div 
       className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-[9999] !important"
+      id="bottom-navigation-bar"
       style={{
         position: 'fixed',
         bottom: 0,
@@ -39,7 +40,11 @@ export default function BottomNavBar() {
         zIndex: 9999,
         backgroundColor: 'white',
         borderTop: '1px solid #e5e7eb',
-        boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)'
+        boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
+        transform: 'none',
+        WebkitTransform: 'none',
+        backfaceVisibility: 'visible',
+        WebkitBackfaceVisibility: 'visible'
       }}
     >
       <nav className="flex justify-around items-center py-3">
