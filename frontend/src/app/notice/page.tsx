@@ -59,13 +59,35 @@ const mobileAnimations = `
   animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
 }
 
-/* glass-effect 스타일 추가 */
+/* glass-effect 스타일 추가 - 강제 고정 */
 .glass-effect {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999 !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  width: 100% !important;
+  height: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  overflow: visible !important;
+}
+
+/* 혹시 부모 요소가 relative나 다른 포지션인 경우를 위한 추가 스타일 */
+body, html {
+  position: relative !important;
+}
+
+/* 헤더가 잘리지 않도록 보장 */
+.glass-effect > * {
+  position: relative !important;
 }
 `;
 
@@ -404,18 +426,16 @@ function NoticeContent() {
 
   if (loading) {
     return (
-      <div className={`min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 ${
-        isExiting ? 'animate-slideOutToRight' : 
-        isEntering ? 'animate-slideInFromRight' : ''
-      }`}>
+      <>
         <style jsx global>{mobileAnimations}</style>
         
-        {/* 개선된 헤더 - group/page.tsx 스타일 */}
+        {/* 개선된 헤더 - 최상위 레벨에서 완전 고정 */}
         <motion.header 
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="fixed top-0 left-0 right-0 z-20 glass-effect"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect"
+          style={{ position: 'fixed' }}
         >
           <div className="flex items-center justify-between h-16 px-4">
             <div className="flex items-center space-x-3">
@@ -429,21 +449,9 @@ function NoticeContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </motion.button>
-              <div className="flex items-center space-x-3">
-                <motion.div
-                  initial={{ rotate: -180, scale: 0 }}
-                  animate={{ rotate: 0, scale: 1 }}
-                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                  className="p-2 bg-indigo-600 rounded-xl"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                </motion.div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">알림</h1>
-                  <p className="text-xs text-gray-500">새로운 소식을 확인해보세요</p>
-                </div>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">알림</h1>
+                <p className="text-xs text-gray-500">새로운 소식을 확인해보세요</p>
               </div>
             </div>
             
@@ -452,24 +460,29 @@ function NoticeContent() {
             </div>
           </div>
         </motion.header>
-      </div>
+        
+        {/* 로딩 컨텐츠 */}
+        <div className={`min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 pt-20 ${
+          isExiting ? 'animate-slideOutToRight' : 
+          isEntering ? 'animate-slideInFromRight' : ''
+        }`}>
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-600">알림을 불러오는 중...</p>
+            </div>
+          </div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 ${
-      isExiting ? 'animate-slideOutToRight' : 
-      isEntering ? 'animate-slideInFromRight' : ''
-    }`}>
+    <>
       <style jsx global>{mobileAnimations}</style>
       
-      {/* 개선된 헤더 - group/page.tsx 스타일 */}
-      <motion.header 
-        initial={{ y: -100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="fixed top-0 left-0 right-0 z-20 glass-effect"
-      >
+      {/* 개선된 헤더 - 최상위 레벨에서 완전 고정 */}
+      <header className="glass-effect">
         <div className="flex items-center justify-between h-16 px-4">
           <div className="flex items-center space-x-3">
             <motion.button 
@@ -482,21 +495,9 @@ function NoticeContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </motion.button>
-            <div className="flex items-center space-x-3">
-              <motion.div
-                initial={{ rotate: -180, scale: 0 }}
-                animate={{ rotate: 0, scale: 1 }}
-                transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                className="p-2 bg-indigo-600 rounded-xl"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-              </motion.div>
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">알림</h1>
-                <p className="text-xs text-gray-500">새로운 소식을 확인해보세요</p>
-              </div>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">알림</h1>
+              <p className="text-xs text-gray-500">새로운 소식을 확인해보세요</p>
             </div>
           </div>
           
@@ -515,34 +516,15 @@ function NoticeContent() {
             </motion.button>
           </div>
         </div>
-      </motion.header>
+              </header>
 
       {/* 메인 컨텐츠 영역 - 패딩 조정 */}
-      <main className="pt-20 pb-8 bg-gradient-to-b from-indigo-50/30 to-white">
-        <div className="px-4 pt-6 pb-16">
-          {notices.length === 0 ? (
-            <div className="fixed inset-0 bg-indigo-50 flex items-center justify-center z-[5]">
-              <div className="text-center px-6 py-12">
-                <div className="mb-8">
-                  <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-5 5-5-5h5v-6h5v6zM9 7H4l5-5 5 5H9v6H4V7z" />
-                    </svg>
-                  </div>
-                  <div className="flex items-center justify-center space-x-1 mb-2">
-                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-pulse"></div>
-                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                    <div className="w-2 h-2 bg-gray-300 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                  </div>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-700 mb-3">알림이 없습니다</h3>
-                <p className="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto">
-                  새로운 알림이 도착하면<br />
-                  여기에 표시됩니다
-                </p>
-              </div>
-            </div>
-           ) : (
+      <div className={`min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 ${
+        isExiting ? 'animate-slideOutToRight' : 
+        isEntering ? 'animate-slideInFromRight' : ''
+      }`}>
+        <main className="pt-20 pb-8 bg-gradient-to-b from-indigo-50/30 to-white">
+        <div className="px-4 pt-2 pb-16">
             <div className="space-y-6">
               {Object.entries(grouped).map(([date, items]) => (
                  <section 
@@ -597,7 +579,6 @@ function NoticeContent() {
                  </section>
                ))}
              </div>
-           )}
          </div>
       </main>
 
@@ -657,7 +638,8 @@ function NoticeContent() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

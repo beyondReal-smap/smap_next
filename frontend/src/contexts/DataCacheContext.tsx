@@ -122,12 +122,12 @@ interface DataCacheContextType {
 }
 
 const CACHE_DURATION = {
-  userProfile: 30 * 60 * 1000, // 30분
-  userGroups: 15 * 60 * 1000,  // 15분
-  groupMembers: 10 * 60 * 1000, // 10분
+  userProfile: 5 * 60 * 1000, // 5분
+  userGroups: 5 * 60 * 1000,  // 5분
+  groupMembers: 5 * 60 * 1000, // 5분
   scheduleData: 5 * 60 * 1000,  // 5분
-  locationData: 2 * 60 * 1000,  // 2분 (위치 데이터는 자주 변경)
-  groupPlaces: 30 * 60 * 1000,  // 30분
+  locationData: 5 * 60 * 1000,  // 5분
+  groupPlaces: 5 * 60 * 1000,  // 5분
   dailyLocationCounts: 5 * 60 * 1000, // 5분
 };
 

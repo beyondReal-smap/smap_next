@@ -22,6 +22,7 @@ import memberLocationLogService, { LocationLog, LocationSummary as APILocationSu
 import ErrorDisplay from './components/ErrorDisplay';
 import ErrorToast from './components/ErrorToast';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
+import InitialLoadingOverlay from './components/InitialLoadingOverlay';
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
 declare global {
@@ -584,13 +585,19 @@ export default function LogsPage() {
   const locationLogPolyline = useRef<any>(null); // 위치 로그 연결선을 위한 ref
   const startEndMarkers = useRef<any[]>([]); // 시작/종료 마커들을 위한 ref
   const stayTimeMarkers = useRef<any[]>([]); // 체류시간 마커들을 위한 ref
-  const arrowMarkers = useRef<any[]>([]); // 화살표 마커들을 저장할 배열 추가
+  const arrowMarkers = useRef<any[]>([]); // 화살표 마커들 저장할 배열 추가
     const currentPositionMarker = useRef<any>(null); // 슬라이더 현재 위치 마커를 위한 ref
   const sliderRef = useRef<HTMLDivElement>(null); // 슬라이더 요소를 위한 ref
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
-  const [isMapLoading, setIsMapLoading] = useState(true); 
+  const [isMapLoading, setIsMapLoading] = useState(true);
   const [isMapInitializedLogs, setIsMapInitializedLogs] = useState(false); // Logs 페이지용 지도 초기화 상태
   const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false); // 초기 데이터 로딩 상태 추가
+
+  // 포괄적인 초기 로딩 상태 관리 추가
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [loadingStep, setLoadingStep] = useState<'maps' | 'groups' | 'members' | 'data' | 'complete'>('maps');
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [hasInitialLoadFailed, setHasInitialLoadFailed] = useState(false);
 
   // 첫 진입 애니메이션 상태 관리
   const [showHeader, setShowHeader] = useState(true);
@@ -650,9 +657,12 @@ export default function LogsPage() {
   
   // 에러 상태 관리
   const [dataError, setDataError] = useState<{
-    type: 'network' | 'no_data' | 'unknown';
+    type: 'network' | 'server' | 'timeout' | 'data' | 'unknown';
     message: string;
     retryable: boolean;
+    details?: any;
+    timestamp?: string;
+    context?: string;
   } | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
@@ -660,30 +670,100 @@ export default function LogsPage() {
 
   // 에러 처리 헬퍼 함수
   const handleDataError = (error: any, context: string) => {
-    console.error(`[${context}] 데이터 로딩 오류:`, error);
+    const timestamp = new Date().toISOString();
+    console.error(`[${context}] 💥 데이터 로딩 오류 발생:`, {
+      error,
+      context,
+      timestamp,
+      userAgent: navigator.userAgent,
+      isOnline: navigator.onLine,
+      url: window.location.href,
+      selectedMember: groupMembers.find(m => m.isSelected)?.name,
+      selectedDate,
+      selectedGroupId
+    });
     
-    let errorType: 'network' | 'no_data' | 'unknown' = 'unknown';
+    // 에러 타입 정확히 분류
+    let errorType: 'network' | 'server' | 'timeout' | 'data' | 'unknown' = 'unknown';
     let errorMessage = '데이터를 불러오는 중 오류가 발생했습니다.';
     let retryable = true;
+    let errorDetails: any = null;
 
-    if (error?.response?.status === 404) {
-      errorType = 'no_data';
-      errorMessage = '해당 날짜의 데이터가 없습니다.';
+    // 네트워크 연결 문제
+    if (!navigator.onLine) {
+      errorType = 'network';
+      errorMessage = '인터넷 연결이 끊어졌습니다. 연결을 확인하고 다시 시도해주세요.';
+      retryable = true;
+    }
+    // 타임아웃 오류
+    else if (error?.message?.includes('타임아웃') || error?.message?.includes('timeout')) {
+      errorType = 'timeout';
+      errorMessage = '응답 시간이 초과되었습니다. 네트워크 상태를 확인하고 다시 시도해주세요.';
+      retryable = true;
+    }
+    // 서버 오류 (5xx)
+    else if (error?.response?.status >= 500) {
+      errorType = 'server';
+      errorMessage = `서버 오류가 발생했습니다 (${error.response.status}). 잠시 후 다시 시도해주세요.`;
+      retryable = true;
+      errorDetails = {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      };
+    }
+    // 클라이언트 오류 (4xx)
+    else if (error?.response?.status >= 400 && error?.response?.status < 500) {
+      if (error.response.status === 404) {
+        errorType = 'data';
+        errorMessage = '요청한 데이터를 찾을 수 없습니다. 다른 날짜나 멤버를 선택해보세요.';
+        retryable = false;
+      } else {
+        errorType = 'data';
+        errorMessage = `잘못된 요청입니다 (${error.response.status}). 다시 시도해주세요.`;
+        retryable = true;
+      }
+      errorDetails = {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      };
+    }
+    // 네트워크 관련 오류
+    else if (error?.code === 'NETWORK_ERROR' || 
+             error?.message?.includes('network') ||
+             error?.message?.includes('Network') ||
+             error?.message?.includes('fetch') ||
+             error?.message?.includes('핵심 API 호출이 모두 실패')) {
+      errorType = 'network';
+      errorMessage = '네트워크 연결에 문제가 있습니다. 연결 상태를 확인하고 다시 시도해주세요.';
+      retryable = true;
+    }
+    // 기타 알 수 없는 오류
+    else {
+      errorType = 'unknown';
+      errorMessage = error?.message || '알 수 없는 오류가 발생했습니다.';
+      retryable = true;
+      errorDetails = {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name
+      };
+    }
+
+    // 상세 정보 추가
+    if (context.includes('retry-failed')) {
+      errorMessage += ' 여러 번 재시도했지만 계속 실패하고 있습니다.';
       retryable = false;
-    } else if (error?.code === 'NETWORK_ERROR' || error?.message?.includes('network')) {
-      errorType = 'network';
-      errorMessage = '네트워크 연결을 확인해주세요.';
-      retryable = true;
-    } else if (error?.response?.status >= 500) {
-      errorType = 'network';
-      errorMessage = '서버에 일시적인 문제가 발생했습니다.';
-      retryable = true;
     }
 
     setDataError({
       type: errorType,
       message: errorMessage,
-      retryable
+      retryable,
+      details: errorDetails,
+      timestamp,
+      context
     });
   };
 
@@ -706,57 +786,98 @@ export default function LogsPage() {
 
 
 
-  // 초기 데이터 로딩 시뮬레이션 - 성능 최적화
+  // 초기 로딩 완료 체크
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsInitialDataLoaded(true);
-    }, 300); // 1000ms → 300ms (70% 단축)
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // 첫 진입 시 헤더는 계속 유지
-  useEffect(() => {
-    if (isInitialDataLoaded && !isMapLoading && isMapInitializedLogs) {
-      // 헤더는 계속 표시 상태로 유지
-      setShowHeader(true);
-      setShowDateSelection(true);
-    }
-  }, [isInitialDataLoaded, isMapLoading, isMapInitializedLogs]);
-
-  // 백업 타이머 - 지도 로딩이 너무 오래 걸리는 경우 강제 완료 (성능 최적화)
-  useEffect(() => {
-    const backupTimer = setTimeout(() => {
-      if (isMapLoading) {
-        console.log('[LOGS] 백업 타이머 - 지도 로딩 강제 완료');
+    if (
+      naverMapsLoaded && 
+      isMapInitializedLogs && 
+      groupMembers.length > 0 && 
+      loadingStep !== 'complete'
+    ) {
+      console.log('[LOGS] 모든 초기 로딩 완료');
+      setLoadingStep('complete');
+      setLoadingProgress(100);
+      
+      // 완료 후 조금의 딜레이를 두고 초기 로딩 상태 해제
+      setTimeout(() => {
+        setIsInitialLoading(false);
         setIsMapLoading(false);
         setIsInitialDataLoaded(true);
         setShowHeader(true);
         setShowDateSelection(true);
+      }, 500);
+    }
+  }, [naverMapsLoaded, isMapInitializedLogs, groupMembers.length, loadingStep]);
+
+  // 백업 타이머 - 초기 로딩이 너무 오래 걸리는 경우 강제 완료
+  useEffect(() => {
+    const backupTimer = setTimeout(() => {
+      if (isInitialLoading && !hasInitialLoadFailed) {
+        console.log('[LOGS] 백업 타이머 - 초기 로딩 강제 완료');
+        setIsInitialLoading(false);
+        setIsMapLoading(false);
+        setIsInitialDataLoaded(true);
+        setShowHeader(true);
+        setShowDateSelection(true);
+        setLoadingStep('complete');
+        setLoadingProgress(100);
       }
-    }, 1500); // 3000ms → 1500ms (50% 단축)
+    }, 10000); // 10초 백업 타이머
 
     return () => clearTimeout(backupTimer);
-  }, [isMapLoading]);
+  }, [isInitialLoading, hasInitialLoadFailed]);
+
+  // 초기 로딩 재시도 함수
+  const handleInitialLoadingRetry = () => {
+    console.log('[LOGS] 초기 로딩 재시도');
+    setHasInitialLoadFailed(false);
+    setIsInitialLoading(true);
+    setLoadingStep('maps');
+    setLoadingProgress(10);
+    
+    // 네이버 지도 API 다시 로드
+    loadNaverMapsAPI();
+  };
+
+  // 초기 로딩 건너뛰기 함수
+  const handleInitialLoadingSkip = () => {
+    console.log('[LOGS] 초기 로딩 건너뛰기');
+    setIsInitialLoading(false);
+    setIsMapLoading(false);
+    setIsInitialDataLoaded(true);
+    setShowHeader(true);
+    setShowDateSelection(true);
+    setLoadingStep('complete');
+    setLoadingProgress(100);
+  };
 
   const loadNaverMapsAPI = () => {
     if (window.naver?.maps) {
+      console.log('[LOGS] Naver Maps API 이미 로드됨');
       setNaverMapsLoaded(true);
+      setLoadingStep('groups');
+      setLoadingProgress(25);
       return;
     }
+    
+    console.log('[LOGS] Naver Maps API 로딩 시작');
+    setLoadingStep('maps');
+    setLoadingProgress(10);
+    
     const script = document.createElement('script');
     script.id = 'naver-maps-script-logs'; // 스크립트 ID 변경 (다른 페이지와 충돌 방지)
     script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${NAVER_MAPS_CLIENT_ID}&submodules=geocoder,drawing,visualization`;
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      console.log('[LOGS] Naver Maps API 로드 완료 - 즉시 지도 로딩 완료');
+      console.log('[LOGS] Naver Maps API 로드 완료');
       setNaverMapsLoaded(true);
-      setIsMapLoading(false); // API 로드 완료 시 즉시 로딩 상태 해제
-      setIsInitialDataLoaded(true); // API 로드 완료 시 초기 데이터도 즉시 로딩 완료 처리
+      setLoadingStep('groups');
+      setLoadingProgress(25);
     };
     script.onerror = () => {
-      console.error('Failed to load Naver Maps API for LogsPage.');
+      console.error('[LOGS] Naver Maps API 로드 실패');
+      setHasInitialLoadFailed(true);
       setIsMapLoading(false);
     };
     const existingScript = document.getElementById('naver-maps-script-logs');
@@ -778,12 +899,15 @@ export default function LogsPage() {
       globalPageExecuted = true;
       console.log(`[${instanceId.current}] 메인 인스턴스로 설정됨`);
       
-      // 메인 인스턴스에서 첫 번째 그룹 자동 선택 (캐시 또는 API에서)
-      if (userGroups && userGroups.length > 0 && !selectedGroupId) {
-        const firstGroupId = userGroups[0].sgt_idx;
-        console.log(`[${instanceId.current}] 첫 번째 그룹 자동 선택:`, firstGroupId);
-        setSelectedGroupId(firstGroupId);
-      }
+              // 메인 인스턴스에서 첫 번째 그룹 자동 선택 (캐시 또는 API에서)
+        if (userGroups && userGroups.length > 0 && !selectedGroupId) {
+          const firstGroupId = userGroups[0].sgt_idx;
+          console.log(`[${instanceId.current}] 첫 번째 그룹 자동 선택:`, firstGroupId);
+          setSelectedGroupId(firstGroupId);
+          // 그룹 선택 시 로딩 상태 업데이트
+          setLoadingStep('groups');
+          setLoadingProgress(40);
+        }
     } else {
       console.log(`[${instanceId.current}] 서브 인스턴스 - 실행하지 않음`);
     }
@@ -830,7 +954,6 @@ export default function LogsPage() {
         map.current = new window.naver.maps.Map(mapContainer.current, mapOptions);
         window.naver.maps.Event.addListener(map.current, 'init', () => {
             console.log('Naver Map initialized for LogsPage with member location');
-            setIsMapLoading(false);
             setIsMapInitializedLogs(true); // 지도 초기화 완료 상태 설정
             if(map.current) map.current.refresh(true);
         });
@@ -2124,14 +2247,28 @@ export default function LogsPage() {
       return;
     }
     
-    // 다른 멤버의 요청이 실행 중인 경우 취소하고 새 요청 시작
+    // 다른 멤버의 요청이 실행 중인 경우 기존 요청 완료 대기 (과도한 취소 방지)
     if (loadLocationDataExecutingRef.current.executing && loadLocationDataExecutingRef.current.currentRequest !== executionKey) {
-      console.log(`[loadLocationData] 🛑 다른 멤버 요청 진행 중 - 이전 요청 취소: ${loadLocationDataExecutingRef.current.currentRequest} → ${executionKey}`);
-      loadLocationDataExecutingRef.current.cancelled = true;
-      loadLocationDataExecutingRef.current.executing = false;
-      loadLocationDataExecutingRef.current.currentRequest = undefined;
-      // 잠시 대기하여 이전 요청이 정리되도록 함
-      await new Promise(resolve => setTimeout(resolve, 100));
+      const existingRequest = loadLocationDataExecutingRef.current.currentRequest;
+      console.log(`[loadLocationData] ⏳ 다른 요청 진행 중 - 완료 대기: ${existingRequest} (새 요청: ${executionKey})`);
+      
+      // 기존 요청이 5초 이상 지속되는 경우에만 취소
+      const waitStart = Date.now();
+      while (loadLocationDataExecutingRef.current.executing && 
+             loadLocationDataExecutingRef.current.currentRequest === existingRequest &&
+             Date.now() - waitStart < 5000) {
+        await new Promise(resolve => setTimeout(resolve, 200)); // 200ms마다 확인
+      }
+      
+      // 5초 후에도 진행 중이면 강제 취소
+      if (loadLocationDataExecutingRef.current.executing && 
+          loadLocationDataExecutingRef.current.currentRequest === existingRequest) {
+        console.log(`[loadLocationData] 🛑 5초 초과 - 이전 요청 강제 취소: ${existingRequest}`);
+        loadLocationDataExecutingRef.current.cancelled = true;
+        loadLocationDataExecutingRef.current.executing = false;
+        loadLocationDataExecutingRef.current.currentRequest = undefined;
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
     
     // 새로운 요청 시작
@@ -2156,23 +2293,66 @@ export default function LogsPage() {
         setTimeout(() => reject(new Error('API 요청 타임아웃 (30초)')), 30000);
       });
 
-      // 초기 진입 최적화: 핵심 API만 먼저 호출 (지도 렌더링 필수 데이터)
-      console.log('[loadLocationData] 핵심 API 먼저 로딩 (지도 렌더링용)');
-      const coreApiPromises = Promise.all([
-        memberLocationLogService.getMapMarkers(mtIdx, date).catch(err => {
-          console.warn('[loadLocationData] getMapMarkers 실패:', err);
-          return []; // 실패 시 빈 배열 반환
-        }),
-        memberLocationLogService.getStayTimes(mtIdx, date).catch(err => {
-          console.warn('[loadLocationData] getStayTimes 실패:', err);
-          return []; // 실패 시 빈 배열 반환
-        })
-      ]);
-
-      const [mapMarkers, stayTimes] = await Promise.race([
-        coreApiPromises,
-        timeoutPromise
-      ]) as any[];
+      // 강화된 API 호출 로직 - 개별 호출로 변경하여 더 정확한 에러 추적
+      console.log('[loadLocationData] 🎯 강화된 API 호출 시작');
+      
+      let mapMarkers: MapMarker[] = [];
+      let stayTimes: StayTime[] = [];
+      let hasAnyApiSuccess = false;
+      
+      // 1. getMapMarkers API 호출
+      try {
+        console.log('[loadLocationData] 📍 getMapMarkers 호출 중...');
+        mapMarkers = await Promise.race([
+          memberLocationLogService.getMapMarkers(mtIdx, date),
+          timeoutPromise
+        ]) as MapMarker[];
+        
+        console.log('[loadLocationData] ✅ getMapMarkers 성공:', {
+          count: mapMarkers?.length || 0,
+          firstMarker: mapMarkers?.[0]
+        });
+        hasAnyApiSuccess = true;
+        
+      } catch (mapMarkersError: any) {
+        console.error('[loadLocationData] ❌ getMapMarkers 실패:', {
+          error: mapMarkersError,
+          errorMessage: mapMarkersError?.message,
+          errorStatus: mapMarkersError?.response?.status,
+          errorData: mapMarkersError?.response?.data
+        });
+        mapMarkers = [];
+      }
+      
+      // 2. getStayTimes API 호출
+      try {
+        console.log('[loadLocationData] ⏱️ getStayTimes 호출 중...');
+        stayTimes = await Promise.race([
+          memberLocationLogService.getStayTimes(mtIdx, date),
+          timeoutPromise
+        ]) as StayTime[];
+        
+        console.log('[loadLocationData] ✅ getStayTimes 성공:', {
+          count: stayTimes?.length || 0,
+          firstStayTime: stayTimes?.[0]
+        });
+        hasAnyApiSuccess = true;
+        
+      } catch (stayTimesError: any) {
+        console.error('[loadLocationData] ❌ getStayTimes 실패:', {
+          error: stayTimesError,
+          errorMessage: stayTimesError?.message,
+          errorStatus: stayTimesError?.response?.status,
+          errorData: stayTimesError?.response?.data
+        });
+        stayTimes = [];
+      }
+      
+      // 모든 API가 실패한 경우 에러 처리
+      if (!hasAnyApiSuccess) {
+        console.error('[loadLocationData] 💥 모든 핵심 API 호출 실패');
+        throw new Error('핵심 API 호출이 모두 실패했습니다. 네트워크 상태를 확인해주세요.');
+      }
 
       // 나머지 API들은 지연 로딩하고 기본값으로 설정
       const logs: any[] = [];
@@ -2226,9 +2406,11 @@ export default function LogsPage() {
         }
       }, 1500); // 1.5초 후 지연 로딩
 
-      // API 응답 완료 후 요청이 여전히 유효한지 확인
+      // API 응답 완료 후 요청이 여전히 유효한지 확인 (단, 로딩 상태는 항상 해제)
       if (loadLocationDataExecutingRef.current.cancelled || loadLocationDataExecutingRef.current.currentRequest !== executionKey) {
-        console.log(`[loadLocationData] 🚫 요청이 취소되었거나 다른 요청으로 대체됨 - 결과 무시: ${executionKey}`);
+        console.log(`[loadLocationData] 🚫 요청이 취소되었거나 다른 요청으로 대체됨 - 결과 무시하지만 모든 로딩 상태는 해제: ${executionKey}`);
+        setIsLocationDataLoading(false); // 로딩 상태 해제하여 스켈레톤 중단
+        setIsMapLoading(false); // 지도 로딩 상태도 해제
         return;
       }
       console.log(`[loadLocationData] ✅ API 응답 완료 - 결과 처리 시작: ${executionKey}`);
@@ -2344,6 +2526,11 @@ export default function LogsPage() {
             if (selectedMember && map.current) {
               updateMemberMarkers([selectedMember], false);
             }
+          } finally {
+            // 렌더링 완료 또는 실패 시 모든 로딩 상태 해제
+            setIsLocationDataLoading(false);
+            setIsMapLoading(false);
+            console.log('[loadLocationData] 🔄 지도 렌더링 완료 - 모든 로딩 상태 해제');
           }
         }, 100); // 100ms 지연
       } else {
@@ -2351,30 +2538,60 @@ export default function LogsPage() {
           mapReady: !!map.current,
           naverMapsReady: !!window.naver?.maps
         });
+        // 지도가 준비되지 않은 경우에도 모든 로딩 상태 해제
+        setIsLocationDataLoading(false);
+        setIsMapLoading(false);
+        console.log('[loadLocationData] 🔄 지도 미준비로 인한 모든 로딩 상태 해제');
       }
 
-    } catch (error) {
-      console.error('[loadLocationData] 위치 데이터 로딩 오류:', error);
+    } catch (error: any) {
+      console.error('[loadLocationData] 💥 위치 데이터 로딩 오류:', {
+        error,
+        errorMessage: error?.message,
+        errorStack: error?.stack,
+        errorStatus: error?.response?.status,
+        errorData: error?.response?.data,
+        mtIdx,
+        date,
+        executionKey,
+        isOnline: navigator.onLine
+      });
       
-      // 네트워크 오류나 타임아웃인 경우 자동 재시도 (최대 2회)
+      // 네트워크 오류나 타임아웃인 경우 자동 재시도 (최대 3회)
       const errorMessage = error instanceof Error ? error.message : String(error);
       const isNetworkError = errorMessage.includes('타임아웃') || 
                             errorMessage.includes('Network') || 
-                            errorMessage.includes('fetch');
+                            errorMessage.includes('fetch') ||
+                            errorMessage.includes('핵심 API 호출이 모두 실패') ||
+                            !navigator.onLine ||
+                            error?.code === 'NETWORK_ERROR';
       
-      if (isNetworkError && retryCount < 2) {
-        console.log(`[loadLocationData] 네트워크 오류 감지 - 자동 재시도 (${retryCount + 1}/2):`, errorMessage);
+      if (isNetworkError && retryCount < 3) {
+        console.log(`[loadLocationData] 🔄 네트워크 오류 감지 - 자동 재시도 (${retryCount + 1}/3):`, errorMessage);
         setRetryCount(prev => prev + 1);
         
-        // 2초 후 재시도
+        // 점진적 지연 (1초, 2초, 3초)
+        const retryDelay = (retryCount + 1) * 1000;
+        console.log(`[loadLocationData] ⏰ ${retryDelay}ms 후 재시도 예정`);
+        
         setTimeout(() => {
+          console.log(`[loadLocationData] 🚀 재시도 실행 중... (${retryCount + 1}/3)`);
           loadLocationData(mtIdx, date);
-        }, 2000);
+        }, retryDelay);
         return;
       }
       
-      // 에러 처리
-      handleDataError(error, 'loadLocationData');
+      // 모든 재시도 실패 또는 네트워크 오류가 아닌 경우
+      if (retryCount >= 3) {
+        console.error(`[loadLocationData] 💔 모든 재시도 실패 (${retryCount}/3):`, errorMessage);
+        const retryFailedError = new Error(
+          `네트워크 연결이 불안정합니다. ${retryCount}번 재시도했지만 데이터를 가져올 수 없습니다.`
+        );
+        handleDataError(retryFailedError, 'loadLocationData-retry-failed');
+      } else {
+        // 일반 에러 처리
+        handleDataError(error, 'loadLocationData');
+      }
       
       // 오류 시 기본값으로 설정 및 지도 정리
       setCurrentLocationLogs([]);
@@ -2412,12 +2629,18 @@ export default function LogsPage() {
 
     } finally {
       // 항상 상태 정리 (취소 로직 제거)
-      setIsLocationDataLoading(false); // 로딩 상태 종료
+      console.log(`[loadLocationData] 🔄 Finally 블록 - 상태 정리 시작: ${executionKey}`);
+      
+      // 모든 로딩 상태 강제 해제 (스켈레톤 멈춤 방지)
+      setIsLocationDataLoading(false);
+      setIsMapLoading(false);
+      console.log(`[loadLocationData] ✅ 모든 로딩 상태 강제 해제 완료: ${executionKey}`);
+      
       loadLocationDataExecutingRef.current.executing = false;
       loadLocationDataExecutingRef.current.currentRequest = undefined;
       loadLocationDataExecutingRef.current.cancelled = false; // 항상 false로 리셋
       
-      console.log(`[loadLocationData] 🔄 로딩 상태 정리 완료: ${executionKey}`);
+      console.log(`[loadLocationData] 🔄 모든 상태 정리 완료: ${executionKey}`);
       
       // 성공적으로 완료된 경우 마지막 로딩된 멤버 정보 업데이트
       if (!loadLocationDataExecutingRef.current.cancelled && loadLocationDataExecutingRef.current.currentRequest === executionKey) {
@@ -3467,6 +3690,10 @@ export default function LogsPage() {
       fetchDataExecutingRef.current = true;
       const fetchId = Math.random().toString(36).substr(2, 9);
       console.log(`[${instanceId.current}-fetchAllGroupData-${fetchId}] 데이터 페칭 시작:`, selectedGroupId);
+      
+      // 로딩 단계 업데이트 - 멤버 데이터 조회 시작
+      setLoadingStep('members');
+      setLoadingProgress(60);
 
       try {
         const groupIdToUse = selectedGroupId.toString();
@@ -3521,8 +3748,49 @@ export default function LogsPage() {
             console.log('[LOGS] 캐시 미스 - API에서 그룹 멤버 데이터 조회');
             
             try {
-              const memberData = await memberService.getGroupMembers(groupIdToUse);
-            
+              // 재시도 로직으로 무조건 성공하게 개선
+              let memberData = null;
+              let retryCount = 0;
+              const maxRetries = 3;
+              
+              while (retryCount < maxRetries && !memberData) {
+                try {
+                  console.log(`[LOGS] 그룹 멤버 조회 시도 ${retryCount + 1}/${maxRetries}:`, groupIdToUse);
+                  memberData = await memberService.getGroupMembers(groupIdToUse);
+                  
+                  if (memberData && memberData.length > 0) {
+                    console.log(`[LOGS] 그룹 멤버 조회 성공 (${retryCount + 1}번째 시도):`, memberData.length, '명');
+                    break;
+                  }
+                  
+                  console.warn(`[LOGS] 그룹 멤버 조회 결과 없음 (${retryCount + 1}번째 시도)`);
+                  retryCount++;
+                  
+                  if (retryCount < maxRetries) {
+                    const backoffDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // 최대 5초
+                    console.log(`[LOGS] ${backoffDelay}ms 후 재시도...`);
+                    await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                  }
+                } catch (memberError) {
+                  console.error(`[LOGS] 그룹 멤버 조회 오류 (${retryCount + 1}번째 시도):`, memberError);
+                  retryCount++;
+                  
+                  if (retryCount < maxRetries) {
+                    const backoffDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // 최대 5초
+                    console.log(`[LOGS] 오류 발생, ${backoffDelay}ms 후 재시도...`);
+                    await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                  } else {
+                    // 최종 실패 시에도 기존 캐시 데이터 확인
+                    console.warn('[LOGS] 모든 재시도 실패, 만료된 캐시 데이터 확인 중...');
+                    const expiredCachedMembers = getCachedGroupMembers(selectedGroupId);
+                    if (expiredCachedMembers && expiredCachedMembers.length > 0) {
+                      console.log('[LOGS] 만료된 캐시 데이터 사용:', expiredCachedMembers.length, '명');
+                      memberData = expiredCachedMembers;
+                    }
+                  }
+                }
+              }
+              
               if (isMounted && memberData && memberData.length > 0) { 
                 // 캐시에 저장 (타입 변환)
                 const cacheMembers = memberData.map((member: any) => ({
@@ -3581,6 +3849,10 @@ export default function LogsPage() {
                 });
                 setGroupMembers(currentMembers);
 
+                // 로딩 단계 업데이트 - 멤버 데이터 로딩 완료
+                setLoadingStep('data');
+                setLoadingProgress(85);
+
                 // 첫 번째 멤버의 데이터 기반 통합 지도 설정 - 자동 날짜 선택 후 처리됨
                 if (currentMembers.length > 0 && map.current) {
                   const firstMember = currentMembers[0];
@@ -3591,52 +3863,15 @@ export default function LogsPage() {
                 console.warn('❌ No member data from API, or API call failed.');
                 setGroupMembers([]);
                 
-                // 멤버 데이터 로딩 실패 시 더 적극적인 백업 처리 (성능 최적화)
-                console.log('[LOGS] 멤버 데이터 없음 - 500ms 후 백업 데이터 시도');
-                setTimeout(() => {
-                  if (groupMembers.length === 0) {
-                    console.log('[LOGS] 백업 시간 경과 - 기본 멤버 데이터로 초기화 시도');
-                    // 기본 멤버 데이터 생성 (임시)
-                    const backupMember = {
-                      id: '1',
-                      name: '기본 멤버',
-                      photo: null,
-                      isSelected: true,
-                      location: { lat: 37.5665, lng: 126.9780 }, // 서울시청
-                      mt_gender: null,
-                      original_index: 0,
-                      sgdt_idx: selectedGroupId
-                    };
-                    setGroupMembers([backupMember]);
-                    console.log('[LOGS] 백업 멤버 데이터 설정 완료');
-                  }
-                }, 500);
-                
+                console.log('[LOGS] 멤버 데이터 없음 - 초기 로딩 실패 처리');
+                setHasInitialLoadFailed(true);
+                setLoadingStep('members');
                 handleDataError(new Error('그룹 멤버 데이터가 없습니다.'), 'fetchAllGroupData');
               }
             } catch (memberError) {
               console.error('[LOGS] 그룹 멤버 조회 API 오류:', memberError);
-              
-              // API 오류 시에도 백업 처리 (성능 최적화)
-              console.log('[LOGS] API 오류 - 300ms 후 백업 데이터 시도');
-              setTimeout(() => {
-                if (groupMembers.length === 0) {
-                  console.log('[LOGS] 오류 백업 시간 경과 - 기본 멤버 데이터로 초기화');
-                  const backupMember = {
-                    id: '1',
-                    name: '백업 멤버',
-                    photo: null,
-                    isSelected: true,
-                    location: { lat: 37.5665, lng: 126.9780 },
-                    mt_gender: null,
-                    original_index: 0,
-                    sgdt_idx: selectedGroupId
-                  };
-                  setGroupMembers([backupMember]);
-                  console.log('[LOGS] 오류 백업 멤버 데이터 설정 완료');
-                }
-              }, 300);
-              
+              setHasInitialLoadFailed(true);
+              setLoadingStep('members');
               handleDataError(memberError, 'fetchAllGroupData');
               setGroupMembers([]);
             } 
@@ -4804,6 +5039,16 @@ export default function LogsPage() {
     <>
       <style jsx global>{pageStyles}</style>
       
+      {/* 초기 로딩 오버레이 */}
+      {/* <InitialLoadingOverlay
+        isVisible={isInitialLoading}
+        loadingStep={loadingStep}
+        progress={loadingProgress}
+        hasFailed={hasInitialLoadFailed}
+        onRetry={handleInitialLoadingRetry}
+        onSkip={handleInitialLoadingSkip}
+      /> */}
+      
       {/* 메인 컨테이너 */}
       <motion.div
         variants={pageVariants}
@@ -4867,8 +5112,8 @@ export default function LogsPage() {
             position: 'relative' // 로딩 오버레이를 위한 relative 포지션
           }}
         >
-          {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
-          {isMapLoading && (
+          {/* 스켈레톤 UI - 초기 로딩이 완료되지 않았지만 초기 로딩 오버레이는 보이지 않을 때 표시 */}
+          {(!isInitialLoading && isMapLoading) && (
             <MapSkeleton 
               showControls={true} 
               showMemberList={false}
@@ -4949,7 +5194,7 @@ export default function LogsPage() {
                       </div>
                       
                       {/* 로딩 상태 표시 */}
-                      {isLocationDataLoading && (
+                      {(isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) && (
                         <div className="ml-1">
                           <motion.div
                             animate={{ rotate: 360 }}
@@ -4962,7 +5207,7 @@ export default function LogsPage() {
                     </div>
 
                     {/* 오른쪽: 위치기록 요약 (로딩 중이 아닐 때만 표시) */}
-                    {!isLocationDataLoading && (
+                    {!(isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) && (
                       <div className="flex items-center space-x-3 text-xs flex-shrink-0">
                         {/* 거리 */}
                         <div className="flex flex-col items-center space-y-1">

@@ -307,14 +307,12 @@ function GroupPageContent() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isMemberManageModalOpen, setIsMemberManageModalOpen] = useState(false);
   
   // 폼 상태
   const [newGroup, setNewGroup] = useState<GroupForm>({ name: '', description: '' });
   const [editGroup, setEditGroup] = useState<GroupForm>({ name: '', description: '' });
   const [selectedMember, setSelectedMember] = useState<GroupMember | null>(null);
-  const [successMessage, setSuccessMessage] = useState('');
   
   // UI 상태
   const [currentView, setCurrentView] = useState<'list' | 'detail'>('list');
@@ -547,28 +545,32 @@ function GroupPageContent() {
       };
       
       const createdGroup = await groupService.createGroup(groupData);
-      const newGroupItem: ExtendedGroup = {
-        sgt_idx: createdGroup.sgt_idx,
-        sgt_title: createdGroup.sgt_title,
-        sgt_content: createdGroup.sgt_memo || '',
-        sgt_memo: createdGroup.sgt_memo,
-        mt_idx: createdGroup.mt_idx,
-        sgt_show: createdGroup.sgt_show,
-        sgt_wdate: createdGroup.sgt_wdate,
-        memberCount: 1
-      };
       
-      setGroups(prev => [newGroupItem, ...prev]);
+      // 그룹 생성 후 최신 그룹 목록을 다시 조회하여 코드 등 모든 정보를 업데이트
+      await fetchGroups();
+      
+      // 생성된 그룹을 선택된 그룹으로 설정 (최신 정보 포함)
+      const updatedGroups = await groupService.getCurrentUserGroups();
+      const freshGroup = updatedGroups.find(g => g.sgt_idx === createdGroup.sgt_idx);
+      
+      if (freshGroup) {
+        const newGroupItem: ExtendedGroup = {
+          ...freshGroup,
+          sgt_code: (freshGroup as any).sgt_code || null,
+          sgt_memo: freshGroup.sgt_content || '',
+          memberCount: 1
+        };
+        setSelectedGroup(newGroupItem);
+      }
+      
       setGroupMemberCounts(prev => ({
         ...prev,
         [createdGroup.sgt_idx]: 1
       }));
-      setSelectedGroup(newGroupItem);
       setIsAddModalOpen(false);
       setNewGroup({ name: '', description: '' });
       
-      setSuccessMessage('새 그룹이 성공적으로 생성되었습니다.');
-      setIsSuccessModalOpen(true);
+      showToastModal('success', '그룹 생성 완료', '새 그룹이 성공적으로 생성되었습니다.');
     } catch (error) {
       console.error('그룹 생성 오류:', error);
       alert('그룹 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -609,8 +611,7 @@ function GroupPageContent() {
       setIsEditModalOpen(false);
       setEditGroup({ name: '', description: '' });
       
-      setSuccessMessage('그룹이 성공적으로 수정되었습니다.');
-      setIsSuccessModalOpen(true);
+      showToastModal('success', '그룹 수정 완료', '그룹이 성공적으로 수정되었습니다.');
     } catch (error) {
       console.error('그룹 수정 오류:', error);
       alert('그룹 수정 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -634,8 +635,7 @@ function GroupPageContent() {
       setIsDeleteModalOpen(false);
       setCurrentView('list');
       
-      setSuccessMessage('그룹이 목록에서 숨겨졌습니다.');
-      setIsSuccessModalOpen(true);
+      showToastModal('success', '그룹 삭제 완료', '그룹이 삭제되었습니다.');
     } catch (error) {
       console.error('그룹 삭제 오류:', error);
       alert('그룹 삭제 중 오류가 발생했습니다. 다시 시도해주세요.');
@@ -650,8 +650,7 @@ function GroupPageContent() {
     navigator.clipboard.writeText(inviteLink)
       .then(() => {
         setIsShareModalOpen(false);
-        setSuccessMessage('초대 링크가 복사되었습니다!');
-        setIsSuccessModalOpen(true);
+        showToastModal('success', '링크 복사 완료', '초대 링크가 복사되었습니다!');
       })
       .catch(err => {
         console.error('링크 복사 실패:', err);
@@ -696,8 +695,7 @@ function GroupPageContent() {
       
       setIsMemberManageModalOpen(false);
       setSelectedMember(null);
-      setSuccessMessage(result.message);
-      setIsSuccessModalOpen(true);
+      showToastModal('success', '역할 변경 완료', result.message);
     } catch (error) {
       console.error('멤버 역할 변경 오류:', error);
       const errorMessage = error instanceof Error ? error.message : '역할 변경 중 오류가 발생했습니다.';
@@ -723,8 +721,7 @@ function GroupPageContent() {
       
       setIsMemberManageModalOpen(false);
       setSelectedMember(null);
-      setSuccessMessage(result.message);
-      setIsSuccessModalOpen(true);
+      showToastModal('success', '멤버 탈퇴 완료', result.message);
     } catch (error) {
       console.error('멤버 탈퇴 처리 오류:', error);
       const errorMessage = error instanceof Error ? error.message : '멤버 탈퇴 처리 중 오류가 발생했습니다.';
@@ -741,16 +738,60 @@ function GroupPageContent() {
     (group.sgt_memo && group.sgt_memo.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  // 성공 모달 자동 닫기
-  useEffect(() => {
-    if (isSuccessModalOpen) {
-      const timer = setTimeout(() => {
-        setIsSuccessModalOpen(false);
-        setSuccessMessage('');
-      }, 3000);
-      return () => clearTimeout(timer);
+  // 토스트 모달 상태
+  const [toastModal, setToastModal] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'loading';
+    title: string;
+    message: string;
+    progress: number;
+    autoClose: boolean;
+  }>({
+    isOpen: false,
+    type: 'success',
+    title: '',
+    message: '',
+    progress: 0,
+    autoClose: true
+  });
+
+  // 토스트 모달 함수들
+  const showToastModal = (
+    type: 'success' | 'error' | 'loading',
+    title: string,
+    message: string,
+    autoClose: boolean = true,
+    duration: number = 3000
+  ) => {
+    setToastModal({
+      isOpen: true,
+      type,
+      title,
+      message,
+      progress: 0,
+      autoClose
+    });
+
+    if (autoClose && type !== 'loading') {
+      // 프로그레스 바 애니메이션
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += (100 / duration) * 50; // 50ms마다 업데이트
+        if (progress >= 100) {
+          clearInterval(interval);
+          setToastModal(prev => ({ ...prev, isOpen: false }));
+        } else {
+          setToastModal(prev => ({ ...prev, progress }));
+        }
+      }, 50);
     }
-  }, [isSuccessModalOpen]);
+  };
+
+  const hideToastModal = () => {
+    setToastModal(prev => ({ ...prev, isOpen: false }));
+  };
+
+
 
 
 
@@ -986,10 +1027,14 @@ function GroupPageContent() {
                       transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
                     >
                       {/* 그룹 액션 메뉴 버튼 */}
-                      <div className="absolute top-4 right-4">
+                      <div className="absolute top-4 right-4 z-[140]">
                         <motion.button
-                          onClick={() => setShowGroupActions(!showGroupActions)}
-                          className="p-2 bg-white/20 rounded-full hover:bg-white/30"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowGroupActions(!showGroupActions);
+                          }}
+                          className="p-2 bg-white/20 rounded-full hover:bg-white/30 z-[150]"
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                         >
@@ -999,15 +1044,15 @@ function GroupPageContent() {
                           {showGroupActions && (
                             <>
                               <div 
-                                className="fixed inset-0 z-[55]" 
+                                className="fixed inset-0 z-[200]" 
                                 onClick={() => setShowGroupActions(false)}
                               />
                               <motion.div 
-                                className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-2xl border border-gray-200 py-2 z-[60]"
-                                initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                className="absolute right-0 top-full mt-1 w-32 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-[210]"
+                                initial={{ opacity: 0, scale: 0.95, y: -5 }}
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                transition={{ duration: 0.15 }}
+                                exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                                transition={{ duration: 0.12 }}
                               >
                                 <button 
                                   onClick={() => {
@@ -1018,21 +1063,20 @@ function GroupPageContent() {
                                     setIsEditModalOpen(true);
                                     setShowGroupActions(false);
                                   }}
-                                  className="w-full px-4 py-3 text-left hover:bg-blue-50 flex items-center text-gray-700"
+                                  className="w-full px-3 py-2 text-left hover:bg-blue-50 flex items-center text-gray-700 text-sm"
                                 >
-                                  <FaEdit className="w-4 h-4 mr-3" />
-                                  그룹 수정
+                                  <FaEdit className="w-3 h-3 mr-2" />
+                                  수정
                                 </button>
-                                <hr className="my-1" />
                                 <button 
                                   onClick={() => {
                                     setIsDeleteModalOpen(true);
                                     setShowGroupActions(false);
                                   }}
-                                  className="w-full px-4 py-3 text-left hover:bg-red-50 flex items-center text-red-600"
+                                  className="w-full px-3 py-2 text-left hover:bg-red-50 flex items-center text-red-600 text-sm"
                                 >
-                                  <FaTrash className="w-4 h-4 mr-3" />
-                                  그룹 삭제
+                                  <FaTrash className="w-3 h-3 mr-2" />
+                                  삭제
                                 </button>
                               </motion.div>
                             </>
@@ -1516,48 +1560,48 @@ function GroupPageContent() {
               onClick={() => setIsDeleteModalOpen(false)}
             >
               <motion.div 
-                className="bg-white rounded-3xl w-full max-w-md mx-auto"
+                className="bg-white rounded-2xl w-full max-w-sm mx-auto"
                 variants={modalVariants}
                 initial="hidden"
                 animate="visible"
                 exit="exit"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="p-6 pb-8">
-                  <div className="text-center mb-6">
-                    <FaTrash className="w-12 h-12 text-red-500 mx-auto mb-3" />
-                    <h3 className="text-xl font-bold text-gray-900">그룹 삭제</h3>
-                    <p className="text-gray-600 mt-2 mb-4">
-                      <span className="font-medium text-red-600">"{selectedGroup.sgt_title}"</span> 그룹을 정말 삭제하시겠습니까?
+                <div className="p-5">
+                  <div className="text-center mb-4">
+                    <FaTrash className="w-8 h-8 text-red-500 mx-auto mb-2" />
+                    <h3 className="text-lg font-bold text-gray-900 mb-2">그룹 삭제</h3>
+                    <p className="text-gray-600 text-sm">
+                      <span className="font-medium text-red-600">"{selectedGroup.sgt_title}"</span><br />
+                      그룹을 삭제하시겠습니까?
                     </p>
                   </div>
                   
-                  <div className="space-y-3">
+                  <div className="flex space-x-2">
+                    <motion.button
+                      onClick={() => setIsDeleteModalOpen(false)}
+                      disabled={isDeleting}
+                      className="flex-1 py-3 border border-gray-300 rounded-xl text-gray-700 font-medium disabled:opacity-50 text-sm"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      취소
+                    </motion.button>
                     <motion.button
                       onClick={handleDeleteGroup}
                       disabled={isDeleting}
-                      className="w-full py-4 bg-red-500 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                      className="flex-1 py-3 bg-red-500 text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                     >
                       {isDeleting ? (
                         <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                          삭제 중...
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                          삭제중
                         </>
                       ) : (
-                        '그룹 삭제'
+                        '삭제'
                       )}
-                    </motion.button>
-                    
-                    <motion.button
-                      onClick={() => setIsDeleteModalOpen(false)}
-                      disabled={isDeleting}
-                      className="w-full py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium disabled:opacity-50"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      취소
                     </motion.button>
                   </div>
                 </div>
@@ -1663,53 +1707,68 @@ function GroupPageContent() {
             </motion.div>
           )}
 
-          {/* 성공 알림 모달 */}
-          {isSuccessModalOpen && (
+          {/* 컴팩트 토스트 모달 */}
+          {toastModal.isOpen && (
             <motion.div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              className="fixed bottom-20 left-4 z-[130] w-3/4 max-w-sm"
+              initial={{ opacity: 0, x: -100, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -100, scale: 0.9 }}
+              transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
             >
-              <motion.div 
-                className="bg-white rounded-3xl w-full max-w-md mx-auto"
-                variants={modalVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-              >
-                <div className="p-6 pb-8">
-                  <div className="text-center mb-6">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FaCheckCircle className="w-8 h-8 text-green-500" />
+              <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden w-full">
+                <div className="p-4">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      toastModal.type === 'success' ? 'bg-green-100' :
+                      toastModal.type === 'error' ? 'bg-red-100' : 'bg-blue-100'
+                    }`}>
+                      {toastModal.type === 'success' && (
+                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      {toastModal.type === 'error' && (
+                        <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      )}
+                      {toastModal.type === 'loading' && (
+                        <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      )}
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">완료</h3>
-                    <p className="text-gray-600 mb-4">{successMessage}</p>
-                    
-                    <div className="w-full bg-gray-200 rounded-full h-1 mb-2">
-                      <motion.div 
-                        className="bg-green-500 h-1 rounded-full"
-                        initial={{ width: "0%" }}
-                        animate={{ width: "100%" }}
-                        transition={{ duration: 3 }}
-                      />
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-semibold text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis">{toastModal.title}</h4>
+                      <p className="text-xs text-gray-600 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis">{toastModal.message}</p>
                     </div>
-                    <p className="text-xs text-gray-400">3초 후 자동으로 닫힙니다</p>
+                    {toastModal.autoClose && toastModal.type !== 'loading' && (
+                      <button
+                        onClick={hideToastModal}
+                        className="w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors flex-shrink-0"
+                      >
+                        <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
-                  
-                  <motion.button
-                    onClick={() => {
-                      setIsSuccessModalOpen(false);
-                      setSuccessMessage('');
-                    }}
-                    className="w-full py-4 bg-green-500 text-white rounded-2xl font-medium flex items-center justify-center"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    확인
-                  </motion.button>
                 </div>
-              </motion.div>
+                
+                {/* 프로그레스 바 */}
+                {toastModal.autoClose && toastModal.type !== 'loading' && (
+                  <div className="h-1 bg-gray-100">
+                    <motion.div 
+                      className={`h-full ${
+                        toastModal.type === 'success' ? 'bg-green-500' :
+                        toastModal.type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                      }`}
+                      initial={{ width: '100%' }}
+                      animate={{ width: `${100 - (toastModal.progress || 0)}%` }}
+                      transition={{ duration: 0.1, ease: 'linear' }}
+                    />
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

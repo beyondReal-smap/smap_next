@@ -6,9 +6,12 @@ import { FiWifi, FiDatabase, FiAlertCircle, FiRefreshCw, FiX } from 'react-icons
 
 interface ErrorToastProps {
   error: {
-    type: 'network' | 'no_data' | 'unknown';
+    type: 'network' | 'server' | 'timeout' | 'data' | 'unknown';
     message: string;
     retryable: boolean;
+    details?: any;
+    timestamp?: string;
+    context?: string;
   } | null;
   onRetry?: () => void;
   onDismiss?: () => void;
@@ -52,8 +55,12 @@ const ErrorToast: React.FC<ErrorToastProps> = ({
     switch (error?.type) {
       case 'network':
         return <FiWifi className="w-5 h-5 text-red-500" />;
-      case 'no_data':
+      case 'data':
         return <FiDatabase className="w-5 h-5 text-gray-500" />;
+      case 'server':
+        return <FiAlertCircle className="w-5 h-5 text-red-500" />;
+      case 'timeout':
+        return <FiAlertCircle className="w-5 h-5 text-yellow-500" />;
       default:
         return <FiAlertCircle className="w-5 h-5 text-orange-500" />;
     }
@@ -63,8 +70,12 @@ const ErrorToast: React.FC<ErrorToastProps> = ({
     switch (error?.type) {
       case 'network':
         return 'border-red-200 bg-red-50 shadow-red-100';
-      case 'no_data':
+      case 'data':
         return 'border-gray-200 bg-gray-50 shadow-gray-100';
+      case 'server':
+        return 'border-red-200 bg-red-50 shadow-red-100';
+      case 'timeout':
+        return 'border-yellow-200 bg-yellow-50 shadow-yellow-100';
       default:
         return 'border-orange-200 bg-orange-50 shadow-orange-100';
     }
@@ -74,8 +85,12 @@ const ErrorToast: React.FC<ErrorToastProps> = ({
     switch (error?.type) {
       case 'network':
         return 'bg-red-500 hover:bg-red-600 text-white';
-      case 'no_data':
+      case 'data':
         return 'bg-gray-500 hover:bg-gray-600 text-white';
+      case 'server':
+        return 'bg-red-500 hover:bg-red-600 text-white';
+      case 'timeout':
+        return 'bg-yellow-500 hover:bg-yellow-600 text-white';
       default:
         return 'bg-orange-500 hover:bg-orange-600 text-white';
     }
@@ -113,9 +128,11 @@ const ErrorToast: React.FC<ErrorToastProps> = ({
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <h4 className="text-sm font-semibold text-gray-900 mb-1">
-                      {error.type === 'network' && '연결 문제'}
-                      {error.type === 'no_data' && '데이터 없음'}
-                      {error.type === 'unknown' && '오류 발생'}
+                      {error.type === 'network' && '네트워크 오류'}
+                      {error.type === 'data' && '데이터 없음'}
+                      {error.type === 'server' && '서버 오류'}
+                      {error.type === 'timeout' && '시간 초과'}
+                      {error.type === 'unknown' && '알 수 없는 오류'}
                     </h4>
                     <p className="text-xs text-gray-600 leading-relaxed">
                       {error.message}
