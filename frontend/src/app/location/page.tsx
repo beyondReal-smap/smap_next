@@ -820,9 +820,25 @@ export default function LocationPage() {
       }
     };
 
+    // InfoWindow 닫기 전역 함수
+    (window as any).closeInfoWindow = () => {
+      console.log('[InfoWindow 닫기] 닫기 요청');
+      if (infoWindow) {
+        try {
+          infoWindow.close();
+          setInfoWindow(null);
+          console.log('[InfoWindow 닫기] 성공');
+        } catch (error) {
+          console.error('[InfoWindow 닫기] 실패:', error);
+          setInfoWindow(null);
+        }
+      }
+    };
+
     // 컴포넌트 언마운트 시 전역 함수 정리
     return () => {
       delete (window as any).handleLocationDeleteFromInfoWindow;
+      delete (window as any).closeInfoWindow;
     };
   }, [selectedMemberSavedLocations, otherMembersSavedLocations, infoWindow]);
 
@@ -3447,6 +3463,8 @@ export default function LocationPage() {
             background: rgba(239, 68, 68, 0.1);
             color: #dc2626;
             right: 35px;
+            z-index: 10000 !important;
+            pointer-events: auto !important;
           }
           .delete-button:hover {
             background: rgba(239, 68, 68, 0.2) !important;
@@ -3465,13 +3483,39 @@ export default function LocationPage() {
         ">
           <!-- 삭제 버튼 -->
           ${locationData ? `
-          <button class="info-button delete-button" onclick="console.log('삭제 버튼 클릭:', '${locationId}'); if(window.handleLocationDeleteFromInfoWindow) { window.handleLocationDeleteFromInfoWindow('${locationId}'); } else { console.error('삭제 함수가 정의되지 않음'); } event.stopPropagation();" title="장소 삭제">
+          <button class="info-button delete-button" 
+            onclick="
+              console.log('=== 삭제 버튼 onclick 실행 ===');
+              console.log('삭제 버튼 클릭:', '${locationId}');
+              window.ignoreInfoWindowClick = true;
+              if(window.handleLocationDeleteFromInfoWindow) { 
+                console.log('삭제 함수 호출 시작');
+                window.handleLocationDeleteFromInfoWindow('${locationId}'); 
+                console.log('삭제 함수 호출 완료');
+              } else { 
+                console.error('삭제 함수가 정의되지 않음'); 
+              }
+            " 
+            onmousedown="console.log('삭제 버튼 mousedown'); window.ignoreInfoWindowClick = true;" 
+            onmouseup="console.log('삭제 버튼 mouseup');"
+            style="z-index: 9999; pointer-events: auto;"
+            title="장소 삭제">
             🗑️
           </button>
           ` : ''}
           
           <!-- 닫기 버튼 -->
-          <button class="info-button close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" title="닫기">
+          <button class="info-button close-button" onclick="
+            console.log('닫기 버튼 클릭'); 
+            event.stopPropagation(); 
+            event.preventDefault();
+            if(window.closeInfoWindow) {
+              window.closeInfoWindow();
+            } else {
+              console.error('닫기 함수가 정의되지 않음');
+            }
+            return false;
+          " onmousedown="event.stopPropagation(); return false;" title="닫기">
             ×
           </button>
           
@@ -3944,18 +3988,59 @@ export default function LocationPage() {
   useEffect(() => {
     if (!infoWindow) return;
 
+    let ignoreNextClick = false;
+
     const handleDocumentClick = (e: MouseEvent) => {
+      // 전역 플래그로 클릭 무시
+      if ((window as any).ignoreInfoWindowClick) {
+        console.log('[InfoWindow 외부 클릭] 클릭 무시됨 (전역 플래그)');
+        (window as any).ignoreInfoWindowClick = false;
+        return;
+      }
+
       const target = e.target as HTMLElement;
       
-      console.log('[InfoWindow 외부 클릭] 클릭 감지:', target.tagName);
+      console.log('[InfoWindow 외부 클릭] 클릭 감지:', target.tagName, target.className, target.textContent);
       
-      // 간단한 방식: InfoWindow가 열려있으면 무조건 닫기 (InfoWindow 내부 요소가 아닌 경우)
-      const isInfoWindowOrMarker = target.closest('.iw_container') || 
-                                   target.closest('.iw_content') ||
-                                   target.parentElement?.classList.contains('iw_container') ||
-                                   target.classList.contains('iw_container');
+      // 삭제 버튼 클릭인지 먼저 확인 (가장 우선순위)
+      const isDeleteButton = target.classList.contains('delete-button') ||
+                             target.closest('.delete-button') ||
+                             target.textContent?.trim() === '🗑️' ||
+                             target.textContent?.includes('🗑️') ||
+                             target.getAttribute('title') === '장소 삭제' ||
+                             (target.tagName === 'BUTTON' && target.textContent?.includes('🗑️'));
       
-      if (!isInfoWindowOrMarker && infoWindow) {
+      // 닫기 버튼 클릭인지 확인
+      const isCloseButton = target.classList.contains('close-button') ||
+                           target.closest('.close-button') ||
+                           target.textContent?.includes('×') ||
+                           target.getAttribute('title') === '닫기';
+      
+      // 모든 InfoWindow 관련 버튼인지 확인
+      const isInfoWindowButton = isDeleteButton || isCloseButton;
+      
+      if (isDeleteButton) {
+        console.log('[InfoWindow 외부 클릭] 삭제 버튼 클릭 감지, InfoWindow 닫기 방지');
+        // 다음 클릭도 무시하도록 플래그 설정
+        (window as any).ignoreInfoWindowClick = true;
+        return;
+      }
+      
+      if (isCloseButton) {
+        console.log('[InfoWindow 외부 클릭] 닫기 버튼 클릭 감지');
+        return; // 닫기 버튼은 자체적으로 처리
+      }
+      
+      // InfoWindow 내부 요소인지 확인
+      const isInfoWindowElement = target.closest('.location-info-window-container') ||
+                                  target.closest('.iw_container') || 
+                                  target.closest('.iw_content') ||
+                                  target.classList.contains('info-button') ||
+                                  target.parentElement?.classList.contains('iw_container') ||
+                                  target.classList.contains('iw_container') ||
+                                  isInfoWindowButton;
+      
+      if (!isInfoWindowElement && infoWindow) {
         console.log('[InfoWindow 외부 클릭] InfoWindow 닫기 시도');
         if (infoWindow.close) {
           infoWindow.close();
@@ -3967,13 +4052,12 @@ export default function LocationPage() {
     // 즉시 이벤트 리스너 등록 (지연 없음)
     console.log('[InfoWindow useEffect] 외부 클릭 리스너 등록');
     document.addEventListener('click', handleDocumentClick, true); // capture 단계에서 처리
-      document.addEventListener('mousedown', handleDocumentClick);
+    document.addEventListener('mousedown', handleDocumentClick, true); // capture 단계에서 처리
 
     return () => {
       console.log('[InfoWindow useEffect] 외부 클릭 리스너 제거');
-      console.log('[InfoWindow useEffect] 외부 클릭 리스너 제거');
       document.removeEventListener('click', handleDocumentClick, true);
-      document.removeEventListener('mousedown', handleDocumentClick);
+      document.removeEventListener('mousedown', handleDocumentClick, true);
     };
   }, [infoWindow]);
 
@@ -4976,7 +5060,7 @@ export default function LocationPage() {
       <AnimatePresence>
         {toastModal.isOpen && (
           <motion.div 
-            className="fixed bottom-20 left-4 z-[130] w-1/2 max-w-sm"
+            className="fixed bottom-20 left-4 z-[130] w-3/4 max-w-sm"
             initial={{ opacity: 0, x: -100, scale: 0.9 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: -100, scale: 0.9 }}
