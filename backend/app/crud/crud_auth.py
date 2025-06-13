@@ -21,6 +21,14 @@ def get_user_by_email(db: Session, email: str) -> Optional[Member]:
     """이메일로 사용자를 조회합니다 (중복 체크용)."""
     return db.query(Member).filter(Member.mt_email == email).first()
 
+def get_user_by_kakao_id(db: Session, kakao_id: str) -> Optional[Member]:
+    """카카오 ID로 사용자를 조회합니다."""
+    return db.query(Member).filter(
+        Member.mt_kakao_id == kakao_id,
+        Member.mt_status == '1', # 정상상태
+        Member.mt_show == 'Y' # 노출여부
+    ).first()
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """입력된 비밀번호와 해시된 비밀번호를 비교합니다."""
     if not hashed_password: # DB에 비밀번호가 없는 경우 (예: 소셜 로그인 사용자)
@@ -85,6 +93,39 @@ def create_user(db: Session, user_in: RegisterRequest) -> Member:
         mt_agree2='Y',
         mt_agree3='Y',
         # ... 기타 필요한 기본값 설정 ...
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def create_kakao_user(db: Session, kakao_data) -> Member:
+    """카카오 로그인으로 새로운 사용자를 생성합니다."""
+    # 카카오 ID를 기반으로 임시 mt_id 생성
+    temp_id = f"kakao_{kakao_data.kakao_id}"
+    
+    db_user = Member(
+        mt_id=temp_id,
+        mt_kakao_id=kakao_data.kakao_id,
+        mt_name=kakao_data.nickname,
+        mt_nickname=kakao_data.nickname,
+        mt_email=kakao_data.email,
+        mt_file1=kakao_data.profile_image,
+        mt_type=2,  # 카카오 로그인
+        mt_level=2, # 기본값: 일반(무료)
+        mt_status=1, # 기본값: 정상
+        mt_show='Y', # 기본값: 노출
+        mt_wdate=datetime.utcnow(), # 등록일시
+        mt_ldate=datetime.utcnow(), # 마지막 로그인 일시
+        mt_agree1='Y', # 필수 약관 동의로 가정
+        mt_agree2='Y',
+        mt_agree3='Y',
+        # 기본 위치 (서울시청)
+        mt_lat=37.5642,
+        mt_long=127.0016,
+        mt_sido='서울특별시',
+        mt_gu='중구',
+        mt_dong='태평로1가',
     )
     db.add(db_user)
     db.commit()

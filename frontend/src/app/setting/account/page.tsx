@@ -1,35 +1,25 @@
 'use client';
-import React, { useState, useRef, useEffect } from 'react';
+
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import Image from 'next/image';
 import { 
   FiUser, 
-  FiPhone, 
-  FiCalendar, 
-  FiUserCheck, 
+  FiMail, 
   FiLock, 
   FiLogOut, 
   FiTrash2, 
-  FiInfo, 
-  FiEdit3, 
   FiCamera, 
-  FiImage,
-  FiMail,
-  FiShield,
-  FiSettings,
-  FiSave,
-  FiKey,
-  FiEye,
-  FiEyeOff
+  FiEdit3,
+  FiChevronRight,
+  FiShield
 } from 'react-icons/fi';
-import { HiCheckCircle, HiExclamationTriangle, HiSparkles } from 'react-icons/hi2';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import { motion } from 'framer-motion';
+import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
 
-// 기본 이미지 가져오기 함수 (schedule/page.tsx에서 가져옴)
+// 기본 이미지 가져오기 함수
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  // frontend/public/images/ 폴더의 기본 이미지 사용
   if (gender === 2) { // 여성
     const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png'];
     return femaleImages[index % femaleImages.length];
@@ -41,14 +31,7 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
 
 // 안전한 이미지 URL 가져오기 함수
 const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
   return photoUrl ?? getDefaultImage(gender, index);
-};
-
-// 이메일 형식 확인 함수
-const isEmail = (str: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(str);
 };
 
 // 사용자 레벨에 따른 등급 반환 함수
@@ -58,18 +41,57 @@ const getUserLevel = (mtLevel: number | null | undefined): string => {
   return '일반'; // 기본값
 };
 
-const GENDER_OPTIONS = [
-  { value: 'male', label: '남성', icon: '👨' },
-  { value: 'female', label: '여성', icon: '👩' },
-  { value: 'other', label: '선택안함', icon: '🤷' }
-];
+// 사용자 레벨에 따른 플랜 반환 함수
+const getUserPlan = (mtLevel: number | null | undefined): string => {
+  if (mtLevel === 5) return '프리미엄 플랜';
+  if (mtLevel === 2) return '베이직 플랜';
+  return '베이직 플랜'; // 기본값
+};
+
+// 로그인 타입에 따른 로그인 방법 반환 함수
+const getLoginMethod = (mtType: number | null | undefined): { method: string; icon: string } => {
+  switch (mtType) {
+    case 1:
+      return { method: '일반 로그인', icon: '🔐' };
+    case 2:
+      return { method: '카카오 로그인', icon: '💬' };
+    case 3:
+      return { method: '애플 로그인', icon: '🍎' };
+    case 4:
+      return { method: '구글 로그인', icon: '🌐' };
+    default:
+      return { method: '일반 로그인', icon: '🔐' };
+  }
+};
 
 // 모바일 최적화된 CSS 애니메이션
-const mobileAnimations = `
+const pageAnimations = `
 html, body {
   width: 100%;
   overflow-x: hidden;
   position: relative;
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutToRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
 }
 
 @keyframes slideInFromBottom {
@@ -79,17 +101,6 @@ html, body {
   }
   to {
     transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideInFromRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
     opacity: 1;
   }
 }
@@ -105,28 +116,6 @@ html, body {
   }
 }
 
-@keyframes slideOutToRight {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-}
-
-@keyframes scaleIn {
-  from {
-    transform: scale(0.9);
-    opacity: 0;
-  }
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -138,50 +127,39 @@ html, body {
   }
 }
 
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
   }
-  50% {
-    transform: scale(1.05);
+  to {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 
-@keyframes shimmer {
-  0% {
-    background-position: -200px 0;
-  }
-  100% {
-    background-position: calc(200px + 100%) 0;
-  }
+.animate-slideInFromRight {
+  animation: slideInFromRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-slideOutToRight {
+  animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
 }
 
 .animate-slideInFromBottom {
   animation: slideInFromBottom 0.3s ease-out forwards;
 }
 
-.animate-slideInFromRight {
-  animation: slideInFromRight 0.3s ease-out forwards;
-}
-
 .animate-slideOutToBottom {
   animation: slideOutToBottom 0.3s ease-in forwards;
 }
 
-.animate-slideOutToRight {
-  animation: slideOutToRight 0.3s ease-in forwards;
+.animate-fadeIn {
+  animation: fadeIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
 .animate-scaleIn {
   animation: scaleIn 0.2s ease-out forwards;
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.4s ease-out forwards;
-}
-
-.animate-pulse {
-  animation: pulse 2s infinite;
 }
 
 .mobile-button {
@@ -194,14 +172,6 @@ html, body {
   transform: scale(0.98);
 }
 
-.modal-safe-area {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.gradient-bg {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
 .glass-effect {
   backdrop-filter: blur(10px);
   background: rgba(255, 255, 255, 0.7);
@@ -209,179 +179,198 @@ html, body {
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
 }
 
-.profile-glow {
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
-}
-
-.input-focus {
+.menu-item-hover {
   transition: all 0.2s ease;
 }
 
-.input-focus:focus {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(99, 102, 241, 0.15);
+.menu-item-hover:hover {
+  background: rgba(99, 102, 241, 0.05);
+  transform: translateX(2px);
 }
 
-.card-hover {
-  transition: all 0.3s ease;
-}
-
-.card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-}
-
-.shimmer {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200px 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-.initial-hidden {
-  opacity: 0;
-  transform: translateX(100%);
-  position: relative;
-  width: 100%;
-  overflow: hidden;
+.menu-item-hover:active {
+  background: rgba(99, 102, 241, 0.1);
+  transform: scale(0.99);
 }
 `;
 
-export default function AccountPage() {
+export default function AccountSettingsPage() {
   const router = useRouter();
-  const { user, logout } = useAuth();
-  const [nickname, setNickname] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [birth, setBirth] = useState('');
-  const [gender, setGender] = useState('other');
-  const [originalNickname, setOriginalNickname] = useState('');
+  const { user } = useAuth();
+  const [profileImg, setProfileImg] = useState(getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0));
+  const [showSheet, setShowSheet] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [showImageModal, setShowImageModal] = useState(false);
-  const [profileImage, setProfileImage] = useState('/images/avatar1.png');
-  const [isSaving, setIsSaving] = useState(false);
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 사용자 정보 로드
+  // 사용자 정보 업데이트
   useEffect(() => {
     if (user) {
-      const userName = user.mt_name || user.mt_nickname || '';
-      const userNickname = user.mt_nickname || user.mt_name || '';
-      const userPhone = user.mt_id || '';
-      const userBirth = user.mt_birth || '';
-      const userGender = user.mt_gender === 1 ? 'male' : user.mt_gender === 2 ? 'female' : 'other';
-      const userImage = getSafeImageUrl(user.mt_file1 || null, user.mt_gender, user.mt_idx || 0);
-
-      setName(userName);
-      setNickname(userNickname);
-      setOriginalNickname(userNickname);
-      setPhone(userPhone);
-      setBirth(userBirth);
-      setGender(userGender);
-      setProfileImage(userImage);
+      setProfileImg(getSafeImageUrl(user.mt_file1 || null, user.mt_gender, user.mt_idx || 0));
     }
   }, [user]);
 
-  // 뒤로가기 핸들러
-  const handleBackNavigation = () => {
-    router.back();
+  // 프로필 데이터
+  const loginInfo = getLoginMethod(user?.mt_type);
+  const profile = {
+    avatar: getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0),
+    name: user?.mt_name || user?.mt_nickname || '사용자',
+    plan: getUserPlan(user?.mt_level),
+    loginMethod: loginInfo.method,
+    loginIcon: loginInfo.icon,
+    memberSince: user?.mt_wdate ? new Date(user.mt_wdate).getFullYear() + '년 ' + (new Date(user.mt_wdate).getMonth() + 1) + '월' : '2024년 1월',
+    level: getUserLevel(user?.mt_level)
   };
 
-  const handleLogout = () => {
-    setShowLogoutModal(true);
-  };
-
-  const handleConfirmLogout = async () => {
-    try {
-      console.log('[ACCOUNT] 로그아웃 시작');
-      
-      // AuthContext를 통한 완전한 로그아웃 처리
-      await logout();
-      
-      console.log('[ACCOUNT] 로그아웃 완료, signin으로 이동');
-      
-      // 로그아웃 후 signin 페이지로 이동
-      router.push('/signin');
-      
-      // 모달 닫기
-      setShowLogoutModal(false);
-    } catch (error) {
-      console.error('[ACCOUNT] 로그아웃 실패:', error);
-      // 실패해도 signin으로 이동
-      router.push('/signin');
-      setShowLogoutModal(false);
+  // 계정 관리 메뉴 섹션들
+  const menuSections = [
+    {
+      title: '개인정보 관리',
+      items: [
+        { 
+          label: '프로필 편집', 
+          href: '/setting/account/profile', 
+          icon: FiUser,
+          color: 'bg-blue-500',
+          description: '이름, 닉네임 변경'
+        },
+        { 
+          label: '연락처 정보', 
+          href: '/setting/account/contact', 
+          icon: FiMail,
+          color: 'bg-green-500',
+          description: '이메일, 전화번호 관리'
+        },
+      ]
+    },
+    {
+      title: '보안 설정',
+      items: [
+        { 
+          label: '비밀번호 변경', 
+          href: '/setting/account/password', 
+          icon: FiLock,
+          color: 'bg-orange-500',
+          description: '계정 비밀번호 변경'
+        },
+        { 
+          label: '보안 설정', 
+          href: '/setting/account/security', 
+          icon: FiShield,
+          color: 'bg-purple-500',
+          description: '2단계 인증, 로그인 알림'
+        },
+      ]
+    },
+    {
+      title: '계정 관리',
+      items: [
+        { 
+          label: '로그아웃', 
+          href: '#', 
+          icon: FiLogOut,
+          color: 'bg-yellow-500',
+          description: '현재 계정에서 로그아웃',
+          onClick: () => setShowLogoutModal(true)
+        },
+        { 
+          label: '회원탈퇴', 
+          href: '/setting/account/withdraw', 
+          icon: FiTrash2,
+          color: 'bg-red-500',
+          description: '계정 영구 삭제'
+        },
+      ]
     }
-  };
+  ];
 
-  const handleImageSelect = (type: 'camera' | 'gallery') => {
-    if (fileInputRef.current) {
-      if (type === 'camera') {
-        fileInputRef.current.setAttribute('capture', 'environment');
-      } else {
-        fileInputRef.current.removeAttribute('capture');
-      }
-      fileInputRef.current.click();
-    }
-    setShowImageModal(false);
-  };
-
+  // 파일 선택 핸들러
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (ev) => {
         if (ev.target?.result) {
-          setProfileImage(ev.target.result as string);
+          setProfileImg(ev.target.result as string);
         }
       };
       reader.readAsDataURL(file);
     }
+    setShowSheet(false);
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setShowSuccessToast(true);
-      setTimeout(() => setShowSuccessToast(false), 3000);
-    } catch (error) {
-      console.error('저장 중 오류:', error);
-    } finally {
-      setIsSaving(false);
+  // 카메라/앨범 선택 트리거
+  const handleSelect = (mode: 'camera' | 'album') => {
+    if (fileInputRef.current) {
+      if (mode === 'camera') {
+        fileInputRef.current.setAttribute('capture', 'environment');
+      } else {
+        fileInputRef.current.removeAttribute('capture');
+      }
+      fileInputRef.current.click();
+    }
+    setShowSheet(false);
+  };
+
+  // 모달 닫기 핸들러
+  const closeModal = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setShowSheet(false);
+      setIsClosing(false);
+    }, 300);
+  };
+
+  // 로그아웃 처리
+  const handleLogout = async () => {
+    // 로그아웃 로직 구현
+    setShowLogoutModal(false);
+    router.push('/signin');
+  };
+
+  // 뒤로가기 핸들러
+  const handleBack = () => {
+    router.back();
+  };
+
+  // 메뉴 아이템 클릭 핸들러
+  const handleMenuClick = (item: any) => {
+    if (item.onClick) {
+      item.onClick();
+    } else {
+      router.push(item.href);
     }
   };
 
-  const closeModal = (setModalState: (state: boolean) => void) => {
-    setModalState(false);
-  };
-
-  const hasChanges = nickname !== originalNickname;
-
   return (
     <>
-      <style jsx global>{mobileAnimations}</style>
-      <motion.div
-        initial={{ opacity: 0, x: 30 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -30 }}
-        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-10"
-        style={{ 
-          position: 'relative',
-          width: '100%'
-        }}
-      >
-        {/* 개선된 헤더 - setting/page.tsx 스타일 */}
+      <style jsx global>{pageAnimations}</style>
+      <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+        {/* 헤더 - 위에서 슬라이드 내려오는 애니메이션 */}
         <motion.header 
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed top-0 left-0 right-0 z-50 glass-effect"
+          initial={{ y: -100, opacity: 0, scale: 0.9 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          transition={{ 
+            delay: 0.2, 
+            duration: 0.8, 
+            ease: [0.25, 0.46, 0.45, 0.94],
+            opacity: { duration: 0.6 },
+            scale: { duration: 0.6 }
+          }}
+          className="fixed top-0 left-0 right-0 z-20 glass-effect"
         >
-          <div className="flex items-center justify-between h-16 px-4">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="flex items-center justify-between h-16 px-4"
+          >
             <div className="flex items-center space-x-3">
               <motion.button 
-                onClick={handleBackNavigation}
+                onClick={handleBack}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5, duration: 0.4 }}
                 className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -390,549 +379,232 @@ export default function AccountPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </motion.button>
-              <div className="flex items-center space-x-3">
-                <motion.div
-                  initial={{ rotate: -180, scale: 0 }}
-                  animate={{ rotate: 0, scale: 1 }}
-                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                  className="p-2 bg-indigo-600 rounded-xl"
-                >
-                  <FiUser className="w-5 h-5 text-white" />
-                </motion.div>
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.6, duration: 0.4 }}
+                className="flex items-center space-x-3"
+              >
                 <div>
                   <h1 className="text-lg font-bold text-gray-900">계정설정</h1>
                   <p className="text-xs text-gray-500">프로필 및 개인정보 관리</p>
                 </div>
-              </div>
+              </motion.div>
             </div>
-            
-            {hasChanges && (
-              <motion.button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-full text-sm font-medium disabled:opacity-50 flex items-center space-x-1"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-              >
-                {isSaving ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <FiSave className="w-4 h-4" />
-                )}
-                <span>{isSaving ? '저장중' : '저장'}</span>
-              </motion.button>
-            )}
-          </div>
+
+          </motion.div>
         </motion.header>
 
-        {/* 프로필 헤더 카드 - 개선된 디자인 */}
-        <motion.div 
+        {/* 스크롤 가능한 메인 컨텐츠 */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="px-4 pt-20 pb-6"
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="schedule-page-content px-4 pt-20 space-y-6 pb-20"
         >
-          <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-6 text-white shadow-2xl">
-            {/* 배경 패턴 */}
-            <div className="absolute inset-0 opacity-10">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white rounded-full -translate-y-16 translate-x-16"></div>
-              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white rounded-full translate-y-12 -translate-x-12"></div>
-            </div>
-            
-            <div className="relative z-10">
-              <div className="flex items-start justify-between mb-6">
-                <div className="flex items-center space-x-4">
-                  <motion.div 
-                    className="relative"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+          {/* 프로필 영역 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+            className="pb-2"
+          >
+            <div className="bg-[#0113A3] rounded-3xl p-6 text-white shadow-xl">
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowSheet(true)} 
+                    className="mobile-button group"
                   >
-                    <button
-                      onClick={() => setShowImageModal(true)}
-                      className="group relative"
-                    >
-                      <div className="w-24 h-24 rounded-2xl overflow-hidden border-4 border-white/30 shadow-xl bg-white/10 backdrop-blur-sm">
-                        <Image
-                          src={profileImage}
-                          alt="프로필 이미지"
-                          width={96}
-                          height={96}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            const fallbackSrc = getDefaultImage(user?.mt_gender, user?.mt_idx || 0);
-                            console.log(`[프로필 이미지 오류] 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
-                            target.src = fallbackSrc;
-                          }}
-                        />
-                      </div>
-                      <motion.div 
-                        className="absolute -bottom-2 -right-2 bg-white rounded-xl p-2 shadow-lg"
-                        whileHover={{ scale: 1.1 }}
-                        transition={{ type: "spring", stiffness: 400 }}
-                      >
+                    <div className="relative">
+                      <Image
+                        src={profileImg}
+                        alt="프로필 이미지"
+                        width={80}
+                        height={80}
+                        className="rounded-full border-4 border-white/30 bg-white/20"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          const fallbackSrc = getDefaultImage(user?.mt_gender, user?.mt_idx || 0);
+                          target.src = fallbackSrc;
+                          setProfileImg(fallbackSrc);
+                        }}
+                      />
+                      <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-2 shadow-lg group-hover:scale-110 transition-transform">
                         <FiCamera className="w-4 h-4 text-indigo-600" />
-                      </motion.div>
-                    </button>
-                  </motion.div>
-                  
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h2 className="text-2xl font-bold">{name}</h2>
-                      <motion.div 
-                        className={`flex items-center space-x-1 px-3 py-1 rounded-full ${
-                          getUserLevel(user?.mt_level) === 'VIP' 
-                            ? 'bg-gradient-to-r from-yellow-400 to-orange-400' 
-                            : 'bg-gradient-to-r from-gray-400 to-gray-500'
-                        }`}
-                        animate={getUserLevel(user?.mt_level) === 'VIP' ? { scale: [1, 1.05, 1] } : {}}
-                        transition={{ duration: 2, repeat: Infinity }}
-                      >
-                        <HiSparkles className="w-4 h-4 text-white" />
-                        <span className="text-xs font-bold text-white">{getUserLevel(user?.mt_level)}</span>
-                      </motion.div>
+                      </div>
                     </div>
-                    <p className="text-white/90 text-base font-medium mb-1">@{nickname}</p>
-                    <p className="text-white/70 text-sm">{phone}</p>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </div>
+                
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h2 className="text-xl font-bold">{profile.name}</h2>
+                    <div className="flex items-center space-x-1 bg-yellow-400/20 px-2 py-1 rounded-full">
+                      <HiSparkles className="w-3 h-3 text-yellow-300" />
+                      <span className="text-xs font-medium text-yellow-100">{profile.level}</span>
+                    </div>
                   </div>
+                  <p className="text-indigo-100 text-sm mb-1">{profile.plan}</p>
+                  <p className="text-indigo-200 text-xs">{profile.memberSince} 가입</p>
                 </div>
               </div>
               
-              {/* 통계 정보 */}
-              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/20">
-                <motion.div 
-                  className="text-center"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  <div className="text-2xl font-bold">24</div>
-                  <div className="text-xs text-white/70">가입일</div>
-                </motion.div>
-                <motion.div 
-                  className="text-center"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                >
-                  <div className="text-2xl font-bold">5</div>
-                  <div className="text-xs text-white/70">그룹수</div>
-                </motion.div>
-                <motion.div 
-                  className="text-center"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
-                >
-                  <div className="text-2xl font-bold">128</div>
-                  <div className="text-xs text-white/70">일정수</div>
-                </motion.div>
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-indigo-100">로그인 방법</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-lg">{profile.loginIcon}</span>
+                    <span className="text-white font-medium">{profile.loginMethod}</span>
+                  </div>
+                </div>
               </div>
             </div>
+          </motion.div>
+
+          {/* 메뉴 섹션들 */}
+          <div className="space-y-6">
+            {menuSections.map((section, sectionIdx) => (
+              <motion.div 
+                key={sectionIdx}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + (sectionIdx * 0.1), duration: 0.6 }}
+              >
+                <h3 className="text-lg font-semibold text-gray-900 mb-3 px-2 flex items-center">
+                  <span>{section.title}</span>
+                  <div className="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent ml-3"></div>
+                </h3>
+                
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                  {section.items.map((item, itemIdx) => {
+                    const IconComponent = item.icon;
+                    return (
+                      <button
+                        key={item.label}
+                        onClick={() => handleMenuClick(item)}
+                        className={`w-full flex items-center px-4 py-4 menu-item-hover mobile-button ${itemIdx !== section.items.length - 1 ? 'border-b border-gray-50' : ''}`}
+                      >
+                        <div className={`w-10 h-10 ${item.color} rounded-xl flex items-center justify-center mr-4 shadow-sm`}>
+                          <IconComponent className="w-5 h-5 text-white" />
+                        </div>
+                        
+                        <div className="flex-1 text-left">
+                          <h4 className="font-medium text-gray-900 mb-0.5">{item.label}</h4>
+                          <p className="text-xs text-gray-500">{item.description}</p>
+                        </div>
+                        
+                        <FiChevronRight className="w-5 h-5 text-gray-400" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            ))}
           </div>
         </motion.div>
 
-        {/* 메인 컨텐츠 */}
-        <div className="px-4 space-y-8 pb-20">
-          {/* 기본 정보 섹션 */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.6 }}
+        {/* 프로필 사진 변경 모달 */}
+        {showSheet && (
+          <div 
+            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
+            onClick={closeModal}
           >
-            <div className="flex items-center mb-5 px-2">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <FiUser className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">기본 정보</h3>
-              </div>
-              <div className="flex-1 h-px bg-gradient-to-r from-gray-200 to-transparent ml-4"></div>
-            </div>
-            
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 card-hover">
-              <div className="space-y-6">
-                {/* 닉네임 */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                    <FiEdit3 className="w-4 h-4 mr-1 text-indigo-500" />
-                    닉네임
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={nickname}
-                      onChange={e => setNickname(e.target.value)}
-                      className="w-full bg-gray-50 rounded-xl px-4 py-4 text-base border border-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 input-focus"
-                      placeholder="닉네임을 입력하세요"
-                    />
-                    {hasChanges && (
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* 성명 (읽기 전용) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                    <FiUserCheck className="w-4 h-4 mr-1 text-gray-500" />
-                    성명
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={name}
-                      className="w-full bg-gray-100 text-gray-500 rounded-xl px-4 py-4 text-base border border-gray-200 cursor-not-allowed"
-                      readOnly
-                    />
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <FiLock className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1 flex items-center">
-                    <FiInfo className="w-3 h-3 mr-1" />
-                    성명은 변경할 수 없습니다
-                  </p>
-                </div>
-                
-                {/* 연락처/이메일 (읽기 전용) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                    <FiPhone className="w-4 h-4 mr-1 text-gray-500" />
-                    {user?.mt_id ? (isEmail(user.mt_id) ? '이메일' : '연락처') : '연락처'}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="tel"
-                      value={phone}
-                      className="w-full bg-gray-100 text-gray-500 rounded-xl px-4 py-4 text-base border border-gray-200 cursor-not-allowed"
-                      readOnly
-                    />
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <FiLock className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1 flex items-center">
-                    <FiInfo className="w-3 h-3 mr-1" />
-                    {user?.mt_id ? (isEmail(user.mt_id) ? '이메일은' : '연락처는') : '연락처는'} 고객센터를 통해 변경 가능합니다
-                  </p>
-                </div>
-                
-                {/* 생년월일 (읽기 전용) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                    <FiCalendar className="w-4 h-4 mr-1 text-gray-500" />
-                    생년월일
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      value={birth}
-                      className="w-full bg-gray-100 text-gray-500 rounded-xl px-4 py-4 text-base border border-gray-200 cursor-not-allowed"
-                      readOnly
-                    />
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <FiLock className="w-4 h-4 text-gray-400" />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1 flex items-center">
-                    <FiInfo className="w-3 h-3 mr-1" />
-                    생년월일은 변경할 수 없습니다
-                  </p>
-                </div>
-                
-                {/* 성별 (읽기 전용) */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                    <FiUser className="w-4 h-4 mr-1 text-gray-500" />
-                    성별
-                  </label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {GENDER_OPTIONS.map(option => (
-                      <div
-                        key={option.value}
-                        className={`p-3 rounded-xl border-2 text-center transition-all ${
-                          gender === option.value
-                            ? 'border-indigo-500 bg-indigo-50'
-                            : 'border-gray-200 bg-gray-100'
-                        } cursor-not-allowed opacity-60`}
-                      >
-                        <div className="text-lg mb-1">{option.icon}</div>
-                        <div className="text-sm font-medium text-gray-600">{option.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2 flex items-center">
-                    <FiInfo className="w-3 h-3 mr-1" />
-                    성별은 변경할 수 없습니다
-                  </p>
-                </div>
-                
-                {/* 저장 버튼 */}
-                {hasChanges && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="pt-4 border-t border-gray-100"
-                  >
-                    <motion.button
-                      onClick={handleSave}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center space-x-2"
-                    >
-                      <FiSave className="w-5 h-5" />
-                      <span>변경사항 저장</span>
-                    </motion.button>
-                  </motion.div>
-                )}
-              </div>
-            </div>
-          </motion.div>
-
-          {/* 보안 관리 섹션 */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.6 }}
-          >
-            <div className="flex items-center mb-5 px-2">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-red-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <FiShield className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">보안 관리</h3>
-              </div>
-              <div className="flex-1 h-px bg-gradient-to-r from-gray-200 to-transparent ml-4"></div>
-            </div>
-            
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden card-hover">
-              <Link href="/setting/account/password">
-                <div className="flex items-center p-4 hover:bg-gray-50 transition-colors mobile-button">
-                  <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mr-4 shadow-sm">
-                    <FiKey className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 mb-0.5">비밀번호 변경</h4>
-                    <p className="text-xs text-gray-500">계정 보안을 위해 정기적으로 변경하세요</p>
-                  </div>
-                  <div className="text-gray-400">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              </Link>
-            </div>
-          </motion.div>
-
-          {/* 계정 관리 섹션 */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 0.6 }}
-          >
-            <div className="flex items-center mb-5 px-2">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-gray-600 to-gray-700 rounded-xl flex items-center justify-center shadow-lg">
-                  <FiSettings className="w-5 h-5 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900">계정 관리</h3>
-              </div>
-              <div className="flex-1 h-px bg-gradient-to-r from-gray-200 to-transparent ml-4"></div>
-            </div>
-            
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden card-hover">
-              <button 
-                onClick={handleLogout}
-                className="w-full flex items-center p-4 hover:bg-gray-50 transition-colors mobile-button"
-              >
-                <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center mr-4 shadow-sm">
-                  <FiLogOut className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1 text-left">
-                  <h4 className="font-medium text-gray-900 mb-0.5">로그아웃</h4>
-                  <p className="text-xs text-gray-500">현재 기기에서 로그아웃합니다</p>
-                </div>
-                <div className="text-gray-400">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </button>
+            <div 
+              className={`w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 shadow-2xl ${
+                isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
+              }`}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
               
-              <div className="border-t border-gray-100">
-                <button 
-                  onClick={() => router.push('/setting/account/withdraw')}
-                  className="w-full flex items-center p-4 hover:bg-red-50 transition-colors mobile-button"
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <FiCamera className="w-8 h-8 text-indigo-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-1">프로필 사진 변경</h3>
+                <p className="text-gray-600 text-sm">새로운 프로필 사진을 선택해주세요</p>
+              </div>
+              
+              <div className="space-y-3">
+                <button
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium shadow-lg mobile-button flex items-center justify-center space-x-2"
+                  onClick={() => handleSelect('camera')}
                 >
-                  <div className="w-12 h-12 bg-gradient-to-r from-red-500 to-red-600 rounded-xl flex items-center justify-center mr-4 shadow-sm">
-                    <FiTrash2 className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <h4 className="font-medium text-red-600 mb-0.5">회원탈퇴</h4>
-                    <p className="text-xs text-red-500">계정을 영구적으로 삭제합니다</p>
-                  </div>
-                  <div className="text-red-400">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
+                  <FiCamera className="w-5 h-5" />
+                  <span>카메라로 촬영</span>
+                </button>
+                
+                <button
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium shadow-lg mobile-button flex items-center justify-center space-x-2"
+                  onClick={() => handleSelect('album')}
+                >
+                  <FiEdit3 className="w-5 h-5" />
+                  <span>앨범에서 선택</span>
+                </button>
+                
+                <button
+                  className="w-full py-4 rounded-2xl bg-gray-100 text-gray-700 font-medium mobile-button"
+                  onClick={closeModal}
+                >
+                  취소
                 </button>
               </div>
             </div>
-          </motion.div>
-        </div>
-
-        {/* 프로필 이미지 변경 모달 */}
-        {showImageModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end justify-center z-50 p-4"
-            onClick={() => closeModal(setShowImageModal)}
-          >
-            <motion.div 
-              initial={{ y: "100%", opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: "100%", opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white rounded-t-3xl w-full max-w-md p-6 pb-8 shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-6"></div>
-              
-              <div className="text-center mb-8">
-                <motion.div 
-                  className="w-20 h-20 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
-                  animate={{ rotate: [0, 5, -5, 0] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  <FiCamera className="w-10 h-10 text-white" />
-                </motion.div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">프로필 사진 변경</h3>
-                <p className="text-gray-600">새로운 프로필 사진을 선택해주세요</p>
-              </div>
-              
-              <div className="space-y-4">
-                <motion.button
-                  onClick={() => handleImageSelect('camera')}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-semibold shadow-lg flex items-center justify-center space-x-3"
-                >
-                  <FiCamera className="w-6 h-6" />
-                  <span>카메라로 촬영</span>
-                </motion.button>
-                
-                <motion.button
-                  onClick={() => handleImageSelect('gallery')}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-semibold shadow-lg flex items-center justify-center space-x-3"
-                >
-                  <FiImage className="w-6 h-6" />
-                  <span>갤러리에서 선택</span>
-                </motion.button>
-                
-                <motion.button
-                  onClick={() => closeModal(setShowImageModal)}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full py-4 rounded-2xl bg-gray-100 text-gray-700 font-semibold"
-                >
-                  취소
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
+          </div>
         )}
 
         {/* 로그아웃 확인 모달 */}
         {showLogoutModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            onClick={() => closeModal(setShowLogoutModal)}
+          <div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            onClick={() => setShowLogoutModal(false)}
           >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="bg-white rounded-3xl w-full max-w-sm mx-auto modal-safe-area shadow-2xl"
+            <div 
+              className="bg-white rounded-3xl w-full max-w-md mx-auto animate-slideInFromBottom"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-8">
-                <div className="text-center mb-8">
-                  <motion.div 
-                    className="w-20 h-20 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
-                    animate={{ rotate: [0, -10, 10, 0] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    <FiLogOut className="w-10 h-10 text-white" />
-                  </motion.div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">로그아웃</h3>
-                  <p className="text-gray-600 text-lg">정말 로그아웃 하시겠습니까?</p>
+              <div className="p-6 pb-8">
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FiLogOut className="w-8 h-8 text-yellow-500" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">로그아웃</h3>
+                  <p className="text-gray-600">
+                    정말 로그아웃 하시겠습니까?
+                  </p>
                 </div>
                 
-                <div className="space-y-4">
-                  <motion.button
-                    onClick={handleConfirmLogout}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full py-4 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-2xl font-semibold shadow-lg"
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="w-full py-4 bg-yellow-500 text-white rounded-2xl font-medium hover:bg-yellow-600 transition-colors"
                   >
                     로그아웃
-                  </motion.button>
-                  <motion.button
-                    onClick={() => closeModal(setShowLogoutModal)}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full py-4 bg-gray-100 text-gray-700 rounded-2xl font-semibold"
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setShowLogoutModal(false)}
+                    className="w-full py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium hover:bg-gray-50 transition-colors"
                   >
                     취소
-                  </motion.button>
+                  </button>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
-
-        {/* 성공 토스트 */}
-        {showSuccessToast && (
-          <motion.div 
-            initial={{ opacity: 0, y: -50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -50, scale: 0.9 }}
-            className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50"
-          >
-            <motion.div 
-              className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center space-x-3"
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 0.3 }}
-            >
-              <HiCheckCircle className="w-6 h-6" />
-              <span className="font-semibold text-lg">변경사항이 저장되었습니다</span>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {/* 숨겨진 파일 입력 */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-      </motion.div>
+      </div>
     </>
   );
 } 

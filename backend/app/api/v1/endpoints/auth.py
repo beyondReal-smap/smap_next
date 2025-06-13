@@ -9,9 +9,13 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.schemas.auth import LoginRequest, LoginResponse, UserIdentity, RegisterRequest
 from app.crud import crud_auth
+import logging
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# 로거 설정
+logger = logging.getLogger(__name__)
 
 # home/page.tsx의 AuthContext에서 사용하는 로그인 요청 모델
 class LoginRequestHome(BaseModel):
@@ -20,6 +24,20 @@ class LoginRequestHome(BaseModel):
 
 # home/page.tsx의 AuthContext에서 사용하는 로그인 응답 모델
 class LoginResponseHome(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+# 카카오 로그인 요청 모델
+class KakaoLoginRequest(BaseModel):
+    kakao_id: str
+    email: Optional[str] = None
+    nickname: str
+    profile_image: Optional[str] = None
+    access_token: str
+
+# 카카오 로그인 응답 모델
+class KakaoLoginResponse(BaseModel):
     success: bool
     message: str
     data: Optional[dict] = None
@@ -261,3 +279,102 @@ async def read_users_me(db: Session = Depends(get_db), token: str = Depends(oaut
         
     except JWTError:
         raise credentials_exception 
+
+@router.post("/kakao-login", response_model=KakaoLoginResponse)
+async def kakao_login(
+    kakao_request: KakaoLoginRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    카카오 로그인 API
+    """
+    try:
+        logger.info(f"[KAKAO LOGIN] 카카오 로그인 요청: kakao_id={kakao_request.kakao_id}")
+        
+        # 기존 카카오 사용자 조회
+        existing_user = crud_auth.get_user_by_kakao_id(db, kakao_request.kakao_id)
+        
+        is_new_user = False
+        
+        if existing_user:
+            # 기존 사용자 로그인
+            logger.info(f"[KAKAO LOGIN] 기존 카카오 사용자 로그인: mt_idx={existing_user.mt_idx}")
+            user = existing_user
+        else:
+            # 이메일로 기존 계정 조회 (이메일이 있는 경우)
+            if kakao_request.email:
+                email_user = crud_auth.get_user_by_email(db, kakao_request.email)
+                if email_user:
+                    # 기존 계정에 카카오 ID 연결
+                    logger.info(f"[KAKAO LOGIN] 기존 이메일 계정에 카카오 연결: mt_idx={email_user.mt_idx}")
+                    email_user.mt_kakao_id = kakao_request.kakao_id
+                    email_user.mt_type = 2  # 카카오 로그인
+                    if kakao_request.profile_image:
+                        email_user.mt_file1 = kakao_request.profile_image
+                    db.commit()
+                    user = email_user
+                else:
+                    # 새 사용자 생성
+                    user = crud_auth.create_kakao_user(db, kakao_request)
+                    is_new_user = True
+                    logger.info(f"[KAKAO LOGIN] 새 카카오 사용자 생성: mt_idx={user.mt_idx}")
+            else:
+                # 이메일 없이 새 사용자 생성
+                user = crud_auth.create_kakao_user(db, kakao_request)
+                is_new_user = True
+                logger.info(f"[KAKAO LOGIN] 새 카카오 사용자 생성 (이메일 없음): mt_idx={user.mt_idx}")
+
+        # 로그인 시간 업데이트
+        user.mt_ldate = datetime.utcnow()
+        db.commit()
+
+        # 사용자 정보 구성
+        user_data = {
+            "mt_idx": user.mt_idx,
+            "mt_type": user.mt_type or 2,
+            "mt_level": user.mt_level or 2,
+            "mt_status": user.mt_status or 1,
+            "mt_id": user.mt_id or "",
+            "mt_name": user.mt_name or "",
+            "mt_nickname": user.mt_nickname or "",
+            "mt_hp": user.mt_hp or "",
+            "mt_email": user.mt_email or "",
+            "mt_birth": user.mt_birth.isoformat() if user.mt_birth else "",
+            "mt_gender": user.mt_gender or 1,
+            "mt_file1": user.mt_file1 or "",
+            "mt_kakao_id": user.mt_kakao_id or "",
+            "mt_lat": float(user.mt_lat) if user.mt_lat else 37.5642,
+            "mt_long": float(user.mt_long) if user.mt_long else 127.0016,
+            "mt_sido": user.mt_sido or "",
+            "mt_gu": user.mt_gu or "",
+            "mt_dong": user.mt_dong or "",
+            "mt_onboarding": user.mt_onboarding or 'Y',
+            "mt_push1": user.mt_push1 or 'Y',
+            "mt_plan_check": user.mt_plan_check or 'N',
+            "mt_plan_date": user.mt_plan_date.isoformat() if user.mt_plan_date else "",
+            "mt_weather_pop": user.mt_weather_pop or "",
+            "mt_weather_sky": user.mt_weather_sky or 8,
+            "mt_weather_tmn": user.mt_weather_tmn or 18,
+            "mt_weather_tmx": user.mt_weather_tmx or 25,
+            "mt_weather_date": user.mt_weather_date.isoformat() if user.mt_weather_date else datetime.utcnow().isoformat(),
+            "mt_ldate": user.mt_ldate.isoformat() if user.mt_ldate else datetime.utcnow().isoformat(),
+            "mt_adate": user.mt_adate.isoformat() if user.mt_adate else datetime.utcnow().isoformat()
+        }
+
+        logger.info(f"[KAKAO LOGIN] 카카오 로그인 성공: mt_idx={user.mt_idx}, is_new_user={is_new_user}")
+        
+        return KakaoLoginResponse(
+            success=True,
+            message="카카오 로그인 성공" if not is_new_user else "카카오 계정으로 회원가입되었습니다.",
+            data={
+                "user": user_data,
+                "isNewUser": is_new_user
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"[KAKAO LOGIN] 카카오 로그인 오류: {str(e)}")
+        return KakaoLoginResponse(
+            success=False,
+            message="카카오 로그인 처리 중 오류가 발생했습니다."
+        ) 

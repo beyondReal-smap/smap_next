@@ -789,7 +789,9 @@ class MemberLocationLogService {
     try {
       console.log('[MemberLocationLogService] 멤버 활동 조회 시작:', { groupId, date });
       
-      const response = await apiClient.get<ApiResponse<MemberActivityResponse>>(`/member-location-logs/member-activity?group_id=${groupId}&date=${date}`);
+      // 캐시 무효화를 위한 타임스탬프 추가
+      const timestamp = Date.now();
+      const response = await apiClient.get<ApiResponse<MemberActivityResponse>>(`/member-location-logs/member-activity?group_id=${groupId}&date=${date}&_t=${timestamp}`);
       const result = response.data;
       
       console.log('[MemberLocationLogService] 멤버 활동 조회 응답:', {
@@ -809,6 +811,45 @@ class MemberLocationLogService {
       });
       
       if (result.result === 'Y' && result.data) {
+        // 응답 데이터의 날짜 검증
+        if (result.data.date !== date) {
+          console.warn('[MemberLocationLogService] ⚠️ 응답 데이터의 날짜가 요청한 날짜와 다름:', {
+            requested: date,
+            received: result.data.date,
+            retrying: true
+          });
+          
+          // 잠시 대기 후 재요청 (백엔드 캐시 갱신 대기)
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          const retryTimestamp = Date.now();
+          const retryResponse = await apiClient.get<ApiResponse<MemberActivityResponse>>(`/member-location-logs/member-activity?group_id=${groupId}&date=${date}&_t=${retryTimestamp}&retry=1`);
+          const retryResult = retryResponse.data;
+          
+          console.log('[MemberLocationLogService] 멤버 활동 재요청 응답:', {
+            status: retryResponse.status,
+            result: retryResult.result,
+            requestedDate: date,
+            receivedDate: retryResult.data?.date
+          });
+          
+          if (retryResult.result === 'Y' && retryResult.data) {
+            if (retryResult.data.date === date) {
+              console.log('[MemberLocationLogService] ✅ 재요청으로 올바른 날짜 데이터 획득');
+              return retryResult.data;
+            } else {
+              console.warn('[MemberLocationLogService] ⚠️ 재요청에도 날짜 불일치, 응답 데이터의 날짜를 요청 날짜로 수정');
+              return {
+                ...retryResult.data,
+                date: date // 요청한 날짜로 강제 수정
+              };
+            }
+          } else {
+            console.warn('[MemberLocationLogService] ⚠️ 재요청 실패, mock 데이터 사용');
+            return mockData;
+          }
+        }
+        
         console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용 (멤버 활동)');
         return result.data;
       } else {

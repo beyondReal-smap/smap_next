@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState } from 'react';
 import { AuthState, AuthAction, UserProfile, GroupWithMembers, LoginRequest } from '@/types/auth';
 import authService from '@/services/authService';
 
@@ -262,4 +262,6 @@ export const useGroups = () => {
 export const useSelectedGroup = () => {
   const { selectedGroup, selectGroup } = useAuth();
   return { selectedGroup, selectGroup };
-}; 
+};
+
+ 

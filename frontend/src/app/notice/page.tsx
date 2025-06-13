@@ -428,19 +428,32 @@ function NoticeContent() {
     return (
       <>
         <style jsx global>{mobileAnimations}</style>
-        
-        {/* 개선된 헤더 - 최상위 레벨에서 완전 고정 */}
+        <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+        {/* 헤더 - 위에서 슬라이드 내려오는 애니메이션 */}
         <motion.header 
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="fixed top-0 left-0 right-0 z-50 glass-effect"
-          style={{ position: 'fixed' }}
+          initial={{ y: -100, opacity: 0, scale: 0.9 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          transition={{ 
+            delay: 0.2, 
+            duration: 0.8, 
+            ease: [0.25, 0.46, 0.45, 0.94],
+            opacity: { duration: 0.6 },
+            scale: { duration: 0.6 }
+          }}
+          className="fixed top-0 left-0 right-0 z-20 glass-effect"
         >
-          <div className="flex items-center justify-between h-16 px-4">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="flex items-center justify-between h-16 px-4"
+          >
             <div className="flex items-center space-x-3">
               <motion.button 
                 onClick={handleBackNavigation}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5, duration: 0.4 }}
                 className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -449,29 +462,42 @@ function NoticeContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </motion.button>
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">알림</h1>
-                <p className="text-xs text-gray-500">새로운 소식을 확인해보세요</p>
-              </div>
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.6, duration: 0.4 }}
+                className="flex items-center space-x-3"
+              >
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">알림</h1>
+                  <p className="text-xs text-gray-500">새로운 소식을 확인해보세요</p>
+                </div>
+              </motion.div>
             </div>
             
             <div className="flex items-center space-x-2">
               {/* 필요시 추가 버튼들을 여기에 배치 */}
             </div>
-          </div>
-        </motion.header>
-        
-        {/* 로딩 컨텐츠 */}
-        <div className={`min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 pt-20 ${
-          isExiting ? 'animate-slideOutToRight' : 
-          isEntering ? 'animate-slideInFromRight' : ''
-        }`}>
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-600">알림을 불러오는 중...</p>
+          </motion.div>
+          </motion.header>
+          
+          {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className={`schedule-page-content px-4 pt-20 space-y-6 pb-20 ${
+              isExiting ? 'animate-slideOutToRight' : 
+              isEntering ? 'animate-slideInFromRight' : ''
+            }`}
+          >
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-gray-600">알림을 불러오는 중...</p>
+              </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </>
     );
@@ -480,51 +506,88 @@ function NoticeContent() {
   return (
     <>
       <style jsx global>{mobileAnimations}</style>
-      
-      {/* 개선된 헤더 - 최상위 레벨에서 완전 고정 */}
-      <header className="glass-effect">
-        <div className="flex items-center justify-between h-16 px-4">
-          <div className="flex items-center space-x-3">
-            <motion.button 
-              onClick={handleBackNavigation}
-              className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </motion.button>
-            <div>
-              <h1 className="text-lg font-bold text-gray-900">알림</h1>
-              <p className="text-xs text-gray-500">새로운 소식을 확인해보세요</p>
+      <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+        {/* 헤더 - 위에서 슬라이드 내려오는 애니메이션 */}
+        <motion.header 
+          initial={{ y: -100, opacity: 0, scale: 0.9 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          transition={{ 
+            delay: 0.2, 
+            duration: 0.8, 
+            ease: [0.25, 0.46, 0.45, 0.94],
+            opacity: { duration: 0.6 },
+            scale: { duration: 0.6 }
+          }}
+          className="fixed top-0 left-0 right-0 z-20 glass-effect"
+        >
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="flex items-center justify-between h-16 px-4"
+          >
+            <div className="flex items-center space-x-3">
+              <motion.button 
+                onClick={handleBackNavigation}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5, duration: 0.4 }}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </motion.button>
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.6, duration: 0.4 }}
+                className="flex items-center space-x-3"
+              >
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">알림</h1>
+                  <p className="text-xs text-gray-500">새로운 소식을 확인해보세요</p>
+                </div>
+              </motion.div>
             </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <motion.button
-              onClick={handleDeleteAll}
-              disabled={notices.length === 0}
-              className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+            
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.7, duration: 0.4 }}
+              className="flex items-center space-x-2"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              전체삭제
-            </motion.button>
-          </div>
-        </div>
-              </header>
+              <motion.button
+                onClick={handleDeleteAll}
+                disabled={notices.length === 0}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.8, duration: 0.4 }}
+                className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                전체삭제
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        </motion.header>
 
-      {/* 메인 컨텐츠 영역 - 패딩 조정 */}
-      <div className={`min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 ${
-        isExiting ? 'animate-slideOutToRight' : 
-        isEntering ? 'animate-slideInFromRight' : ''
-      }`}>
-        <main className="pt-20 pb-8 bg-gradient-to-b from-indigo-50/30 to-white">
-        <div className="px-4 pt-2 pb-16">
+        {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className={`schedule-page-content px-4 pt-20 space-y-3 pb-20 ${
+            isExiting ? 'animate-slideOutToRight' : 
+            isEntering ? 'animate-slideInFromRight' : ''
+          }`}
+        >
             <div className="space-y-6">
               {Object.entries(grouped).map(([date, items]) => (
                  <section 
@@ -534,7 +597,7 @@ function NoticeContent() {
                    className="relative"
                  >
                    {/* 날짜 헤더 - 모바일 최적화 */}
-                   <div className="sticky top-20 z-[8] mb-3">
+                   <div className="sticky top-1 z-[8] mb-5">
                      <div className="bg-gray-900 backdrop-blur-md rounded-lg px-4 py-2 mx-2 shadow-sm border border-gray-800 text-white">
                        <div className="flex items-center justify-center space-x-2">
                          <div className="w-1.5 h-1.5 bg-pink-400 rounded-full"></div>
@@ -579,10 +642,9 @@ function NoticeContent() {
                  </section>
                ))}
              </div>
-         </div>
-      </main>
+         </motion.div>
 
-      {/* 전체 삭제 확인 모달 */}
+         {/* 전체 삭제 확인 모달 */}
       {isDeleteModalOpen && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"

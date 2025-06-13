@@ -2,7 +2,8 @@
 export const API_KEYS = {
   GOOGLE_MAPS: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
   NAVER_MAPS: process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '',
-  KAKAO_MAPS: process.env.NEXT_PUBLIC_KAKAO_MAPS_API_KEY || ''
+  KAKAO_MAPS: process.env.NEXT_PUBLIC_KAKAO_MAPS_API_KEY || '',
+  KAKAO_LOGIN: process.env.NEXT_PUBLIC_KAKAO_APP_KEY || ''
 };
 
 // 기본 설정

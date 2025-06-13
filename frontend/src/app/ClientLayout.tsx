@@ -61,8 +61,8 @@ export default function ClientLayout({
   useServiceWorker();
 
   // 네비게이션 바를 숨길 페이지들
-  const hideNavBarPages = ['/signin', '/register'];
-  const shouldHideNavBar = hideNavBarPages.includes(pathname);
+  const hideNavBarPages = ['/signin', '/register', '/notice', '/setting'];
+  const shouldHideNavBar = hideNavBarPages.some(page => pathname.startsWith(page));
 
   // 클라이언트 측에서만 마운트
   useEffect(() => {

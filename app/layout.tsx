@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import AuthHeader from '../components/AuthHeader'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -29,6 +30,7 @@ export default function RootLayout({
                   <a href="/group" className="text-gray-700 hover:text-blue-600">그룹</a>
                   <a href="/location" className="text-gray-700 hover:text-blue-600">위치</a>
                   <a href="/schedule" className="text-gray-700 hover:text-blue-600">스케줄</a>
+                  <AuthHeader />
                 </div>
               </div>
             </div>

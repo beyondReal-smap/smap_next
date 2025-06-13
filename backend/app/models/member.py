@@ -65,6 +65,7 @@ class Member(BaseModel):
     mt_remember_token = Column(String(255), nullable=True)
     mt_token_expiry = Column(DateTime, nullable=True)
     mt_google_id = Column(String(255), nullable=True, comment='Google 계정 ID')
+    mt_kakao_id = Column(String(255), nullable=True, comment='Kakao 계정 ID')
 
     @classmethod
     def find_by_email(cls, db: Session, email: str) -> Optional['Member']:

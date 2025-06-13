@@ -15,6 +15,13 @@ import { FcGoogle } from 'react-icons/fc';
 import { RiKakaoTalkFill } from 'react-icons/ri';
 import { FiX, FiAlertTriangle, FiPhone, FiLock } from 'react-icons/fi';
 
+// 카카오 SDK 타입 정의
+declare global {
+  interface Window {
+    Kakao: any;
+  }
+}
+
 export default function SignInPage() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
@@ -24,9 +31,59 @@ export default function SignInPage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorModalMessage, setErrorModalMessage] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
+
+  // 이미 로그인된 사용자 감지 및 자동 리다이렉트
+  useEffect(() => {
+    const checkExistingAuth = async () => {
+      try {
+        console.log('[SIGNIN] 기존 인증 상태 확인 중...');
+        
+        // 쿠키에서 JWT 토큰 확인
+        const token = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('auth-token='))
+          ?.split('=')[1];
+
+        if (token) {
+          console.log('[SIGNIN] JWT 토큰 발견, 유효성 검증 중...');
+          
+          // 토큰 유효성 검증
+          const response = await fetch('/api/auth/verify-token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              console.log('[SIGNIN] 유효한 토큰 발견, 홈으로 리다이렉트');
+              router.replace('/home');
+              return;
+            }
+          } else {
+            console.log('[SIGNIN] 토큰이 유효하지 않음, 쿠키 삭제');
+            // 유효하지 않은 토큰 삭제
+            document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+          }
+        }
+
+        console.log('[SIGNIN] 기존 인증 없음, 로그인 페이지 표시');
+      } catch (error) {
+        console.error('[SIGNIN] 인증 상태 확인 중 오류:', error);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkExistingAuth();
+  }, [router]);
 
   // 자동 입력 기능 제거됨 - 사용자가 직접 입력해야 함
   // useEffect(() => {
@@ -232,31 +289,65 @@ export default function SignInPage() {
 
   // Kakao 로그인 핸들러
   const handleKakaoLogin = async () => {
-    setIsLoading(true);
-    try {
-      // Kakao 로그인 로직 구현
-      console.log('Kakao 로그인 시도');
-      // 임시로 소셜 로그인 API 호출
-      const response = await fetch('/api/auth/social-login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          provider: 'kakao',
-          token: 'mock-kakao-token'
-        }),
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        router.push('/home');
-      }
-    } catch (error) {
-      console.error('Kakao 로그인 실패:', error);
-      setErrorModalMessage('Kakao 로그인에 실패했습니다.');
+    // 카카오 SDK가 로드되었는지 확인
+    if (!window.Kakao || !window.Kakao.isInitialized()) {
+      setErrorModalMessage('카카오 SDK가 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
       setShowErrorModal(true);
-    } finally {
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      // 카카오 로그인 팝업 띄우기
+      window.Kakao.Auth.login({
+        success: async (authObj: any) => {
+          try {
+            console.log('카카오 로그인 성공:', authObj);
+            
+                         // 백엔드 API로 액세스 토큰 전송
+             const response = await fetch('/api/kakao-auth', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                access_token: authObj.access_token,
+              }),
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              console.log('[KAKAO LOGIN] 카카오 로그인 성공, 사용자 정보:', data.user);
+              
+              // AuthContext에 사용자 정보 설정 (JWT 토큰은 이미 쿠키에 저장됨)
+              // AuthContext가 쿠키에서 토큰을 자동으로 읽어올 것임
+              
+              // 로그인 성공 시 홈 페이지로 이동
+              router.push('/home');
+            } else {
+              throw new Error(data.error || '로그인에 실패했습니다.');
+            }
+          } catch (error: any) {
+            console.error('카카오 로그인 처리 오류:', error);
+            setErrorModalMessage(error.message || '로그인 처리 중 오류가 발생했습니다.');
+            setShowErrorModal(true);
+          } finally {
+            setIsLoading(false);
+          }
+        },
+        fail: (error: any) => {
+          console.error('카카오 로그인 실패:', error);
+          setErrorModalMessage('카카오 로그인에 실패했습니다.');
+          setShowErrorModal(true);
+          setIsLoading(false);
+        },
+      });
+    } catch (error: any) {
+      console.error('카카오 로그인 오류:', error);
+      setErrorModalMessage('카카오 로그인 중 오류가 발생했습니다.');
+      setShowErrorModal(true);
       setIsLoading(false);
     }
   };
@@ -288,12 +379,36 @@ export default function SignInPage() {
       const script = document.createElement('script');
       script.src = 'https://developers.kakao.com/sdk/js/kakao.js';
       script.async = true;
-      script.defer = true;
-      document.body.appendChild(script);
+      script.onload = () => {
+        // 카카오 SDK 초기화
+        if (window.Kakao && !window.Kakao.isInitialized()) {
+          const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY;
+          if (kakaoAppKey) {
+            window.Kakao.init(kakaoAppKey);
+            console.log('카카오 SDK 초기화 완료');
+          } else {
+            console.error('카카오 앱 키가 설정되지 않았습니다.');
+          }
+        }
+      };
+      document.head.appendChild(script);
     };
 
     loadKakaoSDK();
   }, []);
+
+  // 인증 상태 확인 중일 때 로딩 화면 표시
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mx-auto mb-6"></div>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">인증 상태 확인 중</h2>
+          <p className="text-gray-600">잠시만 기다려주세요...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div 

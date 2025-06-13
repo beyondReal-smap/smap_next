@@ -69,6 +69,22 @@ const getUserPlan = (mtLevel: number | null | undefined): string => {
   return '베이직 플랜'; // 기본값
 };
 
+// 로그인 타입에 따른 로그인 방법 반환 함수
+const getLoginMethod = (mtType: number | null | undefined): { method: string; icon: string } => {
+  switch (mtType) {
+    case 1:
+      return { method: '일반 로그인', icon: '🔐' };
+    case 2:
+      return { method: '카카오 로그인', icon: '💬' };
+    case 3:
+      return { method: '애플 로그인', icon: '🍎' };
+    case 4:
+      return { method: '구글 로그인', icon: '🌐' };
+    default:
+      return { method: '일반 로그인', icon: '🔐' };
+  }
+};
+
 // 모바일 최적화된 CSS 애니메이션
 const pageAnimations = `
 html, body {
@@ -284,12 +300,13 @@ export default function SettingsPage() {
   };
 
   // 프로필 데이터 (실제 사용자 정보 기반)
+  const loginInfo = getLoginMethod(user?.mt_type);
   const profile = {
     avatar: getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0),
     name: user?.mt_name || user?.mt_nickname || '사용자',
     plan: getUserPlan(user?.mt_level),
-    contact: user?.mt_id || '',
-    contactType: user?.mt_id ? (isEmail(user.mt_id) ? '이메일' : '연락처') : '연락처',
+    loginMethod: loginInfo.method,
+    loginIcon: loginInfo.icon,
     memberSince: user?.mt_wdate ? new Date(user.mt_wdate).getFullYear() + '년 ' + (new Date(user.mt_wdate).getMonth() + 1) + '월' : '2024년 1월',
     level: getUserLevel(user?.mt_level)
   };
@@ -439,28 +456,32 @@ export default function SettingsPage() {
   return (
     <>
       <style jsx global>{pageAnimations}</style>
-      <motion.div
-        initial={{ opacity: 0, x: 30 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -30 }}
-        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-10"
-        style={{ 
-          position: 'relative',
-          width: '100%'
-        }}
-      >
-        {/* 개선된 헤더 - home/page.tsx 스타일 */}
+      <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+        {/* 헤더 - 위에서 슬라이드 내려오는 애니메이션 */}
         <motion.header 
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed top-0 left-0 right-0 z-50 glass-effect"
+          initial={{ y: -100, opacity: 0, scale: 0.9 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          transition={{ 
+            delay: 0.2, 
+            duration: 0.8, 
+            ease: [0.25, 0.46, 0.45, 0.94],
+            opacity: { duration: 0.6 },
+            scale: { duration: 0.6 }
+          }}
+          className="fixed top-0 left-0 right-0 z-20 glass-effect"
         >
-          <div className="flex items-center justify-between h-16 px-4">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="flex items-center justify-between h-16 px-4"
+          >
             <div className="flex items-center space-x-3">
               <motion.button 
                 onClick={handleBack}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5, duration: 0.4 }}
                 className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -469,34 +490,37 @@ export default function SettingsPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </motion.button>
-              <div className="flex items-center space-x-3">
-                <motion.div
-                  initial={{ rotate: -180, scale: 0 }}
-                  animate={{ rotate: 0, scale: 1 }}
-                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                  className="p-2 bg-indigo-600 rounded-xl"
-                >
-                  <FiSettings className="w-5 h-5 text-white" />
-                </motion.div>
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.6, duration: 0.4 }}
+                className="flex items-center space-x-3"
+              >
                 <div>
                   <h1 className="text-lg font-bold text-gray-900">설정</h1>
                   <p className="text-xs text-gray-500">앱 설정과 계정 관리</p>
                 </div>
-              </div>
+              </motion.div>
             </div>
-            
 
-          </div>
+          </motion.div>
         </motion.header>
 
-        {/* 프로필 영역 - 개선된 디자인 */}
-        <motion.div 
+        {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-          className="px-4 pt-20 pb-6"
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="schedule-page-content px-4 pt-20 space-y-6 pb-20"
         >
-          <div className="bg-indigo-700 rounded-3xl p-6 text-white shadow-xl">
+          {/* 프로필 영역 - 개선된 디자인 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+            className="pb-2"
+          >
+          <div className="bg-[#0113A3] rounded-3xl p-6 text-white shadow-xl">
             <div className="flex items-center space-x-4">
               <div className="relative">
                 <button 
@@ -548,15 +572,18 @@ export default function SettingsPage() {
             
             <div className="mt-4 pt-4 border-t border-white/20">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-indigo-100">{profile.contactType}</span>
-                <span className="text-white font-medium">{profile.contact}</span>
+                <span className="text-indigo-100">로그인 방법</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">{profile.loginIcon}</span>
+                  <span className="text-white font-medium">{profile.loginMethod}</span>
+                </div>
               </div>
             </div>
           </div>
         </motion.div>
 
-        {/* 메뉴 섹션들 */}
-        <div className="px-4 space-y-6 pb-20">
+          {/* 메뉴 섹션들 */}
+          <div className="space-y-6">
           {menuSections.map((section, sectionIdx) => (
             <motion.div 
               key={sectionIdx}
@@ -657,7 +684,8 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
-      </motion.div>
+        </motion.div>
+      </div>
     </>
   );
 } 

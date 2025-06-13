@@ -17,6 +17,12 @@ const getMetadata = (): Metadata => {
     authors: [{ name: localizedInfo.APP_AUTHOR }],
     keywords: '',
     metadataBase: new URL(APP_INFO.DOMAIN),
+    viewport: {
+      width: 'device-width',
+      initialScale: 1,
+      maximumScale: 1,
+      userScalable: false,
+    },
     openGraph: {
       title: localizedInfo.APP_TITLE,
       description: localizedInfo.DESCRIPTION,

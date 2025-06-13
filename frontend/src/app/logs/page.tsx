@@ -1150,17 +1150,45 @@ export default function LogsPage() {
     }
   }, [dailyCountsData, groupMembers, calculateMemberLogDistribution]);
 
-  // 사이드바 날짜 선택 부분 초기 스크롤 설정
+  // 그룹 멤버가 로딩된 후 캐시에서 일별 카운트 데이터 확인
   useEffect(() => {
-    if (isSidebarOpen && dateScrollContainerRef.current) {
-      // 사이드바가 열리고 DOM이 렌더링된 후 오늘 날짜로 스크롤
-      const timer = setTimeout(() => {
-        scrollToTodayDate('사이드바 날짜 초기화');
-      }, 100);
+    if (groupMembers.length > 0 && selectedGroupId && !dailyCountsData) {
+      const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
+      const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
       
-      return () => clearTimeout(timer);
+      if (cachedCounts && isCountsCacheValid) {
+        console.log('[LOGS] 그룹 멤버 로딩 후 캐시에서 일별 카운트 데이터 복원');
+        setDailyCountsData(cachedCounts);
+        dataFetchedRef.current.dailyCounts = true;
+      }
     }
-  }, [isSidebarOpen]);
+  }, [groupMembers.length, selectedGroupId, dailyCountsData, getCachedDailyLocationCounts, isCacheValid]);
+
+  // 사이드바 날짜 선택 부분 초기 스크롤 설정 및 캐시 데이터 확인
+  useEffect(() => {
+    if (isSidebarOpen) {
+      // 사이드바가 열릴 때 캐시에서 일별 카운트 데이터 확인
+      if (selectedGroupId && !dailyCountsData) {
+        const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
+        const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
+        
+        if (cachedCounts && isCountsCacheValid) {
+          console.log('[LOGS] 사이드바 열기 시 캐시에서 일별 카운트 데이터 복원');
+          setDailyCountsData(cachedCounts);
+          dataFetchedRef.current.dailyCounts = true;
+        }
+      }
+      
+      // 사이드바가 열리고 DOM이 렌더링된 후 오늘 날짜로 스크롤
+      if (dateScrollContainerRef.current) {
+        const timer = setTimeout(() => {
+          scrollToTodayDate('사이드바 날짜 초기화');
+        }, 100);
+        
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isSidebarOpen, selectedGroupId, dailyCountsData, getCachedDailyLocationCounts, isCacheValid]);
 
   // home/page.tsx와 동일한 드래그 핸들러들
   const handleDragStart = (e: React.TouchEvent | React.MouseEvent) => {
@@ -1357,151 +1385,62 @@ export default function LogsPage() {
     return format(new Date(), 'yyyy-MM-dd'); // 활동이 없으면 오늘 반환
   };
 
-  const handleMemberSelect = (id: string, e?: React.MouseEvent | null) => {
+  const handleMemberSelect = async (id: string, e?: React.MouseEvent | null): Promise<void> => {
     // 이벤트 전파 중단 (이벤트 객체가 유효한 경우에만)
     if (e && typeof e.preventDefault === 'function') {
-    e.preventDefault();
+      e.preventDefault();
     }
     if (e && typeof e.stopPropagation === 'function') {
-    e.stopPropagation();
+      e.stopPropagation();
     }
     
     // 이벤트가 null인 경우는 자동 선택, 있는 경우는 사용자 선택
     const isUserManualSelection = e !== null && e !== undefined;
     
-    console.log('Member selection started:', id, isUserManualSelection ? '(사용자 선택)' : '(자동 선택)');
+    console.log('[LOGS] ===== 멤버 선택 시작 =====');
+    console.log('[LOGS] 멤버 ID:', id, isUserManualSelection ? '(사용자 선택)' : '(자동 선택)');
     
-    // 멤버 선택 시 모든 요청 취소 및 상태 완전 초기화
-    console.log('[handleMemberSelect] 멤버 선택 - 모든 요청 취소 및 상태 초기화 시작');
-    
-    // 모든 진행 중인 요청 강제 취소 (더 확실한 취소 처리)
-    if (loadLocationDataExecutingRef.current.executing) {
-      console.log(`[handleMemberSelect] 진행 중인 요청 취소: ${loadLocationDataExecutingRef.current.currentRequest}`);
-      loadLocationDataExecutingRef.current.cancelled = true;
-      loadLocationDataExecutingRef.current.executing = false;
-      loadLocationDataExecutingRef.current.currentRequest = undefined;
-    }
-    
-    // 즉시 지도 초기화 (위치 로그만 제거, 멤버 마커는 보존, 요청은 취소)
-    clearMapMarkersAndPaths(false, true);
-    
-    // 추가로 경로 제거 재확인
-    if (locationLogPolyline.current) {
-      locationLogPolyline.current.setMap(null);
-      locationLogPolyline.current = null;
-      console.log('[handleMemberSelect] 경로 추가 제거 완료');
-    }
-    
-    // 위치기록 요약 즉시 초기화
-    setLocationSummary(DEFAULT_LOCATION_SUMMARY);
-    console.log('[handleMemberSelect] 위치기록 요약 초기화 완료');
-    
-    // 지도 강제 새로고침
-    if (map.current) {
-      map.current.refresh(true);
-      setTimeout(() => {
-        if (map.current) {
-          map.current.refresh(true);
-          console.log('[handleMemberSelect] 지도 이중 새로고침 완료');
-        }
-      }, 100);
-    }
-    
-    console.log('[handleMemberSelect] 멤버 선택으로 지도 초기화 완료');
-    
-    // 다른 멤버 선택 시 해당 멤버의 최근 활동 날짜로 변경
+    // 현재 선택된 멤버와 같으면 무시 (사용자 수동 선택이 아닌 경우)
     const currentSelectedMember = groupMembers.find(m => m.isSelected);
-    const isChangingMember = !currentSelectedMember || currentSelectedMember.id !== id;
-    const isSameMemberReselection = currentSelectedMember && currentSelectedMember.id === id;
+    if (!isUserManualSelection && currentSelectedMember?.id === id) {
+      console.log('[LOGS] 같은 멤버 자동 선택 - 무시');
+      return;
+    }
     
-    let targetDate = selectedDate;
+    console.log('[LOGS] 멤버 변경 - 통합 데이터 로딩 시작');
     
-    if (isChangingMember) {
-      // 항상 현재 선택된 날짜를 유지 (최근 활동 날짜로 변경하지 않음)
-      targetDate = selectedDate;
-      console.log('[handleMemberSelect] 멤버 변경 시 현재 선택된 날짜 유지:', selectedDate);
-      
-      // 사용자 날짜 선택 플래그가 설정되어 있다면 리셋
-      if (isUserDateSelectionRef.current) {
+    // 지도 초기화
+    clearMapMarkersAndPaths(false, true);
+    setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+    
+    try {
+      // 사용자 수동 선택일 때만 데이터 로딩
+      if (isUserManualSelection) {
+        // 통합 함수로 날짜+멤버 데이터 로딩
+        await loadDateMemberData(selectedDate, id, 'member');
+        
+        // 사이드바 자동 닫기
         setTimeout(() => {
-          isUserDateSelectionRef.current = false;
-          console.log('[handleMemberSelect] 사용자 날짜 선택 플래그 리셋 (지연)');
-        }, 2000);
+          setIsSidebarOpen(false);
+          console.log('[handleMemberSelect] 멤버 선택 완료 - 사이드바 자동 닫기');
+        }, 300);
+      } else {
+        // 자동 선택일 때는 상태만 업데이트
+        const updatedMembers = groupMembers.map(member => ({
+          ...member,
+          isSelected: member.id === id
+        }));
+        setGroupMembers(updatedMembers);
+        console.log('[handleMemberSelect] 자동 선택 - 상태만 업데이트');
       }
-    }
-    
-    // 멤버 재선택 시 모든 플래그 리셋 (지도 조정 허용)
-    if (isDateChangedRef.current) {
-      isDateChangedRef.current = false;
-      console.log('[handleMemberSelect] 멤버 재선택으로 날짜 변경 플래그 리셋');
-    }
-    
-    // 자동 재생성 방지 플래그도 리셋
-    if (isDateChangingRef.current) {
-      isDateChangingRef.current = false;
-      console.log('[handleMemberSelect] 멤버 재선택으로 자동 재생성 방지 플래그 리셋');
-    }
-    
-
-    
-    const updatedMembers = groupMembers.map(member => {
-      const isSelected = member.id === id;
-      console.log(`Updating member ${member.name}: isSelected = ${isSelected}`);
-      return {
-        ...member,
-        isSelected: isSelected
-      };
-    });
-    
-    console.log('Updated members:', updatedMembers);
-    
-    setGroupMembers(updatedMembers);
-    // updateMemberMarkers는 useEffect에서 처리되도록 제거
-    // setActiveLogView('members'); // 이제 summary만 사용하므로 제거
-    
-    // 멤버 선택 시 날짜 스크롤 위치 조정 - 현재 선택된 날짜 유지
-    if (isChangingMember) {
-      setTimeout(() => scrollToSelectedDate(selectedDate, '멤버 선택 - 현재 날짜 유지'), 100);
-    } else {
-      setTimeout(() => scrollToSelectedDate(selectedDate, '멤버 재선택 - 현재 날짜 유지'), 100);
-    }
-    
-
-    
-    // 선택 상태 변경 확인을 위한 로그
-    const selectedMember = updatedMembers.find(m => m.isSelected);
-    console.log('[handleMemberSelect] Selected member:', selectedMember?.name);
-    
-    // 사용자 수동 선택일 때만 데이터 로딩 (항상 로딩 상태 표시)
-    if (selectedMember && isUserManualSelection) {
-      // 사용자 수동 선택이면 항상 로딩 상태 표시 (같은 멤버든 다른 멤버든)
-      setIsLocationDataLoading(true);
-      console.log('[handleMemberSelect] 사용자 멤버 선택 - 로딩 상태 활성화:', selectedMember.name);
       
-      // 새로운 요청 시작 전에 취소 플래그 리셋
-      loadLocationDataExecutingRef.current.cancelled = false;
-      loadLocationDataExecutingRef.current.executing = false;
-      
-      // 통합 지도 설정 및 위치 데이터 로딩 (항상 실행)
-      setTimeout(async () => {
-        if (selectedMember && map.current) {
-          console.log('[handleMemberSelect] 선택된 멤버 기반 통합 지도 설정 시작:', selectedMember.name);
-          await loadLocationDataWithMapPreset(parseInt(id), targetDate, selectedMember, isChangingMember);
-        }
-      }, 100); // 상태 업데이트 대기
-    } else if (selectedMember && !isUserManualSelection) {
-      console.log('[handleMemberSelect] 자동 선택 - 데이터 로딩 건너뜀 (사용자 액션 대기)');
+    } catch (error) {
+      console.error('[handleMemberSelect] 멤버 선택 오류:', error);
+      setIsLocationDataLoading(false);
+      setIsMapLoading(false);
     }
     
-    // 멤버 선택 시 사이드바 자동 닫기 (사용자 수동 선택일 때만, 더 빠르게)
-    if (isUserManualSelection && isSidebarOpen) {
-      setTimeout(() => {
-        setIsSidebarOpen(false);
-        console.log('[handleMemberSelect] 멤버 선택 완료 - 사이드바 자동 닫기');
-      }, 300); // 0.3초 후 자동 닫기 (더 빠른 응답)
-    }
-    
-    console.log('[handleMemberSelect] 멤버 선택 완료');
+    console.log('[LOGS] ===== 멤버 선택 완료 =====');
   };
 
   // 위치 로그 마커를 지도에 업데이트하는 함수 (새 함수로 대체)
@@ -1519,7 +1458,7 @@ export default function LogsPage() {
   };
 
   // 지도 마커와 경로 즉시 초기화 함수 - 완전 강화 버전
-  const clearMapMarkersAndPaths = (clearMemberMarkers: boolean = false, cancelPendingRequests: boolean = true) => {
+  const clearMapMarkersAndPaths = (clearMemberMarkers: boolean = false, cancelPendingRequests: boolean = true, refreshMap: boolean = true) => {
     console.log('[clearMapMarkersAndPaths] ===== 완전 초기화 시작 =====');
     console.log('[clearMapMarkersAndPaths] 제거할 마커 개수:', {
       locationLog: locationLogMarkers.current.length,
@@ -1728,8 +1667,8 @@ export default function LogsPage() {
     setSliderValue(0);
     setIsSliderDragging(false);
     
-    // 10. 지도 강력 새로고침 (삼중 새로고침)
-    if (map.current) {
+    // 10. 조건부 지도 새로고침 (렌더링 중에는 새로고침 방지)
+    if (refreshMap && map.current) {
       try {
         map.current.refresh(true);
         setTimeout(() => {
@@ -1746,177 +1685,47 @@ export default function LogsPage() {
       } catch (e) {
         console.log('[clearMapMarkersAndPaths] 지도 새로고침 오류 무시:', e);
       }
+    } else if (!refreshMap) {
+      console.log('[clearMapMarkersAndPaths] 지도 새로고침 건너뜀 (렌더링 중)');
     }
     
     console.log('[clearMapMarkersAndPaths] ===== 완전 초기화 완료 =====');
   };
 
-  const handleDateSelect = (date: string) => {
+  const handleDateSelect = async (date: string) => {
     console.log('[LOGS] ===== 날짜 선택 시작 =====');
-    console.log('[LOGS] 호출자:', new Error().stack?.split('\n')[1]); // 호출 경로 추적
     console.log('[LOGS] 새 날짜:', date, '현재 날짜:', selectedDate);
     
-    // 사용자가 직접 날짜를 선택했음을 표시
-    isUserDateSelectionRef.current = true;
-    console.log('[handleDateSelect] 사용자 직접 날짜 선택 플래그 ON');
-    
-    // 현재 선택된 멤버 정보 확인 (활동 캘린더에서 전달받은 멤버 정보 우선 사용)
-    const currentSelectedMember = groupMembers.find(m => m.isSelected);
-    const currentMemberId = currentSelectedMember?.id || null;
-    const hasCurrentData = currentLocationLogs.length > 0 || mapMarkersData.length > 0;
-    const isSameDate = selectedDate === date;
-    const isSameMember = lastLoadedMemberRef.current === currentMemberId;
-    
-    console.log('[LOGS] 선택 상황 분석:', { 
-      newDate: date, 
-      currentDate: selectedDate, 
-      isSameDate,
-      currentMember: currentSelectedMember?.name,
-      currentMemberId,
-      lastLoadedMember: lastLoadedMemberRef.current,
-      isSameMember,
-      hasCurrentData
-    });
-    
-    // 같은 날짜 + 같은 멤버 + 데이터 있음 → 무시
-    if (isSameDate && isSameMember && hasCurrentData) {
-      console.log('[LOGS] 같은 날짜 + 같은 멤버 + 데이터 있음 - 무시');
+    // 같은 날짜면 무시
+    if (selectedDate === date) {
+      console.log('[LOGS] 같은 날짜 선택 - 무시');
       return;
     }
     
-    // 같은 날짜지만 다른 멤버이거나 데이터가 없으면 재로딩
-    if (isSameDate && (!isSameMember || !hasCurrentData)) {
-      console.log('[LOGS] 같은 날짜지만 다른 멤버이거나 데이터 없음 - 재로딩');
-    }
+    console.log('[LOGS] 날짜 변경 - 통합 데이터 로딩 시작');
     
-    console.log('[LOGS] 날짜 변경 - 완전 초기화 후 재생성');
-    
-    // 1. 날짜 변경 중 플래그 설정 (자동 재생성 방지)
-    isDateChangingRef.current = true;
-    console.log('[handleDateSelect] 자동 재생성 방지 플래그 ON');
-    
-    // 2. 모든 것을 완전히 지우기 (날짜 변경 시에는 멤버 마커도 제거)
+    // 지도 초기화
     clearMapMarkersAndPaths(true);
-    
-    // 3. 추가 상태 초기화 (확실히 하기 위해)
-    // setActiveLogView('members'); // 이제 summary만 사용하므로 제거
-    setFirstMemberSelected(false);
-    isDateChangedRef.current = true;
-    // 날짜 변경 시에만 로딩 상태 표시
-    setIsLocationDataLoading(true);
-    
-    // 위치기록 요약 즉시 초기화
     setLocationSummary(DEFAULT_LOCATION_SUMMARY);
-    console.log('[handleDateSelect] 위치기록 요약 초기화 완료');
     
-    // 4. 날짜 상태 업데이트
-    setPreviousDate(selectedDate);
-    setSelectedDate(date);
-    
-    console.log('[LOGS] 완전 초기화 완료 - 새 데이터 로딩 시작');
-    
-    // 5. 새 데이터 로딩 준비
-    if (selectedGroupId) {
-      loadMemberActivityByDate(selectedGroupId, date);
-    }
-    
-    // 6. 멤버 마커 재생성 후 위치 데이터 로딩
-    console.log('[LOGS] 멤버 마커 재생성 후 위치 데이터 로딩 준비');
-    
-    // 약간의 지연 후 멤버 마커 재생성 및 데이터 로딩
-    // setTimeout(() => {
-      // 먼저 멤버 마커 재생성
-      // if (groupMembers.length > 0) {
-      //   console.log('[LOGS] 날짜 변경 후 멤버 마커 재생성');
-      //   updateMemberMarkers(groupMembers, true); // 날짜 변경임을 명시
-      // }
+    try {
+      // 통합 함수로 날짜+멤버 데이터 로딩
+      await loadDateMemberData(date, undefined, 'date');
       
-      // 선택된 멤버가 있으면 위치 데이터 로딩 (정확한 최신 멤버 정보 재확인)
-      const startDataLoading = () => {
-        console.log('[handleDateSelect] 데이터 로딩 시작 시도 - groupMembers 개수:', groupMembers.length);
-        const currentSelectedMember = groupMembers.find(m => m.isSelected);
-        
-        console.log('[handleDateSelect] 현재 선택된 멤버:', {
-          found: !!currentSelectedMember,
-          name: currentSelectedMember?.name,
-          id: currentSelectedMember?.id,
-          totalMembers: groupMembers.length
-        });
-        
-        if (currentSelectedMember) {
-          console.log('[LOGS] 선택된 멤버 새 데이터 로딩:', currentSelectedMember.name, date);
-          
-          // 플래그 리셋하고 데이터 로딩
-          isDateChangingRef.current = false;
-          console.log('[handleDateSelect] 자동 재생성 방지 플래그 OFF - 새 데이터 로딩 시작');
-          
-          // 실제 데이터 로딩 수행
-          const memberId = parseInt(currentSelectedMember.id);
-          
-          // 데이터 로딩 직전에 로딩 상태 활성화
-          setIsLocationDataLoading(true);
-          console.log('[handleDateSelect] 로딩 상태 활성화 및 데이터 로딩 호출:', { memberId, date });
-          
-          // loadLocationDataWithMapPreset 호출하여 지도 설정과 함께 데이터 로딩
-          loadLocationDataWithMapPreset(memberId, date, currentSelectedMember, false).then(() => {
-            console.log('[handleDateSelect] 통합 데이터 로딩 완료');
-          }).catch((error) => {
-            console.error('[handleDateSelect] 데이터 로딩 오류:', error);
-            setIsLocationDataLoading(false);
-          });
-        } else {
-          // 선택된 멤버가 없으면 첫 번째 멤버를 선택하고 다시 시도
-          if (groupMembers.length > 0) {
-            console.log('[handleDateSelect] 선택된 멤버 없음 - 첫 번째 멤버 자동 선택 후 재시도');
-            const firstMember = groupMembers[0];
-            const updatedMembers = groupMembers.map(m => ({
-              ...m,
-              isSelected: m.id === firstMember.id
-            }));
-            
-            setGroupMembers(updatedMembers);
-            
-            // 약간의 지연 후 다시 데이터 로딩 시도
-            setTimeout(() => {
-              const memberId = parseInt(firstMember.id);
-              setIsLocationDataLoading(true);
-              console.log('[handleDateSelect] 첫 번째 멤버 자동 선택 후 데이터 로딩:', { memberId, date });
-              
-              loadLocationDataWithMapPreset(memberId, date, firstMember, false).then(() => {
-                console.log('[handleDateSelect] 첫 번째 멤버 데이터 로딩 완료');
-              }).catch((error) => {
-                console.error('[handleDateSelect] 첫 번째 멤버 데이터 로딩 오류:', error);
-                setIsLocationDataLoading(false);
-              });
-            }, 50);
-          } else {
-            // 그룹 멤버가 아예 없으면 로딩 해제하고 플래그 리셋
-            isDateChangingRef.current = false;
-            setIsLocationDataLoading(false);
-            console.log('[handleDateSelect] 그룹 멤버 없음 - 플래그 리셋 및 로딩 해제');
-          }
-        }
-      };
-      
-      // 즉시 시도하고, 실패하면 지연 후 재시도
-      startDataLoading();
-      
-      // 백업: 100ms 후에도 한 번 더 시도 (상태 업데이트 지연 대비)
+      // 사이드바 자동 닫기
       setTimeout(() => {
-        if (!isLocationDataLoading && groupMembers.length > 0) {
-          console.log('[handleDateSelect] 백업 데이터 로딩 시도');
-          startDataLoading();
-        }
-      }, 100);
-    
-    // 날짜 선택 완료 후 잠시 후 사이드바 자동 닫기 (사용자가 결과를 확인할 시간 제공)
-    setTimeout(() => {
-      setIsSidebarOpen(false);
-      console.log('[handleDateSelect] 날짜 선택 완료 - 2초 후 사이드바 자동 닫기');
-    }, 2000); // 2초 후 자동 닫기
+        setIsSidebarOpen(false);
+        console.log('[handleDateSelect] 날짜 선택 완료 - 2초 후 사이드바 자동 닫기');
+      }, 2000);
+      
+    } catch (error) {
+      console.error('[handleDateSelect] 날짜 선택 오류:', error);
+      setIsLocationDataLoading(false);
+      setIsMapLoading(false);
+    }
     
     console.log('[LOGS] ===== 날짜 선택 완료 =====');
-    };
+  };
 
 
 
@@ -2199,38 +2008,72 @@ export default function LogsPage() {
           naverMapsReady: !!window.naver?.maps
         });
         
-        if (map.current && window.naver?.maps && actualMapMarkers.length > 0) {
-          // 캐시 데이터도 지연 처리하여 상태 업데이트 완료 후 렌더링
-          setTimeout(async () => {
-            try {
-              console.log('[loadLocationData] 🗺️ 캐시 데이터 지도 렌더링 실행 - 마커 개수:', actualMapMarkers.length);
-              
-              await renderLocationDataOnMap(
-                actualMapMarkers, 
-                cachedLocationData.stayTimes || [], 
-                cachedLocationData.locationLogSummary, 
-                groupMembers, 
-                map.current
-              );
-              console.log('[loadLocationData] ✅ 캐시된 데이터 지도 렌더링 완료');
-              
-              // 렌더링 완료 후 지도 새로고침
-              if (map.current) {
-                map.current.refresh(true);
-                console.log('[loadLocationData] 🔄 캐시 데이터 지도 새로고침 완료');
-              }
-            } catch (renderError) {
-              console.error('[loadLocationData] ❌ 캐시 데이터 지도 렌더링 오류:', renderError);
+        // 캐시 데이터를 사용할 때도 더 확실한 지도 렌더링 보장  
+        const renderCachedDataOnMap = async () => {
+          if (!map.current || !window.naver?.maps) {
+            console.warn('[loadLocationData] 지도 미준비 - 지도 렌더링 대기');
+            // 지도가 준비될 때까지 짧은 간격으로 재시도 (최대 3초)
+            let attempts = 0;
+            const maxAttempts = 15; // 200ms * 15 = 3초
+            
+            const waitForMap = () => {
+              setTimeout(() => {
+                attempts++;
+                if (map.current && window.naver?.maps) {
+                  console.log('[loadLocationData] 지도 준비 완료 - 캐시 데이터 렌더링 진행');
+                  renderCachedDataOnMap(); // 재귀 호출
+                } else if (attempts < maxAttempts) {
+                  waitForMap(); // 재시도
+                } else {
+                  console.error('[loadLocationData] 지도 대기 시간 초과 - 캐시 데이터 렌더링 포기');
+                }
+              }, 200);
+            };
+            
+            waitForMap();
+            return;
+          }
+          
+          if (actualMapMarkers.length === 0) {
+            console.warn('[loadLocationData] 캐시된 마커 데이터 없음 - 지도 정리만 수행');
+            clearMapMarkersAndPaths(true);
+            setIsLocationDataLoading(false);
+            setIsMapLoading(false);
+            return;
+          }
+          
+          try {
+            console.log('[loadLocationData] 🗺️ 캐시 데이터 지도 렌더링 실행 - 마커 개수:', actualMapMarkers.length);
+            
+            await renderLocationDataOnMap(
+              actualMapMarkers, 
+              cachedLocationData.stayTimes || [], 
+              cachedLocationData.locationLogSummary, 
+              groupMembers, 
+              map.current
+            );
+            console.log('[loadLocationData] ✅ 캐시된 데이터 지도 렌더링 완료');
+            
+            // 렌더링 완료 후 지도 새로고침
+            if (map.current) {
+              map.current.refresh(true);
+              console.log('[loadLocationData] 🔄 캐시 데이터 지도 새로고침 완료');
             }
-          }, 100); // 100ms 지연
-        } else {
-          console.warn('[loadLocationData] ⚠️ 캐시 데이터 지도 렌더링 건너뜀:', {
-            mapReady: !!map.current,
-            naverMapsReady: !!window.naver?.maps,
-            actualMapMarkersLength: actualMapMarkers.length,
-            hasActualMapMarkers: actualMapMarkers.length > 0
-          });
-        }
+            
+          } catch (renderError) {
+            console.error('[loadLocationData] ❌ 캐시 데이터 지도 렌더링 오류:', renderError);
+          } finally {
+            // 렌더링 완료 또는 실패 시 모든 로딩 상태 해제
+            setIsLocationDataLoading(false);
+            setIsMapLoading(false);
+            console.log('[loadLocationData] 🔄 캐시 데이터 렌더링 완료 - 모든 로딩 상태 해제');
+          }
+        };
+        
+        // 상태 업데이트 완료 후 렌더링
+        setTimeout(() => {
+          renderCachedDataOnMap();
+        }, 100); // 100ms 지연
         
         setIsLocationDataLoading(false);
         return;
@@ -2499,50 +2342,90 @@ export default function LogsPage() {
       
       const currentMembers = groupMembers; // 최신 멤버 상태 전달
 
-      if (map.current && window.naver?.maps) {
-        // 지도 렌더링을 약간 지연시켜 상태 업데이트가 완료된 후 실행
-        setTimeout(async () => {
-          try {
-            console.log('[loadLocationData] 🗺️ 지도 렌더링 시작 - 마커 개수:', validatedData.mapMarkers.length);
-            
-            await renderLocationDataOnMap(
-              validatedData.mapMarkers, 
-              validatedData.stayTimes, 
-              validatedData.locationLogSummary, 
-              currentMembers, 
-              map.current
-            );
-            console.log('[loadLocationData] ✅ 통합 지도 렌더링 함수 호출 완료');
-            
-            // 렌더링 완료 후 지도 새로고침
-            if (map.current) {
-              map.current.refresh(true);
-              console.log('[loadLocationData] 🔄 지도 새로고침 완료');
-            }
-          } catch (renderError) {
-            console.error('[loadLocationData] ❌ 지도 렌더링 오류:', renderError);
-            // 렌더링 실패 시에도 멤버 마커는 표시
-            const selectedMember = groupMembers.find(m => m.isSelected);
-            if (selectedMember && map.current) {
-              updateMemberMarkers([selectedMember], false);
-            }
-          } finally {
-            // 렌더링 완료 또는 실패 시 모든 로딩 상태 해제
-            setIsLocationDataLoading(false);
-            setIsMapLoading(false);
-            console.log('[loadLocationData] 🔄 지도 렌더링 완료 - 모든 로딩 상태 해제');
-          }
-        }, 100); // 100ms 지연
-      } else {
-        console.warn('[loadLocationData] 지도가 준비되지 않아 렌더링 건너뜀:', {
+      // 신규 데이터 지도 렌더링 (강화된 버전)
+      const renderNewDataOnMap = async () => {
+        console.log('[loadLocationData] 신규 데이터 지도 렌더링 시작 검증:', {
           mapReady: !!map.current,
-          naverMapsReady: !!window.naver?.maps
+          naverMapsReady: !!window.naver?.maps,
+          markersCount: validatedData.mapMarkers.length
         });
-        // 지도가 준비되지 않은 경우에도 모든 로딩 상태 해제
-        setIsLocationDataLoading(false);
-        setIsMapLoading(false);
-        console.log('[loadLocationData] 🔄 지도 미준비로 인한 모든 로딩 상태 해제');
-      }
+        
+        if (!map.current || !window.naver?.maps) {
+          console.warn('[loadLocationData] 지도 미준비 - 신규 데이터 렌더링 대기');
+          // 지도가 준비될 때까지 짧은 간격으로 재시도 (최대 3초)
+          let attempts = 0;
+          const maxAttempts = 15; // 200ms * 15 = 3초
+          
+          const waitForMap = () => {
+            setTimeout(() => {
+              attempts++;
+              if (map.current && window.naver?.maps) {
+                console.log('[loadLocationData] 지도 준비 완료 - 신규 데이터 렌더링 진행');
+                renderNewDataOnMap(); // 재귀 호출
+              } else if (attempts < maxAttempts) {
+                waitForMap(); // 재시도
+              } else {
+                console.error('[loadLocationData] 지도 대기 시간 초과 - 신규 데이터 렌더링 포기');
+                setIsLocationDataLoading(false);
+                setIsMapLoading(false);
+              }
+            }, 200);
+          };
+          
+          waitForMap();
+          return;
+        }
+        
+        if (validatedData.mapMarkers.length === 0) {
+          console.warn('[loadLocationData] 신규 마커 데이터 없음 - 지도 정리만 수행');
+          clearMapMarkersAndPaths(true);
+          setIsLocationDataLoading(false);
+          setIsMapLoading(false);
+          return;
+        }
+        
+        try {
+          console.log('[loadLocationData] 🗺️ 신규 데이터 지도 렌더링 시작 - 마커 개수:', validatedData.mapMarkers.length);
+          
+          await renderLocationDataOnMap(
+            validatedData.mapMarkers, 
+            validatedData.stayTimes, 
+            validatedData.locationLogSummary, 
+            currentMembers, 
+            map.current
+          );
+          console.log('[loadLocationData] ✅ 통합 지도 렌더링 함수 호출 완료');
+          
+          // 렌더링 완료 후 지도 새로고침
+          if (map.current) {
+            map.current.refresh(true);
+            console.log('[loadLocationData] 🔄 지도 새로고침 완료');
+          }
+          
+        } catch (renderError) {
+          console.error('[loadLocationData] ❌ 지도 렌더링 오류:', renderError);
+          // 렌더링 실패 시에도 멤버 마커는 표시
+          const selectedMember = groupMembers.find(m => m.isSelected);
+          if (selectedMember && map.current) {
+            updateMemberMarkers([selectedMember], false);
+          }
+        } finally {
+          // 렌더링 완료 또는 실패 시 모든 로딩 상태 해제
+          setIsLocationDataLoading(false);
+          setIsMapLoading(false);
+          console.log('[loadLocationData] 🔄 신규 데이터 렌더링 완료 - 모든 로딩 상태 해제');
+          
+          // 렌더링 완료 후 마커 표시 검증 및 재시도 로직
+          setTimeout(() => {
+            verifyAndRetryMapRendering(validatedData.mapMarkers, validatedData.stayTimes, validatedData.locationLogSummary, currentMembers, mtIdx, date);
+          }, 1000); // 1초 후 검증
+        }
+      };
+      
+      // 상태 업데이트 완료 후 렌더링 (finally 블록 이전에 실행)
+      setTimeout(() => {
+        renderNewDataOnMap();
+      }, 50); // 50ms 지연으로 상태 업데이트 완료 대기
 
     } catch (error: any) {
       console.error('[loadLocationData] 💥 위치 데이터 로딩 오류:', {
@@ -2628,37 +2511,35 @@ export default function LogsPage() {
        }
 
     } finally {
-      // 항상 상태 정리 (취소 로직 제거)
-      console.log(`[loadLocationData] 🔄 Finally 블록 - 상태 정리 시작: ${executionKey}`);
-      
-      // 모든 로딩 상태 강제 해제 (스켈레톤 멈춤 방지)
-      setIsLocationDataLoading(false);
-      setIsMapLoading(false);
-      console.log(`[loadLocationData] ✅ 모든 로딩 상태 강제 해제 완료: ${executionKey}`);
-      
-      loadLocationDataExecutingRef.current.executing = false;
-      loadLocationDataExecutingRef.current.currentRequest = undefined;
-      loadLocationDataExecutingRef.current.cancelled = false; // 항상 false로 리셋
-      
-      console.log(`[loadLocationData] 🔄 모든 상태 정리 완료: ${executionKey}`);
-      
-      // 성공적으로 완료된 경우 마지막 로딩된 멤버 정보 업데이트
-      if (!loadLocationDataExecutingRef.current.cancelled && loadLocationDataExecutingRef.current.currentRequest === executionKey) {
-        lastLoadedMemberRef.current = mtIdx.toString();
-        console.log(`[loadLocationData] 마지막 로딩된 멤버 업데이트: ${mtIdx}`);
-      }
-      
-      console.log(`[loadLocationData] 🎉 모든 처리 및 실행 완료: ${executionKey}-${currentTime}`);
-      
-      // 날짜 변경 플래그 리셋 (loadLocationData 완료 시점에 리셋)
-      if (isDateChangingRef.current) {
-        isDateChangingRef.current = false;
-        console.log('[loadLocationData] 날짜 변경 플래그 리셋');
-      }
-      
-      // 사용자 날짜 선택 플래그는 멤버 선택에서만 리셋하도록 변경
-      // (loadLocationData에서는 리셋하지 않음)
-      console.log('[loadLocationData] 사용자 날짜 선택 플래그 유지 (멤버 선택에서만 리셋)');
+      // 지연된 상태 정리 (렌더링 완료 후 정리)
+      setTimeout(() => {
+        console.log(`[loadLocationData] 🔄 Finally 블록 - 지연된 상태 정리 시작: ${executionKey}`);
+        
+        // 실행 상태 정리
+        loadLocationDataExecutingRef.current.executing = false;
+        loadLocationDataExecutingRef.current.currentRequest = undefined;
+        loadLocationDataExecutingRef.current.cancelled = false; // 항상 false로 리셋
+        
+        console.log(`[loadLocationData] 🔄 모든 상태 정리 완료: ${executionKey}`);
+        
+        // 성공적으로 완료된 경우 마지막 로딩된 멤버 정보 업데이트
+        if (!loadLocationDataExecutingRef.current.cancelled) {
+          lastLoadedMemberRef.current = mtIdx.toString();
+          console.log(`[loadLocationData] 마지막 로딩된 멤버 업데이트: ${mtIdx}`);
+        }
+        
+        console.log(`[loadLocationData] 🎉 모든 처리 및 실행 완료: ${executionKey}-${currentTime}`);
+        
+        // 날짜 변경 플래그 리셋 (loadLocationData 완료 시점에 리셋)
+        if (isDateChangingRef.current) {
+          isDateChangingRef.current = false;
+          console.log('[loadLocationData] 날짜 변경 플래그 리셋');
+        }
+        
+        // 사용자 날짜 선택 플래그는 멤버 선택에서만 리셋하도록 변경
+        // (loadLocationData에서는 리셋하지 않음)
+        console.log('[loadLocationData] 사용자 날짜 선택 플래그 유지 (멤버 선택에서만 리셋)');
+      }, 500); // 500ms 지연으로 렌더링 완료 후 정리
     }
   };
 
@@ -3238,6 +3119,118 @@ export default function LogsPage() {
     }
   }, [dailySummaryData, stayTimesData, mapMarkersData, locationLogSummaryData, dailyCountsData, memberActivityData]);
 
+  // 날짜와 멤버를 함께 처리하는 통합 데이터 로딩 함수
+  const loadDateMemberData = async (targetDate: string, targetMemberId?: string, triggerSource: 'date' | 'member' = 'date') => {
+    console.log('[loadDateMemberData] ===== 통합 데이터 로딩 시작 =====');
+    console.log('[loadDateMemberData] 입력값:', { targetDate, targetMemberId, triggerSource });
+    
+    if (!selectedGroupId) {
+      console.warn('[loadDateMemberData] selectedGroupId가 없어서 중단');
+      return;
+    }
+    
+    try {
+      // 1단계: 날짜 상태 업데이트 (날짜 변경인 경우에만)
+      if (triggerSource === 'date' && targetDate !== selectedDate) {
+        console.log('[loadDateMemberData] 날짜 상태 업데이트:', selectedDate, '->', targetDate);
+        setPreviousDate(selectedDate);
+        setSelectedDate(targetDate);
+      }
+      
+      // 2단계: 해당 날짜의 멤버 활동 데이터 조회
+      console.log('[loadDateMemberData] 날짜별 멤버 활동 데이터 조회:', targetDate);
+      const memberActivityResponse = await memberLocationLogService.getMemberActivityByDate(selectedGroupId, targetDate);
+      
+      if (!memberActivityResponse?.member_activities || memberActivityResponse.member_activities.length === 0) {
+        console.warn('[loadDateMemberData] 해당 날짜에 활동한 멤버 없음:', targetDate);
+        // 빈 데이터로 상태 업데이트
+        setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+        setIsLocationDataLoading(false);
+        setIsMapLoading(false);
+        return;
+      }
+      
+      // 3단계: 멤버 목록 업데이트 및 선택할 멤버 결정
+      const currentSelectedMember = groupMembers.find((m: GroupMember) => m.isSelected);
+      let selectedMemberId = targetMemberId;
+      
+      // targetMemberId가 없으면 우선순위에 따라 선택
+      if (!selectedMemberId) {
+        if (triggerSource === 'date' && currentSelectedMember) {
+          // 날짜 변경 시: 현재 선택된 멤버가 해당 날짜에 활동했으면 유지
+          const memberStillActive = memberActivityResponse.member_activities.find(
+            m => m.member_id.toString() === currentSelectedMember.id
+          );
+          selectedMemberId = memberStillActive ? currentSelectedMember.id : memberActivityResponse.member_activities[0].member_id.toString();
+        } else {
+          // 멤버 변경 시 또는 기본: 첫 번째 활동 멤버 선택
+          selectedMemberId = memberActivityResponse.member_activities[0].member_id.toString();
+        }
+      }
+      
+      console.log('[loadDateMemberData] 선택될 멤버 ID:', selectedMemberId);
+      
+      // 4단계: 그룹 멤버 상태 업데이트
+      const updatedMembers = memberActivityResponse.member_activities.map((memberActivity: any, index: number) => {
+        const existingMember = groupMembers.find((m: GroupMember) => m.id === memberActivity.member_id.toString());
+        
+        return {
+          id: memberActivity.member_id.toString(),
+          name: memberActivity.member_name || `멤버 ${index + 1}`,
+          photo: memberActivity.member_photo ? (memberActivity.member_photo.startsWith('http') ? memberActivity.member_photo : `${BACKEND_STORAGE_BASE_URL}${memberActivity.member_photo}`) : null,
+          isSelected: memberActivity.member_id.toString() === selectedMemberId,
+          location: { 
+            lat: existingMember?.location.lat || 37.5665, 
+            lng: existingMember?.location.lng || 126.9780 
+          },
+          mt_gender: typeof memberActivity.member_gender === 'number' ? memberActivity.member_gender : null,
+          original_index: index,
+          mt_weather_sky: existingMember?.mt_weather_sky,
+          mt_weather_tmx: existingMember?.mt_weather_tmx,
+          mt_weather_tmn: existingMember?.mt_weather_tmn,
+          mt_weather_date: existingMember?.mt_weather_date,
+          mlt_lat: existingMember?.mlt_lat,
+          mlt_long: existingMember?.mlt_long,
+          mlt_speed: existingMember?.mlt_speed,
+          mlt_battery: existingMember?.mlt_battery,
+          mlt_gps_time: existingMember?.mlt_gps_time,
+          sgdt_owner_chk: existingMember?.sgdt_owner_chk,
+          sgdt_leader_chk: existingMember?.sgdt_leader_chk,
+          sgdt_idx: existingMember?.sgdt_idx
+        };
+      });
+      
+      // 상태 업데이트
+      setGroupMembers(updatedMembers);
+      
+      // 5단계: 선택된 멤버의 위치 데이터 로딩
+      const selectedMember = updatedMembers.find(m => m.isSelected);
+      if (selectedMember) {
+        console.log('[loadDateMemberData] 선택된 멤버의 위치 데이터 로딩:', selectedMember.name, targetDate);
+        
+        // 로딩 상태 활성화
+        setIsLocationDataLoading(true);
+        setIsMapLoading(true);
+        
+        // 지도 초기화
+        clearMapMarkersAndPaths(false, true, true);
+        
+        // 위치 데이터 로딩
+        await loadLocationDataWithMapPreset(parseInt(selectedMember.id), targetDate, selectedMember, false);
+        
+        console.log('[loadDateMemberData] 위치 데이터 로딩 완료');
+      }
+      
+      console.log('[loadDateMemberData] ===== 통합 데이터 로딩 완료 =====');
+      
+    } catch (error) {
+      console.error('[loadDateMemberData] 오류:', error);
+      setIsLocationDataLoading(false);
+      setIsMapLoading(false);
+      handleDataError(error, 'loadDateMemberData');
+    }
+  };
+
   // 날짜 변경 중 자동 재생성 방지 플래그
   const isDateChangingRef = useRef(false);
 
@@ -3400,17 +3393,41 @@ export default function LogsPage() {
       mapExists: !!map.current,
       naverMapsExists: !!window.naver?.maps,
       selectedDate,
-      firstMemberSelected
+      firstMemberSelected,
+      hasExecuted: hasExecuted.current,
+      isMainInstance: isMainInstance.current
     });
     
+    // 컴포넌트 재마운트 시 초기화 강화
+    if (isMapInitializedLogs && groupMembers.length > 0 && !hasExecuted.current) {
+      console.log("[LogsPage] 🔄 컴포넌트 재마운트 감지 - 상태 초기화 강화");
+      
+      // 실행 플래그 설정으로 중복 실행 방지
+      hasExecuted.current = true;
+      isMainInstance.current = true;
+      
+      // 모든 제어 플래그 초기화
+      isDateChangingRef.current = false;
+      isDateChangedRef.current = false;
+      isUserDateSelectionRef.current = false;
+      loadLocationDataExecutingRef.current = { executing: false, cancelled: false };
+      
+      // firstMemberSelected 상태 초기화 (재진입 시 자동 선택이 다시 작동하도록)
+      if (firstMemberSelected) {
+        console.log("[LogsPage] firstMemberSelected 상태 초기화 (재진입 대응)");
+        setFirstMemberSelected(false);
+      }
+    }
+    
     if (isMapInitializedLogs && groupMembers.length > 0) {
-      // 첫 번째 멤버 자동 선택 (선택된 멤버가 없는 경우)
-      if (!groupMembers.some(m => m.isSelected)) {
+      // 첫 번째 멤버 자동 선택 (선택된 멤버가 없고 아직 자동선택하지 않은 경우)
+      if (!groupMembers.some(m => m.isSelected) && !firstMemberSelected) {
         console.log("[LogsPage] 🎯 Auto-selection: Setting first member as selected.");
         
         // 자동 선택 전에 모든 플래그 리셋 (확실히 하기 위해)
         isDateChangingRef.current = false;
         isDateChangedRef.current = false;
+        loadLocationDataExecutingRef.current = { executing: false, cancelled: false };
         console.log("[LogsPage] Auto-selection: 모든 플래그 리셋 완료");
         
         // 멤버 상태 업데이트 후 마커 생성
@@ -3470,8 +3487,14 @@ export default function LogsPage() {
         return; // 상태 업데이트 후 다음 렌더 사이클에서 처리되도록 return
       }
 
-      // 선택된 멤버가 있는 경우 지도 업데이트
-      console.log("[LogsPage] Member selection detected or map initialized with selection. Updating markers and view.");
+      // 선택된 멤버가 있는 경우 지도 업데이트 및 데이터 로딩
+      const selectedMember = groupMembers.find(m => m.isSelected);
+      console.log("[LogsPage] Member selection detected or map initialized with selection.", {
+        selectedMember: selectedMember?.name,
+        firstMemberSelected,
+        isLocationDataLoading,
+        executing: loadLocationDataExecutingRef.current.executing
+      });
       
       // 날짜 변경 플래그 확인
       const isDateChange = isDateChangedRef.current;
@@ -3482,8 +3505,32 @@ export default function LogsPage() {
         firstMemberSelected,
         isDateChangedRefValue: isDateChangedRef.current
       });
-      // updateMemberMarkers(groupMembers, isDateChange); // loadLocationData에서 처리하도록 주석 처리
-      // setActiveLogView('members'); // 이제 summary만 사용하므로 제거
+      
+      // 선택된 멤버가 있고 데이터 로딩이 필요한 경우 (firstMemberSelected가 false이거나 날짜가 변경된 경우)
+      if (selectedMember && (!firstMemberSelected || isDateChange) && !isLocationDataLoading && !loadLocationDataExecutingRef.current.executing) {
+        console.log("[LogsPage] 🚀 선택된 멤버 데이터 로딩 시작:", selectedMember.name, selectedDate);
+        
+        // 플래그들 초기화
+        isDateChangingRef.current = false;
+        isDateChangedRef.current = false;
+        loadLocationDataExecutingRef.current = { executing: false, cancelled: false };
+        
+        // 데이터 로딩 시작
+        setIsLocationDataLoading(true);
+        setFirstMemberSelected(true); // 이후 중복 로딩 방지
+        
+        // 데이터 로딩 실행
+        setTimeout(async () => {
+          try {
+            console.log("[LogsPage] 🔥 선택된 멤버 데이터 로딩 실행:", selectedMember.name, selectedDate);
+            await loadLocationDataWithMapPreset(parseInt(selectedMember.id), selectedDate, selectedMember, false);
+            console.log("[LogsPage] ✅ 선택된 멤버 데이터 로딩 완료");
+          } catch (error) {
+            console.error("[LogsPage] ❌ 선택된 멤버 데이터 로딩 실패:", error);
+            setIsLocationDataLoading(false);
+          }
+        }, 50);
+      }
       
       // 자동 재생성 방지 플래그가 설정되어 있으면 리셋
       if (isDateChangingRef.current) {
@@ -3493,26 +3540,7 @@ export default function LogsPage() {
     }
   }, [groupMembers, isMapInitializedLogs]); // selectedDate 제거 - 날짜 변경 시 지도 조정 중복 방지
 
-  // 첫 번째 멤버 자동 선택 완료 후 데이터 로딩 트리거 (백업용 - 위의 직접 실행으로 대체됨)
-  useEffect(() => {
-    // 직접 실행 방식으로 변경했으므로 이 useEffect는 백업 또는 예외 상황용으로만 사용
-    if (firstMemberSelected && !isLocationDataLoading && groupMembers.length > 0 && !loadLocationDataExecutingRef.current.executing) {
-      const selectedMember = groupMembers.find(m => m.isSelected);
-      if (selectedMember && map.current) {
-        console.log("[LogsPage] 🔄 BACKUP: firstMemberSelected useEffect 트리거 (직접 실행이 실패한 경우):", selectedMember.name, selectedDate);
-        
-        setIsLocationDataLoading(true);
-        loadLocationDataWithMapPreset(parseInt(selectedMember.id), selectedDate, selectedMember, false)
-          .then(() => {
-            console.log("[LogsPage] 🔄 BACKUP: 데이터 로딩 완료");
-          })
-          .catch((error) => {
-            console.error("[LogsPage] 🔄 BACKUP: 데이터 로딩 오류:", error);
-            setIsLocationDataLoading(false);
-          });
-      }
-    }
-  }, [firstMemberSelected, groupMembers, selectedDate, isLocationDataLoading]);
+  // 백업 useEffect 제거됨 - 위의 통합 로직에서 처리
 
 
 
@@ -3882,27 +3910,28 @@ export default function LogsPage() {
             
             // 지연 로딩 최적화: 초기 진입 시 필수가 아닌 API들은 나중에 호출
             if (isMounted) {
-              // 2초 후 지연 로딩으로 사이드바 관련 데이터 로딩
+              // 캐시에서 일별 카운트 데이터 즉시 복원 (사이드바 표시용)
+              const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
+              const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
+              
+              if (cachedCounts && isCountsCacheValid) {
+                console.log('[LOGS] 캐시에서 일별 카운트 데이터 즉시 복원');
+                setDailyCountsData(cachedCounts);
+                dataFetchedRef.current.dailyCounts = true;
+              }
+
+              // 2초 후 지연 로딩으로 사이드바 관련 데이터 로딩 (캐시 미스 시에만)
               setTimeout(async () => {
                 if (!isMounted) return;
                 
                 console.log('[LOGS] 지연 로딩 시작 - 사이드바 캘린더 데이터');
                 const delayedPromises = [];
                 
-                // 1. 최근 14일간 일별 카운트 조회 (사이드바 캘린더용) - 지연 로딩
+                // 1. 최근 14일간 일별 카운트 조회 (사이드바 캘린더용) - 캐시 미스 시에만 API 호출
                 if (!dailyCountsData || !dataFetchedRef.current.dailyCounts) {
-                  const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
-                  const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
-                  
-                  if (cachedCounts && isCountsCacheValid) {
-                    console.log('[LOGS] 캐시에서 일별 카운트 데이터 사용 (지연 로딩)');
-                    setDailyCountsData(cachedCounts);
-                    dataFetchedRef.current.dailyCounts = true;
-                  } else {
-                    console.log('[LOGS] 캐시 미스 - API에서 일별 카운트 데이터 조회 (지연 로딩)');
-                    delayedPromises.push(loadDailyLocationCounts(selectedGroupId, 14));
-                    dataFetchedRef.current.dailyCounts = true;
-                  }
+                  console.log('[LOGS] 캐시 미스 - API에서 일별 카운트 데이터 조회 (지연 로딩)');
+                  delayedPromises.push(loadDailyLocationCounts(selectedGroupId, 14));
+                  dataFetchedRef.current.dailyCounts = true;
                 } else {
                   console.log('[LOGS] 일별 카운트 데이터 이미 로드됨 - 지연 로딩 건너뛰기');
                 }
@@ -4373,7 +4402,7 @@ export default function LogsPage() {
     // }
   }, [selectedDate, groupMembers.find(m => m.isSelected)?.id, isLocationDataLoading]);
 
-  // 컴포넌트 언마운트 시 이벤트 리스너 정리
+    // 컴포넌트 언마운트 시 이벤트 리스너 정리
   useEffect(() => {
     return () => {
       // 모든 글로벌 이벤트 리스너 정리
@@ -4392,6 +4421,97 @@ export default function LogsPage() {
   //     console.log('[LOGS] selectedDate useEffect - 보조 로딩 비활성화됨');
   //   }
   // }, [selectedDate]);
+
+  // 지도 렌더링 재시도 카운터 ref
+  const mapRenderRetryCountRef = useRef<{ [key: string]: number }>({});
+
+  // 지도 렌더링 검증 및 재시도 함수
+  const verifyAndRetryMapRendering = async (mapMarkers: MapMarker[], stayTimes: StayTime[], locationLogSummary: LocationLogSummary | null, members: GroupMember[], mtIdx: number, date: string) => {
+    if (!map.current || !window.naver?.maps) {
+      console.log('[verifyAndRetryMapRendering] 지도 미준비 - 검증 건너뜀');
+      return;
+    }
+
+    // 네모 캘린더에 데이터가 있는지 확인
+    const selectedMember = members.find(m => m.isSelected);
+    if (!selectedMember) {
+      console.log('[verifyAndRetryMapRendering] 선택된 멤버 없음 - 검증 건너뜀');
+      return;
+    }
+
+    const memberId = selectedMember.id;
+    const hasCalendarData = dailyCountsData && Array.isArray(dailyCountsData) ? 
+      dailyCountsData.some((memberData: any) => 
+        memberData.member_id.toString() === memberId && 
+        memberData.daily_counts.some((dayData: any) => dayData.date === date && dayData.count > 0)
+      ) : false;
+
+    if (!hasCalendarData) {
+      console.log('[verifyAndRetryMapRendering] 네모 캘린더에 데이터 없음 - 검증 건너뜀');
+      return;
+    }
+
+    // 지도에 실제로 마커가 표시되어 있는지 확인
+    const hasVisibleMarkers = locationLogMarkers.current.length > 0 || 
+                             startEndMarkers.current.length > 0 || 
+                             stayTimeMarkers.current.length > 0;
+
+    console.log('[verifyAndRetryMapRendering] 마커 표시 상태 검증:', {
+      hasCalendarData,
+      expectedMarkers: mapMarkers.length,
+      visibleLocationMarkers: locationLogMarkers.current.length,
+      visibleStartEndMarkers: startEndMarkers.current.length,
+      visibleStayMarkers: stayTimeMarkers.current.length,
+      hasVisibleMarkers,
+      selectedMember: selectedMember.name,
+      date
+    });
+
+    // 네모 캘린더에는 데이터가 있지만 지도에 마커가 없으면 재시도
+    if (hasCalendarData && mapMarkers.length > 0 && !hasVisibleMarkers) {
+      console.warn('[verifyAndRetryMapRendering] 🔄 데이터는 있지만 지도에 마커 없음 - 자동 재시도 시작');
+      
+      // 재시도 카운터 확인 (무한 루프 방지)
+      const retryKey = `${mtIdx}-${date}`;
+      const currentRetryCount = mapRenderRetryCountRef.current[retryKey] || 0;
+      
+      if (currentRetryCount >= 2) {
+        console.error('[verifyAndRetryMapRendering] 최대 재시도 횟수 초과 (2회) - 재시도 중단');
+        return;
+      }
+
+      mapRenderRetryCountRef.current[retryKey] = currentRetryCount + 1;
+      console.log(`[verifyAndRetryMapRendering] 재시도 ${currentRetryCount + 1}/2 시작`);
+
+      // 지도 완전 정리 후 재렌더링
+      try {
+        clearMapMarkersAndPaths(true, false, false); // 새로고침 없이 정리
+        
+        setTimeout(async () => {
+          try {
+            console.log('[verifyAndRetryMapRendering] 🗺️ 재시도 렌더링 시작');
+            await renderLocationDataOnMap(mapMarkers, stayTimes, locationLogSummary, members, map.current);
+            console.log('[verifyAndRetryMapRendering] ✅ 재시도 렌더링 완료');
+            
+            // 재시도 성공 시 카운터 리셋
+            delete mapRenderRetryCountRef.current[retryKey];
+          } catch (retryError) {
+            console.error('[verifyAndRetryMapRendering] ❌ 재시도 렌더링 실패:', retryError);
+          }
+        }, 300);
+        
+      } catch (error) {
+        console.error('[verifyAndRetryMapRendering] 재시도 중 오류:', error);
+      }
+    } else if (hasVisibleMarkers) {
+      console.log('[verifyAndRetryMapRendering] ✅ 지도에 마커가 정상적으로 표시됨');
+      // 성공 시 재시도 카운터 리셋
+      const retryKey = `${mtIdx}-${date}`;
+      if (mapRenderRetryCountRef.current[retryKey]) {
+        delete mapRenderRetryCountRef.current[retryKey];
+      }
+    }
+  };
 
   // --- 새로운 통합 지도 렌더링 함수 ---
   const renderLocationDataOnMap = async (locationMarkersData: MapMarker[], stayTimesData: StayTime[], locationLogSummaryData: LocationLogSummary | null, groupMembers: GroupMember[], mapInstance: any) => {
@@ -4413,22 +4533,30 @@ export default function LogsPage() {
     
     // 마커 데이터가 비어있는 경우 별도 처리
     if (!locationMarkersData || locationMarkersData.length === 0) {
-      console.warn('[renderLocationDataOnMap] ⚠️ 위치 마커 데이터가 비어있음 - 지도 정리만 수행');
+      console.warn('[renderLocationDataOnMap] ⚠️ 위치 마커 데이터가 비어있음 - 지도 정리 수행');
       clearMapMarkersAndPaths(true);
-      return;
+      
+      // 빈 데이터일 때도 체류지점이 있으면 표시
+      if (stayTimesData && stayTimesData.length > 0) {
+        console.log('[renderLocationDataOnMap] 📍 마커 데이터는 없지만 체류지점 데이터 있음 - 체류지점만 표시:', stayTimesData.length);
+        // 체류지점만 표시하는 로직은 아래에서 계속 진행
+      } else {
+        console.log('[renderLocationDataOnMap] 📍 마커 데이터와 체류지점 데이터 모두 없음 - 렌더링 종료');
+        return;
+      }
+    } else {
+      console.log('[renderLocationDataOnMap] ✅ 위치 마커 데이터 확인됨 - 렌더링 계속 진행');
     }
-    
-    console.log('[renderLocationDataOnMap] ✅ 위치 마커 데이터 확인됨 - 렌더링 계속 진행');
 
-    // 1. 지도 완전히 정리 (멤버 마커 포함)
-    clearMapMarkersAndPaths(true);
+    // 1. 지도 완전히 정리 (멤버 마커 포함) - 단, 새로고침은 하지 않음
+    clearMapMarkersAndPaths(true, false, false); // refreshMap=false로 설정하여 새로고침 방지
 
     // 2. 지도 중심 위치를 시작위치로 설정 (마커 생성 전에)
     console.log('[renderLocationDataOnMap] 지도 중심 위치 계산 시작');
     let mapCenter = null;
     
     // 위치 데이터가 있으면 시작위치로 지도 중심 설정
-    if (locationMarkersData.length > 0) {
+    if (locationMarkersData && locationMarkersData.length > 0) {
       const firstMarker = locationMarkersData[0];
       const startLat = firstMarker.latitude || firstMarker.mlt_lat;
       const startLng = firstMarker.longitude || firstMarker.mlt_long;
@@ -4441,8 +4569,22 @@ export default function LogsPage() {
           lat: startLat, lng: startLng
         });
       }
+    } else if (stayTimesData && stayTimesData.length > 0) {
+      // 위치 데이터가 없지만 체류지점이 있으면 첫 번째 체류지점으로 중심 설정
+      const firstStayPoint = stayTimesData[0];
+      const stayLat = firstStayPoint.latitude || firstStayPoint.start_lat;
+      const stayLng = firstStayPoint.longitude || firstStayPoint.start_long;
+      
+      if (stayLat && stayLng) {
+        mapCenter = new window.naver.maps.LatLng(Number(stayLat), Number(stayLng));
+        mapInstance.setCenter(mapCenter);
+        mapInstance.setZoom(16);
+        console.log('[renderLocationDataOnMap] 지도 중심을 체류지점으로 설정:', {
+          lat: stayLat, lng: stayLng
+        });
+      }
     } else {
-      console.log('[renderLocationDataOnMap] 위치 데이터 없음 - 지도 중심 유지');
+      console.log('[renderLocationDataOnMap] 위치 데이터와 체류지점 데이터 모두 없음 - 지도 중심 유지');
     }
 
     // 2. 멤버 마커는 더 이상 사용하지 않음
@@ -5024,13 +5166,13 @@ export default function LogsPage() {
       }, 100);
     }
 
-    // 9. 지도 새로고침 (지연 후 실행)
+    // 9. 지도 새로고침 (마커 렌더링 완료 후 한 번만)
     setTimeout(() => {
       if (mapInstance) { 
         mapInstance.refresh(true); 
         console.log('[renderLocationDataOnMap] 최종 지도 새로고침 완료');
       }
-    }, 500);
+    }, 200);
 
     console.log('[renderLocationDataOnMap] 통합 지도 렌더링 완료');
   };
@@ -5112,8 +5254,8 @@ export default function LogsPage() {
             position: 'relative' // 로딩 오버레이를 위한 relative 포지션
           }}
         >
-          {/* 스켈레톤 UI - 초기 로딩이 완료되지 않았지만 초기 로딩 오버레이는 보이지 않을 때 표시 */}
-          {(!isInitialLoading && isMapLoading) && (
+          {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
+          {isMapLoading && (
             <MapSkeleton 
               showControls={true} 
               showMemberList={false}
@@ -5261,10 +5403,11 @@ export default function LogsPage() {
                     <h3 className="text-sm font-bold text-gray-900">경로 따라가기</h3>
                   </div>
                   
-                  <div className="px-1">
+                  {/* 슬라이더 컨트롤 영역 */}
+                  <div className="px-2 py-1">
                     <div 
                       ref={sliderRef}
-                      className="relative w-full h-3 bg-gray-200 rounded-full cursor-pointer select-none touch-none"
+                      className="relative w-full h-3 bg-gray-200 rounded-full cursor-pointer select-none touch-none overflow-hidden"
                       style={{ 
                         touchAction: 'none',
                         userSelect: 'none',
@@ -5274,12 +5417,14 @@ export default function LogsPage() {
                       onMouseDown={handleSliderStart}
                       onTouchStart={handleSliderStart}
                     >
+                      {/* 진행 표시 바 */}
                       <div 
                         className={`absolute top-0 left-0 h-3 bg-blue-500 rounded-full pointer-events-none ${
                           isSliderDragging ? '' : 'transition-all duration-150 ease-out'
                         }`}
                         style={{ width: `${sliderValue}%` }} 
                       ></div>
+                      {/* 슬라이더 핸들 */}
                       <div 
                         className={`absolute top-1/2 w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg transform -translate-y-1/2 cursor-grab active:cursor-grabbing pointer-events-none ${
                           isSliderDragging ? 'scale-110' : 'transition-all duration-150 ease-out hover:scale-105'
@@ -5287,6 +5432,7 @@ export default function LogsPage() {
                         style={{ left: `calc(${sliderValue}% - 12px)` }}
                       ></div>
                     </div>
+                    {/* 슬라이더 레이블 */}
                     <div className="flex justify-between text-xs text-gray-500 mt-1">
                       <span>시작</span>
                       <span>{Math.round(sliderValue)}%</span>
@@ -5449,7 +5595,7 @@ export default function LogsPage() {
                     <h2 className="text-xl font-bold bg-gray-900 bg-clip-text text-transparent">
                       그룹 멤버
                     </h2>
-                    <p className="text-sm text-gray-600">멤버를 선택하거나 ← 스와이프로 닫기</p>
+                    <p className="text-sm text-gray-600">멤버를 선택해보세요</p>
                   </div>
                 </div>
                 <motion.button
@@ -5855,13 +6001,16 @@ export default function LogsPage() {
                                               // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택
                                               if (!member.isSelected) {
                                                 console.log(`[활동 캘린더] 멤버 선택 후 날짜 변경`);
-                                                handleMemberSelect(member.id, e); // 이벤트 객체 전달로 사용자 선택으로 처리
-                                                // 멤버 선택 완료 후 날짜 변경 (날짜가 다른 경우에만)
-                                                if (dateString !== selectedDate) {
-                                                  setTimeout(() => {
-                                                    handleDateSelect(dateString);
-                                                  }, 150);
-                                                }
+                                                // 멤버 선택을 async로 처리하고 완료 후 날짜 변경
+                                                (async () => {
+                                                  await handleMemberSelect(member.id, e); // 이벤트 객체 전달로 사용자 선택으로 처리
+                                                  // 멤버 선택 완료 후 날짜 변경 (날짜가 다른 경우에만)
+                                                  if (dateString !== selectedDate) {
+                                                    setTimeout(() => {
+                                                      handleDateSelect(dateString);
+                                                    }, 300); // 300ms로 증가하여 멤버 선택 완료 확실히 대기
+                                                  }
+                                                })();
                                               } else {
                                                 // 이미 선택된 멤버인 경우 날짜만 변경
                                                 console.log(`[활동 캘린더] 선택된 멤버 - 날짜만 변경`);
@@ -5965,13 +6114,16 @@ export default function LogsPage() {
                                               // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택
                                               if (!member.isSelected) {
                                                 console.log(`[활동 캘린더] 멤버 선택 후 날짜 변경`);
-                                                handleMemberSelect(member.id, e); // 이벤트 객체 전달로 사용자 선택으로 처리
-                                                // 멤버 선택 완료 후 날짜 변경 (날짜가 다른 경우에만)
-                                                if (dateString !== selectedDate) {
-                                                  setTimeout(() => {
-                                                    handleDateSelect(dateString);
-                                                  }, 150);
-                                                }
+                                                // 멤버 선택을 async로 처리하고 완료 후 날짜 변경
+                                                (async () => {
+                                                  await handleMemberSelect(member.id, e); // 이벤트 객체 전달로 사용자 선택으로 처리
+                                                  // 멤버 선택 완료 후 날짜 변경 (날짜가 다른 경우에만)
+                                                  if (dateString !== selectedDate) {
+                                                    setTimeout(() => {
+                                                      handleDateSelect(dateString);
+                                                    }, 300); // 300ms로 증가하여 멤버 선택 완료 확실히 대기
+                                                  }
+                                                })();
                                               } else {
                                                 // 이미 선택된 멤버인 경우 날짜만 변경
                                                 console.log(`[활동 캘린더] 선택된 멤버 - 날짜만 변경`);
