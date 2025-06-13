@@ -232,7 +232,7 @@ export default function AccountSettingsPage() {
           href: '/setting/account/profile', 
           icon: FiUser,
           color: 'bg-blue-500',
-          description: '이름, 닉네임 변경'
+          description: '이름, 닉네임, 생년월일, 성별 변경'
         },
         { 
           label: '연락처 정보', 

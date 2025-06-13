@@ -103,9 +103,16 @@ export async function POST(request: NextRequest) {
         // JWT 토큰 생성 (실제 사용자 정보 포함)
         const jwtToken = generateJWT({
           mt_idx: userData.mt_idx,
+          userId: userData.mt_idx,
           mt_id: userData.mt_id,
           mt_name: userData.mt_name,
           mt_nickname: userData.mt_nickname,
+          mt_hp: userData.mt_hp,
+          mt_email: userData.mt_email,
+          mt_birth: userData.mt_birth,
+          mt_gender: userData.mt_gender,
+          mt_type: userData.mt_type,
+          mt_level: userData.mt_level,
           mt_file1: userData.mt_file1
         });
 

@@ -356,10 +356,10 @@ export default function SignInPage() {
   const LoadingSpinner = ({ message, fullScreen = true }: { message: string; fullScreen?: boolean }) => {
     if (fullScreen) {
       return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
-            <span className="text-gray-700">{message}</span>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white px-6 py-4 rounded-xl shadow-lg flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+            <span className="text-gray-700 text-sm font-medium">{message}</span>
           </div>
         </div>
       );
@@ -368,7 +368,7 @@ export default function SignInPage() {
     return (
       <div className="flex items-center justify-center space-x-2">
         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-        <span>{message}</span>
+        <span className="text-sm">{message}</span>
       </div>
     );
   };
@@ -623,7 +623,7 @@ export default function SignInPage() {
         </motion.div>
       </motion.div>
 
-      {/* 에러 모달 */}
+      {/* 에러 모달 - 컴팩트 버전 */}
       <AnimatePresence>
         {showErrorModal && (
           <motion.div 
@@ -634,19 +634,19 @@ export default function SignInPage() {
             onClick={closeErrorModal}
           >
             <motion.div 
-              className="bg-white rounded-3xl w-full max-w-sm mx-auto shadow-2xl"
+              className="bg-white rounded-2xl w-full max-w-xs mx-auto shadow-xl"
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-6 pb-8">
-                <div className="text-center mb-6">
-                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FiAlertTriangle className="w-8 h-8 text-red-500" />
+              <div className="p-4">
+                <div className="text-center mb-4">
+                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <FiAlertTriangle className="w-6 h-6 text-red-500" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">로그인 실패</h3>
-                  <p className="text-gray-600 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">로그인 실패</h3>
+                  <p className="text-sm text-gray-600 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
                     {errorModalMessage}
                   </p>
                 </div>
@@ -655,7 +655,7 @@ export default function SignInPage() {
                   onClick={closeErrorModal}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full py-4 bg-red-500 text-white rounded-2xl font-medium hover:bg-red-600 transition-colors"
+                  className="w-full py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors"
                 >
                   확인
                 </motion.button>

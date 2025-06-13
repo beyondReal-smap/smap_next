@@ -1,16 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 
-// JWT 시크릿 키 (환경변수에서 가져오거나 기본값 사용)
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+// JWT 시크릿 키 (백엔드와 동일하게 설정)
+const JWT_SECRET = process.env.JWT_SECRET || 'smap!@super-secret';
 console.log('[AUTH] JWT_SECRET 설정됨, 길이:', JWT_SECRET.length);
 
 // JWT 토큰 페이로드 인터페이스
 interface JWTPayload {
   mt_idx: number;
+  userId?: number; // mt_idx의 별칭
   mt_id: string;
   mt_name: string;
   mt_nickname?: string;
+  mt_hp?: string;
+  mt_email?: string;
+  mt_birth?: string;
+  mt_gender?: number;
+  mt_type?: number;
+  mt_level?: number;
   mt_file1?: string; // 프로필 이미지 경로
   sgt_idx?: number;
   sgdt_idx?: number;
@@ -62,9 +69,16 @@ export function verifyJWT(token: string): JWTPayload | null {
  */
 export function generateJWT(userInfo: {
   mt_idx: number;
+  userId?: number; // mt_idx의 별칭
   mt_id: string;
   mt_name: string;
   mt_nickname?: string;
+  mt_hp?: string;
+  mt_email?: string;
+  mt_birth?: string;
+  mt_gender?: number;
+  mt_type?: number;
+  mt_level?: number;
   mt_file1?: string; // 프로필 이미지 경로
   sgt_idx?: number;
   sgdt_idx?: number;

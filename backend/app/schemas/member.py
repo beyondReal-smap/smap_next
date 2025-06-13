@@ -178,4 +178,26 @@ class ChangePasswordRequest(BaseModel):
 # 비밀번호 변경 응답 스키마
 class ChangePasswordResponse(BaseModel):
     success: bool
-    message: str 
+    message: str
+
+# 프로필 수정 관련 스키마
+class UpdateProfileRequest(BaseModel):
+    mt_name: str
+    mt_nickname: str
+    mt_birth: Optional[str] = None
+    mt_gender: Optional[int] = None
+
+class UpdateProfileResponse(BaseModel):
+    result: str
+    message: str
+    success: bool
+
+# 연락처 수정 관련 스키마
+class UpdateContactRequest(BaseModel):
+    mt_hp: str
+    mt_email: str
+
+class UpdateContactResponse(BaseModel):
+    result: str
+    message: str
+    success: bool 

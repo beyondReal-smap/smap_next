@@ -45,33 +45,63 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def verify_user_password(db: Session, mt_idx: int, current_password: str) -> bool:
     """사용자의 현재 비밀번호를 확인합니다."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"[VERIFY_PASSWORD] 비밀번호 확인 시작 - mt_idx: {mt_idx}")
+    
     user = get_user_by_idx(db, mt_idx)
     if not user:
+        logger.warning(f"[VERIFY_PASSWORD] 사용자를 찾을 수 없음 - mt_idx: {mt_idx}")
         return False
     
-    # 소셜 로그인 사용자인 경우 (비밀번호가 없는 경우)
-    if not user.mt_pwd or user.mt_type != 1:  # mt_type 1은 일반회원
+    logger.info(f"[VERIFY_PASSWORD] 사용자 확인됨 - mt_idx: {mt_idx}, name: {user.mt_name}, type: {user.mt_type}")
+    
+    # 비밀번호가 없는 경우 (소셜 로그인 사용자가 비밀번호를 아직 설정하지 않은 경우)
+    if not user.mt_pwd:
+        logger.warning(f"[VERIFY_PASSWORD] 사용자에게 비밀번호가 없음 - mt_idx: {mt_idx}")
         return False
     
-    return verify_password(current_password, user.mt_pwd)
+    logger.info(f"[VERIFY_PASSWORD] 비밀번호 해시 확인 시작 - mt_idx: {mt_idx}")
+    result = verify_password(current_password, user.mt_pwd)
+    logger.info(f"[VERIFY_PASSWORD] 비밀번호 확인 결과 - mt_idx: {mt_idx}, result: {result}")
+    
+    return result
 
 def change_user_password(db: Session, mt_idx: int, new_password: str) -> bool:
     """사용자의 비밀번호를 변경합니다."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"[CHANGE_PASSWORD] 비밀번호 변경 시작 - mt_idx: {mt_idx}")
+    
     user = get_user_by_idx(db, mt_idx)
     if not user:
+        logger.warning(f"[CHANGE_PASSWORD] 사용자를 찾을 수 없음 - mt_idx: {mt_idx}")
         return False
     
-    # 새 비밀번호 해싱
-    hashed_password = get_hashed_password(new_password)
+    logger.info(f"[CHANGE_PASSWORD] 사용자 확인됨 - mt_idx: {mt_idx}, name: {user.mt_name}, type: {user.mt_type}")
     
-    # 비밀번호 업데이트
-    user.mt_pwd = hashed_password
-    user.mt_udate = datetime.utcnow()  # 수정일시 업데이트
-    
-    db.commit()
-    db.refresh(user)
-    
-    return True
+    try:
+        # 새 비밀번호 해싱
+        logger.info(f"[CHANGE_PASSWORD] 새 비밀번호 해싱 시작 - mt_idx: {mt_idx}")
+        hashed_password = get_hashed_password(new_password)
+        logger.info(f"[CHANGE_PASSWORD] 새 비밀번호 해싱 완료 - mt_idx: {mt_idx}")
+        
+        # 비밀번호 업데이트
+        user.mt_pwd = hashed_password
+        user.mt_udate = datetime.utcnow()  # 수정일시 업데이트
+        
+        db.commit()
+        db.refresh(user)
+        
+        logger.info(f"[CHANGE_PASSWORD] 비밀번호 변경 성공 - mt_idx: {mt_idx}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"[CHANGE_PASSWORD] 비밀번호 변경 실패 - mt_idx: {mt_idx}, error: {str(e)}")
+        db.rollback()
+        return False
 
 def validate_password_policy(password: str) -> tuple[bool, list[str]]:
     """비밀번호 정책을 검증합니다."""
@@ -177,4 +207,112 @@ def create_user_identity_from_member(member: Member) -> UserIdentity:
         mt_id=member.mt_id,
         mt_name=member.mt_name,
         mt_level=member.mt_level
-    ) 
+    )
+
+def update_user_profile(db: Session, mt_idx: int, profile_data: dict) -> bool:
+    """사용자의 프로필 정보를 업데이트합니다."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"[UPDATE_PROFILE] 프로필 업데이트 시작 - mt_idx: {mt_idx}")
+    
+    user = get_user_by_idx(db, mt_idx)
+    if not user:
+        logger.warning(f"[UPDATE_PROFILE] 사용자를 찾을 수 없음 - mt_idx: {mt_idx}")
+        return False
+    
+    logger.info(f"[UPDATE_PROFILE] 사용자 확인됨 - mt_idx: {mt_idx}, name: {user.mt_name}")
+    
+    try:
+        # 프로필 정보 업데이트
+        if 'mt_name' in profile_data:
+            user.mt_name = profile_data['mt_name']
+        if 'mt_nickname' in profile_data:
+            user.mt_nickname = profile_data['mt_nickname']
+        if 'mt_birth' in profile_data and profile_data['mt_birth']:
+            try:
+                user.mt_birth = datetime.strptime(profile_data['mt_birth'], '%Y-%m-%d').date()
+            except ValueError:
+                logger.warning(f"[UPDATE_PROFILE] 잘못된 생년월일 형식 - mt_idx: {mt_idx}")
+        if 'mt_gender' in profile_data:
+            user.mt_gender = profile_data['mt_gender']
+        
+        user.mt_udate = datetime.utcnow()  # 수정일시 업데이트
+        
+        db.commit()
+        db.refresh(user)
+        
+        logger.info(f"[UPDATE_PROFILE] 프로필 업데이트 성공 - mt_idx: {mt_idx}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"[UPDATE_PROFILE] 프로필 업데이트 실패 - mt_idx: {mt_idx}, error: {str(e)}")
+        db.rollback()
+        return False
+
+def update_user_contact(db: Session, mt_idx: int, contact_data: dict) -> bool:
+    """사용자의 연락처 정보를 업데이트합니다."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"[UPDATE_CONTACT] 연락처 업데이트 시작 - mt_idx: {mt_idx}")
+    
+    user = get_user_by_idx(db, mt_idx)
+    if not user:
+        logger.warning(f"[UPDATE_CONTACT] 사용자를 찾을 수 없음 - mt_idx: {mt_idx}")
+        return False
+    
+    logger.info(f"[UPDATE_CONTACT] 사용자 확인됨 - mt_idx: {mt_idx}, name: {user.mt_name}")
+    
+    try:
+        # 연락처 정보 업데이트
+        if 'mt_hp' in contact_data:
+            # 전화번호 형식 정리 (하이픈 제거)
+            clean_phone = contact_data['mt_hp'].replace('-', '')
+            user.mt_hp = clean_phone
+        if 'mt_email' in contact_data:
+            user.mt_email = contact_data['mt_email']
+        
+        user.mt_udate = datetime.utcnow()  # 수정일시 업데이트
+        
+        db.commit()
+        db.refresh(user)
+        
+        logger.info(f"[UPDATE_CONTACT] 연락처 업데이트 성공 - mt_idx: {mt_idx}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"[UPDATE_CONTACT] 연락처 업데이트 실패 - mt_idx: {mt_idx}, error: {str(e)}")
+        db.rollback()
+        return False
+
+def check_phone_duplicate(db: Session, mt_idx: int, phone: str) -> bool:
+    """전화번호 중복 확인 (자신 제외)"""
+    clean_phone = phone.replace('-', '')
+    existing_user = db.query(Member).filter(
+        Member.mt_hp == clean_phone,
+        Member.mt_idx != mt_idx,
+        Member.mt_status == '1',
+        Member.mt_show == 'Y'
+    ).first()
+    return existing_user is not None
+
+def check_email_duplicate(db: Session, mt_idx: int, email: str) -> bool:
+    """이메일 중복 확인 (자신 제외)"""
+    existing_user = db.query(Member).filter(
+        Member.mt_email == email,
+        Member.mt_idx != mt_idx,
+        Member.mt_status == '1',
+        Member.mt_show == 'Y'
+    ).first()
+    return existing_user is not None
+
+def check_nickname_duplicate(db: Session, mt_idx: int, nickname: str) -> bool:
+    """닉네임 중복 확인 (자신 제외)"""
+    existing_user = db.query(Member).filter(
+        Member.mt_nickname == nickname,
+        Member.mt_idx != mt_idx,
+        Member.mt_status == '1',
+        Member.mt_show == 'Y'
+    ).first()
+    return existing_user is not None 

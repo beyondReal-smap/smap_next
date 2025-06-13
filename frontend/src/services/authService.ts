@@ -14,9 +14,22 @@ class AuthService {
       
       if (response.data.success && response.data.data) {
         // 토큰 저장 (token이 있는 경우에만)
+        console.log('[AUTH SERVICE] 로그인 응답 데이터:', response.data.data);
+        console.log('[AUTH SERVICE] 토큰 존재 여부:', !!response.data.data.token);
+        console.log('[AUTH SERVICE] 토큰 값:', response.data.data.token);
+        
         if (response.data.data.token) {
+          console.log('[AUTH SERVICE] JWT 토큰 저장 시작');
           this.setToken(response.data.data.token);
+          console.log('[AUTH SERVICE] JWT 토큰 저장 완료');
+          
+          // 저장 확인
+          const savedToken = this.getToken();
+          console.log('[AUTH SERVICE] 저장된 토큰 확인:', savedToken ? '토큰 있음' : '토큰 없음');
+        } else {
+          console.warn('[AUTH SERVICE] 응답에 토큰이 없음');
         }
+        
         // 사용자 전체 정보 조회 및 저장
         const userProfile = await this.getUserProfile(response.data.data.member.mt_idx);
         this.setUserData(userProfile);

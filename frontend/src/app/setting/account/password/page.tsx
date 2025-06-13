@@ -141,12 +141,24 @@ export default function PasswordChangePage() {
     setIsLoading(true);
     
     try {
+      // JWT 토큰 디버깅
+      const token = localStorage.getItem('auth-token');
+      console.log('[PASSWORD CHANGE] JWT 토큰 확인:', token);
+      console.log('[PASSWORD CHANGE] 토큰 존재:', !!token);
+      console.log('[PASSWORD CHANGE] 토큰 길이:', token ? token.length : 0);
+      
+      if (!token || token === 'null' || token === 'undefined') {
+        setErrors({ general: '로그인이 필요합니다. 다시 로그인해주세요.' });
+        setIsLoading(false);
+        return;
+      }
+      
       // 백엔드 API로 비밀번호 변경 요청
       const response = await fetch('/api/auth/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth-token')}`, // JWT 토큰
+          'Authorization': `Bearer ${token}`, // JWT 토큰
         },
         body: JSON.stringify({
           currentPassword,
@@ -184,7 +196,7 @@ export default function PasswordChangePage() {
 
   // 비밀번호 강도 색상
   const getStrengthColor = (score: number) => {
-    const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#10b981'];
+    const colors = ['#ef4444', '#F97315', '#eab308', '#22c55e', '#10b981'];
     const colorIndex = Math.min(score, colors.length - 1);
     return colors[colorIndex] || '#ef4444';
   };
@@ -251,15 +263,17 @@ export default function PasswordChangePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.6 }}
-          className="bg-blue-50 border border-blue-200 rounded-2xl p-4"
+          className="bg-orange-50 border border-orange-200 rounded-2xl p-4"
+          style={{ backgroundColor: '#FFF7ED', borderColor: '#FDBA74' }}
         >
           <div className="flex items-start space-x-3">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-              <FiShield className="w-4 h-4 text-blue-600" />
+            <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                 style={{ backgroundColor: '#FED7AA' }}>
+              <FiShield className="w-4 h-4" style={{ color: '#F97315' }} />
             </div>
             <div>
-              <h3 className="font-semibold text-blue-900 mb-1">보안 권장사항</h3>
-              <ul className="text-sm text-blue-700 space-y-1">
+              <h3 className="font-semibold mb-1" style={{ color: '#9A3412' }}>보안 권장사항</h3>
+              <ul className="text-sm space-y-1" style={{ color: '#C2410C' }}>
                 <li>• 8자 이상의 비밀번호를 사용하세요</li>
                 <li>• 대문자, 소문자, 숫자, 특수문자를 조합하세요</li>
                 <li>• 다른 사이트와 다른 비밀번호를 사용하세요</li>
@@ -291,7 +305,21 @@ export default function PasswordChangePage() {
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   className={`block w-full pl-10 pr-12 py-3 border ${
                     errors.currentPassword ? 'border-red-300' : 'border-gray-300'
-                  } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200`}
+                  } rounded-xl focus:ring-2 transition-all duration-200`}
+                  style={{ 
+                    '--tw-ring-color': '#F97315',
+                    '--tw-border-opacity': '1'
+                  } as any}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#F97315';
+                    e.target.style.boxShadow = '0 0 0 2px rgba(249, 115, 21, 0.2)';
+                  }}
+                  onBlur={(e) => {
+                    if (!errors.currentPassword) {
+                      e.target.style.borderColor = '#D1D5DB';
+                    }
+                    e.target.style.boxShadow = 'none';
+                  }}
                   placeholder="현재 비밀번호를 입력하세요"
                 />
                 <button
@@ -328,7 +356,17 @@ export default function PasswordChangePage() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   className={`block w-full pl-10 pr-12 py-3 border ${
                     errors.newPassword ? 'border-red-300' : 'border-gray-300'
-                  } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200`}
+                  } rounded-xl focus:ring-2 transition-all duration-200`}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#F97315';
+                    e.target.style.boxShadow = '0 0 0 2px rgba(249, 115, 21, 0.2)';
+                  }}
+                  onBlur={(e) => {
+                    if (!errors.newPassword) {
+                      e.target.style.borderColor = '#D1D5DB';
+                    }
+                    e.target.style.boxShadow = 'none';
+                  }}
                   placeholder="새 비밀번호를 입력하세요"
                 />
                 <button
@@ -396,7 +434,19 @@ export default function PasswordChangePage() {
                     errors.confirmPassword ? 'border-red-300' : 
                     confirmPassword && newPassword === confirmPassword ? 'border-green-300' :
                     'border-gray-300'
-                  } rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200`}
+                  } rounded-xl focus:ring-2 transition-all duration-200`}
+                  onFocus={(e) => {
+                    if (!errors.confirmPassword && !(confirmPassword && newPassword === confirmPassword)) {
+                      e.target.style.borderColor = '#F97315';
+                      e.target.style.boxShadow = '0 0 0 2px rgba(249, 115, 21, 0.2)';
+                    }
+                  }}
+                  onBlur={(e) => {
+                    if (!errors.confirmPassword && !(confirmPassword && newPassword === confirmPassword)) {
+                      e.target.style.borderColor = '#D1D5DB';
+                    }
+                    e.target.style.boxShadow = 'none';
+                  }}
                   placeholder="새 비밀번호를 다시 입력하세요"
                 />
                 <button
@@ -438,7 +488,21 @@ export default function PasswordChangePage() {
             <button
               onClick={handleSave}
               disabled={isLoading || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword}
-              className="w-full py-4 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
+              className="w-full py-4 text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
+              style={{ 
+                backgroundColor: '#F97315',
+                background: 'linear-gradient(135deg, #F97315 0%, #EA580C 100%)'
+              }}
+              onMouseEnter={(e) => {
+                if (!e.currentTarget.disabled) {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #EA580C 0%, #DC2626 100%)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!e.currentTarget.disabled) {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #F97315 0%, #EA580C 100%)';
+                }
+              }}
             >
               {isLoading ? (
                 <>

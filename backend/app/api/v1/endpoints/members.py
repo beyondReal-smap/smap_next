@@ -20,7 +20,11 @@ from app.schemas.member import (
     VerifyPasswordRequest,
     VerifyPasswordResponse,
     ChangePasswordRequest,
-    ChangePasswordResponse
+    ChangePasswordResponse,
+    UpdateProfileRequest,
+    UpdateProfileResponse,
+    UpdateContactRequest,
+    UpdateContactResponse
 )
 from app.services.member_service import member_service
 from app.crud import crud_auth
@@ -47,11 +51,10 @@ def get_current_user_id_from_token(authorization: str = Header(None)) -> Optiona
     logger.info(f"[JWT DEBUG] 토큰 길이: {len(token)}")
     
     try:
-        # settings에서 올바른 키 이름 사용
-        secret_key = getattr(settings, 'JWT_SECRET_KEY', 'your-secret-key-here')
-        algorithm = getattr(settings, 'JWT_ALGORITHM', 'HS256')
+        # 직접 하드코딩된 시크릿 키 사용 (프론트엔드와 동일)
+        secret_key = 'smap!@super-secret'
+        algorithm = 'HS256'
         
-        logger.info(f"[JWT DEBUG] JWT_SECRET_KEY 존재: {hasattr(settings, 'JWT_SECRET_KEY')}")
         logger.info(f"[JWT DEBUG] 사용할 SECRET_KEY: {secret_key}")
         logger.info(f"[JWT DEBUG] 사용할 ALGORITHM: {algorithm}")
         
@@ -60,6 +63,8 @@ def get_current_user_id_from_token(authorization: str = Header(None)) -> Optiona
         
         logger.info(f"[JWT DEBUG] 토큰 페이로드: {payload}")
         logger.info(f"[JWT DEBUG] 추출된 mt_idx: {mt_idx}")
+        logger.info(f"[JWT DEBUG] 페이로드 타입: {type(payload)}")
+        logger.info(f"[JWT DEBUG] 페이로드 키 목록: {list(payload.keys()) if isinstance(payload, dict) else 'not dict'}")
         
         return mt_idx
     except JWTError as e:
@@ -145,8 +150,23 @@ async def change_password(
         
         logger.info(f"[CHANGE_PASSWORD] 비밀번호 변경 요청 - user_id: {user_id}")
         
+        # 사용자 정보 확인
+        user = crud_auth.get_user_by_idx(db, user_id)
+        if not user:
+            logger.warning(f"[CHANGE_PASSWORD] 사용자를 찾을 수 없음 - user_id: {user_id}")
+            return {
+                "result": "N",
+                "message": "사용자를 찾을 수 없습니다.",
+                "success": False
+            }
+        
+        logger.info(f"[CHANGE_PASSWORD] 사용자 확인됨 - user_id: {user_id}, name: {user.mt_name}, id: {user.mt_id}")
+        
         # 현재 비밀번호 확인
+        logger.info(f"[CHANGE_PASSWORD] 현재 비밀번호 확인 시작 - user_id: {user_id}")
         is_current_valid = crud_auth.verify_user_password(db, user_id, request.currentPassword)
+        logger.info(f"[CHANGE_PASSWORD] 현재 비밀번호 확인 결과 - user_id: {user_id}, valid: {is_current_valid}")
+        
         if not is_current_valid:
             logger.warning(f"[CHANGE_PASSWORD] 현재 비밀번호 불일치 - user_id: {user_id}")
             return {
@@ -281,6 +301,71 @@ def get_members(
     
     members = db.query(Member).offset(skip).limit(limit).all()
     return members
+
+@router.get("/me")
+async def get_user_profile(
+    authorization: str = Header(None),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    현재 로그인한 사용자의 프로필 정보를 조회합니다.
+    """
+    logger.info("[GET_PROFILE] 사용자 프로필 조회 요청 시작")
+    
+    try:
+        # 토큰에서 사용자 ID 추출
+        user_id = get_current_user_id_from_token(authorization)
+        if not user_id:
+            logger.warning("[GET_PROFILE] 인증 토큰이 없거나 유효하지 않음")
+            return {
+                "result": "N",
+                "message": "인증이 필요합니다.",
+                "success": False
+            }
+        
+        logger.info(f"[GET_PROFILE] 프로필 조회 요청 - user_id: {user_id}")
+        
+        # 데이터베이스에서 최신 사용자 정보 조회
+        user = crud_auth.get_user_by_idx(db, user_id)
+        if not user:
+            logger.warning(f"[GET_PROFILE] 사용자를 찾을 수 없음 - user_id: {user_id}")
+            return {
+                "result": "N",
+                "message": "사용자를 찾을 수 없습니다.",
+                "success": False
+            }
+        
+        # 응답 데이터 구성
+        profile_data = {
+            "mt_idx": user.mt_idx,
+            "mt_id": user.mt_id,
+            "mt_name": user.mt_name,
+            "mt_nickname": user.mt_nickname,
+            "mt_hp": user.mt_hp,
+            "mt_email": user.mt_email,
+            "mt_birth": user.mt_birth.strftime('%Y-%m-%d') if user.mt_birth else None,
+            "mt_gender": user.mt_gender,
+            "mt_type": user.mt_type,
+            "mt_level": user.mt_level
+        }
+        
+        logger.info(f"[GET_PROFILE] 프로필 조회 성공 - user_id: {user_id}")
+        return {
+            "result": "Y",
+            "data": profile_data,
+            "message": "프로필 조회가 성공했습니다.",
+            "success": True
+        }
+        
+    except Exception as e:
+        logger.error(f"[GET_PROFILE] 서버 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {
+            "result": "N",
+            "message": "서버 오류가 발생했습니다.",
+            "success": False
+        }
 
 @router.get("/{member_id}", response_model=MemberResponse)
 def get_member(
@@ -509,4 +594,148 @@ def update_member_location(
     db.add(member)
     db.commit()
     db.refresh(member)
-    return member 
+    return member
+
+@router.post("/update-profile")
+async def update_profile(
+    request: UpdateProfileRequest,
+    authorization: str = Header(None),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    사용자 프로필을 업데이트합니다.
+    """
+    logger.info("[UPDATE_PROFILE] 프로필 업데이트 요청 시작")
+    
+    try:
+        # 토큰에서 사용자 ID 추출
+        user_id = get_current_user_id_from_token(authorization)
+        if not user_id:
+            logger.warning("[UPDATE_PROFILE] 인증 토큰이 없거나 유효하지 않음")
+            return {
+                "result": "N",
+                "message": "인증이 필요합니다.",
+                "success": False
+            }
+        
+        logger.info(f"[UPDATE_PROFILE] 프로필 업데이트 요청 - user_id: {user_id}")
+        
+        # 닉네임 중복 확인
+        if crud_auth.check_nickname_duplicate(db, user_id, request.mt_nickname):
+            logger.warning(f"[UPDATE_PROFILE] 닉네임 중복 - user_id: {user_id}, nickname: {request.mt_nickname}")
+            return {
+                "result": "N",
+                "message": "이미 사용 중인 닉네임입니다.",
+                "success": False
+            }
+        
+        # 프로필 정보 업데이트
+        profile_data = {
+            "mt_name": request.mt_name,
+            "mt_nickname": request.mt_nickname,
+            "mt_birth": request.mt_birth,
+            "mt_gender": request.mt_gender
+        }
+        
+        is_updated = crud_auth.update_user_profile(db, user_id, profile_data)
+        
+        if is_updated:
+            logger.info(f"[UPDATE_PROFILE] 프로필 업데이트 성공 - user_id: {user_id}")
+            return {
+                "result": "Y",
+                "message": "프로필이 성공적으로 업데이트되었습니다.",
+                "success": True
+            }
+        else:
+            logger.error(f"[UPDATE_PROFILE] 프로필 업데이트 실패 - user_id: {user_id}")
+            return {
+                "result": "N",
+                "message": "프로필 업데이트에 실패했습니다.",
+                "success": False
+            }
+    
+    except Exception as e:
+        logger.error(f"[UPDATE_PROFILE] 서버 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {
+            "result": "N",
+            "message": "서버 오류가 발생했습니다.",
+            "success": False
+        }
+
+@router.post("/update-contact")
+async def update_contact(
+    request: UpdateContactRequest,
+    authorization: str = Header(None),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    사용자 연락처를 업데이트합니다.
+    """
+    logger.info("[UPDATE_CONTACT] 연락처 업데이트 요청 시작")
+    
+    try:
+        # 토큰에서 사용자 ID 추출
+        user_id = get_current_user_id_from_token(authorization)
+        if not user_id:
+            logger.warning("[UPDATE_CONTACT] 인증 토큰이 없거나 유효하지 않음")
+            return {
+                "result": "N",
+                "message": "인증이 필요합니다.",
+                "success": False
+            }
+        
+        logger.info(f"[UPDATE_CONTACT] 연락처 업데이트 요청 - user_id: {user_id}")
+        
+        # 전화번호 중복 확인
+        if crud_auth.check_phone_duplicate(db, user_id, request.mt_hp):
+            logger.warning(f"[UPDATE_CONTACT] 전화번호 중복 - user_id: {user_id}, phone: {request.mt_hp}")
+            return {
+                "result": "N",
+                "message": "이미 사용 중인 전화번호입니다.",
+                "success": False
+            }
+        
+        # 이메일 중복 확인
+        if crud_auth.check_email_duplicate(db, user_id, request.mt_email):
+            logger.warning(f"[UPDATE_CONTACT] 이메일 중복 - user_id: {user_id}, email: {request.mt_email}")
+            return {
+                "result": "N",
+                "message": "이미 사용 중인 이메일입니다.",
+                "success": False
+            }
+        
+        # 연락처 정보 업데이트
+        contact_data = {
+            "mt_hp": request.mt_hp,
+            "mt_email": request.mt_email
+        }
+        
+        is_updated = crud_auth.update_user_contact(db, user_id, contact_data)
+        
+        if is_updated:
+            logger.info(f"[UPDATE_CONTACT] 연락처 업데이트 성공 - user_id: {user_id}")
+            return {
+                "result": "Y",
+                "message": "연락처가 성공적으로 업데이트되었습니다.",
+                "success": True
+            }
+        else:
+            logger.error(f"[UPDATE_CONTACT] 연락처 업데이트 실패 - user_id: {user_id}")
+            return {
+                "result": "N",
+                "message": "연락처 업데이트에 실패했습니다.",
+                "success": False
+            }
+    
+    except Exception as e:
+        logger.error(f"[UPDATE_CONTACT] 서버 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {
+            "result": "N",
+            "message": "서버 오류가 발생했습니다.",
+            "success": False
+        }
+
