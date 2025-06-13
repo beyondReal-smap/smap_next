@@ -50,6 +50,9 @@ body {
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
     Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  /* 한글 텍스트 줄바꿈 최적화 */
+  word-break: keep-all;
+  word-wrap: break-word;
 }
 
 .font-suite {
@@ -120,14 +123,65 @@ input:focus, select:focus, textarea:focus {
 /* 반응형 타이포그래피 */
 h1 {
   @apply text-2xl sm:text-3xl md:text-4xl font-bold;
+  word-break: keep-all;
+  word-wrap: break-word;
 }
 
 h2 {
   @apply text-xl sm:text-2xl md:text-3xl font-semibold;
+  word-break: keep-all;
+  word-wrap: break-word;
+}
+
+h3, h4, h5, h6 {
+  word-break: keep-all;
+  word-wrap: break-word;
 }
 
 p {
   @apply text-base leading-relaxed;
+  word-break: keep-all;
+  word-wrap: break-word;
+}
+
+/* 한글 텍스트 최적화 클래스 */
+.keep-all-ko {
+  word-break: keep-all; /* 한글은 어절(공백) 단위로만 나눔 */
+  word-wrap: break-word; /* 긴 단어는 줄바꿈 */
+}
+
+/* 영문/숫자는 일반적인 줄바꿈 */
+.break-words-en {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* 모든 텍스트 요소에 한글 최적화 적용 */
+span, div, label, button, input, textarea, select {
+  word-break: keep-all;
+  word-wrap: break-word;
+}
+
+/* 특별한 경우를 위한 예외 클래스 */
+.break-all {
+  word-break: break-all !important; /* URL, 이메일 등 강제 줄바꿈 */
+}
+
+.break-normal {
+  word-break: normal !important; /* 기본 줄바꿈 */
+  word-wrap: normal !important;
+}
+
+/* 코드, URL, 이메일 등에는 break-all 적용 */
+code, pre, .url, .email, .code {
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+/* 테이블 셀에서의 텍스트 처리 */
+td, th {
+  word-break: keep-all;
+  word-wrap: break-word;
 }
 
 /* 스크롤바 숨기기 */

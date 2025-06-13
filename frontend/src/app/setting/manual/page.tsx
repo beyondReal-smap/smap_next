@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FiBook, FiPlay } from 'react-icons/fi';
@@ -12,109 +12,157 @@ const videos = [
   { title: '내장소', url: 'https://www.youtube.com/embed/EDcvCwZmF38' },
 ];
 
+// 모바일 최적화된 CSS 애니메이션
+const pageAnimations = `
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+  position: relative;
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutToRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideInFromRight {
+  animation: slideInFromRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-slideOutToRight {
+  animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.initial-hidden {
+  opacity: 0;
+  transform: translateX(100%);
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* glass-effect 스타일 - setting 페이지와 동일 */
+.glass-effect {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999 !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  width: 100% !important;
+  height: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  overflow: visible !important;
+}
+
+/* 혹시 부모 요소가 relative나 다른 포지션인 경우를 위한 추가 스타일 */
+body, html {
+  position: relative !important;
+}
+
+/* 헤더가 잘리지 않도록 보장 */
+.glass-effect > * {
+  position: relative !important;
+}
+
+.mobile-button {
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.mobile-button:active {
+  transform: scale(0.98);
+}
+`;
+
 export default function ManualPage() {
   const router = useRouter();
-  const [isExiting, setIsExiting] = useState(false);
-  const [shouldAnimate, setShouldAnimate] = useState(true);
-  const [isPageLoaded, setIsPageLoaded] = useState(false);
 
+  // 페이지 마운트 시 스크롤 설정
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsPageLoaded(true);
-    }, 100);
-    return () => clearTimeout(timer);
+    document.body.style.overflowY = 'auto';
+    document.documentElement.style.overflowY = 'auto';
+    return () => {
+      document.body.style.overflowY = '';
+      document.documentElement.style.overflowY = '';
+    };
   }, []);
 
   const handleBack = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      router.back();
-    }, 400);
+    router.back();
   };
 
   return (
     <>
-      <style jsx global>{`
-        @keyframes slideInFromRight {
-          from {
-            transform: translateX(30px);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-
-        @keyframes slideOutToRight {
-          from {
-            transform: translateX(0);
-            opacity: 1;
-          }
-          to {
-            transform: translateX(-30px);
-            opacity: 0;
-          }
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-slideInFromRight {
-          animation: slideInFromRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-        }
-
-        .animate-slideOutToRight {
-          animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
-        }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-        }
-
-        .initial-hidden {
-          opacity: 0;
-          transform: translateX(100%);
-        }
-
-        .glass-effect {
-          backdrop-filter: blur(10px);
-          background: rgba(255, 255, 255, 0.7);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-          box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-        }
-      `}</style>
-      
-      <div className={`bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-10 ${
-        isExiting ? 'animate-slideOutToRight' : 
-        (shouldAnimate && isPageLoaded) ? 'animate-slideInFromRight' : 
-        shouldAnimate ? 'initial-hidden' : ''
-      }`} style={{ 
-        position: 'relative',
-        width: '100%',
-        overflow: shouldAnimate && !isPageLoaded ? 'hidden' : 'visible'
-      }}>
-        {/* 개선된 헤더 */}
+      <style jsx global>{pageAnimations}</style>
+      <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+        {/* 헤더 - setting 페이지와 동일한 애니메이션 */}
         <motion.header 
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ y: -100, opacity: 0, scale: 0.9 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          transition={{ 
+            delay: 0.2, 
+            duration: 0.8, 
+            ease: [0.25, 0.46, 0.45, 0.94],
+            opacity: { duration: 0.6 },
+            scale: { duration: 0.6 }
+          }}
           className="fixed top-0 left-0 right-0 z-50 glass-effect"
+          style={{ position: 'fixed', zIndex: 9999 }}
         >
-          <div className="flex items-center justify-between h-16 px-4">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="flex items-center justify-between h-16 px-4"
+          >
             <div className="flex items-center space-x-3">
               <motion.button 
                 onClick={handleBack}
-                disabled={isExiting}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200 disabled:opacity-50"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5, duration: 0.4 }}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -122,60 +170,99 @@ export default function ManualPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </motion.button>
-              <div className="flex items-center space-x-3">
-                <motion.div
-                  initial={{ rotate: -180, scale: 0 }}
-                  animate={{ rotate: 0, scale: 1 }}
-                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                  className="p-2 bg-purple-600 rounded-xl"
-                >
-                  <FiBook className="w-5 h-5 text-white" />
-                </motion.div>
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.4 }}
+                className="flex items-center space-x-3"
+              >
                 <div>
                   <h1 className="text-lg font-bold text-gray-900">사용 가이드</h1>
                   <p className="text-xs text-gray-500">앱 사용법 및 도움말</p>
                 </div>
-              </div>
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
         </motion.header>
 
-        {/* 메인 콘텐츠 */}
-        <div className="px-4 pt-20 pb-6">
-          <div className="space-y-6">
-            {videos.map((video, idx) => (
-              <motion.div 
-                key={video.title}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 * idx, duration: 0.5 }}
-                className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
-              >
-                <div className="p-4">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-purple-600 rounded-xl flex items-center justify-center">
-                      <FiPlay className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900">{video.title}</h3>
-                      <p className="text-sm text-gray-500">동영상 가이드</p>
-                    </div>
+        {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="schedule-page-content px-4 pt-20 space-y-3 pb-6"
+        >
+          {/* 가이드 소개 */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.6 }}
+            className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-4 mb-4"
+          >
+            <div className="flex items-center space-x-3 mb-2">
+              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <FiBook className="w-4 h-4 text-white" />
+              </div>
+              <h3 className="text-base font-bold text-gray-900">동영상 가이드</h3>
+            </div>
+            <p className="text-xs text-gray-600">앱의 주요 기능들을 동영상으로 쉽게 배워보세요</p>
+          </motion.div>
+
+          {/* 동영상 목록 */}
+          {videos.map((video, idx) => (
+            <motion.div 
+              key={video.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 + (0.1 * idx), duration: 0.6 }}
+              className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+            >
+              <div className="p-3">
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="w-6 h-6 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <FiPlay className="w-3 h-3 text-white" />
                   </div>
-                  
-                  <div className="aspect-w-16 aspect-h-9 w-full rounded-xl overflow-hidden bg-black">
-                    <iframe
-                      src={video.url}
-                      title={video.title}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      className="w-full h-56 rounded-xl border-none"
-                    />
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-900">{video.title}</h3>
+                    <p className="text-xs text-gray-500">동영상 가이드</p>
                   </div>
                 </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
+                
+                <div className="w-full rounded-lg overflow-hidden bg-black">
+                  <iframe
+                    src={video.url}
+                    title={video.title}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="w-full h-48 border-none"
+                    style={{ aspectRatio: '16/9' }}
+                  />
+                </div>
+              </div>
+            </motion.div>
+          ))}
+
+          {/* 추가 도움말 */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8, duration: 0.6 }}
+            className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-4"
+          >
+            <h3 className="text-sm font-bold text-gray-900 mb-2">추가 도움이 필요하신가요?</h3>
+            <p className="text-xs text-gray-600 mb-3">
+              동영상 가이드로 해결되지 않는 문제가 있으시면 언제든지 문의해 주세요.
+            </p>
+            <motion.button
+              onClick={() => router.push('/setting/inquiry')}
+              className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg py-2 text-xs font-medium mobile-button"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              1:1 문의하기
+            </motion.button>
+          </motion.div>
+        </motion.div>
       </div>
     </>
   );

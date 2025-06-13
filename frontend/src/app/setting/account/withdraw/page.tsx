@@ -319,7 +319,7 @@ export default function WithdrawPage() {
           </div>
           {step < 3 && (
             <div className={`w-8 h-1 mx-2 rounded-full transition-all duration-300 ${
-              step < currentStep ? 'bg-green-500' : 'bg-gray-200'
+              step < currentStep ? 'bg-gray-500' : 'bg-gray-500'
             }`} />
           )}
         </div>
@@ -427,13 +427,13 @@ export default function WithdrawPage() {
           style={{ backgroundColor: '#FEF2F2', borderColor: '#FECACA' }}
         >
           <div className="flex items-start space-x-2">
-            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
                  style={{ backgroundColor: '#FEE2E2' }}>
-              <FiAlertTriangle className="w-3 h-3" style={{ color: '#DC2626' }} />
+              <FiAlertTriangle className="w-4 h-4" style={{ color: '#DC2626' }} />
             </div>
             <div>
               <h3 className="text-sm font-semibold mb-1" style={{ color: '#7F1D1D' }}>탈퇴 주의사항</h3>
-              <ul className="text-xs space-y-0.5" style={{ color: '#B91C1C' }}>
+              <ul className="text-sm space-y-0.5" style={{ color: '#B91C1C' }}>
                 <li>• 계정 정보 영구 삭제</li>
                 <li>• 데이터 복구 불가능</li>
                 <li>• 30일간 재가입 제한</li>
@@ -529,13 +529,13 @@ export default function WithdrawPage() {
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-3"
                    style={{ backgroundColor: '#FFF7ED', borderColor: '#FDBA74' }}>
                 <div className="flex items-start space-x-2">
-                  <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
                        style={{ backgroundColor: '#FED7AA' }}>
-                    <FiShield className="w-3 h-3" style={{ color: '#F97315' }} />
+                    <FiShield className="w-4 h-4" style={{ color: '#F97315' }} />
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold mb-1" style={{ color: '#9A3412' }}>보안 확인</h4>
-                    <p className="text-xs" style={{ color: '#C2410C' }}>계정 보안을 위해 본인 확인이 필요합니다.</p>
+                    <p className="text-sm" style={{ color: '#C2410C' }}>계정 보안을 위해 본인 확인이 필요합니다.</p>
                   </div>
                 </div>
               </div>

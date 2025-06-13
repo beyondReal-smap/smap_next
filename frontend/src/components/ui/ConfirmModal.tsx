@@ -79,13 +79,13 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
         </div>
 
         {/* 메시지 */}
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <h3 className="text-lg font-semibold text-gray-900 mb-2" style={{ wordBreak: 'break-all' }}>
           {message}
         </h3>
 
         {/* 설명 */}
         {description && (
-          <p className="text-sm text-gray-600 mb-6">
+          <p className="text-sm text-gray-600 mb-6" style={{ wordBreak: 'break-all' }}>
             {description}
           </p>
         )}

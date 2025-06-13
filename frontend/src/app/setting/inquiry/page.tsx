@@ -3,55 +3,268 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { FiMail, FiSend, FiUser, FiMessageSquare, FiCheck } from 'react-icons/fi';
+import { FiMail, FiSend, FiMessageSquare, FiCheck } from 'react-icons/fi';
+import { AlertModal, ConfirmModal } from '@/components/ui';
 
 const INQUIRY_CATEGORIES = [
   { value: 'general', label: '일반 문의', icon: '💬' },
   { value: 'technical', label: '기술 지원', icon: '🔧' },
   { value: 'account', label: '계정 문제', icon: '👤' },
-  { value: 'billing', label: '결제 문의', icon: '💳' },
-  { value: 'feature', label: '기능 요청', icon: '✨' },
-  { value: 'bug', label: '버그 신고', icon: '🐛' }
+  { value: 'billing', label: '결제 문의', icon: '💳' }
 ];
+
+// 모바일 최적화된 CSS 애니메이션
+const pageAnimations = `
+html, body {
+  width: 100%;
+  overflow-x: hidden;
+  position: relative;
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutToRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-30px);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideInFromRight {
+  animation: slideInFromRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-slideOutToRight {
+  animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.initial-hidden {
+  opacity: 0;
+  transform: translateX(100%);
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* glass-effect 스타일 - setting 페이지와 동일 */
+.glass-effect {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999 !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  width: 100% !important;
+  height: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  overflow: visible !important;
+}
+
+/* 혹시 부모 요소가 relative나 다른 포지션인 경우를 위한 추가 스타일 */
+body, html {
+  position: relative !important;
+}
+
+/* 헤더가 잘리지 않도록 보장 */
+.glass-effect > * {
+  position: relative !important;
+}
+
+.mobile-button {
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.mobile-button:active {
+  transform: scale(0.98);
+}
+`;
 
 export default function InquiryPage() {
   const router = useRouter();
-  const [isExiting, setIsExiting] = useState(false);
-  const [shouldAnimate, setShouldAnimate] = useState(true);
-  const [isPageLoaded, setIsPageLoaded] = useState(false);
   const [category, setCategory] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [emailError, setEmailError] = useState('');
 
+  // 텔레그램 봇 토큰 및 채팅 ID
+  const TELEGRAM_BOT_TOKEN = process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN || '7701491070:AAH6wpf7wK5o7jq--mRlZWpE_rb3HIIjvBU';
+  const TELEGRAM_CHAT_ID = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID || '6495247513';
+
+  // 페이지 마운트 시 스크롤 설정
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsPageLoaded(true);
-    }, 100);
-    return () => clearTimeout(timer);
+    document.body.style.overflowY = 'auto';
+    document.documentElement.style.overflowY = 'auto';
+    return () => {
+      document.body.style.overflowY = '';
+      document.documentElement.style.overflowY = '';
+    };
   }, []);
 
   const handleBack = () => {
-    setIsExiting(true);
-    setTimeout(() => {
-      router.back();
-    }, 400);
+    router.back();
+  };
+
+  // 이메일 형식 검증 함수
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // 이메일 입력 핸들러
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setEmail(value);
+    
+    if (value && !validateEmail(value)) {
+      setEmailError('올바른 이메일 형식을 입력해주세요.');
+    } else {
+      setEmailError('');
+    }
   };
 
   const handleSubmit = async () => {
     if (!category || !subject || !message || !email) {
-      alert('모든 필드를 입력해주세요.');
+      setErrorMessage('모든 필수 필드를 입력해주세요.');
+      setShowErrorModal(true);
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      setErrorMessage('올바른 이메일 형식을 입력해주세요.');
+      setShowErrorModal(true);
       return;
     }
 
     setIsSending(true);
-    // 모의 전송
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsSending(false);
     
-    alert('문의가 성공적으로 전송되었습니다. 빠른 시일 내에 답변드리겠습니다.');
-    
+    try {
+      // 텔레그램으로 문의 내용 전송
+      const telegramResult = await sendTelegram();
+      
+      if (!telegramResult.success) {
+        throw new Error(telegramResult.message);
+      }
+      
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      console.error('Error sending inquiry:', error);
+      setErrorMessage(error.message || '문의 전송 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+      setShowErrorModal(true);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  // 텔레그램 전송 함수
+  const sendTelegram = async (): Promise<{success: boolean, message: string}> => {
+    try {
+      // 문의 유형 한글 변환
+      const categoryLabels: { [key: string]: string } = {
+        'general': '일반 문의',
+        'technical': '기술 지원',
+        'account': '계정 문제',
+        'billing': '결제 문의'
+      };
+
+      // 텔레그램 메시지 텍스트 구성
+      const text = `
+📨 새로운 1:1 문의
+
+📋 문의 유형: ${categoryLabels[category] || category}
+📝 제목: ${subject}
+📧 이메일: ${email}
+
+💬 문의 내용:
+${message}
+
+⏰ 접수 시간: ${new Date().toLocaleString('ko-KR')}
+      `.trim();
+
+      // 텔레그램 API 호출
+      const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHAT_ID,
+          text: text,
+          parse_mode: 'HTML'
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!result.ok) {
+        throw new Error(result.description || '텔레그램 전송 실패');
+      }
+      
+      return { success: true, message: '메시지가 성공적으로 전송되었습니다.' };
+    } catch (error: any) {
+      console.error('Telegram API error:', error);
+      
+      // API 호출 실패 시 대체 방법으로 텔레그램 웹을 여는 링크 제공
+      const categoryLabels: { [key: string]: string } = {
+        'general': '일반 문의',
+        'technical': '기술 지원', 
+        'account': '계정 문제',
+        'billing': '결제 문의'
+      };
+      
+      const telegramMessage = encodeURIComponent(`📨 새로운 1:1 문의\n\n📋 문의 유형: ${categoryLabels[category] || category}\n📝 제목: ${subject}\n📧 이메일: ${email}\n\n💬 문의 내용:\n${message}`);
+      window.open(`https://t.me/smapvisual?text=${telegramMessage}`);
+      
+      return { 
+        success: false, 
+        message: '텔레그램 API 전송에 실패했습니다. 대신 텔레그램 채팅창이 열렸습니다.' 
+      };
+    }
+  };
+
+  const handleSuccessConfirm = () => {
+    setShowSuccessModal(false);
     // 폼 초기화
     setCategory('');
     setSubject('');
@@ -63,96 +276,35 @@ export default function InquiryPage() {
 
   return (
     <>
-      <style jsx global>{`
-        @keyframes slideInFromRight {
-          from {
-            transform: translateX(30px);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-
-        @keyframes slideOutToRight {
-          from {
-            transform: translateX(0);
-            opacity: 1;
-          }
-          to {
-            transform: translateX(-30px);
-            opacity: 0;
-          }
-        }
-
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-slideInFromRight {
-          animation: slideInFromRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-        }
-
-        .animate-slideOutToRight {
-          animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
-        }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-        }
-
-        .initial-hidden {
-          opacity: 0;
-          transform: translateX(100%);
-        }
-
-        .glass-effect {
-          backdrop-filter: blur(10px);
-          background: rgba(255, 255, 255, 0.7);
-          border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-          box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-        }
-
-        .input-focus {
-          transition: all 0.2s ease;
-        }
-
-        .input-focus:focus {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(99, 102, 241, 0.15);
-        }
-      `}</style>
-      
-      <div className={`bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-10 ${
-        isExiting ? 'animate-slideOutToRight' : 
-        (shouldAnimate && isPageLoaded) ? 'animate-slideInFromRight' : 
-        shouldAnimate ? 'initial-hidden' : ''
-      }`} style={{ 
-        position: 'relative',
-        width: '100%',
-        overflow: shouldAnimate && !isPageLoaded ? 'hidden' : 'visible'
-      }}>
-        {/* 개선된 헤더 */}
+      <style jsx global>{pageAnimations}</style>
+      <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+        {/* 헤더 - setting 페이지와 동일한 애니메이션 */}
         <motion.header 
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ y: -100, opacity: 0, scale: 0.9 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          transition={{ 
+            delay: 0.2, 
+            duration: 0.8, 
+            ease: [0.25, 0.46, 0.45, 0.94],
+            opacity: { duration: 0.6 },
+            scale: { duration: 0.6 }
+          }}
           className="fixed top-0 left-0 right-0 z-50 glass-effect"
+          style={{ position: 'fixed', zIndex: 9999 }}
         >
-          <div className="flex items-center justify-between h-16 px-4">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="flex items-center justify-between h-16 px-4"
+          >
             <div className="flex items-center space-x-3">
               <motion.button 
                 onClick={handleBack}
-                disabled={isExiting}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200 disabled:opacity-50"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5, duration: 0.4 }}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -160,61 +312,53 @@ export default function InquiryPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </motion.button>
-              <div className="flex items-center space-x-3">
-                <motion.div
-                  initial={{ rotate: -180, scale: 0 }}
-                  animate={{ rotate: 0, scale: 1 }}
-                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                  className="p-2 bg-orange-600 rounded-xl"
-                >
-                  <FiMail className="w-5 h-5 text-white" />
-                </motion.div>
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.4 }}
+                className="flex items-center space-x-3"
+              >
                 <div>
                   <h1 className="text-lg font-bold text-gray-900">1:1 문의</h1>
                   <p className="text-xs text-gray-500">궁금한 점을 문의하세요</p>
                 </div>
-              </div>
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
         </motion.header>
 
-        {/* 메인 콘텐츠 */}
-        <div className="px-4 pt-20 pb-6 space-y-6">
+        {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="schedule-page-content px-4 pt-20 space-y-4 pb-6"
+        >
           {/* 문의 양식 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.5 }}
-            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6"
+            transition={{ delay: 0.2, duration: 0.6 }}
+            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4"
           >
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl flex items-center justify-center">
-                <FiMessageSquare className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">문의하기</h3>
-                <p className="text-sm text-gray-500">자세한 내용을 작성해주시면 빠르게 답변드리겠습니다</p>
-              </div>
-            </div>
-
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* 문의 유형 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">문의 유형</label>
-                <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm font-medium text-gray-700 mb-2">문의 유형</label>
+                <div className="grid grid-cols-2 gap-1.5">
                   {INQUIRY_CATEGORIES.map((cat) => (
                     <motion.button
                       key={cat.value}
                       onClick={() => setCategory(cat.value)}
-                      className={`p-4 rounded-xl border-2 transition-all ${
+                      className={`p-2 rounded-lg border-2 transition-all mobile-button ${
                         category === cat.value
                           ? 'border-orange-500 bg-orange-50'
                           : 'border-gray-200 bg-gray-50 hover:border-gray-300'
                       }`}
                       whileTap={{ scale: 0.98 }}
                     >
-                      <div className="text-2xl mb-1">{cat.icon}</div>
-                      <div className="text-sm font-medium text-gray-900">{cat.label}</div>
+                      <div className="text-sm mb-0.5">{cat.icon}</div>
+                      <div className="text-xs font-medium text-gray-900 leading-tight">{cat.label}</div>
                     </motion.button>
                   ))}
                 </div>
@@ -223,16 +367,20 @@ export default function InquiryPage() {
               {/* 이메일 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">이메일</label>
-                <div className="relative">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-gray-50 rounded-xl px-4 py-4 pl-12 text-base border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 input-focus"
-                    placeholder="답변받을 이메일을 입력하세요"
-                  />
-                  <FiUser className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={handleEmailChange}
+                  className={`w-full bg-gray-50 rounded-xl px-4 py-3 text-sm border transition-all ${
+                    emailError 
+                      ? 'border-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500' 
+                      : 'border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500'
+                  }`}
+                  placeholder="답변받을 이메일을 입력하세요"
+                />
+                {emailError && (
+                  <p className="text-xs text-red-500 mt-1">{emailError}</p>
+                )}
               </div>
 
               {/* 제목 */}
@@ -242,7 +390,7 @@ export default function InquiryPage() {
                   type="text"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  className="w-full bg-gray-50 rounded-xl px-4 py-4 text-base border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 input-focus"
+                  className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
                   placeholder="문의 제목을 입력하세요"
                 />
               </div>
@@ -253,8 +401,8 @@ export default function InquiryPage() {
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  rows={6}
-                  className="w-full bg-gray-50 rounded-xl px-4 py-4 text-base border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 input-focus resize-none"
+                  rows={3}
+                  className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all resize-none"
                   placeholder="문의 내용을 자세히 작성해주세요"
                 />
               </div>
@@ -263,55 +411,66 @@ export default function InquiryPage() {
               <motion.button
                 onClick={handleSubmit}
                 disabled={!isFormValid || isSending}
-                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl py-4 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl py-3 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 mobile-button"
                 whileHover={{ scale: isFormValid ? 1.02 : 1 }}
                 whileTap={{ scale: isFormValid ? 0.98 : 1 }}
               >
                 {isSending ? (
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 ) : (
                   <>
-                    <FiSend className="w-5 h-5" />
+                    <FiSend className="w-4 h-4" />
                     <span>문의 전송</span>
                   </>
                 )}
-              </motion.button>
+              </motion.button>  
             </div>
           </motion.div>
 
-          {/* 문의 안내 */}
+          {/* 문의 안내 - 컴팩트 버전 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-6"
+            transition={{ delay: 0.3, duration: 0.6 }}
+            className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-4"
           >
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                <FiCheck className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="text-lg font-bold text-gray-900">문의 안내</h3>
+            <div className="flex items-center space-x-3 mb-3">
+              <h3 className="text-base font-bold text-gray-900">문의 안내</h3>
             </div>
-            <ul className="space-y-2 text-sm text-gray-700">
+            <ul className="space-y-1.5 text-xs text-gray-700">
               <li className="flex items-start space-x-2">
-                <FiCheck className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <FiCheck className="w-3 h-3 text-blue-500 mt-0.5 flex-shrink-0" />
                 <span>평일 09:00 ~ 18:00 내에 답변드립니다</span>
               </li>
               <li className="flex items-start space-x-2">
-                <FiCheck className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <FiCheck className="w-3 h-3 text-blue-500 mt-0.5 flex-shrink-0" />
                 <span>주말 및 공휴일은 답변이 지연될 수 있습니다</span>
-              </li>
-              <li className="flex items-start space-x-2">
-                <FiCheck className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                <span>긴급한 문의는 고객센터(1588-0000)로 연락주세요</span>
-              </li>
-              <li className="flex items-start space-x-2">
-                <FiCheck className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                <span>문의 내용을 자세히 작성해주시면 더 정확한 답변이 가능합니다</span>
               </li>
             </ul>
           </motion.div>
-        </div>
+        </motion.div>
+
+        {/* 성공 모달 */}
+        <AlertModal
+          isOpen={showSuccessModal}
+          onClose={() => setShowSuccessModal(false)}
+          message="문의 전송 완료"
+          description="빠른 시일 내에 답변드리겠습니다."
+          buttonText="확인"
+          onConfirm={handleSuccessConfirm}
+          type="success"
+        />
+
+        {/* 에러 모달 */}
+        <AlertModal
+          isOpen={showErrorModal}
+          onClose={() => setShowErrorModal(false)}
+          message="전송 실패"
+          description={errorMessage}
+          buttonText="확인"
+          onConfirm={() => setShowErrorModal(false)}
+          type="error"
+        />
       </div>
     </>
   );
