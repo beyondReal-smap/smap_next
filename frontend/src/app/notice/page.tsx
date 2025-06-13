@@ -66,7 +66,7 @@ const mobileAnimations = `
   left: 0 !important;
   right: 0 !important;
   z-index: 9999 !important;
-  background: rgba(255, 255, 255, 0.7) !important;
+  background: rgba(255, 255, 255, 0.8) !important;
   backdrop-filter: blur(10px) !important;
   -webkit-backdrop-filter: blur(10px) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
@@ -117,6 +117,16 @@ function NoticeContent() {
   const sectionRefs = useRef<Map<string, HTMLElement>>(new Map());
   const lastScrollY = useRef(0);
   const updateTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  // 페이지 마운트 시 스크롤 설정
+  useEffect(() => {
+    document.body.style.overflowY = 'auto';
+    document.documentElement.style.overflowY = 'auto';
+    return () => {
+      document.body.style.overflowY = '';
+      document.documentElement.style.overflowY = '';
+    };
+  }, []);
 
   // 디바운싱된 날짜 업데이트 함수
   const updateStickyDate = useCallback((newDate: string) => {
@@ -429,58 +439,6 @@ function NoticeContent() {
       <>
         <style jsx global>{mobileAnimations}</style>
         <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        {/* 헤더 - 위에서 슬라이드 내려오는 애니메이션 */}
-        <motion.header 
-          initial={{ y: -100, opacity: 0, scale: 0.9 }}
-          animate={{ y: 0, opacity: 1, scale: 1 }}
-          transition={{ 
-            delay: 0.2, 
-            duration: 0.8, 
-            ease: [0.25, 0.46, 0.45, 0.94],
-            opacity: { duration: 0.6 },
-            scale: { duration: 0.6 }
-          }}
-          className="fixed top-0 left-0 right-0 z-20 glass-effect"
-        >
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="flex items-center justify-between h-16 px-4"
-          >
-            <div className="flex items-center space-x-3">
-              <motion.button 
-                onClick={handleBackNavigation}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5, duration: 0.4 }}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </motion.button>
-              <motion.div 
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.6, duration: 0.4 }}
-                className="flex items-center space-x-3"
-              >
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">알림</h1>
-                  <p className="text-xs text-gray-500">새로운 소식을 확인해보세요</p>
-                </div>
-              </motion.div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              {/* 필요시 추가 버튼들을 여기에 배치 */}
-            </div>
-          </motion.div>
-          </motion.header>
-          
           {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -518,7 +476,8 @@ function NoticeContent() {
             opacity: { duration: 0.6 },
             scale: { duration: 0.6 }
           }}
-          className="fixed top-0 left-0 right-0 z-20 glass-effect"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect"
+          style={{ position: 'fixed', zIndex: 9999 }}
         >
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
@@ -541,8 +500,8 @@ function NoticeContent() {
                 </svg>
               </motion.button>
               <motion.div 
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6, duration: 0.4 }}
                 className="flex items-center space-x-3"
               >

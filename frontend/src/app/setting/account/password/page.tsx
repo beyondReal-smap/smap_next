@@ -136,6 +136,8 @@ export default function PasswordChangePage() {
       newErrors.newPassword = '새 비밀번호를 입력해주세요';
     } else if (newPassword.length < 8) {
       newErrors.newPassword = '비밀번호는 8자 이상이어야 합니다';
+    } else if (currentPassword && newPassword === currentPassword) {
+      newErrors.newPassword = '새 비밀번호는 현재 비밀번호와 달라야 합니다';
     }
     
     if (!confirmPassword) {
@@ -406,6 +408,14 @@ export default function PasswordChangePage() {
                 </p>
               )}
 
+              {/* 현재 비밀번호와 동일한지 확인 */}
+              {currentPassword && newPassword && currentPassword === newPassword && (
+                <p className="mt-1 text-sm text-red-600 flex items-center">
+                  <FiX className="w-4 h-4 mr-1" />
+                  새 비밀번호는 현재 비밀번호와 달라야 합니다
+                </p>
+              )}
+
               {/* 비밀번호 강도 표시 */}
               {newPassword && (
                 <div className="mt-3">
@@ -506,7 +516,7 @@ export default function PasswordChangePage() {
             {/* 저장 버튼 */}
             <button
               onClick={handleSave}
-              disabled={isLoading || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword}
+              disabled={isLoading || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword || (!!currentPassword && !!newPassword && currentPassword === newPassword)}
               className="w-full py-4 text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
               style={{ 
                 backgroundColor: '#F97315',
