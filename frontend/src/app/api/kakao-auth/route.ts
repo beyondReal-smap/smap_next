@@ -87,6 +87,19 @@ export async function POST(request: NextRequest) {
       const user = backendData.data.user;
       isNewUser = backendData.data.isNewUser;
 
+      // 탈퇴한 사용자인지 확인 (mt_level이 1이면 탈퇴한 사용자)
+      if (user.mt_level === 1) {
+        console.log('[KAKAO API] 탈퇴한 사용자 로그인 시도:', user.mt_idx);
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: '탈퇴한 계정입니다. 새로운 계정으로 가입해주세요.',
+            isWithdrawnUser: true
+          },
+          { status: 403 }
+        );
+      }
+
       // JWT 토큰 생성 (백엔드 응답의 실제 사용자 정보 사용)
       const token = jwt.sign(
         { 

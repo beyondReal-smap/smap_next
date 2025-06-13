@@ -213,6 +213,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (session?.backendData?.member) {
           console.log('[AUTH CONTEXT] NextAuth 세션에서 사용자 데이터 발견:', session.backendData.member.mt_name, 'ID:', session.backendData.member.mt_idx);
           
+          // 탈퇴한 사용자인지 확인 (mt_level이 1이면 탈퇴한 사용자)
+          if (session.backendData.member.mt_level === 1) {
+            console.log('[AUTH CONTEXT] 탈퇴한 사용자 세션 감지, 세션 정리:', session.backendData.member.mt_idx);
+            
+            // NextAuth 세션 정리
+            try {
+              const { signOut } = await import('next-auth/react');
+              await signOut({ redirect: false });
+              console.log('[AUTH CONTEXT] 탈퇴한 사용자 세션 정리 완료');
+            } catch (error) {
+              console.log('[AUTH CONTEXT] 세션 정리 오류:', error);
+            }
+            
+            // 기존 데이터 정리
+            authService.clearAuthData();
+            dispatch({ type: 'SET_LOADING', payload: false });
+            return;
+          }
+          
           // 기존 authService 데이터와 비교하여 다른 사용자면 초기화
           const existingUserData = authService.getUserData();
           if (existingUserData && existingUserData.mt_idx !== session.backendData.member.mt_idx) {

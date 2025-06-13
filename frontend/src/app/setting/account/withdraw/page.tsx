@@ -18,6 +18,7 @@ import {
   FiArrowLeft
 } from 'react-icons/fi';
 import { HiExclamationTriangle, HiCheckCircle, HiInformationCircle, HiSparkles } from 'react-icons/hi2';
+import { ConfirmModal, AlertModal } from '@/components/ui';
 
 // 탈퇴 사유 리스트
 const reasonList = [
@@ -180,10 +181,102 @@ export default function WithdrawPage() {
     setIsLoading(true);
     
     try {
-      // 모의 API 호출
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // JWT 토큰 확인
+      const token = localStorage.getItem('auth-token');
+      console.log('[WITHDRAW] JWT 토큰 확인:', token);
+      
+      if (!token || token === 'null' || token === 'undefined') {
+        setError('로그인이 필요합니다. 다시 로그인해주세요.');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('[WITHDRAW] 탈퇴 요청 데이터:', {
+        reasons: reasons,
+        etcReason: etcReason,
+      });
+
+      // 회원 탈퇴 API 호출
+      const response = await fetch('/api/auth/withdraw', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          reasons: reasons,
+          etcReason: etcReason,
+        }),
+      });
+
+      console.log('[WITHDRAW] API 응답 상태:', response.status);
+      const data = await response.json();
+      console.log('[WITHDRAW] API 응답 데이터:', data);
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          setError('인증이 만료되었습니다. 다시 로그인해주세요.');
+        } else if (response.status === 400) {
+          setError(data.message || '잘못된 요청입니다.');
+        } else {
+          throw new Error(data.message || '회원 탈퇴에 실패했습니다.');
+        }
+        return;
+      }
+
+      // 회원 탈퇴 성공
+      console.log('[WITHDRAW] 회원 탈퇴 성공');
+      
+      // 모든 인증 관련 데이터 제거
+      localStorage.removeItem('auth-token');
+      localStorage.removeItem('user-data');
+      localStorage.removeItem('kakao-token');
+      localStorage.removeItem('google-token');
+      
+      // 세션 스토리지도 정리
+      sessionStorage.clear();
+      
+      // NextAuth 세션 정리
+      try {
+        const { signOut } = await import('next-auth/react');
+        await signOut({ redirect: false });
+        console.log('[WITHDRAW] NextAuth 세션 정리 완료');
+      } catch (error) {
+        console.log('[WITHDRAW] NextAuth 세션 정리 오류:', error);
+      }
+      
+      // 카카오 완전 로그아웃 (카카오 SDK가 있는 경우)
+      if (typeof window !== 'undefined' && window.Kakao && window.Kakao.Auth) {
+        try {
+          // 카카오 액세스 토큰 만료
+          await window.Kakao.Auth.logout();
+          console.log('[WITHDRAW] 카카오 로그아웃 완료');
+          
+          // 카카오 연결 해제 (선택사항 - 앱 연결 완전 해제)
+          // await window.Kakao.API.request({
+          //   url: '/v1/user/unlink'
+          // });
+        } catch (error) {
+          console.log('[WITHDRAW] 카카오 로그아웃 오류:', error);
+        }
+      }
+      
+      // 모든 쿠키 정리 (특히 auth-token)
+      const cookies = ['auth-token', 'next-auth.session-token', 'next-auth.csrf-token', 'next-auth.callback-url'];
+      cookies.forEach(cookieName => {
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${window.location.hostname}`;
+        document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/`;
+      });
+      
+      // 모든 쿠키 정리 (일반적인 방법)
+      document.cookie.split(";").forEach(function(c) { 
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+      });
+      
       setShowSuccessModal(true);
+
     } catch (error) {
+      console.error('회원 탈퇴 오류:', error);
       setError('탈퇴 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setIsLoading(false);
@@ -199,7 +292,14 @@ export default function WithdrawPage() {
   };
 
   const handleSuccessConfirm = () => {
-    router.push('/login');
+    // 탈퇴 완료 후 로그인 페이지로 이동하고 강제 새로고침
+    console.log('[WITHDRAW] 탈퇴 완료 후 로그인 페이지로 이동');
+    
+    // 브라우저 히스토리 정리
+    window.history.replaceState(null, '', '/signin');
+    
+    // 강제 새로고침으로 모든 상태 초기화 (탈퇴 플래그 포함)
+    window.location.href = '/signin?from=withdraw';
   };
 
   const renderStepIndicator = () => (
@@ -660,72 +760,28 @@ export default function WithdrawPage() {
       </motion.div>
 
       {/* 최종 확인 모달 */}
-      {showFinalModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-xl w-full max-w-xs mx-auto"
-          >
-            <div className="p-4">
-              <div className="text-center mb-3">
-                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <FiAlertTriangle className="w-4 h-4 text-red-600" />
-                </div>
-                <h3 className="text-base font-bold text-gray-900 mb-1">정말 탈퇴하시겠습니까?</h3>
-                <p className="text-xs text-gray-600">
-                  이 작업은 되돌릴 수 없습니다.
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <button
-                  onClick={handleConfirmWithdraw}
-                  className="w-full py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
-                >
-                  탈퇴하기
-                </button>
-                <button
-                  onClick={() => setShowFinalModal(false)}
-                  className="w-full py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
-                >
-                  취소
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <ConfirmModal
+        isOpen={showFinalModal}
+        onClose={() => setShowFinalModal(false)}
+        message="정말 탈퇴하시겠습니까?"
+        description="이 작업은 되돌릴 수 없습니다."
+        confirmText="탈퇴하기"
+        cancelText="취소"
+        onConfirm={handleConfirmWithdraw}
+        type="error"
+        isLoading={isLoading}
+      />
 
       {/* 성공 모달 */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-xl w-full max-w-xs mx-auto"
-          >
-            <div className="p-4">
-              <div className="text-center mb-3">
-                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <HiCheckCircle className="w-4 h-4 text-green-600" />
-                </div>
-                <h3 className="text-base font-bold text-gray-900 mb-1">탈퇴 완료</h3>
-                <p className="text-xs text-gray-600">
-                  그동안 서비스를 이용해주셔서 감사했습니다.
-                </p>
-              </div>
-              
-              <button
-                onClick={handleSuccessConfirm}
-                className="w-full py-2.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-              >
-                확인
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <AlertModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        message="탈퇴 완료"
+        description="그동안 서비스를 이용해주셔서 감사했습니다."
+        buttonText="확인"
+        onConfirm={handleSuccessConfirm}
+        type="success"
+      />
     </div>
   );
 } 

@@ -297,6 +297,14 @@ async def kakao_login(
         is_new_user = False
         
         if existing_user:
+            # 탈퇴한 사용자인지 확인
+            if existing_user.mt_level == 1:
+                logger.warning(f"[KAKAO LOGIN] 탈퇴한 사용자 로그인 시도: mt_idx={existing_user.mt_idx}")
+                return KakaoLoginResponse(
+                    success=False,
+                    message="탈퇴한 계정입니다. 새로운 계정으로 가입해주세요."
+                )
+            
             # 기존 사용자 로그인
             logger.info(f"[KAKAO LOGIN] 기존 카카오 사용자 로그인: mt_idx={existing_user.mt_idx}")
             user = existing_user
@@ -305,6 +313,14 @@ async def kakao_login(
             if kakao_request.email:
                 email_user = crud_auth.get_user_by_email(db, kakao_request.email)
                 if email_user:
+                    # 탈퇴한 사용자인지 확인
+                    if email_user.mt_level == 1:
+                        logger.warning(f"[KAKAO LOGIN] 탈퇴한 이메일 계정 로그인 시도: mt_idx={email_user.mt_idx}")
+                        return KakaoLoginResponse(
+                            success=False,
+                            message="탈퇴한 계정입니다. 새로운 계정으로 가입해주세요."
+                        )
+                    
                     # 기존 계정에 카카오 ID 연결
                     logger.info(f"[KAKAO LOGIN] 기존 이메일 계정에 카카오 연결: mt_idx={email_user.mt_idx}")
                     email_user.mt_kakao_id = kakao_request.kakao_id

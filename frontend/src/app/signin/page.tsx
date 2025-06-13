@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { FcGoogle } from 'react-icons/fc';
 import { RiKakaoTalkFill } from 'react-icons/ri';
 import { FiX, FiAlertTriangle, FiPhone, FiLock } from 'react-icons/fi';
+import { AlertModal } from '@/components/ui';
 
 // 카카오 SDK 타입 정의
 declare global {
@@ -41,6 +42,22 @@ export default function SignInPage() {
     const checkExistingAuth = async () => {
       try {
         console.log('[SIGNIN] 기존 인증 상태 확인 중...');
+        
+        // URL에서 탈퇴 완료 플래그 확인
+        const urlParams = new URLSearchParams(window.location.search);
+        const isFromWithdraw = urlParams.get('from') === 'withdraw';
+        
+        if (isFromWithdraw) {
+          console.log('[SIGNIN] 탈퇴 후 접근 - 자동 로그인 건너뛰기');
+          
+          // URL에서 from 파라미터 제거
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.delete('from');
+          window.history.replaceState({}, '', newUrl.toString());
+          
+          setIsCheckingAuth(false);
+          return;
+        }
         
         // 쿠키에서 JWT 토큰 확인
         const token = document.cookie
@@ -331,7 +348,13 @@ export default function SignInPage() {
             }
           } catch (error: any) {
             console.error('카카오 로그인 처리 오류:', error);
-            setErrorModalMessage(error.message || '로그인 처리 중 오류가 발생했습니다.');
+            
+            // 탈퇴한 사용자 오류 처리
+            if (error.response?.status === 403 && error.response?.data?.isWithdrawnUser) {
+              setErrorModalMessage('탈퇴한 계정입니다. 새로운 계정으로 가입해주세요.');
+            } else {
+              setErrorModalMessage(error.message || '로그인 처리 중 오류가 발생했습니다.');
+            }
             setShowErrorModal(true);
           } finally {
             setIsLoading(false);
@@ -623,47 +646,15 @@ export default function SignInPage() {
         </motion.div>
       </motion.div>
 
-      {/* 에러 모달 - 컴팩트 버전 */}
-      <AnimatePresence>
-        {showErrorModal && (
-          <motion.div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeErrorModal}
-          >
-            <motion.div 
-              className="bg-white rounded-2xl w-full max-w-xs mx-auto shadow-xl"
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-4">
-                <div className="text-center mb-4">
-                  <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <FiAlertTriangle className="w-6 h-6 text-red-500" />
-                  </div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">로그인 실패</h3>
-                  <p className="text-sm text-gray-600 leading-relaxed" style={{ wordBreak: 'keep-all' }}>
-                    {errorModalMessage}
-                  </p>
-                </div>
-                
-                <motion.button
-                  onClick={closeErrorModal}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full py-2.5 bg-red-500 text-white rounded-xl text-sm font-medium hover:bg-red-600 transition-colors"
-                >
-                  확인
-                </motion.button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 에러 모달 */}
+      <AlertModal
+        isOpen={showErrorModal}
+        onClose={closeErrorModal}
+        message="로그인 실패"
+        description={errorModalMessage}
+        buttonText="확인"
+        type="error"
+      />
 
       {/* 전체 화면 로딩 스피너 */}
       {isLoading && <LoadingSpinner message="처리 중..." />}

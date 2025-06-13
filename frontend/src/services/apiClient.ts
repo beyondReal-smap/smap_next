@@ -107,26 +107,41 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       
+      // refresh 요청 자체가 401이면 토큰 갱신 시도하지 않음
+      if (originalRequest.url?.includes('/auth/refresh')) {
+        console.log('[API CLIENT] 토큰 갱신 요청이 401 - 무효한 토큰으로 판단하여 로그아웃 처리');
+        removeToken();
+        
+        // 로그인 페이지로 리다이렉트 (클라이언트 사이드에서만)
+        if (typeof window !== 'undefined') {
+          window.location.href = '/signin';
+        }
+        return Promise.reject(error);
+      }
+      
       try {
+        console.log('[API CLIENT] 토큰 갱신 시도');
         // 토큰 갱신 시도
         const refreshResponse = await apiClient.post('/auth/refresh');
         const newToken = refreshResponse.data.token;
         
         if (newToken) {
-          localStorage.setItem('auth-token', newToken); // 실제 사용하는 키로 변경
+          console.log('[API CLIENT] 토큰 갱신 성공');
+          localStorage.setItem('auth-token', newToken);
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return apiClient(originalRequest);
         }
       } catch (refreshError) {
         console.error('[TOKEN REFRESH ERROR]:', refreshError);
-      }
-      
-      // 토큰 갱신 실패 시 로그아웃 처리
-      removeToken();
-      
-      // 로그인 페이지로 리다이렉트 (클라이언트 사이드에서만)
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login';
+        
+        // 토큰 갱신 실패 시 로그아웃 처리
+        console.log('[API CLIENT] 토큰 갱신 실패 - 로그아웃 처리');
+        removeToken();
+        
+        // 로그인 페이지로 리다이렉트 (클라이언트 사이드에서만)
+        if (typeof window !== 'undefined') {
+          window.location.href = '/signin';
+        }
       }
     }
     

@@ -15,6 +15,7 @@ import {
   FiSave
 } from 'react-icons/fi';
 import { HiCheckCircle } from 'react-icons/hi2';
+import { AlertModal } from '@/components/ui';
 
 // 비밀번호 강도 검사 함수
 const checkPasswordStrength = (password: string) => {
@@ -539,34 +540,15 @@ export default function PasswordChangePage() {
       </motion.div>
 
       {/* 성공 모달 */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-2xl w-full max-w-xs mx-auto"
-          >
-            <div className="p-6">
-              <div className="text-center mb-4">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <HiCheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-1">변경 완료</h3>
-                <p className="text-sm text-gray-600">
-                  비밀번호가 성공적으로 변경되었습니다.
-                </p>
-              </div>
-              
-              <button
-                onClick={handleSuccessConfirm}
-                className="w-full py-3 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors"
-              >
-                확인
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
+      <AlertModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        message="변경 완료"
+        description="비밀번호가 성공적으로 변경되었습니다."
+        buttonText="확인"
+        onConfirm={handleSuccessConfirm}
+        type="success"
+      />
     </div>
   );
 } 
