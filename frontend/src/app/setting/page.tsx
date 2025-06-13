@@ -323,13 +323,6 @@ export default function SettingsPage() {
           color: 'bg-blue-500',
           description: '프로필 및 개인정보 관리'
         },
-        { 
-          label: '보안 설정', 
-          href: '/setting/security', 
-          icon: FiShield,
-          color: 'bg-green-500',
-          description: '비밀번호 및 보안 관리'
-        },
       ]
     },
     {

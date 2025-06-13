@@ -253,13 +253,6 @@ export default function AccountSettingsPage() {
           color: 'bg-orange-500',
           description: '계정 비밀번호 변경'
         },
-        { 
-          label: '보안 설정', 
-          href: '/setting/account/security', 
-          icon: FiShield,
-          color: 'bg-purple-500',
-          description: '2단계 인증, 로그인 알림'
-        },
       ]
     },
     {
@@ -402,73 +395,6 @@ export default function AccountSettingsPage() {
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="schedule-page-content px-4 pt-20 space-y-6 pb-20"
         >
-          {/* 프로필 영역 */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
-            className="pb-2"
-          >
-            <div className="bg-[#0113A3] rounded-3xl p-6 text-white shadow-xl">
-              <div className="flex items-center space-x-4">
-                <div className="relative">
-                  <button 
-                    type="button" 
-                    onClick={() => setShowSheet(true)} 
-                    className="mobile-button group"
-                  >
-                    <div className="relative">
-                      <Image
-                        src={profileImg}
-                        alt="프로필 이미지"
-                        width={80}
-                        height={80}
-                        className="rounded-full border-4 border-white/30 bg-white/20"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          const fallbackSrc = getDefaultImage(user?.mt_gender, user?.mt_idx || 0);
-                          target.src = fallbackSrc;
-                          setProfileImg(fallbackSrc);
-                        }}
-                      />
-                      <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-2 shadow-lg group-hover:scale-110 transition-transform">
-                        <FiCamera className="w-4 h-4 text-indigo-600" />
-                      </div>
-                    </div>
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                </div>
-                
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <h2 className="text-xl font-bold">{profile.name}</h2>
-                    <div className="flex items-center space-x-1 bg-yellow-400/20 px-2 py-1 rounded-full">
-                      <HiSparkles className="w-3 h-3 text-yellow-300" />
-                      <span className="text-xs font-medium text-yellow-100">{profile.level}</span>
-                    </div>
-                  </div>
-                  <p className="text-indigo-100 text-sm mb-1">{profile.plan}</p>
-                  <p className="text-indigo-200 text-xs">{profile.memberSince} 가입</p>
-                </div>
-              </div>
-              
-              <div className="mt-4 pt-4 border-t border-white/20">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-indigo-100">로그인 방법</span>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-lg">{profile.loginIcon}</span>
-                    <span className="text-white font-medium">{profile.loginMethod}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
 
           {/* 메뉴 섹션들 */}
           <div className="space-y-6">
@@ -562,42 +488,41 @@ export default function AccountSettingsPage() {
           </div>
         )}
 
-        {/* 로그아웃 확인 모달 */}
+        {/* 로그아웃 확인 모달 - 컴팩트 버전 */}
         {showLogoutModal && (
           <div 
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={() => setShowLogoutModal(false)}
           >
             <div 
-              className="bg-white rounded-3xl w-full max-w-md mx-auto animate-slideInFromBottom"
+              className="bg-white rounded-2xl w-full max-w-xs mx-auto animate-slideInFromBottom"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-6 pb-8">
-                <div className="text-center mb-6">
-                  <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FiLogOut className="w-8 h-8 text-yellow-500" />
+              <div className="p-5">
+                <div className="text-center mb-4">
+                  <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <FiLogOut className="w-6 h-6 text-yellow-500" />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">로그아웃</h3>
-                  <p className="text-gray-600">
+                  <h3 className="text-lg font-bold text-gray-900 mb-1">로그아웃</h3>
+                  <p className="text-sm text-gray-600">
                     정말 로그아웃 하시겠습니까?
                   </p>
                 </div>
                 
-                <div className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="w-full py-4 bg-yellow-500 text-white rounded-2xl font-medium hover:bg-yellow-600 transition-colors"
-                  >
-                    로그아웃
-                  </button>
-                  
+                <div className="flex space-x-2">
                   <button
                     type="button"
                     onClick={() => setShowLogoutModal(false)}
-                    className="w-full py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                    className="flex-1 py-3 border border-gray-300 rounded-xl text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
                   >
                     취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex-1 py-3 bg-yellow-500 text-white rounded-xl text-sm font-medium hover:bg-yellow-600 transition-colors"
+                  >
+                    로그아웃
                   </button>
                 </div>
               </div>
