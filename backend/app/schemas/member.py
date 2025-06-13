@@ -118,4 +118,64 @@ class GoogleLoginRequest(BaseModel):
 class GoogleLoginResponse(BaseModel):
     success: bool
     message: str
-    data: Optional[dict] = None 
+    data: Optional[dict] = None
+
+# 비밀번호 확인 요청 스키마
+class VerifyPasswordRequest(BaseModel):
+    currentPassword: str
+    
+    @validator('currentPassword')
+    def validate_current_password(cls, v):
+        if not v or not v.strip():
+            raise ValueError('현재 비밀번호를 입력해주세요.')
+        return v
+
+# 비밀번호 확인 응답 스키마
+class VerifyPasswordResponse(BaseModel):
+    success: bool
+    message: str
+
+# 비밀번호 변경 요청 스키마
+class ChangePasswordRequest(BaseModel):
+    currentPassword: str
+    newPassword: str
+    
+    @validator('currentPassword')
+    def validate_current_password(cls, v):
+        if not v or not v.strip():
+            raise ValueError('현재 비밀번호를 입력해주세요.')
+        return v
+    
+    @validator('newPassword')
+    def validate_new_password(cls, v):
+        if not v or not v.strip():
+            raise ValueError('새 비밀번호를 입력해주세요.')
+        
+        # 비밀번호 강도 검사
+        if len(v) < 8:
+            raise ValueError('새 비밀번호는 8자 이상이어야 합니다.')
+        
+        import re
+        
+        # 대문자 포함 검사
+        if not re.search(r'[A-Z]', v):
+            raise ValueError('새 비밀번호는 대문자를 포함해야 합니다.')
+        
+        # 소문자 포함 검사
+        if not re.search(r'[a-z]', v):
+            raise ValueError('새 비밀번호는 소문자를 포함해야 합니다.')
+        
+        # 숫자 포함 검사
+        if not re.search(r'\d', v):
+            raise ValueError('새 비밀번호는 숫자를 포함해야 합니다.')
+        
+        # 특수문자 포함 검사
+        if not re.search(r'[@$!%*?&]', v):
+            raise ValueError('새 비밀번호는 특수문자(@$!%*?&)를 포함해야 합니다.')
+        
+        return v
+
+# 비밀번호 변경 응답 스키마
+class ChangePasswordResponse(BaseModel):
+    success: bool
+    message: str 

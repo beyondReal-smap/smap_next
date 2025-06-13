@@ -262,6 +262,6 @@ export const useGroups = () => {
 export const useSelectedGroup = () => {
   const { selectedGroup, selectGroup } = useAuth();
   return { selectedGroup, selectGroup };
-};
+}; 
 
  

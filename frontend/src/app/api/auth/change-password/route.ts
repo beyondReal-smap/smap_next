@@ -1,121 +1,167 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// 백엔드 서버 URL (환경 변수에서 가져오거나 기본값 사용)
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080';
+const BACKEND_URL = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
+
+// node-fetch를 대안으로 사용
+let nodeFetch: any = null;
+try {
+  nodeFetch = require('node-fetch');
+} catch (e) {
+  console.log('[Change Password API] node-fetch 패키지를 찾을 수 없음');
+}
+
+async function fetchWithFallback(url: string, options: any = {}): Promise<any> {
+  const fetchOptions: RequestInit = {
+    method: options.method || 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'Next.js API Proxy',
+      ...options.headers,
+    },
+    body: options.body,
+    // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
+    rejectUnauthorized: false,
+  };
+  
+  // Node.js 환경 변수로 SSL 검증 비활성화
+  const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  
+  let response: any;
+
+  try {
+    try {
+      // 기본 fetch 시도
+      response = await fetch(url, fetchOptions);
+      console.log('[Change Password API] 기본 fetch 성공');
+    } catch (fetchError) {
+      console.log('[Change Password API] 기본 fetch 실패, node-fetch 시도:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+      
+      if (nodeFetch) {
+        // node-fetch 시도
+        response = await nodeFetch(url, {
+          method: options.method || 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Next.js API Proxy (node-fetch)',
+            ...options.headers,
+          },
+          body: options.body,
+          agent: function(_parsedURL: any) {
+            const https = require('https');
+            return new https.Agent({
+              rejectUnauthorized: false
+            });
+          }
+        });
+        console.log('[Change Password API] node-fetch 성공');
+      } else {
+        throw fetchError;
+      }
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API error: ${response.status} - ${errorText}`);
+    }
+
+    return await response.json();
+  } finally {
+    // 환경 변수 복원
+    if (originalTlsReject !== undefined) {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
+    } else {
+      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    }
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { currentPassword, newPassword } = await request.json();
+    const body = await request.json();
+    const { currentPassword, newPassword } = body;
 
-    // Authorization 헤더에서 토큰 추출
-    const authHeader = request.headers.get('authorization');
-    const token = authHeader?.replace('Bearer ', '');
-
-    if (!token) {
-      return NextResponse.json(
-        { error: '인증 토큰이 필요합니다' },
-        { status: 401 }
-      );
-    }
-
-    // 토큰에서 사용자 정보 추출 (간단한 방식)
-    // 실제 운영 환경에서는 JWT 라이브러리를 사용해 토큰을 검증해야 합니다
-    let userId: string;
-    try {
-      // Base64 디코딩으로 페이로드 추출 (임시 방식)
-      const parts = token.split('.');
-      if (parts.length !== 3) {
-        throw new Error('Invalid token format');
-      }
-      const payload = JSON.parse(atob(parts[1]));
-      userId = payload.userId || payload.sub;
-      
-      if (!userId) {
-        throw new Error('User ID not found in token');
-      }
-    } catch (error) {
-      return NextResponse.json(
-        { error: '유효하지 않은 토큰입니다' },
-        { status: 401 }
-      );
-    }
-
-    // 입력 값 검증
+    // 기본 유효성 검사
     if (!currentPassword || !newPassword) {
       return NextResponse.json(
-        { error: '현재 비밀번호와 새 비밀번호를 모두 입력해주세요' },
-        { status: 400 }
-      );
-    }
-
-    if (newPassword.length < 8) {
-      return NextResponse.json(
-        { error: '새 비밀번호는 8자 이상이어야 합니다' },
-        { status: 400 }
-      );
-    }
-
-    try {
-      // 백엔드 서버로 비밀번호 변경 요청
-      const backendResponse = await fetch(`${BACKEND_URL}/api/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+        { 
+          success: false, 
+          message: '현재 비밀번호와 새 비밀번호를 모두 입력해주세요.' 
         },
-        body: JSON.stringify({
-          userId,
-          currentPassword,
-          newPassword,
-        }),
-      });
+        { status: 400 }
+      );
+    }
 
-      const backendData = await backendResponse.json();
+    // 비밀번호 강도 검사
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: '새 비밀번호는 8자 이상, 대소문자, 숫자, 특수문자를 포함해야 합니다.' 
+        },
+        { status: 400 }
+      );
+    }
 
-      if (!backendResponse.ok) {
-        if (backendResponse.status === 401) {
-          return NextResponse.json(
-            { error: '현재 비밀번호가 일치하지 않습니다' },
-            { status: 401 }
-          );
-        }
-        return NextResponse.json(
-          { error: backendData.message || '비밀번호 변경에 실패했습니다' },
-          { status: backendResponse.status }
-        );
-      }
+    // Authorization 헤더 전달
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: '인증 토큰이 필요합니다.' 
+        },
+        { status: 401 }
+      );
+    }
 
+    console.log('🔄 FastAPI 백엔드로 비밀번호 변경 요청 전달');
+
+    // FastAPI 백엔드 API 호출 (fetchWithFallback 사용)
+    const backendData = await fetchWithFallback(`${BACKEND_URL}/api/v1/members/change-password`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+      },
+      body: JSON.stringify({
+        currentPassword,
+        newPassword,
+      }),
+    });
+
+    console.log('🔍 FastAPI 서버 응답:', JSON.stringify(backendData, null, 2));
+
+    if (backendData.success || backendData.result === 'Y') {
+      console.log('✅ FastAPI 백엔드 비밀번호 변경 성공');
+      
       return NextResponse.json({
         success: true,
-        message: '비밀번호가 성공적으로 변경되었습니다',
+        message: backendData.message || '비밀번호가 성공적으로 변경되었습니다.'
       });
-
-    } catch (backendError) {
-      console.log('백엔드 서버 연결 실패, 임시 모드로 전환');
+    } else {
+      console.log('❌ FastAPI 백엔드 비밀번호 변경 실패:', backendData.message);
+      console.log('❌ 전체 응답 데이터:', JSON.stringify(backendData, null, 2));
       
-      // 백엔드 서버 연결 실패 시 임시 모드
-      // 실제 운영 환경에서는 이 부분을 제거해야 합니다
-      
-      // 간단한 검증 (실제로는 데이터베이스에서 확인해야 함)
-      const isValidCurrentPassword = currentPassword === 'temp123'; // 임시 검증
-      
-      if (!isValidCurrentPassword) {
-        return NextResponse.json(
-          { error: '현재 비밀번호가 일치하지 않습니다' },
-          { status: 401 }
-        );
-      }
-
-      // 임시 성공 응답
-      return NextResponse.json({
-        success: true,
-        message: '비밀번호가 성공적으로 변경되었습니다 (임시 모드)',
-      });
+      return NextResponse.json(
+        { 
+          success: false, 
+          message: backendData.message || '비밀번호 변경에 실패했습니다.' 
+        },
+        { status: 400 }
+      );
     }
 
   } catch (error) {
-    console.error('비밀번호 변경 API 오류:', error);
+    console.error('❌ 비밀번호 변경 API 오류:', error);
+    
     return NextResponse.json(
-      { error: '서버 오류가 발생했습니다' },
+      { 
+        success: false, 
+        message: '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' 
+      },
       { status: 500 }
     );
   }

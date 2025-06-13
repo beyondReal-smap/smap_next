@@ -30,9 +30,18 @@ class Settings(BaseSettings):
     )
     
     # JWT 설정
-    SECRET_KEY: str = "your-secret-key-here"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_SECRET_KEY: str = "smap!@super-secret"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    
+    # 하위 호환성을 위한 별칭
+    @property
+    def SECRET_KEY(self) -> str:
+        return self.JWT_SECRET_KEY
+    
+    @property 
+    def ALGORITHM(self) -> str:
+        return self.JWT_ALGORITHM
     
     class Config:
         case_sensitive = True

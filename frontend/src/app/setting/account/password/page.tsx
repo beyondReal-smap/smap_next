@@ -146,7 +146,7 @@ export default function PasswordChangePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`, // JWT 토큰
+          'Authorization': `Bearer ${localStorage.getItem('auth-token')}`, // JWT 토큰
         },
         body: JSON.stringify({
           currentPassword,

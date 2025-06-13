@@ -354,20 +354,20 @@ export default function SettingsPage() {
     {
       title: '혜택 & 결제',
       items: [
-        { 
-          label: '쿠폰함', 
-          href: '/setting/coupon', 
-          icon: FiGift,
-          color: 'bg-pink-500',
-          description: '사용 가능한 쿠폰 확인'
-        },
-        { 
-          label: '친구 초대', 
-          href: '/setting/referrer', 
-          icon: FiUserPlus,
-          color: 'bg-indigo-500',
-          description: '친구 초대하고 혜택 받기'
-        },
+        // { 
+        //   label: '쿠폰함', 
+        //   href: '/setting/coupon', 
+        //   icon: FiGift,
+        //   color: 'bg-pink-500',
+        //   description: '사용 가능한 쿠폰 확인'
+        // },
+        // { 
+        //   label: '친구 초대', 
+        //   href: '/setting/referrer', 
+        //   icon: FiUserPlus,
+        //   color: 'bg-indigo-500',
+        //   description: '친구 초대하고 혜택 받기'
+        // },
         { 
           label: '구매 내역', 
           href: '/setting/purchase', 
@@ -504,7 +504,7 @@ export default function SettingsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="schedule-page-content px-4 pt-20 space-y-6 pb-20"
+          className="schedule-page-content px-4 pt-20 space-y-6"
         >
           {/* 프로필 영역 - 개선된 디자인 */}
           <motion.div 

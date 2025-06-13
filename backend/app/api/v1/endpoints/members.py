@@ -1,8 +1,10 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+from jose import JWTError, jwt
 from app.api import deps
+from app.core.config import settings
 from app.models.member import Member
 from app.models.group_detail import GroupDetail
 from app.schemas.member import (
@@ -14,13 +16,181 @@ from app.schemas.member import (
     MemberLogin,
     MemberLoginResponse,
     GoogleLoginRequest,
-    GoogleLoginResponse
+    GoogleLoginResponse,
+    VerifyPasswordRequest,
+    VerifyPasswordResponse,
+    ChangePasswordRequest,
+    ChangePasswordResponse
 )
 from app.services.member_service import member_service
+from app.crud import crud_auth
 from app.models.enums import StatusEnum
 from datetime import datetime
+import logging
+
+# 로거 설정
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+def get_current_user_id_from_token(authorization: str = Header(None)) -> Optional[int]:
+    """
+    Authorization 헤더에서 토큰을 추출하고 사용자 ID를 반환합니다.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    
+    token = authorization.split(" ")[1]
+    
+    logger.info(f"[JWT DEBUG] 원본 Authorization 헤더: {authorization}")
+    logger.info(f"[JWT DEBUG] 추출된 토큰: {token}")
+    logger.info(f"[JWT DEBUG] 토큰 길이: {len(token)}")
+    
+    try:
+        # settings에서 올바른 키 이름 사용
+        secret_key = getattr(settings, 'JWT_SECRET_KEY', 'your-secret-key-here')
+        algorithm = getattr(settings, 'JWT_ALGORITHM', 'HS256')
+        
+        logger.info(f"[JWT DEBUG] JWT_SECRET_KEY 존재: {hasattr(settings, 'JWT_SECRET_KEY')}")
+        logger.info(f"[JWT DEBUG] 사용할 SECRET_KEY: {secret_key}")
+        logger.info(f"[JWT DEBUG] 사용할 ALGORITHM: {algorithm}")
+        
+        payload = jwt.decode(token, secret_key, algorithms=[algorithm])
+        mt_idx: Optional[int] = payload.get("mt_idx")
+        
+        logger.info(f"[JWT DEBUG] 토큰 페이로드: {payload}")
+        logger.info(f"[JWT DEBUG] 추출된 mt_idx: {mt_idx}")
+        
+        return mt_idx
+    except JWTError as e:
+        logger.error(f"[JWT DEBUG] JWT 오류: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"[JWT DEBUG] 기타 오류: {str(e)}")
+        return None
+
+@router.post("/verify-password")
+async def verify_password(
+    request: VerifyPasswordRequest,
+    authorization: str = Header(None),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    현재 비밀번호를 확인합니다.
+    """
+    logger.info("[VERIFY_PASSWORD] 비밀번호 확인 요청 시작")
+    
+    try:
+        # 토큰에서 사용자 ID 추출
+        user_id = get_current_user_id_from_token(authorization)
+        if not user_id:
+            logger.warning("[VERIFY_PASSWORD] 인증 토큰이 없거나 유효하지 않음")
+            return {
+                "result": "N",
+                "message": "인증이 필요합니다.",
+                "success": False
+            }
+        
+        logger.info(f"[VERIFY_PASSWORD] 비밀번호 확인 요청 - user_id: {user_id}")
+        
+        # 현재 비밀번호 확인
+        is_valid = crud_auth.verify_user_password(db, user_id, request.currentPassword)
+        
+        if is_valid:
+            logger.info(f"[VERIFY_PASSWORD] 비밀번호 확인 성공 - user_id: {user_id}")
+            return {
+                "result": "Y",
+                "message": "비밀번호가 확인되었습니다.",
+                "success": True
+            }
+        else:
+            logger.warning(f"[VERIFY_PASSWORD] 비밀번호 확인 실패 - user_id: {user_id}")
+            return {
+                "result": "N",
+                "message": "현재 비밀번호가 올바르지 않습니다.",
+                "success": False
+            }
+    
+    except Exception as e:
+        logger.error(f"[VERIFY_PASSWORD] 서버 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {
+            "result": "N",
+            "message": "서버 오류가 발생했습니다.",
+            "success": False
+        }
+
+@router.post("/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    authorization: str = Header(None),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    비밀번호를 변경합니다.
+    """
+    logger.info("[CHANGE_PASSWORD] 비밀번호 변경 요청 시작")
+    
+    try:
+        # 토큰에서 사용자 ID 추출
+        user_id = get_current_user_id_from_token(authorization)
+        if not user_id:
+            logger.warning("[CHANGE_PASSWORD] 인증 토큰이 없거나 유효하지 않음")
+            return {
+                "result": "N",
+                "message": "인증이 필요합니다.",
+                "success": False
+            }
+        
+        logger.info(f"[CHANGE_PASSWORD] 비밀번호 변경 요청 - user_id: {user_id}")
+        
+        # 현재 비밀번호 확인
+        is_current_valid = crud_auth.verify_user_password(db, user_id, request.currentPassword)
+        if not is_current_valid:
+            logger.warning(f"[CHANGE_PASSWORD] 현재 비밀번호 불일치 - user_id: {user_id}")
+            return {
+                "result": "N",
+                "message": "현재 비밀번호가 올바르지 않습니다.",
+                "success": False
+            }
+        
+        # 새 비밀번호로 변경
+        is_changed = crud_auth.change_user_password(db, user_id, request.newPassword)
+        
+        if is_changed:
+            logger.info(f"[CHANGE_PASSWORD] 비밀번호 변경 성공 - user_id: {user_id}")
+            return {
+                "result": "Y",
+                "message": "비밀번호가 성공적으로 변경되었습니다.",
+                "success": True
+            }
+        else:
+            logger.error(f"[CHANGE_PASSWORD] 비밀번호 변경 실패 - user_id: {user_id}")
+            return {
+                "result": "N",
+                "message": "비밀번호 변경에 실패했습니다.",
+                "success": False
+            }
+    
+    except ValueError as e:
+        # 비밀번호 검증 오류
+        logger.warning(f"[CHANGE_PASSWORD] 비밀번호 검증 오류 - user_id: {user_id if 'user_id' in locals() else 'unknown'}, error: {str(e)}")
+        return {
+            "result": "N",
+            "message": str(e),
+            "success": False
+        }
+    
+    except Exception as e:
+        logger.error(f"[CHANGE_PASSWORD] 서버 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {
+            "result": "N",
+            "message": "서버 오류가 발생했습니다.",
+            "success": False
+        }
 
 @router.post("/register", response_model=RegisterResponse)
 def register_member(

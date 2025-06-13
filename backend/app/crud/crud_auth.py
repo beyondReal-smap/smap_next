@@ -29,11 +29,49 @@ def get_user_by_kakao_id(db: Session, kakao_id: str) -> Optional[Member]:
         Member.mt_show == 'Y' # 노출여부
     ).first()
 
+def get_user_by_idx(db: Session, mt_idx: int) -> Optional[Member]:
+    """사용자 인덱스로 사용자를 조회합니다."""
+    return db.query(Member).filter(
+        Member.mt_idx == mt_idx,
+        Member.mt_status == '1', # 정상상태
+        Member.mt_show == 'Y' # 노출여부
+    ).first()
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """입력된 비밀번호와 해시된 비밀번호를 비교합니다."""
     if not hashed_password: # DB에 비밀번호가 없는 경우 (예: 소셜 로그인 사용자)
         return False
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+def verify_user_password(db: Session, mt_idx: int, current_password: str) -> bool:
+    """사용자의 현재 비밀번호를 확인합니다."""
+    user = get_user_by_idx(db, mt_idx)
+    if not user:
+        return False
+    
+    # 소셜 로그인 사용자인 경우 (비밀번호가 없는 경우)
+    if not user.mt_pwd or user.mt_type != 1:  # mt_type 1은 일반회원
+        return False
+    
+    return verify_password(current_password, user.mt_pwd)
+
+def change_user_password(db: Session, mt_idx: int, new_password: str) -> bool:
+    """사용자의 비밀번호를 변경합니다."""
+    user = get_user_by_idx(db, mt_idx)
+    if not user:
+        return False
+    
+    # 새 비밀번호 해싱
+    hashed_password = get_hashed_password(new_password)
+    
+    # 비밀번호 업데이트
+    user.mt_pwd = hashed_password
+    user.mt_udate = datetime.utcnow()  # 수정일시 업데이트
+    
+    db.commit()
+    db.refresh(user)
+    
+    return True
 
 def validate_password_policy(password: str) -> tuple[bool, list[str]]:
     """비밀번호 정책을 검증합니다."""
