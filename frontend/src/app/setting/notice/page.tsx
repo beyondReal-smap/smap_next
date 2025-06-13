@@ -5,33 +5,59 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FiBell, FiCalendar } from 'react-icons/fi';
 
-// 공지사항 mock 데이터
-const MOCK_NOTICES = [
-  {
-    id: 1,
-    title: '서비스 점검 안내',
-    date: '2024-06-10',
-    content: '6월 12일(수) 02:00~04:00 서비스 점검이 예정되어 있습니다. 이용에 참고 부탁드립니다.'
-  },
-  {
-    id: 2,
-    title: '신규 기능 업데이트',
-    date: '2024-05-28',
-    content: '그룹 관리 기능이 추가되었습니다. 자세한 내용은 공지사항을 확인해 주세요.'
-  },
-  {
-    id: 3,
-    title: '개인정보 처리방침 변경 안내',
-    date: '2024-05-15',
-    content: '개인정보 처리방침이 일부 변경되었습니다. 변경된 내용을 확인해 주세요.'
-  },
-  {
-    id: 4,
-    title: '앱 버전 업데이트 안내',
-    date: '2024-05-01',
-    content: '새로운 기능과 버그 수정이 포함된 앱 업데이트가 출시되었습니다.'
+// 공지사항 타입 정의
+interface Notice {
+  nt_idx: number;
+  nt_title: string;
+  nt_content: string;
+  nt_hit: number;
+  nt_wdate: string;
+}
+
+interface NoticeListResponse {
+  notices: Notice[];
+  total: number;
+  page: number;
+  size: number;
+  total_pages: number;
+}
+
+// API 호출 함수
+const fetchNotices = async (page: number = 1, size: number = 20): Promise<NoticeListResponse> => {
+  try {
+    const response = await fetch(`/api/v1/notices?page=${page}&size=${size}&show_only=true`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('공지사항 API 호출 실패:', error);
+    throw error;
   }
-];
+};
+
+// 날짜 포맷팅 함수
+const formatDate = (dateString: string): string => {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).replace(/\./g, '-').replace(/ /g, '').slice(0, -1);
+  } catch (error) {
+    return dateString;
+  }
+};
+
+// 내용 요약 함수 (100자 제한)
+const truncateContent = (content: string, maxLength: number = 100): string => {
+  if (content.length <= maxLength) return content;
+  return content.substring(0, maxLength) + '...';
+};
 
 // 모바일 최적화된 CSS 애니메이션
 const pageAnimations = `
@@ -147,8 +173,10 @@ body, html {
 
 export default function NoticePage() {
   const router = useRouter();
-  const [notices, setNotices] = useState<any[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
 
   // 페이지 마운트 시 스크롤 설정
   useEffect(() => {
@@ -160,23 +188,27 @@ export default function NoticePage() {
     };
   }, []);
 
-  // 공지사항 데이터 로딩 시뮬레이션
+  // 공지사항 데이터 로딩
   useEffect(() => {
-    const fetchNotices = async () => {
+    const loadNotices = async () => {
       setIsLoading(true);
+      setError(null);
+      
       try {
-        // 실제 API 호출 시뮬레이션 (1초 지연)
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        setNotices(MOCK_NOTICES);
+        const data = await fetchNotices(1, 20);
+        setNotices(data.notices);
+        setTotalCount(data.total);
       } catch (error) {
         console.error('공지사항 로딩 실패:', error);
+        setError('공지사항을 불러오는데 실패했습니다.');
         setNotices([]);
+        setTotalCount(0);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchNotices();
+    loadNotices();
   }, []);
 
   const handleBack = () => {
@@ -281,43 +313,69 @@ export default function NoticePage() {
               </motion.div>
             ) : (
               <>
+                {/* 에러 상태 표시 */}
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1, duration: 0.6 }}
+                    className="bg-red-50 rounded-2xl p-3 mb-1"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 bg-red-500 rounded-lg flex items-center justify-center">
+                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-red-900">오류 발생</h3>
+                        <p className="text-xs text-red-600">{error}</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
                 {/* 공지사항 개수 표시 */}
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1, duration: 0.6 }}
-                  className="bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl p-3 mb-1"
-                >
-                  <div className="flex items-center space-x-2">
-                    <div className="w-6 h-6 bg-gradient-to-r from-red-500 to-pink-600 rounded-lg flex items-center justify-center">
-                      <FiBell className="w-3 h-3 text-white" />
+                {!error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1, duration: 0.6 }}
+                    className="bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl p-3 mb-1"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 bg-gradient-to-r from-red-500 to-pink-600 rounded-lg flex items-center justify-center">
+                        <FiBell className="w-3 h-3 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-gray-900">전체 공지사항</h3>
+                        <p className="text-xs text-gray-600">{totalCount}개의 공지사항이 있습니다</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-900">전체 공지사항</h3>
-                      <p className="text-xs text-gray-600">{notices.length}개의 공지사항이 있습니다</p>
-                    </div>
-                  </div>
-                </motion.div>
+                  </motion.div>
+                )}
 
                 {/* 공지사항 목록 */}
                 {notices.map((notice, idx) => (
                   <motion.div
-                    key={notice.id}
+                    key={notice.nt_idx}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 + (0.1 * idx), duration: 0.6 }}
                   >
-                    <Link href={`/setting/notice/${notice.id}`} className="block">
+                    <Link href={`/setting/notice/${notice.nt_idx}`} className="block">
                       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 card-hover mobile-button">
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-3 flex-1">
                             <div className="flex-1 min-w-0">
-                              <h3 className="font-bold text-sm text-gray-900 mb-1 line-clamp-1">{notice.title}</h3>
+                              <h3 className="font-bold text-sm text-gray-900 mb-1 line-clamp-1">{notice.nt_title}</h3>
                               <div className="flex items-center space-x-2 text-xs text-gray-500 mb-2">
                                 <FiCalendar className="w-3 h-3" />
-                                <span>{notice.date}</span>
+                                <span>{formatDate(notice.nt_wdate)}</span>
+                                <span className="text-gray-400">•</span>
+                                <span>조회 {notice.nt_hit}회</span>
                               </div>
-                              <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">{notice.content}</p>
+                              <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">{truncateContent(notice.nt_content)}</p>
                             </div>
                           </div>
                           <div className="text-gray-400 ml-2">
