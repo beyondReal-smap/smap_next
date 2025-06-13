@@ -60,12 +60,16 @@ export default function ContactPage() {
         
         if (data.success && data.data) {
           const userData = data.data;
+          
+          // 전화번호에 하이픈 포맷팅 적용
+          const formattedPhone = userData.mt_hp ? formatPhoneNumber(userData.mt_hp) : '';
+          
           setContact({
-            mt_hp: userData.mt_hp || '',
+            mt_hp: formattedPhone,
             mt_email: userData.mt_email || ''
           });
           console.log('✅ 연락처 데이터 설정 완료:', {
-            phone: userData.mt_hp,
+            phone: formattedPhone,
             email: userData.mt_email
           });
         }
@@ -93,13 +97,16 @@ export default function ContactPage() {
     // 숫자만 추출
     const numbers = value.replace(/[^\d]/g, '');
     
+    // 최대 11자리까지만 허용
+    const limitedNumbers = numbers.slice(0, 11);
+    
     // 010-xxxx-xxxx 형식으로 포맷팅
-    if (numbers.length <= 3) {
-      return numbers;
-    } else if (numbers.length <= 7) {
-      return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+    if (limitedNumbers.length <= 3) {
+      return limitedNumbers;
+    } else if (limitedNumbers.length <= 7) {
+      return `${limitedNumbers.slice(0, 3)}-${limitedNumbers.slice(3)}`;
     } else {
-      return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+      return `${limitedNumbers.slice(0, 3)}-${limitedNumbers.slice(3, 7)}-${limitedNumbers.slice(7)}`;
     }
   };
 
@@ -144,13 +151,20 @@ export default function ContactPage() {
 
     try {
       const token = localStorage.getItem('auth-token');
+      
+      // 서버로 전송할 때는 하이픈 제거
+      const contactForSubmit = {
+        mt_hp: contact.mt_hp.replace(/[^\d]/g, ''), // 숫자만 남기기
+        mt_email: contact.mt_email
+      };
+      
       const response = await fetch('/api/auth/update-contact', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(contact),
+        body: JSON.stringify(contactForSubmit),
       });
 
       const data = await response.json();
@@ -213,8 +227,8 @@ export default function ContactPage() {
               className="flex items-center space-x-3"
             >
               <div>
-                <h1 className="text-lg font-bold text-gray-900">연락처 수정</h1>
-                <p className="text-xs text-gray-500">전화번호와 이메일을 업데이트하세요</p>
+                <h1 className="text-lg font-bold text-gray-900" >연락처 수정</h1>
+                <p className="text-xs text-gray-500" >전화번호와 이메일을 업데이트하세요</p>
               </div>
             </motion.div>
           </div>
@@ -240,11 +254,11 @@ export default function ContactPage() {
               <FiPhone className="w-4 h-4" style={{ color: '#22C55E' }} />
             </div>
             <div>
-              <h3 className="font-semibold text-green-900 mb-1">연락처 정보</h3>
+              <h3 className="font-semibold text-green-900 mb-1" >연락처 정보</h3>
               <ul className="text-sm text-green-700 space-y-1">
-                <li>• 전화번호는 010으로 시작하는 11자리 번호입니다</li>
-                <li>• 이메일과 전화번호는 다른 사용자와 중복될 수 없습니다</li>
-                <li>• 정확한 연락처 정보를 입력해주세요</li>
+                <li >• 전화번호는 010으로 시작하는 11자리 번호입니다</li>
+                <li >• 다른 사용자와 중복될 수 없습니다</li>
+                <li >• 정확한 연락처 정보를 입력해주세요</li>
               </ul>
             </div>
           </div>
@@ -261,14 +275,14 @@ export default function ContactPage() {
             <div className="flex items-center justify-center py-12">
               <div className="flex flex-col items-center space-y-3">
                 <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#22C55E', borderTopColor: 'transparent' }}></div>
-                <p className="text-sm text-gray-500">연락처 정보를 불러오는 중...</p>
+                <p className="text-sm text-gray-500" >연락처 정보를 불러오는 중...</p>
               </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* 전화번호 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2" >
                   전화번호 *
                 </label>
                 <div className="relative">
@@ -293,14 +307,14 @@ export default function ContactPage() {
                     }}
                   />
                 </div>
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-xs text-gray-500" >
                   010으로 시작하는 휴대폰 번호를 입력하세요
                 </p>
               </div>
 
               {/* 이메일 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2" >
                   이메일 *
                 </label>
                 <div className="relative">
@@ -324,7 +338,7 @@ export default function ContactPage() {
                     }}
                   />
                 </div>
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-xs text-gray-500" >
                   유효한 이메일 주소를 입력하세요
                 </p>
               </div>
@@ -347,7 +361,7 @@ export default function ContactPage() {
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                     </svg>
                   )}
-                  <span>{message}</span>
+                  <span >{message}</span>
                 </motion.div>
               )}
 
@@ -375,10 +389,10 @@ export default function ContactPage() {
                 {isLoading ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>업데이트 중...</span>
+                    <span >업데이트 중...</span>
                   </div>
                 ) : (
-                  '연락처 업데이트'
+                  <span >연락처 업데이트</span>
                 )}
               </motion.button>
             </form>

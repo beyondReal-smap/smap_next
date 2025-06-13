@@ -647,6 +647,16 @@ function MobileCalendar({
 
 export default function SchedulePage() {
   const router = useRouter();
+  
+  // 페이지 마운트 시 스크롤 설정
+  useEffect(() => {
+    document.body.style.overflowY = 'auto';
+    document.documentElement.style.overflowY = 'auto';
+    return () => {
+      document.body.style.overflowY = '';
+      document.documentElement.style.overflowY = '';
+    };
+  }, []);
   const [selectedDay, setSelectedDay] = useState<Dayjs | null>(dayjs());
   const [events, setEvents] = useState<ScheduleEvent[]>([]);  // 목업 데이터 제거
   const [isAddEventModalOpen, setIsAddEventModalOpen] = useState(false);
@@ -3772,40 +3782,51 @@ export default function SchedulePage() {
     <>
       <style jsx global>{pageStyles}</style>
       <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        {/* 개선된 헤더 */}
+        {/* 개선된 헤더 - password 페이지와 동일한 고정 스타일 */}
         <motion.header 
-            initial={{ y: -100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="fixed top-0 left-0 right-0 z-20 glass-effect"
+            initial={{ y: -100, opacity: 0, scale: 0.9 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            transition={{ 
+              delay: 0.2, 
+              duration: 0.8, 
+              ease: [0.25, 0.46, 0.45, 0.94],
+              opacity: { duration: 0.6 },
+              scale: { duration: 0.6 }
+            }}
+            className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-sm"
+            style={{ 
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 9999,
+              width: '100%'
+            }}
           >
-            <div className="flex items-center justify-between h-16 px-4">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4, duration: 0.5 }}
+              className="flex items-center justify-between h-16 px-4"
+            >
               <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-3">
-                  <div
-                    className="p-2 rounded-xl"
-                    style={{ backgroundColor: '#0113A3' }}
-                  >
-                    <svg 
-                    className="w-5 h-5 text-white" 
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path d="M12.75 12.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM7.5 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM8.25 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM9.75 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM10.5 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM12.75 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM14.25 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM15 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM16.5 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM15 12.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM16.5 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" />
-                    <path fillRule="evenodd" d="M6.75 2.25A.75.75 0 0 1 7.5 3v1.5h9V3A.75.75 0 0 1 18 3v1.5h.75a3 3 0 0 1 3 3v11.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3H6V3a.75.75 0 0 1 .75-.75Zm13.5 9a1.5 1.5 0 0 0-1.5-1.5H5.25a1.5 1.5 0 0 0-1.5 1.5v7.5a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5v-7.5Z" clipRule="evenodd" />
-                  </svg>
-                  </div>
+                <motion.div 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.6, duration: 0.4 }}
+                  className="flex items-center space-x-3"
+                >
                   <div>
                     <h1 className="text-lg font-bold text-gray-900">일정</h1>
                     <p className="text-xs text-gray-500">그룹 멤버들과 일정을 공유해보세요</p>
                   </div>
-                </div>
+                </motion.div>
               </div>
               
               <div className="flex items-center space-x-2">
                 {/* 필요시 추가 버튼들을 여기에 배치 */}
               </div>
-            </div>
+            </motion.div>
           </motion.header>
 
         {/* 메인 컨텐츠 */}

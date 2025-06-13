@@ -1,8 +1,12 @@
 {
-  "/api/auth/profile/route": "app/api/auth/profile/route.js",
-  "/setting/account/contact/page": "app/setting/account/contact/page.js",
-  "/setting/account/profile/page": "app/setting/account/profile/page.js",
-  "/setting/account/password/page": "app/setting/account/password/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/push-logs/[...slug]/route": "app/api/push-logs/[...slug]/route.js",
+  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
+  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
+  "/api/auth/verify-password/route": "app/api/auth/verify-password/route.js",
   "/setting/account/withdraw/page": "app/setting/account/withdraw/page.js",
-  "/logs/page": "app/logs/page.js"
+  "/login/page": "app/login/page.js",
+  "/setting/page": "app/setting/page.js",
+  "/setting/account/page": "app/setting/account/page.js",
+  "/home/page": "app/home/page.js"
 }

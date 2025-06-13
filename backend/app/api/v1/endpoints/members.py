@@ -24,7 +24,9 @@ from app.schemas.member import (
     UpdateProfileRequest,
     UpdateProfileResponse,
     UpdateContactRequest,
-    UpdateContactResponse
+    UpdateContactResponse,
+    WithdrawRequest,
+    WithdrawResponse
 )
 from app.services.member_service import member_service
 from app.crud import crud_auth
@@ -731,6 +733,103 @@ async def update_contact(
     
     except Exception as e:
         logger.error(f"[UPDATE_CONTACT] 서버 오류: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {
+            "result": "N",
+            "message": "서버 오류가 발생했습니다.",
+            "success": False
+        }
+
+@router.post("/withdraw")
+async def withdraw_member(
+    request: WithdrawRequest,
+    authorization: str = Header(None),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    회원 탈퇴를 처리합니다.
+    실제 삭제가 아닌 mt_level을 1로 변경하고 탈퇴 관련 정보를 저장합니다.
+    """
+    logger.info("[WITHDRAW] 회원 탈퇴 요청 시작")
+    
+    try:
+        # 토큰에서 사용자 ID 추출
+        user_id = get_current_user_id_from_token(authorization)
+        if not user_id:
+            logger.warning("[WITHDRAW] 인증 토큰이 없거나 유효하지 않음")
+            return {
+                "result": "N",
+                "message": "인증이 필요합니다.",
+                "success": False
+            }
+        
+        logger.info(f"[WITHDRAW] 회원 탈퇴 요청 - user_id: {user_id}")
+        logger.info(f"[WITHDRAW] 탈퇴 사유: {request.mt_retire_chk}, 기타 사유: {request.mt_retire_etc}")
+        
+        # 사용자 정보 확인
+        user = crud_auth.get_user_by_idx(db, user_id)
+        if not user:
+            logger.warning(f"[WITHDRAW] 사용자를 찾을 수 없음 - user_id: {user_id}")
+            return {
+                "result": "N",
+                "message": "사용자를 찾을 수 없습니다.",
+                "success": False
+            }
+        
+        # 이미 탈퇴한 회원인지 확인
+        if user.mt_level == 1:
+            logger.warning(f"[WITHDRAW] 이미 탈퇴한 회원 - user_id: {user_id}")
+            return {
+                "result": "N",
+                "message": "이미 탈퇴한 회원입니다.",
+                "success": False
+            }
+        
+        # 탈퇴 처리
+        # 1. 이전 레벨 저장
+        user.mt_retire_level = user.mt_level
+        
+        # 2. 탈퇴 레벨로 변경
+        user.mt_level = 1
+        
+        # 3. 탈퇴 사유 저장
+        user.mt_retire_chk = request.mt_retire_chk
+        user.mt_retire_etc = request.mt_retire_etc
+        
+        # 4. 탈퇴 일시 저장
+        user.mt_rdate = datetime.utcnow()
+        
+        # 5. 탈퇴 아이디 저장 (기존 아이디를 탈퇴 아이디로 이동)
+        user.mt_id_retire = user.mt_id
+        
+        # 6. 수정 일시 업데이트
+        user.mt_udate = datetime.utcnow()
+        
+        # 데이터베이스에 저장
+        db.add(user)
+        db.commit()
+        
+        logger.info(f"[WITHDRAW] 회원 탈퇴 처리 완료 - user_id: {user_id}")
+        logger.info(f"[WITHDRAW] 탈퇴 정보 - 사유: {request.mt_retire_chk}, 기타: {request.mt_retire_etc}, 탈퇴일: {user.mt_rdate}")
+        
+        return {
+            "result": "Y",
+            "message": "회원 탈퇴가 완료되었습니다.",
+            "success": True
+        }
+    
+    except ValueError as e:
+        # 유효성 검사 오류
+        logger.warning(f"[WITHDRAW] 유효성 검사 오류 - user_id: {user_id if 'user_id' in locals() else 'unknown'}, error: {str(e)}")
+        return {
+            "result": "N",
+            "message": str(e),
+            "success": False
+        }
+    
+    except Exception as e:
+        logger.error(f"[WITHDRAW] 서버 오류: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
         return {

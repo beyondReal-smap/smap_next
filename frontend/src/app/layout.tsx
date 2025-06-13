@@ -1,5 +1,5 @@
 import './globals.css'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 // import { Suspense } from 'react' // Suspense는 ClientLayout 내부 또는 필요시 사용
 import { lineSeed } from './fonts'; // LINE SEED 폰트 임포트
 // import { BottomNavBar } from './components/layout' // 직접 사용하지 않음
@@ -17,12 +17,6 @@ const getMetadata = (): Metadata => {
     authors: [{ name: localizedInfo.APP_AUTHOR }],
     keywords: '',
     metadataBase: new URL(APP_INFO.DOMAIN),
-    viewport: {
-      width: 'device-width',
-      initialScale: 1,
-      maximumScale: 1,
-      userScalable: false,
-    },
     openGraph: {
       title: localizedInfo.APP_TITLE,
       description: localizedInfo.DESCRIPTION,
@@ -33,6 +27,14 @@ const getMetadata = (): Metadata => {
       type: 'website',
     },
   }
+}
+
+// Viewport 설정을 별도 export로 분리
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export const metadata = getMetadata()

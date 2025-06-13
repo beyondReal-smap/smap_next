@@ -200,4 +200,29 @@ class UpdateContactRequest(BaseModel):
 class UpdateContactResponse(BaseModel):
     result: str
     message: str
-    success: bool 
+    success: bool
+
+# 회원 탈퇴 관련 스키마
+class WithdrawRequest(BaseModel):
+    mt_retire_chk: int  # 탈퇴 사유 번호 (1-5)
+    mt_retire_etc: Optional[str] = None  # 기타 사유 (mt_retire_chk가 5일 때)
+    reasons: Optional[list] = None  # 프론트엔드에서 전달하는 사유 목록
+    
+    @validator('mt_retire_chk')
+    def validate_retire_reason(cls, v):
+        if v not in [1, 2, 3, 4, 5]:
+            raise ValueError('탈퇴 사유는 1-5 사이의 값이어야 합니다.')
+        return v
+    
+    @validator('mt_retire_etc')
+    def validate_etc_reason(cls, v, values):
+        # mt_retire_chk가 5(기타 이유)일 때 mt_retire_etc 필수
+        if values.get('mt_retire_chk') == 5:
+            if not v or not v.strip():
+                raise ValueError('기타 사유를 입력해주세요.')
+        return v
+
+class WithdrawResponse(BaseModel):
+    success: bool
+    message: str
+    result: Optional[str] = None 

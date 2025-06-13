@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -101,6 +101,16 @@ export default function PasswordChangePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  // 페이지 마운트 시 스크롤 설정
+  useEffect(() => {
+    document.body.style.overflowY = 'auto';
+    document.documentElement.style.overflowY = 'auto';
+    return () => {
+      document.body.style.overflowY = '';
+      document.documentElement.style.overflowY = '';
+    };
+  }, []);
 
   // 비밀번호 강도 계산
   const passwordStrength = checkPasswordStrength(newPassword);
@@ -214,7 +224,15 @@ export default function PasswordChangePage() {
           opacity: { duration: 0.6 },
           scale: { duration: 0.6 }
         }}
-        className="fixed top-0 left-0 right-0 z-20 bg-white/70 backdrop-blur-xl border-b border-white/20 shadow-sm"
+        className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-sm"
+        style={{ 
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+          width: '100%'
+        }}
       >
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
