@@ -622,17 +622,178 @@ function GroupPageContent() {
   };
 
   // 공유 기능
+  // 플랫폼 감지 함수들
+  const isIOS = () => {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent);
+  };
+
+  const isAndroid = () => {
+    return /Android/.test(navigator.userAgent);
+  };
+
+  const isMobile = () => {
+    return isIOS() || isAndroid();
+  };
+
+  const supportsWebShare = () => {
+    return 'share' in navigator;
+  };
+
+  // 카카오톡 공유 함수
+  const handleKakaoShare = () => {
+    if (!selectedGroup) return;
+    
+    const inviteLink = `${window.location.origin}/group/${selectedGroup.sgt_idx}/join`;
+    const message = `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다!\n\n아래 링크를 클릭하여 참여해보세요:\n${inviteLink}`;
+    
+    if (isMobile()) {
+      if (isIOS()) {
+        // iOS: 카카오톡 앱 스키마 사용
+        const kakaoUrl = `kakaolink://send?msg=${encodeURIComponent(message)}`;
+        window.location.href = kakaoUrl;
+        
+        // 카카오톡이 설치되어 있지 않은 경우 앱스토어로 이동
+        setTimeout(() => {
+          if (document.hidden) return; // 이미 앱이 열린 경우
+          const appStoreUrl = 'https://apps.apple.com/kr/app/kakaotalk/id362057947';
+          if (confirm('카카오톡이 설치되어 있지 않습니다. 앱스토어로 이동하시겠습니까?')) {
+            window.open(appStoreUrl, '_blank');
+          }
+        }, 1000);
+      } else if (isAndroid()) {
+        // Android: 인텐트 사용
+        const intentUrl = `intent://send?msg=${encodeURIComponent(message)}#Intent;package=com.kakao.talk;scheme=kakaolink;launchFlags=0x10000000;end`;
+        window.location.href = intentUrl;
+        
+        // 카카오톡이 설치되어 있지 않은 경우 플레이스토어로 이동
+        setTimeout(() => {
+          if (document.hidden) return; // 이미 앱이 열린 경우
+          const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.kakao.talk';
+          if (confirm('카카오톡이 설치되어 있지 않습니다. 플레이스토어로 이동하시겠습니까?')) {
+            window.open(playStoreUrl, '_blank');
+          }
+        }, 1000);
+      }
+    } else {
+      // 데스크탑: 웹 카카오톡 또는 클립보드 복사
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(message).then(() => {
+          alert('카카오톡 공유 메시지가 클립보드에 복사되었습니다.\n카카오톡에서 붙여넣기하여 공유해주세요.');
+        });
+      } else {
+        // 클립보드 API를 지원하지 않는 경우
+        const textArea = document.createElement('textarea');
+        textArea.value = message;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        alert('카카오톡 공유 메시지가 클립보드에 복사되었습니다.\n카카오톡에서 붙여넣기하여 공유해주세요.');
+      }
+    }
+    
+    setIsShareModalOpen(false);
+    showToastModal('success', '카카오톡 공유', '카카오톡으로 초대 메시지를 전송합니다.');
+  };
+
+  // 초대 링크 복사 함수
   const handleCopyLink = () => {
     const inviteLink = `${window.location.origin}/group/${selectedGroup?.sgt_idx}/join`;
-    navigator.clipboard.writeText(inviteLink)
-      .then(() => {
-        setIsShareModalOpen(false);
-        showToastModal('success', '링크 복사 완료', '초대 링크가 복사되었습니다!');
-      })
-      .catch(err => {
-        console.error('링크 복사 실패:', err);
-        alert('링크 복사에 실패했습니다.');
+    
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(inviteLink)
+        .then(() => {
+          setIsShareModalOpen(false);
+          showToastModal('success', '링크 복사 완료', '초대 링크가 복사되었습니다!');
+        })
+        .catch(err => {
+          console.error('링크 복사 실패:', err);
+          // 폴백 방법 사용
+          fallbackCopyText(inviteLink);
+        });
+    } else {
+      // 클립보드 API를 지원하지 않는 경우 폴백 방법 사용
+      fallbackCopyText(inviteLink);
+    }
+  };
+
+  // 폴백 복사 함수
+  const fallbackCopyText = (text: string) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      document.execCommand('copy');
+      setIsShareModalOpen(false);
+      showToastModal('success', '링크 복사 완료', '초대 링크가 복사되었습니다!');
+    } catch (err) {
+      console.error('폴백 복사 실패:', err);
+      alert('링크 복사에 실패했습니다. 수동으로 복사해주세요:\n' + text);
+    } finally {
+      document.body.removeChild(textArea);
+    }
+  };
+
+  // 문자(SMS) 공유 함수
+  const handleSMSShare = () => {
+    if (!selectedGroup) return;
+    
+    const inviteLink = `${window.location.origin}/group/${selectedGroup.sgt_idx}/join`;
+    const message = `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다! 링크: ${inviteLink}`;
+    
+    if (isMobile()) {
+      if (isIOS()) {
+        // iOS: SMS 앱 스키마
+        const smsUrl = `sms:&body=${encodeURIComponent(message)}`;
+        window.location.href = smsUrl;
+      } else if (isAndroid()) {
+        // Android: SMS 인텐트
+        const smsUrl = `sms:?body=${encodeURIComponent(message)}`;
+        window.location.href = smsUrl;
+      }
+    } else {
+      // 데스크탑: 메시지를 클립보드에 복사
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(message).then(() => {
+          alert('문자 메시지가 클립보드에 복사되었습니다.\n문자 앱에서 붙여넣기하여 전송해주세요.');
+        });
+      } else {
+        fallbackCopyText(message);
+      }
+    }
+    
+    setIsShareModalOpen(false);
+    showToastModal('success', '문자 공유', '문자 앱으로 초대 메시지를 전송합니다.');
+  };
+
+  // Web Share API를 사용한 네이티브 공유 함수
+  const handleNativeShare = async () => {
+    if (!selectedGroup || !supportsWebShare()) return;
+    
+    const inviteLink = `${window.location.origin}/group/${selectedGroup.sgt_idx}/join`;
+    
+    try {
+      await navigator.share({
+        title: `${selectedGroup.sgt_title} 그룹 초대`,
+        text: `[SMAP] ${selectedGroup.sgt_title} 그룹에 초대되었습니다! 함께 참여해보세요.`,
+        url: inviteLink
       });
+      
+      setIsShareModalOpen(false);
+      showToastModal('success', '공유 완료', '그룹 초대 링크가 공유되었습니다.');
+    } catch (error) {
+      console.error('네이티브 공유 실패:', error);
+      // 사용자가 공유를 취소한 경우는 오류로 처리하지 않음
+      if ((error as Error).name !== 'AbortError') {
+        showToastModal('error', '공유 실패', '공유 중 오류가 발생했습니다.');
+      }
+    }
   };
 
   // 멤버 관리
@@ -1449,19 +1610,35 @@ function GroupPageContent() {
               </div>
               
               <div className="space-y-2">
+                {/* Web Share API 지원 시 네이티브 공유 버튼 */}
+                {supportsWebShare() && (
+                  <motion.button 
+                    onClick={handleNativeShare} 
+                    className="w-full flex items-center justify-center p-3 rounded-lg text-white shadow-sm hover:shadow-md transition-all"
+                    style={{ backgroundColor: '#F97315' }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <FaShare className="w-4 h-4 mr-2" />
+                    <span className="font-medium text-sm">다른 앱으로 공유</span>
+                  </motion.button>
+                )}
+                
                 <motion.button 
-                  onClick={() => alert('카카오톡 공유 기능은 준비 중입니다.')} 
-                  className="w-full flex items-center justify-center p-3 rounded-lg bg-[#FEE500] text-[#3C1E1E]"
+                  onClick={handleKakaoShare} 
+                  className="w-full flex items-center justify-center p-3 rounded-lg bg-[#FEE500] text-[#3C1E1E] shadow-sm hover:shadow-md transition-shadow"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   <RiKakaoTalkFill className="w-4 h-4 mr-2" />
-                  <span className="font-medium text-sm">카카오톡으로 공유</span>
+                  <span className="font-medium text-sm">
+                    {isMobile() ? '카카오톡으로 공유' : '카카오톡 메시지 복사'}
+                  </span>
                 </motion.button>
                 
                 <motion.button 
                   onClick={handleCopyLink} 
-                  className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-400 text-white"
+                  className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-500 text-white shadow-sm hover:shadow-md transition-shadow"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -1470,13 +1647,16 @@ function GroupPageContent() {
                 </motion.button>
                 
                 <motion.button 
-                  onClick={() => alert('문자 공유 기능은 준비 중입니다.')} 
-                  className="w-full flex items-center justify-center p-3 rounded-lg bg-red-400 text-white"
+                  onClick={handleSMSShare} 
+                  className="w-full flex items-center justify-center p-3 rounded-lg text-white shadow-sm hover:shadow-md transition-all"
+                  style={{ backgroundColor: '#22C55D' }}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
                   <MdOutlineMessage className="w-4 h-4 mr-2" />
-                  <span className="font-medium text-sm">문자로 공유</span>
+                  <span className="font-medium text-sm">
+                    {isMobile() ? '문자로 공유' : '문자 메시지 복사'}
+                  </span>
                 </motion.button>
                 
                 <motion.button

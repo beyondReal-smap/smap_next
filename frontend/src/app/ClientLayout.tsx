@@ -21,6 +21,50 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // 앱 시작 시 대기 중인 그룹 가입 처리
+  useEffect(() => {
+    const handlePendingGroupJoin = async () => {
+      // 로그인되지 않았거나 로딩 중이면 처리하지 않음
+      if (!isLoggedIn || loading) return;
+      
+      const pendingJoin = localStorage.getItem('pendingGroupJoin');
+      if (!pendingJoin) return;
+      
+      try {
+        const { groupId, groupTitle, timestamp } = JSON.parse(pendingJoin);
+        
+        // 24시간 이내의 요청만 처리 (만료된 요청 방지)
+        const isExpired = Date.now() - timestamp > 24 * 60 * 60 * 1000;
+        if (isExpired) {
+          localStorage.removeItem('pendingGroupJoin');
+          return;
+        }
+        
+        console.log('[AuthGuard] 대기 중인 그룹 가입 처리:', { groupId, groupTitle });
+        
+        // 그룹 가입 API 호출
+        const groupService = (await import('@/services/groupService')).default;
+        await groupService.joinGroup(parseInt(groupId));
+        
+        // 성공 시 localStorage에서 제거
+        localStorage.removeItem('pendingGroupJoin');
+        
+        // 그룹 페이지로 이동
+        router.push('/group');
+        
+        // 성공 알림 (선택사항)
+        console.log(`[AuthGuard] 그룹 "${groupTitle}" 가입 완료!`);
+        
+      } catch (error) {
+        console.error('[AuthGuard] 자동 그룹 가입 실패:', error);
+        // 실패해도 localStorage는 정리
+        localStorage.removeItem('pendingGroupJoin');
+      }
+    };
+    
+    handlePendingGroupJoin();
+  }, [isLoggedIn, loading, router]);
+
   useEffect(() => {
     console.log('[AUTH GUARD] 상태 체크:', { 
       pathname, 
@@ -93,7 +137,13 @@ export default function ClientLayout({
 
   // 네비게이션 바를 숨길 페이지들
   const hideNavBarPages = ['/signin', '/register', '/notice', '/setting'];
-  const shouldHideNavBar = hideNavBarPages.some(page => pathname.startsWith(page));
+  const shouldHideNavBar = hideNavBarPages.some(page => pathname.startsWith(page)) || 
+                           pathname.includes('/join') || // 그룹 초대 페이지도 네비게이션 숨김
+                           pathname.match(/\/group\/\d+\/join/); // 정규식으로 그룹 초대 페이지 확실히 매칭
+  
+  // 디버깅용 로그
+  console.log('[ClientLayout] 현재 경로:', pathname);
+  console.log('[ClientLayout] 네비게이션 숨김 여부:', shouldHideNavBar);
 
   // 클라이언트 측에서만 마운트
   useEffect(() => {

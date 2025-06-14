@@ -335,6 +335,45 @@ class GroupService {
       throw new Error('그룹 통계를 가져오는데 실패했습니다.');
     }
   }
+  // 그룹 가입 (초대 링크를 통한 가입)
+  async joinGroup(groupId: number): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log(`[GroupService] 그룹 가입 시작 - groupId: ${groupId}`);
+      
+      const response = await apiClient.post(`/groups/${groupId}/join`);
+      
+      console.log(`[GroupService] 그룹 가입 응답:`, response.data);
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || '그룹 가입에 실패했습니다.');
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to join group ${groupId}:`, error);
+      throw error;
+    }
+  }
+
+  // 그룹 정보 조회 (공개 정보, 로그인 불필요)
+  async getPublicGroupInfo(groupId: number): Promise<Group> {
+    try {
+      console.log(`[GroupService] 공개 그룹 정보 조회 - groupId: ${groupId}`);
+      
+      const response = await apiClient.get(`/groups/${groupId}/public`);
+      
+      console.log(`[GroupService] 공개 그룹 정보 응답:`, response.data);
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || '그룹 정보 조회에 실패했습니다.');
+      }
+      
+      return response.data.data;
+    } catch (error) {
+      console.error(`Failed to fetch public group info ${groupId}:`, error);
+      throw error;
+    }
+  }
 }
 
 // 싱글톤 인스턴스 생성
