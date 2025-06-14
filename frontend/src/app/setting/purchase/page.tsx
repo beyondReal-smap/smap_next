@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { 
@@ -15,6 +15,8 @@ import {
   FiFilter
 } from 'react-icons/fi';
 import { HiSparkles, HiCheckCircle } from 'react-icons/hi2';
+import { Order, OrderSummary, OrderListResponse, OrderStatus, OrderStatusLabels, PaymentType, PaymentTypeLabels } from '@/types/order';
+import authService from '@/services/authService';
 
 // 모바일 최적화된 CSS 애니메이션 (초록색 테마)
 const pageAnimations = `
@@ -216,113 +218,105 @@ html, body {
 `;
 
 // 데이터 타입 정의
-interface Purchase {
-  id: string;
-  type: 'monthly' | 'yearly' | 'premium' | 'addon';
-  name: string;
-  amount: number;
-  date: string;
-  status: 'completed' | 'pending' | 'failed' | 'refunded';
-  paymentMethod: string;
-  receiptUrl?: string;
-  description?: string;
-}
 
 
 
-// 모의 데이터
-const MOCK_PURCHASES: Purchase[] = [
-  {
-    id: '1',
-    type: 'yearly',
-    name: '프리미엄 연간 플랜',
-    amount: 120000,
-    date: '2024-01-15',
-    status: 'completed',
-    paymentMethod: '신용카드 (**** 1234)',
-    receiptUrl: '/receipts/1.pdf',
-    description: '1년간 모든 프리미엄 기능 이용 가능'
-  },
-  {
-    id: '2',
-    type: 'monthly',
-    name: '베이직 월간 플랜',
-    amount: 15000,
-    date: '2024-02-01',
-    status: 'completed',
-    paymentMethod: '카카오페이',
-    receiptUrl: '/receipts/2.pdf'
-  },
-  {
-    id: '3',
-    type: 'addon',
-    name: '추가 저장공간',
-    amount: 5000,
-    date: '2024-02-10',
-    status: 'pending',
-    paymentMethod: '신용카드 (**** 5678)'
-  }
+
+// 상태별 필터 옵션
+const STATUS_FILTERS = [
+  { key: 'all', label: '전체' },
+  { key: OrderStatus.PAYMENT_COMPLETED, label: '완료' },
+  { key: OrderStatus.PAYMENT_PENDING, label: '대기' },
+  { key: OrderStatus.CANCELLED, label: '취소' }
 ];
 
 
 
 export default function PurchasePage() {
   const router = useRouter();
-  const [purchases] = useState(MOCK_PURCHASES);
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [summary, setSummary] = useState<OrderSummary | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string | number>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // 데이터 로드
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const user = authService.getUserData();
+      if (!user?.mt_idx) {
+        setError('사용자 정보를 찾을 수 없습니다');
+        return;
+      }
+
+      // 주문 요약 정보 로드
+      const summaryResponse = await fetch(`/api/orders/summary?memberId=${user.mt_idx}`);
+      if (summaryResponse.ok) {
+        const summaryData = await summaryResponse.json();
+        setSummary(summaryData);
+      }
+
+      // 주문 목록 로드
+      const ordersResponse = await fetch(`/api/orders?memberId=${user.mt_idx}&size=100`);
+      if (ordersResponse.ok) {
+        const ordersData: OrderListResponse = await ordersResponse.json();
+        setOrders(ordersData.orders);
+      }
+
+    } catch (error) {
+      console.error('데이터 로드 오류:', error);
+      setError('데이터를 불러오는데 실패했습니다');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 뒤로가기 핸들러
   const handleBack = () => {
     router.back();
   };
 
-  // 구매 상태별 필터링
-  const filteredPurchases = purchases.filter(purchase => 
-    filterStatus === 'all' || purchase.status === filterStatus
+  // 주문 상태별 필터링
+  const filteredOrders = orders.filter(order => 
+    filterStatus === 'all' || order.ot_status === filterStatus
   );
 
-  // 구매 상태 아이콘
+  // 주문 상태 아이콘
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
+    const statusNum = parseInt(status);
+    switch (statusNum) {
+      case OrderStatus.PAYMENT_COMPLETED:
         return <HiCheckCircle className="w-4 h-4 text-green-500" />;
-      case 'pending':
+      case OrderStatus.PAYMENT_PENDING:
         return <FiClock className="w-4 h-4 text-yellow-500" />;
-      case 'failed':
+      case OrderStatus.CANCELLED:
         return <FiX className="w-4 h-4 text-red-500" />;
-      case 'refunded':
-        return <FiRefreshCw className="w-4 h-4 text-blue-500" />;
       default:
         return <FiInfo className="w-4 h-4 text-gray-400" />;
     }
   };
 
-  // 구매 상태 텍스트
+  // 주문 상태 텍스트
   const getStatusText = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return '결제 완료';
-      case 'pending':
-        return '결제 대기';
-      case 'failed':
-        return '결제 실패';
-      case 'refunded':
-        return '환불 완료';
-      default:
-        return '알 수 없음';
-    }
+    const statusNum = parseInt(status);
+    return OrderStatusLabels[statusNum as OrderStatus] || '알 수 없음';
   };
 
-  // 구매 타입 색상 (초록색 테마)
+  // 결제 타입 색상 (초록색 테마)
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'yearly':
+      case PaymentType.NEW_SIGNUP:
         return 'bg-green-100 text-green-700';
-      case 'monthly':
+      case PaymentType.APP_PAYMENT:
         return 'bg-emerald-100 text-emerald-700';
-      case 'premium':
+      case PaymentType.COUPON:
         return 'bg-teal-100 text-teal-700';
-      case 'addon':
+      case PaymentType.REFERRAL:
         return 'bg-lime-100 text-lime-700';
       default:
         return 'bg-gray-100 text-gray-700';
@@ -330,15 +324,15 @@ export default function PurchasePage() {
   };
 
   // 영수증 다운로드
-  const handleDownloadReceipt = (purchase: Purchase) => {
-    console.log('영수증 다운로드:', purchase);
+  const handleDownloadReceipt = (order: Order) => {
+    console.log('영수증 다운로드:', order);
     // 실제 다운로드 로직 구현
   };
 
-  // 총 지출 계산
-  const totalSpent = purchases
-    .filter(p => p.status === 'completed')
-    .reduce((sum, p) => sum + p.amount, 0);
+  // 총 지출 계산 (요약 정보에서 가져오거나 계산)
+  const totalSpent = summary?.total_amount || 0;
+  const thisMonthSpent = summary?.this_month_amount || 0;
+  const averageSpent = summary?.average_amount || 0;
 
   return (
     <>
@@ -384,7 +378,7 @@ export default function PurchasePage() {
                 className="flex items-center space-x-3"
               >
                 <div>
-                  <h1 className="text-lg font-bold text-gray-900">구매 관리</h1>
+                  <h1 className="text-lg font-bold text-gray-900">구독 관리</h1>
                   <p className="text-xs text-gray-500">결제 내역 및 구독 관리</p>
                 </div>
               </motion.div>
@@ -419,7 +413,7 @@ export default function PurchasePage() {
                     <h2 className="text-xl font-bold">총 지출 현황</h2>
                     <div className="flex items-center space-x-1 bg-yellow-400/20 px-2 py-1 rounded-full">
                       <HiSparkles className="w-3 h-3 text-yellow-300" />
-                      <span className="text-xs font-medium text-yellow-100">{purchases.length}건</span>
+                      <span className="text-xs font-medium text-yellow-100">{summary?.total_orders || 0}건</span>
                     </div>
                   </div>
                   <p className="text-green-100 text-sm mb-1">₩{totalSpent.toLocaleString()}</p>
@@ -434,14 +428,14 @@ export default function PurchasePage() {
                       <FiTrendingUp className="w-4 h-4 text-green-200" />
                       <span className="text-sm text-green-100">이번 달</span>
                     </div>
-                    <p className="text-lg font-bold">₩{(totalSpent * 0.3).toLocaleString()}</p>
+                    <p className="text-lg font-bold">₩{thisMonthSpent.toLocaleString()}</p>
                   </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center space-x-1 mb-1">
                       <FiBarChart className="w-4 h-4 text-green-200" />
                       <span className="text-sm text-green-100">평균</span>
                     </div>
-                    <p className="text-lg font-bold">₩{Math.round(totalSpent / purchases.length).toLocaleString()}</p>
+                    <p className="text-lg font-bold">₩{Math.round(averageSpent).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -467,12 +461,7 @@ export default function PurchasePage() {
                       <FiFilter className="w-4 h-4 text-gray-400" />
                     </div>
                     <div className="flex space-x-2 overflow-x-auto pb-2">
-                      {[
-                        { key: 'all', label: '전체' },
-                        { key: 'completed', label: '완료' },
-                        { key: 'pending', label: '대기' },
-                        { key: 'refunded', label: '환불' }
-                      ].map(({ key, label }) => (
+                      {STATUS_FILTERS.map(({ key, label }) => (
                         <button
                           key={key}
                           onClick={() => setFilterStatus(key)}
@@ -489,15 +478,31 @@ export default function PurchasePage() {
                   </div>
 
                   {/* 구매 내역 - 초록색 테마 */}
-                  {filteredPurchases.length > 0 ? (
+                  {loading ? (
+                    <div className="text-center py-16">
+                      <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FiShoppingBag className="w-10 h-10 text-green-400 animate-pulse" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">로딩 중...</h3>
+                      <p className="text-gray-500">주문 내역을 불러오고 있습니다</p>
+                    </div>
+                  ) : error ? (
+                    <div className="text-center py-16">
+                      <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FiX className="w-10 h-10 text-red-400" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">오류 발생</h3>
+                      <p className="text-gray-500">{error}</p>
+                    </div>
+                  ) : filteredOrders.length > 0 ? (
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                      {filteredPurchases.map((purchase, index) => (
+                      {filteredOrders.map((order, index) => (
                         <motion.div
-                          key={purchase.id}
+                          key={order.ot_idx}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.1 }}
-                          className={`p-4 menu-item-hover mobile-button ${index !== filteredPurchases.length - 1 ? 'border-b border-gray-50' : ''}`}
+                          className={`p-4 menu-item-hover mobile-button ${index !== filteredOrders.length - 1 ? 'border-b border-gray-50' : ''}`}
                         >
                           <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -506,22 +511,25 @@ export default function PurchasePage() {
                             
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center space-x-2 mb-1">
-                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getTypeColor(purchase.type)}`}>
-                                  {purchase.name}
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getTypeColor(order.ot_pay_type || '')}`}>
+                                  {order.ot_title || '주문'}
                                 </span>
                                 <div className="flex items-center space-x-1">
-                                  {getStatusIcon(purchase.status)}
-                                  <span className="text-xs text-gray-500">{getStatusText(purchase.status)}</span>
+                                  {getStatusIcon(order.ot_status?.toString() || '')}
+                                  <span className="text-xs text-gray-500">{getStatusText(order.ot_status?.toString() || '')}</span>
                                 </div>
                               </div>
-                              <h4 className="font-medium text-gray-900 mb-0.5">₩{purchase.amount.toLocaleString()}</h4>
-                              <p className="text-xs text-gray-500">{purchase.date} • {purchase.paymentMethod}</p>
+                              <h4 className="font-medium text-gray-900 mb-0.5">₩{(order.ot_price || 0).toLocaleString()}</h4>
+                              <p className="text-xs text-gray-500">
+                                {order.ot_wdate ? new Date(order.ot_wdate).toLocaleDateString() : ''} • 
+                                {PaymentTypeLabels[order.ot_pay_type as PaymentType] || order.ot_pay_type}
+                              </p>
                             </div>
                             
                             <div className="flex items-center space-x-2">
-                              {purchase.receiptUrl && (
+                              {order.ot_rsp_imp_uid && (
                                 <motion.button
-                                  onClick={() => handleDownloadReceipt(purchase)}
+                                  onClick={() => handleDownloadReceipt(order)}
                                   whileHover={{ scale: 1.05 }}
                                   whileTap={{ scale: 0.95 }}
                                   className="p-2 bg-green-50 rounded-xl hover:bg-green-100 transition-colors"
@@ -539,8 +547,8 @@ export default function PurchasePage() {
                       <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
                         <FiShoppingBag className="w-10 h-10 text-green-400" />
                       </div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">구매 내역이 없습니다</h3>
-                      <p className="text-gray-500">아직 구매한 상품이나 서비스가 없어요</p>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">주문 내역이 없습니다</h3>
+                      <p className="text-gray-500">아직 주문한 상품이나 서비스가 없어요</p>
                     </div>
                   )}
                 </motion.div>

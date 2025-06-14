@@ -380,11 +380,11 @@ export default function SettingsPage() {
         //   description: '친구 초대하고 혜택 받기'
         // },
         { 
-          label: '구매 내역', 
+          label: '구독 내역', 
           href: '/setting/purchase', 
           icon: FiShoppingBag,
           color: 'bg-emerald-500',
-          description: '결제 및 구매 이력'
+          description: '결제 및 구독 이력'
         },
       ]
     },

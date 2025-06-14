@@ -1,8 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Double, Text, Enum as SQLEnum
-from sqlalchemy.ext.declarative import declarative_base
-from app.db.base_class import Base
+from app.models.base import BaseModel
 
-class Order(Base):
+class Order(BaseModel):
     __tablename__ = "order_t"
     
     ot_idx = Column(Integer, primary_key=True, index=True, autoincrement=True)

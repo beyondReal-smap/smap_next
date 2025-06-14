@@ -1,0 +1,56 @@
+import { NextRequest, NextResponse } from 'next/server';
+import authService from '@/services/authService';
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const memberId = searchParams.get('memberId');
+
+    if (!memberId) {
+      return NextResponse.json(
+        { error: '회원 ID가 필요합니다' },
+        { status: 400 }
+      );
+    }
+
+    // 토큰 가져오기
+    const token = authService.getToken();
+    if (!token) {
+      return NextResponse.json(
+        { error: '인증이 필요합니다' },
+        { status: 401 }
+      );
+    }
+
+    const response = await fetch(
+      `${BACKEND_URL}/api/v1/orders/summary/${memberId}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return NextResponse.json(
+        { error: errorData.detail || '주문 요약 정보 조회에 실패했습니다' },
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data);
+
+  } catch (error) {
+    console.error('주문 요약 정보 조회 오류:', error);
+    return NextResponse.json(
+      { error: '서버 오류가 발생했습니다' },
+      { status: 500 }
+    );
+  }
+} 
