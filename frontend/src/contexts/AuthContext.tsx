@@ -392,16 +392,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // 로그아웃
   const logout = async (): Promise<void> => {
     try {
+      console.log('[AUTH] 로그아웃 시작');
+      
+      // 1. authService 로그아웃 (localStorage, 쿠키 정리)
       await authService.logout();
       
-      // 🗑️ 로그아웃 시 모든 캐시 삭제
+      // 2. NextAuth 세션 정리
+      try {
+        const { signOut } = await import('next-auth/react');
+        await signOut({ redirect: false });
+        console.log('[AUTH] NextAuth 세션 정리 완료');
+      } catch (error) {
+        console.log('[AUTH] NextAuth 세션 정리 오류:', error);
+      }
+      
+      // 3. 모든 캐시 삭제
       clearAllCache();
       console.log('[AUTH] 로그아웃 시 모든 캐시 삭제 완료');
       
+      // 4. 상태 초기화
       dispatch({ type: 'LOGOUT' });
+      
+      console.log('[AUTH] 로그아웃 완료');
     } catch (error) {
       console.error('[AUTH CONTEXT] 로그아웃 실패:', error);
+      
       // 로그아웃은 에러가 발생해도 상태를 초기화
+      try {
+        const { signOut } = await import('next-auth/react');
+        await signOut({ redirect: false });
+      } catch (signOutError) {
+        console.log('[AUTH] NextAuth 세션 정리 오류 (에러 처리):', signOutError);
+      }
+      
       clearAllCache(); // 에러 시에도 캐시는 삭제
       dispatch({ type: 'LOGOUT' });
     }

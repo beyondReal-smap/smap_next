@@ -20,8 +20,11 @@ const apiPaths = ['/api'];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
+  console.log('[MIDDLEWARE] 요청 경로:', pathname);
+  
   // 공개 경로는 통과
   if (publicPaths.some(path => pathname.startsWith(path))) {
+    console.log('[MIDDLEWARE] 공개 경로 통과:', pathname);
     return NextResponse.next();
   }
 
@@ -33,8 +36,11 @@ export function middleware(request: NextRequest) {
   // 쿠키에서 JWT 토큰 확인
   const token = request.cookies.get('token')?.value;
   
+  console.log('[MIDDLEWARE] 토큰 확인:', token ? '토큰 있음' : '토큰 없음');
+  
   // 토큰이 없으면 signin 페이지로 리다이렉트
   if (!token) {
+    console.log('[MIDDLEWARE] 토큰 없음, signin으로 리다이렉트:', pathname);
     const signinUrl = new URL('/signin', request.url);
     signinUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(signinUrl);

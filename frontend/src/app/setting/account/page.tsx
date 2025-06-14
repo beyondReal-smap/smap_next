@@ -196,7 +196,7 @@ html, body {
 
 export default function AccountSettingsPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [profileImg, setProfileImg] = useState(getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0));
   const [showSheet, setShowSheet] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -316,9 +316,19 @@ export default function AccountSettingsPage() {
 
   // 로그아웃 처리
   const handleLogout = async () => {
-    // 로그아웃 로직 구현
-    setShowLogoutModal(false);
-    router.push('/signin');
+    try {
+      setShowLogoutModal(false);
+      
+      // AuthContext의 logout 호출
+      await logout();
+      
+      console.log('[LOGOUT] 로그아웃 완료, signin으로 이동');
+      router.push('/signin');
+    } catch (error) {
+      console.error('[LOGOUT] 로그아웃 실패:', error);
+      // 실패해도 signin으로 이동
+      router.push('/signin');
+    }
   };
 
   // 뒤로가기 핸들러

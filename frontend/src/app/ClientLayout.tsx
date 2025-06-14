@@ -11,8 +11,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMapPreloader } from '@/hooks/useMapPreloader';
 import { useServiceWorker } from '@/hooks/useServiceWorker';
 
-// 인증이 필요하지 않은 페이지들
-const PUBLIC_ROUTES = ['/signin', '/register', '/'];
+// 인증이 필요하지 않은 페이지들 (루트 페이지는 자체적으로 리다이렉트 처리)
+const PUBLIC_ROUTES = ['/signin', '/register', '/login', '/social-login', '/'];
 
 // 인증 가드 컴포넌트
 function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -21,11 +21,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
+    console.log('[AUTH GUARD] 상태 체크:', { 
+      pathname, 
+      isLoggedIn, 
+      loading, 
+      isPublicRoute: PUBLIC_ROUTES.includes(pathname) 
+    });
+
     // 로딩 중이면 대기
-    if (loading) return;
+    if (loading) {
+      console.log('[AUTH GUARD] 로딩 중, 대기...');
+      return;
+    }
 
     // 공개 페이지는 인증 체크 안함
-    if (PUBLIC_ROUTES.includes(pathname)) return;
+    if (PUBLIC_ROUTES.includes(pathname)) {
+      console.log('[AUTH GUARD] 공개 페이지, 인증 체크 생략:', pathname);
+      return;
+    }
 
     // 로그인되지 않은 상태에서 보호된 페이지 접근 시 signin으로 리다이렉트
     if (!isLoggedIn) {
@@ -33,16 +46,33 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       router.push('/signin');
       return;
     }
+
+    console.log('[AUTH GUARD] 인증된 사용자, 접근 허용:', pathname);
   }, [isLoggedIn, loading, pathname, router]);
 
-  // 로딩 중이면 바로 children 렌더링
+  // 로딩 중이면 로딩 화면 표시
   if (loading) {
-    return <>{children}</>;
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
+          <p className="text-gray-600">로딩 중...</p>
+        </div>
+      </div>
+    );
   }
 
+  // 인증되지 않은 사용자가 보호된 페이지에 접근하려는 경우
   if (!isLoggedIn && !PUBLIC_ROUTES.includes(pathname)) {
-    // 로그인 페이지로 리다이렉트 중이므로 기존 컨텐츠 유지
-    return <>{children}</>;
+    console.log('[AUTH GUARD] 인증되지 않은 사용자, 빈 화면 표시 (리다이렉트 대기)');
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
+          <p className="text-gray-600">로그인 페이지로 이동 중...</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;
