@@ -235,5 +235,133 @@ class CRUDMember:
             )
         ).offset(skip).limit(limit).all()
 
+    # 약관 동의 관련 CRUD 함수들
+    def get_consent_info(self, db: Session, *, user_id: int) -> Optional[dict]:
+        """사용자의 동의 정보 조회"""
+        user = self.get(db, user_id)
+        if not user:
+            return None
+        
+        return {
+            "mt_agree1": user.mt_agree1,
+            "mt_agree2": user.mt_agree2,
+            "mt_agree3": user.mt_agree3,
+            "mt_agree4": user.mt_agree4,
+            "mt_agree5": user.mt_agree5
+        }
+
+    def update_consent(self, db: Session, *, user_id: int, field: str, value: str) -> Optional[Member]:
+        """개별 약관 동의 상태 변경"""
+        user = self.get(db, user_id)
+        if not user:
+            return None
+        
+        # 유효한 필드인지 확인
+        valid_fields = ['mt_agree1', 'mt_agree2', 'mt_agree3', 'mt_agree4', 'mt_agree5']
+        if field not in valid_fields:
+            raise ValueError(f"유효하지 않은 필드입니다: {field}")
+        
+        # 유효한 값인지 확인
+        if value not in ['Y', 'N']:
+            raise ValueError(f"유효하지 않은 값입니다: {value}")
+        
+        # 동의 상태 업데이트
+        setattr(user, field, value)
+        user.mt_udate = datetime.utcnow()
+        
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+    def update_all_consent(
+        self, 
+        db: Session, 
+        *, 
+        user_id: int, 
+        consent_data: dict
+    ) -> Optional[Member]:
+        """전체 약관 동의 상태 변경"""
+        user = self.get(db, user_id)
+        if not user:
+            return None
+        
+        # 동의 정보 업데이트
+        for field, value in consent_data.items():
+            if field in ['mt_agree1', 'mt_agree2', 'mt_agree3', 'mt_agree4', 'mt_agree5']:
+                if value in ['Y', 'N']:
+                    setattr(user, field, value)
+        
+        user.mt_udate = datetime.utcnow()
+        
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+    def get_consent_statistics(self, db: Session) -> dict:
+        """전체 동의 통계 조회 (관리자용)"""
+        from sqlalchemy import func
+        
+        # 각 약관별 동의 통계
+        stats = {}
+        for i in range(1, 6):
+            field = f'mt_agree{i}'
+            result = db.query(
+                func.count().label('total'),
+                func.sum(func.case([(getattr(self.model, field) == 'Y', 1)], else_=0)).label('agreed')
+            ).filter(
+                self.model.mt_level > 1,  # 탈퇴하지 않은 회원만
+                self.model.mt_status == 1  # 정상 상태 회원만
+            ).first()
+            
+            stats[field] = {
+                'total': result.total or 0,
+                'agreed': result.agreed or 0,
+                'rate': round((result.agreed / result.total * 100) if result.total > 0 else 0, 2)
+            }
+        
+        return stats
+
+    def get_users_by_consent(
+        self, 
+        db: Session, 
+        *, 
+        field: str, 
+        value: str, 
+        skip: int = 0, 
+        limit: int = 100
+    ) -> List[Member]:
+        """특정 약관 동의 상태별 사용자 조회"""
+        valid_fields = ['mt_agree1', 'mt_agree2', 'mt_agree3', 'mt_agree4', 'mt_agree5']
+        if field not in valid_fields:
+            return []
+        
+        if value not in ['Y', 'N']:
+            return []
+        
+        return db.query(self.model).filter(
+            getattr(self.model, field) == value,
+            self.model.mt_level > 1,
+            self.model.mt_status == 1
+        ).offset(skip).limit(limit).all()
+
+    def update_password(self, db: Session, *, user_id: int, new_password: str) -> Optional[Member]:
+        """비밀번호 변경"""
+        user = self.get(db, user_id)
+        if not user:
+            return None
+        
+        # 새 비밀번호 해싱
+        hashed_password = self.hash_password(new_password)
+        
+        user.mt_pwd = hashed_password
+        user.mt_udate = datetime.utcnow()
+        
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
 # 인스턴스 생성
 crud_member = CRUDMember(Member) 

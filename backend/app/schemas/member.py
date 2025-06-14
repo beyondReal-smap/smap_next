@@ -225,4 +225,53 @@ class WithdrawRequest(BaseModel):
 class WithdrawResponse(BaseModel):
     success: bool
     message: str
-    result: Optional[str] = None 
+    result: Optional[str] = None
+
+# 약관 동의 관련 스키마
+class ConsentUpdate(BaseModel):
+    field: str
+    value: YNEnum
+    
+    @validator('field')
+    def validate_field(cls, v):
+        valid_fields = ['mt_agree1', 'mt_agree2', 'mt_agree3', 'mt_agree4', 'mt_agree5']
+        if v not in valid_fields:
+            raise ValueError(f'유효하지 않은 필드입니다. 허용된 필드: {valid_fields}')
+        return v
+
+class ConsentUpdateAll(BaseModel):
+    mt_agree1: YNEnum
+    mt_agree2: YNEnum
+    mt_agree3: YNEnum
+    mt_agree4: YNEnum
+    mt_agree5: YNEnum
+
+class ConsentResponse(BaseModel):
+    mt_agree1: YNEnum
+    mt_agree2: YNEnum
+    mt_agree3: YNEnum
+    mt_agree4: YNEnum
+    mt_agree5: YNEnum
+    
+    class Config:
+        from_attributes = True
+
+class ConsentUpdateResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+# 약관 정보 스키마
+class TermInfo(BaseModel):
+    id: str
+    title: str
+    description: str
+    version: str
+    last_updated: str
+    is_required: bool
+    db_field: str
+
+class TermsListResponse(BaseModel):
+    success: bool
+    message: str
+    data: list[TermInfo] 

@@ -28,6 +28,12 @@ export interface Member {
   mt_weather_date?: string;
   mt_ldate?: string;
   mt_adate?: string;
+  // 약관 동의 필드
+  mt_agree1?: 'Y' | 'N';  // 서비스이용약관 동의여부
+  mt_agree2?: 'Y' | 'N';  // 개인정보 처리방침 동의여부
+  mt_agree3?: 'Y' | 'N';  // 위치기반서비스 이용약관 동의여부
+  mt_agree4?: 'Y' | 'N';  // 개인정보 제3자 제공 동의여부
+  mt_agree5?: 'Y' | 'N';  // 마케팅 정보 수집 및 이용 동의
   // 추가 필드 (그룹 멤버 조회 시 사용)
   mt_regdate?: string;
   mt_wdate?: string;

@@ -115,10 +115,19 @@ export default function NoticeDetailPage() {
           width: 100% !important;
           height: auto !important;
           transform: none !important;
+          -webkit-transform: none !important;
+          -moz-transform: none !important;
+          -ms-transform: none !important;
+          -o-transform: none !important;
           margin: 0 !important;
           padding: 0 !important;
           display: block !important;
           overflow: visible !important;
+          will-change: auto !important;
+          backface-visibility: visible !important;
+          -webkit-backface-visibility: visible !important;
+          -webkit-perspective: none !important;
+          perspective: none !important;
         }
 
         body, html {
@@ -140,6 +149,7 @@ export default function NoticeDetailPage() {
           }}
           className="fixed top-0 left-0 right-0 z-50 glass-effect"
           style={{ position: 'fixed', zIndex: 9999 }}
+          data-fixed="true"
         >
           <motion.div 
             initial={{ opacity: 0, x: -20 }}

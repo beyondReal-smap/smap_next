@@ -26,10 +26,17 @@ from app.schemas.member import (
     UpdateContactRequest,
     UpdateContactResponse,
     WithdrawRequest,
-    WithdrawResponse
+    WithdrawResponse,
+    ConsentUpdate,
+    ConsentUpdateAll,
+    ConsentResponse,
+    ConsentUpdateResponse,
+    TermInfo,
+    TermsListResponse
 )
 from app.services.member_service import member_service
 from app.crud import crud_auth
+from app.crud.crud_member import crud_member
 from app.models.enums import StatusEnum
 from datetime import datetime
 import logging

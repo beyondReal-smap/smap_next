@@ -344,4 +344,331 @@ router.get('/info', async (req, res) => {
   }
 });
 
+/**
+ * 개별 약관 동의 상태 변경
+ * POST /api/member/consent
+ */
+router.post('/consent', async (req, res) => {
+  try {
+    const { mt_idx, field, value } = req.body;
+    const token = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: '인증 토큰이 필요합니다.'
+      });
+    }
+
+    // 유효한 동의 필드인지 확인
+    const validFields = ['mt_agree1', 'mt_agree2', 'mt_agree3', 'mt_agree4', 'mt_agree5'];
+    if (!validFields.includes(field)) {
+      return res.status(400).json({
+        success: false,
+        message: '유효하지 않은 필드입니다.'
+      });
+    }
+
+    // 유효한 값인지 확인
+    if (!['Y', 'N'].includes(value)) {
+      return res.status(400).json({
+        success: false,
+        message: '유효하지 않은 값입니다. Y 또는 N만 허용됩니다.'
+      });
+    }
+
+    const memberId = extractUserIdFromToken(token);
+    if (!memberId) {
+      return res.status(401).json({
+        success: false,
+        message: '유효하지 않은 토큰입니다.'
+      });
+    }
+
+    // 토큰의 사용자 ID와 요청의 mt_idx가 일치하는지 확인
+    if (memberId !== mt_idx) {
+      return res.status(403).json({
+        success: false,
+        message: '권한이 없습니다.'
+      });
+    }
+
+    console.log(`동의 상태 변경 시도 - 회원 ID: ${memberId}, 필드: ${field}, 값: ${value}`);
+
+    // 1단계: 외부 API 시도
+    let updateSuccess = false;
+    try {
+      const response = await apiClient.put(`/api/v1/members/${memberId}`, {
+        [field]: value
+      });
+      updateSuccess = response.success;
+      console.log('외부 API 동의 상태 변경 결과:', updateSuccess);
+    } catch (error) {
+      console.log('외부 API 실패, 데이터베이스로 폴백');
+      // 2단계: 데이터베이스 직접 접근으로 폴백
+      let connection;
+      try {
+        connection = await mysql.createConnection(dbConfig);
+        
+        const [result] = await connection.execute(
+          `UPDATE member_t SET ${field} = ?, mt_udate = NOW() WHERE mt_idx = ? AND mt_show = "Y"`,
+          [value, memberId]
+        );
+
+        updateSuccess = result.affectedRows > 0;
+        console.log('데이터베이스 동의 상태 변경 결과:', updateSuccess);
+      } catch (dbError) {
+        console.error('데이터베이스 동의 상태 변경 실패:', dbError);
+        updateSuccess = false;
+      } finally {
+        if (connection) {
+          await connection.end();
+        }
+      }
+    }
+
+    if (updateSuccess) {
+      res.json({
+        success: true,
+        message: '동의 상태가 성공적으로 변경되었습니다.',
+        data: {
+          mt_idx: memberId,
+          field,
+          value
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: '동의 상태 변경에 실패했습니다.'
+      });
+    }
+
+  } catch (error) {
+    console.error('동의 상태 변경 중 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '동의 상태 변경 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+/**
+ * 전체 약관 동의 처리
+ * POST /api/member/consent/all
+ */
+router.post('/consent/all', async (req, res) => {
+  try {
+    const { mt_idx, mt_agree1, mt_agree2, mt_agree3, mt_agree4, mt_agree5 } = req.body;
+    const token = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: '인증 토큰이 필요합니다.'
+      });
+    }
+
+    // 모든 값이 'Y' 또는 'N'인지 확인
+    const agreeValues = [mt_agree1, mt_agree2, mt_agree3, mt_agree4, mt_agree5];
+    const validValues = agreeValues.every(value => ['Y', 'N'].includes(value));
+    
+    if (!validValues) {
+      return res.status(400).json({
+        success: false,
+        message: '유효하지 않은 동의 값입니다. Y 또는 N만 허용됩니다.'
+      });
+    }
+
+    const memberId = extractUserIdFromToken(token);
+    if (!memberId) {
+      return res.status(401).json({
+        success: false,
+        message: '유효하지 않은 토큰입니다.'
+      });
+    }
+
+    // 토큰의 사용자 ID와 요청의 mt_idx가 일치하는지 확인
+    if (memberId !== mt_idx) {
+      return res.status(403).json({
+        success: false,
+        message: '권한이 없습니다.'
+      });
+    }
+
+    console.log(`전체 동의 처리 시도 - 회원 ID: ${memberId}`);
+
+    // 1단계: 외부 API 시도
+    let updateSuccess = false;
+    try {
+      const response = await apiClient.put(`/api/v1/members/${memberId}`, {
+        mt_agree1,
+        mt_agree2,
+        mt_agree3,
+        mt_agree4,
+        mt_agree5
+      });
+      updateSuccess = response.success;
+      console.log('외부 API 전체 동의 처리 결과:', updateSuccess);
+    } catch (error) {
+      console.log('외부 API 실패, 데이터베이스로 폴백');
+      // 2단계: 데이터베이스 직접 접근으로 폴백
+      let connection;
+      try {
+        connection = await mysql.createConnection(dbConfig);
+        
+        const [result] = await connection.execute(
+          `UPDATE member_t SET 
+           mt_agree1 = ?, 
+           mt_agree2 = ?, 
+           mt_agree3 = ?, 
+           mt_agree4 = ?, 
+           mt_agree5 = ?, 
+           mt_udate = NOW() 
+           WHERE mt_idx = ? AND mt_show = "Y"`,
+          [mt_agree1, mt_agree2, mt_agree3, mt_agree4, mt_agree5, memberId]
+        );
+
+        updateSuccess = result.affectedRows > 0;
+        console.log('데이터베이스 전체 동의 처리 결과:', updateSuccess);
+      } catch (dbError) {
+        console.error('데이터베이스 전체 동의 처리 실패:', dbError);
+        updateSuccess = false;
+      } finally {
+        if (connection) {
+          await connection.end();
+        }
+      }
+    }
+
+    if (updateSuccess) {
+      res.json({
+        success: true,
+        message: '전체 동의가 성공적으로 처리되었습니다.',
+        data: {
+          mt_idx: memberId,
+          mt_agree1,
+          mt_agree2,
+          mt_agree3,
+          mt_agree4,
+          mt_agree5
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: '전체 동의 처리에 실패했습니다.'
+      });
+    }
+
+  } catch (error) {
+    console.error('전체 동의 처리 중 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '전체 동의 처리 중 오류가 발생했습니다.'
+    });
+  }
+});
+
+/**
+ * 사용자 동의 정보 조회
+ * GET /api/member/consent/:mt_idx
+ */
+router.get('/consent/:mt_idx', async (req, res) => {
+  try {
+    const { mt_idx } = req.params;
+    const token = req.headers.authorization?.replace('Bearer ', '');
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: '인증 토큰이 필요합니다.'
+      });
+    }
+
+    const memberId = extractUserIdFromToken(token);
+    if (!memberId) {
+      return res.status(401).json({
+        success: false,
+        message: '유효하지 않은 토큰입니다.'
+      });
+    }
+
+    // 토큰의 사용자 ID와 요청의 mt_idx가 일치하는지 확인
+    if (memberId !== parseInt(mt_idx)) {
+      return res.status(403).json({
+        success: false,
+        message: '권한이 없습니다.'
+      });
+    }
+
+    console.log(`동의 정보 조회 시도 - 회원 ID: ${memberId}`);
+
+    // 1단계: 외부 API 시도
+    let consentData = null;
+    try {
+      const response = await apiClient.get(`/api/v1/members/${memberId}`);
+      if (response.success && response.data) {
+        consentData = {
+          mt_agree1: response.data.mt_agree1 || 'N',
+          mt_agree2: response.data.mt_agree2 || 'N',
+          mt_agree3: response.data.mt_agree3 || 'N',
+          mt_agree4: response.data.mt_agree4 || 'N',
+          mt_agree5: response.data.mt_agree5 || 'N'
+        };
+      }
+      console.log('외부 API 동의 정보 조회 결과:', consentData);
+    } catch (error) {
+      console.log('외부 API 실패, 데이터베이스로 폴백');
+      // 2단계: 데이터베이스 직접 접근으로 폴백
+      let connection;
+      try {
+        connection = await mysql.createConnection(dbConfig);
+        
+        const [rows] = await connection.execute(
+          'SELECT mt_agree1, mt_agree2, mt_agree3, mt_agree4, mt_agree5 FROM member_t WHERE mt_idx = ? AND mt_show = "Y"',
+          [memberId]
+        );
+
+        if (rows.length > 0) {
+          consentData = {
+            mt_agree1: rows[0].mt_agree1 || 'N',
+            mt_agree2: rows[0].mt_agree2 || 'N',
+            mt_agree3: rows[0].mt_agree3 || 'N',
+            mt_agree4: rows[0].mt_agree4 || 'N',
+            mt_agree5: rows[0].mt_agree5 || 'N'
+          };
+        }
+        console.log('데이터베이스 동의 정보 조회 결과:', consentData);
+      } catch (dbError) {
+        console.error('데이터베이스 동의 정보 조회 실패:', dbError);
+      } finally {
+        if (connection) {
+          await connection.end();
+        }
+      }
+    }
+
+    if (consentData) {
+      res.json({
+        success: true,
+        message: '동의 정보 조회 성공',
+        data: consentData
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: '동의 정보를 찾을 수 없습니다.'
+      });
+    }
+
+  } catch (error) {
+    console.error('동의 정보 조회 중 오류:', error);
+    res.status(500).json({
+      success: false,
+      message: '동의 정보 조회 중 오류가 발생했습니다.'
+    });
+  }
+});
+
 module.exports = router; 

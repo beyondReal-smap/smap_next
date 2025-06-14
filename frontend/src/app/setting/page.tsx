@@ -372,15 +372,8 @@ export default function SettingsPage() {
           label: '구매 내역', 
           href: '/setting/purchase', 
           icon: FiShoppingBag,
-          color: 'bg-teal-500',
+          color: 'bg-emerald-500',
           description: '결제 및 구매 이력'
-        },
-        { 
-          label: '구독 관리', 
-          href: '/setting/subscription', 
-          icon: FiCreditCard,
-          color: 'bg-yellow-500',
-          description: '플랜 변경 및 구독 관리'
         },
       ]
     },
@@ -391,7 +384,7 @@ export default function SettingsPage() {
           label: '약관 및 정책', 
           href: '/setting/terms', 
           icon: FiFileText,
-          color: 'bg-gray-500',
+          color: 'bg-yellow-500',
           description: '이용약관 및 개인정보처리방침'
         },
       ]

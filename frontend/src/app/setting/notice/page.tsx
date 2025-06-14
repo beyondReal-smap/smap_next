@@ -90,6 +90,28 @@ html, body {
   }
 }
 
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutToBottom {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -101,6 +123,17 @@ html, body {
   }
 }
 
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .animate-slideInFromRight {
   animation: slideInFromRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
@@ -109,8 +142,20 @@ html, body {
   animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
 }
 
+.animate-slideInFromBottom {
+  animation: slideInFromBottom 0.3s ease-out forwards;
+}
+
+.animate-slideOutToBottom {
+  animation: slideOutToBottom 0.3s ease-in forwards;
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.2s ease-out forwards;
 }
 
 .initial-hidden {
@@ -136,10 +181,32 @@ html, body {
 }
 
 .glass-effect {
-  backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.7);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999 !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  width: 100% !important;
+  height: auto !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  -moz-transform: none !important;
+  -ms-transform: none !important;
+  -o-transform: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
+  overflow: visible !important;
+  will-change: auto !important;
+  backface-visibility: visible !important;
+  -webkit-backface-visibility: visible !important;
+  -webkit-perspective: none !important;
+  perspective: none !important;
 }
 
 .menu-item-hover {
@@ -158,6 +225,10 @@ html, body {
 .card-hover:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+body, html {
+  word-break: keep-all;
 }
 `;
 
@@ -221,6 +292,7 @@ export default function NoticePage() {
             scale: { duration: 0.6 }
           }}
           className="fixed top-0 left-0 right-0 z-20 glass-effect"
+          data-fixed="true"
         >
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
