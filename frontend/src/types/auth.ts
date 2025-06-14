@@ -140,6 +140,7 @@ export interface AuthState {
   selectedGroup: GroupWithMembers | null;
   loading: boolean;
   error: string | null;
+  isPreloadingComplete: boolean;
 }
 
 // Auth 액션 타입
@@ -152,4 +153,5 @@ export type AuthAction =
   | { type: 'SELECT_GROUP'; payload: GroupWithMembers | null }
   | { type: 'UPDATE_GROUPS'; payload: GroupWithMembers[] }
   | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_ERROR'; payload: string | null }; 
+  | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'SET_PRELOADING_COMPLETE'; payload: boolean }; 

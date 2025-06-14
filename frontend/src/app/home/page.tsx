@@ -614,12 +614,21 @@ const getScheduleStatus = (schedule: Schedule): { name: 'completed' | 'ongoing' 
 export default function HomePage() {
   const router = useRouter();
   // 인증 관련 상태 추가
-  const { user, isLoggedIn, loading: authLoading } = useAuth();
+  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
       // UserContext 사용
     const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData } = useUser();
    
     // 데이터 캐시 컨텍스트
-    const dataCacheContext = useDataCache();
+    const { 
+      getUserProfile, 
+      getUserGroups, 
+      getGroupMembers, 
+      getScheduleData,
+      getLocationData,
+      getGroupPlaces,
+      getDailyLocationCounts,
+      isCacheValid
+    } = useDataCache();
     
     const [userName, setUserName] = useState('사용자');
   const [userLocation, setUserLocation] = useState<Location>({ lat: 37.5642, lng: 127.0016 }); // 기본: 서울
@@ -672,6 +681,8 @@ export default function HomePage() {
   const [groupSchedules, setGroupSchedules] = useState<Schedule[]>([]); // 그룹 전체 스케줄 (memberId 포함)
   // const [dataFetched, setDataFetched] = useState({ members: false, schedules: false }); // 삭제
   const [isFirstMemberSelectionComplete, setIsFirstMemberSelectionComplete] = useState(false); // 첫번째 멤버 선택 완료 상태 추가
+  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({}); // 그룹별 멤버 수 캐시
+  const [hasNewNotifications, setHasNewNotifications] = useState(false); // 새로운 알림 여부
 
   // 그룹 관련 상태 - UserContext로 대체됨
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
@@ -705,7 +716,7 @@ export default function HomePage() {
       setSelectedGroupId(firstGroup.sgt_idx);
       console.log('[HOME] UserContext에서 첫 번째 그룹 자동 선택:', firstGroup.sgt_title, 'ID:', firstGroup.sgt_idx);
     }
-  }, [isUserDataLoading, userGroups.length, selectedGroupId]); // userGroups 대신 userGroups.length 사용
+  }, [isUserDataLoading, userGroups.length]); // selectedGroupId 의존성 제거로 중복 실행 방지
 
   // selectedGroupId 상태 변화 추적 및 데이터 초기화
   useEffect(() => {
@@ -753,62 +764,80 @@ export default function HomePage() {
     let isMounted = true;
     
     const fetchAllGroupData = async () => {
-      if (!isMounted) return;
+      if (dataFetchedRef.current.loading) return;
+      
+      // 🔥 AuthContext의 로딩과 프리로딩이 완료될 때까지 기다리기
+      if (authLoading || !isPreloadingComplete) {
+        console.log('[fetchAllGroupData] AuthContext 로딩 또는 프리로딩 중이므로 대기:', { authLoading, isPreloadingComplete });
+        return;
+      }
+      
+      dataFetchedRef.current.loading = true;
 
-      console.log('[fetchAllGroupData] 실행 시작 - selectedGroupId:', selectedGroupId, 'userGroups:', userGroups.length);
-
-      // selectedGroupId가 없으면 빈 데이터로 완료 처리 (신규 사용자)
-      if (!selectedGroupId) {
-        console.log('[fetchAllGroupData] selectedGroupId가 없음 - 신규 사용자로 빈 데이터 설정');
-        setGroupMembers([]);
-        setGroupSchedules([]);
-        setFilteredSchedules([]);
-        dataFetchedRef.current.members = true;
-        dataFetchedRef.current.schedules = true;
-        dataFetchedRef.current.currentGroupId = null;
-        setIsFirstMemberSelectionComplete(true);
+      const groupIdToUse = selectedGroupId?.toString() || '';
+      if (!groupIdToUse) {
+        dataFetchedRef.current.loading = false;
         return;
       }
 
-      // 그룹이 변경되었으면 데이터 초기화
-      if (dataFetchedRef.current.currentGroupId !== selectedGroupId) {
-        console.log('[fetchAllGroupData] 그룹 변경 감지 - 데이터 초기화');
-        dataFetchedRef.current.members = false;
-        dataFetchedRef.current.schedules = false;
-        dataFetchedRef.current.currentGroupId = selectedGroupId;
-      }
-
-      // 이미 데이터가 로드되었거나 로딩 중이면 중복 실행 방지 - 조건 강화
-      if (dataFetchedRef.current.members && dataFetchedRef.current.schedules && dataFetchedRef.current.currentGroupId === selectedGroupId) {
-        console.log('[fetchAllGroupData] 현재 그룹의 데이터가 이미 로드되어 중복 실행 방지');
-        return;
-      }
-
-      // 현재 로딩 중인지 확인하는 플래그 추가
-      if (dataFetchedRef.current.loading) {
-        console.log('[fetchAllGroupData] 이미 로딩 중이므로 중복 실행 방지');
-        return;
-      }
+      dataFetchedRef.current.currentGroupId = parseInt(groupIdToUse);
 
       try {
-        dataFetchedRef.current.loading = true; // 로딩 시작 플래그
-        const groupIdToUse = selectedGroupId.toString();
-        console.log('[fetchAllGroupData] 사용할 그룹 ID:', groupIdToUse);
-
         let currentMembers: GroupMember[] = groupMembers.length > 0 ? [...groupMembers] : [];
 
         if (!dataFetchedRef.current.members) {
           console.log('[fetchAllGroupData] 멤버 데이터 로딩 시작');
-          const memberData = await memberService.getGroupMembers(groupIdToUse);
-          if (isMounted) { 
-            if (memberData && memberData.length > 0) { 
-              currentMembers = memberData.map((member: any, index: number) => ({
+          
+          // 🔥 캐시된 데이터 먼저 확인
+          const cachedMembers = getGroupMembers(parseInt(groupIdToUse));
+          const isMemberCacheValid = isCacheValid('groupMembers', parseInt(groupIdToUse));
+          
+          if (cachedMembers && cachedMembers.length > 0 && isMemberCacheValid) {
+            console.log('[fetchAllGroupData] 유효한 캐시된 멤버 데이터 사용:', cachedMembers.length, '명');
+            currentMembers = cachedMembers.map((member: any, index: number) => ({
+              id: member.mt_idx.toString(),
+              name: member.mt_name || `멤버 ${index + 1}`,
+              photo: getSafeImageUrl(member.mt_file1, member.mt_gender, index),
+              isSelected: false,
+              location: { 
+                lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
+                  ? parseFloat(member.mlt_lat.toString()) 
+                  : parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
+                lng: member.mlt_long !== null && member.mlt_long !== undefined 
+                  ? parseFloat(member.mlt_long.toString()) 
+                  : parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
+              },
+              schedules: [], 
+              mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
+              original_index: index,
+              mlt_lat: member.mlt_lat,
+              mlt_long: member.mlt_long,
+              mlt_speed: member.mlt_speed,
+              mlt_battery: member.mlt_battery,
+              mlt_gps_time: member.mlt_gps_time,
+              sgdt_owner_chk: member.sgdt_owner_chk,
+              sgdt_leader_chk: member.sgdt_leader_chk,
+              sgdt_idx: member.sgdt_idx
+            }));
+          } else {
+            // 🔥 캐시된 데이터가 없거나 만료되었을 때만 API 호출
+            // AuthContext 프리로딩이 진행 중일 수 있으므로 잠시 대기
+            console.log('[fetchAllGroupData] 캐시된 멤버 데이터 없음 또는 만료 - 잠시 대기 후 API 호출');
+            
+            // 500ms 대기 후 다시 캐시 확인
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const cachedMembersRetry = getGroupMembers(parseInt(groupIdToUse));
+            const isMemberCacheValidRetry = isCacheValid('groupMembers', parseInt(groupIdToUse));
+            
+            if (cachedMembersRetry && cachedMembersRetry.length > 0 && isMemberCacheValidRetry) {
+              console.log('[fetchAllGroupData] 대기 후 캐시된 멤버 데이터 발견:', cachedMembersRetry.length, '명');
+              currentMembers = cachedMembersRetry.map((member: any, index: number) => ({
                 id: member.mt_idx.toString(),
                 name: member.mt_name || `멤버 ${index + 1}`,
-                photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
+                photo: getSafeImageUrl(member.mt_file1, member.mt_gender, index),
                 isSelected: false,
                 location: { 
-                  // 최신 위치 정보가 있으면 사용, 없으면 기본 위치 사용
                   lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
                     ? parseFloat(member.mlt_lat.toString()) 
                     : parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
@@ -819,103 +848,208 @@ export default function HomePage() {
                 schedules: [], 
                 mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
                 original_index: index,
-                
-                // 새로 추가된 위치 정보
                 mlt_lat: member.mlt_lat,
                 mlt_long: member.mlt_long,
                 mlt_speed: member.mlt_speed,
                 mlt_battery: member.mlt_battery,
                 mlt_gps_time: member.mlt_gps_time,
-                
-                // 그룹 권한 정보
                 sgdt_owner_chk: member.sgdt_owner_chk,
                 sgdt_leader_chk: member.sgdt_leader_chk,
                 sgdt_idx: member.sgdt_idx
               }));
-              console.log('[fetchAllGroupData] 멤버 데이터 로딩 완료:', currentMembers.length, '명');
             } else {
-              console.warn('No member data from API, or API call failed.');
-              setIsFirstMemberSelectionComplete(true);
+              // 여전히 캐시가 없으면 API 호출
+              console.log('[fetchAllGroupData] 대기 후에도 캐시 없음 - API 호출 실행');
+              const memberData = await memberService.getGroupMembers(groupIdToUse);
+              if (isMounted) { 
+                if (memberData && memberData.length > 0) { 
+                  currentMembers = memberData.map((member: any, index: number) => ({
+                    id: member.mt_idx.toString(),
+                    name: member.mt_name || `멤버 ${index + 1}`,
+                    photo: getSafeImageUrl(member.mt_file1, member.mt_gender, index),
+                    isSelected: false,
+                    location: { 
+                      lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
+                        ? parseFloat(member.mlt_lat.toString()) 
+                        : parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
+                      lng: member.mlt_long !== null && member.mlt_long !== undefined 
+                        ? parseFloat(member.mlt_long.toString()) 
+                        : parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
+                    },
+                    schedules: [], 
+                    mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
+                    original_index: index,
+                    mlt_lat: member.mlt_lat,
+                    mlt_long: member.mlt_long,
+                    mlt_speed: member.mlt_speed,
+                    mlt_battery: member.mlt_battery,
+                    mlt_gps_time: member.mlt_gps_time,
+                    sgdt_owner_chk: member.sgdt_owner_chk,
+                    sgdt_leader_chk: member.sgdt_leader_chk,
+                    sgdt_idx: member.sgdt_idx
+                  }));
+                } else {
+                  console.warn('No member data from API, or API call failed.');
+                  setIsFirstMemberSelectionComplete(true);
+                }
+              }
             }
+          }
+          
+          if (isMounted && currentMembers.length > 0) {
             setGroupMembers(currentMembers); 
+            console.log('[fetchAllGroupData] 멤버 데이터 로딩 완료:', currentMembers.length, '명');
             dataFetchedRef.current.members = true;
           }
         }
 
         if (dataFetchedRef.current.members && !dataFetchedRef.current.schedules) {
           console.log('[fetchAllGroupData] 스케줄 데이터 로딩 시작');
-          const scheduleResponse = await scheduleService.getGroupSchedules(parseInt(groupIdToUse)); 
-          if (isMounted) {
-            const rawSchedules = scheduleResponse.data.schedules;
-            if (rawSchedules && rawSchedules.length > 0) {
-              console.log('[fetchAllGroupData] 원본 스케줄 데이터:', rawSchedules.map(s => ({
-                id: s.id,
-                title: s.title,
-                date: s.date,
-                sst_location_lat: s.sst_location_lat,
-                sst_location_long: s.sst_location_long,
-                location: s.location,
-                sst_location_add: s.sst_location_add,
-                mt_schedule_idx: s.mt_schedule_idx,
-                sgdt_idx: s.sgdt_idx
-              })));
-
-              // 스케줄에 statusDetail 추가
-              const schedulesWithStatus = rawSchedules.map((schedule: Schedule) => ({
-                ...schedule,
-                statusDetail: getScheduleStatus(schedule)
-              }));
-              
-              setGroupSchedules(schedulesWithStatus); 
-              setGroupMembers(prevMembers =>
-                prevMembers.map(member => {
-                  const memberSchedules = schedulesWithStatus
-                    .filter((schedule: Schedule) => 
-                      schedule.sgdt_idx !== null && 
-                      schedule.sgdt_idx !== undefined && 
-                      Number(schedule.sgdt_idx) === Number(member.sgdt_idx)
-                    );
-                  
-                  console.log(`[fetchAllGroupData] 멤버 ${member.name}의 스케줄:`, {
-                    memberId: member.id,
-                    memberSgdtIdx: member.sgdt_idx,
-                    totalSchedules: memberSchedules.length,
-                    schedulesWithLocation: memberSchedules.filter(s => s.sst_location_lat && s.sst_location_long).length,
-                    scheduleDetails: memberSchedules.map(s => ({
-                      id: s.id,
-                      title: s.title,
-                      date: s.date,
-                      sgdt_idx: s.sgdt_idx,
-                      statusDetail: s.statusDetail?.name,
-                      sst_location_lat: s.sst_location_lat,
-                      sst_location_long: s.sst_location_long,
-                      hasLocation: !!(s.sst_location_lat && s.sst_location_long)
-                    }))
-                  });
-
-                  return {
-                    ...member,
-                    schedules: memberSchedules
-                  };
-                })
-              );
-              const todayStr = format(new Date(), 'yyyy-MM-dd');
-              const todaySchedules = schedulesWithStatus.filter((s: Schedule) => s.date && s.date.startsWith(todayStr));
-              console.log('[fetchAllGroupData] 오늘의 스케줄:', {
-                todayStr,
-                totalTodaySchedules: todaySchedules.length,
-                schedulesWithLocation: todaySchedules.filter(s => s.sst_location_lat && s.sst_location_long).length,
-                statusDetails: todaySchedules.map(s => ({ id: s.id, title: s.title, status: s.statusDetail?.name }))
-              });
-              
-              // 초기에는 스케줄을 빈 배열로 설정 (첫 번째 멤버 선택 후 필터링됨)
-              setFilteredSchedules([]);
-              console.log('[fetchAllGroupData] 스케줄 데이터 로딩 완료 (초기 빈 배열 설정):', rawSchedules.length, '개');
+          
+          // 🔥 캐시된 스케줄 데이터 먼저 확인
+          const today = new Date().toISOString().split('T')[0];
+          const cachedSchedules: any = getScheduleData(parseInt(groupIdToUse), today);
+          const isScheduleCacheValid = isCacheValid('scheduleData', parseInt(groupIdToUse), today);
+          
+          let rawSchedules: any[] = [];
+          
+          if (cachedSchedules && isScheduleCacheValid) {
+            if (Array.isArray(cachedSchedules)) {
+              console.log('[fetchAllGroupData] 유효한 캐시된 스케줄 데이터 사용 (배열):', cachedSchedules.length, '개');
+              rawSchedules = cachedSchedules;
+            } else if (cachedSchedules.data && cachedSchedules.data.schedules) {
+              console.log('[fetchAllGroupData] 유효한 캐시된 스케줄 데이터 사용 (객체):', cachedSchedules.data.schedules.length, '개');
+              rawSchedules = cachedSchedules.data.schedules;
             } else {
-              console.warn('No schedule data from API for the group, or API call failed.');
-              setGroupSchedules([]);
-              setFilteredSchedules([]);
+              console.log('[fetchAllGroupData] 캐시된 스케줄 데이터 형태 확인 불가 - 대기 후 재시도');
+              
+              // 500ms 대기 후 다시 캐시 확인
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              const cachedSchedulesRetry: any = getScheduleData(parseInt(groupIdToUse), today);
+              const isScheduleCacheValidRetry = isCacheValid('scheduleData', parseInt(groupIdToUse), today);
+              
+              if (cachedSchedulesRetry && isScheduleCacheValidRetry) {
+                if (Array.isArray(cachedSchedulesRetry)) {
+                  console.log('[fetchAllGroupData] 대기 후 캐시된 스케줄 데이터 발견 (배열):', cachedSchedulesRetry.length, '개');
+                  rawSchedules = cachedSchedulesRetry;
+                } else if (cachedSchedulesRetry.data && cachedSchedulesRetry.data.schedules) {
+                  console.log('[fetchAllGroupData] 대기 후 캐시된 스케줄 데이터 발견 (객체):', cachedSchedulesRetry.data.schedules.length, '개');
+                  rawSchedules = cachedSchedulesRetry.data.schedules;
+                } else {
+                  console.log('[fetchAllGroupData] 대기 후에도 캐시 형태 확인 불가 - API 호출');
+                  const scheduleResponse = await scheduleService.getGroupSchedules(parseInt(groupIdToUse)); 
+                  if (scheduleResponse && scheduleResponse.data && scheduleResponse.data.schedules) {
+                    rawSchedules = scheduleResponse.data.schedules;
+                  }
+                }
+              } else {
+                console.log('[fetchAllGroupData] 대기 후에도 캐시 없음 - API 호출');
+                const scheduleResponse = await scheduleService.getGroupSchedules(parseInt(groupIdToUse)); 
+                if (scheduleResponse && scheduleResponse.data && scheduleResponse.data.schedules) {
+                  rawSchedules = scheduleResponse.data.schedules;
+                }
+              }
             }
+          } else {
+            // 캐시된 데이터가 없거나 만료되었으면 잠시 대기 후 재확인
+            console.log('[fetchAllGroupData] 캐시된 스케줄 데이터 없음 또는 만료 - 잠시 대기 후 재확인');
+            
+            // 500ms 대기 후 다시 캐시 확인
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const cachedSchedulesRetry: any = getScheduleData(parseInt(groupIdToUse), today);
+            const isScheduleCacheValidRetry = isCacheValid('scheduleData', parseInt(groupIdToUse), today);
+            
+            if (cachedSchedulesRetry && isScheduleCacheValidRetry) {
+              if (Array.isArray(cachedSchedulesRetry)) {
+                console.log('[fetchAllGroupData] 대기 후 캐시된 스케줄 데이터 발견 (배열):', cachedSchedulesRetry.length, '개');
+                rawSchedules = cachedSchedulesRetry;
+              } else if (cachedSchedulesRetry.data && cachedSchedulesRetry.data.schedules) {
+                console.log('[fetchAllGroupData] 대기 후 캐시된 스케줄 데이터 발견 (객체):', cachedSchedulesRetry.data.schedules.length, '개');
+                rawSchedules = cachedSchedulesRetry.data.schedules;
+              }
+            } else {
+              // 여전히 캐시가 없으면 API 호출
+              console.log('[fetchAllGroupData] 대기 후에도 캐시 없음 - API 호출 실행');
+              const scheduleResponse = await scheduleService.getGroupSchedules(parseInt(groupIdToUse)); 
+              if (scheduleResponse && scheduleResponse.data && scheduleResponse.data.schedules) {
+                rawSchedules = scheduleResponse.data.schedules;
+              }
+            }
+          }
+          
+          if (isMounted && rawSchedules.length > 0) {
+            console.log('[fetchAllGroupData] 원본 스케줄 데이터:', rawSchedules.map(s => ({
+              id: s.id,
+              title: s.title,
+              date: s.date,
+              sst_location_lat: s.sst_location_lat,
+              sst_location_long: s.sst_location_long,
+              location: s.location,
+              sst_location_add: s.sst_location_add,
+              mt_schedule_idx: s.mt_schedule_idx,
+              sgdt_idx: s.sgdt_idx
+            })));
+
+            // 스케줄에 statusDetail 추가
+            const schedulesWithStatus = rawSchedules.map((schedule: Schedule) => ({
+              ...schedule,
+              statusDetail: getScheduleStatus(schedule)
+            }));
+            
+            setGroupSchedules(schedulesWithStatus); 
+            setGroupMembers(prevMembers =>
+              prevMembers.map(member => {
+                const memberSchedules = schedulesWithStatus
+                  .filter((schedule: Schedule) => 
+                    schedule.sgdt_idx !== null && 
+                    schedule.sgdt_idx !== undefined && 
+                    Number(schedule.sgdt_idx) === Number(member.sgdt_idx)
+                  );
+                
+                console.log(`[fetchAllGroupData] 멤버 ${member.name}의 스케줄:`, {
+                  memberId: member.id,
+                  memberSgdtIdx: member.sgdt_idx,
+                  totalSchedules: memberSchedules.length,
+                  schedulesWithLocation: memberSchedules.filter(s => s.sst_location_lat && s.sst_location_long).length,
+                  scheduleDetails: memberSchedules.map(s => ({
+                    id: s.id,
+                    title: s.title,
+                    date: s.date,
+                    sgdt_idx: s.sgdt_idx,
+                    statusDetail: s.statusDetail?.name,
+                    sst_location_lat: s.sst_location_lat,
+                    sst_location_long: s.sst_location_long,
+                    hasLocation: !!(s.sst_location_lat && s.sst_location_long)
+                  }))
+                });
+
+                return {
+                  ...member,
+                  schedules: memberSchedules
+                };
+              })
+            );
+            const todayStr = format(new Date(), 'yyyy-MM-dd');
+            const todaySchedules = schedulesWithStatus.filter((s: Schedule) => s.date && s.date.startsWith(todayStr));
+            console.log('[fetchAllGroupData] 오늘의 스케줄:', {
+              todayStr,
+              totalTodaySchedules: todaySchedules.length,
+              schedulesWithLocation: todaySchedules.filter(s => s.sst_location_lat && s.sst_location_long).length,
+              statusDetails: todaySchedules.map(s => ({ id: s.id, title: s.title, status: s.statusDetail?.name }))
+            });
+            
+            // 초기에는 스케줄을 빈 배열로 설정 (첫 번째 멤버 선택 후 필터링됨)
+            setFilteredSchedules([]);
+            console.log('[fetchAllGroupData] 스케줄 데이터 로딩 완료 (초기 빈 배열 설정):', rawSchedules.length, '개');
+          } else if (isMounted) {
+            console.warn('No schedule data from cache or API for the group.');
+            setGroupSchedules([]);
+            setFilteredSchedules([]);
+          }
+          
+          if (isMounted) {
             dataFetchedRef.current.schedules = true; 
           }
         }
@@ -945,7 +1079,7 @@ export default function HomePage() {
     }
 
     return () => { isMounted = false; };
-  }, [selectedGroupId]); // selectedGroupId를 의존성에 추가
+  }, [selectedGroupId, authLoading, isPreloadingComplete, getGroupMembers, getScheduleData, isCacheValid]); // authLoading, 프리로딩 완료 상태와 캐시 함수들을 의존성에 추가
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
@@ -3197,18 +3331,7 @@ export default function HomePage() {
     });
   }, []);
 
-
-
-
-
-
-  // 상태 추가
-  const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({});
-  
-  // 알림 관련 상태 추가
-  const [hasNewNotifications, setHasNewNotifications] = useState(false);
-
-  // 그룹별 멤버 수 조회 (userGroups가 변경될 때만)
+  // 그룹별 멤버 수 조회 (UserContext 데이터 우선 사용)
   useEffect(() => {
     const fetchGroupMemberCounts = async () => {
       if (!userGroups || userGroups.length === 0) return;
@@ -3217,40 +3340,65 @@ export default function HomePage() {
       
       const counts: Record<number, number> = {};
       
-      // 모든 그룹의 멤버 수를 병렬로 조회
-      await Promise.all(userGroups.map(async (group) => {
-        try {
-          const count = await getGroupMemberCount(group.sgt_idx);
-          counts[group.sgt_idx] = count;
-          console.log(`[HOME] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수:`, count);
-        } catch (error) {
-          console.error(`[HOME] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
-          counts[group.sgt_idx] = 0;
+      // UserContext의 그룹 데이터에서 멤버 수 직접 사용 (API 호출 없음)
+      userGroups.forEach(group => {
+        if (group.member_count !== undefined) {
+          counts[group.sgt_idx] = group.member_count;
+          console.log(`[HOME] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 (UserContext):`, group.member_count);
+        } else {
+          // 캐시된 데이터에서 멤버 수 확인
+          const cachedMembers = getGroupMembers(group.sgt_idx);
+          const isMemberCacheValid = isCacheValid('groupMembers', group.sgt_idx);
+          
+          if (cachedMembers && cachedMembers.length > 0 && isMemberCacheValid) {
+            counts[group.sgt_idx] = cachedMembers.length;
+            console.log(`[HOME] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 (캐시):`, cachedMembers.length);
+          } else {
+            counts[group.sgt_idx] = 0;
+            console.log(`[HOME] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 (기본값):`, 0);
+          }
         }
-      }));
+      });
       
       setGroupMemberCounts(counts);
-      console.log('[HOME] 그룹 멤버 수 조회 완료:', counts);
+      console.log('[HOME] 그룹 멤버 수 조회 완료 (API 호출 없음):', counts);
     };
 
     fetchGroupMemberCounts();
-  }, [userGroups]);
+  }, [userGroups, getGroupMembers, isCacheValid]); // 의존성 최적화
 
-  // 새로운 알림 확인 (사용자 로그인 후)
+  // 새로운 알림 확인 (사용자 로그인 후) - 최적화
   useEffect(() => {
     if (user?.mt_idx && !authLoading) {
-      checkNewNotifications();
+      // 초기 알림 확인은 1초 지연 후 실행 (다른 초기화 완료 후)
+      const initialTimer = setTimeout(() => {
+        checkNewNotifications();
+      }, 1000);
       
-      // 3분마다 새로운 알림 확인
-      const interval = setInterval(checkNewNotifications, 3 * 60 * 1000);
+      // 5분마다 새로운 알림 확인 (3분 → 5분으로 변경)
+      const interval = setInterval(checkNewNotifications, 5 * 60 * 1000);
       
-      return () => clearInterval(interval);
+      return () => {
+        clearTimeout(initialTimer);
+        clearInterval(interval);
+      };
     }
   }, [user?.mt_idx, authLoading]);
 
-  // 그룹 멤버 수를 가져오는 함수
+  // 그룹 멤버 수를 가져오는 함수 (캐시 우선 사용)
   const getGroupMemberCount = async (groupId: number): Promise<number> => {
     try {
+      // 🔥 캐시된 멤버 데이터 먼저 확인
+      const cachedMembers = getGroupMembers(groupId);
+      const isMemberCacheValid = isCacheValid('groupMembers', groupId);
+      
+      if (cachedMembers && cachedMembers.length > 0 && isMemberCacheValid) {
+        console.log(`[getGroupMemberCount] 캐시된 데이터 사용 - 그룹 ${groupId}:`, cachedMembers.length, '명');
+        return cachedMembers.length;
+      }
+      
+      // 캐시가 없으면 API 호출
+      console.log(`[getGroupMemberCount] 캐시 없음 - API 호출 - 그룹 ${groupId}`);
       const memberData = await memberService.getGroupMembers(groupId.toString());
       return memberData ? memberData.length : 0;
     } catch (error) {
@@ -3608,19 +3756,8 @@ export default function HomePage() {
             <div className="flex items-center justify-between h-16 px-4">
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-3">
-                  <div className="p-2 rounded-xl" style={{ backgroundColor: '#0113A3' }}>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 text-white"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path d="M11.47 3.841a.75.75 0 0 1 1.06 0l8.69 8.69a.75.75 0 1 0 1.06-1.061l-8.689-8.69a2.25 2.25 0 0 0-3.182 0l-8.69 8.69a.75.75 0 1 0 1.061 1.06l8.69-8.689Z" />
-                      <path d="m12 5.432 8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 0 1-.75-.75v-4.5a.75.75 0 0 0-.75-.75h-3a.75.75 0 0 0-.75.75V21a.75.75 0 0 1-.75.75H5.625a1.875 1.875 0 0 1-1.875-1.875v-6.198a2.29 2.29 0 0 0 .091-.086L12 5.432Z" />
-                    </svg>
-                  </div>
                   <div>
-                    <h1 className="text-base font-semibold text-gray-900">홈</h1>
+                    <h1 className="text-lg font-semibold text-gray-900">홈</h1>
                     <p className="text-xs text-gray-500">그룹 멤버들과 실시간으로 소통해보세요</p>
                   </div>
                 </div>
@@ -3648,7 +3785,7 @@ export default function HomePage() {
                     }
                   }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="#0113A3">
                     <path fillRule="evenodd" d="M5.25 9a6.75 6.75 0 0 1 13.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 1 1-7.48 0 24.585 24.585 0 0 1-4.831-1.244.75.75 0 0 1-.298-1.205A8.217 8.217 0 0 0 5.25 9.75V9Zm4.502 8.9a2.25 2.25 0 1 0 4.496 0 25.057 25.057 0 0 1-4.496 0Z" clipRule="evenodd" />
                   </svg>
                   {/* 읽지 않은 알림이 있을 때만 빨간색 점 표시 */}
@@ -3663,7 +3800,7 @@ export default function HomePage() {
                   className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200"
                   onClick={() => router.push('/setting')}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="#0113A3">
                     <path fillRule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 0 0-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 0 0-2.282.819l-.922 1.597a1.875 1.875 0 0 0 .432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 0 0 0 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 0 0-.432 2.385l.922 1.597a1.875 1.875 0 0 0 2.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.570.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 0 0 2.28-.819l.923-1.597a1.875 1.875 0 0 0-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 0 0 0-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 0 0-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 0 0-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 0 0-1.85-1.567h-1.843ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" clipRule="evenodd" />
                   </svg>
                 </motion.button>

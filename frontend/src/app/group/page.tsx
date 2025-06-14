@@ -36,6 +36,7 @@ import memberService from '@/services/memberService';
 import scheduleService from '@/services/scheduleService';
 import locationService from '@/services/locationService';
 import { useAuth } from '@/contexts/AuthContext';
+import Modal from '@/components/ui/Modal';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +44,7 @@ export const dynamic = 'force-dynamic';
 const floatingButtonStyles = `
 .floating-button {
   position: fixed;
-  bottom: -195px;
+  bottom: 80px;
   right: 20px;
   z-index: 40;
   background: #0113A3;
@@ -110,31 +111,7 @@ const pageVariants = {
   }
 };
 
-const modalVariants = {
-  hidden: { 
-    opacity: 0, 
-    y: 100,
-    scale: 0.9
-  },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    scale: 1,
-    transition: {
-      duration: 0.3,
-      ease: [0.25, 0.46, 0.45, 0.94]
-    }
-  },
-  exit: { 
-    opacity: 0, 
-    y: 100,
-    scale: 0.9,
-    transition: {
-      duration: 0.2,
-      ease: [0.55, 0.06, 0.68, 0.19]
-    }
-  }
-};
+
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -813,15 +790,6 @@ function GroupPageContent() {
               {currentView === 'list' ? (
                 <div className="flex items-center space-x-3">
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 rounded-xl" style={{ backgroundColor: '#0113A3' }}>
-                      <svg 
-                    className="w-5 h-5 text-white" 
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
-                  </svg>
-                    </div>
                     <div>
                       <h1 className="text-lg font-bold text-gray-900">그룹</h1>
                       <p className="text-xs text-gray-500">나의 소중한 그룹을 관리해보세요</p>
@@ -990,18 +958,6 @@ function GroupPageContent() {
                       </motion.div>
                   </div>
 
-                  {/* 플로팅 추가 버튼 */}
-                  <motion.button
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="floating-button w-14 h-14 rounded-full flex items-center justify-center text-white"
-                    variants={floatingButtonVariants}
-                    initial="initial"
-                    animate="animate"
-                    whileHover="hover"
-                    whileTap="tap"
-                  >
-                    <FiPlus className="w-6 h-6 stroke-2" />
-                  </motion.button>
                 </motion.div>
               ) : selectedGroup ? (
                 <motion.div
@@ -1193,12 +1149,41 @@ function GroupPageContent() {
                           <h3 className="text-lg font-normal text-gray-900">그룹 멤버</h3>
                           <motion.button
                             onClick={() => setIsShareModalOpen(true)}
-                            className="px-3 py-2 bg-pink-500 text-white rounded-lg text-sm flex items-center space-x-1"
-                            whileHover={{ scale: 1.05 }}
+                            className="px-3 py-2 bg-green-600 text-white rounded-lg text-xs font-medium flex items-center space-x-1.5 shadow-md relative overflow-hidden"
+                            whileHover={{ 
+                              scale: 1.05,
+                              backgroundColor: "#16a34a"
+                            }}
                             whileTap={{ scale: 0.95 }}
+                            animate={{
+                              boxShadow: [
+                                "0 2px 8px rgba(34, 197, 94, 0.3)",
+                                "0 4px 12px rgba(34, 197, 94, 0.5)",
+                                "0 2px 8px rgba(34, 197, 94, 0.3)"
+                              ]
+                            }}
+                            transition={{
+                              boxShadow: {
+                                duration: 2,
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                              }
+                            }}
                           >
-                            <MdGroupAdd className="w-4 h-4" />
-                            <span>초대</span>
+                            <motion.div
+                              className="absolute inset-0 bg-white opacity-20"
+                              animate={{
+                                x: ["-100%", "100%"]
+                              }}
+                              transition={{
+                                duration: 2,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                                repeatDelay: 1
+                              }}
+                            />
+                            <MdGroupAdd className="w-4 h-4 relative z-10" />
+                            <span className="relative z-10">초대</span>
                           </motion.button>
                         </div>
                       </div>
@@ -1284,7 +1269,63 @@ function GroupPageContent() {
                                   <FaUsers className="w-6 h-6" style={{ color: 'rgba(1, 19, 163, 0.6)' }} />
                                 </div>
                                 <p className="text-gray-500 font-medium">그룹원이 없습니다</p>
-                                <p className="text-gray-400 text-sm mt-1">새로운 멤버를 초대해보세요</p>
+                                <p className="text-gray-400 text-sm mt-1 mb-4">새로운 멤버를 초대해보세요</p>
+                                <motion.button
+                                  onClick={() => setIsShareModalOpen(true)}
+                                  className="px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium flex items-center space-x-2 mx-auto shadow-md relative overflow-hidden text-sm"
+                                  whileHover={{ 
+                                    scale: 1.05,
+                                    backgroundColor: "#16a34a"
+                                  }}
+                                  whileTap={{ scale: 0.95 }}
+                                  animate={{
+                                    boxShadow: [
+                                      "0 2px 8px rgba(34, 197, 94, 0.3)",
+                                      "0 4px 15px rgba(34, 197, 94, 0.5)",
+                                      "0 2px 8px rgba(34, 197, 94, 0.3)"
+                                    ],
+                                    y: [0, -1, 0]
+                                  }}
+                                  transition={{
+                                    boxShadow: {
+                                      duration: 2.5,
+                                      repeat: Infinity,
+                                      ease: "easeInOut"
+                                    },
+                                    y: {
+                                      duration: 2.5,
+                                      repeat: Infinity,
+                                      ease: "easeInOut"
+                                    }
+                                  }}
+                                >
+                                  <motion.div
+                                    className="absolute inset-0 bg-white opacity-20"
+                                    animate={{
+                                      x: ["-100%", "100%"]
+                                    }}
+                                    transition={{
+                                      duration: 2.5,
+                                      repeat: Infinity,
+                                      ease: "easeInOut",
+                                      repeatDelay: 1.5
+                                    }}
+                                  />
+                                  <motion.div
+                                    animate={{
+                                      rotate: [0, 360]
+                                    }}
+                                    transition={{
+                                      duration: 3,
+                                      repeat: Infinity,
+                                      ease: "linear"
+                                    }}
+                                    className="relative z-10"
+                                  >
+                                    <MdGroupAdd className="w-4 h-4" />
+                                  </motion.div>
+                                  <span className="relative z-10">멤버 초대</span>
+                                </motion.button>
                               </div>
                             )}
                           </div>
@@ -1298,414 +1339,370 @@ function GroupPageContent() {
             </AnimatePresence>
           </div>
 
+        {/* 플로팅 추가 버튼 - 전체 페이지 기준 */}
+        {currentView === 'list' && (
+          <motion.button
+            onClick={() => setIsAddModalOpen(true)}
+            className="floating-button w-14 h-14 rounded-full flex items-center justify-center text-white"
+            variants={floatingButtonVariants}
+            initial="initial"
+            animate="animate"
+            whileHover="hover"
+            whileTap="tap"
+          >
+            <FiPlus className="w-6 h-6 stroke-2" />
+          </motion.button>
+        )}
+
         {/* 모달들 */}
         <AnimatePresence>
           {/* 새 그룹 추가 모달 */}
-          {isAddModalOpen && (
-            <motion.div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsAddModalOpen(false)}
-            >
-              <motion.div 
-                className="bg-white rounded-3xl w-full max-w-md mx-auto"
-                variants={modalVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6 pb-8">
-                  <div className="text-center mb-6">
-                    <HiUserGroup className="w-12 h-12 text-gray-700 mx-auto mb-3" />
-                    <h3 className="text-xl font-normal text-gray-900">새 그룹 만들기</h3>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-normal mb-2" style={{ color: '#0113A3' }}>
-                        그룹명 <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={newGroup.name}
-                        onChange={(e) => setNewGroup(prev => ({ ...prev, name: e.target.value }))}
-                        placeholder="예: 가족, 친구, 직장"
-                        className="w-full px-4 py-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 text-base"
-                        style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
-                        maxLength={50}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">{newGroup.name.length}/50</p>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-normal mb-2" style={{ color: '#0113A3' }}>
-                        그룹 설명
-                      </label>
-                      <textarea
-                        value={newGroup.description}
-                        onChange={(e) => setNewGroup(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="그룹에 대한 간단한 설명을 입력해주세요"
-                        rows={3}
-                        className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 resize-none text-base"
-                        style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
-                        maxLength={100}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">{newGroup.description.length}/100</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex space-x-3 mt-8">
-                    <motion.button
-                      onClick={() => setIsAddModalOpen(false)}
-                      disabled={isCreatingGroup}
-                      className="flex-1 py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium disabled:opacity-50"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      취소
-                    </motion.button>
-                    <motion.button
-                      onClick={handleSaveGroup}
-                      disabled={newGroup.name.trim() === '' || isCreatingGroup}
-                      className="flex-1 py-4 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                      style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      {isCreatingGroup ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                          생성 중...
-                        </>
-                      ) : (
-                        '그룹 만들기'
-                      )}
-                    </motion.button>
-                  </div>
+          <Modal
+            isOpen={isAddModalOpen}
+            onClose={() => setIsAddModalOpen(false)}
+            title="새 그룹 만들기"
+            size="sm"
+            className="rounded-2xl max-w-xs"
+          >
+            <div className="p-4">
+              <div className="text-center mb-4">
+                <HiUserGroup className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#0113A3' }}>
+                    그룹명 <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newGroup.name}
+                    onChange={(e) => setNewGroup(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="예: 가족, 친구, 직장"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-gray-500 text-sm"
+                    style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
+                    maxLength={50}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{newGroup.name.length}/50</p>
                 </div>
-              </motion.div>
-            </motion.div>
-          )}
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#0113A3' }}>
+                    그룹 설명
+                  </label>
+                  <textarea
+                    value={newGroup.description}
+                    onChange={(e) => setNewGroup(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="그룹에 대한 간단한 설명을 입력해주세요"
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:border-gray-500 resize-none text-sm"
+                    style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
+                    maxLength={100}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{newGroup.description.length}/100</p>
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 mt-4">
+                <motion.button
+                  onClick={() => setIsAddModalOpen(false)}
+                  disabled={isCreatingGroup}
+                  className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium disabled:opacity-50 text-sm"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  취소
+                </motion.button>
+                <motion.button
+                  onClick={handleSaveGroup}
+                  disabled={newGroup.name.trim() === '' || isCreatingGroup}
+                  className="flex-1 py-2 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
+                  style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isCreatingGroup ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                      생성 중...
+                    </>
+                  ) : (
+                    '그룹 만들기'
+                  )}
+                </motion.button>
+              </div>
+            </div>
+          </Modal>
 
           {/* 공유 모달 */}
-          {isShareModalOpen && selectedGroup && (
-            <motion.div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsShareModalOpen(false)}
-            >
-              <motion.div 
-                className="bg-white rounded-3xl w-full max-w-md mx-auto"
-                variants={modalVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6 pb-8">
-                  <div className="text-center mb-6">
-                    <FaShare className="w-12 h-12 text-gray-700 mx-auto mb-3" />
-                    <h3 className="text-xl font-bold text-gray-900">그룹 초대하기</h3>
-                    <p className="text-gray-600 mt-1">{selectedGroup.sgt_title}</p>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    <motion.button 
-                      onClick={() => alert('카카오톡 공유 기능은 준비 중입니다.')} 
-                      className="w-full flex items-center justify-center p-4 rounded-2xl bg-[#FEE500] text-[#3C1E1E]"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <RiKakaoTalkFill className="w-6 h-6 mr-4" />
-                      <span className="font-medium">카카오톡으로 공유</span>
-                    </motion.button>
-                    
-                    <motion.button 
-                      onClick={handleCopyLink} 
-                      className="w-full flex items-center justify-center p-4 rounded-2xl bg-blue-400 text-white"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <FiCopy className="w-6 h-6 mr-4" />
-                      <span className="font-medium">초대 링크 복사</span>
-                    </motion.button>
-                    
-                    <motion.button 
-                      onClick={() => alert('문자 공유 기능은 준비 중입니다.')} 
-                      className="w-full flex items-center justify-center p-4 rounded-2xl bg-red-400 text-white"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <MdOutlineMessage className="w-6 h-6 mr-4" />
-                      <span className="font-medium">문자로 공유</span>
-                    </motion.button>
-                    
-                    <motion.button
-                      onClick={() => setIsShareModalOpen(false)}
-                      className="w-full py-4 mt-6 text-gray-600 font-medium"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      닫기
-                    </motion.button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
+          <Modal
+            isOpen={isShareModalOpen && !!selectedGroup}
+            onClose={() => setIsShareModalOpen(false)}
+            title="그룹 초대하기"
+            size="sm"
+            className="rounded-2xl max-w-xs"
+          >
+            <div className="p-4">
+              <div className="text-center mb-4">
+                <FaShare className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+                <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
+              </div>
+              
+              <div className="space-y-2">
+                <motion.button 
+                  onClick={() => alert('카카오톡 공유 기능은 준비 중입니다.')} 
+                  className="w-full flex items-center justify-center p-3 rounded-lg bg-[#FEE500] text-[#3C1E1E]"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <RiKakaoTalkFill className="w-4 h-4 mr-2" />
+                  <span className="font-medium text-sm">카카오톡으로 공유</span>
+                </motion.button>
+                
+                <motion.button 
+                  onClick={handleCopyLink} 
+                  className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-400 text-white"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <FiCopy className="w-4 h-4 mr-2" />
+                  <span className="font-medium text-sm">초대 링크 복사</span>
+                </motion.button>
+                
+                <motion.button 
+                  onClick={() => alert('문자 공유 기능은 준비 중입니다.')} 
+                  className="w-full flex items-center justify-center p-3 rounded-lg bg-red-400 text-white"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <MdOutlineMessage className="w-4 h-4 mr-2" />
+                  <span className="font-medium text-sm">문자로 공유</span>
+                </motion.button>
+                
+                <motion.button
+                  onClick={() => setIsShareModalOpen(false)}
+                  className="w-full py-2 mt-3 text-gray-600 font-medium text-sm"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  닫기
+                </motion.button>
+              </div>
+            </div>
+          </Modal>
 
           {/* 그룹 수정 모달 */}
-          {isEditModalOpen && selectedGroup && (
-            <motion.div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsEditModalOpen(false)}
-            >
-              <motion.div 
-                className="bg-white rounded-3xl w-full max-w-md mx-auto"
-                variants={modalVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6 pb-8">
-                  <div className="text-center mb-6">
-                    <FaEdit className="w-12 h-12 text-gray-700 mx-auto mb-3" />
-                    <h3 className="text-xl font-normal text-gray-900">그룹 수정하기</h3>
-                    <p className="text-gray-600 mt-1">{selectedGroup.sgt_title}</p>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-normal mb-2" style={{ color: '#0113A3' }}>
-                        그룹명 <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={editGroup.name}
-                        onChange={(e) => setEditGroup(prev => ({ ...prev, name: e.target.value }))}
-                        placeholder="예: 가족, 친구, 직장"
-                        className="w-full px-4 py-4 border border-gray-300 rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 text-base"
-                        style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
-                        maxLength={50}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">{editGroup.name.length}/50</p>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-normal mb-2" style={{ color: '#0113A3' }}>
-                        그룹 설명
-                      </label>
-                      <textarea
-                        value={editGroup.description}
-                        onChange={(e) => setEditGroup(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="그룹에 대한 간단한 설명을 입력해주세요"
-                        rows={3}
-                        className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 resize-none text-base"
-                        style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
-                        maxLength={100}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">{editGroup.description.length}/100</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex space-x-3 mt-8">
-                    <motion.button
-                      onClick={() => setIsEditModalOpen(false)}
-                      disabled={isUpdatingGroup}
-                      className="flex-1 py-4 border border-gray-300 rounded-2xl text-gray-700 font-medium disabled:opacity-50"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      취소
-                    </motion.button>
-                    <motion.button
-                      onClick={handleUpdateGroup}
-                      disabled={editGroup.name.trim() === '' || isUpdatingGroup}
-                      className="flex-1 py-4 text-white rounded-2xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                      style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      {isUpdatingGroup ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                          수정 중...
-                        </>
-                      ) : (
-                        '수정 완료'
-                      )}
-                    </motion.button>
-                  </div>
+          <Modal
+            isOpen={isEditModalOpen && !!selectedGroup}
+            onClose={() => setIsEditModalOpen(false)}
+            title="그룹 수정하기"
+            size="sm"
+            className="rounded-2xl max-w-xs"
+          >
+            <div className="p-4">
+              <div className="text-center mb-4">
+                <FaEdit className="w-8 h-8 text-gray-700 mx-auto mb-2" />
+                <p className="text-gray-600 text-sm">{selectedGroup?.sgt_title}</p>
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#0113A3' }}>
+                    그룹명 <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={editGroup.name}
+                    onChange={(e) => setEditGroup(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="예: 가족, 친구, 직장"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-gray-500 text-sm"
+                    style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
+                    maxLength={50}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{editGroup.name.length}/50</p>
                 </div>
-              </motion.div>
-            </motion.div>
-          )}
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{ color: '#0113A3' }}>
+                    그룹 설명
+                  </label>
+                  <textarea
+                    value={editGroup.description}
+                    onChange={(e) => setEditGroup(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="그룹에 대한 간단한 설명을 입력해주세요"
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:border-gray-500 resize-none text-sm"
+                    style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
+                    maxLength={100}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{editGroup.description.length}/100</p>
+                </div>
+              </div>
+              
+              <div className="flex space-x-2 mt-4">
+                <motion.button
+                  onClick={() => setIsEditModalOpen(false)}
+                  disabled={isUpdatingGroup}
+                  className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium disabled:opacity-50 text-sm"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  취소
+                </motion.button>
+                <motion.button
+                  onClick={handleUpdateGroup}
+                  disabled={editGroup.name.trim() === '' || isUpdatingGroup}
+                  className="flex-1 py-2 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
+                  style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isUpdatingGroup ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                      수정 중...
+                    </>
+                  ) : (
+                    '수정 완료'
+                  )}
+                </motion.button>
+              </div>
+            </div>
+          </Modal>
 
           {/* 그룹 삭제 확인 모달 */}
-          {isDeleteModalOpen && selectedGroup && (
-            <motion.div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsDeleteModalOpen(false)}
-            >
-              <motion.div 
-                className="bg-white rounded-2xl w-full max-w-sm mx-auto"
-                variants={modalVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-5">
-                  <div className="text-center mb-4">
-                    <FaTrash className="w-8 h-8 text-red-500 mx-auto mb-2" />
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">그룹 삭제</h3>
-                    <p className="text-gray-600 text-sm">
-                      <span className="font-medium text-red-600">"{selectedGroup.sgt_title}"</span><br />
-                      그룹을 삭제하시겠습니까?
-                    </p>
-                  </div>
-                  
-                  <div className="flex space-x-2">
-                    <motion.button
-                      onClick={() => setIsDeleteModalOpen(false)}
-                      disabled={isDeleting}
-                      className="flex-1 py-3 border border-gray-300 rounded-xl text-gray-700 font-medium disabled:opacity-50 text-sm"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      취소
-                    </motion.button>
-                    <motion.button
-                      onClick={handleDeleteGroup}
-                      disabled={isDeleting}
-                      className="flex-1 py-3 bg-red-500 text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      {isDeleting ? (
-                        <>
-                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
-                          삭제중
-                        </>
-                      ) : (
-                        '삭제'
-                      )}
-                    </motion.button>
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
+          <Modal
+            isOpen={isDeleteModalOpen && !!selectedGroup}
+            onClose={() => setIsDeleteModalOpen(false)}
+            title="그룹 삭제"
+            size="sm"
+            className="rounded-2xl max-w-xs"
+          >
+            <div className="p-4">
+              <div className="text-center mb-4">
+                <FaTrash className="w-8 h-8 text-red-500 mx-auto mb-2" />
+                <p className="text-gray-600 text-sm">
+                  <span className="font-medium text-red-600">"{selectedGroup?.sgt_title}"</span><br />
+                  그룹을 삭제하시겠습니까?
+                </p>
+              </div>
+              
+              <div className="flex space-x-2">
+                <motion.button
+                  onClick={() => setIsDeleteModalOpen(false)}
+                  disabled={isDeleting}
+                  className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium disabled:opacity-50 text-sm"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  취소
+                </motion.button>
+                <motion.button
+                  onClick={handleDeleteGroup}
+                  disabled={isDeleting}
+                  className="flex-1 py-2 bg-red-500 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                      삭제중
+                    </>
+                  ) : (
+                    '삭제'
+                  )}
+                </motion.button>
+              </div>
+            </div>
+          </Modal>
 
           {/* 멤버 관리 모달 */}
-          {isMemberManageModalOpen && selectedMember && (
-            <motion.div 
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMemberManageModalOpen(false)}
-            >
-              <motion.div 
-                className="bg-white rounded-3xl w-full max-w-md mx-auto"
-                variants={modalVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6 pb-8">
-                  <div className="text-center mb-6">
-                    <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: 'rgba(1, 19, 163, 0.1)' }}>
-                      <img
-                        src={getSafeImageUrl(selectedMember.photo || null, selectedMember.mt_gender, selectedMember.original_index)}
-                        alt={selectedMember.mt_name}
-                        className="w-full h-full object-cover rounded-full"
-                        onError={(e) => {
-                          e.currentTarget.src = getDefaultImage(selectedMember.mt_gender, selectedMember.original_index);
-                        }}
-                      />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-1">{selectedMember.mt_nickname || selectedMember.mt_name}</h3>
-                    <p className="text-gray-600">
-                      현재: {selectedMember.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
-                    </p>
-                  </div>
-                  
-                  <div className="space-y-3">
-                    {selectedMember.sgdt_leader_chk === 'Y' ? (
-                      <motion.button 
-                        onClick={() => handleChangeMemberRole('member')}
-                        disabled={isUpdatingMember}
-                        className="w-full flex items-center justify-center p-4 rounded-2xl bg-blue-500 text-white disabled:opacity-50"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        {isUpdatingMember ? (
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                        ) : (
-                          <FaUsers className="w-5 h-5 mr-2" />
-                        )}
-                        <span>멤버로 변경</span>
-                      </motion.button>
-                    ) : (
-                      <motion.button 
-                        onClick={() => handleChangeMemberRole('leader')}
-                        disabled={isUpdatingMember}
-                        className="w-full flex items-center justify-center p-4 rounded-2xl bg-gradient-to-r from-gray-400 to-gray-500 text-white disabled:opacity-50"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        {isUpdatingMember ? (
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                        ) : (
-                          <FaCrown className="w-5 h-5 mr-2" />
-                        )}
-                        <span>리더로 승격</span>
-                      </motion.button>
-                    )}
-                    
-                    <motion.button 
-                      onClick={handleRemoveMember}
-                      disabled={isUpdatingMember}
-                      className="w-full flex items-center justify-center p-4 rounded-2xl bg-red-500 text-white disabled:opacity-50"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      {isUpdatingMember ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                      ) : (
-                        <FaTrash className="w-5 h-5 mr-2" />
-                      )}
-                      <span>그룹에서 탈퇴</span>
-                    </motion.button>
-                    
-                    <motion.button
-                      onClick={() => setIsMemberManageModalOpen(false)}
-                      disabled={isUpdatingMember}
-                      className="w-full py-4 text-gray-600 font-medium disabled:opacity-50"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      취소
-                    </motion.button>
-                  </div>
+          <Modal
+            isOpen={isMemberManageModalOpen && !!selectedMember}
+            onClose={() => setIsMemberManageModalOpen(false)}
+            title="멤버 관리"
+            size="sm"
+            className="rounded-2xl max-w-xs"
+          >
+            <div className="p-4">
+              <div className="text-center mb-4">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: 'rgba(1, 19, 163, 0.1)' }}>
+                  <img
+                    src={getSafeImageUrl(selectedMember?.photo || null, selectedMember?.mt_gender, selectedMember?.original_index || 0)}
+                    alt={selectedMember?.mt_name}
+                    className="w-full h-full object-cover rounded-full"
+                    onError={(e) => {
+                      e.currentTarget.src = getDefaultImage(selectedMember?.mt_gender, selectedMember?.original_index || 0);
+                    }}
+                  />
                 </div>
-              </motion.div>
-            </motion.div>
-          )}
+                <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedMember?.mt_nickname || selectedMember?.mt_name}</h3>
+                <p className="text-gray-600 text-sm">
+                  현재: {selectedMember?.sgdt_leader_chk === 'Y' ? '리더' : '멤버'}
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                {selectedMember?.sgdt_leader_chk === 'Y' ? (
+                  <motion.button 
+                    onClick={() => handleChangeMemberRole('member')}
+                    disabled={isUpdatingMember}
+                    className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-500 text-white disabled:opacity-50"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isUpdatingMember ? (
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    ) : (
+                      <FaUsers className="w-4 h-4 mr-2" />
+                    )}
+                    <span className="text-sm">멤버로 변경</span>
+                  </motion.button>
+                ) : (
+                  <motion.button 
+                    onClick={() => handleChangeMemberRole('leader')}
+                    disabled={isUpdatingMember}
+                    className="w-full flex items-center justify-center p-3 rounded-lg bg-gradient-to-r from-gray-400 to-gray-500 text-white disabled:opacity-50"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isUpdatingMember ? (
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    ) : (
+                      <FaCrown className="w-4 h-4 mr-2" />
+                    )}
+                    <span className="text-sm">리더로 승격</span>
+                  </motion.button>
+                )}
+                
+                <motion.button 
+                  onClick={handleRemoveMember}
+                  disabled={isUpdatingMember}
+                  className="w-full flex items-center justify-center p-3 rounded-lg bg-red-500 text-white disabled:opacity-50"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {isUpdatingMember ? (
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  ) : (
+                    <FaTrash className="w-4 h-4 mr-2" />
+                  )}
+                  <span className="text-sm">그룹에서 탈퇴</span>
+                </motion.button>
+                
+                <motion.button
+                  onClick={() => setIsMemberManageModalOpen(false)}
+                  disabled={isUpdatingMember}
+                  className="w-full py-2 text-gray-600 font-medium disabled:opacity-50 text-sm"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  취소
+                </motion.button>
+              </div>
+            </div>
+          </Modal>
 
           {/* 컴팩트 토스트 모달 */}
           {toastModal.isOpen && (

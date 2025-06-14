@@ -9,8 +9,8 @@ import { UserProvider } from '@/contexts/UserContext';
 import { DataCacheProvider } from '@/contexts/DataCacheContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMapPreloader } from '@/hooks/useMapPreloader';
-import { useServiceWorker } from '@/hooks/useServiceWorker';
-import PerformanceMonitor from '@/components/PerformanceMonitor';
+// import { useServiceWorker } from '@/hooks/useServiceWorker';
+// import PerformanceMonitor from '@/components/PerformanceMonitor';
 
 // 인증이 필요하지 않은 페이지들 (루트 페이지는 자체적으로 리다이렉트 처리)
 const PUBLIC_ROUTES = ['/signin', '/register', '/login', '/social-login', '/'];
@@ -89,7 +89,7 @@ export default function ClientLayout({
 
   // 지도 API 프리로딩 및 서비스 워커 등록
   useMapPreloader();
-  useServiceWorker();
+  // useServiceWorker(); // 임시 비활성화
 
   // 네비게이션 바를 숨길 페이지들
   const hideNavBarPages = ['/signin', '/register', '/notice', '/setting'];
@@ -113,7 +113,7 @@ export default function ClientLayout({
             <AuthGuard>
               {children}
               {!shouldHideNavBar && <BottomNavBar />}
-              <PerformanceMonitor />
+              {/* <PerformanceMonitor /> */}
             </AuthGuard>
           </UserProvider>
         </AuthProvider>

@@ -145,7 +145,7 @@ export default function PerformanceMonitor() {
 
   // 서비스 워커 성능 리포트 요청
   const getServiceWorkerReport = async () => {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
       const messageChannel = new MessageChannel()
       
       return new Promise((resolve) => {
@@ -263,6 +263,70 @@ export default function PerformanceMonitor() {
           SW 리포트
         </button>
       </div>
+
+      {/* 개발 환경 전용 서비스 워커 제어 */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-3 space-y-2">
+          <h4 className="text-xs font-medium text-gray-600 uppercase tracking-wide">서비스 워커 제어</h4>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={async () => {
+                if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                  const registration = await navigator.serviceWorker.getRegistration();
+                  if (registration) {
+                    await registration.update();
+                    console.log('서비스 워커 강제 업데이트 완료');
+                  }
+                }
+              }}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white text-xs py-1 px-2 rounded transition-colors"
+            >
+              SW 업데이트
+            </button>
+            <button
+              onClick={async () => {
+                if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                  const registration = await navigator.serviceWorker.getRegistration();
+                  if (registration) {
+                    await registration.unregister();
+                    console.log('서비스 워커 해제 완료');
+                    window.location.reload();
+                  }
+                }
+              }}
+              className="bg-red-500 hover:bg-red-600 text-white text-xs py-1 px-2 rounded transition-colors"
+            >
+              SW 해제
+            </button>
+            <button
+              onClick={async () => {
+                if (typeof window !== 'undefined' && 'caches' in window) {
+                  const cacheNames = await caches.keys();
+                  await Promise.all(cacheNames.map(name => caches.delete(name)));
+                  console.log('모든 캐시 삭제 완료');
+                  window.location.reload();
+                }
+              }}
+              className="bg-orange-500 hover:bg-orange-600 text-white text-xs py-1 px-2 rounded transition-colors"
+            >
+              캐시 삭제
+            </button>
+            <button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  console.log('스토리지 삭제 완료');
+                  window.location.reload();
+                }
+              }}
+              className="bg-purple-500 hover:bg-purple-600 text-white text-xs py-1 px-2 rounded transition-colors"
+            >
+              스토리지 삭제
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-2 text-xs text-gray-500 text-center">
         Ctrl+Shift+P로 토글

@@ -35,13 +35,40 @@ export default function SignInPage() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { login, isLoggedIn, loading } = useAuth();
 
-  // 이미 로그인된 사용자 감지 및 자동 리다이렉트
+  // AuthContext 상태 변화 감지 및 자동 리다이렉트
+  useEffect(() => {
+    console.log('[SIGNIN] AuthContext 상태 확인:', { isLoggedIn, loading, showErrorModal });
+    
+    // 로딩 중이면 대기
+    if (loading) {
+      console.log('[SIGNIN] AuthContext 로딩 중, 대기...');
+      return;
+    }
+
+    // 에러 모달이 표시 중이면 리다이렉트 하지 않음
+    if (showErrorModal) {
+      console.log('[SIGNIN] 에러 모달 표시 중, 리다이렉트 건너뛰기');
+      return;
+    }
+
+    // 로그인된 사용자는 홈으로 리다이렉트
+    if (isLoggedIn) {
+      console.log('[SIGNIN] 로그인된 사용자 감지, /home으로 리다이렉트');
+      router.replace('/home');
+      return;
+    }
+
+    console.log('[SIGNIN] 로그인되지 않은 상태, 로그인 페이지 표시');
+    setIsCheckingAuth(false);
+  }, [isLoggedIn, loading, router, showErrorModal]);
+
+  // 초기 인증 상태 확인 (페이지 첫 로드 시에만)
   useEffect(() => {
     const checkExistingAuth = async () => {
       try {
-        console.log('[SIGNIN] 기존 인증 상태 확인 중...');
+        console.log('[SIGNIN] 초기 인증 상태 확인 중...');
         
         // URL에서 탈퇴 완료 플래그 확인
         const urlParams = new URLSearchParams(window.location.search);
@@ -55,52 +82,31 @@ export default function SignInPage() {
           newUrl.searchParams.delete('from');
           window.history.replaceState({}, '', newUrl.toString());
           
-          setIsCheckingAuth(false);
           return;
         }
         
-        // 쿠키에서 JWT 토큰 확인
-        const token = document.cookie
-          .split('; ')
-          .find(row => row.startsWith('auth-token='))
-          ?.split('=')[1];
-
-        if (token) {
-          console.log('[SIGNIN] JWT 토큰 발견, 유효성 검증 중...');
-          
-          // 토큰 유효성 검증
-          const response = await fetch('/api/auth/verify-token', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ token }),
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success) {
-              console.log('[SIGNIN] 유효한 토큰 발견, 홈으로 리다이렉트');
-              router.replace('/home');
-              return;
-            }
-          } else {
-            console.log('[SIGNIN] 토큰이 유효하지 않음, 쿠키 삭제');
-            // 유효하지 않은 토큰 삭제
-            document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-          }
+        // AuthContext가 아직 로딩 중이면 대기
+        if (loading) {
+          console.log('[SIGNIN] AuthContext 로딩 중, 초기 확인 건너뛰기');
+          return;
         }
 
-        console.log('[SIGNIN] 기존 인증 없음, 로그인 페이지 표시');
+        // AuthContext에서 이미 로그인 상태라면 리다이렉트
+        if (isLoggedIn) {
+          console.log('[SIGNIN] AuthContext에서 로그인 상태 확인, /home으로 리다이렉트');
+          router.replace('/home');
+          return;
+        }
+
+        console.log('[SIGNIN] 초기 인증 없음, 로그인 페이지 표시');
       } catch (error) {
-        console.error('[SIGNIN] 인증 상태 확인 중 오류:', error);
-      } finally {
-        setIsCheckingAuth(false);
+        console.error('[SIGNIN] 초기 인증 상태 확인 중 오류:', error);
       }
     };
 
+    // 컴포넌트 마운트 시 한 번만 실행
     checkExistingAuth();
-  }, [router]);
+  }, []); // 빈 의존성 배열로 한 번만 실행
 
   // 자동 입력 기능 제거됨 - 사용자가 직접 입력해야 함
   // useEffect(() => {
@@ -164,6 +170,11 @@ export default function SignInPage() {
     }
   }, [searchParams]);
 
+  // 에러 모달 상태 디버깅
+  useEffect(() => {
+    console.log('[SIGNIN] 에러 모달 상태 변화:', { showErrorModal, errorModalMessage });
+  }, [showErrorModal, errorModalMessage]);
+
   // 전화번호 포맷팅 함수 (register/page.tsx의 함수와 유사)
   const formatPhoneNumber = (value: string) => {
     if (!value) return value;
@@ -195,7 +206,12 @@ export default function SignInPage() {
 
   // 전화번호 로그인 핸들러
   const handlePhoneNumberLogin = async (e: React.FormEvent) => {
+    // 폼 기본 제출 동작 방지
     e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('[SIGNIN] 로그인 시도 시작');
+    
     setIsLoading(true);
     setApiError('');
     setFormErrors({});
@@ -209,6 +225,7 @@ export default function SignInPage() {
     }
 
     if (Object.keys(currentFormErrors).length > 0) {
+      console.log('[SIGNIN] 입력 검증 실패:', currentFormErrors);
       setFormErrors(currentFormErrors);
       setIsLoading(false);
       return;
@@ -230,18 +247,27 @@ export default function SignInPage() {
 
     } catch (err: any) {
       console.error('[SIGNIN] 로그인 오류:', err);
+      console.log('[SIGNIN] 에러 메시지:', err.message);
+      
       const errorMessage = err.message || '아이디 또는 비밀번호가 올바르지 않습니다.';
+      console.log('[SIGNIN] 모달에 표시할 메시지:', errorMessage);
+      
       setErrorModalMessage(errorMessage);
       setShowErrorModal(true);
+      
+      console.log('[SIGNIN] 에러 모달 상태 설정 완료');
     } finally {
       setIsLoading(false);
+      console.log('[SIGNIN] 로그인 시도 완료');
     }
   };
 
   // 에러 모달 닫기
   const closeErrorModal = () => {
+    console.log('[SIGNIN] 에러 모달 닫기 시작');
     setShowErrorModal(false);
     setErrorModalMessage('');
+    console.log('[SIGNIN] 에러 모달 닫기 완료 - 사용자가 signin 페이지에 남아있어야 함');
   };
 
   // Google 로그인 핸들러

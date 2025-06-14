@@ -54,12 +54,6 @@ const getMetadata = (): Metadata => {
     // 앱 매니페스트
     manifest: '/manifest.json',
     
-    // 테마 색상
-    themeColor: [
-      { media: '(prefers-color-scheme: light)', color: '#22C55D' },
-      { media: '(prefers-color-scheme: dark)', color: '#16A34A' },
-    ],
-    
     // 앱 링크
     appleWebApp: {
       capable: true,
@@ -137,9 +131,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         
-        {/* 중요한 CSS 프리로드 */}
-        <link rel="preload" href="/fonts/LINESeedKR-Rg.woff2" as="font" type="font/woff2" crossOrigin="" />
-        <link rel="preload" href="/fonts/LINESeedKR-Bd.woff2" as="font" type="font/woff2" crossOrigin="" />
+        {/* 폰트 프리로드 제거 - CSS에서 필요시 로드되도록 함 */}
       </head>
       <body className={`${lineSeed.variable} font-sans antialiased`} suppressHydrationWarning>
         <ClientLayout>

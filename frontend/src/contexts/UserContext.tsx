@@ -1,8 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
-import groupService, { Group } from '@/services/groupService';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { Group } from '@/services/groupService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDataCache } from '@/contexts/DataCacheContext';
 
 // 사용자 기본 정보 타입
 interface UserInfo {
@@ -53,10 +54,11 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // 초기화 완료 상태 추가
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // AuthContext 사용
-  const { user, isLoggedIn, loading: authLoading } = useAuth();
+  // AuthContext와 DataCache 사용
+  const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
+  const { getUserProfile, getUserGroups } = useDataCache();
 
-  // 사용자 데이터 새로고침 함수
+  // 사용자 데이터 새로고침 함수 (캐시된 데이터만 사용)
   const refreshUserData = useCallback(async () => {
     try {
       setIsUserDataLoading(true);
@@ -70,7 +72,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
 
-      console.log('[UserContext] 로그인된 사용자 정보로 데이터 로딩:', user.mt_idx, user.mt_name);
+      console.log('[UserContext] 캐시된 데이터로 사용자 정보 로딩:', user.mt_idx, user.mt_name);
       
       // AuthContext에서 받은 사용자 정보 설정
       let userInfoData: UserInfo = {
@@ -81,55 +83,46 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         profile_image: user.mt_file1 || undefined
       };
 
-      // 사용자 정보가 부족한 경우 (예: email이나 phone이 없는 경우) 추가 API 호출
-      if (!user.mt_email || !user.mt_hp) {
-        try {
-          console.log('[UserContext] 추가 사용자 정보 조회 시도 - 현재 사용자:', user.mt_idx, user.mt_name);
-          
-          // 인증 토큰 포함하여 API 호출
-          const token = localStorage.getItem('auth-token');
-          const headers: HeadersInit = {
-            'Content-Type': 'application/json',
-          };
-          
-          if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-          }
-          
-          const response = await fetch('/api/members/me', {
-            method: 'GET',
-            headers
-          });
-          
-          if (response.ok) {
-            const result = await response.json();
-            if (result.success && result.data) {
-              console.log('[UserContext] 추가 사용자 정보 조회 성공:', result.data);
-              console.log('[UserContext] 조회된 사용자 ID:', result.data.mt_idx, '현재 사용자 ID:', user.mt_idx);
-              userInfoData = {
-                mt_idx: result.data.mt_idx,
-                name: result.data.mt_name || user.mt_name || '사용자',
-                email: result.data.mt_email || user.mt_email || undefined,
-                phone: result.data.mt_hp || user.mt_hp || undefined,
-                profile_image: result.data.mt_file1 || user.mt_file1 || undefined
-              };
-            }
-          }
-        } catch (apiError) {
-          console.warn('[UserContext] 추가 사용자 정보 조회 실패, AuthContext 정보 사용:', apiError);
-        }
+      // 캐시된 사용자 프로필 데이터 확인
+      const cachedProfile = getUserProfile();
+      if (cachedProfile) {
+        console.log('[UserContext] 캐시된 프로필 데이터 사용:', cachedProfile.mt_idx);
+        userInfoData = {
+          mt_idx: cachedProfile.mt_idx,
+          name: cachedProfile.mt_name || user.mt_name || '사용자',
+          email: cachedProfile.mt_email || user.mt_email || undefined,
+          phone: user.mt_hp || undefined, // UserProfile에 mt_hp가 없으므로 user에서 가져옴
+          profile_image: cachedProfile.mt_file1 || user.mt_file1 || undefined
+        };
       }
 
       setUserInfo(userInfoData);
 
-      // 사용자 그룹 목록 조회 (AuthContext에 이미 있지만 최신 상태로 다시 조회)
-      const groups = await groupService.getCurrentUserGroups();
-      setUserGroups(groups);
+      // 캐시된 사용자 그룹 목록 사용 (GroupInfo를 Group으로 변환)
+      const cachedGroups = getUserGroups();
+      if (cachedGroups && cachedGroups.length > 0) {
+        console.log('[UserContext] 캐시된 그룹 데이터 사용:', cachedGroups.length, '개');
+        // GroupInfo를 Group 타입으로 변환
+        const convertedGroups: Group[] = cachedGroups.map(group => ({
+          sgt_idx: group.sgt_idx,
+          sgt_title: group.sgt_title,
+          sgt_content: group.sgt_intro || '',
+          sgt_memo: '',
+          mt_idx: user.mt_idx, // 현재 사용자 ID
+          sgt_show: 'Y',
+          sgt_wdate: new Date().toISOString(),
+          member_count: group.member_count
+        }));
+        setUserGroups(convertedGroups);
+      } else {
+        console.log('[UserContext] 캐시된 그룹 데이터 없음, 빈 배열 설정');
+        setUserGroups([]);
+      }
 
-      console.log('[UserContext] 사용자 데이터 로딩 완료:', {
+      console.log('[UserContext] 사용자 데이터 로딩 완료 (캐시 사용):', {
         userId: user.mt_idx,
         userName: userInfoData.name,
-        groupCount: groups.length
+        groupCount: cachedGroups?.length || 0
       });
 
     } catch (error) {
@@ -138,15 +131,16 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setIsUserDataLoading(false);
     }
-  }, [isLoggedIn, user]);
+  }, [isLoggedIn, user, getUserProfile, getUserGroups]);
 
-  // AuthContext 상태 변경 시 데이터 새로고침
+  // AuthContext 프리로딩 완료 후 데이터 새로고침
   useEffect(() => {
-    // AuthContext 로딩이 완료된 후 실행
-    if (!authLoading) {
+    // AuthContext 로딩과 프리로딩이 모두 완료된 후 실행
+    if (!authLoading && isPreloadingComplete) {
+      console.log('[UserContext] AuthContext 프리로딩 완료, 캐시된 데이터 로딩');
       refreshUserData();
     }
-  }, [authLoading, isLoggedIn, user?.mt_idx, refreshUserData]); // user.mt_idx 추가하여 사용자 변경 시 새로고침
+  }, [authLoading, isPreloadingComplete, refreshUserData]);
 
   // 사용자 변경 시 초기화 상태 리셋
   useEffect(() => {

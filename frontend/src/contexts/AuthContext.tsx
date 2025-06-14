@@ -1,11 +1,18 @@
 'use client';
 
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, useCallback } from 'react';
 import { AuthState, AuthAction, UserProfile, GroupWithMembers, LoginRequest } from '@/types/auth';
 import authService from '@/services/authService';
 import { getSession } from 'next-auth/react';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import dataPreloadService from '@/services/dataPreloadService';
+
+// 전역 상태로 중복 실행 방지
+let globalPreloadingState = {
+  isPreloading: false,
+  completedUsers: new Set<number>(),
+  lastPreloadTime: 0
+};
 
 // 초기 상태
 const initialState: AuthState = {
@@ -14,6 +21,7 @@ const initialState: AuthState = {
   selectedGroup: null,
   loading: true,
   error: null,
+  isPreloadingComplete: false,
 };
 
 // Reducer 함수
@@ -85,6 +93,12 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         error: action.payload,
       };
 
+    case 'SET_PRELOADING_COMPLETE':
+      return {
+        ...state,
+        isPreloadingComplete: action.payload,
+      };
+
     default:
       return state;
   }
@@ -110,6 +124,7 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const [preloadingUsers, setPreloadingUsers] = useState<Set<number>>(new Set()); // 프리로딩 중인 사용자 ID 추적
   
   // DataCache 사용
   const {
@@ -120,85 +135,107 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLocationData,
     setGroupPlaces,
     setDailyLocationCounts,
-    clearAllCache
+    clearAllCache,
+    getUserProfile,
+    getUserGroups
   } = useDataCache();
 
-  // 로그인 성공 시 데이터 프리로딩
-  const executeDataPreloading = async (userId: number) => {
+  // 데이터 프리로딩 함수 (중복 실행 방지 강화)
+  const preloadUserData = useCallback(async (userId: number, source: string = 'unknown') => {
+    const now = Date.now();
+    
+    // 🔥 강화된 중복 실행 방지 로직
+    if (globalPreloadingState.isPreloading) {
+      console.log(`[AUTH] 프리로딩 이미 진행 중이므로 건너뛰기 (${source}):`, userId);
+      return;
+    }
+    
+    if (globalPreloadingState.completedUsers.has(userId)) {
+      const timeSinceLastPreload = now - globalPreloadingState.lastPreloadTime;
+      if (timeSinceLastPreload < 10000) { // 10초 내 중복 방지
+        console.log(`[AUTH] 최근 프리로딩 완료된 사용자이므로 건너뛰기 (${source}):`, userId, `(${timeSinceLastPreload}ms 전)`);
+        dispatch({ type: 'SET_PRELOADING_COMPLETE', payload: true });
+        return;
+      }
+    }
+
+    globalPreloadingState.isPreloading = true;
+    console.log(`[AUTH] 🚀 데이터 프리로딩 시작 (${source}):`, userId);
+
     try {
-      console.log('[AUTH] 🚀 데이터 프리로딩 시작:', userId);
-      
-      const preloadResult = await dataPreloadService.preloadAllData({
+      const results = await dataPreloadService.preloadAllData({
         userId,
         onProgress: (step: string, progress: number) => {
-          console.log(`[AUTH] 프리로딩 진행: ${step} (${progress}%)`);
-        },
-        onError: (error: Error, step: string) => {
-          console.error(`[AUTH] 프리로딩 실패: ${step}`, error);
+          console.log(`[AUTH] 프리로딩 진행 (${source}): ${step} (${progress}%)`);
         }
       });
 
-      // 프리로딩된 데이터를 캐시에 저장
-      if (preloadResult.userProfile) {
-        setUserProfile(preloadResult.userProfile);
-        console.log('[AUTH] ✅ 사용자 프로필 캐시 저장 완료');
+      // 캐시에 데이터 저장
+      if (results.userProfile) {
+        setUserProfile(results.userProfile.data);
+        console.log(`[AUTH] ✅ 사용자 프로필 캐시 저장 완료 (${source})`);
       }
 
-      if (preloadResult.userGroups.length > 0) {
-        setUserGroups(preloadResult.userGroups);
-        console.log('[AUTH] ✅ 사용자 그룹 캐시 저장 완료:', preloadResult.userGroups.length);
+      if (results.userGroups && results.userGroups.length > 0) {
+        setUserGroups(results.userGroups);
+        console.log(`[AUTH] ✅ 사용자 그룹 캐시 저장 완료 (${source}):`, results.userGroups.length);
+
+        // 각 그룹의 데이터 캐시 저장
+        Object.keys(results.groupMembers).forEach(groupId => {
+          const members = results.groupMembers[groupId];
+          if (members) {
+            setGroupMembers(parseInt(groupId), members);
+            console.log(`[AUTH] ✅ 그룹 ${groupId} 멤버 캐시 저장 완료 (${source}):`, members.length);
+          }
+        });
+
+        Object.keys(results.monthlySchedules).forEach(groupId => {
+          const schedules = results.monthlySchedules[groupId];
+          if (schedules) {
+            const today = new Date().toISOString().split('T')[0];
+            setScheduleData(parseInt(groupId), today, schedules);
+            console.log(`[AUTH] ✅ 그룹 ${groupId} 스케줄 캐시 저장 완료 (${source})`);
+          }
+        });
+
+        Object.keys(results.groupPlaces).forEach(groupId => {
+          const places = results.groupPlaces[groupId];
+          if (places) {
+            setGroupPlaces(parseInt(groupId), places);
+            console.log(`[AUTH] ✅ 그룹 ${groupId} 장소 캐시 저장 완료 (${source}):`, places.length);
+          }
+        });
+
+        Object.keys(results.todayLocationData).forEach(groupId => {
+          const locationData = results.todayLocationData[groupId];
+          if (locationData) {
+            const today = new Date().toISOString().split('T')[0];
+            setLocationData(parseInt(groupId), today, userId.toString(), locationData);
+            console.log(`[AUTH] ✅ 그룹 ${groupId} 오늘 위치 데이터 캐시 저장 완료 (${source})`);
+          }
+        });
+
+        Object.keys(results.dailyLocationCounts).forEach(groupId => {
+          const counts = results.dailyLocationCounts[groupId];
+          if (counts) {
+            setDailyLocationCounts(parseInt(groupId), counts);
+            console.log(`[AUTH] ✅ 그룹 ${groupId} 일별 카운트 캐시 저장 완료 (${source})`);
+          }
+        });
       }
 
-      // 각 그룹별 데이터 캐시 저장
-      Object.keys(preloadResult.groupMembers).forEach(groupId => {
-        const members = preloadResult.groupMembers[groupId];
-        if (members) {
-          setGroupMembers(parseInt(groupId), members);
-          console.log(`[AUTH] ✅ 그룹 ${groupId} 멤버 캐시 저장 완료:`, members.length);
-        }
-      });
-
-      Object.keys(preloadResult.monthlySchedules).forEach(groupId => {
-        const schedules = preloadResult.monthlySchedules[groupId];
-        if (schedules) {
-          const today = new Date().toISOString().split('T')[0];
-          setScheduleData(parseInt(groupId), today, schedules);
-          console.log(`[AUTH] ✅ 그룹 ${groupId} 스케줄 캐시 저장 완료`);
-        }
-      });
-
-      Object.keys(preloadResult.groupPlaces).forEach(groupId => {
-        const places = preloadResult.groupPlaces[groupId];
-        if (places) {
-          setGroupPlaces(parseInt(groupId), places);
-          console.log(`[AUTH] ✅ 그룹 ${groupId} 장소 캐시 저장 완료:`, places.length);
-        }
-      });
-
-      Object.keys(preloadResult.todayLocationData).forEach(groupId => {
-        const locationData = preloadResult.todayLocationData[groupId];
-        if (locationData) {
-          const today = new Date().toISOString().split('T')[0];
-          setLocationData(parseInt(groupId), today, userId.toString(), locationData);
-          console.log(`[AUTH] ✅ 그룹 ${groupId} 오늘 위치 데이터 캐시 저장 완료`);
-        }
-      });
-
-      Object.keys(preloadResult.dailyLocationCounts).forEach(groupId => {
-        const counts = preloadResult.dailyLocationCounts[groupId];
-        if (counts) {
-          setDailyLocationCounts(parseInt(groupId), counts);
-          console.log(`[AUTH] ✅ 그룹 ${groupId} 일별 카운트 캐시 저장 완료`);
-        }
-      });
-
-      console.log('[AUTH] 🎉 모든 데이터 프리로딩 및 캐시 저장 완료!');
+      // 프리로딩 완료 상태 업데이트
+      globalPreloadingState.completedUsers.add(userId);
+      globalPreloadingState.lastPreloadTime = now;
+      dispatch({ type: 'SET_PRELOADING_COMPLETE', payload: true });
       
+      console.log(`[AUTH] 🎉 모든 데이터 프리로딩 및 캐시 저장 완료! (${source})`);
     } catch (error) {
-      console.error('[AUTH] ❌ 데이터 프리로딩 실패:', error);
-      // 프리로딩 실패해도 로그인은 계속 진행
+      console.error(`[AUTH] 데이터 프리로딩 실패 (${source}):`, error);
+    } finally {
+      globalPreloadingState.isPreloading = false;
     }
-  };
+  }, [setUserProfile, setUserGroups, setGroupMembers, setScheduleData, setGroupPlaces, setLocationData, setDailyLocationCounts]);
 
   // 초기 인증 상태 확인
   useEffect(() => {
@@ -258,9 +295,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // 최신 데이터로 갱신
           await refreshUserData();
           
-          // 🚀 기존 로그인 사용자도 프리로딩 실행 (백그라운드)
-          executeDataPreloading(userData.mt_idx).catch(error => {
-            console.error('[AUTH] 기존 로그인 사용자 프리로딩 실패:', error);
+          // 🚀 NextAuth 세션 사용자 프리로딩 실행 (백그라운드)
+          preloadUserData(userData.mt_idx, 'NextAuth').catch(error => {
+            console.error('[AUTH] NextAuth 사용자 프리로딩 실패:', error);
           });
           
           return;
@@ -279,9 +316,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // 최신 데이터로 갱신
             await refreshUserData();
             
-            // 🚀 authService 로그인 사용자도 프리로딩 실행 (백그라운드)
-            executeDataPreloading(userData.mt_idx).catch(error => {
-              console.error('[AUTH] authService 로그인 사용자 프리로딩 실패:', error);
+            // 🚀 authService 사용자 프리로딩 실행 (백그라운드) - NextAuth와 다른 사용자일 때만
+            preloadUserData(userData.mt_idx, 'authService').catch(error => {
+              console.error('[AUTH] authService 사용자 프리로딩 실패:', error);
             });
             
             return;
@@ -301,53 +338,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initializeAuth();
   }, []);
 
-    // NextAuth 세션 변경 감지 (비활성화 - 무한 루프 방지)
-  // useEffect(() => {
-  //   const checkSessionChange = async () => {
-  //     try {
-  //       const session = await getSession();
-        
-  //       if (session?.backendData?.member) {
-  //         const sessionUserId = session.backendData.member.mt_idx;
-  //         const currentUserId = state.user?.mt_idx;
-          
-  //         // 세션의 사용자와 현재 사용자가 다르면 업데이트
-  //         if (currentUserId && sessionUserId !== currentUserId) {
-  //           console.log('[AUTH CONTEXT] 세션 사용자 변경 감지:', currentUserId, '->', sessionUserId);
-            
-  //           // 기존 데이터 초기화
-  //           authService.clearAuthData();
-            
-  //           // 새로운 사용자 데이터 설정
-  //           const userData = session.backendData.member;
-  //           const token = session.backendData.token || '';
-            
-  //           console.log('[AUTH CONTEXT] 세션 변경 - 토큰 저장:', token ? '토큰 있음' : '토큰 없음');
-            
-  //           authService.setUserData(userData);
-  //           authService.setToken(token);
-            
-  //           // localStorage에도 직접 저장 (apiClient가 인식할 수 있도록)
-  //           if (typeof window !== 'undefined' && token) {
-  //             localStorage.setItem('auth-token', token);
-  //             console.log('[AUTH CONTEXT] 세션 변경 - localStorage에 토큰 저장 완료');
-  //           }
-            
-  //           dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
-  //           await refreshUserData();
-  //         }
-  //       }
-  //     } catch (error) {
-  //       console.error('[AUTH CONTEXT] 세션 변경 확인 실패:', error);
-  //     }
-  //   };
-
-  //   // 주기적으로 세션 변경 확인 (30초마다로 변경)
-  //   const interval = setInterval(checkSessionChange, 30000);
-    
-  //   return () => clearInterval(interval);
-  // }, [state.user?.mt_idx]);
-
   // 로그인
   const login = async (credentials: LoginRequest): Promise<void> => {
     try {
@@ -363,7 +353,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
           
           // 🚀 로그인 성공 시 백그라운드에서 데이터 프리로딩 실행
-          executeDataPreloading(userProfile.mt_idx).catch(error => {
+          preloadUserData(userProfile.mt_idx, 'login').catch(error => {
             console.error('[AUTH] 로그인 후 프리로딩 실패:', error);
             // 프리로딩 실패는 로그인 성공에 영향을 주지 않음
           });
@@ -374,7 +364,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
           
           // 🚀 로그인 성공 시 백그라운드에서 데이터 프리로딩 실행
-          executeDataPreloading(userProfile.mt_idx).catch(error => {
+          preloadUserData(userProfile.mt_idx, 'login-retry').catch(error => {
             console.error('[AUTH] 로그인 후 프리로딩 실패:', error);
             // 프리로딩 실패는 로그인 성공에 영향을 주지 않음
           });
@@ -412,6 +402,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // 4. 상태 초기화
       dispatch({ type: 'LOGOUT' });
+      
+      // 전역 상태 초기화
+      globalPreloadingState.completedUsers.clear();
+      globalPreloadingState.lastPreloadTime = 0;
+      globalPreloadingState.isPreloading = false;
       
       console.log('[AUTH] 로그아웃 완료');
     } catch (error) {

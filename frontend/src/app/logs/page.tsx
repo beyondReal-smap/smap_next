@@ -530,6 +530,28 @@ const interpolateColor = (color1: string, color2: string, factor: number): strin
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 };
 
+// 멤버 목록 정렬 함수: 오너 > 리더 > mt_idx 순서
+const sortGroupMembers = (members: GroupMember[]): GroupMember[] => {
+  return [...members].sort((a, b) => {
+    // 1. 오너가 최우선
+    if (a.sgdt_owner_chk === 'Y' && b.sgdt_owner_chk !== 'Y') return -1;
+    if (b.sgdt_owner_chk === 'Y' && a.sgdt_owner_chk !== 'Y') return 1;
+    
+    // 2. 리더가 두 번째 우선순위 (오너가 아닌 경우)
+    if (a.sgdt_owner_chk !== 'Y' && b.sgdt_owner_chk !== 'Y') {
+      if (a.sgdt_leader_chk === 'Y' && b.sgdt_leader_chk !== 'Y') return -1;
+      if (b.sgdt_leader_chk === 'Y' && a.sgdt_leader_chk !== 'Y') return 1;
+    }
+    
+    // 3. 같은 권한 레벨이면 mt_idx(id를 숫자로 변환) 순서로 정렬
+    const aId = parseInt(a.id) || 0;
+    const bId = parseInt(b.id) || 0;
+    return aId - bId;
+  });
+};
+
+
+
 // 전역 실행 제어 - 한 번만 실행되도록 보장
 let globalPageExecuted = false;
 let globalComponentInstances = 0;
@@ -1727,7 +1749,87 @@ export default function LogsPage() {
     console.log('[LOGS] ===== 날짜 선택 완료 =====');
   };
 
-
+  // 네모 캘린더 클릭 시 멤버와 날짜를 순서대로 변경하는 함수
+  const handleCalendarSquareClick = async (member: GroupMember, dateString: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log(`[네모 캘린더] 클릭 시작 - 멤버: ${member.name}, 날짜: ${dateString}`);
+    console.log(`[네모 캘린더] 현재 상태 - 선택된 멤버: ${groupMembers.find(m => m.isSelected)?.name}, 선택된 날짜: ${selectedDate}`);
+    
+    // 클릭된 네모에 시각적 피드백
+    const clickedElement = e.currentTarget as HTMLElement;
+    clickedElement.style.transform = 'scale(1.2) translateY(-1px)';
+    clickedElement.style.boxShadow = '0 8px 25px -5px rgba(236, 72, 153, 0.4), 0 0 0 3px rgba(236, 72, 153, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
+    clickedElement.style.zIndex = '1000';
+    clickedElement.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
+    
+    try {
+      // 1단계: 멤버가 다른 경우 먼저 멤버 변경
+      if (!member.isSelected) {
+        console.log(`[네모 캘린더] 1단계: 멤버 변경 ${groupMembers.find(m => m.isSelected)?.name} → ${member.name}`);
+        
+        // 멤버 상태만 먼저 업데이트 (데이터 로딩 없이)
+        const updatedMembers = groupMembers.map(m => ({
+          ...m,
+          isSelected: m.id === member.id
+        }));
+        setGroupMembers(updatedMembers);
+        
+        // 멤버 변경 완료 대기
+        await new Promise(resolve => setTimeout(resolve, 100));
+        console.log(`[네모 캘린더] 멤버 변경 완료: ${member.name}`);
+      }
+      
+      // 2단계: 날짜가 다른 경우 날짜 변경 및 데이터 로딩
+      if (selectedDate !== dateString) {
+        console.log(`[네모 캘린더] 2단계: 날짜 변경 및 데이터 로딩 ${selectedDate} → ${dateString}`);
+        
+        // 지도 초기화
+        clearMapMarkersAndPaths(false, true);
+        setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+        
+        // 통합 함수로 날짜+멤버 데이터 로딩
+        await loadDateMemberData(dateString, member.id, 'date');
+        
+        console.log(`[네모 캘린더] 날짜 변경 및 데이터 로딩 완료: ${dateString}`);
+      } else {
+        console.log(`[네모 캘린더] 같은 날짜 - 데이터 로딩 생략`);
+      }
+      
+      // 사이드바 자동 닫기
+      setTimeout(() => {
+        setIsSidebarOpen(false);
+        console.log('[네모 캘린더] 처리 완료 - 사이드바 자동 닫기');
+      }, 500);
+      
+    } catch (error) {
+      console.error('[네모 캘린더] 처리 중 오류:', error);
+      setIsLocationDataLoading(false);
+      setIsMapLoading(false);
+    }
+    
+    // 시각적 피드백 원복
+    setTimeout(() => {
+      clickedElement.style.transform = '';
+      clickedElement.style.boxShadow = '';
+      clickedElement.style.zIndex = '';
+      clickedElement.style.transition = 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+      
+      setTimeout(() => {
+        clickedElement.style.transition = '';
+      }, 300);
+    }, 250);
+    
+    // 햅틱 피드백
+    try {
+      if ('vibrate' in navigator) {
+        navigator.vibrate([10, 50, 10]);
+      }
+    } catch (err) {
+      console.debug('햅틱 피드백 차단');
+    }
+  };
 
   // 위치 데이터 로딩 후 지도 초기화를 수행하는 함수
   const loadLocationDataWithMapPreset = async (mtIdx: number, date: string, member: GroupMember, forceToday: boolean = false) => {
@@ -2758,7 +2860,7 @@ export default function LogsPage() {
       // 유효하지 않은 clientX 값 체크
       if (isNaN(clientX) || !isFinite(clientX)) return;
       
-      const percentage = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+      const percentage = Math.max(0, Math.min(90, ((clientX - rect.left) / rect.width) * 100));
       
       // 유효하지 않은 percentage 값 체크
       if (isNaN(percentage) || !isFinite(percentage)) return;
@@ -2953,7 +3055,9 @@ export default function LogsPage() {
     if (!map.current || sortedLocationData.length === 0) return;
 
     const totalMarkers = sortedLocationData.length;
-    const currentIndex = Math.floor((percentage / 100) * totalMarkers);
+    // 슬라이더 90% 지점에서 100% 데이터를 보여주도록 조정
+    const adjustedPercentage = Math.min(percentage / 0.9, 100);
+    const currentIndex = Math.floor((adjustedPercentage / 100) * totalMarkers);
     const targetIndex = Math.min(currentIndex, totalMarkers - 1);
 
     if (targetIndex >= 0 && sortedLocationData[targetIndex]) {
@@ -5221,18 +5325,7 @@ export default function LogsPage() {
               >
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-3">
-                  <div
-                    className="p-2 rounded-xl" style={{ backgroundColor: '#0113A3' }}
-                  >
-                    <svg 
-                    className="w-5 h-5 text-white" 
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                  >
-                    <path fillRule="evenodd" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625ZM7.5 15a.75.75 0 0 1 .75-.75h7.5a.75.75 0 0 1 0 1.5h-7.5A.75.75 0 0 1 7.5 15Zm.75-6.75a.75.75 0 0 0 0 1.5H12a.75.75 0 0 0 0-1.5H8.25Z" clipRule="evenodd" />
-                    <path d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z" />
-                  </svg>
-                  </div>
+
                   <div>
                     <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
                     <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
@@ -5398,7 +5491,7 @@ export default function LogsPage() {
                     boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
                   }}
                 >
-                  <div className="flex items-center mb-2">
+                  <div className="flex items-center">
                     <FiPlayCircle className="w-4 h-4 text-blue-500 mr-2" />
                     <h3 className="text-sm font-bold text-gray-900">경로 따라가기</h3>
                   </div>
@@ -5407,7 +5500,7 @@ export default function LogsPage() {
                   <div className="px-2 py-1">
                     <div 
                       ref={sliderRef}
-                      className="relative w-full h-3 bg-gray-200 rounded-full cursor-pointer select-none touch-none overflow-hidden"
+                      className="relative w-full h-8 cursor-pointer select-none touch-none flex items-center"
                       style={{ 
                         touchAction: 'none',
                         userSelect: 'none',
@@ -5417,19 +5510,25 @@ export default function LogsPage() {
                       onMouseDown={handleSliderStart}
                       onTouchStart={handleSliderStart}
                     >
+                      {/* 슬라이더 트랙 */}
+                      <div className="absolute w-full h-3 bg-gray-200 rounded-full top-1/2 transform -translate-y-1/2"></div>
                       {/* 진행 표시 바 */}
                       <div 
-                        className={`absolute top-0 left-0 h-3 bg-blue-500 rounded-full pointer-events-none ${
+                        className={`absolute left-0 h-3 bg-blue-500 rounded-full pointer-events-none top-1/2 transform -translate-y-1/2 ${
                           isSliderDragging ? '' : 'transition-all duration-150 ease-out'
                         }`}
                         style={{ width: `${sliderValue}%` }} 
                       ></div>
                       {/* 슬라이더 핸들 */}
                       <div 
-                        className={`absolute top-1/2 w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg transform -translate-y-1/2 cursor-grab active:cursor-grabbing pointer-events-none ${
+                        className={`absolute w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg transform -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing z-10 ${
                           isSliderDragging ? 'scale-110' : 'transition-all duration-150 ease-out hover:scale-105'
                         }`}
-                        style={{ left: `calc(${sliderValue}% - 12px)` }}
+                        style={{ 
+                          left: `calc(${sliderValue}% - 5px)`,
+                          top: 'calc(50% - 6px)',
+                          pointerEvents: 'auto'
+                        }}
                       ></div>
                     </div>
                     {/* 슬라이더 레이블 */}
@@ -5841,7 +5940,7 @@ export default function LogsPage() {
                 <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-16">
                   {groupMembers.length > 0 ? (
                     <motion.div variants={sidebarContentVariants} className="space-y-2">
-                      {groupMembers.map((member, index) => (
+                      {sortGroupMembers(groupMembers).map((member, index) => (
                         <motion.div
                           key={member.id}
                           id={`member-${member.id}`}
@@ -5981,66 +6080,9 @@ export default function LogsPage() {
                                           } ${isToday && !isSelected ? 'ring-1 ring-indigo-300' : ''}`}
                                           title={`${format(date, 'MM.dd(E)', { locale: ko })} - ${hasLog ? '활동 있음' : '활동 없음'}${isToday ? ' (오늘)' : ''}${isSelected ? ' (선택됨)' : hasLog ? ' (클릭하여 이동)' : ''}`}
                                           onClick={hasLog ? (e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            
                                             const dateString = format(date, 'yyyy-MM-dd');
                                             console.log(`[활동 캘린더] 지난주 ${format(date, 'MM.dd(E)', { locale: ko })} 클릭 - 멤버: ${member.name}, 날짜: ${dateString}`);
-                                            
-                                            // 클릭된 네모에 고급스러운 시각적 피드백
-                                            const clickedElement = e.currentTarget as HTMLElement;
-                                            clickedElement.style.transform = 'scale(1.2) translateY(-1px)';
-                                            clickedElement.style.boxShadow = '0 8px 25px -5px rgba(236, 72, 153, 0.4), 0 0 0 3px rgba(236, 72, 153, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
-                                            clickedElement.style.zIndex = '1000';
-                                            clickedElement.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
-                                            
-                                            // 멤버가 다르거나 날짜가 다른 경우 처리
-                                            if (!member.isSelected || dateString !== selectedDate) {
-                                              console.log(`[활동 캘린더] 지난주 변경: ${selectedDate} → ${dateString}, 멤버: ${member.name} (선택됨: ${member.isSelected})`);
-                                              
-                                              // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택
-                                              if (!member.isSelected) {
-                                                console.log(`[활동 캘린더] 멤버 선택 후 날짜 변경`);
-                                                // 멤버 선택을 async로 처리하고 완료 후 날짜 변경
-                                                (async () => {
-                                                  await handleMemberSelect(member.id, e); // 이벤트 객체 전달로 사용자 선택으로 처리
-                                                  // 멤버 선택 완료 후 날짜 변경 (날짜가 다른 경우에만)
-                                                  if (dateString !== selectedDate) {
-                                                    setTimeout(() => {
-                                                      handleDateSelect(dateString);
-                                                    }, 300); // 300ms로 증가하여 멤버 선택 완료 확실히 대기
-                                                  }
-                                                })();
-                                              } else {
-                                                // 이미 선택된 멤버인 경우 날짜만 변경
-                                                console.log(`[활동 캘린더] 선택된 멤버 - 날짜만 변경`);
-                                                handleDateSelect(dateString);
-                                              }
-                                            } else {
-                                              console.log(`[활동 캘린더] 같은 멤버, 같은 날짜 - 변경 없음`);
-                                            }
-                                            
-                                            // 시각적 피드백 원복 (고급스러운 애니메이션)
-                                            setTimeout(() => {
-                                              clickedElement.style.transform = '';
-                                              clickedElement.style.boxShadow = '';
-                                              clickedElement.style.zIndex = '';
-                                              clickedElement.style.transition = 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-                                              
-                                              // 트랜지션 완료 후 초기화
-                                              setTimeout(() => {
-                                                clickedElement.style.transition = '';
-                                              }, 300);
-                                            }, 250);
-                                            
-                                            // 햅틱 피드백 강화
-                                            try {
-                                              if ('vibrate' in navigator) {
-                                                navigator.vibrate([10, 50, 10]);
-                                              }
-                                            } catch (err) {
-                                              console.debug('햅틱 피드백 차단');
-                                            }
+                                            handleCalendarSquareClick(member, dateString, e);
                                           } : undefined}
                                         />
                                       );
@@ -6094,66 +6136,9 @@ export default function LogsPage() {
                                           }`}
                                           title={`${format(date, 'MM.dd(E)', { locale: ko })} - ${hasLog ? '활동 있음' : '활동 없음'}${isToday ? ' (오늘)' : ''}${isSelected ? ' (선택됨)' : (hasLog || isToday) ? ' (클릭하여 이동)' : ''}`}
                                           onClick={(hasLog || isToday) ? (e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            
                                             const dateString = format(date, 'yyyy-MM-dd');
                                             console.log(`[활동 캘린더] 이번주 ${format(date, 'MM.dd(E)', { locale: ko })} 클릭 - 멤버: ${member.name}, 날짜: ${dateString}${isToday ? ' (오늘)' : ''}`);
-                                            
-                                            // 클릭된 네모에 고급스러운 시각적 피드백
-                                            const clickedElement = e.currentTarget as HTMLElement;
-                                            clickedElement.style.transform = 'scale(1.2) translateY(-1px)';
-                                            clickedElement.style.boxShadow = '0 8px 25px -5px rgba(236, 72, 153, 0.4), 0 0 0 3px rgba(236, 72, 153, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2)';
-                                            clickedElement.style.zIndex = '1000';
-                                            clickedElement.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
-                                            
-                                            // 멤버가 다르거나 날짜가 다른 경우 처리
-                                            if (!member.isSelected || dateString !== selectedDate) {
-                                              console.log(`[활동 캘린더] 이번주 변경: ${selectedDate} → ${dateString}, 멤버: ${member.name} (선택됨: ${member.isSelected})`);
-                                              
-                                              // 해당 멤버가 선택되지 않은 경우 먼저 멤버 선택
-                                              if (!member.isSelected) {
-                                                console.log(`[활동 캘린더] 멤버 선택 후 날짜 변경`);
-                                                // 멤버 선택을 async로 처리하고 완료 후 날짜 변경
-                                                (async () => {
-                                                  await handleMemberSelect(member.id, e); // 이벤트 객체 전달로 사용자 선택으로 처리
-                                                  // 멤버 선택 완료 후 날짜 변경 (날짜가 다른 경우에만)
-                                                  if (dateString !== selectedDate) {
-                                                    setTimeout(() => {
-                                                      handleDateSelect(dateString);
-                                                    }, 300); // 300ms로 증가하여 멤버 선택 완료 확실히 대기
-                                                  }
-                                                })();
-                                              } else {
-                                                // 이미 선택된 멤버인 경우 날짜만 변경
-                                                console.log(`[활동 캘린더] 선택된 멤버 - 날짜만 변경`);
-                                                handleDateSelect(dateString);
-                                              }
-                                            } else {
-                                              console.log(`[활동 캘린더] 같은 멤버, 같은 날짜 - 변경 없음`);
-                                            }
-                                            
-                                            // 시각적 피드백 원복 (고급스러운 애니메이션)
-                                            setTimeout(() => {
-                                              clickedElement.style.transform = '';
-                                              clickedElement.style.boxShadow = '';
-                                              clickedElement.style.zIndex = '';
-                                              clickedElement.style.transition = 'all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-                                              
-                                              // 트랜지션 완료 후 초기화
-                                              setTimeout(() => {
-                                                clickedElement.style.transition = '';
-                                              }, 300);
-                                            }, 250);
-                                            
-                                            // 햅틱 피드백 강화
-                                            try {
-                                              if ('vibrate' in navigator) {
-                                                navigator.vibrate([10, 50, 10]);
-                                              }
-                                            } catch (err) {
-                                              console.debug('햅틱 피드백 차단');
-                                            }
+                                            handleCalendarSquareClick(member, dateString, e);
                                           } : undefined}
                                         />
                                       );

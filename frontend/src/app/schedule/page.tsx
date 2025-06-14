@@ -3896,49 +3896,29 @@ export default function SchedulePage() {
       <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
         {/* 개선된 헤더 - password 페이지와 동일한 고정 스타일 */}
         <motion.header 
-            initial={{ y: -100, opacity: 0, scale: 0.9 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
+            initial={{ y: -100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
             transition={{ 
-              delay: 0.2, 
-              duration: 0.8, 
-              ease: [0.25, 0.46, 0.45, 0.94],
-              opacity: { duration: 0.6 },
-              scale: { duration: 0.6 }
+              duration: 0.5, 
+              ease: [0.22, 1, 0.36, 1],
+              delay: 0.1 
             }}
-            className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-sm"
-            style={{ 
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              zIndex: 9999,
-              width: '100%'
-            }}
+            className="fixed top-0 left-0 right-0 z-50 glass-effect"
           >
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4, duration: 0.5 }}
-              className="flex items-center justify-between h-16 px-4"
-            >
+            <div className="flex items-center justify-between h-16 px-4">
               <div className="flex items-center space-x-3">
-                <motion.div 
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.6, duration: 0.4 }}
-                  className="flex items-center space-x-3"
-                >
+                <div className="flex items-center space-x-3">
                   <div>
-                    <h1 className="text-lg font-bold text-gray-900">일정</h1>
+                    <h1 className="text-lg font-semibold text-gray-900">일정</h1>
                     <p className="text-xs text-gray-500">그룹 멤버들과 일정을 공유해보세요</p>
                   </div>
-                </motion.div>
+                </div>
               </div>
               
               <div className="flex items-center space-x-2">
                 {/* 필요시 추가 버튼들을 여기에 배치 */}
               </div>
-            </motion.div>
+            </div>
           </motion.header>
 
         {/* 메인 컨텐츠 */}

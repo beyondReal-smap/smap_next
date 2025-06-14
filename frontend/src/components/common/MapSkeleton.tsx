@@ -81,28 +81,6 @@ export const MapSkeleton: React.FC<MapSkeletonProps> = ({
             </div>
           </div>
         </div>
-
-        {/* 지도 컨트롤 버튼들 */}
-        {showControls && (
-          <div className={styles.controls}>
-            {/* 지도 타입 선택 */}
-            <div className={styles.mapTypeControl}>
-              <div className={styles.controlButton} />
-              <div className={styles.controlButton} />
-            </div>
-            
-            {/* 줌 컨트롤 */}
-            <div className={styles.zoomControl}>
-              <div className={styles.controlButton} />
-              <div className={styles.controlButton} />
-            </div>
-            
-            {/* 현재 위치 버튼 */}
-            <div className={styles.locationControl}>
-              <div className={styles.controlButton} />
-            </div>
-          </div>
-        )}
       </div>
 
       {/* 멤버 리스트 (home 페이지용) */}

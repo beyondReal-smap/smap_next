@@ -56,7 +56,7 @@ export default function RootPage() {
           </div>
         </div>
         
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">스맵</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">SMAP</h2>
         
         <div className="flex items-center justify-center space-x-2">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>

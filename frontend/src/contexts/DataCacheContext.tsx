@@ -155,23 +155,36 @@ const DataCacheContext = createContext<DataCacheContextType | undefined>(undefin
 export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [cache, setCache] = useState<CacheData>(initialCache);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  console.log('[DATA CACHE] 🚀 DataCacheProvider 초기화');
-
-  // 캐시 상태 변화 추적
+  // 초기화는 한 번만 로그 출력
   React.useEffect(() => {
-    const cacheStats = {
-      userProfile: cache.userProfile ? '존재' : '없음',
-      userGroups: cache.userGroups.length,
-      groupMembers: Object.keys(cache.groupMembers).length,
-      scheduleData: Object.keys(cache.scheduleData).length,
-      locationData: Object.keys(cache.locationData).length,
-      groupPlaces: Object.keys(cache.groupPlaces).length,
-      dailyLocationCounts: Object.keys(cache.dailyLocationCounts).length,
-    };
+    if (!isInitialized) {
+      console.log('[DATA CACHE] 🚀 DataCacheProvider 초기화');
+      setIsInitialized(true);
+    }
+  }, [isInitialized]);
+
+  // 캐시 상태 변화 추적 (디바운스 적용)
+  React.useEffect(() => {
+    if (!isInitialized) return;
     
-    console.log('[DATA CACHE] 📊 캐시 상태 업데이트:', cacheStats);
-  }, [cache]);
+    const timeoutId = setTimeout(() => {
+      const cacheStats = {
+        userProfile: cache.userProfile ? '존재' : '없음',
+        userGroups: cache.userGroups.length,
+        groupMembers: Object.keys(cache.groupMembers).length,
+        scheduleData: Object.keys(cache.scheduleData).length,
+        locationData: Object.keys(cache.locationData).length,
+        groupPlaces: Object.keys(cache.groupPlaces).length,
+        dailyLocationCounts: Object.keys(cache.dailyLocationCounts).length,
+      };
+      
+      console.log('[DATA CACHE] 📊 캐시 상태 업데이트:', cacheStats);
+    }, 500); // 500ms 디바운스
+    
+    return () => clearTimeout(timeoutId);
+  }, [cache, isInitialized]);
 
   // 캐시 유효성 검사
   const isCacheValid = useCallback((type: string, groupId?: number, date?: string): boolean => {

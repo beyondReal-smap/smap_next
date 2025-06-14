@@ -33,12 +33,33 @@ class AuthService {
         // 사용자 전체 정보 조회 및 저장
         const userProfile = await this.getUserProfile(response.data.data.member.mt_idx);
         this.setUserData(userProfile);
+      } else {
+        // 백엔드에서 success: false로 응답한 경우
+        console.log('[AUTH SERVICE] 백엔드 로그인 실패 응답:', response.data);
+        throw new Error(response.data.message || '로그인에 실패했습니다.');
       }
       
       return response.data;
     } catch (error: any) {
       console.error('[AUTH SERVICE] 로그인 실패:', error);
-      throw new Error(error.response?.data?.message || '로그인에 실패했습니다.');
+      
+      // API 응답에서 메시지 추출 (여러 경우 고려)
+      let errorMessage = '로그인에 실패했습니다.';
+      
+      if (error.response?.data) {
+        // HTTP 응답이 있는 경우
+        if (error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data;
+        }
+      } else if (error.message) {
+        // 네트워크 오류 등의 경우
+        errorMessage = error.message;
+      }
+      
+      console.log('[AUTH SERVICE] 최종 에러 메시지:', errorMessage);
+      throw new Error(errorMessage);
     }
   }
 
