@@ -177,6 +177,9 @@ class AuthService {
   setToken(token: string): void {
     if (typeof window !== 'undefined') {
       localStorage.setItem(this.TOKEN_KEY, token);
+      
+      // 쿠키에도 토큰 저장 (middleware에서 사용)
+      document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
     }
   }
 
@@ -233,7 +236,7 @@ class AuthService {
       localStorage.removeItem(this.USER_KEY);
       
       // 쿠키에서도 토큰 삭제
-      document.cookie = 'auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax';
+      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax';
       console.log('[AUTH SERVICE] 로컬스토리지 및 쿠키 삭제 완료');
     }
   }
@@ -249,7 +252,7 @@ class AuthService {
     if (!token && typeof window !== 'undefined') {
       const cookieToken = document.cookie
         .split('; ')
-        .find(row => row.startsWith('auth-token='))
+        .find(row => row.startsWith('token='))
         ?.split('=')[1];
       
       if (cookieToken && userData) {
