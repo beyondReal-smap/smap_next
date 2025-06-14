@@ -1,7 +1,10 @@
 {
+  "/api/v1/notices/route": "app/api/v1/notices/route.js",
   "/setting/page": "app/setting/page.js",
-  "/setting/terms/page": "app/setting/terms/page.js",
-  "/setting/manual/page": "app/setting/manual/page.js",
   "/setting/purchase/page": "app/setting/purchase/page.js",
+  "/setting/manual/page": "app/setting/manual/page.js",
+  "/setting/account/page": "app/setting/account/page.js",
+  "/setting/terms/page": "app/setting/terms/page.js",
+  "/setting/inquiry/page": "app/setting/inquiry/page.js",
   "/setting/notice/page": "app/setting/notice/page.js"
 }

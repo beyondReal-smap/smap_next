@@ -276,8 +276,7 @@ export default function SettingsPage() {
       };
       reset(userSettings);
       
-      // 프로필 이미지도 업데이트
-      setProfileImg(getSafeImageUrl(user.mt_file1 || null, user.mt_gender, user.mt_idx || 0));
+
     }
   }, [user, reset]);
 
@@ -322,6 +321,18 @@ export default function SettingsPage() {
           icon: FiUser,
           color: 'bg-blue-500',
           description: '프로필 및 개인정보 관리'
+        },
+      ]
+    },
+    {
+      title: '약관 & 정책',
+      items: [
+        { 
+          label: '약관 및 정책', 
+          href: '/setting/terms', 
+          icon: FiFileText,
+          color: 'bg-yellow-500',
+          description: '이용약관 및 개인정보처리방침'
         },
       ]
     },
@@ -377,62 +388,9 @@ export default function SettingsPage() {
         },
       ]
     },
-    {
-      title: '약관 & 정책',
-      items: [
-        { 
-          label: '약관 및 정책', 
-          href: '/setting/terms', 
-          icon: FiFileText,
-          color: 'bg-yellow-500',
-          description: '이용약관 및 개인정보처리방침'
-        },
-      ]
-    }
   ];
 
-  // 프로필 이미지 관련 상태 및 ref
-  const [profileImg, setProfileImg] = useState(getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0));
-  const [showSheet, setShowSheet] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 파일 선택 핸들러
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        if (ev.target?.result) {
-          setProfileImg(ev.target.result as string);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-    setShowSheet(false);
-  };
-
-  // 카메라/앨범 선택 트리거
-  const handleSelect = (mode: 'camera' | 'album') => {
-    if (fileInputRef.current) {
-      if (mode === 'camera') {
-        fileInputRef.current.setAttribute('capture', 'environment');
-      } else {
-        fileInputRef.current.removeAttribute('capture');
-      }
-      fileInputRef.current.click();
-    }
-    setShowSheet(false);
-  };
-
-  // 모달 닫기 핸들러
-  const closeModal = () => {
-    setIsClosing(true);
-    setTimeout(() => {
-      setShowSheet(false);
-      setIsClosing(false);
-    }, 300);
-  };
 
   // 뒤로가기 핸들러
   const handleBack = () => {
@@ -499,74 +457,7 @@ export default function SettingsPage() {
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="schedule-page-content px-4 pt-20 space-y-6"
         >
-          {/* 프로필 영역 - 개선된 디자인 */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
-            className="pb-2"
-          >
-          <div className="bg-[#0113A3] rounded-3xl p-6 text-white shadow-xl">
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <button 
-                  type="button" 
-                  onClick={() => setShowSheet(true)} 
-                  className="mobile-button group"
-                >
-                  <div className="relative">
-                    <Image
-                      src={profileImg}
-                      alt="프로필 이미지"
-                      width={80}
-                      height={80}
-                      className="rounded-full border-4 border-white/30 bg-white/20 profile-glow"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        const fallbackSrc = getDefaultImage(user?.mt_gender, user?.mt_idx || 0);
-                        console.log(`[프로필 이미지 오류] 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
-                        target.src = fallbackSrc;
-                        setProfileImg(fallbackSrc);
-                      }}
-                    />
-                    <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-2 shadow-lg group-hover:scale-110 transition-transform">
-                      <FiCamera className="w-4 h-4 text-indigo-600" />
-                    </div>
-                  </div>
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-              </div>
-              
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-1">
-                  <h2 className="text-xl font-bold">{profile.name}</h2>
-                  <div className="flex items-center space-x-1 bg-yellow-400/20 px-2 py-1 rounded-full">
-                    <HiSparkles className="w-3 h-3 text-yellow-300" />
-                    <span className="text-xs font-medium text-yellow-100">{profile.level}</span>
-                  </div>
-                </div>
-                <p className="text-indigo-100 text-sm mb-1">{profile.plan}</p>
-                <p className="text-indigo-200 text-xs">{profile.memberSince} 가입</p>
-              </div>
-            </div>
-            
-            <div className="mt-4 pt-4 border-t border-white/20">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-indigo-100">로그인 방법</span>
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg">{profile.loginIcon}</span>
-                  <span className="text-white font-medium">{profile.loginMethod}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
+
 
           {/* 메뉴 섹션들 */}
           <div className="space-y-6">
@@ -620,56 +511,7 @@ export default function SettingsPage() {
           </motion.div>
         </div>
 
-        {/* 개선된 프로필 사진 변경 모달 */}
-        {showSheet && (
-          <div 
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
-            onClick={closeModal}
-          >
-            <div 
-              className={`w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 shadow-2xl ${
-                isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
-              }`}
-              onClick={e => e.stopPropagation()}
-            >
-              {/* 모달 핸들 */}
-              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
-              
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FiCamera className="w-8 h-8 text-indigo-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-1">프로필 사진 변경</h3>
-                <p className="text-gray-600 text-sm">새로운 프로필 사진을 선택해주세요</p>
-              </div>
-              
-              <div className="space-y-3">
-                <button
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium shadow-lg mobile-button flex items-center justify-center space-x-2"
-                  onClick={() => handleSelect('camera')}
-                >
-                  <FiCamera className="w-5 h-5" />
-                  <span>카메라로 촬영</span>
-                </button>
-                
-                <button
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-medium shadow-lg mobile-button flex items-center justify-center space-x-2"
-                  onClick={() => handleSelect('album')}
-                >
-                  <FiEdit3 className="w-5 h-5" />
-                  <span>앨범에서 선택</span>
-                </button>
-                
-                <button
-                  className="w-full py-4 rounded-2xl bg-gray-100 text-gray-700 font-medium mobile-button"
-                  onClick={closeModal}
-                >
-                  취소
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+
         </motion.div>
       </div>
     </>

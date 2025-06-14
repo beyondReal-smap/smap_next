@@ -25,6 +25,7 @@ import {
 } from 'react-icons/fi';
 import { HiSparkles, HiCheckCircle } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
+import authService from '@/services/authService';
 
 // 모바일 최적화된 CSS 애니메이션 (노란색 테마)
 const pageAnimations = `
@@ -265,7 +266,7 @@ const TERMS_DATA: Term[] = [
     dbField: 'mt_agree1',
     title: '서비스 이용약관',
     description: 'SMAP 서비스 이용에 관한 기본 약관입니다.',
-    link: '/terms/service',
+    link: 'https://schedulemap.notion.site/30b32b5ad0bc4f99a39b28c0fe5f1de4?source=copy_link',
     icon: FiFileText,
     color: 'bg-yellow-100 text-yellow-700',
     version: 'v2.1',
@@ -279,7 +280,7 @@ const TERMS_DATA: Term[] = [
     dbField: 'mt_agree2',
     title: '개인정보 처리방침',
     description: '개인정보 수집, 이용, 보관에 관한 정책입니다.',
-    link: '/terms/privacy',
+    link: 'https://schedulemap.notion.site/2ac62e02f97b4d61945d68c2d89109e9?source=copy_link',
     icon: FiShield,
     color: 'bg-amber-100 text-amber-700',
     version: 'v1.8',
@@ -293,12 +294,12 @@ const TERMS_DATA: Term[] = [
     dbField: 'mt_agree3',
     title: '위치기반서비스 이용약관',
     description: '위치 기반 서비스 이용에 관한 약관입니다.',
-    link: '/terms/location',
+    link: 'https://schedulemap.notion.site/69cf94c6a04e471d8c3e3043f95baefb?source=copy_link',
     icon: FiMapPin,
     color: 'bg-orange-100 text-orange-700',
     version: 'v1.3',
     lastUpdated: '2024-01-20',
-    isRequired: false,
+    isRequired: true,
     isConsented: false,
     summary: '위치정보 수집 및 활용에 대한 동의사항을 포함합니다.'
   },
@@ -307,7 +308,7 @@ const TERMS_DATA: Term[] = [
     dbField: 'mt_agree4',
     title: '개인정보 제3자 제공 동의',
     description: '개인정보 제3자 제공에 관한 동의사항입니다.',
-    link: '/terms/third-party',
+    link: 'https://schedulemap.notion.site/3-21b302dcaba0490fbaa9430618a74f01?source=copy_link',
     icon: FiUsers,
     color: 'bg-red-100 text-red-700',
     version: 'v1.2',
@@ -321,7 +322,7 @@ const TERMS_DATA: Term[] = [
     dbField: 'mt_agree5',
     title: '마케팅 정보 수집 및 이용 동의',
     description: '마케팅 목적의 개인정보 수집 및 이용에 관한 동의사항입니다.',
-    link: '/terms/marketing',
+    link: 'https://schedulemap.notion.site/7e35638d106f433f86fa95f88ba6efb1?source=copy_link',
     icon: FiGlobe,
     color: 'bg-yellow-100 text-yellow-700',
     version: 'v1.0',
@@ -356,45 +357,99 @@ const CONSENT_HISTORY: ConsentHistory[] = [
 export default function TermsPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'terms' | 'consent' | 'history'>('terms');
+
   const [terms, setTerms] = useState(TERMS_DATA);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [selectedTerm, setSelectedTerm] = useState<Term | null>(null);
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingConsents, setIsLoadingConsents] = useState(true);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   // 사용자 동의 정보 로드
   useEffect(() => {
     if (user) {
       loadUserConsents();
+    } else {
+      setIsLoadingConsents(false);
     }
   }, [user]);
 
   // 사용자의 동의 정보를 로드하는 함수
   const loadUserConsents = async () => {
-    try {
-      // 실제 API 호출 시 사용할 코드
-      // const response = await fetch(`/api/user/${user.mt_idx}/consents`);
-      // const userData = await response.json();
-      
-      // 임시로 사용자 데이터에서 동의 정보 가져오기
-      const userConsents = {
-        mt_agree1: user?.mt_agree1 || 'N',
-        mt_agree2: user?.mt_agree2 || 'N',
-        mt_agree3: user?.mt_agree3 || 'N',
-        mt_agree4: user?.mt_agree4 || 'N',
-        mt_agree5: user?.mt_agree5 || 'N'
-      };
-
-      setTerms(prev => prev.map(term => ({
-        ...term,
-        isConsented: userConsents[term.dbField as keyof typeof userConsents] === 'Y'
-      })));
-    } catch (error) {
-      console.error('동의 정보 로드 실패:', error);
+    if (!user?.mt_idx) {
+      console.error('사용자 정보가 없습니다.');
+      setIsLoadingConsents(false);
+      return;
     }
-  };
+
+    setIsLoadingConsents(true);
+    try {
+      console.log(`[TERMS] 동의 정보 조회 시작 - user_id: ${user.mt_idx}`);
+      
+      // 실제 JWT 토큰 가져오기
+      const token = authService.getToken();
+      if (!token) {
+        throw new Error('인증 토큰이 없습니다.');
+      }
+      
+      // 백엔드 API 호출하여 동의 정보 조회
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://118.67.130.71:8000'}/api/v1/members/consent/${user.mt_idx}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('[TERMS] 동의 정보 조회 응답:', result);
+
+      if (result.success && result.data) {
+        // 백엔드에서 받은 동의 정보로 상태 업데이트
+        const userConsents = result.data;
+        
+        setTerms(prev => prev.map(term => ({
+          ...term,
+          isConsented: userConsents[term.dbField as keyof typeof userConsents] === 'Y'
+        })));
+        
+        console.log('[TERMS] 동의 정보 로드 성공:', userConsents);
+      } else {
+        console.error('[TERMS] 동의 정보 조회 실패:', result.message);
+        // 실패 시 기본값으로 설정
+        setTerms(prev => prev.map(term => ({
+          ...term,
+          isConsented: false
+        })));
+      }
+    } catch (error) {
+      console.error('[TERMS] 동의 정보 로드 실패:', error);
+      
+      // 에러 발생 시 사용자 컨텍스트에서 가져오기 (폴백)
+      if (user) {
+        console.log('[TERMS] 폴백: 사용자 컨텍스트에서 동의 정보 가져오기');
+        const userConsents = {
+          mt_agree1: user.mt_agree1 || 'N',
+          mt_agree2: user.mt_agree2 || 'N',
+          mt_agree3: user.mt_agree3 || 'N',
+          mt_agree4: user.mt_agree4 || 'N',
+          mt_agree5: user.mt_agree5 || 'N'
+        };
+
+        setTerms(prev => prev.map(term => ({
+          ...term,
+          isConsented: userConsents[term.dbField as keyof typeof userConsents] === 'Y'
+                 })));
+       }
+     } finally {
+       setIsLoadingConsents(false);
+     }
+   };
 
   // 뒤로가기 핸들러
   const handleBack = () => {
@@ -403,7 +458,8 @@ export default function TermsPage() {
 
   // 약관 상세 보기
   const handleViewTerm = (term: Term) => {
-    router.push(term.link);
+    // 외부 링크로 새 탭에서 열기
+    window.open(term.link, '_blank', 'noopener,noreferrer');
   };
 
   // 약관 미리보기
@@ -419,87 +475,74 @@ export default function TermsPage() {
       return;
     }
 
+    const term = terms.find(t => t.id === termId);
+    if (!term) return;
+
+    console.log('[TOGGLE] 클릭된 약관:', term.title, '현재 상태:', term.isConsented);
+
+    // 필수 약관은 변경할 수 없음
+    if (term.isRequired) {
+      alert('필수 약관은 변경할 수 없습니다.');
+      return;
+    }
+
+    // 즉시 UI 업데이트 (낙관적 업데이트)
+    setTerms(prevTerms => 
+      prevTerms.map(t => 
+        t.id === termId 
+          ? { ...t, isConsented: !t.isConsented }
+          : t
+      )
+    );
+
     setIsLoading(true);
     try {
-      const term = terms.find(t => t.id === termId);
-      if (!term) return;
+
+      // 실제 JWT 토큰 가져오기
+      const token = authService.getToken();
+      if (!token) {
+        throw new Error('인증 토큰이 없습니다.');
+      }
 
       const newConsentValue = term.isConsented ? 'N' : 'Y';
       
-      // 실제 API 호출 (임시로 토큰 없이 처리)
-      const response = await fetch('/api/user/consent', {
+      // 백엔드 API 호출하여 개별 동의 상태 변경
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://118.67.130.71:8000'}/api/v1/members/consent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer temp-token`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          mt_idx: user.mt_idx,
           field: term.dbField,
           value: newConsentValue
         })
       });
 
-      if (!response.ok) {
-        throw new Error('동의 상태 변경 실패');
+      const result = await response.json();
+      console.log('[TERMS] 개별 동의 상태 변경 응답:', result);
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || '동의 상태 변경 실패');
       }
 
-      // 로컬 상태 업데이트
-      setTerms(prev => prev.map(t => 
-        t.id === termId 
-          ? { ...t, isConsented: !t.isConsented }
-          : t
-      ));
-      
+      // API 성공 - 낙관적 업데이트가 이미 되어있으므로 추가 업데이트 불필요
       setShowSuccessToast(true);
       setTimeout(() => setShowSuccessToast(false), 3000);
+      console.log('[TERMS] 개별 동의 상태 변경 성공');
     } catch (error) {
       console.error('동의 상태 변경 실패:', error);
+      
+      // API 실패 시 원래 상태로 되돌리기
+      setTerms(prevTerms => 
+        prevTerms.map(t => 
+          t.id === termId 
+            ? { ...t, isConsented: !t.isConsented }
+            : t
+        )
+      );
+      
       alert('동의 상태 변경에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 전체 동의
-  const handleAllConsent = async () => {
-    if (!user) {
-      alert('로그인이 필요합니다.');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // 모든 약관에 대해 동의 처리
-      const consentData = {
-        mt_idx: user.mt_idx,
-        mt_agree1: 'Y',
-        mt_agree2: 'Y',
-        mt_agree3: 'Y',
-        mt_agree4: 'Y',
-        mt_agree5: 'Y'
-      };
-
-      const response = await fetch('/api/user/consent/all', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer temp-token`,
-        },
-        body: JSON.stringify(consentData)
-      });
-
-      if (!response.ok) {
-        throw new Error('전체 동의 처리 실패');
-      }
-
-      // 로컬 상태 업데이트
-      setTerms(prev => prev.map(term => ({ ...term, isConsented: true })));
-      setShowSuccessToast(true);
-      setTimeout(() => setShowSuccessToast(false), 3000);
-    } catch (error) {
-      console.error('전체 동의 실패:', error);
-      alert('전체 동의 처리에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setIsLoading(false);
     }
@@ -577,7 +620,6 @@ export default function TermsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.6 }}
-            className="pb-2"
           >
             <div className="bg-[#EBB305] rounded-3xl p-6 text-white shadow-xl">
               <div className="flex items-center space-x-4">
@@ -621,255 +663,62 @@ export default function TermsPage() {
             </div>
           </motion.div>
 
-          {/* 탭 메뉴 - 노란색 테마 */}
+          {/* 약관 목록 */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.6 }}
           >
-            <div className="bg-white rounded-2xl p-2 shadow-sm border border-gray-100">
-              <div className="grid grid-cols-3 gap-1 relative">
-                <motion.div
-                  className="absolute top-1 bottom-1 bg-yellow-600 rounded-xl"
-                  initial={false}
-                  animate={{
-                    x: activeTab === 'terms' ? '0%' : activeTab === 'consent' ? '100%' : '200%'
-                  }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  style={{ width: 'calc(33.333% - 4px)' }}
-                />
-                {[
-                  { key: 'terms', label: '약관목록', icon: FiFileText },
-                  { key: 'consent', label: '동의관리', icon: FiCheck },
-                  { key: 'history', label: '동의이력', icon: FiClock }
-                ].map(({ key, label, icon: Icon }) => (
-                  <button
-                    key={key}
-                    onClick={() => setActiveTab(key as any)}
-                    className={`relative z-10 py-3 px-2 rounded-xl text-sm font-medium transition-colors mobile-button ${
-                      activeTab === key ? 'text-white' : 'text-gray-600'
-                    }`}
+            {/* 로딩 상태 */}
+            {isLoadingConsents ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-center justify-center py-12"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-6 h-6 border-2 border-yellow-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-gray-600">동의 정보를 불러오는 중...</span>
+                </div>
+              </motion.div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                {terms.map((term, index) => (
+                  <motion.div
+                    key={term.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className={`p-3 menu-item-hover mobile-button cursor-pointer ${index !== terms.length - 1 ? 'border-b border-gray-50' : ''}`}
+                    onClick={() => handlePreviewTerm(term)}
                   >
-                    <div className="flex items-center justify-center space-x-1">
-                      <Icon className="w-4 h-4" />
-                      <span className="hidden sm:inline">{label}</span>
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <term.icon className="w-5 h-5 text-yellow-600" />
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h4 className="font-xs text-gray-900">{term.title}</h4>
+                          {term.isRequired && (
+                            <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+                              필수
+                            </span>
+                          )}
+                          {term.isConsented && (
+                            <HiCheckCircle className="w-4 h-4 text-green-500" />
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mb-1">{term.description}</p>
+                        <p className="text-xs text-gray-400">{term.version} • {term.lastUpdated}</p>
+                      </div>
                     </div>
-                  </button>
+                  </motion.div>
                 ))}
               </div>
-            </div>
+            )}
           </motion.div>
 
-          {/* 탭 컨텐츠 */}
-          <div className="space-y-6">
-            <AnimatePresence mode="wait">
-              {activeTab === 'terms' && (
-                <motion.div
-                  key="terms"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: 0.4, duration: 0.6 }}
-                >
-                  {/* 전체 동의 버튼 */}
-                  <motion.button
-                    onClick={handleAllConsent}
-                    disabled={isLoading || consentStats.consented === consentStats.total}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full py-4 bg-gradient-to-r from-yellow-600 to-amber-600 text-white font-medium rounded-2xl shadow-lg mobile-button disabled:opacity-50 mb-4"
-                  >
-                    {isLoading ? '처리 중...' : '전체 동의하기'}
-                  </motion.button>
-
-                  {/* 약관 목록 - 노란색 테마 */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    {terms.map((term, index) => (
-                      <motion.div
-                        key={term.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`p-4 menu-item-hover mobile-button ${index !== terms.length - 1 ? 'border-b border-gray-50' : ''}`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <term.icon className="w-5 h-5 text-yellow-600" />
-                          </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <h4 className="font-medium text-gray-900">{term.title}</h4>
-                              {term.isRequired && (
-                                <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
-                                  필수
-                                </span>
-                              )}
-                              {term.isConsented && (
-                                <HiCheckCircle className="w-4 h-4 text-green-500" />
-                              )}
-                            </div>
-                            <p className="text-xs text-gray-500 mb-1">{term.description}</p>
-                            <p className="text-xs text-gray-400">{term.version} • {term.lastUpdated} • {term.dbField}</p>
-                          </div>
-                          
-                          <div className="flex items-center space-x-2">
-                            <motion.button
-                              onClick={() => handlePreviewTerm(term)}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="p-2 bg-yellow-50 rounded-xl hover:bg-yellow-100 transition-colors"
-                            >
-                              <FiEye className="w-4 h-4 text-yellow-600" />
-                            </motion.button>
-                            <motion.button
-                              onClick={() => handleViewTerm(term)}
-                              whileHover={{ scale: 1.05 }}
-                              whileTap={{ scale: 0.95 }}
-                              className="p-2 bg-yellow-50 rounded-xl hover:bg-yellow-100 transition-colors"
-                            >
-                              <FiChevronRight className="w-4 h-4 text-yellow-600" />
-                            </motion.button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {activeTab === 'consent' && (
-                <motion.div
-                  key="consent"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: 0.4, duration: 0.6 }}
-                >
-                  {/* 동의 관리 안내 */}
-                  <div className="bg-yellow-50 rounded-2xl p-4 border border-yellow-100 mb-4">
-                    <div className="flex items-start space-x-3">
-                      <FiInfo className="w-5 h-5 text-yellow-600 mt-0.5" />
-                      <div>
-                        <h3 className="font-semibold text-yellow-900 mb-1">동의 관리 안내</h3>
-                        <p className="text-yellow-700 text-sm">
-                          필수 약관은 서비스 이용을 위해 반드시 동의해야 하며, 선택 약관은 언제든지 철회할 수 있습니다.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 동의 관리 - 노란색 테마 */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    {terms.map((term, index) => (
-                      <motion.div
-                        key={term.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`p-4 ${index !== terms.length - 1 ? 'border-b border-gray-50' : ''}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3 flex-1">
-                            <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                              <term.icon className="w-5 h-5 text-yellow-600" />
-                            </div>
-                            
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-2 mb-1">
-                                <h4 className="font-medium text-gray-900">{term.title}</h4>
-                                {term.isRequired && (
-                                  <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
-                                    필수
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-sm text-gray-600">{term.summary}</p>
-                              <p className="text-xs text-gray-400 mt-1">DB 필드: {term.dbField}</p>
-                            </div>
-                          </div>
-                          
-                          <motion.button
-                            onClick={() => handleConsentToggle(term.id)}
-                            disabled={isLoading}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className={`w-12 h-6 rounded-full transition-colors mobile-button ${
-                              term.isConsented 
-                                ? 'bg-yellow-500' 
-                                : 'bg-gray-300'
-                            }`}
-                          >
-                            <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                              term.isConsented ? 'translate-x-6' : 'translate-x-0.5'
-                            }`} />
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-
-              {activeTab === 'history' && (
-                <motion.div
-                  key="history"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: 0.4, duration: 0.6 }}
-                >
-                  {/* 동의 이력 - 노란색 테마 */}
-                  {CONSENT_HISTORY.length > 0 ? (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                      {CONSENT_HISTORY.map((history, index) => {
-                        const term = terms.find(t => t.id === history.termId);
-                        return (
-                          <motion.div
-                            key={`${history.termId}-${history.version}`}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.1 }}
-                            className={`p-4 menu-item-hover ${index !== CONSENT_HISTORY.length - 1 ? 'border-b border-gray-50' : ''}`}
-                          >
-                            <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                                {term?.icon && <term.icon className="w-5 h-5 text-yellow-600" />}
-                              </div>
-                              
-                              <div className="flex-1">
-                                <div className="flex items-center space-x-2 mb-1">
-                                  <h4 className="font-medium text-gray-900">{term?.title}</h4>
-                                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                                    history.action === 'agreed' ? 'bg-green-100 text-green-700' :
-                                    history.action === 'updated' ? 'bg-blue-100 text-blue-700' :
-                                    'bg-red-100 text-red-700'
-                                  }`}>
-                                    {history.action === 'agreed' ? '동의' : 
-                                     history.action === 'updated' ? '업데이트' : '거부'}
-                                  </span>
-                                </div>
-                                <p className="text-xs text-gray-500">{history.version} • {history.consentedAt}</p>
-                                {term && <p className="text-xs text-gray-400">DB 필드: {term.dbField}</p>}
-                              </div>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-16">
-                      <div className="w-20 h-20 bg-yellow-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <FiClock className="w-10 h-10 text-yellow-400" />
-                      </div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">동의 이력이 없습니다</h3>
-                      <p className="text-gray-500">아직 약관 동의 이력이 없어요</p>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
         </motion.div>
 
         {/* 성공 토스트 */}
@@ -907,7 +756,6 @@ export default function TermsPage() {
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-1">{selectedTerm.title}</h3>
                 <p className="text-gray-600 text-sm">{selectedTerm.version} • {selectedTerm.lastUpdated}</p>
-                <p className="text-gray-500 text-xs mt-1">DB 필드: {selectedTerm.dbField}</p>
               </div>
               
               <div className="space-y-4 mb-6">

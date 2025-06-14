@@ -246,7 +246,7 @@ class ConsentUpdateAll(BaseModel):
     mt_agree4: YNEnum
     mt_agree5: YNEnum
 
-class ConsentResponse(BaseModel):
+class ConsentInfo(BaseModel):
     mt_agree1: YNEnum
     mt_agree2: YNEnum
     mt_agree3: YNEnum
@@ -255,6 +255,11 @@ class ConsentResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class ConsentResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[ConsentInfo] = None
 
 class ConsentUpdateResponse(BaseModel):
     success: bool

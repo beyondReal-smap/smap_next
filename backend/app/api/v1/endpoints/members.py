@@ -845,3 +845,211 @@ async def withdraw_member(
             "success": False
         }
 
+# ==================== 동의 관리 엔드포인트 ====================
+
+@router.get("/consent/{member_id}", response_model=ConsentResponse)
+async def get_consent_info(
+    member_id: int,
+    authorization: str = Header(None),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    사용자의 동의 정보를 조회합니다.
+    """
+    logger.info(f"[CONSENT] 동의 정보 조회 요청 - member_id: {member_id}")
+    
+    try:
+        # 토큰에서 사용자 ID 추출
+        current_user_id = get_current_user_id_from_token(authorization)
+        if not current_user_id:
+            logger.warning("[CONSENT] 인증 토큰이 없거나 유효하지 않음")
+            raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+        
+        # 본인 정보만 조회 가능 (관리자 권한 추가 가능)
+        if current_user_id != member_id:
+            logger.warning(f"[CONSENT] 권한 없음 - current_user: {current_user_id}, requested: {member_id}")
+            raise HTTPException(status_code=403, detail="본인의 동의 정보만 조회할 수 있습니다.")
+        
+        # 동의 정보 조회
+        consent_info = crud_member.get_consent_info(db, user_id=member_id)
+        if not consent_info:
+            logger.warning(f"[CONSENT] 사용자를 찾을 수 없음 - member_id: {member_id}")
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+        
+        logger.info(f"[CONSENT] 동의 정보 조회 성공 - member_id: {member_id}")
+        from app.schemas.member import ConsentInfo
+        
+        consent_data = ConsentInfo(**consent_info)
+        return ConsentResponse(
+            success=True,
+            message="동의 정보 조회 성공",
+            data=consent_data
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[CONSENT] 동의 정보 조회 실패: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
+
+@router.post("/consent", response_model=ConsentUpdateResponse)
+async def update_consent(
+    request: ConsentUpdate,
+    authorization: str = Header(None),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    개별 동의 상태를 변경합니다.
+    """
+    logger.info(f"[CONSENT] 개별 동의 상태 변경 요청 - field: {request.field}, value: {request.value}")
+    
+    try:
+        # 토큰에서 사용자 ID 추출
+        user_id = get_current_user_id_from_token(authorization)
+        if not user_id:
+            logger.warning("[CONSENT] 인증 토큰이 없거나 유효하지 않음")
+            raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+        
+        # 동의 상태 업데이트
+        is_updated = crud_member.update_consent(db, user_id=user_id, field=request.field, value=request.value)
+        
+        if is_updated:
+            logger.info(f"[CONSENT] 개별 동의 상태 변경 성공 - user_id: {user_id}, field: {request.field}")
+            return ConsentUpdateResponse(
+                success=True,
+                message="동의 상태가 성공적으로 변경되었습니다.",
+                field=request.field,
+                value=request.value
+            )
+        else:
+            logger.error(f"[CONSENT] 개별 동의 상태 변경 실패 - user_id: {user_id}, field: {request.field}")
+            raise HTTPException(status_code=400, detail="동의 상태 변경에 실패했습니다.")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[CONSENT] 개별 동의 상태 변경 실패: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
+
+@router.post("/consent/all", response_model=ConsentUpdateResponse)
+async def update_all_consent(
+    request: ConsentUpdateAll,
+    authorization: str = Header(None),
+    db: Session = Depends(deps.get_db)
+):
+    """
+    전체 동의 상태를 변경합니다.
+    """
+    logger.info("[CONSENT] 전체 동의 상태 변경 요청")
+    
+    try:
+        # 토큰에서 사용자 ID 추출
+        user_id = get_current_user_id_from_token(authorization)
+        if not user_id:
+            logger.warning("[CONSENT] 인증 토큰이 없거나 유효하지 않음")
+            raise HTTPException(status_code=401, detail="인증이 필요합니다.")
+        
+        # 전체 동의 상태 업데이트
+        consent_data = {
+            "mt_agree1": request.mt_agree1,
+            "mt_agree2": request.mt_agree2,
+            "mt_agree3": request.mt_agree3,
+            "mt_agree4": request.mt_agree4,
+            "mt_agree5": request.mt_agree5
+        }
+        
+        is_updated = crud_member.update_all_consent(db, user_id=user_id, consent_data=consent_data)
+        
+        if is_updated:
+            logger.info(f"[CONSENT] 전체 동의 상태 변경 성공 - user_id: {user_id}")
+            return ConsentUpdateResponse(
+                success=True,
+                message="전체 동의 상태가 성공적으로 변경되었습니다.",
+                field="all",
+                value="updated"
+            )
+        else:
+            logger.error(f"[CONSENT] 전체 동의 상태 변경 실패 - user_id: {user_id}")
+            raise HTTPException(status_code=400, detail="전체 동의 상태 변경에 실패했습니다.")
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[CONSENT] 전체 동의 상태 변경 실패: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
+
+@router.get("/terms", response_model=TermsListResponse)
+async def get_terms_list():
+    """
+    약관 목록을 조회합니다.
+    """
+    logger.info("[TERMS] 약관 목록 조회 요청")
+    
+    try:
+        terms = [
+            TermInfo(
+                id="service",
+                title="서비스 이용약관",
+                description="SMAP 서비스 이용에 관한 약관",
+                version="1.0",
+                lastUpdated="2024-01-01",
+                isRequired=True,
+                field="mt_agree1"
+            ),
+            TermInfo(
+                id="privacy",
+                title="개인정보 처리방침",
+                description="개인정보 수집 및 이용에 관한 방침",
+                version="1.0",
+                lastUpdated="2024-01-01",
+                isRequired=True,
+                field="mt_agree2"
+            ),
+            TermInfo(
+                id="location",
+                title="위치기반서비스 이용약관",
+                description="위치정보 수집 및 이용에 관한 약관",
+                version="1.0",
+                lastUpdated="2024-01-01",
+                isRequired=True,
+                field="mt_agree3"
+            ),
+            TermInfo(
+                id="third_party",
+                title="개인정보 제3자 제공",
+                description="개인정보 제3자 제공에 관한 동의",
+                version="1.0",
+                lastUpdated="2024-01-01",
+                isRequired=False,
+                field="mt_agree4"
+            ),
+            TermInfo(
+                id="marketing",
+                title="마케팅 정보 수신",
+                description="마케팅 정보 수집 및 이용에 관한 동의",
+                version="1.0",
+                lastUpdated="2024-01-01",
+                isRequired=False,
+                field="mt_agree5"
+            )
+        ]
+        
+        logger.info(f"[TERMS] 약관 목록 조회 성공 - 총 {len(terms)}개")
+        return TermsListResponse(
+            success=True,
+            message="약관 목록 조회 성공",
+            data=terms
+        )
+    
+    except Exception as e:
+        logger.error(f"[TERMS] 약관 목록 조회 실패: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail="서버 오류가 발생했습니다.")
+

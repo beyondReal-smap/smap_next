@@ -336,6 +336,54 @@ export default function NoticePage() {
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="schedule-page-content px-4 pt-20 space-y-6"
         >
+          {/* 공지사항 정보 카드 - 빨간색 테마 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+          >
+            <div className="bg-[#EF4444] rounded-3xl p-6 text-white shadow-xl">
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                    <FiBell className="w-8 h-8" />
+                  </div>
+                </div>
+                
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h2 className="text-xl font-bold">공지사항</h2>
+                    <div className="flex items-center space-x-1 bg-white/20 px-2 py-1 rounded-full">
+                      <FiCalendar className="w-3 h-3 text-red-100" />
+                      <span className="text-xs font-medium text-red-100">최신 소식</span>
+                    </div>
+                  </div>
+                  <p className="text-red-100 text-sm mb-1">최신 소식 및 업데이트</p>
+                  <p className="text-red-200 text-xs">중요한 공지사항을 확인하세요</p>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 mb-1">
+                      <FiBell className="w-4 h-4 text-red-200" />
+                      <span className="text-sm text-red-100">총 공지</span>
+                    </div>
+                    <p className="text-lg font-bold">{isLoading ? '...' : `${totalCount}개`}</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 mb-1">
+                      <FiCalendar className="w-4 h-4 text-red-200" />
+                      <span className="text-sm text-red-100">업데이트</span>
+                    </div>
+                    <p className="text-lg font-bold">정기</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
           {/* 로딩 상태 */}
           {isLoading && (
             <motion.div 
@@ -393,26 +441,6 @@ export default function NoticePage() {
                         <div>
                           <h3 className="text-lg font-bold text-red-900">오류 발생</h3>
                           <p className="text-sm text-red-600">{error}</p>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {/* 공지사항 개수 표시 */}
-                  {!error && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1, duration: 0.6 }}
-                      className="bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl p-4 mb-4"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-pink-600 rounded-lg flex items-center justify-center">
-                          <FiBell className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-bold text-gray-900">전체 공지사항</h3>
-                          <p className="text-sm text-gray-600">{totalCount}개의 공지사항이 있습니다</p>
                         </div>
                       </div>
                     </motion.div>

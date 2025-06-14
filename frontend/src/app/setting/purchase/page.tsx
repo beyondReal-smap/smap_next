@@ -2,29 +2,17 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
-  FiCreditCard, 
   FiDownload, 
-  FiCalendar,
-  FiDollarSign,
-  FiCheck,
   FiX,
   FiRefreshCw,
   FiShoppingBag,
-  FiStar,
   FiTrendingUp,
-  FiPieChart,
   FiBarChart,
-  FiSettings,
   FiInfo,
-  FiAlertCircle,
-  FiCheckCircle,
   FiClock,
-  FiFilter,
-  FiSearch,
-  FiMoreVertical,
-  FiUsers
+  FiFilter
 } from 'react-icons/fi';
 import { HiSparkles, HiCheckCircle } from 'react-icons/hi2';
 
@@ -240,22 +228,7 @@ interface Purchase {
   description?: string;
 }
 
-interface Subscription {
-  id: string;
-  plan: string;
-  status: 'active' | 'expired' | 'cancelled';
-  nextBilling: string;
-  amount: number;
-  features: string[];
-}
 
-interface PaymentMethod {
-  id: string;
-  type: 'card' | 'bank' | 'paypal';
-  name: string;
-  last4: string;
-  isDefault: boolean;
-}
 
 // 모의 데이터
 const MOCK_PURCHASES: Purchase[] = [
@@ -291,50 +264,12 @@ const MOCK_PURCHASES: Purchase[] = [
   }
 ];
 
-const MOCK_SUBSCRIPTION: Subscription = {
-  id: 'sub_1',
-  plan: '프리미엄 플랜',
-  status: 'active',
-  nextBilling: '2024-03-15',
-  amount: 15000,
-  features: [
-    '무제한 그룹 생성',
-    '고급 분석 도구',
-    '우선 고객 지원',
-    '광고 제거',
-    '데이터 백업'
-  ]
-};
 
-const MOCK_PAYMENT_METHODS: PaymentMethod[] = [
-  {
-    id: '1',
-    type: 'card',
-    name: '신한카드',
-    last4: '1234',
-    isDefault: true
-  },
-  {
-    id: '2',
-    type: 'card',
-    name: '국민카드',
-    last4: '5678',
-    isDefault: false
-  }
-];
 
 export default function PurchasePage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'history' | 'subscription' | 'payment'>('history');
   const [purchases] = useState(MOCK_PURCHASES);
-  const [subscription] = useState(MOCK_SUBSCRIPTION);
-  const [paymentMethods] = useState(MOCK_PAYMENT_METHODS);
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   // 뒤로가기 핸들러
   const handleBack = () => {
@@ -396,24 +331,8 @@ export default function PurchasePage() {
 
   // 영수증 다운로드
   const handleDownloadReceipt = (purchase: Purchase) => {
-    setSelectedPurchase(purchase);
-    setShowReceiptModal(true);
-  };
-
-  // 구독 취소
-  const handleCancelSubscription = async () => {
-    setIsLoading(true);
-    try {
-      // 모의 API 호출
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setShowCancelModal(false);
-      setShowSuccessToast(true);
-      setTimeout(() => setShowSuccessToast(false), 3000);
-    } catch (error) {
-      console.error('구독 취소 실패:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    console.log('영수증 다운로드:', purchase);
+    // 실제 다운로드 로직 구현
   };
 
   // 총 지출 계산
@@ -529,49 +448,11 @@ export default function PurchasePage() {
             </div>
           </motion.div>
 
-          {/* 탭 메뉴 - 초록색 테마 */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-          >
-            <div className="bg-white rounded-2xl p-2 shadow-sm border border-gray-100">
-              <div className="grid grid-cols-3 gap-1 relative">
-                <motion.div
-                  className="absolute top-1 bottom-1 bg-green-600 rounded-xl"
-                  initial={false}
-                  animate={{
-                    x: activeTab === 'history' ? '0%' : activeTab === 'subscription' ? '100%' : '200%'
-                  }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  style={{ width: 'calc(33.333% - 4px)' }}
-                />
-                {[
-                  { key: 'history', label: '구매내역', icon: FiShoppingBag },
-                  { key: 'subscription', label: '구독관리', icon: FiStar },
-                  { key: 'payment', label: '결제수단', icon: FiCreditCard }
-                ].map(({ key, label, icon: Icon }) => (
-                  <button
-                    key={key}
-                    onClick={() => setActiveTab(key as any)}
-                    className={`relative z-10 py-3 px-2 rounded-xl text-sm font-medium transition-colors mobile-button ${
-                      activeTab === key ? 'text-white' : 'text-gray-600'
-                    }`}
-                  >
-                    <div className="flex items-center justify-center space-x-1">
-                      <Icon className="w-4 h-4" />
-                      <span className="hidden sm:inline">{label}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </motion.div>
 
-          {/* 탭 컨텐츠 */}
+
+          {/* 구매 내역 컨텐츠 */}
           <div className="space-y-6">
-            <AnimatePresence mode="wait">
-              {activeTab === 'history' && (
+            <div>
                 <motion.div
                   key="history"
                   initial={{ opacity: 0, y: 20 }}
@@ -663,202 +544,9 @@ export default function PurchasePage() {
                     </div>
                   )}
                 </motion.div>
-              )}
-
-              {activeTab === 'subscription' && (
-                <motion.div
-                  key="subscription"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: 0.4, duration: 0.6 }}
-                >
-                  {/* 현재 구독 - 초록색 테마 */}
-                  <div className="subscription-card rounded-2xl p-6 text-white shadow-xl">
-                    <div className="relative z-10">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h3 className="text-xl font-bold mb-1">{subscription.plan}</h3>
-                          <p className="text-green-100">현재 활성 구독</p>
-                        </div>
-                        <motion.div
-                          className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm"
-                          animate={{ scale: [1, 1.1, 1] }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                        >
-                          <FiStar className="w-6 h-6" />
-                        </motion.div>
-                      </div>
-                      
-                      <div className="bg-white/20 rounded-xl p-4 backdrop-blur-sm mb-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-green-100">다음 결제일</span>
-                          <span className="font-semibold">{subscription.nextBilling}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-green-100">결제 금액</span>
-                          <span className="text-xl font-bold">₩{subscription.amount.toLocaleString()}</span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="bg-white/20 py-3 rounded-xl backdrop-blur-sm font-medium mobile-button"
-                        >
-                          플랜 변경
-                        </motion.button>
-                        <motion.button
-                          onClick={() => setShowCancelModal(true)}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="bg-white/20 py-3 rounded-xl backdrop-blur-sm font-medium mobile-button"
-                        >
-                          구독 취소
-                        </motion.button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 구독 혜택 - 초록색 테마 */}
-                  <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">구독 혜택</h3>
-                    <div className="space-y-3">
-                      {subscription.features.map((feature, index) => (
-                        <motion.div
-                          key={feature}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.1 }}
-                          className="flex items-center space-x-3"
-                        >
-                          <HiCheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
-                          <span className="text-gray-700">{feature}</span>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {activeTab === 'payment' && (
-                <motion.div
-                  key="payment"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ delay: 0.4, duration: 0.6 }}
-                >
-                  {/* 등록된 결제 수단 - 초록색 테마 */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    {paymentMethods.map((method, index) => (
-                      <motion.div
-                        key={method.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className={`p-4 menu-item-hover mobile-button ${index !== paymentMethods.length - 1 ? 'border-b border-gray-50' : ''}`}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                            <FiCreditCard className="w-5 h-5 text-green-600" />
-                          </div>
-                          
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-1">
-                              <h4 className="font-medium text-gray-900">{method.name}</h4>
-                              {method.isDefault && (
-                                <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">
-                                  기본
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-sm text-gray-500">**** **** **** {method.last4}</p>
-                          </div>
-                          
-                          <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="p-2 bg-green-50 rounded-xl hover:bg-green-100 transition-colors"
-                          >
-                            <FiMoreVertical className="w-4 h-4 text-green-600" />
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-
-                  {/* 새 결제 수단 추가 버튼 - 초록색 테마 */}
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium rounded-2xl shadow-lg mobile-button"
-                  >
-                    새 결제 수단 추가
-                  </motion.button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-
-        {/* 성공 토스트 */}
-        <AnimatePresence>
-          {showSuccessToast && (
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              className="fixed bottom-4 left-4 right-4 z-50"
-            >
-              <div className="bg-green-500 text-white p-4 rounded-2xl shadow-lg flex items-center space-x-3">
-                <HiCheckCircle className="w-6 h-6" />
-                <span className="font-medium">구독이 성공적으로 취소되었습니다</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* 구독 취소 모달 */}
-        {showCancelModal && (
-          <div 
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
-            onClick={() => setShowCancelModal(false)}
-          >
-            <div 
-              className="w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 shadow-2xl animate-slideInFromBottom"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
-              
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FiAlertCircle className="w-8 h-8 text-red-600" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-1">구독 취소</h3>
-                <p className="text-gray-600 text-sm">정말로 구독을 취소하시겠습니까?</p>
-              </div>
-              
-              <div className="space-y-3">
-                <button
-                  onClick={handleCancelSubscription}
-                  disabled={isLoading}
-                  className="w-full py-4 rounded-2xl bg-red-500 text-white font-medium shadow-lg mobile-button disabled:opacity-50"
-                >
-                  {isLoading ? '처리 중...' : '구독 취소'}
-                </button>
-                
-                <button
-                  onClick={() => setShowCancelModal(false)}
-                  className="w-full py-4 rounded-2xl bg-gray-100 text-gray-700 font-medium mobile-button"
-                >
-                  취소
-                </button>
-              </div>
             </div>
           </div>
-        )}
+        </motion.div>
       </div>
     </>
   );

@@ -332,8 +332,56 @@ ${message}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="schedule-page-content px-4 pt-20 space-y-4 pb-6"
+          className="schedule-page-content px-4 pt-20 space-y-6 pb-6"
         >
+          {/* 1:1 문의 정보 카드 - 주황색 테마 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+          >
+            <div className="bg-[#F97315] rounded-3xl p-6 text-white shadow-xl">
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                    <FiMessageSquare className="w-8 h-8" />
+                  </div>
+                </div>
+                
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h2 className="text-xl font-bold">1:1 문의</h2>
+                    <div className="flex items-center space-x-1 bg-white/20 px-2 py-1 rounded-full">
+                      <FiMail className="w-3 h-3 text-orange-100" />
+                      <span className="text-xs font-medium text-orange-100">빠른 답변</span>
+                    </div>
+                  </div>
+                  <p className="text-orange-100 text-sm mb-1">궁금한 점을 문의하세요</p>
+                  <p className="text-orange-200 text-xs">평일 09:00~18:00 답변 제공</p>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 mb-1">
+                      <FiMessageSquare className="w-4 h-4 text-orange-200" />
+                      <span className="text-sm text-orange-100">문의 유형</span>
+                    </div>
+                    <p className="text-lg font-bold">{INQUIRY_CATEGORIES.length}가지</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 mb-1">
+                      <FiMail className="w-4 h-4 text-orange-200" />
+                      <span className="text-sm text-orange-100">답변 방식</span>
+                    </div>
+                    <p className="text-lg font-bold">이메일</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
           {/* 문의 양식 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}

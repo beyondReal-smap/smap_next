@@ -395,6 +395,83 @@ export default function AccountSettingsPage() {
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="schedule-page-content px-4 pt-20 space-y-6 pb-20"
         >
+          {/* 계정 정보 카드 - 파란색 테마 */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+          >
+            <div className="bg-[#3C82F6] rounded-3xl p-6 text-white shadow-xl">
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowSheet(true)} 
+                    className="mobile-button group"
+                  >
+                    <div className="relative">
+                      <Image
+                        src={profileImg}
+                        alt="프로필 이미지"
+                        width={80}
+                        height={80}
+                        className="rounded-full border-4 border-white/30 bg-white/20 profile-glow"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          const fallbackSrc = getDefaultImage(user?.mt_gender, user?.mt_idx || 0);
+                          console.log(`[프로필 이미지 오류] 이미지 로딩 실패, 기본 이미지로 대체:`, fallbackSrc);
+                          target.src = fallbackSrc;
+                          setProfileImg(fallbackSrc);
+                        }}
+                      />
+                      <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-2 shadow-lg group-hover:scale-110 transition-transform">
+                        <FiCamera className="w-4 h-4 text-blue-600" />
+                      </div>
+                    </div>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                </div>
+                
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h2 className="text-xl font-bold">계정 정보</h2>
+                    <div className="flex items-center space-x-1 bg-white/20 px-2 py-1 rounded-full">
+                      <HiSparkles className="w-3 h-3 text-blue-100" />
+                      <span className="text-xs font-medium text-blue-100">{profile.level}</span>
+                    </div>
+                  </div>
+                  <p className="text-blue-100 text-sm mb-1">{profile.name || '사용자'}</p>
+                  <p className="text-blue-200 text-xs">{user?.mt_email || '이메일 정보 없음'}</p>
+                  <p className="text-blue-200 text-xs">{user?.mt_id ? user.mt_id.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3') : '전화번호 정보 없음'}</p>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 mb-1">
+                      <FiShield className="w-4 h-4 text-blue-200" />
+                      <span className="text-sm text-blue-100">가입일</span>
+                    </div>
+                    <p className="text-lg font-bold">{profile.memberSince}</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 mb-1">
+                      <span className="text-sm text-blue-200">{profile.loginIcon}</span>
+                      <span className="text-sm text-blue-100">로그인</span>
+                    </div>
+                    <p className="text-lg font-bold">{profile.loginMethod}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
 
           {/* 메뉴 섹션들 */}
           <div className="space-y-6">

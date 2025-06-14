@@ -190,24 +190,55 @@ export default function ManualPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="schedule-page-content px-4 pt-20 space-y-3 pb-6"
+          className="schedule-page-content px-4 pt-20 space-y-6 pb-6"
         >
-          {/* 가이드 소개 */}
-          <motion.div
+          {/* 사용 가이드 정보 카드 - 보라색 테마 */}
+          <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.6 }}
-            className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl p-4 mb-4"
+            transition={{ delay: 0.2, duration: 0.6 }}
           >
-            <div className="flex items-center space-x-3 mb-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                <FiBook className="w-4 h-4 text-white" />
+            <div className="bg-[#A855F7] rounded-3xl p-6 text-white shadow-xl">
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                    <FiBook className="w-8 h-8" />
+                  </div>
+                </div>
+                
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h2 className="text-xl font-bold">사용 가이드</h2>
+                    <div className="flex items-center space-x-1 bg-white/20 px-2 py-1 rounded-full">
+                      <FiPlay className="w-3 h-3 text-purple-100" />
+                      <span className="text-xs font-medium text-purple-100">동영상</span>
+                    </div>
+                  </div>
+                  <p className="text-purple-100 text-sm mb-1">앱 사용법 및 도움말</p>
+                  <p className="text-purple-200 text-xs">동영상으로 쉽게 배우는 스케줄맵</p>
+                </div>
               </div>
-              <h3 className="text-base font-bold text-gray-900">동영상 가이드</h3>
+              
+              <div className="mt-4 pt-4 border-t border-white/20">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 mb-1">
+                      <FiPlay className="w-4 h-4 text-purple-200" />
+                      <span className="text-sm text-purple-100">총 영상</span>
+                    </div>
+                    <p className="text-lg font-bold">{videos.length}개</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 mb-1">
+                      <FiBook className="w-4 h-4 text-purple-200" />
+                      <span className="text-sm text-purple-100">가이드</span>
+                    </div>
+                    <p className="text-lg font-bold">무료</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-gray-600">앱의 주요 기능들을 동영상으로 쉽게 배워보세요</p>
           </motion.div>
-
           {/* 동영상 목록 */}
           {videos.map((video, idx) => (
             <motion.div 
