@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import authService from '@/services/authService';
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
@@ -19,9 +18,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 토큰 가져오기
-    const token = authService.getToken();
-    if (!token) {
+    // 클라이언트에서 전달받은 Authorization 헤더 가져오기
+    const authorization = request.headers.get('authorization');
+    if (!authorization) {
       return NextResponse.json(
         { error: '인증이 필요합니다' },
         { status: 401 }
@@ -42,7 +41,7 @@ export async function GET(request: NextRequest) {
       {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': authorization,
           'Content-Type': 'application/json',
         },
       }

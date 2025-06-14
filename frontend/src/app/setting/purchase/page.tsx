@@ -249,20 +249,36 @@ export default function PurchasePage() {
     try {
       setLoading(true);
       const user = authService.getUserData();
+      const token = authService.getToken();
+      
       if (!user?.mt_idx) {
         setError('사용자 정보를 찾을 수 없습니다');
         return;
       }
 
+      if (!token) {
+        setError('인증이 필요합니다');
+        return;
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
       // 주문 요약 정보 로드
-      const summaryResponse = await fetch(`/api/orders/summary?memberId=${user.mt_idx}`);
+      const summaryResponse = await fetch(`/api/orders/summary?memberId=${user.mt_idx}`, {
+        headers
+      });
       if (summaryResponse.ok) {
         const summaryData = await summaryResponse.json();
         setSummary(summaryData);
       }
 
       // 주문 목록 로드
-      const ordersResponse = await fetch(`/api/orders?memberId=${user.mt_idx}&size=100`);
+      const ordersResponse = await fetch(`/api/orders?memberId=${user.mt_idx}&size=100`, {
+        headers
+      });
       if (ordersResponse.ok) {
         const ordersData: OrderListResponse = await ordersResponse.json();
         setOrders(ordersData.orders);
