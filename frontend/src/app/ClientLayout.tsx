@@ -10,6 +10,7 @@ import { DataCacheProvider } from '@/contexts/DataCacheContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMapPreloader } from '@/hooks/useMapPreloader';
 import { useServiceWorker } from '@/hooks/useServiceWorker';
+import PerformanceMonitor from '@/components/PerformanceMonitor';
 
 // 인증이 필요하지 않은 페이지들 (루트 페이지는 자체적으로 리다이렉트 처리)
 const PUBLIC_ROUTES = ['/signin', '/register', '/login', '/social-login', '/'];
@@ -112,6 +113,7 @@ export default function ClientLayout({
             <AuthGuard>
               {children}
               {!shouldHideNavBar && <BottomNavBar />}
+              <PerformanceMonitor />
             </AuthGuard>
           </UserProvider>
         </AuthProvider>
