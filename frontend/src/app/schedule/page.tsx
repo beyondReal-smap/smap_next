@@ -1289,22 +1289,60 @@ export default function SchedulePage() {
       // 약간의 지연을 두고 스크롤 (모달 애니메이션 완료 후)
       setTimeout(() => {
         if (hourScrollRef.current && minuteScrollRef.current) {
-          // 시간 스크롤 위치 계산 (각 버튼 높이 약 36px)
-          const hourScrollTop = selectedHour * 36 - 64; // 64px = 컨테이너 높이의 절반 정도
-          const minuteIndex = selectedMinute / 5; // 5분 단위 인덱스
-          const minuteScrollTop = minuteIndex * 36 - 64;
-          
-          hourScrollRef.current.scrollTo({
-            top: Math.max(0, hourScrollTop),
-            behavior: 'smooth'
-          });
-          
-          minuteScrollRef.current.scrollTo({
-            top: Math.max(0, minuteScrollTop),
-            behavior: 'smooth'
-          });
+          try {
+            // 실제 DOM 요소에서 버튼들 찾기
+            const hourButtons = hourScrollRef.current.querySelectorAll('button');
+            const minuteButtons = minuteScrollRef.current.querySelectorAll('button');
+            
+            console.log('[시간 스크롤] DOM 요소 확인:', {
+              selectedHour,
+              selectedMinute,
+              hourButtonsCount: hourButtons.length,
+              minuteButtonsCount: minuteButtons.length,
+              hourScrollContainer: !!hourScrollRef.current,
+              minuteScrollContainer: !!minuteScrollRef.current
+            });
+            
+            if (hourButtons.length > 0 && minuteButtons.length > 0) {
+              // 버튼 높이 측정
+              const buttonHeight = hourButtons[0].offsetHeight;
+              const containerHeight = hourScrollRef.current.clientHeight;
+              
+              // 시간 스크롤 계산
+              const hourScrollTop = Math.max(0, (selectedHour * buttonHeight) - (containerHeight / 2) + (buttonHeight / 2));
+              
+              // 분 스크롤 계산 (5분 단위)
+              const minuteIndex = selectedMinute / 5;
+              const minuteScrollTop = Math.max(0, (minuteIndex * buttonHeight) - (containerHeight / 2) + (buttonHeight / 2));
+              
+              console.log('[시간 스크롤] 스크롤 계산:', {
+                buttonHeight,
+                containerHeight,
+                hourScrollTop,
+                minuteIndex,
+                minuteScrollTop
+              });
+              
+              // 스크롤 실행
+              hourScrollRef.current.scrollTo({
+                top: hourScrollTop,
+                behavior: 'smooth'
+              });
+              
+              minuteScrollRef.current.scrollTo({
+                top: minuteScrollTop,
+                behavior: 'smooth'
+              });
+              
+              console.log('[시간 스크롤] 스크롤 실행 완료');
+            } else {
+              console.log('[시간 스크롤] 버튼을 찾을 수 없음');
+            }
+          } catch (error) {
+            console.error('[시간 스크롤] 오류 발생:', error);
+          }
         }
-      }, 300);
+      }, 500); // 더 긴 지연시간으로 변경
     }
   }, [isTimeModalOpen, selectedHour, selectedMinute]);
 
@@ -2587,6 +2625,80 @@ export default function SchedulePage() {
     setSelectedHour(hour);
     setSelectedMinute(minute);
     setIsTimeModalOpen(true);
+    
+    // 모달이 열린 후 스크롤 실행 (여러 단계로 시도)
+    const performScroll = () => {
+      if (hourScrollRef.current && minuteScrollRef.current) {
+        try {
+          const hourButtons = hourScrollRef.current.querySelectorAll('button');
+          const minuteButtons = minuteScrollRef.current.querySelectorAll('button');
+          
+          console.log('[handleOpenTimeModal] 스크롤 실행:', {
+            hour,
+            minute,
+            hourButtonsCount: hourButtons.length,
+            minuteButtonsCount: minuteButtons.length,
+            hourContainer: hourScrollRef.current.clientHeight,
+            minuteContainer: minuteScrollRef.current.clientHeight
+          });
+          
+          if (hourButtons.length > 0 && minuteButtons.length > 0) {
+            const buttonHeight = hourButtons[0].offsetHeight;
+            const containerHeight = hourScrollRef.current.clientHeight;
+            
+            // 시간 스크롤 계산 - 선택된 항목이 중앙에 오도록
+            const hourScrollTop = Math.max(0, (hour * buttonHeight) - (containerHeight / 2) + (buttonHeight / 2));
+            
+            // 분 스크롤 계산 (5분 단위)
+            const minuteIndex = minute / 5;
+            const minuteScrollTop = Math.max(0, (minuteIndex * buttonHeight) - (containerHeight / 2) + (buttonHeight / 2));
+            
+            console.log('[handleOpenTimeModal] 스크롤 계산:', {
+              buttonHeight,
+              containerHeight,
+              hourScrollTop,
+              minuteIndex,
+              minuteScrollTop
+            });
+            
+            // 즉시 스크롤 (smooth 없이)
+            hourScrollRef.current.scrollTop = hourScrollTop;
+            minuteScrollRef.current.scrollTop = minuteScrollTop;
+            
+            // 그 다음 smooth 스크롤
+            setTimeout(() => {
+              if (hourScrollRef.current && minuteScrollRef.current) {
+                hourScrollRef.current.scrollTo({
+                  top: hourScrollTop,
+                  behavior: 'smooth'
+                });
+                
+                minuteScrollRef.current.scrollTo({
+                  top: minuteScrollTop,
+                  behavior: 'smooth'
+                });
+              }
+            }, 100);
+            
+            console.log('[handleOpenTimeModal] 스크롤 완료');
+          } else {
+            console.log('[handleOpenTimeModal] 버튼을 찾을 수 없음, 재시도...');
+            // 버튼이 아직 렌더링되지 않았다면 다시 시도
+            setTimeout(performScroll, 200);
+          }
+        } catch (error) {
+          console.error('[handleOpenTimeModal] 스크롤 오류:', error);
+        }
+      } else {
+        console.log('[handleOpenTimeModal] 스크롤 컨테이너를 찾을 수 없음, 재시도...');
+        setTimeout(performScroll, 200);
+      }
+    };
+    
+    // 여러 시점에서 스크롤 시도
+    setTimeout(performScroll, 300);
+    setTimeout(performScroll, 600);
+    setTimeout(performScroll, 1000);
   };
 
   const handleCloseTimeModal = () => {

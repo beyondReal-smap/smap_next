@@ -1,70 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// node-fetch를 대안으로 사용
-let nodeFetch: any = null;
-try {
-  nodeFetch = require('node-fetch');
-} catch (e) {
-  console.log('[Group Locations API] node-fetch 패키지를 찾을 수 없음');
-}
+// SSL 인증서 문제 해결을 위한 설정 (공지사항 API와 동일)
+process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
 async function fetchWithFallback(url: string): Promise<any> {
-  const fetchOptions: RequestInit = {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'User-Agent': 'Next.js API Proxy',
-    },
-    // @ts-ignore - Next.js 환경에서 SSL 인증서 검증 우회
-    rejectUnauthorized: false,
-  };
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
   
-  // Node.js 환경 변수로 SSL 검증 비활성화
-  const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-  
-  let response: any;
+  console.log('[Group Locations API] 🔗 백엔드 요청:', {
+    url,
+    backendUrl,
+    timestamp: new Date().toISOString()
+  });
 
   try {
-    try {
-      // 기본 fetch 시도
-      response = await fetch(url, fetchOptions);
-    } catch (fetchError) {
-      if (nodeFetch) {
-        // node-fetch 시도
-        response = await nodeFetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'User-Agent': 'Next.js API Proxy (node-fetch)',
-          },
-          agent: function(_parsedURL: any) {
-            const https = require('https');
-            return new https.Agent({
-              rejectUnauthorized: false
-            });
-          }
-        });
-      } else {
-        throw fetchError;
-      }
-    }
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('[Group Locations API] ❌ 백엔드 응답 오류:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        url
+      });
       throw new Error(`API error: ${response.status} - ${errorText}`);
     }
 
-    return await response.json();
-  } finally {
-    // 환경 변수 복원
-    if (originalTlsReject !== undefined) {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
-    } else {
-      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    }
+    const data = await response.json();
+    console.log('[Group Locations API] ✅ 백엔드 응답 성공:', {
+      url,
+      dataLength: Array.isArray(data) ? data.length : 'not array',
+      timestamp: new Date().toISOString()
+    });
+
+    return data;
+  } catch (error) {
+    console.error('[Group Locations API] 🚨 요청 실패:', {
+      url,
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString()
+    });
+    throw error;
   }
 }
 
@@ -77,11 +59,44 @@ export async function GET(
   try {
     console.log('[Group Locations API] 그룹 장소 조회 요청:', { groupId });
 
-    // 백엔드 엔드포인트 직접 호출
-    const locationsUrl = `https://118.67.130.71:8000/api/v1/locations/group/${groupId}`;
-    console.log('[Group Locations API] 백엔드 API 호출:', locationsUrl);
+    // 먼저 그룹 멤버들을 조회
+    const membersUrl = `https://118.67.130.71:8000/api/v1/group-members/member/${groupId}`;
+    console.log('[Group Locations API] 그룹 멤버 조회:', membersUrl);
     
-    const locationsData = await fetchWithFallback(locationsUrl);
+    const membersData = await fetchWithFallback(membersUrl);
+    console.log('[Group Locations API] 그룹 멤버 응답:', { count: membersData.length });
+    
+    // 각 멤버의 위치 정보를 조회
+    const allLocations: any[] = [];
+    
+    for (const member of membersData) {
+      try {
+        const memberLocationsUrl = `https://118.67.130.71:8000/api/v1/locations/member/${member.mt_idx}`;
+        console.log('[Group Locations API] 멤버 위치 조회:', { memberId: member.mt_idx, url: memberLocationsUrl });
+        
+        const memberLocations = await fetchWithFallback(memberLocationsUrl);
+        
+        // 해당 그룹의 위치만 필터링
+        const groupLocations = memberLocations.filter((location: any) => 
+          location.sgt_idx == groupId
+        );
+        
+        allLocations.push(...groupLocations);
+        console.log('[Group Locations API] 멤버 위치 추가:', { 
+          memberId: member.mt_idx, 
+          memberName: member.mt_name,
+          locationCount: groupLocations.length 
+        });
+      } catch (memberError) {
+        console.warn('[Group Locations API] 멤버 위치 조회 실패:', { 
+          memberId: member.mt_idx, 
+          error: memberError 
+        });
+        // 개별 멤버 오류는 무시하고 계속 진행
+      }
+    }
+    
+    const locationsData = allLocations;
     console.log('[Group Locations API] 백엔드 응답 성공:', { 
       count: locationsData.length, 
       sampleLocation: locationsData[0] ? {

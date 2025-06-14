@@ -5388,7 +5388,7 @@ export default function LogsPage() {
                   duration: 0.6,
                   delay: 0.4
                 }}
-                className="absolute bottom-20 left-4 z-20"
+                className="absolute bottom-20 left-4 z-50"
               >
                 <motion.div
                   whileHover={{ scale: 1.02, y: -2 }}

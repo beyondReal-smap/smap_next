@@ -28,7 +28,9 @@ async function makeBackendRequest(url: string, options: RequestInit): Promise<an
     console.log('[SCHEDULE API] 🚀 백엔드 요청 시작:', { url, method: options.method });
     console.log('[SCHEDULE API] 📦 요청 옵션:', options);
     
-    // HTTPS 자체 서명된 인증서 처리를 위한 설정
+    // SSL 인증서 문제 해결을 위한 설정 (공지사항 API와 동일)
+    process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
+    
     const fetchOptions: RequestInit = {
       ...options,
       headers: {
@@ -37,23 +39,6 @@ async function makeBackendRequest(url: string, options: RequestInit): Promise<an
         ...options.headers,
       },
     };
-
-    // Node.js 환경에서만 SSL 검증 비활성화
-    if (typeof process !== 'undefined' && process.env && url.startsWith('https:')) {
-      // @ts-ignore - Node.js 환경에서만 사용
-      if (typeof require !== 'undefined') {
-        try {
-          const https = require('https');
-          const agent = new https.Agent({
-            rejectUnauthorized: false
-          });
-          // @ts-ignore
-          fetchOptions.agent = agent;
-        } catch (e) {
-          console.log('[SCHEDULE API] ⚠️ HTTPS Agent 설정 실패, 기본 설정 사용');
-        }
-      }
-    }
     
     const response = await fetch(url, fetchOptions);
 

@@ -1,11 +1,12 @@
 'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FiBell, FiCalendar } from 'react-icons/fi';
 
-// 공지사항 타입 정의
+// 공지사항 인터페이스
 interface Notice {
   nt_idx: number;
   nt_title: string;
@@ -59,7 +60,7 @@ const truncateContent = (content: string, maxLength: number = 100): string => {
   return content.substring(0, maxLength) + '...';
 };
 
-// 모바일 최적화된 CSS 애니메이션
+// 모바일 최적화된 CSS 애니메이션 (setting 페이지와 동일)
 const pageAnimations = `
 html, body {
   width: 100%;
@@ -120,37 +121,6 @@ html, body {
   overflow: hidden;
 }
 
-/* glass-effect 스타일 - setting 페이지와 동일 */
-.glass-effect {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 9999 !important;
-  background: rgba(255, 255, 255, 0.8) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
-  width: 100% !important;
-  height: auto !important;
-  transform: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  display: block !important;
-  overflow: visible !important;
-}
-
-/* 혹시 부모 요소가 relative나 다른 포지션인 경우를 위한 추가 스타일 */
-body, html {
-  position: relative !important;
-}
-
-/* 헤더가 잘리지 않도록 보장 */
-.glass-effect > * {
-  position: relative !important;
-}
-
 .mobile-button {
   transition: all 0.2s ease;
   touch-action: manipulation;
@@ -159,6 +129,26 @@ body, html {
 
 .mobile-button:active {
   transform: scale(0.98);
+}
+
+.gradient-bg {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.glass-effect {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+}
+
+.menu-item-hover {
+  transition: all 0.2s ease;
+}
+
+.menu-item-hover:hover {
+  transform: translateX(4px);
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
 }
 
 .card-hover {
@@ -219,7 +209,7 @@ export default function NoticePage() {
     <>
       <style jsx global>{pageAnimations}</style>
       <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        {/* 헤더 - setting 페이지와 동일한 애니메이션 */}
+        {/* 헤더 - setting 페이지와 완전히 동일한 구조 */}
         <motion.header 
           initial={{ y: -100, opacity: 0, scale: 0.9 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
@@ -230,8 +220,7 @@ export default function NoticePage() {
             opacity: { duration: 0.6 },
             scale: { duration: 0.6 }
           }}
-          className="fixed top-0 left-0 right-0 z-50 glass-effect"
-          style={{ position: 'fixed', zIndex: 9999 }}
+          className="fixed top-0 left-0 right-0 z-20 glass-effect"
         >
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
@@ -268,130 +257,137 @@ export default function NoticePage() {
           </motion.div>
         </motion.header>
 
-        {/* 로딩 상태 */}
-        {isLoading && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="schedule-page-content px-4 pt-20 space-y-3 pb-6"
-          >
-            {[...Array(4)].map((_, idx) => (
-              <div key={idx} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 animate-pulse">
-                <div className="flex items-start space-x-3">
-                  <div className="w-6 h-6 bg-gray-200 rounded-lg"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-full"></div>
+        {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="schedule-page-content px-4 pt-20 space-y-6"
+        >
+          {/* 로딩 상태 */}
+          {isLoading && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-3"
+            >
+              {[...Array(4)].map((_, idx) => (
+                <div key={idx} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 animate-pulse">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-6 h-6 bg-gray-200 rounded-lg"></div>
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                      <div className="h-3 bg-gray-200 rounded w-full"></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </motion.div>
-        )}
+              ))}
+            </motion.div>
+          )}
 
-        {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
-        {!isLoading && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="schedule-page-content px-4 pt-20 space-y-3 pb-6"
-          >
-            {notices.length === 0 ? (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.6 }}
-                className="flex flex-col items-center justify-center py-16 text-gray-400"
-              >
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                  <FiBell className="w-6 h-6 text-gray-400" />
-                </div>
-                <div className="text-base font-medium text-gray-600">등록된 공지사항이 없습니다</div>
-                <p className="text-xs text-gray-500 mt-1">새로운 소식이 있으면 알려드릴게요</p>
-              </motion.div>
-            ) : (
-              <>
-                {/* 에러 상태 표시 */}
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1, duration: 0.6 }}
-                    className="bg-red-50 rounded-2xl p-3 mb-1"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <div className="w-6 h-6 bg-red-500 rounded-lg flex items-center justify-center">
-                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-red-900">오류 발생</h3>
-                        <p className="text-xs text-red-600">{error}</p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* 공지사항 개수 표시 */}
-                {!error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1, duration: 0.6 }}
-                    className="bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl p-3 mb-1"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <div className="w-6 h-6 bg-gradient-to-r from-red-500 to-pink-600 rounded-lg flex items-center justify-center">
-                        <FiBell className="w-3 h-3 text-white" />
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-gray-900">전체 공지사항</h3>
-                        <p className="text-xs text-gray-600">{totalCount}개의 공지사항이 있습니다</p>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-
-                {/* 공지사항 목록 */}
-                {notices.map((notice, idx) => (
-                  <motion.div
-                    key={notice.nt_idx}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 + (0.1 * idx), duration: 0.6 }}
-                  >
-                    <Link href={`/setting/notice/${notice.nt_idx}`} className="block">
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-3 card-hover mobile-button">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3 flex-1">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-bold text-sm text-gray-900 mb-1 line-clamp-1">{notice.nt_title}</h3>
-                              <div className="flex items-center space-x-2 text-xs text-gray-500 mb-2">
-                                <FiCalendar className="w-3 h-3" />
-                                <span>{formatDate(notice.nt_wdate)}</span>
-                                <span className="text-gray-400">•</span>
-                                <span>조회 {notice.nt_hit}회</span>
-                              </div>
-                              <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">{truncateContent(notice.nt_content)}</p>
-                            </div>
-                          </div>
-                          <div className="text-gray-400 ml-2">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </div>
+          {/* 메인 컨텐츠 */}
+          {!isLoading && (
+            <>
+              {notices.length === 0 ? (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.6 }}
+                  className="flex flex-col items-center justify-center py-16 text-gray-400"
+                >
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                    <FiBell className="w-6 h-6 text-gray-400" />
+                  </div>
+                  <div className="text-base font-medium text-gray-600">등록된 공지사항이 없습니다</div>
+                  <p className="text-xs text-gray-500 mt-1">새로운 소식이 있으면 알려드릴게요</p>
+                </motion.div>
+              ) : (
+                <>
+                  {/* 에러 상태 표시 */}
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1, duration: 0.6 }}
+                      className="bg-red-50 rounded-2xl p-4 mb-4"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-red-900">오류 발생</h3>
+                          <p className="text-sm text-red-600">{error}</p>
                         </div>
                       </div>
-                    </Link>
-                  </motion.div>
-                ))}
-              </>
-            )}
-          </motion.div>
-        )}
+                    </motion.div>
+                  )}
+
+                  {/* 공지사항 개수 표시 */}
+                  {!error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1, duration: 0.6 }}
+                      className="bg-gradient-to-r from-red-50 to-pink-50 rounded-2xl p-4 mb-4"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-r from-red-500 to-pink-600 rounded-lg flex items-center justify-center">
+                          <FiBell className="w-4 h-4 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">전체 공지사항</h3>
+                          <p className="text-sm text-gray-600">{totalCount}개의 공지사항이 있습니다</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* 공지사항 목록 */}
+                  <div className="space-y-3">
+                    {notices.map((notice, idx) => (
+                      <motion.div
+                        key={notice.nt_idx}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 + (0.1 * idx), duration: 0.6 }}
+                      >
+                        <Link href={`/setting/notice/${notice.nt_idx}`} className="block">
+                          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 card-hover mobile-button">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-3 flex-1">
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-bold text-base text-gray-900 mb-2 line-clamp-1">{notice.nt_title}</h3>
+                                  <div className="flex items-center space-x-3 text-sm text-gray-500 mb-2">
+                                    <div className="flex items-center space-x-1">
+                                      <FiCalendar className="w-4 h-4" />
+                                      <span>{formatDate(notice.nt_wdate)}</span>
+                                    </div>
+                                    <span className="text-gray-400">•</span>
+                                    <span>조회 {notice.nt_hit}회</span>
+                                  </div>
+                                  <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{truncateContent(notice.nt_content)}</p>
+                                </div>
+                              </div>
+                              <div className="text-gray-400 ml-3">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      </motion.div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </motion.div>
       </div>
     </>
   );
