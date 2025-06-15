@@ -858,7 +858,7 @@ export default function SignInPage() {
               </button>
               
               {/* iOS WebView 안내 메시지 */}
-              {typeof window !== 'undefined' && (window as any).webkit && (window as any).webkit.messageHandlers && (
+              {/* {typeof window !== 'undefined' && (window as any).webkit && (window as any).webkit.messageHandlers && (
                 <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
                   <div className="flex items-start">
                     <FiAlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" />
@@ -869,7 +869,7 @@ export default function SignInPage() {
                     </p>
                   </div>
                 </div>
-              )}
+              )} */}
             </div>
 
             {/* Kakao 로그인 버튼 */}

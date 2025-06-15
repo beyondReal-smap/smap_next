@@ -167,6 +167,15 @@ window.handlePageLoaded = function() {
     }
 };
 
+// iOS 웹뷰에서 필요한 전역 함수들 정의
+window.location_refresh = function() {
+    console.log('[iOS Bridge] location_refresh 호출됨');
+    // 위치 새로고침 로직 (필요시 구현)
+    if (window.location && window.location.reload) {
+        window.location.reload();
+    }
+};
+
 // DOM 로드 완료 시 초기화
 document.addEventListener('DOMContentLoaded', function() {
     console.log('[iOS Bridge] DOM 로드 완료');
