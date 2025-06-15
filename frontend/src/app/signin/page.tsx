@@ -285,7 +285,23 @@ export default function SignInPage() {
       (window as any).googleSignInError = (errorMessage: string) => {
         console.error('[GOOGLE LOGIN] iOS 네이티브 Google Sign-In 실패:', errorMessage);
         setIsLoading(false);
-        showError(`Google 로그인 실패: ${errorMessage}`);
+        
+        // 에러 메시지에 따른 사용자 친화적 메시지 제공
+        let userFriendlyMessage = errorMessage;
+        if (errorMessage.includes('cancelled') || errorMessage.includes('canceled')) {
+          userFriendlyMessage = '사용자가 Google 로그인을 취소했습니다.';
+        } else if (errorMessage.includes('network') || errorMessage.includes('Network')) {
+          userFriendlyMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
+        } else if (errorMessage.includes('configuration') || errorMessage.includes('Configuration')) {
+          userFriendlyMessage = 'Google 로그인 설정에 문제가 있습니다. 앱을 다시 시작해주세요.';
+        }
+        
+        showError(`Google 로그인 실패: ${userFriendlyMessage}`);
+      };
+
+      // iOS 앱에서 메시지를 받았는지 확인하는 콜백 (디버깅용)
+      (window as any).googleSignInMessageReceived = (message: string) => {
+        console.log('[GOOGLE LOGIN] iOS 앱에서 메시지 수신 확인:', message);
       };
     }
 
@@ -294,6 +310,7 @@ export default function SignInPage() {
       if (isIOSWebView) {
         delete (window as any).googleSignInSuccess;
         delete (window as any).googleSignInError;
+        delete (window as any).googleSignInMessageReceived;
       }
     };
   }, []);
@@ -532,7 +549,10 @@ export default function SignInPage() {
         isIOSWebView,
         hasWebkit: !!(window as any).webkit,
         hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
-        hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos
+        hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
+        hasIosBridge: !!(window as any).iosBridge,
+        hasGoogleSignIn: !!(window as any).iosBridge?.googleSignIn,
+        hasGoogleSignInMethod: !!(window as any).iosBridge?.googleSignIn?.signIn
       });
       
       if (isIOSWebView) {
@@ -540,10 +560,43 @@ export default function SignInPage() {
         
         // iOS 네이티브 Google Sign-In 사용
         try {
+          // ios-bridge.js가 로드될 때까지 최대 3초 대기
+          const waitForIosBridge = async (maxWait = 3000) => {
+            const startTime = Date.now();
+            while (Date.now() - startTime < maxWait) {
+              if ((window as any).iosBridge?.googleSignIn?.signIn) {
+                return true;
+              }
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            return false;
+          };
+
+          // ios-bridge.js의 googleSignIn 메서드 사용 시도
+          if ((window as any).iosBridge?.googleSignIn?.signIn) {
+            console.log('[GOOGLE LOGIN] ios-bridge.js googleSignIn 메서드 사용');
+            (window as any).iosBridge.googleSignIn.signIn();
+            console.log('[GOOGLE LOGIN] ios-bridge 메시지 전송 완료, 콜백 대기 중...');
+            return;
+          }
+
+          // ios-bridge.js가 아직 로드되지 않았다면 잠시 대기
+          console.log('[GOOGLE LOGIN] ios-bridge.js 로드 대기 중...');
+          const bridgeLoaded = await waitForIosBridge();
+          
+          if (bridgeLoaded) {
+            console.log('[GOOGLE LOGIN] ios-bridge.js 로드 완료, googleSignIn 메서드 사용');
+            (window as any).iosBridge.googleSignIn.signIn();
+            console.log('[GOOGLE LOGIN] ios-bridge 메시지 전송 완료, 콜백 대기 중...');
+            return;
+          }
+          
+          // 직접 메시지 핸들러 사용 (fallback)
           if ((window as any).webkit?.messageHandlers?.smapIos) {
-            console.log('[GOOGLE LOGIN] iOS 네이티브 Google Sign-In 시작');
+            console.log('[GOOGLE LOGIN] 직접 메시지 핸들러 사용 (fallback)');
             (window as any).webkit.messageHandlers.smapIos.postMessage({
-              action: 'googleSignIn'
+              type: 'googleSignIn',
+              param: ''
             });
             
             console.log('[GOOGLE LOGIN] 네이티브 메시지 전송 완료, 콜백 대기 중...');
@@ -558,7 +611,14 @@ export default function SignInPage() {
         
         // 네이티브 처리가 불가능한 경우 에러 표시
         console.log('[GOOGLE LOGIN] 네이티브 Google Sign-In을 사용할 수 없음');
-        showError('Google 로그인을 사용할 수 없습니다. 앱을 다시 시작해주세요.');
+        console.log('[GOOGLE LOGIN] 환경 정보:', {
+          hasWebkit: !!(window as any).webkit,
+          hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
+          hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
+          hasIosBridge: !!(window as any).iosBridge,
+          userAgent: navigator.userAgent
+        });
+        showError('Google 로그인을 사용할 수 없습니다.\n\n가능한 해결 방법:\n1. 앱을 완전히 종료 후 다시 시작\n2. 네트워크 연결 확인\n3. 앱 업데이트 확인');
         return;
       }
       
