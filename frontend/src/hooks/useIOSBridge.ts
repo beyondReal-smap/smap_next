@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 
 // iOS 브릿지 타입 정의
 interface IOSBridge {
@@ -22,6 +22,17 @@ interface IOSBridge {
   ui: {
     showToast: (message: string) => void
   }
+  haptic: {
+    light: () => void
+    medium: () => void
+    heavy: () => void
+    success: () => void
+    warning: () => void
+    error: () => void
+    selection: () => void
+  }
+  requestNotificationPermission: () => void
+  sendNotification: (title: string, body: string) => void
 }
 
 declare global {
@@ -34,6 +45,14 @@ declare global {
     onFCMTokenUpdate?: (token: string) => void
     onDeviceInfo?: (deviceInfo: any) => void
     onPageLoaded?: () => void
+    iosBridge?: IOSBridge
+    webkit?: {
+      messageHandlers?: {
+        smapIos?: {
+          postMessage: (message: any) => void
+        }
+      }
+    }
   }
 }
 
@@ -44,165 +63,116 @@ interface IOSBridgeState {
   notificationPermission: boolean | null
 }
 
-export const useIOSBridge = () => {
-  const [state, setState] = useState<IOSBridgeState>({
-    isIOSApp: false,
-    deviceInfo: null,
-    fcmToken: null,
-    notificationPermission: null,
-  })
+export function useIOSBridge() {
+  const [isIOS, setIsIOS] = useState(false)
 
-  // iOS 브릿지 사용 가능 여부 확인
-  const checkIOSBridge = useCallback(() => {
-    if (typeof window !== 'undefined' && window.SmapApp) {
-      const isIOS = window.SmapApp.isIOSApp()
-      setState(prev => ({ ...prev, isIOSApp: isIOS }))
-      return isIOS
-    }
-    return false
+  useEffect(() => {
+    // iOS 환경인지 확인
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && 
+                       window.webkit?.messageHandlers?.smapIos
+    setIsIOS(isIOSDevice)
   }, [])
 
-  // 이벤트 리스너 설정
-  useEffect(() => {
-    if (typeof window === 'undefined') return
+  // 햅틱 피드백 함수들
+  const haptic = {
+    // 가벼운 햅틱 (버튼 탭, 가벼운 상호작용)
+    light: () => {
+      if (isIOS && window.iosBridge?.haptic?.light) {
+        window.iosBridge.haptic.light()
+      }
+    },
 
-    let mounted = true
+    // 중간 햅틱 (중간 정도의 상호작용)
+    medium: () => {
+      if (isIOS && window.iosBridge?.haptic?.medium) {
+        window.iosBridge.haptic.medium()
+      }
+    },
 
-    // 브릿지 초기화 대기
-    const initBridge = () => {
-      if (!mounted) return
-      
-      if (window.SmapApp) {
-        checkIOSBridge()
-        
-        // 디바이스 정보 요청
-        if (state.isIOSApp) {
-          window.SmapApp.device.getInfo()
-        }
-      } else {
-        // 브릿지가 아직 로드되지 않았으면 다시 시도
-        setTimeout(initBridge, 100)
+    // 강한 햅틱 (중요한 액션, 경고)
+    heavy: () => {
+      if (isIOS && window.iosBridge?.haptic?.heavy) {
+        window.iosBridge.haptic.heavy()
+      }
+    },
+
+    // 성공 햅틱
+    success: () => {
+      if (isIOS && window.iosBridge?.haptic?.success) {
+        window.iosBridge.haptic.success()
+      }
+    },
+
+    // 경고 햅틱
+    warning: () => {
+      if (isIOS && window.iosBridge?.haptic?.warning) {
+        window.iosBridge.haptic.warning()
+      }
+    },
+
+    // 에러 햅틱
+    error: () => {
+      if (isIOS && window.iosBridge?.haptic?.error) {
+        window.iosBridge.haptic.error()
+      }
+    },
+
+    // 선택 변경 햅틱 (탭 전환, 선택 변경)
+    selection: () => {
+      if (isIOS && window.iosBridge?.haptic?.selection) {
+        window.iosBridge.haptic.selection()
       }
     }
+  }
 
-    initBridge()
-
-    // 글로벌 콜백 함수 설정
-    window.onDeviceInfo = (deviceInfo: any) => {
-      if (!mounted) return
-      setState(prev => ({ ...prev, deviceInfo }))
+  // 알림 관련
+  const requestNotificationPermission = () => {
+    if (isIOS && window.iosBridge?.requestNotificationPermission) {
+      window.iosBridge.requestNotificationPermission()
     }
+  }
 
-    window.onFCMTokenUpdate = (token: string) => {
-      if (!mounted) return
-      setState(prev => ({ ...prev, fcmToken: token }))
+  const sendNotification = (title: string, body: string) => {
+    if (isIOS && window.iosBridge?.sendNotification) {
+      window.iosBridge.sendNotification(title, body)
     }
+  }
 
-    window.onNotificationPermissionResult = (granted: boolean) => {
-      if (!mounted) return
-      setState(prev => ({ ...prev, notificationPermission: granted }))
-    }
-
-    // 커스텀 이벤트 리스너
-    const handleDeviceInfo = (event: CustomEvent) => {
-      if (!mounted) return
-      setState(prev => ({ ...prev, deviceInfo: event.detail }))
-    }
-
-    const handleFCMTokenUpdate = (event: CustomEvent) => {
-      if (!mounted) return
-      setState(prev => ({ ...prev, fcmToken: event.detail.token }))
-    }
-
-    const handleNotificationPermission = (event: CustomEvent) => {
-      if (!mounted) return
-      setState(prev => ({ ...prev, notificationPermission: event.detail.granted }))
-    }
-
-    window.addEventListener('ios:deviceInfo', handleDeviceInfo as EventListener)
-    window.addEventListener('ios:fcmTokenUpdate', handleFCMTokenUpdate as EventListener)
-    window.addEventListener('ios:notificationPermission', handleNotificationPermission as EventListener)
-
-    return () => {
-      mounted = false
-      window.removeEventListener('ios:deviceInfo', handleDeviceInfo as EventListener)
-      window.removeEventListener('ios:fcmTokenUpdate', handleFCMTokenUpdate as EventListener)
-      window.removeEventListener('ios:notificationPermission', handleNotificationPermission as EventListener)
-      
-      // 글로벌 콜백 정리
-      delete window.onDeviceInfo
-      delete window.onFCMTokenUpdate
-      delete window.onNotificationPermissionResult
-    }
-  }, [checkIOSBridge, state.isIOSApp])
-
-  // iOS 브릿지 메서드들
-  const requestNotificationPermission = useCallback(() => {
-    if (window.SmapApp && state.isIOSApp) {
-      window.SmapApp.notification.requestPermission()
-    }
-  }, [state.isIOSApp])
-
-  const shareContent = useCallback((text: string, url?: string) => {
-    if (window.SmapApp && state.isIOSApp) {
-      window.SmapApp.share.content(text, url)
+  // 공유하기
+  const share = (content: string) => {
+    if (isIOS && window.iosBridge?.share) {
+      window.iosBridge.share(content)
     } else {
-      // 웹 브라우저에서는 Web Share API 또는 클립보드 복사
+      // iOS가 아닌 경우 Web Share API 사용
       if (navigator.share) {
-        navigator.share({ text, url })
-      } else if (navigator.clipboard) {
-        navigator.clipboard.writeText(url ? `${text} ${url}` : text)
+        navigator.share({
+          text: content
+        }).catch(console.error)
+      } else {
+        // Web Share API가 지원되지 않는 경우 클립보드에 복사
+        navigator.clipboard?.writeText(content).then(() => {
+          alert('클립보드에 복사되었습니다.')
+        }).catch(() => {
+          alert('공유 기능을 지원하지 않습니다.')
+        })
       }
     }
-  }, [state.isIOSApp])
+  }
 
-  const openExternalURL = useCallback((url: string) => {
-    if (window.SmapApp && state.isIOSApp) {
-      window.SmapApp.browser.openURL(url)
-    } else {
-      window.open(url, '_blank')
+  // 디바이스 정보
+  const getDeviceInfo = () => {
+    if (isIOS && window.iosBridge?.getDeviceInfo) {
+      window.iosBridge.getDeviceInfo()
     }
-  }, [state.isIOSApp])
-
-  const hapticFeedback = useCallback((style: 'light' | 'medium' | 'heavy' = 'medium') => {
-    if (window.SmapApp && state.isIOSApp) {
-      window.SmapApp.feedback.impact(style)
-    }
-  }, [state.isIOSApp])
-
-  const showToast = useCallback((message: string) => {
-    if (window.SmapApp && state.isIOSApp) {
-      window.SmapApp.ui.showToast(message)
-    } else {
-      // 웹에서는 일반적인 토스트 또는 alert 사용
-      console.log('[Toast]', message)
-      // 필요시 웹용 토스트 라이브러리 사용
-    }
-  }, [state.isIOSApp])
-
-  const getDeviceInfo = useCallback(() => {
-    if (window.SmapApp && state.isIOSApp) {
-      window.SmapApp.device.getInfo()
-    }
-  }, [state.isIOSApp])
+  }
 
   return {
-    // 상태
-    isIOSApp: state.isIOSApp,
-    deviceInfo: state.deviceInfo,
-    fcmToken: state.fcmToken,
-    notificationPermission: state.notificationPermission,
-    
-    // 메서드
+    isIOS,
+    haptic,
     requestNotificationPermission,
-    shareContent,
-    openExternalURL,
-    hapticFeedback,
-    showToast,
-    getDeviceInfo,
-    
-    // 유틸리티
-    checkIOSBridge,
+    sendNotification,
+    share,
+    getDeviceInfo
   }
 }
 

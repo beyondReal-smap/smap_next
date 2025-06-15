@@ -253,4 +253,153 @@ window.addEventListener('unhandledrejection', function(event) {
     }
 });
 
-console.log('[iOS Bridge] 초기화 완료'); 
+console.log('[iOS Bridge] 초기화 완료');
+
+window.iosBridge = {
+    // 기존 메서드들...
+    
+    // 알림 관련
+    requestNotificationPermission() {
+        if (window.webkit?.messageHandlers?.smapIos) {
+            window.webkit.messageHandlers.smapIos.postMessage({
+                type: 'requestNotificationPermission',
+                param: ''
+            });
+        }
+    },
+
+    sendNotification(title, body) {
+        if (window.webkit?.messageHandlers?.smapIos) {
+            window.webkit.messageHandlers.smapIos.postMessage({
+                type: 'sendNotification',
+                param: { title, body }
+            });
+        }
+    },
+
+    // 공유하기
+    share(content) {
+        if (window.webkit?.messageHandlers?.smapIos) {
+            window.webkit.messageHandlers.smapIos.postMessage({
+                type: 'openShare',
+                param: content
+            });
+        }
+    },
+
+    // 햅틱 피드백 메서드들
+    haptic: {
+        // 가벼운 햅틱 (버튼 탭, 가벼운 상호작용)
+        light() {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'haptic',
+                    param: 'light'
+                });
+            }
+        },
+
+        // 중간 햅틱 (중간 정도의 상호작용)
+        medium() {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'haptic',
+                    param: 'medium'
+                });
+            }
+        },
+
+        // 강한 햅틱 (중요한 액션, 경고)
+        heavy() {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'haptic',
+                    param: 'heavy'
+                });
+            }
+        },
+
+        // 성공 햅틱
+        success() {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'haptic',
+                    param: 'success'
+                });
+            }
+        },
+
+        // 경고 햅틱
+        warning() {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'haptic',
+                    param: 'warning'
+                });
+            }
+        },
+
+        // 에러 햅틱
+        error() {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'haptic',
+                    param: 'error'
+                });
+            }
+        },
+
+        // 선택 변경 햅틱 (탭 전환, 선택 변경)
+        selection() {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'haptic',
+                    param: 'selection'
+                });
+            }
+        }
+    },
+
+    // 디바이스 정보
+    getDeviceInfo() {
+        if (window.webkit?.messageHandlers?.smapIos) {
+            window.webkit.messageHandlers.smapIos.postMessage({
+                type: 'getDeviceInfo',
+                param: ''
+            });
+        }
+    },
+
+    // Google Sign-In 기능
+    googleSignIn: {
+        // Google 로그인 시작
+        signIn() {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'googleSignIn',
+                    param: ''
+                });
+            }
+        },
+
+        // Google 로그아웃
+        signOut() {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'googleSignOut',
+                    param: ''
+                });
+            }
+        },
+
+        // 현재 로그인 상태 확인
+        checkStatus() {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'googleSignInStatus',
+                    param: ''
+                });
+            }
+        }
+    }
+}; 

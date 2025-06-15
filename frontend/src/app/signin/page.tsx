@@ -152,6 +152,72 @@ export default function SignInPage() {
     }
   }, [searchParams]);
 
+  // iOS 네이티브 Google Sign-In 콜백 함수 등록
+  useEffect(() => {
+    // iOS 환경인지 확인
+    const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
+    
+    if (isIOSWebView) {
+      // Google Sign-In 성공 콜백
+      (window as any).googleSignInSuccess = async (idToken: string, userInfoJson: string) => {
+        try {
+          console.log('[SIGNIN] iOS 네이티브 Google Sign-In 성공');
+          setIsLoading(true);
+          
+          // ID 토큰을 서버로 전송하여 로그인 처리
+          const response = await fetch('/api/google-auth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              idToken: idToken,
+              userInfo: JSON.parse(userInfoJson)
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            console.log('[SIGNIN] 네이티브 Google 로그인 성공, 사용자 정보:', data.user);
+            
+            // AuthContext에 사용자 정보 설정
+            if (data.user && data.token) {
+              authService.setUserData(data.user);
+              authService.setToken(data.token);
+              
+              console.log('[SIGNIN] 로그인 성공 - 자동 리다이렉션 대기');
+            }
+          } else {
+            throw new Error(data.error || '로그인에 실패했습니다.');
+          }
+        } catch (error: any) {
+          console.error('[SIGNIN] 네이티브 Google 로그인 처리 오류:', error);
+          setErrorModalMessage(error.message || 'Google 로그인 처리 중 오류가 발생했습니다.');
+          setShowErrorModal(true);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      // Google Sign-In 실패 콜백
+      (window as any).googleSignInError = (errorMessage: string) => {
+        console.error('[SIGNIN] iOS 네이티브 Google Sign-In 실패:', errorMessage);
+        setErrorModalMessage(`Google 로그인 실패: ${errorMessage}`);
+        setShowErrorModal(true);
+        setIsLoading(false);
+      };
+    }
+
+    // 컴포넌트 언마운트 시 콜백 함수 정리
+    return () => {
+      if (isIOSWebView) {
+        delete (window as any).googleSignInSuccess;
+        delete (window as any).googleSignInError;
+      }
+    };
+  }, []);
+
   // 에러 모달 상태 디버깅
   useEffect(() => {
     console.log('[SIGNIN] 에러 모달 상태 변화:', { showErrorModal, errorModalMessage });
@@ -258,32 +324,33 @@ export default function SignInPage() {
     try {
       console.log('Google 로그인 시도');
       
-      // iOS WebView에서 구글 로그인 차단 감지
+      // iOS WebView에서 네이티브 Google Sign-In 사용
       const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
       if (isIOSWebView) {
-        console.log('iOS WebView에서 구글 로그인 시도 감지');
+        console.log('iOS WebView에서 네이티브 Google Sign-In 사용');
         
-        // iOS 앱에 구글 로그인 요청 전달
+        // iOS 네이티브 Google Sign-In 사용
         try {
-          if ((window as any).webkit?.messageHandlers?.googleLogin) {
-            (window as any).webkit.messageHandlers.googleLogin.postMessage({
-              action: 'startLogin',
-              source: 'signin_page'
-            });
-            return; // 네이티브 처리로 위임
+          if ((window as any).iosBridge?.googleSignIn?.signIn) {
+            console.log('iOS 네이티브 Google Sign-In 시작');
+            (window as any).iosBridge.googleSignIn.signIn();
+            
+            // 네이티브 로그인 결과는 useGoogleSignIn 훅에서 처리됨
+            setIsLoading(false);
+            return;
           }
         } catch (e) {
           console.error('iOS 네이티브 구글 로그인 요청 실패:', e);
         }
         
-        // 네이티브 처리가 불가능한 경우 사용자에게 안내
-        setErrorModalMessage('앱 내에서 구글 로그인이 제한됩니다. Safari 브라우저에서 시도해주세요.');
+        // 네이티브 처리가 불가능한 경우에만 에러 표시
+        setErrorModalMessage('네이티브 Google Sign-In을 사용할 수 없습니다. 앱을 업데이트해주세요.');
         setShowErrorModal(true);
         setIsLoading(false);
         return;
       }
       
-      // NextAuth.js를 통한 Google 로그인
+      // 웹 환경에서는 NextAuth.js를 통한 Google 로그인
       const result = await signIn('google', {
         redirect: false, // 자동 리디렉션 방지
         callbackUrl: '/home'

@@ -1,38 +1,77 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
+'use client'
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
-  size?: "default" | "sm" | "lg" | "icon"
+import React from 'react'
+import { cn } from '@/lib/utils'
+import { useHapticFeedback } from '@/hooks/useHapticFeedback'
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error'
+  size?: 'sm' | 'md' | 'lg'
+  hapticType?: 'light' | 'medium' | 'heavy' | 'success' | 'warning' | 'error'
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "default", size = "default", ...props }, ref) => {
+  ({ className, variant = 'default', size = 'md', hapticType, onClick, children, ...props }, ref) => {
+    const { haptic } = useHapticFeedback()
+
+    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+      // 햅틱 피드백 실행
+      if (hapticType) {
+        haptic[hapticType]()
+      } else {
+        // 기본 햅틱은 variant에 따라 결정
+        switch (variant) {
+          case 'success':
+            haptic.success()
+            break
+          case 'warning':
+            haptic.warning()
+            break
+          case 'error':
+            haptic.error()
+            break
+          case 'primary':
+            haptic.medium()
+            break
+          default:
+            haptic.light()
+            break
+        }
+      }
+
+      // 원래 onClick 핸들러 실행
+      onClick?.(event)
+    }
+
     return (
       <button
         className={cn(
-          "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+          'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background',
           {
-            "bg-primary text-primary-foreground shadow hover:bg-primary/90": variant === "default",
-            "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90": variant === "destructive",
-            "border border-input bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground": variant === "outline",
-            "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80": variant === "secondary",
-            "hover:bg-accent hover:text-accent-foreground": variant === "ghost",
-            "text-primary underline-offset-4 hover:underline": variant === "link",
-            "h-9 px-4 py-2": size === "default",
-            "h-8 rounded-md px-3 text-xs": size === "sm",
-            "h-10 rounded-md px-8": size === "lg",
-            "h-9 w-9": size === "icon",
+            // variant styles
+            'bg-primary text-primary-foreground hover:bg-primary/90': variant === 'default',
+            'bg-blue-600 text-white hover:bg-blue-700': variant === 'primary',
+            'bg-secondary text-secondary-foreground hover:bg-secondary/80': variant === 'secondary',
+            'bg-green-600 text-white hover:bg-green-700': variant === 'success',
+            'bg-yellow-600 text-white hover:bg-yellow-700': variant === 'warning',
+            'bg-red-600 text-white hover:bg-red-700': variant === 'error',
+            
+            // size styles
+            'h-9 px-3': size === 'sm',
+            'h-10 py-2 px-4': size === 'md',
+            'h-11 px-8': size === 'lg',
           },
           className
         )}
         ref={ref}
+        onClick={handleClick}
         {...props}
-      />
+      >
+        {children}
+      </button>
     )
   }
 )
-Button.displayName = "Button"
+Button.displayName = 'Button'
 
 export { Button } 
