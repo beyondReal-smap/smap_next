@@ -148,5 +148,7 @@ cover/
 **/.next/cache/
 
 # iOS 프로젝트 폴더 제외
+iOS/
+iOS/**
 !iOS_next/
 !iOS_next/**
