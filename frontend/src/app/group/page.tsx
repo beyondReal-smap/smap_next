@@ -1238,7 +1238,7 @@ function GroupPageContent() {
                         {membersLoading ? (
                           <div className="flex items-center justify-center py-2">
                             <div className="text-center">
-                              <div className="w-4 h-4 border-2 border-red-800 border-t-transparent rounded-full animate-spin mx-auto mb-1"></div>
+                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-1"></div>
                               <div className="text-xs text-red-800">로딩중...</div>
                             </div>
                           </div>
@@ -1259,7 +1259,7 @@ function GroupPageContent() {
                         {statsLoading ? (
                           <div className="flex items-center justify-center py-2">
                             <div className="text-center">
-                              <div className="w-4 h-4 border-2 border-yellow-800 border-t-transparent rounded-full animate-spin mx-auto mb-1"></div>
+                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-1"></div>
                               <div className="text-xs text-yellow-800">로딩중...</div>
                             </div>
                           </div>
@@ -1280,7 +1280,7 @@ function GroupPageContent() {
                         {statsLoading ? (
                           <div className="flex items-center justify-center py-2">
                             <div className="text-center">
-                              <div className="w-4 h-4 border-2 border-blue-800 border-t-transparent rounded-full animate-spin mx-auto mb-1"></div>
+                              <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-1"></div>
                               <div className="text-xs text-blue-800">로딩중...</div>
                             </div>
                           </div>
@@ -1353,7 +1353,7 @@ function GroupPageContent() {
                         {membersLoading ? (
                           <div className="flex items-center justify-center py-8">
                             <div className="text-center">
-                              <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-2" style={{ borderColor: '#0113A3', borderTopColor: 'transparent' }}></div>
+                              <div className="w-6 h-6 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-2"></div>
                               <p className="text-sm text-gray-600">그룹원을 불러오는 중...</p>
                             </div>
                           </div>
@@ -1518,13 +1518,15 @@ function GroupPageContent() {
         {/* 모달들 */}
         <AnimatePresence>
           {/* 새 그룹 추가 모달 */}
-          <Modal
-            isOpen={isAddModalOpen}
-            onClose={() => setIsAddModalOpen(false)}
-            title="새 그룹 만들기"
-            size="sm"
-            className="rounded-2xl max-w-xs"
-          >
+          {isAddModalOpen && (
+            <Modal
+              key="add-group-modal"
+              isOpen={isAddModalOpen}
+              onClose={() => setIsAddModalOpen(false)}
+              title="새 그룹 만들기"
+              size="sm"
+              className="rounded-2xl max-w-xs"
+            >
             <div className="p-4">
               <div className="text-center mb-4">
                 <HiUserGroup className="w-8 h-8 text-gray-700 mx-auto mb-2" />
@@ -1584,7 +1586,7 @@ function GroupPageContent() {
                 >
                   {isCreatingGroup ? (
                     <>
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                      <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-1"></div>
                       생성 중...
                     </>
                   ) : (
@@ -1593,16 +1595,19 @@ function GroupPageContent() {
                 </motion.button>
               </div>
             </div>
-          </Modal>
+            </Modal>
+          )}
 
           {/* 공유 모달 */}
-          <Modal
-            isOpen={isShareModalOpen && !!selectedGroup}
-            onClose={() => setIsShareModalOpen(false)}
-            title="그룹 초대하기"
-            size="sm"
-            className="rounded-2xl max-w-xs"
-          >
+          {isShareModalOpen && !!selectedGroup && (
+            <Modal
+              key="share-group-modal"
+              isOpen={isShareModalOpen && !!selectedGroup}
+              onClose={() => setIsShareModalOpen(false)}
+              title="그룹 초대하기"
+              size="sm"
+              className="rounded-2xl max-w-xs"
+            >
             <div className="p-4">
               <div className="text-center mb-4">
                 <FaShare className="w-8 h-8 text-gray-700 mx-auto mb-2" />
@@ -1669,16 +1674,19 @@ function GroupPageContent() {
                 </motion.button>
               </div>
             </div>
-          </Modal>
+            </Modal>
+          )}
 
           {/* 그룹 수정 모달 */}
-          <Modal
-            isOpen={isEditModalOpen && !!selectedGroup}
-            onClose={() => setIsEditModalOpen(false)}
-            title="그룹 수정하기"
-            size="sm"
-            className="rounded-2xl max-w-xs"
-          >
+          {isEditModalOpen && !!selectedGroup && (
+            <Modal
+              key="edit-group-modal"
+              isOpen={isEditModalOpen && !!selectedGroup}
+              onClose={() => setIsEditModalOpen(false)}
+              title="그룹 수정하기"
+              size="sm"
+              className="rounded-2xl max-w-xs"
+            >
             <div className="p-4">
               <div className="text-center mb-4">
                 <FaEdit className="w-8 h-8 text-gray-700 mx-auto mb-2" />
@@ -1739,7 +1747,7 @@ function GroupPageContent() {
                 >
                   {isUpdatingGroup ? (
                     <>
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                      <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-1"></div>
                       수정 중...
                     </>
                   ) : (
@@ -1748,16 +1756,19 @@ function GroupPageContent() {
                 </motion.button>
               </div>
             </div>
-          </Modal>
+            </Modal>
+          )}
 
           {/* 그룹 삭제 확인 모달 */}
-          <Modal
-            isOpen={isDeleteModalOpen && !!selectedGroup}
-            onClose={() => setIsDeleteModalOpen(false)}
-            title="그룹 삭제"
-            size="sm"
-            className="rounded-2xl max-w-xs"
-          >
+          {isDeleteModalOpen && !!selectedGroup && (
+            <Modal
+              key="delete-group-modal"
+              isOpen={isDeleteModalOpen && !!selectedGroup}
+              onClose={() => setIsDeleteModalOpen(false)}
+              title="그룹 삭제"
+              size="sm"
+              className="rounded-2xl max-w-xs"
+            >
             <div className="p-4">
               <div className="text-center mb-4">
                 <FaTrash className="w-8 h-8 text-red-500 mx-auto mb-2" />
@@ -1786,7 +1797,7 @@ function GroupPageContent() {
                 >
                   {isDeleting ? (
                     <>
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                      <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-1"></div>
                       삭제중
                     </>
                   ) : (
@@ -1795,16 +1806,19 @@ function GroupPageContent() {
                 </motion.button>
               </div>
             </div>
-          </Modal>
+            </Modal>
+          )}
 
           {/* 멤버 관리 모달 */}
-          <Modal
-            isOpen={isMemberManageModalOpen && !!selectedMember}
-            onClose={() => setIsMemberManageModalOpen(false)}
-            title="멤버 관리"
-            size="sm"
-            className="rounded-2xl max-w-xs"
-          >
+          {isMemberManageModalOpen && !!selectedMember && (
+            <Modal
+              key="member-manage-modal"
+              isOpen={isMemberManageModalOpen && !!selectedMember}
+              onClose={() => setIsMemberManageModalOpen(false)}
+              title="멤버 관리"
+              size="sm"
+              className="rounded-2xl max-w-xs"
+            >
             <div className="p-4">
               <div className="text-center mb-4">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2" style={{ backgroundColor: 'rgba(1, 19, 163, 0.1)' }}>
@@ -1833,7 +1847,7 @@ function GroupPageContent() {
                     whileTap={{ scale: 0.98 }}
                   >
                     {isUpdatingMember ? (
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-2"></div>
                     ) : (
                       <FaUsers className="w-4 h-4 mr-2" />
                     )}
@@ -1848,7 +1862,7 @@ function GroupPageContent() {
                     whileTap={{ scale: 0.98 }}
                   >
                     {isUpdatingMember ? (
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-2"></div>
                     ) : (
                       <FaCrown className="w-4 h-4 mr-2" />
                     )}
@@ -1864,7 +1878,7 @@ function GroupPageContent() {
                   whileTap={{ scale: 0.98 }}
                 >
                   {isUpdatingMember ? (
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-2"></div>
                   ) : (
                     <FaTrash className="w-4 h-4 mr-2" />
                   )}
@@ -1882,7 +1896,8 @@ function GroupPageContent() {
                 </motion.button>
               </div>
             </div>
-          </Modal>
+            </Modal>
+          )}
 
           {/* 컴팩트 토스트 모달 */}
           {toastModal.isOpen && (
@@ -1911,7 +1926,7 @@ function GroupPageContent() {
                         </svg>
                       )}
                       {toastModal.type === 'loading' && (
-                        <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                        <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin"></div>
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

@@ -274,7 +274,7 @@ export default function ContactPage() {
           {isLoadingContact ? (
             <div className="flex items-center justify-center py-12">
               <div className="flex flex-col items-center space-y-3">
-                <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#22C55E', borderTopColor: 'transparent' }}></div>
+                                        <div className="w-8 h-8 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin"></div>
                 <p className="text-sm text-gray-500" >연락처 정보를 불러오는 중...</p>
               </div>
             </div>
@@ -388,7 +388,7 @@ export default function ContactPage() {
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                                <div className="w-4 h-4 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin"></div>
                     <span >업데이트 중...</span>
                   </div>
                 ) : (

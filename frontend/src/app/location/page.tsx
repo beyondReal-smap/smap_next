@@ -4412,7 +4412,7 @@ export default function LocationPage() {
                     }}
                   />
                   {isSearchingLocationForPanel ? (
-                      <FiLoader className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 animate-spin" size={16} />
+                                              <FiLoader className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-600 unified-animate-spin" size={16} />
                   ) : (
                       <FaSearchSolid className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer" size={16} onClick={handlePanelAddressSearch} />
                   )}
@@ -4680,7 +4680,7 @@ export default function LocationPage() {
                       </span>
                       <div className="ml-2 flex-shrink-0">
                         {isLoadingGroups ? (
-                          <FiLoader className="animate-spin text-gray-400" size={14} />
+                          <FiLoader className="unified-animate-spin text-blue-600" size={14} />
                         ) : (
                           <motion.div
                             animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
@@ -5029,7 +5029,7 @@ export default function LocationPage() {
                   >
                     {isDeletingLocation ? (
                       <>
-                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                        <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-1"></div>
                         삭제 중
                       </>
                     ) : (
@@ -5071,7 +5071,7 @@ export default function LocationPage() {
                       </svg>
                     )}
                     {toastModal.type === 'loading' && (
-                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                              <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin"></div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -5209,7 +5209,7 @@ export default function LocationPage() {
                       </span>
                       <div className="ml-2 flex-shrink-0">
                         {isLoadingGroups ? (
-                          <FiLoader className="animate-spin text-gray-400" size={14} />
+                          <FiLoader className="unified-animate-spin text-blue-600" size={14} />
                         ) : (
                           <motion.div
                             animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}

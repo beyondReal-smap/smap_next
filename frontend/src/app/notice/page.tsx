@@ -451,7 +451,7 @@ function NoticeContent() {
           >
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                        <div className="w-8 h-8 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-4"></div>
                 <p className="text-gray-600">알림을 불러오는 중...</p>
               </div>
             </div>
@@ -638,7 +638,7 @@ function NoticeContent() {
                 >
                   {isDeleting ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                                                  <div className="w-4 h-4 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-2"></div>
                       삭제 중...
                     </>
                   ) : (

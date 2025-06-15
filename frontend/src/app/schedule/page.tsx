@@ -40,6 +40,7 @@ import memberService from '@/services/memberService';
 import groupService, { Group } from '@/services/groupService';
 import scheduleService, { Schedule, UserPermission } from '@/services/scheduleService';
 import pushNotificationService, { ScheduleNotificationContext, GroupMemberInfo } from '@/services/pushNotificationService';
+import { useDataCache } from '@/contexts/DataCacheContext';
 
 dayjs.extend(isBetween);
 dayjs.locale('ko');
@@ -647,6 +648,9 @@ function MobileCalendar({
 
 export default function SchedulePage() {
   const router = useRouter();
+  
+  // DataCache 컨텍스트 사용
+  const { invalidateCache } = useDataCache();
   
   // 페이지 마운트 시 스크롤 설정
   useEffect(() => {
@@ -1893,6 +1897,12 @@ export default function SchedulePage() {
           // 로컬 스토리지 캐시도 완전 초기화
           clearCacheFromStorage();
           
+          // DataCacheContext의 스케줄 캐시 무효화
+          if (selectedGroupId) {
+            console.log('[handleSaveEvent] 🗑️ DataCacheContext 스케줄 캐시 무효화:', selectedGroupId);
+            invalidateCache('scheduleData', selectedGroupId);
+          }
+          
           // 서버에서 최신 데이터 강제 로드
           await loadAllGroupSchedules(undefined, undefined, true, true);
           
@@ -2016,6 +2026,12 @@ export default function SchedulePage() {
           // 로컬 스토리지 캐시도 완전 초기화
           clearCacheFromStorage();
           
+          // DataCacheContext의 스케줄 캐시 무효화
+          if (selectedGroupId) {
+            console.log('[handleSaveEvent] 🗑️ DataCacheContext 스케줄 캐시 무효화 (생성):', selectedGroupId);
+            invalidateCache('scheduleData', selectedGroupId);
+          }
+          
           // 서버에서 최신 데이터 강제 로드
           await loadAllGroupSchedules(undefined, undefined, true, true);
           
@@ -2092,6 +2108,12 @@ export default function SchedulePage() {
         // 삭제 성공 시 로컬 스토리지 캐시 완전 초기화
         clearCacheFromStorage();
         console.log('[handleDeleteEvent] 🗑️ 삭제 후 로컬 스토리지 캐시 완전 초기화');
+        
+        // DataCacheContext의 스케줄 캐시 무효화
+        if (selectedGroupId) {
+          console.log('[handleDeleteEvent] 🗑️ DataCacheContext 스케줄 캐시 무효화 (삭제):', selectedGroupId);
+          invalidateCache('scheduleData', selectedGroupId);
+        }
         
         // 백그라운드에서 서버 동기화
         await loadAllGroupSchedules(undefined, undefined, true, true);
@@ -3347,6 +3369,12 @@ export default function SchedulePage() {
         // 삭제 성공 시 로컬 스토리지 캐시 완전 초기화
         clearCacheFromStorage();
         console.log('[executeDeleteAction] 🗑️ 삭제 후 로컬 스토리지 캐시 완전 초기화');
+        
+        // DataCacheContext의 스케줄 캐시 무효화
+        if (selectedGroupId) {
+          console.log('[executeDeleteAction] 🗑️ DataCacheContext 스케줄 캐시 무효화 (반복 삭제):', selectedGroupId);
+          invalidateCache('scheduleData', selectedGroupId);
+        }
         
         // 모든 관련 모달 상태 초기화
         setIsScheduleActionModalOpen(false);
@@ -4876,7 +4904,7 @@ export default function SchedulePage() {
                       >
                         {isSearchingLocation ? (
                           <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <div className="w-4 h-4 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin"></div>
                             <span>검색 중...</span>
                           </>
                         ) : (
@@ -4910,7 +4938,7 @@ export default function SchedulePage() {
                       {isSearchingLocation ? (
                         <div className="text-center py-8 px-6">
                           <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="animate-spin h-6 w-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <svg className="unified-animate-spin h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
@@ -5641,7 +5669,7 @@ export default function SchedulePage() {
                                 >
                                   {isLoadingGroups ? (
                                     <div className="p-4 text-center text-gray-500">
-                                      <div className="animate-spin w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                                      <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-2"></div>
                                       그룹 목록을 불러오는 중...
                                     </div>
                                   ) : userGroups.length > 0 ? (
@@ -5674,7 +5702,7 @@ export default function SchedulePage() {
                         <label className="block text-sm font-medium text-gray-700 mb-3">멤버 선택</label>
                         {isFetchingMembers ? (
                           <div className="text-center py-6 text-gray-500">
-                            <div className="animate-spin w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto mb-2"></div>
+                            <div className="w-6 h-6 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-2"></div>
                             멤버 목록을 불러오는 중...
                           </div>
                         ) : scheduleGroupMembers.length > 0 ? (
@@ -5944,7 +5972,7 @@ export default function SchedulePage() {
                               </svg>
                             )}
                             {toastModal.type === 'loading' && (
-                              <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                              <div className="w-5 h-5 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin"></div>
                             )}
                           </div>
                           <div className="flex-1 min-w-0">

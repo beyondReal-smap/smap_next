@@ -10,7 +10,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "dev:ios": "next dev --hostname 0.0.0.0",
+    "check-server": "node scripts/check-dev-server.js",
+    "ios-debug": "npm run check-server && echo '🔧 iOS WebView 디버깅 준비 완료!'"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.7",

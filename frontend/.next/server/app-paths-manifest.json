@@ -1,19 +1,15 @@
 {
   "/icon/route": "app/icon/route.js",
+  "/api/schedule/owner-groups/all-schedules/route": "app/api/schedule/owner-groups/all-schedules/route.js",
   "/api/group-members/member/[groupId]/route": "app/api/group-members/member/[groupId]/route.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/groups/[groupId]/route": "app/api/groups/[groupId]/route.js",
-  "/api/groups/current-user/route": "app/api/groups/current-user/route.js",
-  "/api/members/[id]/route": "app/api/members/[id]/route.js",
+  "/api/schedule/group/[groupId]/schedules/[scheduleId]/route": "app/api/schedule/group/[groupId]/schedules/[scheduleId]/route.js",
+  "/api/fcm_sendone/route": "app/api/fcm_sendone/route.js",
   "/api/push-logs/[...slug]/route": "app/api/push-logs/[...slug]/route.js",
-  "/api/member-location-logs/member-activity/route": "app/api/member-location-logs/member-activity/route.js",
+  "/api/locations/other-members/[memberId]/route": "app/api/locations/other-members/[memberId]/route.js",
   "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
-  "/api/groups/[groupId]/locations/route": "app/api/groups/[groupId]/locations/route.js",
-  "/api/member-location-logs/daily-counts/route": "app/api/member-location-logs/daily-counts/route.js",
-  "/api/member-location-logs/[mt_idx]/map-markers/route": "app/api/member-location-logs/[mt_idx]/map-markers/route.js",
-  "/setting/account/page": "app/setting/account/page.js",
   "/home/page": "app/home/page.js",
-  "/logs/page": "app/logs/page.js",
+  "/schedule/page": "app/schedule/page.js",
   "/location/page": "app/location/page.js",
-  "/group/[id]/join/page": "app/group/[id]/join/page.js"
+  "/signin/page": "app/signin/page.js",
+  "/logs/page": "app/logs/page.js"
 }

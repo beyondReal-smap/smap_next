@@ -1,7 +1,7 @@
 // frontend/src/app/signin/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image'; // Image 컴포넌트 임포트
@@ -9,11 +9,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { signIn, getSession } from 'next-auth/react';
 import authService from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
+import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
 
 // 아이콘 임포트 (react-icons 사용 예시)
 import { FcGoogle } from 'react-icons/fc';
 import { RiKakaoTalkFill } from 'react-icons/ri';
-import { FiX, FiAlertTriangle, FiPhone, FiLock } from 'react-icons/fi';
+import { FiX, FiAlertTriangle, FiPhone, FiLock, FiEye, FiEyeOff, FiMail, FiUser } from 'react-icons/fi';
 import { AlertModal } from '@/components/ui';
 
 // 카카오 SDK 타입 정의
@@ -276,6 +277,31 @@ export default function SignInPage() {
     try {
       console.log('Google 로그인 시도');
       
+      // iOS WebView에서 구글 로그인 차단 감지
+      const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
+      if (isIOSWebView) {
+        console.log('iOS WebView에서 구글 로그인 시도 감지');
+        
+        // iOS 앱에 구글 로그인 요청 전달
+        try {
+          if ((window as any).webkit?.messageHandlers?.googleLogin) {
+            (window as any).webkit.messageHandlers.googleLogin.postMessage({
+              action: 'startLogin',
+              source: 'signin_page'
+            });
+            return; // 네이티브 처리로 위임
+          }
+        } catch (e) {
+          console.error('iOS 네이티브 구글 로그인 요청 실패:', e);
+        }
+        
+        // 네이티브 처리가 불가능한 경우 사용자에게 안내
+        setErrorModalMessage('앱 내에서 구글 로그인이 제한됩니다. Safari 브라우저에서 시도해주세요.');
+        setShowErrorModal(true);
+        setIsLoading(false);
+        return;
+      }
+      
       // NextAuth.js를 통한 Google 로그인
       const result = await signIn('google', {
         redirect: false, // 자동 리디렉션 방지
@@ -285,7 +311,16 @@ export default function SignInPage() {
       console.log('Google 로그인 결과:', result);
 
       if (result?.error) {
-        throw new Error(result.error);
+        // 구글 로그인 에러 처리
+        if (result.error.includes('disallowed_useragent') || 
+            result.error.includes('403') ||
+            result.error.includes('blocked')) {
+          setErrorModalMessage('구글 로그인이 차단되었습니다. Safari 브라우저에서 시도해주세요.');
+        } else {
+          setErrorModalMessage(`구글 로그인 실패: ${result.error}`);
+        }
+        setShowErrorModal(true);
+        return;
       }
 
       if (result?.ok) {
@@ -323,7 +358,22 @@ export default function SignInPage() {
       }
     } catch (error) {
       console.error('Google 로그인 실패:', error);
-      setErrorModalMessage('Google 로그인에 실패했습니다.');
+      
+      // 에러 메시지 개선
+      let errorMessage = 'Google 로그인에 실패했습니다.';
+      if (error instanceof Error) {
+        if (error.message.includes('disallowed_useragent') || 
+            error.message.includes('403') ||
+            error.message.includes('blocked')) {
+          errorMessage = '구글 로그인이 차단되었습니다. Safari 브라우저에서 시도해주세요.';
+        } else if (error.message.includes('network')) {
+          errorMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
+        } else {
+          errorMessage = `구글 로그인 오류: ${error.message}`;
+        }
+      }
+      
+      setErrorModalMessage(errorMessage);
       setShowErrorModal(true);
     } finally {
       setIsLoading(false);
@@ -401,23 +451,21 @@ export default function SignInPage() {
     }
   };
 
-  // 로딩 스피너 컴포넌트
+  // 로딩 스피너 컴포넌트 (통일된 디자인)
   const LoadingSpinner = ({ message, fullScreen = true }: { message: string; fullScreen?: boolean }) => {
     if (fullScreen) {
       return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white px-6 py-4 rounded-xl shadow-lg flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
-            <span className="text-gray-700 text-sm font-medium">{message}</span>
+          <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
+            <UnifiedLoadingSpinner size="md" message={message} />
           </div>
         </div>
       );
     }
     
     return (
-      <div className="flex items-center justify-center space-x-2">
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-        <span className="text-sm">{message}</span>
+      <div className="flex items-center justify-center">
+        <UnifiedLoadingSpinner size="sm" message={message} inline color="white" />
       </div>
     );
   };
@@ -447,17 +495,26 @@ export default function SignInPage() {
   }, []);
 
   // 인증 상태 확인 중일 때 로딩 화면 표시
-  if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600 mx-auto mb-6"></div>
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">인증 상태 확인 중</h2>
-          <p className="text-gray-600">잠시만 기다려주세요...</p>
-        </div>
-      </div>
-    );
-  }
+  // if (isCheckingAuth) {
+  //   return (
+  //     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center">
+  //       <div className="text-center">
+  //         <div 
+  //           className="rounded-full h-16 w-16 border-4 border-gray-200 border-t-indigo-600 mx-auto mb-6"
+  //           style={{
+  //             WebkitAnimation: 'spin 1s linear infinite',
+  //             animation: 'spin 1s linear infinite',
+  //             WebkitTransformOrigin: 'center',
+  //             transformOrigin: 'center',
+  //             willChange: 'transform'
+  //           }}
+  //         ></div>
+  //         <h2 className="text-xl font-semibold text-gray-800 mb-2">인증 상태 확인 중</h2>
+  //         <p className="text-gray-600">잠시만 기다려주세요...</p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <motion.div 
@@ -627,15 +684,31 @@ export default function SignInPage() {
 
           <div className="mt-4 grid grid-cols-1 gap-3">
             {/* Google 로그인 버튼 */}
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={isLoading}
-              className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
-            >
-              <FcGoogle className="w-5 h-5 mr-3" aria-hidden="true" />
-              Google 계정으로 로그인
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={isLoading}
+                className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
+              >
+                <FcGoogle className="w-5 h-5 mr-3" aria-hidden="true" />
+                Google 계정으로 로그인
+              </button>
+              
+              {/* iOS WebView 안내 메시지 */}
+              {typeof window !== 'undefined' && (window as any).webkit && (window as any).webkit.messageHandlers && (
+                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <div className="flex items-start">
+                    <FiAlertTriangle className="w-4 h-4 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" />
+                    <p className="text-xs text-yellow-800">
+                      앱 내에서 구글 로그인이 제한될 수 있습니다. 
+                      <br />
+                      문제 발생 시 Safari 브라우저에서 시도해주세요.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Kakao 로그인 버튼 */}
             <button

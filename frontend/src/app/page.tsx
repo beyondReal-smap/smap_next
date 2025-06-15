@@ -59,7 +59,16 @@ export default function RootPage() {
         <h2 className="text-2xl font-bold text-gray-900 mb-4">SMAP</h2>
         
         <div className="flex items-center justify-center space-x-2">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
+          <div 
+            className="rounded-full h-6 w-6 border-4 border-gray-200 border-t-green-500"
+            style={{
+              WebkitAnimation: 'spin 1s linear infinite',
+              animation: 'spin 1s linear infinite',
+              WebkitTransformOrigin: 'center',
+              transformOrigin: 'center',
+              willChange: 'transform'
+            }}
+          ></div>
           <p className="text-gray-600">
             {loading ? '로딩 중...' : '페이지 이동 중...'}
           </p>

@@ -25,6 +25,7 @@ import mapService, {
   cleanupGoogleMap, 
   cleanupNaverMap 
 } from '../../services/mapService';
+import MapDebugger from '@/../../components/MapDebugger';
 import memberService from '@/services/memberService';
 import scheduleService from '../../services/scheduleService';
 import groupService from '@/services/groupService';
@@ -39,6 +40,9 @@ declare global {
   interface Window {
     naver: any;
     google: any;
+    webkit?: {
+      messageHandlers?: any;
+    };
   }
 }
 
@@ -764,21 +768,39 @@ export default function HomePage() {
     let isMounted = true;
     
     const fetchAllGroupData = async () => {
-      if (dataFetchedRef.current.loading) return;
+      // 중복 실행 방지 - 이미 로딩 중이거나 해당 그룹의 데이터가 이미 로드된 경우
+      if (dataFetchedRef.current.loading) {
+        console.log('[fetchAllGroupData] 중복 실행 방지 - 이미 로딩 중');
+        return;
+      }
       
       // 🔥 AuthContext의 로딩과 프리로딩이 완료될 때까지 기다리기
       if (authLoading || !isPreloadingComplete) {
         console.log('[fetchAllGroupData] AuthContext 로딩 또는 프리로딩 중이므로 대기:', { authLoading, isPreloadingComplete });
         return;
       }
-      
-      dataFetchedRef.current.loading = true;
 
       const groupIdToUse = selectedGroupId?.toString() || '';
       if (!groupIdToUse) {
-        dataFetchedRef.current.loading = false;
+        console.log('[fetchAllGroupData] selectedGroupId가 없어서 실행 중단');
         return;
       }
+
+      // 이미 해당 그룹의 데이터가 로드되었는지 확인
+      if (dataFetchedRef.current.currentGroupId === parseInt(groupIdToUse) && 
+          dataFetchedRef.current.members && 
+          dataFetchedRef.current.schedules) {
+        console.log('[fetchAllGroupData] 중복 실행 방지 - 해당 그룹 데이터 이미 로드됨:', {
+          currentGroupId: dataFetchedRef.current.currentGroupId,
+          selectedGroupId: parseInt(groupIdToUse),
+          members: dataFetchedRef.current.members,
+          schedules: dataFetchedRef.current.schedules
+        });
+        return;
+      }
+      
+      // 로딩 시작 플래그 설정
+      dataFetchedRef.current.loading = true;
 
       dataFetchedRef.current.currentGroupId = parseInt(groupIdToUse);
 
@@ -1075,11 +1097,26 @@ export default function HomePage() {
       !dataFetchedRef.current.members || 
       !dataFetchedRef.current.schedules
     )) {
+      console.log('[useEffect] fetchAllGroupData 호출 조건 만족:', {
+        selectedGroupId,
+        currentGroupId: dataFetchedRef.current.currentGroupId,
+        members: dataFetchedRef.current.members,
+        schedules: dataFetchedRef.current.schedules,
+        loading: dataFetchedRef.current.loading
+      });
       fetchAllGroupData();
+    } else {
+      console.log('[useEffect] fetchAllGroupData 호출 조건 불만족 - 실행 건너뜀:', {
+        selectedGroupId,
+        currentGroupId: dataFetchedRef.current.currentGroupId,
+        members: dataFetchedRef.current.members,
+        schedules: dataFetchedRef.current.schedules,
+        loading: dataFetchedRef.current.loading
+      });
     }
 
     return () => { isMounted = false; };
-  }, [selectedGroupId, authLoading, isPreloadingComplete, getGroupMembers, getScheduleData, isCacheValid]); // authLoading, 프리로딩 완료 상태와 캐시 함수들을 의존성에 추가
+  }, [selectedGroupId, authLoading, isPreloadingComplete]); // 캐시 함수들은 의존성에서 제거 (안정적인 참조 유지)
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
@@ -1195,14 +1232,34 @@ export default function HomePage() {
     }
   };
 
-  // Naver Maps API 로드 함수 (프리로딩 최적화)
+  // Naver Maps API 로드 함수 (프리로딩 최적화 + iOS WebView 지원)
   const loadNaverMapsAPI = () => {
+    // iOS WebView 감지
+    const isIOSWebView = typeof window !== 'undefined' && 
+                        window.webkit && 
+                        window.webkit.messageHandlers;
+
     // 이미 로드된 경우 중복 로드 방지
     if (apiLoadStatus.naver || window.naver?.maps) {
       console.log('[HOME] 🚀 Naver Maps API 프리로딩 완료 - 즉시 사용 가능');
       setNaverMapsLoaded(true);
       apiLoadStatus.naver = true;
       setIsMapLoading(false); // 프리로드 완료시 즉시 로딩 상태 해제
+      return;
+    }
+
+    if (isIOSWebView) {
+      console.log('[HOME] iOS WebView 환경 - 네이버 지도 최적화 로딩');
+      // iOS WebView에서는 ios-webview-fix.js의 최적화를 기다림
+      // 스크립트가 이미 있는지 확인
+      const existingScript = document.querySelector('script[src*="openapi.map.naver.com"]');
+      if (!existingScript) {
+        // 스크립트가 없으면 생성
+        performBackupLoading();
+      } else {
+        console.log('[HOME] iOS WebView - 네이버 지도 스크립트 발견, 최적화 대기');
+        // ios-webview-fix.js에서 naverMapsReady 이벤트를 발생시킬 때까지 대기
+      }
       return;
     }
 
@@ -1240,9 +1297,12 @@ export default function HomePage() {
 
     function performBackupLoading() {
       // 네이버 지도 API 로드용 URL 생성
-      const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
-      naverMapUrl.searchParams.append('ncpKeyId', NAVER_MAPS_CLIENT_ID);
-      naverMapUrl.searchParams.append('submodules', 'panorama,geocoder,drawing,visualization');
+      const naverMapUrl = new URL(`https://openapi.map.naver.com/openapi/v3/maps.js`);
+      naverMapUrl.searchParams.append('ncpClientId', NAVER_MAPS_CLIENT_ID);
+      if (!isIOSWebView) {
+        // iOS WebView가 아닌 경우에만 서브모듈 추가 (호환성 문제 방지)
+        naverMapUrl.searchParams.append('submodules', 'panorama,geocoder,drawing,visualization');
+      }
       
       // script 요소 생성 및 로드
       const script = document.createElement('script');
@@ -1253,15 +1313,27 @@ export default function HomePage() {
       
       script.onload = () => {
         console.log('[HOME] Naver Maps API 백업 로드 성공');
-        apiLoadStatus.naver = true;
-        setNaverMapsLoaded(true);
-        setIsMapLoading(false);
+        
+        if (isIOSWebView) {
+          console.log('[HOME] iOS WebView - 네이버 지도 스크립트 로드 완료, 최적화 대기');
+          // iOS WebView에서는 ios-webview-fix.js의 최적화를 기다림
+        } else {
+          // 일반 브라우저에서는 즉시 설정
+          apiLoadStatus.naver = true;
+          setNaverMapsLoaded(true);
+          setIsMapLoading(false);
+        }
       };
       
       script.onerror = () => {
         console.error('[HOME] 네이버 지도 백업 로드 실패');
         setIsMapLoading(false);
         setMapType('google'); // 로드 실패 시 구글 지도로 전환
+        
+        // 구글 지도 API 로드
+        if (!apiLoadStatus.google) {
+          loadGoogleMapsAPI();
+        }
       };
       
       // 중복 로드 방지를 위해 기존 스크립트 제거
@@ -1271,6 +1343,18 @@ export default function HomePage() {
       }
       
       document.head.appendChild(script);
+      
+      // iOS WebView에서는 더 긴 타임아웃 설정 (15초)
+      const timeout = isIOSWebView ? 15000 : 10000;
+      setTimeout(() => {
+        if (!naverMapsLoaded && isIOSWebView) {
+          console.warn(`[HOME] iOS WebView 네이버 지도 로딩 타임아웃 (${timeout}ms) - 구글 지도로 전환`);
+          setMapType('google');
+          if (!apiLoadStatus.google) {
+            loadGoogleMapsAPI();
+          }
+        }
+      }, timeout);
     }
   };
 
@@ -1349,6 +1433,15 @@ export default function HomePage() {
         console.log('Google Maps 타일 로딩 완료');
       });
       
+      // iOS WebView에서 구글 지도 로딩 타임아웃 설정 (15초)
+      const googleMapTimeout = setTimeout(() => {
+        if (isMapLoading) {
+          console.warn('Google Maps 로딩 타임아웃');
+          setIsMapLoading(false);
+          setMapsInitialized(prev => ({...prev, google: true}));
+        }
+      }, 15000);
+      
       console.log('Google Maps 초기화 완료');
     } catch (error) {
       console.error('Google Maps 초기화 오류:', error);
@@ -1360,6 +1453,17 @@ export default function HomePage() {
   const initNaverMap = () => {
     if (!naverMapContainer.current || !naverMapsLoaded || !window.naver || !window.naver.maps) {
       console.log('Naver Maps 초기화를 위한 조건이 충족되지 않음');
+      
+      // iOS WebView에서 지도 로딩 실패 시 구글 지도로 폴백
+      if ((window as any).webkit && (window as any).webkit.messageHandlers) {
+        console.log('iOS WebView에서 Naver Maps 로딩 실패, Google Maps로 전환');
+        setTimeout(() => {
+          setMapType('google');
+          if (!apiLoadStatus.google) {
+            loadGoogleMapsAPI();
+          }
+        }, 2000);
+      }
       return;
     }
 
@@ -1460,6 +1564,22 @@ export default function HomePage() {
           window.naver.maps.Event.removeListener(errorListener);
           window.naver.maps.Event.removeListener(initListener);
         });
+        
+        // iOS WebView에서 지도 로딩 타임아웃 설정 (10초)
+        const mapLoadTimeout = setTimeout(() => {
+          if (isMapLoading) {
+            console.warn('Naver Maps 로딩 타임아웃, Google Maps로 전환');
+            setIsMapLoading(false);
+            window.naver.maps.Event.removeListener(errorListener);
+            window.naver.maps.Event.removeListener(initListener);
+            
+            // 구글 지도로 전환
+            setMapType('google');
+            if (!apiLoadStatus.google) {
+              loadGoogleMapsAPI();
+            }
+          }
+        }, 10000);
       } catch (innerError) {
         console.error('Naver Maps 객체 생성 오류:', innerError);
         window.naver.maps.Event.removeListener(errorListener);
@@ -1481,6 +1601,90 @@ export default function HomePage() {
       loadGoogleMapsAPI();
     }
   }, [mapType]);
+
+  // iOS WebView에서 지도 폴백 이벤트 리스너
+  useEffect(() => {
+    const handleMapTypeFallback = (event: CustomEvent) => {
+      console.log('Map type fallback event received:', event.detail);
+      if (event.detail.from === 'naver' && event.detail.to === 'google') {
+        console.log('Switching from Naver to Google Maps due to auth failure');
+        setMapType('google');
+        if (!apiLoadStatus.google) {
+          loadGoogleMapsAPI();
+        }
+      }
+    };
+
+    // iOS WebView 전용 네이버 지도 폴백 이벤트 리스너
+    const handleNaverMapsFallback = (event: CustomEvent) => {
+      console.log('[iOS WebView] Naver Maps fallback event:', event.detail);
+      
+      // 네이버 지도 로딩 실패 시 구글 지도로 전환
+      if (event.detail.reason) {
+        console.log(`[iOS WebView] Naver Maps failed: ${event.detail.reason}, switching to Google Maps`);
+        setMapType('google');
+        setNaverMapsLoaded(false);
+        
+        // 구글 지도 API 로드
+        if (!apiLoadStatus.google) {
+          console.log('[iOS WebView] Loading Google Maps API as fallback');
+          loadGoogleMapsAPI();
+        } else if (googleMapsLoaded) {
+          // 이미 로드된 경우 바로 초기화
+          setTimeout(() => {
+            initGoogleMap();
+          }, 500);
+        }
+      }
+    };
+
+    // iOS WebView 전용 네이버 지도 준비 완료 이벤트 리스너
+    const handleNaverMapsReady = (event: CustomEvent) => {
+      console.log('[iOS WebView] Naver Maps ready event:', event.detail);
+      
+      if (event.detail.source === 'ios-webview-fix') {
+        console.log('[iOS WebView] Naver Maps optimized and ready');
+        setNaverMapsLoaded(true);
+        
+        // 네이버 지도 초기화
+        setTimeout(() => {
+          if (mapType === 'naver') {
+            initNaverMap();
+          }
+        }, 500);
+      }
+    };
+
+    // iOS WebView 전용 구글 지도 준비 완료 이벤트 리스너
+    const handleGoogleMapsReady = (event: CustomEvent) => {
+      console.log('[iOS WebView] Google Maps ready event:', event.detail);
+      
+      if (event.detail.source === 'ios-webview-fix') {
+        console.log('[iOS WebView] Google Maps optimized and ready');
+        setGoogleMapsLoaded(true);
+        
+        // 구글 지도 초기화
+        setTimeout(() => {
+          if (mapType === 'google') {
+            initGoogleMap();
+          }
+        }, 500);
+      }
+    };
+
+    // 이벤트 리스너 등록
+    document.addEventListener('mapTypeFallback', handleMapTypeFallback as EventListener);
+    document.addEventListener('mapFallbackToGoogle', handleNaverMapsFallback as EventListener);
+    document.addEventListener('naverMapsReady', handleNaverMapsReady as EventListener);
+    document.addEventListener('googleMapsReady', handleGoogleMapsReady as EventListener);
+    
+    return () => {
+      document.removeEventListener('mapTypeFallback', handleMapTypeFallback as EventListener);
+      document.removeEventListener('mapFallbackToGoogle', handleNaverMapsFallback as EventListener);
+      document.removeEventListener('naverMapsReady', handleNaverMapsReady as EventListener);
+      document.removeEventListener('googleMapsReady', handleGoogleMapsReady as EventListener);
+    };
+  }, [mapType, googleMapsLoaded]);
 
   // 지도 타입 변경 & 지도 업데이트
   useEffect(() => {
@@ -3365,7 +3569,7 @@ export default function HomePage() {
     };
 
     fetchGroupMemberCounts();
-  }, [userGroups, getGroupMembers, isCacheValid]); // 의존성 최적화
+  }, [userGroups]); // 캐시 함수들은 의존성에서 제거 (안정적인 참조 유지)
 
   // 새로운 알림 확인 (사용자 로그인 후) - 최적화
   useEffect(() => {
@@ -3785,7 +3989,7 @@ export default function HomePage() {
                     }
                   }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="#0113A3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="gray">
                     <path fillRule="evenodd" d="M5.25 9a6.75 6.75 0 0 1 13.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 1 1-7.48 0 24.585 24.585 0 0 1-4.831-1.244.75.75 0 0 1-.298-1.205A8.217 8.217 0 0 0 5.25 9.75V9Zm4.502 8.9a2.25 2.25 0 1 0 4.496 0 25.057 25.057 0 0 1-4.496 0Z" clipRule="evenodd" />
                   </svg>
                   {/* 읽지 않은 알림이 있을 때만 빨간색 점 표시 */}
@@ -3800,7 +4004,7 @@ export default function HomePage() {
                   className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200"
                   onClick={() => router.push('/setting')}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="#0113A3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="gray">
                     <path fillRule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 0 0-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 0 0-2.282.819l-.922 1.597a1.875 1.875 0 0 0 .432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 0 0 0 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 0 0-.432 2.385l.922 1.597a1.875 1.875 0 0 0 2.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.570.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 0 0 2.28-.819l.923-1.597a1.875 1.875 0 0 0-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 0 0 0-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 0 0-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 0 0-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 0 0-1.85-1.567h-1.843ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" clipRule="evenodd" />
                   </svg>
                 </motion.button>
@@ -4031,7 +4235,7 @@ export default function HomePage() {
                          </span>
                          <div className="ml-2 flex-shrink-0">
                            {isUserDataLoading ? (
-                             <FiLoader className="animate-spin text-gray-400" size={14} />
+                             <FiLoader className="unified-animate-spin text-blue-600" size={14} />
                            ) : (
                              <motion.div
                                animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
