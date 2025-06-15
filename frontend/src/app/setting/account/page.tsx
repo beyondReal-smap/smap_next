@@ -196,12 +196,27 @@ html, body {
 
 export default function AccountSettingsPage() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUserData } = useAuth();
   const [profileImg, setProfileImg] = useState(getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0));
   const [showSheet, setShowSheet] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 페이지 로드 시 사용자 데이터 새로고침
+  useEffect(() => {
+    const refreshData = async () => {
+      try {
+        console.log('[ACCOUNT SETTING] 사용자 데이터 새로고침 시작');
+        await refreshUserData();
+        console.log('[ACCOUNT SETTING] 사용자 데이터 새로고침 완료');
+      } catch (error) {
+        console.error('[ACCOUNT SETTING] 사용자 데이터 새로고침 실패:', error);
+      }
+    };
+
+    refreshData();
+  }, []); // 컴포넌트 마운트 시 한 번만 실행
 
   // 사용자 정보 업데이트
   useEffect(() => {
@@ -212,9 +227,34 @@ export default function AccountSettingsPage() {
 
   // 프로필 데이터
   const loginInfo = getLoginMethod(user?.mt_type);
+  
+  // 사용자 이름 결정 로직 개선
+  const getUserDisplayName = () => {
+    console.log('[ACCOUNT SETTING] 사용자 데이터 확인:', {
+      mt_name: user?.mt_name,
+      mt_nickname: user?.mt_nickname,
+      mt_id: user?.mt_id,
+      mt_idx: user?.mt_idx
+    });
+    
+    // 우선순위: mt_nickname > mt_name > mt_id의 앞 3자리 > '사용자'
+    if (user?.mt_nickname && user.mt_nickname !== '테스트 사용자') {
+      return user.mt_nickname;
+    }
+    if (user?.mt_name && user.mt_name !== '테스트 사용자') {
+      return user.mt_name;
+    }
+    if (user?.mt_id) {
+      // 전화번호에서 앞 3자리를 사용자명으로 사용 (예: 01012345678 -> user123)
+      const phonePrefix = user.mt_id.replace(/[^0-9]/g, '').slice(-4); // 뒤 4자리
+      return `user${phonePrefix}`;
+    }
+    return '사용자';
+  };
+  
   const profile = {
     avatar: getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0),
-    name: user?.mt_name || user?.mt_nickname || '사용자',
+    name: getUserDisplayName(),
     plan: getUserPlan(user?.mt_level),
     loginMethod: loginInfo.method,
     loginIcon: loginInfo.icon,

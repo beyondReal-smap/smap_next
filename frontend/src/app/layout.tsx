@@ -132,6 +132,9 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         
         {/* 폰트 프리로드 제거 - CSS에서 필요시 로드되도록 함 */}
+        
+        {/* iOS 웹뷰 브릿지 */}
+        <script src="/ios-bridge.js" async></script>
       </head>
       <body className={`${lineSeed.variable} font-sans antialiased`} suppressHydrationWarning>
         <ClientLayout>

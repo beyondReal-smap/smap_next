@@ -37,10 +37,13 @@ export default function SignInPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, isLoggedIn, loading } = useAuth();
+  
+  // 리다이렉트 중복 실행 방지 플래그
+  const isRedirectingRef = useRef(false);
 
-  // AuthContext 상태 변화 감지 및 자동 리다이렉트
+  // 통합된 인증 상태 확인 및 리다이렉트 처리
   useEffect(() => {
-    console.log('[SIGNIN] AuthContext 상태 확인:', { isLoggedIn, loading, showErrorModal });
+    console.log('[SIGNIN] 인증 상태 확인:', { isLoggedIn, loading, showErrorModal });
     
     // 로딩 중이면 대기
     if (loading) {
@@ -54,60 +57,38 @@ export default function SignInPage() {
       return;
     }
 
-    // 로그인된 사용자는 홈으로 리다이렉트
-    if (isLoggedIn) {
+    // URL에서 탈퇴 완료 플래그 확인
+    const urlParams = new URLSearchParams(window.location.search);
+    const isFromWithdraw = urlParams.get('from') === 'withdraw';
+    
+    if (isFromWithdraw) {
+      console.log('[SIGNIN] 탈퇴 후 접근 - 자동 로그인 건너뛰기');
+      
+      // URL에서 from 파라미터 제거
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('from');
+      window.history.replaceState({}, '', newUrl.toString());
+      
+      setIsCheckingAuth(false);
+      return;
+    }
+
+    // 로그인된 사용자는 홈으로 리다이렉트 (한 번만 실행)
+    if (isLoggedIn && !isRedirectingRef.current) {
       console.log('[SIGNIN] 로그인된 사용자 감지, /home으로 리다이렉트');
+      isRedirectingRef.current = true;
       router.replace('/home');
       return;
     }
 
     console.log('[SIGNIN] 로그인되지 않은 상태, 로그인 페이지 표시');
     setIsCheckingAuth(false);
-  }, [isLoggedIn, loading, router, showErrorModal]);
-
-  // 초기 인증 상태 확인 (페이지 첫 로드 시에만)
-  useEffect(() => {
-    const checkExistingAuth = async () => {
-      try {
-        console.log('[SIGNIN] 초기 인증 상태 확인 중...');
-        
-        // URL에서 탈퇴 완료 플래그 확인
-        const urlParams = new URLSearchParams(window.location.search);
-        const isFromWithdraw = urlParams.get('from') === 'withdraw';
-        
-        if (isFromWithdraw) {
-          console.log('[SIGNIN] 탈퇴 후 접근 - 자동 로그인 건너뛰기');
-          
-          // URL에서 from 파라미터 제거
-          const newUrl = new URL(window.location.href);
-          newUrl.searchParams.delete('from');
-          window.history.replaceState({}, '', newUrl.toString());
-          
-          return;
-        }
-        
-        // AuthContext가 아직 로딩 중이면 대기
-        if (loading) {
-          console.log('[SIGNIN] AuthContext 로딩 중, 초기 확인 건너뛰기');
-          return;
-        }
-
-        // AuthContext에서 이미 로그인 상태라면 리다이렉트
-        if (isLoggedIn) {
-          console.log('[SIGNIN] AuthContext에서 로그인 상태 확인, /home으로 리다이렉트');
-          router.replace('/home');
-          return;
-        }
-
-        console.log('[SIGNIN] 초기 인증 없음, 로그인 페이지 표시');
-      } catch (error) {
-        console.error('[SIGNIN] 초기 인증 상태 확인 중 오류:', error);
-      }
+    
+    // cleanup 함수: 컴포넌트 언마운트 시 플래그 리셋
+    return () => {
+      isRedirectingRef.current = false;
     };
-
-    // 컴포넌트 마운트 시 한 번만 실행
-    checkExistingAuth();
-  }, []); // 빈 의존성 배열로 한 번만 실행
+  }, [isLoggedIn, loading, showErrorModal, router]);
 
   // 자동 입력 기능 제거됨 - 사용자가 직접 입력해야 함
   // useEffect(() => {
