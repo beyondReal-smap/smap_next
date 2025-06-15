@@ -211,7 +211,20 @@ export default function SignInPage() {
       (window as any).googleSignInSuccess = async (idToken: string, userInfoJson: string) => {
         try {
           console.log('[SIGNIN] iOS 네이티브 Google Sign-In 성공');
+          console.log('[SIGNIN] ID Token:', idToken);
+          console.log('[SIGNIN] User Info JSON:', userInfoJson);
           setIsLoading(true);
+          
+          // JSON 파싱 시도
+          let userInfo;
+          try {
+            userInfo = JSON.parse(userInfoJson);
+            console.log('[SIGNIN] 파싱된 사용자 정보:', userInfo);
+          } catch (parseError) {
+            console.error('[SIGNIN] JSON 파싱 오류:', parseError);
+            console.log('[SIGNIN] 원본 JSON 문자열:', userInfoJson);
+            throw new Error('사용자 정보 파싱에 실패했습니다.');
+          }
           
           // ID 토큰을 서버로 전송하여 로그인 처리
           const response = await fetch('/api/google-auth', {
@@ -221,7 +234,7 @@ export default function SignInPage() {
             },
             body: JSON.stringify({
               idToken: idToken,
-              userInfo: JSON.parse(userInfoJson)
+              userInfo: userInfo
             }),
           });
 
