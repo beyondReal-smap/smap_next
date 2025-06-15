@@ -235,7 +235,11 @@ export default function SignInPage() {
               authService.setUserData(data.user);
               authService.setToken(data.token);
               
-              console.log('[SIGNIN] 로그인 성공 - 자동 리다이렉션 대기');
+              console.log('[SIGNIN] 로그인 성공 - home으로 즉시 리다이렉션');
+              
+              // 즉시 home으로 리다이렉션
+              window.location.href = '/home';
+              return;
             }
           } else {
             throw new Error(data.error || '로그인에 실패했습니다.');
@@ -243,6 +247,8 @@ export default function SignInPage() {
         } catch (error: any) {
           console.error('[SIGNIN] 네이티브 Google 로그인 처리 오류:', error);
           showError(error.message || 'Google 로그인 처리 중 오류가 발생했습니다.');
+        } finally {
+          setIsLoading(false);
         }
       };
 
@@ -375,10 +381,11 @@ export default function SignInPage() {
         mt_pwd: password,
       });
 
-      console.log('[SIGNIN] AuthContext 로그인 성공 - 자동 리다이렉션 대기');
+      console.log('[SIGNIN] AuthContext 로그인 성공 - home으로 즉시 리다이렉션');
       
-      // 수동 리다이렉션 제거 - AuthContext의 자동 리다이렉션 사용
-      // router.push('/home'); // 이 줄을 제거
+      // 즉시 home으로 리다이렉션
+      window.location.href = '/home';
+      return;
 
     } catch (err: any) {
       console.error('[SIGNIN] 로그인 오류:', err);
@@ -463,12 +470,13 @@ export default function SignInPage() {
         
         // iOS 네이티브 Google Sign-In 사용
         try {
-          if ((window as any).iosBridge?.googleSignIn?.signIn) {
+          if ((window as any).webkit?.messageHandlers?.smapIos) {
             console.log('iOS 네이티브 Google Sign-In 시작');
-            (window as any).iosBridge.googleSignIn.signIn();
+            (window as any).webkit.messageHandlers.smapIos.postMessage({
+              action: 'googleSignIn'
+            });
             
-            // 네이티브 로그인 결과는 useGoogleSignIn 훅에서 처리됨
-            setIsLoading(false);
+            // 로딩 상태는 콜백에서 처리되므로 여기서는 유지
             return;
           }
         } catch (e) {
@@ -573,9 +581,11 @@ export default function SignInPage() {
               // AuthContext에 사용자 정보 설정 (JWT 토큰은 이미 쿠키에 저장됨)
               // AuthContext가 쿠키에서 토큰을 자동으로 읽어올 것임
               
-              // 수동 리다이렉션 제거 - AuthContext의 자동 리다이렉션 사용
-              // router.push('/home'); // 이 줄을 제거
-              console.log('[KAKAO LOGIN] 로그인 성공 - 자동 리다이렉션 대기');
+              console.log('[KAKAO LOGIN] 로그인 성공 - home으로 즉시 리다이렉션');
+              
+              // 즉시 home으로 리다이렉션
+              window.location.href = '/home';
+              return;
             } else {
               throw new Error(data.error || '로그인에 실패했습니다.');
             }
