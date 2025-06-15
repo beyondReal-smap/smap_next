@@ -50,6 +50,12 @@ export default function SignInPage() {
   // 🔒 컴포넌트 재마운트 방지 플래그들
   const componentMountedRef = useRef(false);
   const preventRemountRef = useRef(false);
+  
+  // 네비게이션 차단 이벤트 리스너 참조
+  const navigationListenersRef = useRef<{
+    beforeunload?: (e: BeforeUnloadEvent) => void;
+    popstate?: (e: PopStateEvent) => void;
+  }>({});
 
   // 🔒 컴포넌트 마운트 추적 및 재마운트 방지
   useEffect(() => {
@@ -80,6 +86,12 @@ export default function SignInPage() {
 
   // 통합된 인증 상태 확인 및 리다이렉트 처리 - 에러 모달 중에는 완전히 비활성화
   useEffect(() => {
+    // 전역 에러 모달 플래그 확인 - 최우선 차단
+    if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+      console.log('[SIGNIN] 🚫 전역 에러 모달 플래그로 인한 메인 useEffect 차단');
+      return;
+    }
+    
     // 모든 useEffect 차단 플래그가 설정되어 있으면 아무것도 하지 않음
     if (blockAllEffectsRef.current || preventRemountRef.current) {
       console.log('[SIGNIN] 🚫 모든 useEffect 차단됨 (재마운트 방지 포함)');
@@ -205,24 +217,25 @@ export default function SignInPage() {
   useEffect(() => {
     // iOS 환경인지 확인
     const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
+    console.log('[GOOGLE LOGIN] 콜백 함수 등록 - iOS WebView 환경:', isIOSWebView);
     
     if (isIOSWebView) {
       // Google Sign-In 성공 콜백
       (window as any).googleSignInSuccess = async (idToken: string, userInfoJson: string) => {
         try {
-          console.log('[SIGNIN] iOS 네이티브 Google Sign-In 성공');
-          console.log('[SIGNIN] ID Token:', idToken);
-          console.log('[SIGNIN] User Info JSON:', userInfoJson);
+          console.log('[GOOGLE LOGIN] iOS 네이티브 Google Sign-In 성공');
+          console.log('[GOOGLE LOGIN] ID Token 길이:', idToken?.length || 0);
+          console.log('[GOOGLE LOGIN] User Info JSON:', userInfoJson);
           setIsLoading(true);
           
           // JSON 파싱 시도
           let userInfo;
           try {
             userInfo = JSON.parse(userInfoJson);
-            console.log('[SIGNIN] 파싱된 사용자 정보:', userInfo);
+            console.log('[GOOGLE LOGIN] 파싱된 사용자 정보:', userInfo);
           } catch (parseError) {
-            console.error('[SIGNIN] JSON 파싱 오류:', parseError);
-            console.log('[SIGNIN] 원본 JSON 문자열:', userInfoJson);
+            console.error('[GOOGLE LOGIN] JSON 파싱 오류:', parseError);
+            console.log('[GOOGLE LOGIN] 원본 JSON 문자열:', userInfoJson);
             throw new Error('사용자 정보 파싱에 실패했습니다.');
           }
           
@@ -241,24 +254,27 @@ export default function SignInPage() {
           const data = await response.json();
 
           if (data.success) {
-            console.log('[SIGNIN] 네이티브 Google 로그인 성공, 사용자 정보:', data.user);
+            console.log('[GOOGLE LOGIN] 네이티브 Google 로그인 성공, 사용자 정보:', data.user);
             
             // AuthContext에 사용자 정보 설정
             if (data.user && data.token) {
               authService.setUserData(data.user);
               authService.setToken(data.token);
               
-              console.log('[SIGNIN] 로그인 성공 - home으로 즉시 리다이렉션');
+              console.log('[GOOGLE LOGIN] 로그인 성공 - home으로 즉시 리다이렉션');
               
-              // 즉시 home으로 리다이렉션
-              window.location.href = '/home';
+              // 리다이렉트 플래그 설정
+              isRedirectingRef.current = true;
+              
+              // router.replace 사용 (페이지 새로고침 없이 이동)
+              router.replace('/home');
               return;
             }
           } else {
             throw new Error(data.error || '로그인에 실패했습니다.');
           }
         } catch (error: any) {
-          console.error('[SIGNIN] 네이티브 Google 로그인 처리 오류:', error);
+          console.error('[GOOGLE LOGIN] 네이티브 Google 로그인 처리 오류:', error);
           showError(error.message || 'Google 로그인 처리 중 오류가 발생했습니다.');
         } finally {
           setIsLoading(false);
@@ -267,7 +283,8 @@ export default function SignInPage() {
 
       // Google Sign-In 실패 콜백
       (window as any).googleSignInError = (errorMessage: string) => {
-        console.error('[SIGNIN] iOS 네이티브 Google Sign-In 실패:', errorMessage);
+        console.error('[GOOGLE LOGIN] iOS 네이티브 Google Sign-In 실패:', errorMessage);
+        setIsLoading(false);
         showError(`Google 로그인 실패: ${errorMessage}`);
       };
     }
@@ -291,6 +308,12 @@ export default function SignInPage() {
 
   // AuthContext 에러 감지 및 에러 모달 표시 (한 번만 실행)
   useEffect(() => {
+    // 전역 에러 모달 플래그 확인 - 최우선 차단
+    if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+      console.log('[SIGNIN] 🚫 전역 에러 모달 플래그로 인한 useEffect 차단');
+      return;
+    }
+    
     // 모든 useEffect 차단 플래그가 설정되어 있으면 아무것도 하지 않음
     if (blockAllEffectsRef.current) {
       console.log('[SIGNIN] 🚫 에러 감지 useEffect 차단됨');
@@ -310,12 +333,16 @@ export default function SignInPage() {
       console.log('[SIGNIN] ⚠️ AuthContext 에러 감지, 에러 모달 표시:', error);
       errorProcessedRef.current = true; // 에러 처리 완료 플래그 설정
       blockAllEffectsRef.current = true; // 모든 useEffect 차단
+      
+      // 에러 모달 표시
       showError(error);
       
-      // 에러 처리 후 AuthContext 에러 즉시 초기화하여 추가 useEffect 실행 방지
-      setError(null);
+      // 에러 처리 후 AuthContext 에러 초기화 (setTimeout으로 지연)
+      setTimeout(() => {
+        setError(null);
+      }, 100);
     }
-  }, [error, isLoggedIn, loading, showErrorModal]);
+  }, [error, isLoggedIn, loading, showErrorModal, setError]);
 
   // 로그인 상태 변화 디버깅 (error 제외)
   useEffect(() => {
@@ -396,8 +423,11 @@ export default function SignInPage() {
 
       console.log('[SIGNIN] AuthContext 로그인 성공 - home으로 즉시 리다이렉션');
       
-      // 즉시 home으로 리다이렉션
-      window.location.href = '/home';
+      // 리다이렉트 플래그 설정하여 useEffect에서 처리하도록 함
+      isRedirectingRef.current = true;
+      
+      // router.replace 사용 (페이지 새로고침 없이 이동)
+      router.replace('/home');
       return;
 
     } catch (err: any) {
@@ -418,6 +448,20 @@ export default function SignInPage() {
   const closeErrorModal = () => {
     console.log('[SIGNIN] 에러 모달 닫기');
     
+    // 전역 플래그 먼저 제거
+    delete (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__;
+    
+    // 🚫 브라우저 네비게이션 차단 해제
+    if (navigationListenersRef.current.beforeunload) {
+      window.removeEventListener('beforeunload', navigationListenersRef.current.beforeunload);
+      navigationListenersRef.current.beforeunload = undefined;
+    }
+    
+    if (navigationListenersRef.current.popstate) {
+      window.removeEventListener('popstate', navigationListenersRef.current.popstate);
+      navigationListenersRef.current.popstate = undefined;
+    }
+    
     // 모달 닫기
     setShowErrorModal(false);
     setErrorModalMessage('');
@@ -426,14 +470,12 @@ export default function SignInPage() {
     document.body.style.overflow = '';
     document.documentElement.style.overflow = '';
     
-    // 플래그 리셋
-    setTimeout(() => {
-      errorProcessedRef.current = false;
-      blockAllEffectsRef.current = false;
-      preventRemountRef.current = false;
-      delete (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__;
-      console.log('[SIGNIN] 모든 플래그 리셋 완료');
-    }, 50);
+    // 플래그 리셋 (즉시)
+    errorProcessedRef.current = false;
+    blockAllEffectsRef.current = false;
+    preventRemountRef.current = false;
+    
+    console.log('[SIGNIN] 모든 플래그 리셋 완료');
   };
 
   // 에러 표시 헬퍼 함수 - 단순하게!
@@ -444,30 +486,38 @@ export default function SignInPage() {
     blockAllEffectsRef.current = true;
     preventRemountRef.current = true;
     
+    // 전역 플래그 설정 (가장 먼저)
+    (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+    
     // 🚫 페이지 완전 고정
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
     
-    // 🚫 단순하게 모든 것 차단
-    window.addEventListener('beforeunload', (e) => {
+    // 🚫 브라우저 네비게이션 차단
+    navigationListenersRef.current.beforeunload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
-    });
+      return '';
+    };
     
-    window.addEventListener('popstate', (e) => {
+    navigationListenersRef.current.popstate = (e: PopStateEvent) => {
       e.preventDefault();
       window.history.pushState(null, '', window.location.href);
-    });
+    };
     
-    // 전역 플래그 설정
-    (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+    // 이벤트 리스너 추가
+    window.addEventListener('beforeunload', navigationListenersRef.current.beforeunload);
+    window.addEventListener('popstate', navigationListenersRef.current.popstate);
     
-          // 에러 모달 표시
-      setErrorModalMessage(message);
-      setShowErrorModal(true);
-      setIsLoading(false);
-      
-      console.log('[SIGNIN] ✅ 에러 모달 표시 완료');
+    // 현재 히스토리 상태 고정
+    window.history.pushState(null, '', window.location.href);
+    
+    // 에러 모달 표시
+    setErrorModalMessage(message);
+    setShowErrorModal(true);
+    setIsLoading(false);
+    
+    console.log('[SIGNIN] ✅ 에러 모달 표시 완료');
   };
 
   // Google 로그인 핸들러
@@ -478,32 +528,43 @@ export default function SignInPage() {
       
       // iOS WebView에서 네이티브 Google Sign-In 사용
       const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
+      console.log('[GOOGLE LOGIN] 환경 체크:', {
+        isIOSWebView,
+        hasWebkit: !!(window as any).webkit,
+        hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
+        hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos
+      });
+      
       if (isIOSWebView) {
-        console.log('iOS WebView에서 네이티브 Google Sign-In 사용');
+        console.log('[GOOGLE LOGIN] iOS WebView에서 네이티브 Google Sign-In 사용');
         
         // iOS 네이티브 Google Sign-In 사용
         try {
           if ((window as any).webkit?.messageHandlers?.smapIos) {
-            console.log('iOS 네이티브 Google Sign-In 시작');
+            console.log('[GOOGLE LOGIN] iOS 네이티브 Google Sign-In 시작');
             (window as any).webkit.messageHandlers.smapIos.postMessage({
               action: 'googleSignIn'
             });
             
+            console.log('[GOOGLE LOGIN] 네이티브 메시지 전송 완료, 콜백 대기 중...');
             // 로딩 상태는 콜백에서 처리되므로 여기서는 유지
             return;
+          } else {
+            console.warn('[GOOGLE LOGIN] smapIos 메시지 핸들러를 찾을 수 없음');
           }
         } catch (e) {
-          console.error('iOS 네이티브 구글 로그인 요청 실패:', e);
+          console.error('[GOOGLE LOGIN] iOS 네이티브 구글 로그인 요청 실패:', e);
         }
         
-        // 네이티브 처리가 불가능한 경우 웹 로그인으로 폴백
-        console.log('네이티브 Google Sign-In을 사용할 수 없어 웹 로그인으로 진행합니다.');
-        // 웹 로그인으로 계속 진행 (return 제거)
+        // 네이티브 처리가 불가능한 경우 에러 표시
+        console.log('[GOOGLE LOGIN] 네이티브 Google Sign-In을 사용할 수 없음');
+        showError('Google 로그인을 사용할 수 없습니다. 앱을 다시 시작해주세요.');
+        return;
       }
       
       // 웹 환경에서는 NextAuth.js를 통한 Google 로그인 (임시 비활성화)
-      console.log('Google 로그인이 임시 비활성화되었습니다.');
-      showError('Google 로그인이 현재 사용할 수 없습니다.');
+      console.log('웹 환경에서 Google 로그인 시도');
+      showError('웹 환경에서는 Google 로그인이 현재 사용할 수 없습니다. 앱에서 이용해주세요.');
       
       /*
       // NextAuth 관련 코드 임시 비활성화
@@ -596,8 +657,11 @@ export default function SignInPage() {
               
               console.log('[KAKAO LOGIN] 로그인 성공 - home으로 즉시 리다이렉션');
               
-              // 즉시 home으로 리다이렉션
-              window.location.href = '/home';
+              // 리다이렉트 플래그 설정
+              isRedirectingRef.current = true;
+              
+              // router.replace 사용 (페이지 새로고침 없이 이동)
+              router.replace('/home');
               return;
             } else {
               throw new Error(data.error || '로그인에 실패했습니다.');
@@ -673,8 +737,20 @@ export default function SignInPage() {
   useEffect(() => {
     return () => {
       // 모든 네비게이션 차단 이벤트 리스너 제거
-      window.removeEventListener('beforeunload', () => {});
-      window.removeEventListener('popstate', () => {});
+      if (navigationListenersRef.current.beforeunload) {
+        window.removeEventListener('beforeunload', navigationListenersRef.current.beforeunload);
+      }
+      if (navigationListenersRef.current.popstate) {
+        window.removeEventListener('popstate', navigationListenersRef.current.popstate);
+      }
+      
+      // 전역 플래그 정리
+      delete (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__;
+      
+      // 스크롤 복구
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      
       console.log('[SIGNIN] 컴포넌트 언마운트 - 모든 이벤트 리스너 정리 완료');
     };
   }, []);
