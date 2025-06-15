@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image'; // Image 컴포넌트 임포트
 import { motion, AnimatePresence } from 'framer-motion';
-import { signIn, getSession } from 'next-auth/react';
+// import { signIn, getSession } from 'next-auth/react'; // 임시 비활성화
 import authService from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
@@ -36,24 +36,68 @@ export default function SignInPage() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, isLoggedIn, loading } = useAuth();
+  const { login, isLoggedIn, loading, error, setError } = useAuth();
   
   // 리다이렉트 중복 실행 방지 플래그
   const isRedirectingRef = useRef(false);
+  
+  // 에러 처리 완료 플래그 - 한 번 에러를 처리하면 더 이상 처리하지 않음
+  const errorProcessedRef = useRef(false);
+  
+  // 에러 모달 표시 중 모든 useEffect 차단 플래그
+  const blockAllEffectsRef = useRef(false);
+  
+  // 🔒 컴포넌트 재마운트 방지 플래그들
+  const componentMountedRef = useRef(false);
+  const preventRemountRef = useRef(false);
 
-  // 통합된 인증 상태 확인 및 리다이렉트 처리
+  // 🔒 컴포넌트 마운트 추적 및 재마운트 방지
   useEffect(() => {
-    console.log('[SIGNIN] 인증 상태 확인:', { isLoggedIn, loading, showErrorModal });
+    // 전역 에러 모달 플래그 확인
+    if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+      console.log('[SIGNIN] 🚫 전역 에러 모달 플래그 감지 - 모든 동작 차단');
+      preventRemountRef.current = true;
+      blockAllEffectsRef.current = true;
+      return;
+    }
+    
+    if (componentMountedRef.current && !preventRemountRef.current) {
+      console.log('[SIGNIN] ⚠️ 컴포넌트 재마운트 감지 - 차단 활성화');
+      preventRemountRef.current = true;
+      blockAllEffectsRef.current = true;
+      
+      // 강제로 현재 페이지 상태 유지
+      window.history.replaceState(null, '', window.location.href);
+      
+      return;
+    }
+    
+    if (!componentMountedRef.current) {
+      componentMountedRef.current = true;
+      console.log('[SIGNIN] 🚀 컴포넌트 최초 마운트');
+    }
+  }, []);
+
+  // 통합된 인증 상태 확인 및 리다이렉트 처리 - 에러 모달 중에는 완전히 비활성화
+  useEffect(() => {
+    // 모든 useEffect 차단 플래그가 설정되어 있으면 아무것도 하지 않음
+    if (blockAllEffectsRef.current || preventRemountRef.current) {
+      console.log('[SIGNIN] 🚫 모든 useEffect 차단됨 (재마운트 방지 포함)');
+      return;
+    }
+    
+    // 에러 모달이 표시 중이면 아무것도 하지 않음 (최우선 조건)
+    if (showErrorModal) {
+      console.log('[SIGNIN] ⛔ 에러 모달 표시 중, useEffect 완전 중단');
+      blockAllEffectsRef.current = true; // 차단 플래그 설정
+      return;
+    }
+    
+    console.log('[SIGNIN] 🔄 메인 useEffect 실행:', { isLoggedIn, loading, showErrorModal, isCheckingAuth });
     
     // 로딩 중이면 대기
     if (loading) {
       console.log('[SIGNIN] AuthContext 로딩 중, 대기...');
-      return;
-    }
-
-    // 에러 모달이 표시 중이면 리다이렉트 하지 않음
-    if (showErrorModal) {
-      console.log('[SIGNIN] 에러 모달 표시 중, 리다이렉트 건너뛰기');
       return;
     }
 
@@ -69,7 +113,9 @@ export default function SignInPage() {
       newUrl.searchParams.delete('from');
       window.history.replaceState({}, '', newUrl.toString());
       
-      setIsCheckingAuth(false);
+      if (isCheckingAuth) {
+        setIsCheckingAuth(false);
+      }
       return;
     }
 
@@ -81,14 +127,17 @@ export default function SignInPage() {
       return;
     }
 
-    console.log('[SIGNIN] 로그인되지 않은 상태, 로그인 페이지 표시');
-    setIsCheckingAuth(false);
+    // 로그인되지 않은 상태에서만 페이지 표시 (상태 변경 최소화)
+    if (!isLoggedIn && isCheckingAuth) {
+      console.log('[SIGNIN] 로그인되지 않은 상태, 로그인 페이지 표시');
+      setIsCheckingAuth(false);
+    }
     
     // cleanup 함수: 컴포넌트 언마운트 시 플래그 리셋
     return () => {
       isRedirectingRef.current = false;
     };
-  }, [isLoggedIn, loading, showErrorModal, router]);
+  }, [isLoggedIn, loading, showErrorModal, isCheckingAuth, router]);
 
   // 자동 입력 기능 제거됨 - 사용자가 직접 입력해야 함
   // useEffect(() => {
@@ -193,19 +242,14 @@ export default function SignInPage() {
           }
         } catch (error: any) {
           console.error('[SIGNIN] 네이티브 Google 로그인 처리 오류:', error);
-          setErrorModalMessage(error.message || 'Google 로그인 처리 중 오류가 발생했습니다.');
-          setShowErrorModal(true);
-        } finally {
-          setIsLoading(false);
+          showError(error.message || 'Google 로그인 처리 중 오류가 발생했습니다.');
         }
       };
 
       // Google Sign-In 실패 콜백
       (window as any).googleSignInError = (errorMessage: string) => {
         console.error('[SIGNIN] iOS 네이티브 Google Sign-In 실패:', errorMessage);
-        setErrorModalMessage(`Google 로그인 실패: ${errorMessage}`);
-        setShowErrorModal(true);
-        setIsLoading(false);
+        showError(`Google 로그인 실패: ${errorMessage}`);
       };
     }
 
@@ -221,7 +265,43 @@ export default function SignInPage() {
   // 에러 모달 상태 디버깅
   useEffect(() => {
     console.log('[SIGNIN] 에러 모달 상태 변화:', { showErrorModal, errorModalMessage });
+    if (showErrorModal && errorModalMessage) {
+      console.log('[SIGNIN] ⚠️ 에러 모달이 표시되어야 함:', errorModalMessage);
+    }
   }, [showErrorModal, errorModalMessage]);
+
+  // AuthContext 에러 감지 및 에러 모달 표시 (한 번만 실행)
+  useEffect(() => {
+    // 모든 useEffect 차단 플래그가 설정되어 있으면 아무것도 하지 않음
+    if (blockAllEffectsRef.current) {
+      console.log('[SIGNIN] 🚫 에러 감지 useEffect 차단됨');
+      return;
+    }
+    
+    console.log('[SIGNIN] 🚨 에러 감지 useEffect 실행:', { 
+      error: !!error, 
+      errorMessage: error, 
+      isLoggedIn, 
+      loading, 
+      showErrorModal, 
+      errorProcessed: errorProcessedRef.current 
+    });
+    
+    if (error && !isLoggedIn && !loading && !showErrorModal && !errorProcessedRef.current) {
+      console.log('[SIGNIN] ⚠️ AuthContext 에러 감지, 에러 모달 표시:', error);
+      errorProcessedRef.current = true; // 에러 처리 완료 플래그 설정
+      blockAllEffectsRef.current = true; // 모든 useEffect 차단
+      showError(error);
+      
+      // 에러 처리 후 AuthContext 에러 즉시 초기화하여 추가 useEffect 실행 방지
+      setError(null);
+    }
+  }, [error, isLoggedIn, loading, showErrorModal]);
+
+  // 로그인 상태 변화 디버깅 (error 제외)
+  useEffect(() => {
+    console.log('[SIGNIN] 로그인 상태 변화:', { isLoggedIn, loading, isCheckingAuth });
+  }, [isLoggedIn, loading, isCheckingAuth]);
 
   // 전화번호 포맷팅 함수 (register/page.tsx의 함수와 유사)
   const formatPhoneNumber = (value: string) => {
@@ -263,6 +343,13 @@ export default function SignInPage() {
     setIsLoading(true);
     setApiError('');
     setFormErrors({});
+    
+    // 기존 AuthContext 에러 초기화 및 에러 처리 플래그 리셋
+    if (error) {
+      setError(null);
+    }
+    errorProcessedRef.current = false; // 새로운 로그인 시도를 위해 플래그 리셋
+    blockAllEffectsRef.current = false; // useEffect 차단 해제
 
     let currentFormErrors: Record<string, string> = {};
     if (!phoneNumber.trim()) {
@@ -297,25 +384,70 @@ export default function SignInPage() {
       console.error('[SIGNIN] 로그인 오류:', err);
       console.log('[SIGNIN] 에러 메시지:', err.message);
       
-      const errorMessage = err.message || '아이디 또는 비밀번호가 올바르지 않습니다.';
-      console.log('[SIGNIN] 모달에 표시할 메시지:', errorMessage);
+      // AuthContext에서 이미 에러 상태가 설정되므로 여기서는 로딩만 해제
+      // showError는 useEffect에서 AuthContext 에러를 감지해서 처리
+      console.log('[SIGNIN] AuthContext에서 에러 처리 예정, 로딩만 해제');
       
-      setErrorModalMessage(errorMessage);
-      setShowErrorModal(true);
-      
-      console.log('[SIGNIN] 에러 모달 상태 설정 완료');
     } finally {
       setIsLoading(false);
       console.log('[SIGNIN] 로그인 시도 완료');
     }
   };
 
-  // 에러 모달 닫기
+  // 에러 모달 닫기 - 단순하게!
   const closeErrorModal = () => {
-    console.log('[SIGNIN] 에러 모달 닫기 시작');
+    console.log('[SIGNIN] 에러 모달 닫기');
+    
+    // 모달 닫기
     setShowErrorModal(false);
     setErrorModalMessage('');
-    console.log('[SIGNIN] 에러 모달 닫기 완료 - 사용자가 signin 페이지에 남아있어야 함');
+    
+    // 페이지 스크롤 복구
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+    
+    // 플래그 리셋
+    setTimeout(() => {
+      errorProcessedRef.current = false;
+      blockAllEffectsRef.current = false;
+      preventRemountRef.current = false;
+      delete (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__;
+      console.log('[SIGNIN] 모든 플래그 리셋 완료');
+    }, 50);
+  };
+
+  // 에러 표시 헬퍼 함수 - 단순하게!
+  const showError = (message: string) => {
+    console.log('[SIGNIN] 💥 에러 표시:', message);
+    
+    // 🔒 모든 것을 멈춰!
+    blockAllEffectsRef.current = true;
+    preventRemountRef.current = true;
+    
+    // 🚫 페이지 완전 고정
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    // 🚫 단순하게 모든 것 차단
+    window.addEventListener('beforeunload', (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    });
+    
+    window.addEventListener('popstate', (e) => {
+      e.preventDefault();
+      window.history.pushState(null, '', window.location.href);
+    });
+    
+    // 전역 플래그 설정
+    (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+    
+          // 에러 모달 표시
+      setErrorModalMessage(message);
+      setShowErrorModal(true);
+      setIsLoading(false);
+      
+      console.log('[SIGNIN] ✅ 에러 모달 표시 완료');
   };
 
   // Google 로그인 핸들러
@@ -343,87 +475,63 @@ export default function SignInPage() {
           console.error('iOS 네이티브 구글 로그인 요청 실패:', e);
         }
         
-        // 네이티브 처리가 불가능한 경우에만 에러 표시
-        setErrorModalMessage('네이티브 Google Sign-In을 사용할 수 없습니다. 앱을 업데이트해주세요.');
-        setShowErrorModal(true);
-        setIsLoading(false);
-        return;
+        // 네이티브 처리가 불가능한 경우 웹 로그인으로 폴백
+        console.log('네이티브 Google Sign-In을 사용할 수 없어 웹 로그인으로 진행합니다.');
+        // 웹 로그인으로 계속 진행 (return 제거)
       }
       
-      // 웹 환경에서는 NextAuth.js를 통한 Google 로그인
+      // 웹 환경에서는 NextAuth.js를 통한 Google 로그인 (임시 비활성화)
+      console.log('Google 로그인이 임시 비활성화되었습니다.');
+      showError('Google 로그인이 현재 사용할 수 없습니다.');
+      
+      /*
+      // NextAuth 관련 코드 임시 비활성화
       const result = await signIn('google', {
-        redirect: false, // 자동 리디렉션 방지
+        redirect: false,
         callbackUrl: '/home'
       });
-
       console.log('Google 로그인 결과:', result);
-
       if (result?.error) {
-        // 구글 로그인 에러 처리
-        if (result.error.includes('disallowed_useragent') || 
-            result.error.includes('403') ||
-            result.error.includes('blocked')) {
-          setErrorModalMessage('구글 로그인이 차단되었습니다. Safari 브라우저에서 시도해주세요.');
-        } else {
-          setErrorModalMessage(`구글 로그인 실패: ${result.error}`);
-        }
-        setShowErrorModal(true);
+        showError(`구글 로그인 실패: ${result.error}`);
         return;
       }
-
       if (result?.ok) {
-        // 세션 정보 가져오기
         const session = await getSession();
         console.log('Google 로그인 세션:', session);
-
         if (session?.backendData) {
-          // authService를 통해 사용자 정보 저장 (AuthContext가 인식할 수 있도록)
           try {
             const userData = session.backendData.member;
             const token = session.backendData.token || '';
-            
             console.log('[GOOGLE LOGIN] 새로운 사용자 정보:', userData.mt_name, 'ID:', userData.mt_idx);
-            
-            // 기존 데이터와 다른 사용자면 완전 초기화
             const existingUserData = authService.getUserData();
             if (existingUserData && existingUserData.mt_idx !== userData.mt_idx) {
               console.log('[GOOGLE LOGIN] 다른 사용자 감지, 기존 데이터 초기화:', existingUserData.mt_idx, '->', userData.mt_idx);
-              authService.clearAuthData(); // 기존 데이터 완전 삭제
+              authService.clearAuthData();
             }
-            
-            // authService를 통해 저장하여 AuthContext가 인식하도록 함
             authService.setUserData(userData);
             authService.setToken(token);
-            
             console.log('[GOOGLE LOGIN] 저장 완료, home으로 이동');
           } catch (error) {
             console.error('사용자 정보 저장 실패:', error);
           }
         }
-
-        // 수동 리다이렉션 제거 - AuthContext의 자동 리다이렉션 사용
-        // router.push('/home'); // 이 줄을 제거
         console.log('[GOOGLE LOGIN] 로그인 성공 - 자동 리다이렉션 대기');
       }
+      */
     } catch (error) {
       console.error('Google 로그인 실패:', error);
       
       // 에러 메시지 개선
       let errorMessage = 'Google 로그인에 실패했습니다.';
       if (error instanceof Error) {
-        if (error.message.includes('disallowed_useragent') || 
-            error.message.includes('403') ||
-            error.message.includes('blocked')) {
-          errorMessage = '구글 로그인이 차단되었습니다. Safari 브라우저에서 시도해주세요.';
-        } else if (error.message.includes('network')) {
+        if (error.message.includes('network')) {
           errorMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
         } else {
           errorMessage = `구글 로그인 오류: ${error.message}`;
         }
       }
       
-      setErrorModalMessage(errorMessage);
-      setShowErrorModal(true);
+      showError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -433,8 +541,7 @@ export default function SignInPage() {
   const handleKakaoLogin = async () => {
     // 카카오 SDK가 로드되었는지 확인
     if (!window.Kakao || !window.Kakao.isInitialized()) {
-      setErrorModalMessage('카카오 SDK가 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
-      setShowErrorModal(true);
+      showError('카카오 SDK가 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
       return;
     }
 
@@ -477,27 +584,22 @@ export default function SignInPage() {
             
             // 탈퇴한 사용자 오류 처리
             if (error.response?.status === 403 && error.response?.data?.isWithdrawnUser) {
-              setErrorModalMessage('탈퇴한 계정입니다. 새로운 계정으로 가입해주세요.');
+              showError('탈퇴한 계정입니다. 새로운 계정으로 가입해주세요.');
             } else {
-              setErrorModalMessage(error.message || '로그인 처리 중 오류가 발생했습니다.');
+              showError(error.message || '로그인 처리 중 오류가 발생했습니다.');
             }
-            setShowErrorModal(true);
           } finally {
             setIsLoading(false);
           }
         },
         fail: (error: any) => {
           console.error('카카오 로그인 실패:', error);
-          setErrorModalMessage('카카오 로그인에 실패했습니다.');
-          setShowErrorModal(true);
-          setIsLoading(false);
+          showError('카카오 로그인에 실패했습니다.');
         },
       });
     } catch (error: any) {
       console.error('카카오 로그인 오류:', error);
-      setErrorModalMessage('카카오 로그인 중 오류가 발생했습니다.');
-      setShowErrorModal(true);
-      setIsLoading(false);
+      showError('카카오 로그인 중 오류가 발생했습니다.');
     }
   };
 
@@ -542,6 +644,16 @@ export default function SignInPage() {
     };
 
     loadKakaoSDK();
+  }, []);
+
+  // 컴포넌트 언마운트 시 모든 이벤트 리스너 정리
+  useEffect(() => {
+    return () => {
+      // 모든 네비게이션 차단 이벤트 리스너 제거
+      window.removeEventListener('beforeunload', () => {});
+      window.removeEventListener('popstate', () => {});
+      console.log('[SIGNIN] 컴포넌트 언마운트 - 모든 이벤트 리스너 정리 완료');
+    };
   }, []);
 
   // 인증 상태 확인 중일 때 로딩 화면 표시

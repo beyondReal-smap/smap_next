@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode, useState, useCallback } from 'react';
 import { AuthState, AuthAction, UserProfile, GroupWithMembers, LoginRequest } from '@/types/auth';
 import authService from '@/services/authService';
-import { getSession } from 'next-auth/react';
+// import { getSession } from 'next-auth/react'; // 임시 비활성화
 import { useDataCache } from '@/contexts/DataCacheContext';
 import dataPreloadService from '@/services/dataPreloadService';
 
@@ -243,11 +243,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         console.log('[AUTH CONTEXT] 초기 인증 상태 확인 시작');
         
-        // 1. NextAuth 세션 먼저 확인 (최신 상태)
-        console.log('[AUTH CONTEXT] NextAuth 세션 확인');
-        const session = await getSession();
+        // 1. NextAuth 세션 먼저 확인 (최신 상태) - 임시 비활성화
+        console.log('[AUTH CONTEXT] NextAuth 세션 확인 (비활성화됨)');
+        // const session = await getSession();
+        const session = null;
         
-        if (session?.backendData?.member) {
+        if (false && session?.backendData?.member) { // 임시 비활성화
           console.log('[AUTH CONTEXT] NextAuth 세션에서 사용자 데이터 발견:', session.backendData.member.mt_name, 'ID:', session.backendData.member.mt_idx);
           
           // 탈퇴한 사용자인지 확인 (mt_level이 1이면 탈퇴한 사용자)

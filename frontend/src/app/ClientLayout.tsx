@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { SessionProvider } from 'next-auth/react';
+// import { SessionProvider } from 'next-auth/react'; // 임시 비활성화
 import { BottomNavBar } from './components/layout';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { UserProvider } from '@/contexts/UserContext';
@@ -153,6 +153,12 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   }, [isLoggedIn, loading, router]);
 
   useEffect(() => {
+    // 🚫 전역 에러 모달 플래그 확인 - 모든 네비게이션 차단
+    if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+      console.log('[AUTH GUARD] 🚫 전역 에러 모달 활성화 - 모든 네비게이션 차단');
+      return;
+    }
+    
     console.log('[AUTH GUARD] 상태 체크:', { 
       pathname, 
       isLoggedIn, 
@@ -173,7 +179,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     // 로그인되지 않은 상태에서 보호된 페이지 접근 시 signin으로 리다이렉트
-    if (!isLoggedIn) {
+    // 단, 이미 signin 페이지에 있으면 리다이렉트하지 않음
+    if (!isLoggedIn && pathname !== '/signin') {
       console.log('[AUTH GUARD] 인증되지 않은 접근, signin으로 리다이렉트:', pathname);
       router.push('/signin');
       return;
@@ -188,7 +195,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   // 인증되지 않은 사용자가 보호된 페이지에 접근하려는 경우
-  if (!isLoggedIn && !PUBLIC_ROUTES.includes(pathname)) {
+  // 단, signin 페이지는 제외 (이미 signin 페이지에 있으면 스피너 표시하지 않음)
+  if (!isLoggedIn && !PUBLIC_ROUTES.includes(pathname) && pathname !== '/signin') {
     console.log('[AUTH GUARD] 인증되지 않은 사용자, 빈 화면 표시 (리다이렉트 대기)');
     return <IOSCompatibleSpinner message="로그인 페이지로 이동 중..." />;
   }
@@ -207,6 +215,34 @@ export default function ClientLayout({
   // 지도 API 프리로딩 및 서비스 워커 등록
   useMapPreloader();
   // useServiceWorker(); // 임시 비활성화
+  
+  // Service Worker 완전 해제 (페이지 새로고침 방지)
+  useEffect(() => {
+    const unregisterServiceWorker = async () => {
+      if ('serviceWorker' in navigator) {
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          for (const registration of registrations) {
+            await registration.unregister();
+            console.log('[ClientLayout] Service Worker 해제 완료:', registration.scope);
+          }
+          
+          // 캐시도 모두 삭제
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            await Promise.all(
+              cacheNames.map(cacheName => caches.delete(cacheName))
+            );
+            console.log('[ClientLayout] 모든 캐시 삭제 완료');
+          }
+        } catch (error) {
+          console.error('[ClientLayout] Service Worker 해제 실패:', error);
+        }
+      }
+    };
+    
+    unregisterServiceWorker();
+  }, []);
 
   // 네비게이션 바를 숨길 페이지들 - useMemo로 최적화
   const shouldHideNavBar = React.useMemo(() => {
@@ -235,18 +271,16 @@ export default function ClientLayout({
   }
 
   return (
-    <SessionProvider>
-      <DataCacheProvider>
-        <AuthProvider>
-          <UserProvider>
-            <AuthGuard>
-              {children}
-              {!shouldHideNavBar && <BottomNavBar />}
-              {/* <PerformanceMonitor /> */}
-            </AuthGuard>
-          </UserProvider>
-        </AuthProvider>
-      </DataCacheProvider>
-    </SessionProvider>
+    <DataCacheProvider>
+      <AuthProvider>
+        <UserProvider>
+          <AuthGuard>
+            {children}
+            {!shouldHideNavBar && <BottomNavBar />}
+            {/* <PerformanceMonitor /> */}
+          </AuthGuard>
+        </UserProvider>
+      </AuthProvider>
+    </DataCacheProvider>
   );
 } 
