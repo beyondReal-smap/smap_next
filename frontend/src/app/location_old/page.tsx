@@ -2236,9 +2236,9 @@ export default function LocationPage() {
                     }}
                   />
                   {isSearchingLocationForPanel ? (
-                    <FiLoader className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 animate-spin" />
+                    <FiLoader className="absolute left-3 top-2 text-gray-400 animate-spin" style={{ marginTop: '4px' }} />
                   ) : (
-                    <FaSearchSolid className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer" onClick={handlePanelAddressSearch} />
+                    <FaSearchSolid className="absolute left-3 top-2 text-gray-400 cursor-pointer" style={{ marginTop: '4px' }} onClick={handlePanelAddressSearch} />
                   )}
                 </div>
                 {locationSearchModalCaller === 'panel' && locationSearchResults.length > 0 && (

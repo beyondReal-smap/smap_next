@@ -4412,9 +4412,9 @@ export default function LocationPage() {
                     }}
                   />
                   {isSearchingLocationForPanel ? (
-                                              <FiLoader className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-600 unified-animate-spin" size={16} />
+                      <FiLoader className="absolute left-3 top-3 text-blue-600 unified-animate-spin" size={16} style={{ marginTop: '2px' }} />
                   ) : (
-                      <FaSearchSolid className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 cursor-pointer" size={16} onClick={handlePanelAddressSearch} />
+                      <FaSearchSolid className="absolute left-3 top-3 text-gray-400 cursor-pointer" size={16} style={{ marginTop: '2px' }} onClick={handlePanelAddressSearch} />
                   )}
                 </div>
 

@@ -241,10 +241,10 @@ export default function SignInPage() {
         mt_pwd: password,
       });
 
-      console.log('[SIGNIN] AuthContext 로그인 성공');
+      console.log('[SIGNIN] AuthContext 로그인 성공 - 자동 리다이렉션 대기');
       
-      // home/page.tsx로 이동
-      router.push('/home');
+      // 수동 리다이렉션 제거 - AuthContext의 자동 리다이렉션 사용
+      // router.push('/home'); // 이 줄을 제거
 
     } catch (err: any) {
       console.error('[SIGNIN] 로그인 오류:', err);
@@ -353,8 +353,9 @@ export default function SignInPage() {
           }
         }
 
-        // home 페이지로 이동
-        router.push('/home');
+        // 수동 리다이렉션 제거 - AuthContext의 자동 리다이렉션 사용
+        // router.push('/home'); // 이 줄을 제거
+        console.log('[GOOGLE LOGIN] 로그인 성공 - 자동 리다이렉션 대기');
       }
     } catch (error) {
       console.error('Google 로그인 실패:', error);
@@ -417,8 +418,9 @@ export default function SignInPage() {
               // AuthContext에 사용자 정보 설정 (JWT 토큰은 이미 쿠키에 저장됨)
               // AuthContext가 쿠키에서 토큰을 자동으로 읽어올 것임
               
-              // 로그인 성공 시 홈 페이지로 이동
-              router.push('/home');
+              // 수동 리다이렉션 제거 - AuthContext의 자동 리다이렉션 사용
+              // router.push('/home'); // 이 줄을 제거
+              console.log('[KAKAO LOGIN] 로그인 성공 - 자동 리다이렉션 대기');
             } else {
               throw new Error(data.error || '로그인에 실패했습니다.');
             }
