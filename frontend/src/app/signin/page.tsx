@@ -110,6 +110,13 @@ export default function SignInPage() {
     }
   };
 
+  // 🧪 강제 시뮬레이터 모드 활성화 (테스트용)
+  const enableSimulatorMode = () => {
+    (window as any).__SMAP_FORCE_SIMULATOR_MODE__ = true;
+    console.log('🧪 [SIMULATOR] 강제 시뮬레이터 모드 활성화');
+    showError('🧪 시뮬레이터 모드 활성화됨\n\n이제 Google 로그인을 다시 시도해보세요.');
+  };
+
   // iOS 네이티브 로그 전송 함수
   const sendLogToiOS = (level: 'info' | 'error' | 'warning', message: string, data?: any) => {
     const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
@@ -129,6 +136,111 @@ export default function SignInPage() {
       } catch (e) {
         console.error('iOS 로그 전송 실패:', e);
       }
+    }
+  };
+
+  // 🚀 시뮬레이터용 Google SDK 로그인 함수
+  const handleGoogleSDKLogin = async () => {
+    console.log('[GOOGLE SDK] 웹 Google SDK를 통한 로그인 시작');
+    
+    try {
+      // Google Identity Services 초기화
+      if ((window as any).google?.accounts?.id) {
+        const google = (window as any).google;
+        
+        console.log('[GOOGLE SDK] Google Identity Services 초기화');
+        
+        google.accounts.id.initialize({
+          client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '1014988669966-qo7vh6cjfn8j00oa9cpplujcjt8m8rn0.apps.googleusercontent.com',
+          callback: async (response: any) => {
+            console.log('[GOOGLE SDK] 로그인 성공, 백엔드로 토큰 전송:', response);
+            
+            try {
+              // 백엔드로 토큰 전송
+              const backendResponse = await fetch('/api/google-auth', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  credential: response.credential,
+                }),
+              });
+              
+              const data = await backendResponse.json();
+              
+              if (data.success) {
+                console.log('[GOOGLE SDK] 백엔드 인증 성공:', data.user);
+                
+                // authService에 사용자 정보 저장
+                if (data.user) {
+                  authService.setUserData(data.user);
+                }
+                
+                // AuthContext 상태 동기화
+                await refreshAuthState();
+                
+                // 성공 햅틱 피드백
+                hapticFeedback.success();
+                console.log('🎮 [SIGNIN] Google 로그인 성공 햅틱 피드백 실행');
+                
+                // 홈으로 이동
+                router.push('/home');
+              } else {
+                throw new Error(data.error || 'Google 인증 실패');
+              }
+            } catch (error) {
+              console.error('[GOOGLE SDK] 백엔드 인증 실패:', error);
+              showError('Google 로그인 처리 중 오류가 발생했습니다.');
+            } finally {
+              setIsLoading(false);
+            }
+          },
+          error_callback: (error: any) => {
+            console.error('[GOOGLE SDK] 로그인 실패:', error);
+            showError('Google 로그인에 실패했습니다.');
+            setIsLoading(false);
+          }
+        });
+        
+        // 로그인 팝업 띄우기
+        google.accounts.id.prompt((notification: any) => {
+          console.log('[GOOGLE SDK] Prompt notification:', notification);
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            // 팝업이 표시되지 않은 경우 버튼 클릭 방식 사용
+            google.accounts.id.renderButton(
+              document.createElement('div'), // 임시 div
+              {
+                theme: 'outline',
+                size: 'large',
+                type: 'standard',
+                text: 'signin_with',
+                shape: 'rectangular',
+                logo_alignment: 'left'
+              }
+            );
+            
+            // 직접 로그인 함수 호출
+            setTimeout(() => {
+              try {
+                google.accounts.id.prompt();
+              } catch (e) {
+                console.error('[GOOGLE SDK] 두 번째 prompt 실패:', e);
+                showError('Google 로그인 팝업을 열 수 없습니다.');
+                setIsLoading(false);
+              }
+            }, 100);
+          }
+        });
+        
+      } else {
+        throw new Error('Google Identity Services를 사용할 수 없습니다.');
+      }
+      
+    } catch (error) {
+      console.error('[GOOGLE SDK] 초기화 실패:', error);
+      showError('Google 로그인 SDK 초기화에 실패했습니다.');
+      setIsLoading(false);
     }
   };
 
@@ -1371,11 +1483,20 @@ export default function SignInPage() {
     try {
       console.log('Google 로그인 시도');
       
-      // 🚨 iOS 시뮬레이터 최적화: 시뮬레이터 환경 감지 로직 추가
+      // 🚨 iOS 시뮬레이터 최적화: 시뮬레이터 환경 감지 로직 개선
       const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
-      const isIOSSimulator = navigator.userAgent.includes('Safari') && 
-                            navigator.userAgent.includes('Mac') &&
-                            process.env.NODE_ENV === 'development';
+      const isIOSSimulator = (
+        // iOS Safari에서 실행 중이고
+        navigator.userAgent.includes('iPhone') &&
+        navigator.userAgent.includes('Safari') &&
+        // 실제 messageHandlers가 없으면서
+        !(window as any).webkit?.messageHandlers?.smapIos &&
+        // ios-bridge가 있으면 시뮬레이터로 간주
+        !!(window as any).iosBridge
+      ) || (
+        // 또는 개발자가 강제로 활성화 (테스트용)
+        (window as any).__SMAP_FORCE_SIMULATOR_MODE__ === true
+      );
       
       console.log('[GOOGLE LOGIN] 환경 체크:', {
         isIOSWebView,
@@ -1406,16 +1527,47 @@ export default function SignInPage() {
       
               // 🚨 iOS 시뮬레이터 테스트: 시뮬레이터에서도 Google 로그인 허용
       if (isIOSWebView || isIOSSimulator) {
-          // 🚨 iOS 시뮬레이터 환경 처리
+          // 🚨 iOS 시뮬레이터 환경 처리: 실제 Google SDK 사용
         if (isIOSSimulator) {
-          console.log('[GOOGLE LOGIN] 🧪 iOS 시뮬레이터 환경에서 Google 로그인 테스트');
+          console.log('[GOOGLE LOGIN] 🧪 iOS 시뮬레이터 환경에서 실제 Google SDK 사용');
           
-          // 시뮬레이터에서는 모의 Google 로그인 처리
-          setTimeout(() => {
-            showError('🧪 시뮬레이터 테스트 환경\n\n실제 iOS 기기에서는 네이티브 Google 로그인이 작동합니다.\n\n현재는 시뮬레이터이므로 전화번호 로그인을 사용해주세요.');
+          // 시뮬레이터에서는 웹 Google SDK를 사용
+          try {
+            // Google SDK 로드 확인
+            if (typeof (window as any).google === 'undefined') {
+              console.log('[GOOGLE LOGIN] Google SDK 로드 시작...');
+              
+              // Google SDK 동적 로드
+              const script = document.createElement('script');
+              script.src = 'https://accounts.google.com/gsi/client';
+              script.async = true;
+              script.defer = true;
+              
+              script.onload = () => {
+                console.log('[GOOGLE LOGIN] Google SDK 로드 완료');
+                // SDK 로드 후 로그인 재시도
+                setTimeout(() => handleGoogleSDKLogin(), 500);
+              };
+              
+              script.onerror = () => {
+                console.error('[GOOGLE LOGIN] Google SDK 로드 실패');
+                showError('🧪 시뮬레이터 테스트\n\nGoogle SDK 로드에 실패했습니다.\n\n전화번호 로그인을 사용해주세요.');
+                setIsLoading(false);
+              };
+              
+              document.head.appendChild(script);
+              return;
+            } else {
+              // SDK가 이미 로드되어 있으면 바로 실행
+              setTimeout(() => handleGoogleSDKLogin(), 100);
+              return;
+            }
+          } catch (error) {
+            console.error('[GOOGLE LOGIN] 시뮬레이터 Google SDK 처리 실패:', error);
+            showError('🧪 시뮬레이터 테스트\n\nGoogle 로그인 처리 중 오류가 발생했습니다.\n\n전화번호 로그인을 사용해주세요.');
             setIsLoading(false);
-          }, 1000);
-          return;
+            return;
+          }
         }
         
         console.log('[GOOGLE LOGIN] iOS WebView에서 네이티브 Google Sign-In 사용');
@@ -2213,38 +2365,53 @@ export default function SignInPage() {
             </Link>
           </p>
           
-          {/* 🧪 햅틱 테스트 버튼 (개발 환경에서만 표시) */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-xs text-gray-600 mb-2">🧪 개발자 도구 - 햅틱 테스트</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={testHapticFeedback}
-                  className="text-xs py-2 px-3 bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  햅틱 테스트
-                </button>
-                <button
-                  onClick={() => hapticFeedback.success({ test: 'manual' })}
-                  className="text-xs py-2 px-3 bg-green-500 text-white rounded hover:bg-green-600"
-                >
-                  성공 햅틱
-                </button>
-                <button
-                  onClick={() => hapticFeedback.error({ test: 'manual' })}
-                  className="text-xs py-2 px-3 bg-red-500 text-white rounded hover:bg-red-600"
-                >
-                  에러 햅틱
-                </button>
-                <button
-                  onClick={() => hapticFeedback.warning({ test: 'manual' })}
-                  className="text-xs py-2 px-3 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                >
-                  경고 햅틱
-                </button>
-              </div>
+          {/* 🧪 개발자 테스트 도구 (항상 표시) */}
+          <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+            <p className="text-xs text-gray-600 mb-2">🧪 개발자 도구</p>
+            
+            {/* 시뮬레이터 모드 활성화 버튼 */}
+            <div className="mb-3">
+              <button
+                onClick={enableSimulatorMode}
+                className="text-xs py-2 px-3 bg-purple-500 text-white rounded hover:bg-purple-600 w-full"
+              >
+                🚀 시뮬레이터 모드 활성화 (Google 로그인 테스트)
+              </button>
             </div>
-          )}
+            
+            {/* 햅틱 테스트 버튼들 */}
+            {process.env.NODE_ENV === 'development' && (
+              <>
+                <p className="text-xs text-gray-600 mb-2">햅틱 테스트</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={testHapticFeedback}
+                    className="text-xs py-2 px-3 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    햅틱 테스트
+                  </button>
+                  <button
+                    onClick={() => hapticFeedback.success({ test: 'manual' })}
+                    className="text-xs py-2 px-3 bg-green-500 text-white rounded hover:bg-green-600"
+                  >
+                    성공 햅틱
+                  </button>
+                  <button
+                    onClick={() => hapticFeedback.error({ test: 'manual' })}
+                    className="text-xs py-2 px-3 bg-red-500 text-white rounded hover:bg-red-600"
+                  >
+                    에러 햅틱
+                  </button>
+                  <button
+                    onClick={() => hapticFeedback.warning({ test: 'manual' })}
+                    className="text-xs py-2 px-3 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                  >
+                    경고 햅틱
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </motion.div>
       </motion.div>
 
