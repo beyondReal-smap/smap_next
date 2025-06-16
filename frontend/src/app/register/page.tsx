@@ -920,7 +920,8 @@ export default function RegisterPage() {
                   </label>
                   <div className="relative register-input-container">
                     <div className="absolute left-5 top-0 bottom-0 flex items-center z-10 pointer-events-none">
-                      <FiPhone className="w-4 h-4" style={{color: '#0113A3'}} />
+                      <FiPhone className="w-4 h-4 transition-colors duration-200" 
+                        style={{color: focusedField === 'phone' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
               <input
                       type="tel"
@@ -1101,7 +1102,8 @@ export default function RegisterPage() {
               </label>
                   <div className="relative register-input-container">
                     <div className="absolute left-4 top-0 bottom-0 flex items-center z-10 pointer-events-none">
-                      <FiLock className="w-4 h-4" style={{color: '#0113A3'}} />
+                      <FiLock className="w-4 h-4 transition-colors duration-200" 
+                        style={{color: focusedField === 'password' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
               <input
                       type={showPassword ? 'text' : 'password'}
@@ -1177,7 +1179,8 @@ export default function RegisterPage() {
               </label>
                   <div className="relative register-input-container">
                     <div className="absolute left-4 top-0 bottom-0 flex items-center z-10 pointer-events-none">
-                      <FiLock className="w-4 h-4" style={{color: '#0113A3'}} />
+                      <FiLock className="w-4 h-4 transition-colors duration-200" 
+                        style={{color: focusedField === 'passwordConfirm' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
               <input
                       type={showPasswordConfirm ? 'text' : 'password'}
@@ -1257,7 +1260,8 @@ export default function RegisterPage() {
                   </label>
                   <div className="relative register-input-container">
                     <div className="absolute left-4 top-0 bottom-0 flex items-center z-10 pointer-events-none">
-                      <FiMail className="w-4 h-4" style={{color: '#0113A3'}} />
+                      <FiMail className="w-4 h-4 transition-colors duration-200" 
+                        style={{color: focusedField === 'email' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
                     <input
                       type="email"
@@ -1329,10 +1333,17 @@ export default function RegisterPage() {
                     type="button"
                     onClick={handleBirthModalOpen}
                     className="w-full flex items-center px-4 py-3 border border-gray-200 rounded-xl transition-colors text-left hover:border-blue-300"
-                    onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3'}
-                    onBlur={(e) => (e.target as HTMLButtonElement).style.boxShadow = ''}
+                    onFocus={(e) => {
+                      setFocusedField('birth');
+                      (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3';
+                    }}
+                    onBlur={(e) => {
+                      setFocusedField(null);
+                      (e.target as HTMLButtonElement).style.boxShadow = '';
+                    }}
                   >
-                    <FiCalendar className="w-5 h-5 mr-3" style={{color: '#0113A3'}} />
+                    <FiCalendar className="w-5 h-5 mr-3 transition-colors duration-200" 
+                      style={{color: focusedField === 'birth' ? '#0113A3' : '#9CA3AF'}} />
                     <span className={registerData.mt_birth ? 'text-gray-900' : 'text-gray-500'}>
                       {registerData.mt_birth 
                         ? dayjs(registerData.mt_birth).format('YYYY년 MM월 DD일')
