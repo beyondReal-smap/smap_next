@@ -25,6 +25,13 @@ import mapService, {
   cleanupGoogleMap, 
   cleanupNaverMap 
 } from '../../services/mapService';
+import { 
+  detectEnvironment, 
+  logEnvironmentInfo, 
+  MapApiLoader,
+  checkNetworkStatus,
+  type EnvironmentConfig 
+} from '../../utils/domainDetection';
 import MapDebugger from '@/../../components/MapDebugger';
 import memberService from '@/services/memberService';
 import scheduleService from '../../services/scheduleService';
@@ -742,7 +749,52 @@ export default function HomePage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const sidebarDraggingRef = useRef(false); // 사이드바 드래그용 ref
+  
+  // 환경 감지 관련 상태
+  const [environment, setEnvironment] = useState<EnvironmentConfig | null>(null);
+  const [mapApiLoader, setMapApiLoader] = useState<MapApiLoader | null>(null);
+  const [networkStatus, setNetworkStatus] = useState<boolean>(true);
+  const [domainDiagnostics, setDomainDiagnostics] = useState<any>(null);
 
+  // 환경 감지 및 초기화 (최우선 실행)
+  useEffect(() => {
+    console.log('🌐 [ENVIRONMENT] 환경 감지 시작');
+    
+    try {
+      // 환경 감지
+      const env = detectEnvironment();
+      setEnvironment(env);
+      
+      // 환경 정보 로깅
+      logEnvironmentInfo(env);
+      
+      // 지도 API 로더 초기화
+      const apiLoader = new MapApiLoader(env);
+      setMapApiLoader(apiLoader);
+      
+      // 네트워크 상태 확인
+      checkNetworkStatus().then(setNetworkStatus);
+      
+      // 도메인별 진단 정보 수집
+      const diagnostics = {
+        hostname: window.location.hostname,
+        protocol: window.location.protocol,
+        port: window.location.port,
+        isLocalhost: env.isLocalhost,
+        isProduction: env.isProduction,
+        isSecure: env.isSecure,
+        userAgent: navigator.userAgent,
+        timestamp: new Date().toISOString(),
+      };
+      setDomainDiagnostics(diagnostics);
+      
+      console.log('🌐 [ENVIRONMENT] 환경 초기화 완료:', diagnostics);
+      
+    } catch (error) {
+      console.error('❌ [ENVIRONMENT] 환경 초기화 실패:', error);
+    }
+  }, []);
+  
   // useEffect를 사용하여 클라이언트 사이드에서 날짜 관련 상태 초기화
   useEffect(() => {
     const today = new Date();
@@ -857,9 +909,10 @@ export default function HomePage() {
         return;
       }
       
-      // iOS 시뮬레이터에서는 프리로딩 조건을 무시하고 진행
+      // 프리로딩 완료를 기다리지 않고 진행 (사용자 경험 개선)
       if (!isPreloadingComplete) {
-        console.log('🏠 [fetchAllGroupData] ⚠️ 프리로딩 미완료지만 진행:', { authLoading, isPreloadingComplete });
+        console.log('🏠 [fetchAllGroupData] ⚠️ 프리로딩 미완료지만 진행 (UX 개선):', { authLoading, isPreloadingComplete });
+        // 프리로딩을 기다리지 않고 바로 진행 (응답성 개선)
       }
       
       console.log('🏠 [fetchAllGroupData] ✅ AuthContext 체크 완료, 데이터 페칭 시작');
@@ -1750,7 +1803,13 @@ export default function HomePage() {
     } else if (mapType === 'google' && !apiLoadStatus.google) {
       loadGoogleMapsAPI();
     }
-  }, [mapType]);
+    
+    // 이미 로드된 API가 있으면 즉시 로딩 상태 해제
+    if ((mapType === 'naver' && naverMapsLoaded) || (mapType === 'google' && googleMapsLoaded)) {
+      console.log(`[HOME] ${mapType} 지도가 이미 로드됨 - 로딩 상태 해제`);
+      setIsMapLoading(false);
+    }
+  }, [mapType, naverMapsLoaded, googleMapsLoaded]);
 
   // iOS WebView에서 지도 폴백 이벤트 리스너
   useEffect(() => {
@@ -1860,6 +1919,19 @@ export default function HomePage() {
     }
   }, [userLocation, mapType, googleMapsLoaded, naverMapsLoaded, groupMembers]);
   
+  // 지도 로딩 상태 강제 완료 처리 (사용자 경험 개선)
+  useEffect(() => {
+    // 3초 후 지도 로딩 상태를 강제로 완료 처리
+    const forceCompleteTimeout = setTimeout(() => {
+      if (isMapLoading) {
+        console.log('[HOME] 지도 로딩 타임아웃 - 강제 완료 처리 (UX 개선)');
+        setIsMapLoading(false);
+      }
+    }, 3000);
+
+    return () => clearTimeout(forceCompleteTimeout);
+  }, [isMapLoading]);
+
   // 컴포넌트 언마운트 시 리소스 정리
   useEffect(() => {
     return () => {
@@ -4185,7 +4257,7 @@ export default function HomePage() {
                          <div className="text-xs font-mono space-y-1">
                <div className="font-bold text-blue-600">🔧 iOS 디버깅 상태</div>
                <div>인증: {authLoading ? '⏳ 로딩중' : '✅ 완료'}</div>
-               <div>프리로딩: {isPreloadingComplete ? '✅ 완료' : '⏳ 진행중'}</div>
+               <div>프리로딩: {isPreloadingComplete ? '✅ 완료' : '🚀 백그라운드'}</div>
                <div>사용자: {user?.mt_name || userInfo?.name || '로딩중'}</div>
                <div>그룹: {selectedGroupId ? `✅ ${selectedGroupId}` : '❌ 없음'}</div>
                <div>멤버: {groupMembers.length}명 {groupMembers.length > 0 ? '✅' : '❌'}</div>
@@ -4720,6 +4792,40 @@ export default function HomePage() {
            )}
          </AnimatePresence>
               </motion.div>
+        {/* 환경별 디버깅 정보 (개발 환경에서만 표시) */}
+        {process.env.NODE_ENV === 'development' && environment && domainDiagnostics && (
+          <div className="fixed bottom-4 right-4 z-[9999] max-w-xs">
+            <details className="bg-black/80 text-white text-xs p-3 rounded-lg backdrop-blur-sm">
+              <summary className="cursor-pointer font-semibold text-yellow-300 mb-2">
+                🌐 환경 진단 ({environment.isLocalhost ? 'localhost' : 'production'})
+              </summary>
+              <div className="space-y-1 mt-2 max-h-40 overflow-y-auto">
+                <div><strong>도메인:</strong> {domainDiagnostics.hostname}</div>
+                <div><strong>프로토콜:</strong> {domainDiagnostics.protocol}</div>
+                <div><strong>포트:</strong> {domainDiagnostics.port || 'N/A'}</div>
+                <div><strong>보안:</strong> {environment.isSecure ? '✅ HTTPS' : '❌ HTTP'}</div>
+                <div><strong>네트워크:</strong> {networkStatus ? '✅ 연결됨' : '❌ 오프라인'}</div>
+                <div><strong>지도 API:</strong></div>
+                <div className="ml-2">
+                  <div>• 네이버: {naverMapsLoaded ? '✅' : '❌'}</div>
+                  <div>• 구글: {googleMapsLoaded ? '✅' : '❌'}</div>
+                  <div>• 현재: {mapType}</div>
+                </div>
+                <div><strong>타임아웃:</strong> {environment.mapApiConfig.timeout}ms</div>
+                {mapApiLoader && (
+                  <div>
+                    <strong>로더 상태:</strong>
+                    <div className="ml-2">
+                      <div>• Naver: {mapApiLoader.getLoadingStatus('naver')}</div>
+                      <div>• Google: {mapApiLoader.getLoadingStatus('google')}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </details>
+          </div>
+        )}
+        
         {/* <DebugPanel />
         <LogParser /> */}
       </>

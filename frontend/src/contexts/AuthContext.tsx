@@ -163,12 +163,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     globalPreloadingState.isPreloading = true;
     console.log(`[AUTH] 🚀 데이터 프리로딩 시작 (${source}):`, userId);
 
-    // 프리로딩 타임아웃 설정 (30초)
+    // 프리로딩 타임아웃 설정 (10초로 단축 - UX 개선)
     const timeoutId = setTimeout(() => {
       console.warn(`[AUTH] ⏰ 프리로딩 타임아웃 (${source}):`, userId);
       globalPreloadingState.isPreloading = false;
       dispatch({ type: 'SET_PRELOADING_COMPLETE', payload: true });
-    }, 30000);
+    }, 10000);
 
     try {
       const results = await dataPreloadService.preloadAllData({
