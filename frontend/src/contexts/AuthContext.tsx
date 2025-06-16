@@ -113,6 +113,7 @@ interface AuthContextType extends AuthState {
   refreshUserData: () => Promise<void>;
   refreshGroups: () => Promise<void>;
   setError: (error: string | null) => void;
+  refreshAuthState: () => Promise<void>; // 수동으로 AuthContext 상태 새로고침
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -479,6 +480,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'SET_ERROR', payload: error });
   };
 
+  // 수동으로 AuthContext 상태 새로고침
+  const refreshAuthState = async (): Promise<void> => {
+    try {
+      console.log('[AUTH CONTEXT] 수동 상태 새로고침 시작');
+      
+      const isLoggedInFromService = authService.isLoggedIn();
+      console.log('[AUTH CONTEXT] authService.isLoggedIn():', isLoggedInFromService);
+      
+      if (isLoggedInFromService) {
+        const userData = authService.getUserData();
+        console.log('[AUTH CONTEXT] authService.getUserData():', userData);
+        if (userData) {
+          console.log('[AUTH CONTEXT] 사용자 데이터 발견, 상태 업데이트:', userData.mt_name);
+          dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+          return;
+        }
+      }
+      
+      console.log('[AUTH CONTEXT] 로그인 상태 없음');
+      dispatch({ type: 'SET_LOADING', payload: false });
+    } catch (error) {
+      console.error('[AUTH CONTEXT] 수동 상태 새로고침 실패:', error);
+      dispatch({ type: 'SET_LOADING', payload: false });
+    }
+  };
+
   const contextValue: AuthContextType = {
     ...state,
     login,
@@ -488,6 +515,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     refreshUserData,
     refreshGroups,
     setError,
+    refreshAuthState,
   };
 
   return (

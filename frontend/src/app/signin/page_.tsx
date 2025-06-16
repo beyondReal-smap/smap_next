@@ -33,7 +33,7 @@ export default function SignInPageNew() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const router = useRouter();
-  const { login, isLoggedIn } = useAuth();
+  const { login, isLoggedIn, refreshAuthState } = useAuth();
 
   // 참조 관리 (page_old.tsx에서 가져온 강화 기능)
   const isRedirectingRef = useRef(false);
@@ -50,10 +50,12 @@ export default function SignInPageNew() {
     keydown?: (e: KeyboardEvent) => void;
   }>({});
 
-  // 로그인 상태 체크 및 리다이렉트
+  // 로그인 상태 체크 및 리다이렉트 (한 번만 실행)
   useEffect(() => {
-    if (isLoggedIn) {
+    if (isLoggedIn && !isRedirectingRef.current) {
       console.log('[SIGNIN_NEW] 이미 로그인된 상태 - home으로 리다이렉트');
+      isRedirectingRef.current = true;
+      blockAllEffectsRef.current = true;
       router.replace('/home');
     }
   }, [isLoggedIn, router]);
@@ -308,19 +310,30 @@ export default function SignInPageNew() {
       blockAllEffectsRef.current = true;
       console.log('[SIGNIN] AuthContext 에러 감지 비활성화');
       
-      // AuthContext를 통해 로그인
-      await login({
+      // authService를 통해 직접 로그인 (AuthContext 우회하여 중복 리다이렉트 방지)
+      const response = await authService.login({
         mt_id: phoneNumber.replace(/-/g, ''), // 전화번호에서 하이픈 제거
         mt_pwd: password,
       });
 
-      console.log('[SIGNIN] AuthContext 로그인 성공 - home으로 즉시 리다이렉션');
+      if (!response.success) {
+        throw new Error(response.message || '로그인에 실패했습니다.');
+      }
+
+      console.log('[SIGNIN] authService 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
+      
+      // AuthContext 상태를 수동으로 동기화
+      await refreshAuthState();
+      console.log('[SIGNIN] AuthContext 상태 동기화 완료');
       
       // 로그인 성공 햅틱 피드백
       hapticFeedback.success();
       
-      // 리다이렉트 플래그 설정하여 useEffect에서 처리하도록 함
+      // 리다이렉트 플래그 설정
       isRedirectingRef.current = true;
+      
+      // 모든 상태 업데이트 차단
+      blockAllEffectsRef.current = true;
       
       // router.replace 사용 (페이지 새로고침 없이 이동)
       router.replace('/home');
@@ -562,16 +575,26 @@ export default function SignInPageNew() {
             if (data.success) {
               console.log('[KAKAO LOGIN] 카카오 로그인 성공, 사용자 정보:', data.user);
               
-              // AuthContext에 사용자 정보 설정 (JWT 토큰은 이미 쿠키에 저장됨)
-              // AuthContext가 쿠키에서 토큰을 자동으로 읽어올 것임
+              // authService에 사용자 정보 설정 (AuthContext 우회, JWT 토큰은 이미 쿠키에 저장됨)
+              if (data.user) {
+                authService.setUserData(data.user);
+                // 토큰은 쿠키에 저장되므로 별도 설정 불필요
+              }
               
-              console.log('[KAKAO LOGIN] 로그인 성공 - home으로 즉시 리다이렉션');
+              console.log('[KAKAO LOGIN] 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
+              
+              // AuthContext 상태를 수동으로 동기화
+              await refreshAuthState();
+              console.log('[KAKAO LOGIN] AuthContext 상태 동기화 완료');
               
               // 로그인 성공 햅틱 피드백
               hapticFeedback.success();
               
               // 리다이렉트 플래그 설정
               isRedirectingRef.current = true;
+              
+              // 모든 상태 업데이트 차단
+              blockAllEffectsRef.current = true;
               
               // router.replace 사용 (페이지 새로고침 없이 이동)
               router.replace('/home');
