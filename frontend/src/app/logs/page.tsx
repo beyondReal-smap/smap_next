@@ -4584,9 +4584,20 @@ export default function LogsPage() {
             );
             
             if (dayData && dayData.count > 0) {
-              console.log(`[LOGS] ✅ 현재 선택된 날짜(${selectedDate})에 데이터 있음: ${dayData.count}건`);
+              console.log(`[LOGS] ✅ 일별 카운트에 현재 날짜(${selectedDate}) 데이터 있음: ${dayData.count}건`);
+              // 실제 지도 마커 데이터도 확인
+              if (mapMarkersData && mapMarkersData.length > 0) {
+                console.log(`[LOGS] ✅ 지도 마커 데이터도 있음: ${mapMarkersData.length}개 - 모든 데이터 준비 완료`);
+              } else {
+                console.log(`[LOGS] ⏳ 지도 마커 데이터 로딩 중... (일별 카운트: ${dayData.count}건)`);
+              }
             } else {
-              console.log(`[LOGS] ⚠️ 현재 선택된 날짜(${selectedDate})에 데이터 없음`);
+              // 일별 카운트에 없어도 지도 마커 데이터가 있을 수 있음
+              if (mapMarkersData && mapMarkersData.length > 0) {
+                console.log(`[LOGS] ✅ 일별 카운트에는 없지만 지도 마커 데이터 있음: ${mapMarkersData.length}개`);
+              } else {
+                console.log(`[LOGS] ⚠️ 현재 선택된 날짜(${selectedDate})에 데이터 없음 (일별/지도 모두)`);
+              }
             }
           }
         } catch (error) {
@@ -4595,6 +4606,46 @@ export default function LogsPage() {
       }
     }
   }, [dailyCountsData, groupMembers, isInitialEntry, selectedDate]);
+
+  // 🚨 NEW: mapMarkersData 변경 감지 및 실시간 디버깅 업데이트
+  useEffect(() => {
+    console.log('[LOGS] 🔄 지도 마커 데이터 변경 감지:', {
+      isMapInitializedLogs: !!map.current,
+      mapMarkersDataLength: mapMarkersData?.length || 0,
+      mapMarkersData: mapMarkersData || [],
+      isDateChanging: isDateChangingRef.current
+    });
+
+    if (mapMarkersData && mapMarkersData.length > 0) {
+      const selectedMember = groupMembers.find(m => m.isSelected);
+      if (selectedMember) {
+        console.log(`[LOGS] ✅ 지도 마커 데이터 로딩 완료: ${mapMarkersData.length}개 - 멤버: ${selectedMember.name} - 날짜: ${selectedDate}`);
+        
+        // 해당 날짜의 일별 카운트도 다시 확인
+        if (dailyCountsData && Array.isArray(dailyCountsData)) {
+          const memberMtIdx = parseInt(selectedMember.id);
+          const memberData = dailyCountsData.member_daily_counts?.find(
+            member => member.member_id === memberMtIdx
+          );
+          
+          if (memberData?.daily_counts) {
+            const shortDateString = format(new Date(selectedDate), 'MM.dd');
+            const dayData = memberData.daily_counts.find(
+              day => day.formatted_date === shortDateString
+            );
+            
+            if (dayData && dayData.count > 0) {
+              console.log(`[LOGS] 🎯 완전한 데이터 확인: 일별카운트 ${dayData.count}건 + 지도마커 ${mapMarkersData.length}개`);
+            } else {
+              console.log(`[LOGS] 🤔 일별카운트에는 없지만 지도마커는 있음: ${mapMarkersData.length}개`);
+            }
+          }
+        }
+      }
+    } else if (map.current) {
+      console.log('[LOGS] ⚠️ 지도가 초기화되지 않아서 마커 업데이트 건너뜀');
+    }
+  }, [mapMarkersData, selectedDate, groupMembers, dailyCountsData]);
 
   // 날짜나 멤버 변경 시 위치기록 요약 초기화 - 완전히 비활성화 (handleMemberSelect/handleDateSelect에서 직접 처리)
   useEffect(() => {
@@ -5461,10 +5512,53 @@ export default function LogsPage() {
               <div>멤버: {groupMembers.length}명 / 선택: {groupMembers.find(m => m.isSelected)?.name || '없음'}</div>
               <div>일별카운트: {dailyCountsData ? '✅ 로드됨' : '❌ 없음'}</div>
               <div>멤버활동: {memberActivityData ? '✅ 로드됨' : '❌ 없음'}</div>
-              <div>지도마커: {mapMarkersData.length}개</div>
-              <div>체류시간: {stayTimesData.length}개</div>
+              <div className={mapMarkersData.length > 0 ? 'text-green-600 font-bold' : 'text-red-600'}>
+                지도마커: {mapMarkersData.length}개 {mapMarkersData.length > 0 ? '✅' : '❌'}
+              </div>
+              <div className={stayTimesData.length > 0 ? 'text-green-600' : 'text-gray-500'}>
+                체류시간: {stayTimesData.length}개
+              </div>
               <div>위치로딩: {isLocationDataLoading ? '⏳' : '✅'}</div>
               <div>지도로딩: {isMapLoading ? '⏳' : '✅'}</div>
+              {/* 데이터 일치성 확인 */}
+              <div className="border-t pt-1 mt-1">
+                <div className="font-bold text-indigo-600">📊 데이터 상태 체크</div>
+                {(() => {
+                  const selectedMember = groupMembers.find(m => m.isSelected);
+                  if (!selectedMember || !dailyCountsData) return <div className="text-gray-400">데이터 없음</div>;
+                  
+                  const memberMtIdx = parseInt(selectedMember.id);
+                  const memberData = dailyCountsData.member_daily_counts?.find(
+                    member => member.member_id === memberMtIdx
+                  );
+                  
+                  if (!memberData?.daily_counts) return <div className="text-gray-400">일별카운트 없음</div>;
+                  
+                  const shortDateString = format(new Date(selectedDate), 'MM.dd');
+                  const dayData = memberData.daily_counts.find(
+                    day => day.formatted_date === shortDateString
+                  );
+                  
+                  const hasDailyCount = dayData && dayData.count > 0;
+                  const hasMapMarkers = mapMarkersData.length > 0;
+                  
+                  return (
+                    <div className="text-xs space-y-1">
+                      <div className={hasDailyCount ? 'text-green-600' : 'text-gray-400'}>
+                        일별: {hasDailyCount ? `${dayData.count}건 ✅` : '없음 ❌'}
+                      </div>
+                      <div className={hasMapMarkers ? 'text-green-600' : 'text-gray-400'}>
+                        마커: {hasMapMarkers ? `${mapMarkersData.length}개 ✅` : '없음 ❌'}
+                      </div>
+                      <div className={hasDailyCount && hasMapMarkers ? 'text-green-600 font-bold' : 
+                                     hasDailyCount || hasMapMarkers ? 'text-yellow-600' : 'text-red-600'}>
+                        {hasDailyCount && hasMapMarkers ? '🎯 모든 데이터 OK' :
+                         hasDailyCount || hasMapMarkers ? '⚠️ 부분 데이터' : '❌ 데이터 없음'}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
               <div>인스턴스: {instanceId.current}</div>
               <div>메인: {isMainInstance.current ? '✅' : '❌'}</div>
               <div>사이드바: {isSidebarOpen ? '열림' : '닫힘'}</div>
