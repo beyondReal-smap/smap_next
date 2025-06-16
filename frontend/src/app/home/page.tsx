@@ -3954,16 +3954,16 @@ export default function HomePage() {
       x: '-100%',
       transition: {
         type: 'tween',
-        ease: [0.25, 0.46, 0.45, 0.94],
-        duration: 0.3
+        ease: [0.22, 1, 0.36, 1], // 더 자연스러운 easing curve
+        duration: 0.4 // 조금 더 긴 duration으로 부드럽게
       }
     },
     open: {
       x: 0,
       transition: {
         type: 'tween',
-        ease: [0.25, 0.46, 0.45, 0.94],
-        duration: 0.3
+        ease: [0.22, 1, 0.36, 1], // 더 자연스러운 easing curve
+        duration: 0.4 // 조금 더 긴 duration으로 부드럽게
       }
     }
   };
@@ -3972,15 +3972,15 @@ export default function HomePage() {
     closed: {
       opacity: 0,
       transition: {
-        duration: 0.25,
-        ease: "easeOut"
+        duration: 0.3,
+        ease: [0.22, 1, 0.36, 1]
       }
     },
     open: {
       opacity: 1,
       transition: {
-        duration: 0.25,
-        ease: "easeInOut"
+        duration: 0.3,
+        ease: [0.22, 1, 0.36, 1]
       }
     }
   };
@@ -3988,18 +3988,20 @@ export default function HomePage() {
   const sidebarContentVariants = {
     closed: {
       opacity: 0,
+      y: 20, // 살짝 아래에서 위로 올라오는 효과 추가
       transition: {
-        duration: 0.15,
-        ease: "easeOut"
+        duration: 0.2,
+        ease: [0.22, 1, 0.36, 1]
       }
     },
     open: {
       opacity: 1,
+      y: 0,
       transition: {
-        delay: 0.1,
-        duration: 0.25,
-        ease: [0.25, 0.46, 0.45, 0.94],
-        staggerChildren: 0.03
+        delay: 0.15, // 사이드바가 어느정도 나온 후에 콘텐츠 애니메이션 시작
+        duration: 0.3,
+        ease: [0.22, 1, 0.36, 1],
+        staggerChildren: 0.05 // 자식 요소들이 순차적으로 나타나는 간격을 조금 늘림
       }
     }
   };
@@ -4007,8 +4009,8 @@ export default function HomePage() {
   const memberItemVariants = {
     closed: { 
       opacity: 0, 
-      x: -10,
-      scale: 0.98
+      x: -15, // 조금 더 큰 이동거리로 효과를 명확하게
+      scale: 0.95
     },
     open: { 
       opacity: 1, 
@@ -4016,8 +4018,8 @@ export default function HomePage() {
       scale: 1,
       transition: {
         type: "tween",
-        ease: [0.25, 0.46, 0.45, 0.94],
-        duration: 0.2
+        ease: [0.22, 1, 0.36, 1],
+        duration: 0.3
       }
     }
   };
