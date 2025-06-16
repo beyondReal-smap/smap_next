@@ -1100,6 +1100,17 @@ export default function LogsPage() {
           }
         }
       } else {
+        // 🚨 iOS 시뮬레이터 디버깅: dailyCountsData 상태 확인
+        console.log(`🔍 [네모 캘린더] ${dateString} 비교:`, {
+          dateString,
+          selectedDate,
+          isSelected: dateString === selectedDate,
+          dayIndex: i,
+          hasLog: hasLogs,
+          dailyCountsDataExists: !!dailyCountsData,
+          selectedMemberExists: !!selectedMember
+        });
+        
         // dailyCountsData가 없거나 선택된 멤버가 없는 경우 - 초기 로딩 시에는 모든 날짜 활성화
         // 사용자가 데이터를 조회할 수 있도록 허용하고, 실제로 데이터가 없으면 API에서 처리
         hasLogs = true; // 모든 날짜를 클릭 가능하게 변경
@@ -4121,39 +4132,39 @@ export default function LogsPage() {
                 dataFetchedRef.current.dailyCounts = true;
               }
 
-              // 2초 후 지연 로딩으로 사이드바 관련 데이터 로딩 (캐시 미스 시에만)
-              setTimeout(async () => {
-                if (!isMounted) return;
-                
-                console.log('[LOGS] 지연 로딩 시작 - 사이드바 캘린더 데이터');
-                const delayedPromises = [];
+              // 🚨 iOS 시뮬레이터 최적화: 즉시 로딩으로 변경 (지연 시간 제거)
+              if (isMounted) {
+                console.log('🚀 [LOGS] iOS 시뮬레이터 최적화 - 사이드바 캘린더 데이터 즉시 로딩');
+                const immediatePromises = [];
                 
                 // 1. 최근 14일간 일별 카운트 조회 (사이드바 캘린더용) - 캐시 미스 시에만 API 호출
                 if (!dailyCountsData || !dataFetchedRef.current.dailyCounts) {
-                  console.log('[LOGS] 캐시 미스 - API에서 일별 카운트 데이터 조회 (지연 로딩)');
-                  delayedPromises.push(loadDailyLocationCounts(selectedGroupId, 14));
+                  console.log('🚀 [LOGS] 캐시 미스 - API에서 일별 카운트 데이터 조회 (즉시 로딩)');
+                  immediatePromises.push(loadDailyLocationCounts(selectedGroupId, 14));
                   dataFetchedRef.current.dailyCounts = true;
                 } else {
-                  console.log('[LOGS] 일별 카운트 데이터 이미 로드됨 - 지연 로딩 건너뛰기');
+                  console.log('✅ [LOGS] 일별 카운트 데이터 이미 로드됨 - 즉시 로딩 건너뛰기');
                 }
                 
-                // 2. 현재 선택된 날짜의 멤버 활동 조회 - 지연 로딩
+                // 2. 현재 선택된 날짜의 멤버 활동 조회 - 즉시 로딩
                 if (selectedDate) {
-                  console.log('[LOGS] 현재 날짜 멤버 활동 데이터 지연 로딩');
-                  delayedPromises.push(loadMemberActivityByDate(selectedGroupId, selectedDate));
+                  console.log('🚀 [LOGS] 현재 날짜 멤버 활동 데이터 즉시 로딩');
+                  immediatePromises.push(loadMemberActivityByDate(selectedGroupId, selectedDate));
                 }
                 
-                // 지연 로딩 병렬 실행
-                if (delayedPromises.length > 0) {
-                  try {
-                    await Promise.all(delayedPromises);
-                    console.log('[LOGS] 지연 로딩 완료');
-                  } catch (promiseError) {
-                    console.error('[LOGS] 지연 로딩 중 일부 실패:', promiseError);
-                    // 일부 실패해도 계속 진행
-                  }
+                // 즉시 로딩 병렬 실행
+                if (immediatePromises.length > 0) {
+                  (async () => {
+                    try {
+                      await Promise.all(immediatePromises);
+                      console.log('✅ [LOGS] 즉시 로딩 완료');
+                    } catch (promiseError) {
+                      console.error('❌ [LOGS] 즉시 로딩 중 일부 실패:', promiseError);
+                      // 일부 실패해도 계속 진행
+                    }
+                  })();
                 }
-              }, 2000); // 2초 후 지연 로딩
+              }
             }
             
 
@@ -5435,6 +5446,35 @@ export default function LogsPage() {
                         {/* 날짜 선택 내용 */}
 
           </motion.header>
+
+        {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
+        {process.env.NODE_ENV === 'development' && (
+          <motion.div
+            initial={{ x: -350, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 1.0, duration: 0.5 }}
+            className="fixed top-20 right-4 z-50 bg-white/90 backdrop-blur-sm rounded-lg p-3 max-w-sm shadow-lg border"
+          >
+            <div className="text-xs font-mono space-y-1">
+              <div className="font-bold text-purple-600">🔧 LOGS 디버깅 상태</div>
+              <div>그룹: {selectedGroupId || '선택안됨'}</div>
+              <div>멤버: {groupMembers.length}명 / 선택: {groupMembers.find(m => m.isSelected)?.name || '없음'}</div>
+              <div>일별카운트: {dailyCountsData ? '✅ 로드됨' : '❌ 없음'}</div>
+              <div>멤버활동: {memberActivityData ? '✅ 로드됨' : '❌ 없음'}</div>
+              <div>지도마커: {mapMarkersData.length}개</div>
+              <div>체류시간: {stayTimesData.length}개</div>
+              <div>위치로딩: {isLocationDataLoading ? '⏳' : '✅'}</div>
+              <div>지도로딩: {isMapLoading ? '⏳' : '✅'}</div>
+              <div>인스턴스: {instanceId.current}</div>
+              <div>메인: {isMainInstance.current ? '✅' : '❌'}</div>
+              <div>사이드바: {isSidebarOpen ? '열림' : '닫힘'}</div>
+              <div>날짜: {selectedDate}</div>
+              {dataError && (
+                <div className="text-red-600 font-bold">에러: {dataError.message}</div>
+              )}
+            </div>
+          </motion.div>
+        )}
 
         {/* 지도 영역 */}
         <div 
