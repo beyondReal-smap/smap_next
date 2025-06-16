@@ -221,25 +221,76 @@ export default function SignInPage() {
     
     if (isIOSWebView) {
       // Google Sign-In 성공 콜백
-      (window as any).googleSignInSuccess = async (idToken: string, userInfoJson: string) => {
+      (window as any).googleSignInSuccess = async (idToken: string, userInfoJson: any) => {
         try {
           console.log('[GOOGLE LOGIN] iOS 네이티브 Google Sign-In 성공');
-          console.log('[GOOGLE LOGIN] ID Token 길이:', idToken?.length || 0);
-          console.log('[GOOGLE LOGIN] User Info JSON:', userInfoJson);
+          console.log('[GOOGLE LOGIN] 매개변수 타입 확인:', {
+            idTokenType: typeof idToken,
+            idTokenLength: idToken?.length || 0,
+            userInfoType: typeof userInfoJson,
+            userInfoValue: userInfoJson
+          });
           setIsLoading(true);
           
-          // JSON 파싱 시도
-          let userInfo;
-          try {
-            userInfo = JSON.parse(userInfoJson);
-            console.log('[GOOGLE LOGIN] 파싱된 사용자 정보:', userInfo);
-          } catch (parseError) {
-            console.error('[GOOGLE LOGIN] JSON 파싱 오류:', parseError);
-            console.log('[GOOGLE LOGIN] 원본 JSON 문자열:', userInfoJson);
-            throw new Error('사용자 정보 파싱에 실패했습니다.');
-          }
+                      // 사용자 정보 처리 (다양한 형태 지원)
+            let userInfo;
+            try {
+              if (typeof userInfoJson === 'string') {
+                console.log('[GOOGLE LOGIN] JSON 문자열 파싱 시도:', userInfoJson);
+                userInfo = JSON.parse(userInfoJson);
+              } else if (typeof userInfoJson === 'object' && userInfoJson !== null) {
+                console.log('[GOOGLE LOGIN] 객체 형태의 사용자 정보 수신:', userInfoJson);
+                userInfo = userInfoJson;
+              } else if (userInfoJson === null || userInfoJson === undefined) {
+                console.log('[GOOGLE LOGIN] 사용자 정보가 null/undefined, ID 토큰에서 추출 시도');
+                // ID 토큰에서 사용자 정보 추출 시도
+                try {
+                  const tokenParts = idToken.split('.');
+                  if (tokenParts.length === 3) {
+                    const payload = JSON.parse(atob(tokenParts[1]));
+                    userInfo = {
+                      email: payload.email,
+                      name: payload.name,
+                      givenName: payload.given_name,
+                      familyName: payload.family_name,
+                      picture: payload.picture,
+                      sub: payload.sub
+                    };
+                    console.log('[GOOGLE LOGIN] ID 토큰에서 추출한 사용자 정보:', userInfo);
+                  } else {
+                    throw new Error('Invalid token format');
+                  }
+                } catch (tokenError) {
+                  console.error('[GOOGLE LOGIN] ID 토큰 파싱 실패:', tokenError);
+                  throw new Error('사용자 정보를 가져올 수 없습니다.');
+                }
+              } else {
+                console.log('[GOOGLE LOGIN] 예상치 못한 userInfoJson 타입:', typeof userInfoJson, userInfoJson);
+                throw new Error('지원되지 않는 사용자 정보 형태입니다.');
+              }
+              
+              console.log('[GOOGLE LOGIN] 처리된 사용자 정보:', userInfo);
+            } catch (parseError) {
+              console.error('[GOOGLE LOGIN] 사용자 정보 처리 오류:', parseError);
+              console.log('[GOOGLE LOGIN] 원본 데이터 타입:', typeof userInfoJson);
+              console.log('[GOOGLE LOGIN] 원본 데이터:', userInfoJson);
+              throw new Error('사용자 정보 파싱에 실패했습니다.');
+            }
           
+          // 사용자 정보 필드명 정규화 (iOS에서 오는 필드명을 표준화)
+          const normalizedUserInfo = {
+            email: userInfo.email || userInfo.Email,
+            name: userInfo.name || userInfo.Name || `${userInfo.givenName || userInfo.GivenName || ''} ${userInfo.familyName || userInfo.FamilyName || ''}`.trim(),
+            givenName: userInfo.givenName || userInfo.GivenName,
+            familyName: userInfo.familyName || userInfo.FamilyName,
+            picture: userInfo.picture || userInfo.imageURL || userInfo.ImageURL,
+            sub: userInfo.sub || userInfo.Sub
+          };
+          
+          console.log('[GOOGLE LOGIN] 정규화된 사용자 정보:', normalizedUserInfo);
+
           // ID 토큰을 서버로 전송하여 로그인 처리
+          console.log('[GOOGLE LOGIN] 서버 API 호출 시작');
           const response = await fetch('/api/google-auth', {
             method: 'POST',
             headers: {
@@ -247,11 +298,19 @@ export default function SignInPage() {
             },
             body: JSON.stringify({
               idToken: idToken,
-              userInfo: userInfo
+              userInfo: normalizedUserInfo
             }),
           });
 
+          console.log('[GOOGLE LOGIN] 서버 응답 상태:', response.status);
+          
+          if (!response.ok) {
+            console.error('[GOOGLE LOGIN] 서버 응답 오류:', response.status, response.statusText);
+            throw new Error(`서버 오류: ${response.status}`);
+          }
+
           const data = await response.json();
+          console.log('[GOOGLE LOGIN] 서버 응답 데이터:', data);
 
           if (data.success) {
             console.log('[GOOGLE LOGIN] 네이티브 Google 로그인 성공, 사용자 정보:', data.user);
@@ -268,7 +327,6 @@ export default function SignInPage() {
               
               // router.replace 사용 (페이지 새로고침 없이 이동)
               router.replace('/home');
-              return;
             }
           } else {
             throw new Error(data.error || '로그인에 실패했습니다.');
@@ -445,7 +503,6 @@ export default function SignInPage() {
       
       // router.replace 사용 (페이지 새로고침 없이 이동)
       router.replace('/home');
-      return;
 
     } catch (err: any) {
       console.error('[SIGNIN] 로그인 오류:', err);
