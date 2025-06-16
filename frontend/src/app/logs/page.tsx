@@ -6217,8 +6217,8 @@ export default function LogsPage() {
         autoHide={true}
         duration={7000}
       />
-      <DebugPanel />
-      <LogParser />
+      {/* <DebugPanel />
+      <LogParser /> */}
     </>
   );
 } 

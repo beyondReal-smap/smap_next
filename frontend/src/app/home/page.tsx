@@ -4544,8 +4544,8 @@ export default function HomePage() {
            )}
          </AnimatePresence>
               </motion.div>
-        <DebugPanel />
-        <LogParser />
+        {/* <DebugPanel />
+        <LogParser /> */}
       </>
     );
 }
