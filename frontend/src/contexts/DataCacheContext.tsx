@@ -121,15 +121,19 @@ interface DataCacheContextType {
   setIsLoading: (loading: boolean) => void;
 }
 
+// 캐시 지속 시간 설정 (더 긴 시간으로 변경)
 const CACHE_DURATION = {
-  userProfile: 5 * 60 * 1000, // 5분
-  userGroups: 5 * 60 * 1000,  // 5분
-  groupMembers: 5 * 60 * 1000, // 5분
-  scheduleData: 5 * 60 * 1000,  // 5분
-  locationData: 5 * 60 * 1000,  // 5분
-  groupPlaces: 5 * 60 * 1000,  // 5분
-  dailyLocationCounts: 5 * 60 * 1000, // 5분
+  userProfile: 15 * 60 * 1000, // 15분 (5분 → 15분)
+  userGroups: 15 * 60 * 1000,  // 15분
+  groupMembers: 10 * 60 * 1000, // 10분
+  scheduleData: 10 * 60 * 1000,  // 10분
+  locationData: 15 * 60 * 1000,  // 15분 (더 긴 시간)
+  groupPlaces: 30 * 60 * 1000,  // 30분 (장소는 자주 변하지 않음)
+  dailyLocationCounts: 10 * 60 * 1000, // 10분 (5분 → 10분)
 };
+
+// 백그라운드 새로고침을 위한 소프트 만료 시간 (실제 만료의 80%)
+const SOFT_EXPIRY_RATIO = 0.8;
 
 const initialCache: CacheData = {
   userProfile: null,
@@ -186,10 +190,11 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     return () => clearTimeout(timeoutId);
   }, [cache, isInitialized]);
 
-  // 캐시 유효성 검사
-  const isCacheValid = useCallback((type: string, groupId?: number, date?: string): boolean => {
+  // 캐시 유효성 검사 (하드 만료와 소프트 만료 구분)
+  const isCacheValid = useCallback((type: string, groupId?: number, date?: string, checkSoft = false): boolean => {
     const now = Date.now();
-    const duration = CACHE_DURATION[type as keyof typeof CACHE_DURATION] || 5 * 60 * 1000;
+    const duration = CACHE_DURATION[type as keyof typeof CACHE_DURATION] || 10 * 60 * 1000;
+    const actualDuration = checkSoft ? duration * SOFT_EXPIRY_RATIO : duration; // 소프트 체크 시 80% 시점
     
     let isValid = false;
     let lastUpdate = 0;
@@ -197,21 +202,21 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     switch (type) {
       case 'userProfile':
         lastUpdate = cache.lastUpdated.userProfile;
-        isValid = now - lastUpdate < duration;
+        isValid = now - lastUpdate < actualDuration;
         break;
       case 'userGroups':
         lastUpdate = cache.lastUpdated.userGroups;
-        isValid = now - lastUpdate < duration;
+        isValid = now - lastUpdate < actualDuration;
         break;
       case 'groupMembers':
         if (!groupId) return false;
         lastUpdate = cache.lastUpdated.groupMembers[groupId] || 0;
-        isValid = now - lastUpdate < duration;
+        isValid = now - lastUpdate < actualDuration;
         break;
       case 'scheduleData':
         if (!groupId) return false;
         lastUpdate = cache.lastUpdated.scheduleData[groupId] || 0;
-        isValid = now - lastUpdate < duration;
+        isValid = now - lastUpdate < actualDuration;
         break;
       case 'locationData':
         if (!groupId || !date) return false;
@@ -220,23 +225,28 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
         if (!memberUpdates) return false;
         const allMemberUpdates = Object.values(memberUpdates);
         lastUpdate = allMemberUpdates.length > 0 ? Math.max(...allMemberUpdates) : 0;
-        isValid = now - lastUpdate < duration;
+        isValid = now - lastUpdate < actualDuration;
         break;
       case 'groupPlaces':
         if (!groupId) return false;
         lastUpdate = cache.lastUpdated.groupPlaces[groupId] || 0;
-        isValid = now - lastUpdate < duration;
+        isValid = now - lastUpdate < actualDuration;
         break;
       case 'dailyLocationCounts':
         if (!groupId) return false;
         lastUpdate = cache.lastUpdated.dailyLocationCounts[groupId] || 0;
-        isValid = now - lastUpdate < duration;
+        isValid = now - lastUpdate < actualDuration;
         break;
       default:
         return false;
     }
     
-    console.log(`[DATA CACHE] 캐시 유효성 검사: ${type}${groupId ? `(${groupId})` : ''}${date ? `[${date}]` : ''} - ${isValid ? '유효' : '만료'} (${Math.round((now - lastUpdate) / 1000)}초 경과)`);
+    const elapsedSeconds = Math.round((now - lastUpdate) / 1000);
+    const maxSeconds = Math.round(actualDuration / 1000);
+    const status = isValid ? '유효' : '만료';
+    const softCheck = checkSoft ? ' (소프트)' : '';
+    
+    console.log(`[DATA CACHE] 캐시 유효성 검사: ${type}${groupId ? `(${groupId})` : ''}${date ? `[${date}]` : ''}${softCheck} - ${status} (${elapsedSeconds}초/${maxSeconds}초)`);
     return isValid;
   }, [cache.lastUpdated]);
 
@@ -453,12 +463,26 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     }));
   }, []);
 
-  // 일별 위치 카운트
+  // 일별 위치 카운트 (백그라운드 새로고침 포함)
   const getDailyLocationCounts = useCallback((groupId: number) => {
     const isValid = isCacheValid('dailyLocationCounts', groupId);
+    const isSoftExpired = !isCacheValid('dailyLocationCounts', groupId, undefined, true); // 소프트 만료 체크
     const counts = cache.dailyLocationCounts[groupId];
+    
     if (isValid && counts) {
       console.log(`[DATA CACHE] ✅ 일별 위치 카운트 캐시 히트 (${groupId}):`, counts);
+      
+      // 소프트 만료된 경우 백그라운드에서 새로고침 힌트 제공
+      if (isSoftExpired) {
+        console.log(`[DATA CACHE] 💡 일별 위치 카운트 백그라운드 새로고침 권장 (${groupId})`);
+        // 백그라운드 새로고침을 위한 이벤트 발생 (선택적)
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('cache-soft-expired', {
+            detail: { type: 'dailyLocationCounts', groupId }
+          }));
+        }, 100);
+      }
+      
       return counts;
     } else {
       console.log(`[DATA CACHE] ❌ 일별 위치 카운트 캐시 미스 (${groupId})`);
