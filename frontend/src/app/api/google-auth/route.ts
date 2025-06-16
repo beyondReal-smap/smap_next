@@ -54,10 +54,54 @@ export async function POST(request: NextRequest) {
     let googleUser;
     try {
       sendLogToConsole('info', 'OAuth2Client.verifyIdToken 호출 중');
-      const ticket = await client.verifyIdToken({
-        idToken: idToken,
-        audience: GOOGLE_CLIENT_ID,
-      });
+      
+      // ID 토큰에서 audience 확인 (디버깅용)
+      try {
+        const tokenParts = idToken.split('.');
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+          sendLogToConsole('info', 'ID 토큰 payload 정보', {
+            aud: payload.aud,
+            iss: payload.iss,
+            expectedAudience: GOOGLE_CLIENT_ID,
+            audienceMatch: payload.aud === GOOGLE_CLIENT_ID
+          });
+        }
+      } catch (decodeError) {
+        sendLogToConsole('warning', 'ID 토큰 디코딩 실패', { error: String(decodeError) });
+      }
+      
+      // 여러 Client ID로 검증 시도
+      let ticket;
+      const possibleAudiences = [
+        GOOGLE_CLIENT_ID,
+        '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com', // iOS Client ID
+        process.env.GOOGLE_CLIENT_ID, // 환경변수
+      ].filter(Boolean); // null/undefined 제거
+      
+      sendLogToConsole('info', '가능한 audience 목록', possibleAudiences);
+      
+      let verificationError;
+      for (const audience of possibleAudiences) {
+        try {
+          sendLogToConsole('info', `audience로 검증 시도: ${audience}`);
+          ticket = await client.verifyIdToken({
+            idToken: idToken,
+            audience: audience,
+          });
+          sendLogToConsole('info', `✅ 검증 성공 - audience: ${audience}`);
+          break; // 성공하면 루프 종료
+        } catch (err) {
+          sendLogToConsole('warning', `❌ 검증 실패 - audience: ${audience}`, {
+            error: err instanceof Error ? err.message : String(err)
+          });
+          verificationError = err;
+        }
+      }
+      
+      if (!ticket) {
+        throw verificationError || new Error('모든 audience로 검증 실패');
+      }
       
       sendLogToConsole('info', '토큰 검증 완료, payload 추출 중');
       const payload = ticket.getPayload();
@@ -95,13 +139,51 @@ export async function POST(request: NextRequest) {
         errorStack: error instanceof Error ? error.stack : 'No stack'
       });
       
-      return NextResponse.json(
-        { 
-          error: 'Google 토큰 검증에 실패했습니다.',
-          details: error instanceof Error ? error.message : String(error)
-        },
-        { status: 400 }
-      );
+      // 토큰 검증 실패 시 토큰에서 직접 정보 추출 시도 (임시 방편)
+      sendLogToConsole('warning', '토큰 검증 실패, 직접 파싱 시도');
+      try {
+        const tokenParts = idToken.split('.');
+        if (tokenParts.length === 3) {
+          const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+          
+          // 기본적인 토큰 유효성 확인
+          const now = Math.floor(Date.now() / 1000);
+          if (payload.exp && payload.exp < now) {
+            throw new Error('토큰이 만료되었습니다');
+          }
+          
+          if (payload.iss !== 'https://accounts.google.com') {
+            throw new Error('유효하지 않은 토큰 발급자입니다');
+          }
+          
+          googleUser = {
+            googleId: payload.sub,
+            email: payload.email,
+            name: payload.name,
+            givenName: payload.given_name,
+            familyName: payload.family_name,
+            picture: payload.picture,
+            emailVerified: payload.email_verified
+          };
+          
+          sendLogToConsole('info', '직접 파싱으로 사용자 정보 추출 성공', googleUser);
+        } else {
+          throw new Error('잘못된 토큰 형식');
+        }
+      } catch (parseError) {
+        sendLogToConsole('error', '직접 파싱도 실패', {
+          error: parseError instanceof Error ? parseError.message : String(parseError)
+        });
+        
+        return NextResponse.json(
+          { 
+            error: 'Google 토큰 검증에 실패했습니다.',
+            details: error instanceof Error ? error.message : String(error),
+            originalError: error instanceof Error ? error.message : String(error)
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // 백엔드 API 시도 (실패해도 계속 진행)

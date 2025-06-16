@@ -1,5 +1,5 @@
 {
   "/icon/route": "app/icon/route.js",
-  "/setting/account/page": "app/setting/account/page.js",
-  "/signin/page": "app/signin/page.js"
+  "/signin/page": "app/signin/page.js",
+  "/setting/account/page": "app/setting/account/page.js"
 }
