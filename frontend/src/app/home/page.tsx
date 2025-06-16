@@ -623,6 +623,37 @@ const getScheduleStatus = (schedule: Schedule): { name: 'completed' | 'ongoing' 
 };
 
 export default function HomePage() {
+  // 🚨 iOS 시뮬레이터 디버깅 - 즉시 실행 로그
+  console.log('🏠 [HOME] HomePage 컴포넌트 시작');
+  console.log('🏠 [HOME] 환경 체크:', {
+    isIOSWebView: !!(window as any).webkit?.messageHandlers,
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+    isClient: typeof window !== 'undefined',
+    timestamp: new Date().toISOString()
+  });
+  
+  // 🚨 iOS 시뮬레이터 에러 핸들링
+  const [componentError, setComponentError] = useState<string | null>(null);
+  
+  useEffect(() => {
+    const handleError = (error: ErrorEvent) => {
+      console.error('🏠 [HOME] ❌ 전역 에러 감지:', error);
+      setComponentError(`전역 에러: ${error.message}`);
+    };
+    
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('🏠 [HOME] ❌ Promise rejection 감지:', event.reason);
+      setComponentError(`Promise 에러: ${String(event.reason)}`);
+    };
+    
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
   const router = useRouter();
   // 인증 관련 상태 추가
   const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
@@ -721,13 +752,33 @@ export default function HomePage() {
 
   // UserContext 데이터가 로딩 완료되면 첫 번째 그룹을 자동 선택
   useEffect(() => {
-    // 중복 실행 방지를 위한 조건 강화
-    if (!isUserDataLoading && userGroups.length > 0 && !selectedGroupId) {
-      const firstGroup = userGroups[0];
-      setSelectedGroupId(firstGroup.sgt_idx);
-      console.log('[HOME] UserContext에서 첫 번째 그룹 자동 선택:', firstGroup.sgt_title, 'ID:', firstGroup.sgt_idx);
+    console.log('🏠 [HOME] UserContext 상태 체크:', {
+      isUserDataLoading,
+      userGroupsLength: userGroups.length,
+      selectedGroupId,
+      authLoading,
+      isPreloadingComplete
+    });
+    
+    // 🚨 iOS 시뮬레이터 디버깅 - 단계별 체크
+    try {
+      // 인증이 완료되고 그룹이 있으면 즉시 선택 (로딩 완료 대기하지 않음)
+      if (!authLoading && userGroups.length > 0 && !selectedGroupId) {
+        const firstGroup = userGroups[0];
+        console.log('🏠 [HOME] 첫 번째 그룹 자동 선택 시도:', firstGroup);
+        setSelectedGroupId(firstGroup.sgt_idx);
+        console.log('🏠 [HOME] ✅ 첫 번째 그룹 자동 선택 완료:', firstGroup.sgt_title, 'ID:', firstGroup.sgt_idx);
+      }
+      
+      // iOS 시뮬레이터에서는 더 빠른 그룹 선택을 위한 폴백
+      if (!authLoading && !isUserDataLoading && userGroups.length === 0 && !selectedGroupId) {
+        console.log('🏠 [HOME] ⚠️ UserContext 그룹이 없음, 하드코딩된 그룹으로 폴백');
+        setSelectedGroupId(641); // family 그룹 ID
+      }
+    } catch (error) {
+      console.error('🏠 [HOME] ❌ 첫 번째 그룹 선택 실패:', error);
     }
-  }, [isUserDataLoading, userGroups.length]); // selectedGroupId 의존성 제거로 중복 실행 방지
+  }, [authLoading, isUserDataLoading, userGroups.length]); // 조건을 더 민감하게 변경
 
   // selectedGroupId 상태 변화 추적 및 데이터 초기화
   useEffect(() => {
@@ -752,21 +803,40 @@ export default function HomePage() {
 
   // 사용자 위치 및 지역명 가져오기
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { longitude, latitude } = position.coords;
-          setUserLocation({ lat: latitude, lng: longitude });
-          setIsLocationEnabled(true);
-          
-          // 정적 위치 정보 설정 (Geocoding API 대신 간단한 해결책)
-          setLocationName("현재 위치");
-        },
-        (error) => {
-          console.log('위치 정보를 가져올 수 없습니다:', error);
-          setIsLocationEnabled(false);
-        }
-      );
+    console.log('🏠 [HOME] 위치 정보 요청 시작');
+    
+    try {
+      if (navigator.geolocation) {
+        console.log('🏠 [HOME] Geolocation API 사용 가능');
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { longitude, latitude } = position.coords;
+            console.log('🏠 [HOME] ✅ 위치 정보 획득 성공:', { latitude, longitude });
+            setUserLocation({ lat: latitude, lng: longitude });
+            setIsLocationEnabled(true);
+            
+            // 정적 위치 정보 설정 (Geocoding API 대신 간단한 해결책)
+            setLocationName("현재 위치");
+          },
+          (error) => {
+            console.error('🏠 [HOME] ❌ 위치 정보 획득 실패:', error);
+            setIsLocationEnabled(false);
+            // 기본 위치로 폴백
+            setUserLocation({ lat: 37.5642, lng: 127.0016 });
+            setLocationName("서울시");
+          }
+        );
+      } else {
+        console.error('🏠 [HOME] ❌ Geolocation API 지원하지 않음');
+        setIsLocationEnabled(false);
+        setUserLocation({ lat: 37.5642, lng: 127.0016 });
+        setLocationName("서울시");
+      }
+    } catch (error) {
+      console.error('🏠 [HOME] ❌ 위치 정보 요청 중 예외 발생:', error);
+      setIsLocationEnabled(false);
+      setUserLocation({ lat: 37.5642, lng: 127.0016 });
+      setLocationName("서울시");
     }
   }, []);
 
@@ -781,11 +851,18 @@ export default function HomePage() {
         return;
       }
       
-      // 🔥 AuthContext의 로딩과 프리로딩이 완료될 때까지 기다리기
-      if (authLoading || !isPreloadingComplete) {
-        console.log('[fetchAllGroupData] AuthContext 로딩 또는 프리로딩 중이므로 대기:', { authLoading, isPreloadingComplete });
+      // 🔥 AuthContext의 로딩이 완료될 때까지만 기다리기 (프리로딩 조건 완화)
+      if (authLoading) {
+        console.log('🏠 [fetchAllGroupData] AuthContext 로딩 중이므로 대기:', { authLoading, isPreloadingComplete });
         return;
       }
+      
+      // iOS 시뮬레이터에서는 프리로딩 조건을 무시하고 진행
+      if (!isPreloadingComplete) {
+        console.log('🏠 [fetchAllGroupData] ⚠️ 프리로딩 미완료지만 진행:', { authLoading, isPreloadingComplete });
+      }
+      
+      console.log('🏠 [fetchAllGroupData] ✅ AuthContext 체크 완료, 데이터 페칭 시작');
 
       const groupIdToUse = selectedGroupId?.toString() || '';
       if (!groupIdToUse) {
@@ -3945,6 +4022,34 @@ export default function HomePage() {
     }
   };
 
+  // 🚨 iOS 시뮬레이터 에러 처리 UI
+  if (componentError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">앱 오류 발생</h3>
+            <p className="text-sm text-gray-600 mb-4">{componentError}</p>
+            <button 
+              onClick={() => {
+                setComponentError(null);
+                window.location.reload();
+              }}
+              className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
+            >
+              앱 다시 시작
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <style jsx global>{mobileStyles}</style>
@@ -4020,6 +4125,31 @@ export default function HomePage() {
               </div>
             </div>
           </motion.header>
+
+        {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
+        {process.env.NODE_ENV === 'development' && (
+          <motion.div
+            initial={{ x: -300, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 1.0, duration: 0.5 }}
+            className="fixed top-20 left-4 z-50 bg-white/90 backdrop-blur-sm rounded-lg p-3 max-w-xs shadow-lg border"
+          >
+                         <div className="text-xs font-mono space-y-1">
+               <div className="font-bold text-blue-600">🔧 iOS 디버깅 상태</div>
+               <div>인증: {authLoading ? '⏳ 로딩중' : '✅ 완료'}</div>
+               <div>프리로딩: {isPreloadingComplete ? '✅ 완료' : '⏳ 진행중'}</div>
+               <div>사용자: {user?.mt_name || userInfo?.name || '로딩중'}</div>
+               <div>그룹: {selectedGroupId ? `✅ ${selectedGroupId}` : '❌ 없음'}</div>
+               <div>멤버: {groupMembers.length}명 {groupMembers.length > 0 ? '✅' : '❌'}</div>
+               <div>지도: {mapType} {isMapLoading ? '⏳' : '✅'}</div>
+               <div>위치: {isLocationEnabled ? '✅' : '❌'}</div>
+               <div>UserContext: {isUserDataLoading ? '⏳' : userGroups.length > 0 ? '✅' : '❌'}</div>
+               {componentError && (
+                 <div className="text-red-600 font-bold">에러: {componentError}</div>
+               )}
+             </div>
+          </motion.div>
+        )}
 
         {/* 지도 영역 (화면 100% 차지, fixed 포지션으로 고정) */}
         <div 
