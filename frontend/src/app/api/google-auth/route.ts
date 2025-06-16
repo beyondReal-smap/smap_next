@@ -71,13 +71,17 @@ export async function POST(request: NextRequest) {
         sendLogToConsole('warning', 'ID 토큰 디코딩 실패', { error: String(decodeError) });
       }
       
-      // 여러 Client ID로 검증 시도
+      // 여러 Client ID로 검증 시도 (더 많은 가능성 추가)
       let ticket;
       const possibleAudiences = [
-        GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_ID, // 환경변수에서 가져온 값
         '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com', // iOS Client ID
-        process.env.GOOGLE_CLIENT_ID, // 환경변수
-      ].filter(Boolean); // null/undefined 제거
+        process.env.GOOGLE_CLIENT_ID, // 환경변수 직접 참조
+        '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com', // 하드코딩된 값 (중복이지만 안전장치)
+        // 웹 클라이언트 ID도 추가 (혹시 다른 클라이언트 ID가 있을 경우)
+        process.env.GOOGLE_WEB_CLIENT_ID,
+        process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+      ].filter(Boolean).filter((value, index, self) => self.indexOf(value) === index); // 중복 제거
       
       sendLogToConsole('info', '가능한 audience 목록', possibleAudiences);
       
@@ -155,6 +159,16 @@ export async function POST(request: NextRequest) {
           if (payload.iss !== 'https://accounts.google.com') {
             throw new Error('유효하지 않은 토큰 발급자입니다');
           }
+          
+          // audience 정보 로깅
+          sendLogToConsole('info', '직접 파싱된 토큰 정보', {
+            aud: payload.aud,
+            iss: payload.iss,
+            sub: payload.sub,
+            email: payload.email,
+            exp: payload.exp,
+            iat: payload.iat
+          });
           
           googleUser = {
             googleId: payload.sub,
