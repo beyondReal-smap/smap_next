@@ -4,20 +4,10 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { hapticFeedback } from '../../../utils/haptic';
 
 export default function BottomNavBar() {
   const pathname = usePathname();
-  
-  // 햅틱 피드백 함수
-  const triggerHaptic = () => {
-    try {
-      if ('vibrate' in navigator) {
-        navigator.vibrate([10]); // 짧은 진동
-      }
-    } catch (err) {
-      console.debug('햅틱 피드백 차단');
-    }
-  };
   
   // 네비게이션 메뉴 아이템
   const navItems = [
@@ -27,6 +17,20 @@ export default function BottomNavBar() {
     { name: '내장소', path: '/location', icon: 'map-pin' },
     { name: '활동 로그', path: '/logs', icon: 'document' },
   ];
+
+  // 네비게이션 메뉴 클릭 핸들러
+  const handleNavClick = (item: { name: string; path: string; icon: string }) => {
+    // 현재 페이지가 아닌 경우에만 햅틱 피드백 실행
+    if (pathname !== item.path) {
+      hapticFeedback.menuSelect({
+        component: 'BottomNavBar',
+        menuName: item.name,
+        menuPath: item.path,
+        currentPath: pathname,
+        iconType: item.icon
+      });
+    }
+  };
 
   return (
     <div 
@@ -55,7 +59,7 @@ export default function BottomNavBar() {
             <Link 
               key={path}
               href={path}
-              onClick={triggerHaptic}
+              onClick={() => handleNavClick({ name, path, icon })}
               className="flex flex-col items-center space-y-1 transition-colors duration-200 flex-1"
             >
                              <motion.div 
