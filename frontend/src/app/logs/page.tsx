@@ -5315,7 +5315,7 @@ export default function LogsPage() {
         initial="initial"
         animate="in"
         exit="out"
-        className="min-h-screen relative overflow-hidden" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #ffffff, #fdf4ff)' }}
+        className="min-h-screen relative overflow-hidden" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
       >
         {/* 통합 헤더 - 내용만 변경됨 */}
         <motion.header 

@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import notificationService from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import LoadingSpinner from '@/app/components/common/LoadingSpinner';
+import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
 import { hapticFeedback } from '@/utils/haptic';
 
 // glass-effect 및 모바일 최적화된 CSS 애니메이션
@@ -49,6 +50,15 @@ const mobileAnimations = `
   }
 }
 
+@keyframes unified-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .animate-slideInFromBottom {
   animation: slideInFromBottom 0.3s ease-out forwards;
 }
@@ -59,6 +69,11 @@ const mobileAnimations = `
 
 .animate-slideOutToRight {
   animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
+}
+
+.unified-animate-spin {
+  animation: unified-spin 1s linear infinite;
+  -webkit-animation: unified-spin 1s linear infinite;
 }
 
 /* glass-effect 스타일 추가 - 강제 고정 */
@@ -441,26 +456,86 @@ function NoticeContent() {
     }, 400); // 애니메이션 시간과 일치
   };
 
+  // signin 페이지와 동일한 로딩 스피너 컴포넌트
+  const NoticeLoadingSpinner = ({ message, fullScreen = true }: { message: string; fullScreen?: boolean }) => {
+    if (fullScreen) {
+      return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
+            <UnifiedLoadingSpinner size="md" message={message} />
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="flex items-center justify-center">
+        <UnifiedLoadingSpinner size="sm" message={message} inline color="primary" />
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <>
         <style jsx global>{mobileAnimations}</style>
-        <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-          {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className={`schedule-page-content px-4 pt-20 space-y-6 pb-20 ${
-              isExiting ? 'animate-slideOutToRight' : 
-              isEntering ? 'animate-slideInFromRight' : ''
-            }`}
+        <motion.div 
+          className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 py-6 px-4 sm:px-6 lg:px-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{
+            type: "spring",
+            stiffness: 260,
+            damping: 20,
+            duration: 0.6
+          }}
+        >
+          <motion.div 
+            className="w-auto bg-white px-5 py-4 rounded-lg shadow-lg"
+            initial={{ opacity: 0, scale: 0.95, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{
+              type: "spring",
+              stiffness: 280,
+              damping: 25,
+              delay: 0.1,
+              duration: 0.5
+            }}
           >
-            <div className="flex items-center justify-center h-full">
-              <LoadingSpinner message="알림을 불러오는 중..." fullScreen={false} />
-            </div>
+            <motion.div 
+              className="text-center"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 25,
+                delay: 0.2,
+                duration: 0.4
+              }}
+            >
+              <h3 className="text-sm font-semibold text-gray-900 mb-2 whitespace-nowrap">
+                알림 로딩 중
+              </h3>
+            </motion.div>
+
+            <motion.div 
+              className="flex justify-center"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 25,
+                delay: 0.3,
+                duration: 0.4
+              }}
+            >
+              <UnifiedLoadingSpinner size="md" />
+            </motion.div>
           </motion.div>
-        </div>
+        </motion.div>
       </>
     );
   }
@@ -611,11 +686,19 @@ function NoticeContent() {
       {isDeleteModalOpen && (
         <div 
           className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={() => setIsDeleteModalOpen(false)}
+          onClick={() => !isDeleting && setIsDeleteModalOpen(false)}
         >
-          <div 
-            className="bg-white rounded-3xl w-full max-w-md mx-auto animate-slideInFromBottom"
+          <motion.div 
+            className="bg-white rounded-3xl w-full max-w-md mx-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
+            initial={{ opacity: 0, scale: 0.95, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{
+              type: "spring",
+              stiffness: 280,
+              damping: 25,
+              duration: 0.5
+            }}
           >
             <div className="p-6 pb-8">
               <div className="text-center mb-6">
@@ -641,10 +724,10 @@ function NoticeContent() {
                   className="w-full py-4 bg-red-500 text-white rounded-2xl font-medium hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
                 >
                   {isDeleting ? (
-                    <>
-                                                  <div className="w-4 h-4 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-2"></div>
-                      삭제 중...
-                    </>
+                    <div className="flex items-center justify-center">
+                      <UnifiedLoadingSpinner size="sm" color="white" inline />
+                      <span className="ml-2">삭제 중...</span>
+                    </div>
                   ) : (
                     '모든 알림 삭제'
                   )}
@@ -660,7 +743,7 @@ function NoticeContent() {
                 </button>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
       </div>

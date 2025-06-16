@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { motion } from 'framer-motion';
+import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
 import styles from './MapSkeleton.module.css';
 
 interface MapSkeletonProps {
@@ -43,42 +45,51 @@ export const MapSkeleton: React.FC<MapSkeletonProps> = ({
             </div>
           </div>
 
-          {/* 로딩 오버레이 */}
-          <div className={styles.loadingOverlay}>
-            <div className={styles.loadingSpinner}>
-              <div className={styles.spinnerIcon}>
-                <svg className="w-10 h-10" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  {/* 구글 스타일 점들이 돌아가는 로딩 애니메이션 */}
-                  <g className={styles.spinnerDots}>
-                    {/* 12개의 점을 원형으로 배치 */}
-                    {[...Array(12)].map((_, i) => {
-                      const angle = (i * 30) * Math.PI / 180; // 30도씩
-                      const x = 20 + Math.cos(angle) * 12;
-                      const y = 20 + Math.sin(angle) * 12;
-                      return (
-                        <circle
-                          key={i}
-                          cx={x}
-                          cy={y}
-                          r="2"
-                          fill="currentColor"
-                          opacity="0.3"
-                          className={styles.spinnerDot}
-                          style={{ 
-                            animationDelay: `${i * 0.1}s`,
-                            transformOrigin: '20px 20px'
-                          }}
-                        />
-                      );
-                    })}
-                  </g>
-                </svg>
-              </div>
-              <div className={styles.loadingText}>지도를 불러오는 중...</div>
-              <div className={styles.loadingProgress}>
-                <div className={styles.progressBar} />
-              </div>
-            </div>
+          {/* 로딩 오버레이 - 컴팩트 스타일 */}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <motion.div 
+              className="bg-white px-5 py-4 rounded-lg shadow-lg w-auto mx-4"
+              initial={{ opacity: 0, scale: 0.95, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{
+                type: "spring",
+                stiffness: 280,
+                damping: 25,
+                duration: 0.5
+              }}
+            >
+              <motion.div 
+                className="text-center"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 25,
+                  delay: 0.2,
+                  duration: 0.4
+                }}
+              >
+                <h3 className="text-sm font-semibold text-gray-900 mb-2 whitespace-nowrap">
+                  지도 로딩 중
+                </h3>
+              </motion.div>
+
+              <motion.div 
+                className="flex justify-center"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 25,
+                  delay: 0.3,
+                  duration: 0.4
+                }}
+              >
+                <UnifiedLoadingSpinner size="md" />
+              </motion.div>
+            </motion.div>
           </div>
         </div>
       </div>

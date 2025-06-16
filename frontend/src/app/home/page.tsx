@@ -42,7 +42,11 @@ declare global {
     naver: any;
     google: any;
     webkit?: {
-      messageHandlers?: any;
+      messageHandlers?: {
+        smapIos?: {
+          postMessage: (message: any) => void;
+        };
+      };
     };
   }
 }
@@ -3947,7 +3951,7 @@ export default function HomePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         className="min-h-screen relative overflow-hidden"
-        style={{ background: 'linear-gradient(to bottom right, #f0f9ff, white, #fdf4ff)' }}
+        style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
       >
         {/* 개선된 헤더 - logs/page.tsx 패턴 적용 */}
         <motion.header 

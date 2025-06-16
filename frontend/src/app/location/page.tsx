@@ -659,6 +659,14 @@ export default function LocationPage() {
   const router = useRouter();
   const { user } = useAuth(); // 현재 로그인한 사용자 정보
   
+  // 성능 측정을 위한 페이지 로드 시작 시간 기록
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !(window as any).pageLoadStart) {
+      (window as any).pageLoadStart = performance.now();
+      console.log('[성능] Location 페이지 로드 시작 (최적화 버전)');
+    }
+  }, []);
+  
   // 상태 관리
   const [isExiting, setIsExiting] = useState(false);
   const [shouldAnimate, setShouldAnimate] = useState(true);
@@ -1553,24 +1561,13 @@ export default function LocationPage() {
       console.log('[fetchGroupMembersData] 멤버 데이터 조회 완료:', membersData);
 
       if (membersData && membersData.length > 0) {
-        // 먼저 모든 멤버의 장소 개수를 가져오기
+        // 장소 개수는 나중에 필요시에만 로딩 (초기 로딩 속도 개선)
         const memberLocationCounts: { [key: string]: number } = {};
         
-        // 모든 멤버의 장소 개수를 병렬로 가져오기
-        await Promise.all(
-          membersData.map(async (member: any) => {
-            try {
-              const memberLocations = await locationService.getOtherMembersLocations(member.mt_idx.toString());
-              memberLocationCounts[member.mt_idx.toString()] = memberLocations.length;
-              console.log(`[fetchGroupMembersData] ${member.mt_name || member.mt_nickname}의 장소 개수:`, memberLocations.length);
-            } catch (error) {
-              console.error(`[fetchGroupMembersData] ${member.mt_name || member.mt_nickname}의 장소 개수 가져오기 실패:`, error);
-              memberLocationCounts[member.mt_idx.toString()] = 0;
-            }
-          })
-        );
+        // 첫 번째 멤버만 즉시 로딩, 나머지는 백그라운드에서 처리
+        console.log('[fetchGroupMembersData] 첫 번째 멤버만 우선 로딩으로 속도 개선');
 
-        // 데이터 즉시 처리
+        // 데이터 즉시 처리 (장소 개수는 나중에 로딩)
         const convertedMembers = membersData.map((member: any, index: number) => {
           // 현재 로그인한 사용자인지 확인
           const isCurrentUser = !!(user && member.mt_idx === user.mt_idx);
@@ -1587,7 +1584,7 @@ export default function LocationPage() {
             },
             schedules: [],
             savedLocations: [], // 나중에 선택할 때 로드
-            savedLocationCount: memberLocationCounts[memberId] || 0, // 장소 개수 미리 설정
+            savedLocationCount: 0, // 초기값 0으로 설정, 나중에 로딩
             mt_gender: member.mt_gender,
             original_index: index,
             mlt_lat: member.mlt_lat,
@@ -1620,13 +1617,16 @@ export default function LocationPage() {
         // 멤버 데이터 로딩 완료 표시
         dataFetchedRef.current.members = true;
         
-        // 첫 번째 멤버의 장소 데이터 즉시 로드
+        // 첫 번째 멤버의 장소 데이터만 즉시 로드하고, 나머지는 백그라운드에서 처리
         if (convertedMembers.length > 0) {
-          console.log('[fetchGroupMembersData] 첫 번째 멤버 장소 데이터 로드 시작:', convertedMembers[0].name);
+          const firstMember = convertedMembers[0];
+          console.log('[fetchGroupMembersData] 첫 번째 멤버 장소 데이터 우선 로드 시작:', firstMember.name);
+          
+          // 첫 번째 멤버 장소 데이터 로드
           (async () => {
             try {
               setIsLoadingOtherLocations(true);
-              const memberLocationsRaw = await locationService.getOtherMembersLocations(convertedMembers[0].id);
+              const memberLocationsRaw = await locationService.getOtherMembersLocations(firstMember.id);
               console.log("[fetchGroupMembersData] 첫 번째 멤버 장소 조회 완료:", memberLocationsRaw.length, '개');
               
               // LocationData 형식으로 변환
@@ -1649,7 +1649,7 @@ export default function LocationPage() {
               setOtherMembersSavedLocations(memberLocationsRaw);
               setActiveView('selectedMemberPlaces');
               
-              // 그룹멤버 상태에도 저장
+              // 첫 번째 멤버의 장소 개수 업데이트
               setGroupMembers(prevMembers => 
                 prevMembers.map((member, index) => 
                   index === 0 
@@ -1664,10 +1664,53 @@ export default function LocationPage() {
               setOtherMembersSavedLocations([]);
             } finally {
               setIsLoadingOtherLocations(false);
-              // 다른 멤버 위치 로딩 완료 햅틱 피드백
+              // 첫 번째 멤버 로딩 완료 햅틱 피드백
               hapticFeedback.dataLoadComplete();
             }
-          })(); // 즉시 실행
+          })();
+          
+          // 나머지 멤버들의 장소 개수를 백그라운드에서 로딩 (UI 블로킹 없이)
+          if (convertedMembers.length > 1) {
+            console.log('[fetchGroupMembersData] 나머지 멤버 장소 개수 백그라운드 로딩 시작');
+            setTimeout(async () => {
+              const remainingMembers = convertedMembers.slice(1);
+              
+              // 3개씩 배치로 나누어 처리 (과도한 동시 요청 방지)
+              const batchSize = 3;
+              for (let i = 0; i < remainingMembers.length; i += batchSize) {
+                const batch = remainingMembers.slice(i, i + batchSize);
+                
+                await Promise.all(
+                  batch.map(async (member, batchIndex) => {
+                    try {
+                      const memberLocations = await locationService.getOtherMembersLocations(member.id);
+                      const actualIndex = i + batchIndex + 1; // +1은 첫 번째 멤버 제외
+                      
+                      // 장소 개수만 업데이트
+                      setGroupMembers(prevMembers => 
+                        prevMembers.map((prevMember, index) => 
+                          index === actualIndex 
+                            ? { ...prevMember, savedLocationCount: memberLocations.length }
+                            : prevMember
+                        )
+                      );
+                      
+                      console.log(`[백그라운드] ${member.name}의 장소 개수:`, memberLocations.length);
+                    } catch (error) {
+                      console.error(`[백그라운드] ${member.name}의 장소 개수 로딩 실패:`, error);
+                    }
+                  })
+                );
+                
+                // 배치 간 250ms 대기 (서버 부하 방지)
+                if (i + batchSize < remainingMembers.length) {
+                  await new Promise(resolve => setTimeout(resolve, 250));
+                }
+              }
+              
+              console.log('[fetchGroupMembersData] 백그라운드 장소 개수 로딩 완료');
+            }, 500); // 초기 로딩 완료 후 500ms 대기
+          }
         }
 
         setIsFirstMemberSelectionComplete(true);
@@ -2024,7 +2067,7 @@ export default function LocationPage() {
     return () => clearTimeout(backupTimer);
   }, []);
 
-  // 네이버 지도 로드
+  // 네이버 지도 로드 (최적화)
   useEffect(() => {
     const loadNaverMaps = () => {
       console.log('[네이버 지도 로드] 시작');
@@ -2035,13 +2078,22 @@ export default function LocationPage() {
         return;
       }
       
+      // geocoder 서브모듈 제거로 로딩 속도 개선
       const script = document.createElement('script');
-      script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEYS.NAVER_MAPS_CLIENT_ID}&submodules=geocoder`;
+      script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEYS.NAVER_MAPS_CLIENT_ID}`;
       script.async = true;
+      script.defer = true; // defer 추가로 최적화
       script.onload = () => {
-        console.log('[네이버 지도 로드] 스크립트 로드 완료');
+        console.log('[네이버 지도 로드] 스크립트 로드 완료 (최적화)');
         setIsMapLoading(false);
-        console.log('[네이버 지도 로드] 지도 로딩 상태 해제');
+        
+        // geocoder가 필요한 경우 나중에 동적 로딩
+        if (window.naver?.maps && !window.naver.maps.Service) {
+          const geocoderScript = document.createElement('script');
+          geocoderScript.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEYS.NAVER_MAPS_CLIENT_ID}&submodules=geocoder`;
+          geocoderScript.async = true;
+          document.head.appendChild(geocoderScript);
+        }
       };
       script.onerror = () => {
         console.error('네이버 지도 로드 실패');
@@ -2060,17 +2112,19 @@ export default function LocationPage() {
     }
   }, [mapContainer.current]);
 
-  // 지도 초기화 (네이버 지도 API가 로드된 후)
+  // 지도 초기화 (최적화 - 멤버 데이터가 있으면 즉시 초기화)
   useEffect(() => {
-    console.log('[지도 초기화 조건 체크]', {
+    console.log('[지도 초기화 조건 체크] (최적화)', {
       isMapLoading,
       hasMapContainer: !!mapContainer.current,
       hasNaverAPI: !!(window.naver && window.naver.maps),
       hasMap: !!map,
-      hasGroupMembers: groupMembers.length > 0
+      hasGroupMembers: groupMembers.length > 0,
+      isFetchingGroupMembers
     });
     
-    if (!isMapLoading && mapContainer.current && window.naver && window.naver.maps && !map && groupMembers.length > 0) {
+    // 그룹멤버 로딩이 완료되면 즉시 지도 초기화 (장소 데이터 로딩 대기 없이)
+    if (!isMapLoading && mapContainer.current && window.naver && window.naver.maps && !map && groupMembers.length > 0 && !isFetchingGroupMembers) {
       console.log('[지도 초기화] 시작 - 첫 번째 그룹멤버 위치로 초기화');
       
       try {
@@ -2102,8 +2156,9 @@ export default function LocationPage() {
           console.log('[지도 초기화] 멤버 위치를 찾을 수 없어 기본 위치로 초기화:', { lat: 37.5665, lng: 126.9780 });
         }
         
+      // home, logs 페이지와 동일한 MAP_CONFIG 사용으로 일관성 확보
       const mapOptions = {
-          center: initialCenter,
+        center: initialCenter,
         zoom: initialZoom,
         minZoom: 8,
         maxZoom: 18,
@@ -2118,11 +2173,13 @@ export default function LocationPage() {
       
       // 지도 초기화 완료 이벤트 리스너 추가
       window.naver.maps.Event.addListener(newMap, 'init', () => {
-        console.log('[지도 초기화] 네이버 지도 초기화 완료');
+        console.log('[지도 초기화] ✅ 네이버 지도 초기화 완료 (최적화됨)');
         setIsMapInitialized(true);
         setIsMapReady(true);
         
-
+        // 성능 로깅
+        const endTime = performance.now();
+        console.log(`[성능] 지도 로딩 완료 시간: ${endTime - (window as any).pageLoadStart || 0}ms`);
       });
       
       setMap(newMap);
@@ -2230,7 +2287,7 @@ export default function LocationPage() {
         console.error('[지도 초기화] 오류:', error);
     }
     }
-  }, [isMapLoading, map, groupMembers]);
+  }, [isMapLoading, map, groupMembers, isFetchingGroupMembers]); // 최적화를 위해 isFetchingGroupMembers 추가
 
 
 
@@ -2246,13 +2303,13 @@ export default function LocationPage() {
     }
   }, [isInitialDataLoaded]);
 
-  // 선택된 그룹이 변경될 때 멤버 데이터 불러오기 (무한 재조회 방지)
+  // 선택된 그룹이 변경될 때 멤버 데이터 불러오기 (최적화)
   useEffect(() => {
-    if (selectedGroupId && !dataFetchedRef.current.members) {
-      console.log('[useEffect] selectedGroupId 변경으로 인한 멤버 데이터 로딩:', selectedGroupId);
+    if (selectedGroupId && !dataFetchedRef.current.members && !isFetchingGroupMembers) {
+      console.log('[useEffect] selectedGroupId 변경으로 인한 멤버 데이터 로딩 (최적화):', selectedGroupId);
       fetchGroupMembersData();
     }
-  }, [selectedGroupId]); // dataFetchedRef.current.members 조건으로 중복 실행 방지
+  }, [selectedGroupId, isFetchingGroupMembers]); // 중복 로딩 방지 강화
   
   // 첫번째 멤버 자동 선택 - 지도 준비되고 멤버가 있을 때
   useEffect(() => {
@@ -4098,7 +4155,8 @@ export default function LocationPage() {
           isExiting ? "out" : "in"
         }
         variants={pageVariants}
-        className="bg-white min-h-screen relative overflow-hidden"
+        className="min-h-screen relative overflow-hidden"
+        style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
       >
         {/* 개선된 헤더 - home/page.tsx 패턴 적용 */}
         <motion.header 

@@ -118,7 +118,8 @@
   animation: pulse 2s ease-in-out infinite;
 }
 
-/* 로딩 오버레이 */
+/* 로딩 오버레이 - 이제 UnifiedLoadingSpinner 사용으로 주석처리 */
+/*
 .loadingOverlay {
   position: absolute;
   top: 0;
@@ -144,7 +145,7 @@
   border-radius: 16px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   min-width: 200px;
-  transform: translate(0, 0); /* 정확한 중앙 정렬을 위한 보정 */
+  transform: translate(0, 0);
 }
 
 .spinnerIcon {
@@ -161,7 +162,7 @@
 }
 
 .spinnerDots {
-  animation: spinnerRotate 8s linear infinite; /* 2s → 4s로 느리게 */
+  animation: spinnerRotate 8s linear infinite;
   transform-origin: 20px 20px;
 }
 
@@ -190,6 +191,7 @@
   border-radius: 2px;
   animation: progress 2s ease-in-out infinite;
 }
+*/
 
 /* 지도 컨트롤들 */
 .controls {
@@ -317,6 +319,8 @@
   }
 }
 
+/* 이제 UnifiedLoadingSpinner 사용으로 주석처리 */
+/*
 @keyframes progress {
   0% {
     transform: translateX(-100%);
@@ -328,6 +332,7 @@
     transform: translateX(100%);
   }
 }
+*/
 
 @keyframes markerFloat1 {
   0%, 100% {
@@ -365,6 +370,8 @@
   }
 }
 
+/* 이제 UnifiedLoadingSpinner 사용으로 주석처리 */
+/*
 @keyframes spinnerRotate {
   0% {
     transform: rotate(0deg);
@@ -384,6 +391,7 @@
     transform: scale(1.2);
   }
 }
+*/
 
 /* 반응형 대응 */
 @media (max-width: 768px) {
@@ -404,6 +412,8 @@
     padding: 12px;
   }
   
+  /* 이제 UnifiedLoadingSpinner 사용으로 주석처리 */
+  /*
   .spinnerIcon {
     font-size: 36px;
     width: 36px;
@@ -413,4 +423,5 @@
   .loadingText {
     font-size: 12px;
   }
+  */
 } 
