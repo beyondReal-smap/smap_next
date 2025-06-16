@@ -205,46 +205,117 @@ export async function POST(request: NextRequest) {
     let isNewUser = true;
     
     try {
-      console.log('[GOOGLE API] 백엔드 연결 시도...');
+      sendLogToConsole('info', '백엔드 연결 시도 시작', {
+        backendUrl: 'https://118.67.130.71:8000/api/v1/auth/google-login',
+        googleUserId: googleUser.googleId,
+        googleUserEmail: googleUser.email
+      });
+      
       // SSL 인증서 검증 비활성화 (개발 환경)
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+      
+      const requestBody = {
+        google_id: googleUser.googleId,
+        email: googleUser.email,
+        name: googleUser.name,
+        given_name: googleUser.givenName,
+        family_name: googleUser.familyName,
+        picture: googleUser.picture,
+        id_token: idToken
+      };
+      
+      sendLogToConsole('info', '백엔드 요청 본문', requestBody);
+      
+      // 타임아웃 설정
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10초 타임아웃
       
       const backendResponse = await fetch('https://118.67.130.71:8000/api/v1/auth/google-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'SMAP-NextJS-GoogleAuth/1.0'
         },
-        body: JSON.stringify({
-          google_id: googleUser.googleId,
-          email: googleUser.email,
-          name: googleUser.name,
-          given_name: googleUser.givenName,
-          family_name: googleUser.familyName,
-          picture: googleUser.picture,
-          id_token: idToken
-        }),
+        body: JSON.stringify(requestBody),
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId); // 성공 시 타임아웃 클리어
+
+      sendLogToConsole('info', '백엔드 응답 상태', {
+        status: backendResponse.status,
+        statusText: backendResponse.statusText,
+        ok: backendResponse.ok,
+        headers: Object.fromEntries(backendResponse.headers.entries())
       });
 
       if (backendResponse.ok) {
-        backendData = await backendResponse.json();
-        console.log('[GOOGLE API] 백엔드 응답 성공:', backendData);
+        const responseText = await backendResponse.text();
+        sendLogToConsole('info', '백엔드 응답 텍스트', { responseText });
+        
+        try {
+          backendData = JSON.parse(responseText);
+          sendLogToConsole('info', '백엔드 JSON 파싱 성공', backendData);
+        } catch (jsonError) {
+          sendLogToConsole('error', 'JSON 파싱 실패', { 
+            error: String(jsonError),
+            responseText: responseText.substring(0, 500) 
+          });
+          throw new Error(`JSON 파싱 실패: ${String(jsonError)}`);
+        }
       } else {
-        console.log('[GOOGLE API] 백엔드 요청 실패:', backendResponse.status);
-        throw new Error('Backend connection failed');
+        const errorText = await backendResponse.text();
+        sendLogToConsole('error', '백엔드 HTTP 오류', {
+          status: backendResponse.status,
+          statusText: backendResponse.statusText,
+          errorBody: errorText.substring(0, 500)
+        });
+        throw new Error(`Backend HTTP Error: ${backendResponse.status} - ${errorText}`);
       }
     } catch (backendError) {
-      console.log('[GOOGLE API] 백엔드 연결 실패:', backendError instanceof Error ? backendError.message : String(backendError));
-      console.log('[GOOGLE API] 임시 모드로 계속 진행...');
+      sendLogToConsole('error', '백엔드 연결 실패 상세', {
+        errorType: typeof backendError,
+        errorMessage: backendError instanceof Error ? backendError.message : String(backendError),
+        errorStack: backendError instanceof Error ? backendError.stack : 'No stack',
+        isNetworkError: backendError instanceof TypeError,
+        isFetchError: String(backendError).includes('fetch')
+      });
+      
+      // 네트워크 오류인 경우 추가 정보
+      if (backendError instanceof TypeError && String(backendError).includes('fetch')) {
+        sendLogToConsole('error', '네트워크 연결 불가 - DNS, 방화벽, 서버 상태 확인 필요');
+      }
+      
+      sendLogToConsole('warning', '임시 모드로 전환');
     }
 
     // 백엔드 연결 성공 시
     if (backendData && backendData.success) {
+      sendLogToConsole('info', '백엔드 연동 성공!', {
+        hasData: !!backendData.data,
+        hasUser: !!backendData.data?.user,
+        isNewUser: !!backendData.data?.isNewUser
+      });
+      
       const user = backendData.data.user;
       isNewUser = backendData.data.isNewUser;
 
+      sendLogToConsole('info', '실제 고객 정보 확인', {
+        mt_idx: user.mt_idx,
+        mt_email: user.mt_email,
+        mt_name: user.mt_name,
+        mt_nickname: user.mt_nickname,
+        mt_level: user.mt_level,
+        mt_type: user.mt_type,
+        isNewUser: isNewUser,
+        googleEmail: googleUser.email,
+        emailMatch: user.mt_email === googleUser.email
+      });
+
       // 탈퇴한 사용자인지 확인 (mt_level이 1이면 탈퇴한 사용자)
       if (user.mt_level === 1) {
-        console.log('[GOOGLE API] 탈퇴한 사용자 로그인 시도:', user.mt_idx);
+        sendLogToConsole('warning', '탈퇴한 사용자 로그인 시도', { mt_idx: user.mt_idx });
         return NextResponse.json(
           { 
             success: false, 
@@ -276,7 +347,12 @@ export async function POST(request: NextRequest) {
         { expiresIn: '7d' }
       );
 
-      console.log('[GOOGLE API] 백엔드 연동 성공');
+      sendLogToConsole('info', '✅ 실제 고객으로 로그인 성공', {
+        mt_idx: user.mt_idx,
+        email: user.mt_email,
+        name: user.mt_name,
+        isNewUser: isNewUser
+      });
 
       const response = NextResponse.json({
         success: true,
@@ -308,7 +384,13 @@ export async function POST(request: NextRequest) {
     }
 
     // 백엔드 연결 실패 시 임시 모드
-    console.log('[GOOGLE API] 임시 모드로 로그인 처리');
+    sendLogToConsole('warning', '⚠️ 백엔드 연결 실패 - 임시 모드로 로그인 처리');
+    sendLogToConsole('warning', '임시 계정 정보', {
+      googleId: googleUser.googleId,
+      email: googleUser.email,
+      name: googleUser.name,
+      note: '실제 고객 데이터가 아닌 임시 테스트 계정입니다'
+    });
     
     const tempUser = {
       id: googleUser.googleId,
