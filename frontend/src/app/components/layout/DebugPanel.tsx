@@ -52,14 +52,22 @@ const DebugPanel: React.FC = () => {
       // 3. UserContext 상태 확인
       results.push({
         component: 'UserContext',
-        status: user.userInfo ? 'success' : 'warning',
-        message: user.userInfo ? '사용자 데이터 있음' : '사용자 데이터 없음',
+        status: user.userInfo ? 'success' : user.isUserDataLoading ? 'warning' : 'error',
+        message: user.userInfo ? '사용자 데이터 있음' : user.isUserDataLoading ? '로딩 중...' : '사용자 데이터 없음',
         details: {
           userInfo: user.userInfo ? { mt_idx: user.userInfo.mt_idx, name: user.userInfo.name } : null,
           selectedGroupId: user.selectedGroupId,
           userGroups: user.userGroups ? user.userGroups.length : 0,
           isUserDataLoading: user.isUserDataLoading,
-          userDataError: user.userDataError
+          userDataError: user.userDataError,
+          // AuthContext 의존성 상태
+          authContext: {
+            isLoggedIn: auth.isLoggedIn,
+            loading: auth.loading,
+            isPreloadingComplete: auth.isPreloadingComplete,
+            hasUser: !!auth.user,
+            userId: auth.user?.mt_idx || null
+          }
         }
       });
 

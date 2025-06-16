@@ -163,6 +163,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     globalPreloadingState.isPreloading = true;
     console.log(`[AUTH] 🚀 데이터 프리로딩 시작 (${source}):`, userId);
 
+    // 프리로딩 타임아웃 설정 (30초)
+    const timeoutId = setTimeout(() => {
+      console.warn(`[AUTH] ⏰ 프리로딩 타임아웃 (${source}):`, userId);
+      globalPreloadingState.isPreloading = false;
+      dispatch({ type: 'SET_PRELOADING_COMPLETE', payload: true });
+    }, 30000);
+
     try {
       const results = await dataPreloadService.preloadAllData({
         userId,
@@ -170,6 +177,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           console.log(`[AUTH] 프리로딩 진행 (${source}): ${step} (${progress}%)`);
         }
       });
+
+      // 타임아웃 취소
+      clearTimeout(timeoutId);
 
       // 캐시에 데이터 저장
       if (results.userProfile) {
@@ -230,7 +240,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       globalPreloadingState.lastPreloadTime = now;
       dispatch({ type: 'SET_PRELOADING_COMPLETE', payload: true });
       
-      console.log(`[AUTH] 🎉 모든 데이터 프리로딩 및 캐시 저장 완료! (${source})`);
+      console.log(`[AUTH] 🎉 프리로딩 완료 (${source}):`, userId);
     } catch (error) {
       console.error(`[AUTH] 데이터 프리로딩 실패 (${source}):`, error);
     } finally {

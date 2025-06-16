@@ -115,11 +115,37 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }));
         setUserGroups(convertedGroups);
       } else {
-        console.log('[UserContext] 캐시된 그룹 데이터 없음, 빈 배열 설정');
-        setUserGroups([]);
+        console.log('[UserContext] 캐시된 그룹 데이터 없음, API 직접 호출 시도');
+        
+        // 캐시된 데이터가 없으면 직접 API 호출 (fallback)
+        try {
+          const response = await fetch('/api/groups', {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+              console.log('[UserContext] ⚡ API 직접 호출로 그룹 데이터 획득:', data.data.length, '개');
+              setUserGroups(data.data);
+            } else {
+              console.log('[UserContext] API 응답에 그룹 데이터 없음');
+              setUserGroups([]);
+            }
+          } else {
+            console.warn('[UserContext] 그룹 API 직접 호출 실패:', response.status);
+            setUserGroups([]);
+          }
+        } catch (apiError) {
+          console.warn('[UserContext] 그룹 API 직접 호출 예외:', apiError);
+          setUserGroups([]);
+        }
       }
 
-      console.log('[UserContext] 사용자 데이터 로딩 완료 (캐시 사용):', {
+      console.log('[UserContext] 사용자 데이터 로딩 완료:', {
         userId: user.mt_idx,
         userName: userInfoData.name,
         groupCount: cachedGroups?.length || 0
@@ -135,12 +161,37 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // AuthContext 프리로딩 완료 후 데이터 새로고침
   useEffect(() => {
-    // AuthContext 로딩과 프리로딩이 모두 완료된 후 실행
-    if (!authLoading && isPreloadingComplete) {
-      console.log('[UserContext] AuthContext 프리로딩 완료, 캐시된 데이터 로딩');
+    // AuthContext 로딩이 완료되고 사용자 정보가 있으면 즉시 실행
+    if (!authLoading && isLoggedIn && user) {
+      console.log('[UserContext] 🚀 AuthContext 사용자 정보 확인, 즉시 데이터 로딩 시작:', user.mt_idx);
+      refreshUserData();
+      return;
+    }
+    
+    // 사용자 정보가 없지만 프리로딩이 완료된 경우 (로그아웃 상태 등)
+    if (!authLoading && !isLoggedIn) {
+      console.log('[UserContext] AuthContext 로그아웃 상태, 데이터 초기화');
+      setUserInfo(null);
+      setUserGroups([]);
+      setIsUserDataLoading(false);
+      return;
+    }
+    
+    // 여전히 로딩 중인 경우
+    if (authLoading) {
+      console.log('[UserContext] AuthContext 로딩 중, 대기...');
+      setIsUserDataLoading(true);
+    }
+  }, [authLoading, isLoggedIn, user, refreshUserData]);
+
+  // 프리로딩 완료 시 추가 데이터 확인 (백업용)
+  useEffect(() => {
+    // 프리로딩이 완료되었지만 UserContext 데이터가 없는 경우 재시도
+    if (isPreloadingComplete && isLoggedIn && user && !userInfo) {
+      console.log('[UserContext] ⚡ 프리로딩 완료 후 백업 데이터 로딩 시도');
       refreshUserData();
     }
-  }, [authLoading, isPreloadingComplete, refreshUserData]);
+  }, [isPreloadingComplete, isLoggedIn, user, userInfo, refreshUserData]);
 
   // 사용자 변경 시 초기화 상태 리셋
   useEffect(() => {
