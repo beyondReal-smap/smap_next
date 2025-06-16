@@ -57,6 +57,28 @@ export default function SignInPage() {
     popstate?: (e: PopStateEvent) => void;
   }>({});
 
+  // iOS 네이티브 로그 전송 함수
+  const sendLogToiOS = (level: 'info' | 'error' | 'warning', message: string, data?: any) => {
+    const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
+    if (isIOSWebView && (window as any).webkit?.messageHandlers?.smapIos) {
+      try {
+        const logData = {
+          type: 'jsLog',
+          param: JSON.stringify({
+            level,
+            message,
+            data: data ? JSON.stringify(data) : null,
+            timestamp: new Date().toISOString()
+          })
+        };
+        (window as any).webkit.messageHandlers.smapIos.postMessage(logData);
+        console.log(`[iOS LOG SENT] ${level.toUpperCase()}: ${message}`);
+      } catch (e) {
+        console.error('iOS 로그 전송 실패:', e);
+      }
+    }
+  };
+
   // 🔒 컴포넌트 마운트 추적 및 재마운트 방지
   useEffect(() => {
     // 전역 에러 모달 플래그 확인
@@ -291,6 +313,11 @@ export default function SignInPage() {
 
           // ID 토큰을 서버로 전송하여 로그인 처리
           console.log('[GOOGLE LOGIN] 서버 API 호출 시작');
+          sendLogToiOS('info', 'Google Auth API 호출 시작', {
+            idTokenLength: idToken.length,
+            userInfo: normalizedUserInfo
+          });
+          
           const response = await fetch('/api/google-auth', {
             method: 'POST',
             headers: {
@@ -303,14 +330,32 @@ export default function SignInPage() {
           });
 
           console.log('[GOOGLE LOGIN] 서버 응답 상태:', response.status);
+          sendLogToiOS('info', `Google Auth API 응답: ${response.status}`, {
+            ok: response.ok,
+            statusText: response.statusText
+          });
           
           if (!response.ok) {
+            const errorText = await response.text();
             console.error('[GOOGLE LOGIN] 서버 응답 오류:', response.status, response.statusText);
-            throw new Error(`서버 오류: ${response.status}`);
+            console.error('[GOOGLE LOGIN] 서버 에러 본문:', errorText);
+            
+            sendLogToiOS('error', `Google Auth API 실패: ${response.status}`, {
+              status: response.status,
+              statusText: response.statusText,
+              errorBody: errorText
+            });
+            
+            throw new Error(`서버 오류: ${response.status} - ${errorText}`);
           }
 
           const data = await response.json();
           console.log('[GOOGLE LOGIN] 서버 응답 데이터:', data);
+          sendLogToiOS('info', 'Google Auth API 성공', {
+            success: data.success,
+            hasUser: !!data.user,
+            hasToken: !!data.token
+          });
 
           if (data.success) {
             console.log('[GOOGLE LOGIN] 네이티브 Google 로그인 성공, 사용자 정보:', data.user);
@@ -528,6 +573,14 @@ export default function SignInPage() {
       console.log('[SIGNIN] 에러 메시지:', err.message);
       console.log('[SIGNIN] 에러 스택:', err.stack);
       
+      // iOS 로그 전송
+      sendLogToiOS('error', '전화번호 로그인 실패', {
+        errorType: typeof err,
+        errorMessage: err.message,
+        errorStack: err.stack,
+        phoneNumber: phoneNumber.replace(/-/g, '').replace(/\d/g, '*') // 마스킹
+      });
+      
       // Google 로그인과 동일하게 에러 모달 표시
       let errorMessage = err.message || '로그인에 실패했습니다.';
       console.log('[SIGNIN] 원본 에러 메시지:', errorMessage);
@@ -546,11 +599,15 @@ export default function SignInPage() {
       console.log('[SIGNIN] 🔥 변환된 에러 메시지:', errorMessage);
       console.log('[SIGNIN] 🔥 showError 함수 호출 시작');
       
+      sendLogToiOS('info', '에러 모달 표시 시도', { errorMessage });
+      
       try {
         showError(errorMessage);
         console.log('[SIGNIN] ✅ showError 함수 호출 완료');
+        sendLogToiOS('info', 'showError 함수 호출 완료');
       } catch (showErrorErr) {
         console.error('[SIGNIN] ❌ showError 함수 호출 실패:', showErrorErr);
+        sendLogToiOS('error', 'showError 함수 호출 실패', { error: String(showErrorErr) });
       }
       
     } finally {
