@@ -1,8 +1,8 @@
 # iOS WebView 트러블슈팅 가이드 📱
-## next.smap.site 데이터 로딩 및 화면 전환 문제 해결
+## nextstep.smap.site 데이터 로딩 및 화면 전환 문제 해결
 
 ### 🚨 현재 문제 상황
-- ✅ 일반 웹브라우저에서는 next.smap.site가 정상 작동
+- ✅ 일반 웹브라우저에서는 nextstep.smap.site가 정상 작동
 - ❌ iOS WebView에서는 데이터 로딩이 안되고 화면 전환이 원활하지 않음
 
 ### 🔍 문제 진단 체크리스트
@@ -172,7 +172,7 @@ override func viewDidLoad() {
     view.addSubview(webView)
     
     // 🌐 SMAP 사이트 로드
-    if let url = URL(string: "https://next.smap.site") {
+    if let url = URL(string: "https://nextstep.smap.site") {
         let request = URLRequest(url: url)
         webView.load(request)
     }
@@ -385,7 +385,7 @@ if let url = URL(string: "https://httpbin.org/user-agent") {
 #### 2단계: SMAP 도메인 직접 접근
 ```swift
 // SMAP API 직접 호출 테스트
-if let url = URL(string: "https://next.smap.site/api/health") {
+if let url = URL(string: "https://nextstep.smap.site/api/health") {
     URLSession.shared.dataTask(with: url) { data, response, error in
         DispatchQueue.main.async {
             if let error = error {

@@ -1,5 +1,5 @@
 // iOS WebView 종합 최적화 - 데이터 로딩 및 화면 전환 문제 해결
-// next.smap.site 웹사이트와 iOS WebView 간의 호환성 개선
+// nextstep.smap.site 웹사이트와 iOS WebView 간의 호환성 개선
 
 import WebKit
 import UIKit
@@ -27,7 +27,7 @@ class EnhancedWebViewController: UIViewController {
     private let maxRetryCount = 3
     
     // MARK: - 🛠️ 설정 상수
-    private let targetURL = "https://next.smap.site"
+    private let targetURL = "https://nextstep.smap.site"
     private let requestTimeout: TimeInterval = 30.0
     private let cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
     
@@ -141,6 +141,13 @@ class EnhancedWebViewController: UIViewController {
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
+        
+        // 🔐 App-Bound Domain 관련 설정 (iOS 14+)
+        if #available(iOS 14.0, *) {
+            config.limitsNavigationsToAppBoundDomains = true
+            print("🔐 [WebView] App-Bound Domain 제한 활성화됨")
+            print("🔐 [WebView] 허용된 도메인: nextstep.smap.site, smap.site, localhost")
+        }
         
         // 데이터 감지 설정
         config.dataDetectorTypes = [.phoneNumber, .link]

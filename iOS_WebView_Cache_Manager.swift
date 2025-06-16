@@ -1,5 +1,5 @@
 // iOS WebView 캐시 및 데이터 관리자
-// next.smap.site의 데이터 로딩 문제 해결을 위한 캐시 최적화
+// nextstep.smap.site의 데이터 로딩 문제 해결을 위한 캐시 최적화
 
 import WebKit
 import UIKit
@@ -446,10 +446,10 @@ class WebViewCacheManager {
         
         // SMAP 주요 API 엔드포인트들을 사전 로드
         let criticalURLs = [
-            "https://next.smap.site/api/auth/session",
-            "https://next.smap.site/api/user/profile", 
-            "https://next.smap.site/api/groups/list",
-            "https://next.smap.site/api/locations/recent"
+            "https://nextstep.smap.site/api/auth/session",
+            "https://nextstep.smap.site/api/user/profile", 
+            "https://nextstep.smap.site/api/groups/list",
+            "https://nextstep.smap.site/api/locations/recent"
         ]
         
         for urlString in criticalURLs {

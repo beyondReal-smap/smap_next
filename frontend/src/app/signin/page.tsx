@@ -2409,54 +2409,6 @@ export default function SignInPage() {
               회원가입
             </Link>
           </p>
-          
-          {/* 🧪 개발자 테스트 도구 (항상 표시) */}
-          <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-            <p className="text-xs text-gray-600 mb-2">🧪 개발자 도구</p>
-            
-            {/* 시뮬레이터 모드 활성화 버튼 */}
-            <div className="mb-3">
-              <button
-                onClick={enableSimulatorMode}
-                className="text-xs py-2 px-3 bg-purple-500 text-white rounded hover:bg-purple-600 w-full"
-              >
-                🚀 시뮬레이터 모드 활성화 (Google 로그인 테스트)
-              </button>
-            </div>
-            
-            {/* 햅틱 테스트 버튼들 */}
-            {process.env.NODE_ENV === 'development' && (
-              <>
-                <p className="text-xs text-gray-600 mb-2">햅틱 테스트</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={testHapticFeedback}
-                    className="text-xs py-2 px-3 bg-blue-500 text-white rounded hover:bg-blue-600"
-                  >
-                    햅틱 테스트
-                  </button>
-                  <button
-                    onClick={() => hapticFeedback.success({ test: 'manual' })}
-                    className="text-xs py-2 px-3 bg-green-500 text-white rounded hover:bg-green-600"
-                  >
-                    성공 햅틱
-                  </button>
-                  <button
-                    onClick={() => hapticFeedback.error({ test: 'manual' })}
-                    className="text-xs py-2 px-3 bg-red-500 text-white rounded hover:bg-red-600"
-                  >
-                    에러 햅틱
-                  </button>
-                  <button
-                    onClick={() => hapticFeedback.warning({ test: 'manual' })}
-                    className="text-xs py-2 px-3 bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                  >
-                    경고 햅틱
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
         </motion.div>
       </motion.div>
 

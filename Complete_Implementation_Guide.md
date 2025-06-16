@@ -134,7 +134,7 @@ class ViewController: UIViewController {
     }
     
     private func loadSMAPWebsite() {
-        guard let url = URL(string: "https://next.smap.site") else { return }
+        guard let url = URL(string: "https://nextstep.smap.site") else { return }
         
         var request = URLRequest(url: url)
         request.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
@@ -191,7 +191,7 @@ extension ViewController: WKNavigationDelegate, WKUIDelegate, WKScriptMessageHan
 📱 [WebView] 초기화 시작 - iPhone iOS 17.0
 🌐 [Network] 상태: 온라인 (WiFi)
 🛠️ [WebView] 설정 완료
-✅ [Navigation] 로딩 완료: https://next.smap.site
+✅ [Navigation] 로딩 완료: https://nextstep.smap.site
 ```
 
 ## 🔧 6단계: 추가 커스터마이징
@@ -268,6 +268,6 @@ print("View bounds: \(view.bounds)")
 
 ## 🎉 완료!
 
-모든 파일이 정상적으로 적용되면 next.smap.site가 iOS WebView에서도 완벽하게 작동할 것입니다!
+모든 파일이 정상적으로 적용되면 nextstep.smap.site가 iOS WebView에서도 완벽하게 작동할 것입니다!
 
 문제가 발생하면 Xcode 콘솔의 로그를 확인하고, 필요시 단계별로 적용해보세요. 📱✨ 

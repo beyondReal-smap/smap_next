@@ -28,7 +28,7 @@ GOOGLE_CLIENT_ID=283271180972-qnh7qqhfqtq7h7q3lktqnqnqnqnqnqnq.apps.googleuserco
 
 # NextAuth 설정
 NEXTAUTH_SECRET=your-secret-key-here
-NEXTAUTH_URL=https://next.smap.site
+NEXTAUTH_URL=https://nextstep.smap.site
 
 # 기타 환경 변수들
 NODE_ENV=production
@@ -171,7 +171,7 @@ function LoginPage() {
 `/test-google` 페이지에서 Google Sign-In 기능을 테스트할 수 있습니다:
 
 ```
-https://next.smap.site/test-google
+https://nextstep.smap.site/test-google
 ```
 
 이 페이지에서는:

@@ -32,8 +32,8 @@
         <!-- SMAP 도메인 예외 설정 -->
         <key>NSExceptionDomains</key>
         <dict>
-            <!-- next.smap.site 도메인 -->
-            <key>next.smap.site</key>
+            <!-- nextstep.smap.site 도메인 -->
+            <key>nextstep.smap.site</key>
             <dict>
                 <key>NSExceptionAllowsInsecureHTTPLoads</key>
                 <true/>
@@ -85,6 +85,14 @@
     <!-- iOS 14+ WebView 개선사항 활성화 -->
     <key>WKWebViewEnhancedPrivacy</key>
     <true/>
+    
+    <!-- 🔐 App-Bound Domains 설정 (JavaScript 실행 허용) -->
+    <key>WKAppBoundDomains</key>
+    <array>
+        <string>nextstep.smap.site</string>
+        <string>smap.site</string>
+        <string>localhost</string>
+    </array>
     
     <!-- 🎮 햅틱 피드백 권한 -->
     <key>UIRequiresFullScreen</key>
