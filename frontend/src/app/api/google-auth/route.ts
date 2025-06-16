@@ -2,37 +2,72 @@ import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+// Google Client ID (iOS 로그에서 확인된 값)
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com';
+const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 export async function POST(request: NextRequest) {
   console.log('[GOOGLE API] POST 요청 시작');
+  console.log('[GOOGLE API] 환경 변수 확인:', {
+    hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID,
+    googleClientIdLength: process.env.GOOGLE_CLIENT_ID?.length || 0,
+    hasNextAuthSecret: !!process.env.NEXTAUTH_SECRET,
+    usingClientId: GOOGLE_CLIENT_ID
+  });
+  
   try {
     const body = await request.json();
-    console.log('[GOOGLE API] 요청 본문:', body);
+    console.log('[GOOGLE API] 요청 본문 타입:', typeof body);
+    console.log('[GOOGLE API] 요청 본문 키:', Object.keys(body || {}));
+    console.log('[GOOGLE API] idToken 존재:', !!body?.idToken);
+    console.log('[GOOGLE API] idToken 길이:', body?.idToken?.length || 0);
+    console.log('[GOOGLE API] userInfo 존재:', !!body?.userInfo);
+    console.log('[GOOGLE API] userInfo 타입:', typeof body?.userInfo);
+    
     const { idToken, userInfo } = body;
 
     if (!idToken) {
-      console.log('[GOOGLE API] ID 토큰이 없음');
+      console.log('[GOOGLE API] ❌ ID 토큰이 없음');
       return NextResponse.json(
         { error: 'ID 토큰이 필요합니다.' },
         { status: 400 }
       );
     }
 
+    console.log('[GOOGLE API] ✅ ID 토큰 확인 완료, 길이:', idToken.length);
+
     console.log('[GOOGLE API] Google ID 토큰 검증 시작');
+    console.log('[GOOGLE API] 검증 설정:', {
+      clientId: GOOGLE_CLIENT_ID,
+      tokenPrefix: idToken.substring(0, 50) + '...'
+    });
 
     // Google ID 토큰 검증
     let googleUser;
     try {
+      console.log('[GOOGLE API] OAuth2Client.verifyIdToken 호출 중...');
       const ticket = await client.verifyIdToken({
         idToken: idToken,
-        audience: process.env.GOOGLE_CLIENT_ID,
+        audience: GOOGLE_CLIENT_ID,
       });
+      
+      console.log('[GOOGLE API] 토큰 검증 완료, payload 추출 중...');
       const payload = ticket.getPayload();
       
       if (!payload) {
+        console.log('[GOOGLE API] ❌ payload가 null/undefined');
         throw new Error('Invalid token payload');
       }
+
+      console.log('[GOOGLE API] payload 내용:', {
+        sub: payload.sub,
+        email: payload.email,
+        name: payload.name,
+        aud: payload.aud,
+        iss: payload.iss,
+        exp: payload.exp,
+        iat: payload.iat
+      });
 
       googleUser = {
         googleId: payload.sub,
@@ -44,11 +79,18 @@ export async function POST(request: NextRequest) {
         emailVerified: payload.email_verified
       };
 
-      console.log('[GOOGLE API] Google 토큰 검증 성공:', googleUser);
+      console.log('[GOOGLE API] ✅ Google 토큰 검증 성공:', googleUser);
     } catch (error) {
-      console.error('[GOOGLE API] Google 토큰 검증 실패:', error);
+      console.error('[GOOGLE API] ❌ Google 토큰 검증 실패:', error);
+      console.log('[GOOGLE API] 에러 타입:', typeof error);
+      console.log('[GOOGLE API] 에러 메시지:', error instanceof Error ? error.message : String(error));
+      console.log('[GOOGLE API] 에러 스택:', error instanceof Error ? error.stack : 'No stack');
+      
       return NextResponse.json(
-        { error: 'Google 토큰 검증에 실패했습니다.' },
+        { 
+          error: 'Google 토큰 검증에 실패했습니다.',
+          details: error instanceof Error ? error.message : String(error)
+        },
         { status: 400 }
       );
     }
