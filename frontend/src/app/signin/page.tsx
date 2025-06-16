@@ -1371,16 +1371,23 @@ export default function SignInPage() {
     try {
       console.log('Google 로그인 시도');
       
-      // iOS WebView에서 네이티브 Google Sign-In 사용
+      // 🚨 iOS 시뮬레이터 최적화: 시뮬레이터 환경 감지 로직 추가
       const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
+      const isIOSSimulator = navigator.userAgent.includes('Safari') && 
+                            navigator.userAgent.includes('Mac') &&
+                            process.env.NODE_ENV === 'development';
+      
       console.log('[GOOGLE LOGIN] 환경 체크:', {
         isIOSWebView,
+        isIOSSimulator,
         hasWebkit: !!(window as any).webkit,
         hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
         hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
         hasIosBridge: !!(window as any).iosBridge,
         hasGoogleSignIn: !!(window as any).iosBridge?.googleSignIn,
-        hasGoogleSignInMethod: !!(window as any).iosBridge?.googleSignIn?.signIn
+        hasGoogleSignInMethod: !!(window as any).iosBridge?.googleSignIn?.signIn,
+        userAgent: navigator.userAgent,
+        environment: process.env.NODE_ENV
       });
       
       // iOS 로그 전송 - 환경 체크 결과
@@ -1397,8 +1404,21 @@ export default function SignInPage() {
         }
       });
       
-              if (isIOSWebView) {
-          console.log('[GOOGLE LOGIN] iOS WebView에서 네이티브 Google Sign-In 사용');
+              // 🚨 iOS 시뮬레이터 테스트: 시뮬레이터에서도 Google 로그인 허용
+      if (isIOSWebView || isIOSSimulator) {
+          // 🚨 iOS 시뮬레이터 환경 처리
+        if (isIOSSimulator) {
+          console.log('[GOOGLE LOGIN] 🧪 iOS 시뮬레이터 환경에서 Google 로그인 테스트');
+          
+          // 시뮬레이터에서는 모의 Google 로그인 처리
+          setTimeout(() => {
+            showError('🧪 시뮬레이터 테스트 환경\n\n실제 iOS 기기에서는 네이티브 Google 로그인이 작동합니다.\n\n현재는 시뮬레이터이므로 전화번호 로그인을 사용해주세요.');
+            setIsLoading(false);
+          }, 1000);
+          return;
+        }
+        
+        console.log('[GOOGLE LOGIN] iOS WebView에서 네이티브 Google Sign-In 사용');
           
           // iOS 로그 전송 - 네이티브 Google Sign-In 사용
           sendLogToiOS('info', '📱 iOS 네이티브 Google Sign-In 사용', {
@@ -1566,7 +1586,7 @@ export default function SignInPage() {
         
         // 에러 모달 강제 표시
         setTimeout(() => {
-          showError('웹 환경에서는 Google 로그인이 현재 사용할 수 없습니다. 앱에서 이용해주세요.');
+          showError('🌐 웹 브라우저 환경\n\nGoogle 로그인은 SMAP iOS 앱에서만 사용 가능합니다.\n\n웹에서는 전화번호 로그인을 사용해주세요.');
         }, 100);
       
       /*
