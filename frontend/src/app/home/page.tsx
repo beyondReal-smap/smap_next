@@ -35,6 +35,7 @@ import notificationService from '@/services/notificationService';
 import { 
     AllDayCheckEnum, ShowEnum, ScheduleAlarmCheckEnum, InCheckEnum, ScheduleCheckEnum 
 } from '../../types/enums';
+import { hapticFeedback } from '@/utils/haptic';
 
 declare global {
   interface Window {
@@ -1087,6 +1088,8 @@ export default function HomePage() {
         if (isMounted && dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
           if (isMapLoading) setIsMapLoading(false); 
           console.log("[fetchAllGroupData] 모든 그룹 데이터 로딩 완료");
+          // 데이터 로딩 완료 햅틱 피드백
+          hapticFeedback.dataLoadComplete();
         }
       }
     };

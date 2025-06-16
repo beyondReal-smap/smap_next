@@ -41,6 +41,7 @@ import locationService, { OtherMemberLocationRaw } from '@/services/locationServ
 import groupService, { Group } from '@/services/groupService';
 import { useAuth } from '@/contexts/AuthContext';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
+import { hapticFeedback } from '@/utils/haptic';
 
 // 모바일 최적화된 CSS 스타일
 const mobileStyles = `
@@ -1663,6 +1664,8 @@ export default function LocationPage() {
               setOtherMembersSavedLocations([]);
             } finally {
               setIsLoadingOtherLocations(false);
+              // 다른 멤버 위치 로딩 완료 햅틱 피드백
+              hapticFeedback.dataLoadComplete();
             }
           })(); // 즉시 실행
         }
@@ -1923,6 +1926,8 @@ export default function LocationPage() {
           setActiveView('selectedMemberPlaces');
         } finally {
           setIsLoadingOtherLocations(false);
+          // 멤버별 위치 로딩 완료 햅틱 피드백
+          hapticFeedback.dataLoadComplete();
         }
       }
 
@@ -2512,6 +2517,8 @@ export default function LocationPage() {
           setOtherMembersSavedLocations([]);
         } finally {
           setIsLoadingOtherLocations(false);
+          // 다른 멤버 위치 뷰 로딩 완료 햅틱 피드백
+          hapticFeedback.dataLoadComplete();
         }
       } else if (activeView === 'selectedMemberPlaces' && currentSelectedMember) {
         // selectedMemberPlaces 뷰에서는 이미 로드된 데이터 사용
@@ -2576,6 +2583,8 @@ export default function LocationPage() {
       dataFetchedRef.current.groups = true;
     } finally {
       setIsLoadingGroups(false);
+      // 그룹 목록 로딩 완료 햅틱 피드백
+      hapticFeedback.dataLoadComplete();
     }
   };
 

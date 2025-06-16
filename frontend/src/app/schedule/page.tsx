@@ -41,6 +41,7 @@ import groupService, { Group } from '@/services/groupService';
 import scheduleService, { Schedule, UserPermission } from '@/services/scheduleService';
 import pushNotificationService, { ScheduleNotificationContext, GroupMemberInfo } from '@/services/pushNotificationService';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { hapticFeedback } from '@/utils/haptic';
 
 dayjs.extend(isBetween);
 dayjs.locale('ko');
@@ -2194,6 +2195,8 @@ export default function SchedulePage() {
 
   // 뒤로가기 핸들러
   const handleBack = () => {
+    // 뒤로가기 햅틱 피드백
+    hapticFeedback.backButton();
     router.back();
   };
 
@@ -3912,10 +3915,22 @@ export default function SchedulePage() {
 
   // 로딩 단계 업데이트 함수
   const updateLoadingStep = (step: 'groups' | 'schedules' | 'calendar' | 'ui', completed: boolean) => {
-    setLoadingSteps(prev => ({
-      ...prev,
-      [step]: completed
-    }));
+    setLoadingSteps(prev => {
+      const newSteps = {
+        ...prev,
+        [step]: completed
+      };
+      
+      // 모든 로딩이 완료되었는지 확인
+      const allCompleted = Object.values(newSteps).every(stepCompleted => stepCompleted);
+      
+      // 모든 로딩이 완료되면 햅틱 피드백
+      if (allCompleted && !Object.values(prev).every(stepCompleted => stepCompleted)) {
+        hapticFeedback.dataLoadComplete();
+      }
+      
+      return newSteps;
+    });
   };
 
   return (

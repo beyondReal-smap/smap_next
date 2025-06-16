@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Home, Search, MessageCircle, User, Map } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useHapticFeedback } from '@/hooks/useHapticFeedback'
+import { hapticFeedback } from '@/utils/haptic'
 
 const navigationItems = [
   {
@@ -36,12 +36,11 @@ const navigationItems = [
 
 export default function BottomNavigation() {
   const pathname = usePathname()
-  const { haptic } = useHapticFeedback()
 
   const handleNavClick = (href: string) => {
-    // 탭 변경 시 선택 햅틱 피드백
+    // 탭 변경 시 메뉴 선택 햅틱 피드백
     if (pathname !== href) {
-      haptic.selection()
+      hapticFeedback.menuSelect()
     }
   }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { hapticFeedback } from '@/utils/haptic';
 
 interface HeaderProps {
   title: string;
@@ -18,7 +19,10 @@ export default function Header({ title, showBackButton = true, rightElement }: H
           <div className="flex items-center">
             {showBackButton && (
               <button
-                onClick={() => router.back()}
+                onClick={() => {
+                  hapticFeedback.backButton();
+                  router.back();
+                }}
                 aria-label="뒤로 가기"
                 className="p-2 mr-2 -ml-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
               >

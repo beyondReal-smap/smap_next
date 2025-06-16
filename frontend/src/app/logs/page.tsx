@@ -15,6 +15,7 @@ import { API_KEYS, MAP_CONFIG } from '../../config';
 import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { hapticFeedback } from '@/utils/haptic';
 import memberService from '@/services/memberService';
 
 import groupService, { Group } from '@/services/groupService';
@@ -2168,6 +2169,8 @@ export default function LogsPage() {
             // 렌더링 완료 또는 실패 시 모든 로딩 상태 해제
             setIsLocationDataLoading(false);
             setIsMapLoading(false);
+            // 캐시 데이터 로딩 완료 햅틱 피드백
+            hapticFeedback.dataLoadComplete();
             console.log('[loadLocationData] 🔄 캐시 데이터 렌더링 완료 - 모든 로딩 상태 해제');
           }
         };
@@ -2515,6 +2518,8 @@ export default function LogsPage() {
           // 렌더링 완료 또는 실패 시 모든 로딩 상태 해제
           setIsLocationDataLoading(false);
           setIsMapLoading(false);
+          // 신규 위치 데이터 로딩 완료 햅틱 피드백
+          hapticFeedback.dataLoadComplete();
           console.log('[loadLocationData] 🔄 신규 데이터 렌더링 완료 - 모든 로딩 상태 해제');
           
           // 렌더링 완료 후 마커 표시 검증 및 재시도 로직
@@ -2869,6 +2874,11 @@ export default function LogsPage() {
       const currentValue = sliderValue;
       if (Math.abs(percentage - currentValue) < 0.05) return; // 더욱 민감하게 반응 (0.2 → 0.05)
       
+      // 슬라이더 이동 햅틱 피드백 (5% 이상 변경 시에만)
+      if (Math.abs(percentage - currentValue) >= 5) {
+        hapticFeedback.sliderMove();
+      }
+      
       // 상태 업데이트 (React의 배치 처리에 맡김)
       setSliderValue(percentage);
       
@@ -3158,6 +3168,8 @@ export default function LogsPage() {
       setDailyCountsData(null);
     } finally {
       setIsDailyCountsLoading(false);
+      // 일별 위치 카운트 로딩 완료 햅틱 피드백
+      hapticFeedback.dataLoadComplete();
     }
   };
 
@@ -3178,6 +3190,8 @@ export default function LogsPage() {
       setMemberActivityData(null);
     } finally {
       setIsMemberActivityLoading(false);
+      // 멤버 활동 로딩 완료 햅틱 피드백
+      hapticFeedback.dataLoadComplete();
     }
   };
 

@@ -37,6 +37,7 @@ import scheduleService from '@/services/scheduleService';
 import locationService from '@/services/locationService';
 import { useAuth } from '@/contexts/AuthContext';
 import Modal from '@/components/ui/Modal';
+import { hapticFeedback } from '@/utils/haptic';
 
 export const dynamic = 'force-dynamic';
 
@@ -397,6 +398,8 @@ function GroupPageContent() {
       setGroupMembers([]);
     } finally {
       setMembersLoading(false);
+      // 멤버 데이터 로딩 완료 햅틱 피드백
+      hapticFeedback.dataLoadComplete();
     }
   };
 
@@ -465,6 +468,8 @@ function GroupPageContent() {
       setGroupStats(basicStatsData);
     } finally {
       setStatsLoading(false);
+      // 통계 데이터 로딩 완료 햅틱 피드백
+      hapticFeedback.dataLoadComplete();
     }
   };
 

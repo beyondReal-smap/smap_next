@@ -30,6 +30,7 @@ import {
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
+import { hapticFeedback } from '@/utils/haptic';
 
 // 기본 이미지 가져오기 함수 (schedule/page.tsx에서 가져옴)
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
@@ -295,6 +296,8 @@ export default function SettingsPage() {
       console.error('설정 저장 중 오류가 발생했습니다.', error);
     } finally {
       setIsLoading(false);
+      // 설정 저장 완료 햅틱 피드백
+      hapticFeedback.dataLoadComplete();
     }
   };
 

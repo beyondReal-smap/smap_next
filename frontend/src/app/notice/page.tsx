@@ -11,6 +11,8 @@ import { PushLog, DeleteAllResponse } from '@/types/push';
 import { useToast } from '@/components/ui/use-toast';
 import notificationService from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
+import LoadingSpinner from '@/app/components/common/LoadingSpinner';
+import { hapticFeedback } from '@/utils/haptic';
 
 // glass-effect 및 모바일 최적화된 CSS 애니메이션
 const mobileAnimations = `
@@ -378,7 +380,9 @@ function NoticeContent() {
         }
       } finally {
         if (isMounted) { // finally 블록에서도 isMounted 체크
-        setLoading(false);
+          setLoading(false);
+          // 데이터 로딩 완료 햅틱 피드백
+          hapticFeedback.dataLoadComplete();
         }
       }
     };
@@ -427,6 +431,9 @@ function NoticeContent() {
 
   // 뒤로가기 애니메이션 핸들러
   const handleBackNavigation = () => {
+    // 뒤로가기 햅틱 피드백
+    hapticFeedback.backButton();
+    
     setIsExiting(true);
     // 애니메이션 완료 후 페이지 이동
     setTimeout(() => {
@@ -450,10 +457,7 @@ function NoticeContent() {
             }`}
           >
             <div className="flex items-center justify-center h-full">
-              <div className="text-center">
-                                        <div className="w-8 h-8 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-4"></div>
-                <p className="text-gray-600">알림을 불러오는 중...</p>
-              </div>
+              <LoadingSpinner message="알림을 불러오는 중..." fullScreen={false} />
             </div>
           </motion.div>
         </div>

@@ -3,6 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { hapticFeedback } from '@/utils/haptic';
 
 interface PageContainerProps {
   title: string;
@@ -30,6 +31,9 @@ export default function PageContainer({
   const router = useRouter();
   
   const handleBackClick = () => {
+    // 뒤로가기 햅틱 피드백
+    hapticFeedback.backButton();
+    
     if (onBackClick) {
       onBackClick();
     } else {
