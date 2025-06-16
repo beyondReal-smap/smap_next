@@ -503,6 +503,10 @@ export default function SignInPage() {
     try {
       console.log('[SIGNIN] AuthContext login 호출 시작');
       
+      // 전화번호 로그인 시작 시 AuthContext 에러 감지 비활성화
+      blockAllEffectsRef.current = true;
+      console.log('[SIGNIN] AuthContext 에러 감지 비활성화');
+      
       // AuthContext를 통해 로그인
       await login({
         mt_id: phoneNumber.replace(/-/g, ''), // 전화번호에서 하이픈 제거
@@ -518,11 +522,15 @@ export default function SignInPage() {
       router.replace('/home');
 
     } catch (err: any) {
-      console.error('[SIGNIN] 로그인 오류:', err);
+      console.error('[SIGNIN] 🚨 로그인 오류 발생:', err);
+      console.log('[SIGNIN] 에러 타입:', typeof err);
+      console.log('[SIGNIN] 에러 객체:', err);
       console.log('[SIGNIN] 에러 메시지:', err.message);
+      console.log('[SIGNIN] 에러 스택:', err.stack);
       
       // Google 로그인과 동일하게 에러 모달 표시
       let errorMessage = err.message || '로그인에 실패했습니다.';
+      console.log('[SIGNIN] 원본 에러 메시지:', errorMessage);
       
       // 사용자 친화적 에러 메시지 변환
       if (errorMessage.includes('아이디') || errorMessage.includes('ID')) {
@@ -535,8 +543,15 @@ export default function SignInPage() {
         errorMessage = '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.';
       }
       
-      console.log('[SIGNIN] 에러 모달 표시:', errorMessage);
-      showError(errorMessage);
+      console.log('[SIGNIN] 🔥 변환된 에러 메시지:', errorMessage);
+      console.log('[SIGNIN] 🔥 showError 함수 호출 시작');
+      
+      try {
+        showError(errorMessage);
+        console.log('[SIGNIN] ✅ showError 함수 호출 완료');
+      } catch (showErrorErr) {
+        console.error('[SIGNIN] ❌ showError 함수 호출 실패:', showErrorErr);
+      }
       
     } finally {
       setIsLoading(false);
@@ -580,44 +595,66 @@ export default function SignInPage() {
 
   // 에러 표시 헬퍼 함수 - 단순하게!
   const showError = (message: string) => {
-    console.log('[SIGNIN] 💥 에러 표시:', message);
+    console.log('[SIGNIN] 💥 showError 함수 시작:', message);
+    console.log('[SIGNIN] 현재 상태:', {
+      showErrorModal,
+      errorModalMessage,
+      isLoading,
+      blockAllEffectsRef: blockAllEffectsRef.current,
+      preventRemountRef: preventRemountRef.current
+    });
     
-    // 🔒 모든 것을 멈춰!
-    blockAllEffectsRef.current = true;
-    preventRemountRef.current = true;
-    
-    // 전역 플래그 설정 (가장 먼저)
-    (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
-    
-    // 🚫 페이지 완전 고정
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    
-    // 🚫 브라우저 네비게이션 차단
-    navigationListenersRef.current.beforeunload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = '';
-      return '';
-    };
-    
-    navigationListenersRef.current.popstate = (e: PopStateEvent) => {
-      e.preventDefault();
+    try {
+      // 🔒 모든 것을 멈춰!
+      console.log('[SIGNIN] 플래그 설정 중...');
+      blockAllEffectsRef.current = true;
+      preventRemountRef.current = true;
+      
+      // 전역 플래그 설정 (가장 먼저)
+      (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+      console.log('[SIGNIN] 전역 플래그 설정 완료');
+      
+      // 🚫 페이지 완전 고정
+      console.log('[SIGNIN] 페이지 스크롤 차단 중...');
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      
+      // 🚫 브라우저 네비게이션 차단
+      console.log('[SIGNIN] 브라우저 네비게이션 차단 설정 중...');
+      navigationListenersRef.current.beforeunload = (e: BeforeUnloadEvent) => {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      };
+      
+      navigationListenersRef.current.popstate = (e: PopStateEvent) => {
+        e.preventDefault();
+        window.history.pushState(null, '', window.location.href);
+      };
+      
+      // 이벤트 리스너 추가
+      window.addEventListener('beforeunload', navigationListenersRef.current.beforeunload);
+      window.addEventListener('popstate', navigationListenersRef.current.popstate);
+      
+      // 현재 히스토리 상태 고정
       window.history.pushState(null, '', window.location.href);
-    };
-    
-    // 이벤트 리스너 추가
-    window.addEventListener('beforeunload', navigationListenersRef.current.beforeunload);
-    window.addEventListener('popstate', navigationListenersRef.current.popstate);
-    
-    // 현재 히스토리 상태 고정
-    window.history.pushState(null, '', window.location.href);
-    
-    // 에러 모달 표시
-    setErrorModalMessage(message);
-    setShowErrorModal(true);
-    setIsLoading(false);
-    
-    console.log('[SIGNIN] ✅ 에러 모달 표시 완료');
+      console.log('[SIGNIN] 브라우저 네비게이션 차단 완료');
+      
+      // 에러 모달 표시
+      console.log('[SIGNIN] 에러 모달 상태 설정 중...');
+      setErrorModalMessage(message);
+      setShowErrorModal(true);
+      setIsLoading(false);
+      
+      console.log('[SIGNIN] ✅ showError 함수 완료');
+      console.log('[SIGNIN] 설정된 상태:', {
+        errorModalMessage: message,
+        showErrorModal: true,
+        isLoading: false
+      });
+    } catch (error) {
+      console.error('[SIGNIN] ❌ showError 함수 내부 오류:', error);
+    }
   };
 
   // Google 로그인 핸들러
@@ -1150,14 +1187,23 @@ export default function SignInPage() {
       </motion.div>
 
       {/* 에러 모달 */}
-      <AlertModal
-        isOpen={showErrorModal}
-        onClose={closeErrorModal}
-        message="로그인 실패"
-        description={errorModalMessage}
-        buttonText="확인"
-        type="error"
-      />
+      {(() => {
+        console.log('[SIGNIN] 에러 모달 렌더링 체크:', {
+          showErrorModal,
+          errorModalMessage,
+          isLoading
+        });
+        return (
+          <AlertModal
+            isOpen={showErrorModal}
+            onClose={closeErrorModal}
+            message="로그인 실패"
+            description={errorModalMessage}
+            buttonText="확인"
+            type="error"
+          />
+        );
+      })()}
 
       {/* 전체 화면 로딩 스피너 */}
       {isLoading && <LoadingSpinner message="처리 중..." />}
