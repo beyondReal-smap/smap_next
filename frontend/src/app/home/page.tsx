@@ -4004,15 +4004,10 @@ export default function HomePage() {
 
   const memberItemVariants = {
     closed: { 
-      opacity: 0
+      opacity: 1
     },
     open: { 
-      opacity: 1,
-      transition: {
-        type: "tween",
-        ease: [0.22, 1, 0.36, 1],
-        duration: 0.3
-      }
+      opacity: 1
     }
   };
 
