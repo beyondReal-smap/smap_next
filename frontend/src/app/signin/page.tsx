@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import authService from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
+import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
 
 // 아이콘 임포트 (react-icons 사용 예시)
 import { FcGoogle } from 'react-icons/fc';
@@ -113,17 +114,7 @@ export default function SignInPage() {
 
   // 🔒 컴포넌트 마운트 추적 및 재마운트 방지 (강화) - 브라우저 저장소 상태 복원
   useEffect(() => {
-    // 🧹 DOM 직접 모달 완전 정리
-    const cleanupDirectModal = () => {
-      const existingModal = document.getElementById('direct-error-modal');
-      if (existingModal) {
-        existingModal.remove();
-        console.log('[SIGNIN] 🧹 DOM 직접 모달 정리 완료');
-      }
-    };
-    
-    // 즉시 정리
-    cleanupDirectModal();
+    // React 모달만 사용하므로 DOM 직접 모달 정리 코드 제거
     
     // 브라우저 저장소에서 에러 모달 상태 복원 (최우선)
     if (typeof window !== 'undefined') {
@@ -146,19 +137,12 @@ export default function SignInPage() {
         preventRemountRef.current = true;
         blockAllEffectsRef.current = true;
         
-        // React 상태 복원 (DOM 직접 모달 생성 제거)
+        // React 상태 복원
         setTimeout(() => {
           setErrorModalMessage(savedErrorMessage);
           setShowErrorModal(true);
           setIsLoading(false);
         }, 100);
-        
-        // 기존 DOM 직접 모달 제거
-        const existingModal = document.getElementById('direct-error-modal');
-        if (existingModal) {
-          existingModal.remove();
-          console.log('[SIGNIN] 기존 DOM 직접 모달 제거됨');
-        }
         
         return;
       }
@@ -170,7 +154,7 @@ export default function SignInPage() {
       preventRemountRef.current = true;
       blockAllEffectsRef.current = true;
       
-      // 전역 에러 상태 복원 (DOM 직접 모달 생성 제거)
+      // 전역 에러 상태 복원
       const globalErrorMessage = (window as any).__SIGNIN_ERROR_MESSAGE__;
       if (globalErrorMessage) {
         console.log('[SIGNIN] 🔄 전역 에러 상태 복원:', globalErrorMessage);
@@ -179,13 +163,6 @@ export default function SignInPage() {
           setShowErrorModal(true);
           setIsLoading(false);
         }, 100);
-        
-        // 기존 DOM 직접 모달 제거
-        const existingModal = document.getElementById('direct-error-modal');
-        if (existingModal) {
-          existingModal.remove();
-          console.log('[SIGNIN] 기존 DOM 직접 모달 제거됨 (전역 복원)');
-        }
       }
       return;
     }
@@ -746,13 +723,6 @@ export default function SignInPage() {
   const closeErrorModal = () => {
     console.log('[SIGNIN] 에러 모달 닫기');
     
-    // 직접 생성한 모달 제거
-    const directModal = document.getElementById('direct-error-modal');
-    if (directModal) {
-      directModal.remove();
-      console.log('[SIGNIN] 직접 모달 제거 완료');
-    }
-    
     // 브라우저 저장소에서 에러 모달 상태 제거
     sessionStorage.removeItem('__SIGNIN_ERROR_MODAL_ACTIVE__');
     sessionStorage.removeItem('__SIGNIN_ERROR_MESSAGE__');
@@ -829,120 +799,7 @@ export default function SignInPage() {
     console.log('[SIGNIN] 모든 플래그 리셋 완료');
   };
 
-  // DOM에 직접 에러 모달 생성 (React와 독립적)
-  const createDirectErrorModal = (message: string) => {
-    console.log('[SIGNIN] 🎯 DOM 직접 에러 모달 생성:', message);
-    
-    // 기존 직접 모달이 있다면 제거
-    const existingModal = document.getElementById('direct-error-modal');
-    if (existingModal) {
-      existingModal.remove();
-    }
-    
-    // 모달 HTML 생성
-    const modalHTML = `
-      <div id="direct-error-modal" style="
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 999999;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      ">
-        <div style="
-          background: white;
-          border-radius: 12px;
-          padding: 24px;
-          max-width: 400px;
-          width: 90%;
-          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-          text-align: center;
-        ">
-          <div style="
-            width: 48px;
-            height: 48px;
-            background-color: #FEF2F2;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 16px;
-          ">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </div>
-          <h3 style="
-            font-size: 18px;
-            font-weight: 600;
-            color: #111827;
-            margin: 0 0 8px 0;
-            word-break: keep-all;
-          ">🔴 DOM 직접 에러 모달</h3>
-          <p style="
-            font-size: 14px;
-            color: #6B7280;
-            margin: 0 0 24px 0;
-            line-height: 1.5;
-            word-break: keep-all;
-          ">${message}</p>
-          <button id="direct-error-modal-close" style="
-            background-color: #EF4444;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 12px 24px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            width: 100%;
-            transition: background-color 0.2s;
-          " onmouseover="this.style.backgroundColor='#DC2626'" onmouseout="this.style.backgroundColor='#EF4444'">
-            확인
-          </button>
-        </div>
-      </div>
-    `;
-    
-    // DOM에 모달 추가
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-    
-    // 확인 버튼 이벤트 리스너
-    const closeButton = document.getElementById('direct-error-modal-close');
-    if (closeButton) {
-      closeButton.addEventListener('click', () => {
-        console.log('[SIGNIN] 직접 모달 닫기 버튼 클릭');
-        
-        // 모달 제거
-        const modal = document.getElementById('direct-error-modal');
-        if (modal) {
-          modal.remove();
-        }
-        
-        // 모든 차단 해제
-        closeErrorModal();
-      });
-    }
-    
-    // 모달 외부 클릭 방지
-    const modal = document.getElementById('direct-error-modal');
-    if (modal) {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-          console.log('[SIGNIN] 🚫 모달 외부 클릭 차단!');
-          e.preventDefault();
-          e.stopPropagation();
-        }
-      });
-    }
-    
-    console.log('[SIGNIN] ✅ DOM 직접 에러 모달 생성 완료');
-  };
+
 
   // 에러 표시 헬퍼 함수 - 즉시 차단!
   const showError = (message: string) => {
@@ -1362,14 +1219,7 @@ export default function SignInPage() {
       setErrorModalMessage(message);
       setShowErrorModal(true);
       
-      // 추가 안전장치 - 약간의 지연 후에도 모달 확인
-      setTimeout(() => {
-        const existingModal = document.getElementById('direct-error-modal');
-        if (!existingModal) {
-          console.log('[SIGNIN] 🔄 모달이 사라졌음, 재생성...');
-          createDirectErrorModal(message);
-        }
-      }, 50);
+      // React 모달만 사용하므로 DOM 직접 모달 관련 코드 제거
       
       console.log('[SIGNIN] ✅ showError 함수 완료');
     } catch (error) {
@@ -1974,7 +1824,7 @@ export default function SignInPage() {
             <AlertModal
               isOpen={shouldShowModal}
               onClose={closeErrorModal}
-              message="🔵 React AlertModal"
+              message="로그인 실패"
               description={displayMessage}
               buttonText="확인"
               type="error"
@@ -1983,48 +1833,13 @@ export default function SignInPage() {
       })()}
 
       {/* 전체 화면 로딩 스피너 */}
-      {isLoading && <LoadingSpinner message="처리 중..." />}
-      
-      {/* 개발용: 브라우저 저장소 정리 버튼 */}
-      <div style={{ position: 'fixed', top: '10px', right: '10px', zIndex: 99999 }}>
-        <button
-          onClick={() => {
-            // sessionStorage 완전 정리
-            sessionStorage.removeItem('__SIGNIN_ERROR_MODAL_ACTIVE__');
-            sessionStorage.removeItem('__SIGNIN_ERROR_MESSAGE__');
-            sessionStorage.removeItem('__SIGNIN_PREVENT_REMOUNT__');
-            sessionStorage.removeItem('__SIGNIN_BLOCK_ALL_EFFECTS__');
-            
-            // 전역 플래그 정리
-            if (typeof window !== 'undefined') {
-              (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = false;
-              delete (window as any).__SIGNIN_ERROR_MESSAGE__;
-            }
-            
-            // DOM 직접 모달 제거
-            const existingModal = document.getElementById('direct-error-modal');
-            if (existingModal) {
-              existingModal.remove();
-            }
-            
-            console.log('[SIGNIN] 🧹 브라우저 저장소 및 DOM 모달 완전 정리 완료');
-            
-            // 페이지 새로고침
-            window.location.reload();
-          }}
-          style={{
-            padding: '8px 12px',
-            backgroundColor: '#dc2626',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            fontSize: '12px',
-            cursor: 'pointer'
-          }}
-        >
-          🧹 정리
-        </button>
-      </div>
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
+            <IOSCompatibleSpinner size="md" message="처리 중..." />
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

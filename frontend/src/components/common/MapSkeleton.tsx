@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
+import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
 import styles from './MapSkeleton.module.css';
 
 interface MapSkeletonProps {
@@ -87,7 +87,7 @@ export const MapSkeleton: React.FC<MapSkeletonProps> = ({
                   duration: 0.4
                 }}
               >
-                <UnifiedLoadingSpinner size="md" />
+                <IOSCompatibleSpinner size="md" />
               </motion.div>
             </motion.div>
           </div>

@@ -11,6 +11,10 @@
 GOOGLE_CLIENT_ID=283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com
 NEXTAUTH_SECRET=your-secret-key-here
 
+# 카카오 로그인 설정
+NEXT_PUBLIC_KAKAO_APP_KEY=your-kakao-javascript-key-here
+NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY=your-kakao-javascript-key-here
+
 # 개발환경 설정
 NODE_ENV=development
 ```

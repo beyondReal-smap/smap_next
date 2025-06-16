@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import notificationService from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import LoadingSpinner from '@/app/components/common/LoadingSpinner';
-import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
+import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
 import { hapticFeedback } from '@/utils/haptic';
 
 // glass-effect 및 모바일 최적화된 CSS 애니메이션
@@ -462,7 +462,7 @@ function NoticeContent() {
       return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
-            <UnifiedLoadingSpinner size="md" message={message} />
+            <IOSCompatibleSpinner size="md" message={message} />
           </div>
         </div>
       );
@@ -470,7 +470,7 @@ function NoticeContent() {
     
     return (
       <div className="flex items-center justify-center">
-        <UnifiedLoadingSpinner size="sm" message={message} inline color="primary" />
+        <IOSCompatibleSpinner size="sm" message={message} inline />
       </div>
     );
   };
@@ -531,9 +531,9 @@ function NoticeContent() {
                 delay: 0.3,
                 duration: 0.4
               }}
-            >
-              <UnifiedLoadingSpinner size="md" />
-            </motion.div>
+                          >
+                <IOSCompatibleSpinner size="md" />
+              </motion.div>
           </motion.div>
         </motion.div>
       </>
@@ -725,7 +725,7 @@ function NoticeContent() {
                 >
                   {isDeleting ? (
                     <div className="flex items-center justify-center">
-                      <UnifiedLoadingSpinner size="sm" color="white" inline />
+                      <IOSCompatibleSpinner size="sm" inline />
                       <span className="ml-2">삭제 중...</span>
                     </div>
                   ) : (
