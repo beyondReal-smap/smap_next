@@ -16,6 +16,7 @@ import { FcGoogle } from 'react-icons/fc';
 import { RiKakaoTalkFill } from 'react-icons/ri';
 import { FiX, FiAlertTriangle, FiPhone, FiLock, FiEye, FiEyeOff, FiMail, FiUser } from 'react-icons/fi';
 import { AlertModal } from '@/components/ui';
+import { hapticFeedback } from '@/utils/haptic';
 
 // 카카오 SDK 타입 정의
 declare global {
@@ -467,6 +468,9 @@ export default function SignInPage() {
               
               console.log('[GOOGLE LOGIN] 로그인 성공 - home으로 즉시 리다이렉션');
               
+              // Google 로그인 성공 햅틱 피드백
+              hapticFeedback.success();
+              
               // 리다이렉트 플래그 설정
               isRedirectingRef.current = true;
               
@@ -478,6 +482,10 @@ export default function SignInPage() {
           }
         } catch (error: any) {
           console.error('[GOOGLE LOGIN] 네이티브 Google 로그인 처리 오류:', error);
+          
+          // Google 로그인 실패 햅틱 피드백
+          hapticFeedback.error();
+          
           showError(error.message || 'Google 로그인 처리 중 오류가 발생했습니다.');
         } finally {
           setIsLoading(false);
@@ -503,6 +511,9 @@ export default function SignInPage() {
         } else if (errorMessage.includes('configuration') || errorMessage.includes('Configuration')) {
           userFriendlyMessage = 'Google 로그인 설정에 문제가 있습니다. 앱을 다시 시작해주세요.';
         }
+        
+        // Google 로그인 에러 햅틱 피드백
+        hapticFeedback.error();
         
         // 에러 모달 강제 표시 - setTimeout으로 확실히 실행
         console.log('[GOOGLE LOGIN] 에러 모달 강제 표시:', userFriendlyMessage);
@@ -669,6 +680,9 @@ export default function SignInPage() {
 
       console.log('[SIGNIN] AuthContext 로그인 성공 - home으로 즉시 리다이렉션');
       
+      // 로그인 성공 햅틱 피드백
+      hapticFeedback.success();
+      
       // 리다이렉트 플래그 설정하여 useEffect에서 처리하도록 함
       isRedirectingRef.current = true;
       
@@ -707,6 +721,9 @@ export default function SignInPage() {
       
       console.log('[SIGNIN] 🔥 변환된 에러 메시지:', errorMessage);
       console.log('[SIGNIN] 🔥 showError 함수 호출 시작');
+      
+      // 로그인 실패 햅틱 피드백
+      hapticFeedback.error();
       
       sendLogToiOS('info', '에러 모달 표시 시도', { errorMessage });
       
@@ -1449,6 +1466,9 @@ export default function SignInPage() {
           hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
           hasIosBridge: !!(window as any).iosBridge
         });
+        
+        // Google 로그인 환경 오류 햅틱 피드백
+        hapticFeedback.warning();
         
         // 에러 모달 강제 표시
         setTimeout(() => {
