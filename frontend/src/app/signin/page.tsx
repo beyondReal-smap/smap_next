@@ -90,6 +90,26 @@ export default function SignInPage() {
     keydown?: (e: KeyboardEvent) => void;
   }>({});
 
+  // 🧪 햅틱 테스트 함수 (개발용)
+  const testHapticFeedback = () => {
+    console.log('🧪 [HAPTIC TEST] 햅틱 테스트 시작');
+    console.log('🧪 [HAPTIC TEST] iOS WebView 확인:', !!(window as any).webkit?.messageHandlers?.smapIos);
+    console.log('🧪 [HAPTIC TEST] hapticSuccess 함수 존재:', typeof (window as any).hapticSuccess);
+    
+    // 직접 햅틱 함수 호출 테스트
+    try {
+      if (typeof (window as any).hapticSuccess === 'function') {
+        console.log('🧪 [HAPTIC TEST] 직접 햅틱 함수 호출');
+        (window as any).hapticSuccess();
+      } else {
+        console.log('🧪 [HAPTIC TEST] hapticFeedback 유틸 사용');
+        hapticFeedback.success({ test: true });
+      }
+    } catch (error) {
+      console.error('🧪 [HAPTIC TEST] 햅틱 테스트 실패:', error);
+    }
+  };
+
   // iOS 네이티브 로그 전송 함수
   const sendLogToiOS = (level: 'info' | 'error' | 'warning', message: string, data?: any) => {
     const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
@@ -727,6 +747,7 @@ export default function SignInPage() {
       
       // 로그인 성공 햅틱 피드백
       hapticFeedback.loginSuccess({ method: 'phone', phone: phoneNumber.replace(/-/g, '').substring(0, 7) + '****' });
+      console.log('🎮 [SIGNIN] 전화번호 로그인 성공 햅틱 피드백 실행');
       
       // 리다이렉트 플래그 설정
       isRedirectingRef.current = true;
@@ -795,6 +816,7 @@ export default function SignInPage() {
       
       // 로그인 실패 햅틱 피드백
       hapticFeedback.loginError({ method: 'phone', error: err.message });
+      console.log('🎮 [SIGNIN] 전화번호 로그인 실패 햅틱 피드백 실행');
       
       try {
         showError(errorMessage);
@@ -1523,6 +1545,7 @@ export default function SignInPage() {
         
         // Google 로그인 환경 오류 햅틱 피드백
         hapticFeedback.warning();
+        console.log('🎮 [SIGNIN] Google 로그인 환경 오류 햅틱 피드백 실행');
         
         // 에러 모달 강제 표시
         setTimeout(() => {
@@ -1743,6 +1766,7 @@ export default function SignInPage() {
               
               // 카카오 로그인 성공 햅틱 피드백
               hapticFeedback.kakaoLogin({ status: 'success', userEmail: data.user?.mt_email?.substring(0, 3) + '***' });
+              console.log('🎮 [SIGNIN] 카카오 로그인 성공 햅틱 피드백 실행');
               
               // 리다이렉트 플래그 설정
               isRedirectingRef.current = true;
@@ -2168,6 +2192,39 @@ export default function SignInPage() {
               회원가입
             </Link>
           </p>
+          
+          {/* 🧪 햅틱 테스트 버튼 (개발 환경에서만 표시) */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <p className="text-xs text-gray-600 mb-2">🧪 개발자 도구 - 햅틱 테스트</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={testHapticFeedback}
+                  className="text-xs py-2 px-3 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  햅틱 테스트
+                </button>
+                <button
+                  onClick={() => hapticFeedback.success({ test: 'manual' })}
+                  className="text-xs py-2 px-3 bg-green-500 text-white rounded hover:bg-green-600"
+                >
+                  성공 햅틱
+                </button>
+                <button
+                  onClick={() => hapticFeedback.error({ test: 'manual' })}
+                  className="text-xs py-2 px-3 bg-red-500 text-white rounded hover:bg-red-600"
+                >
+                  에러 햅틱
+                </button>
+                <button
+                  onClick={() => hapticFeedback.warning({ test: 'manual' })}
+                  className="text-xs py-2 px-3 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                >
+                  경고 햅틱
+                </button>
+              </div>
+            </div>
+          )}
         </motion.div>
       </motion.div>
 
