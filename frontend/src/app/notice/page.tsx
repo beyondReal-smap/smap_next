@@ -515,9 +515,6 @@ function NoticeContent() {
                 duration: 0.4
               }}
             >
-              <h3 className="text-sm font-semibold text-gray-900 mb-2 whitespace-nowrap">
-                알림 로딩 중
-              </h3>
             </motion.div>
 
             <motion.div 

@@ -778,8 +778,14 @@ export default function LogsPage() {
 
     // 상세 정보 추가
     if (context.includes('retry-failed')) {
-      errorMessage += ' 여러 번 재시도했지만 계속 실패하고 있습니다.';
+      errorMessage += ' 잠시 후 다시 시도해주세요.';
       retryable = false;
+    }
+
+    // 부분 실패인 경우 에러 메시지 완화
+    if (context === 'loadLocationData' && !context.includes('retry-failed')) {
+      errorMessage = '일부 데이터를 불러오지 못했지만 가능한 정보를 표시합니다.';
+      retryable = true;
     }
 
     setDataError({
@@ -794,18 +800,28 @@ export default function LogsPage() {
 
   // 재시도 함수
   const retryDataLoad = async () => {
-    if (retryCount >= maxRetries) {
+    if (retryCount >= 2) { // maxRetries를 2로 축소
       console.log('[RETRY] 최대 재시도 횟수 초과');
       return;
     }
 
+    console.log(`[RETRY] 수동 재시도 시작 (${retryCount + 1}/2)`);
     setRetryCount(prev => prev + 1);
     setDataError(null);
+    setIsLocationDataLoading(true);
     
     const selectedMember = groupMembers.find(m => m.isSelected);
     if (selectedMember && selectedDate) {
-      console.log(`[RETRY] 데이터 재시도 (${retryCount + 1}/${maxRetries}):`, selectedMember.name, selectedDate);
-      await loadLocationData(parseInt(selectedMember.id), selectedDate);
+      console.log(`[RETRY] 데이터 재시도 (${retryCount + 1}/2):`, selectedMember.name, selectedDate);
+      try {
+        await loadLocationData(parseInt(selectedMember.id), selectedDate);
+      } catch (retryError) {
+        console.error('[RETRY] 수동 재시도 실패:', retryError);
+        setIsLocationDataLoading(false);
+      }
+    } else {
+      console.warn('[RETRY] 선택된 멤버 또는 날짜가 없어 재시도 불가');
+      setIsLocationDataLoading(false);
     }
   };
 
@@ -2238,11 +2254,6 @@ export default function LogsPage() {
         return;
       }
 
-      // 타임아웃 설정 (30초)
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('API 요청 타임아웃 (30초)')), 30000);
-      });
-
       // 강화된 API 호출 로직 - 개별 호출로 변경하여 더 정확한 에러 추적
       console.log('[loadLocationData] 🎯 강화된 API 호출 시작');
       
@@ -2250,12 +2261,20 @@ export default function LogsPage() {
       let stayTimes: StayTime[] = [];
       let hasAnyApiSuccess = false;
       
-      // 1. getMapMarkers API 호출
+      // 타임아웃 설정을 개별 API마다 다르게 적용 (핵심 API는 15초, 보조 API는 10초)
+      const coreApiTimeout = 15000; // 15초
+      const auxiliaryApiTimeout = 10000; // 10초
+      
+      // 1. getMapMarkers API 호출 (핵심 API)
       try {
         console.log('[loadLocationData] 📍 getMapMarkers 호출 중...');
+        const timeoutPromise1 = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('getMapMarkers API 타임아웃 (15초)')), coreApiTimeout);
+        });
+        
         mapMarkers = await Promise.race([
           memberLocationLogService.getMapMarkers(mtIdx, date),
-          timeoutPromise
+          timeoutPromise1
         ]) as MapMarker[];
         
         console.log('[loadLocationData] ✅ getMapMarkers 성공:', {
@@ -2272,14 +2291,19 @@ export default function LogsPage() {
           errorData: mapMarkersError?.response?.data
         });
         mapMarkers = [];
+        // getMapMarkers 실패해도 계속 진행 (stayTimes만으로도 부분 표시 가능)
       }
       
-      // 2. getStayTimes API 호출
+      // 2. getStayTimes API 호출 (핵심 API)
       try {
         console.log('[loadLocationData] ⏱️ getStayTimes 호출 중...');
+        const timeoutPromise2 = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('getStayTimes API 타임아웃 (15초)')), coreApiTimeout);
+        });
+        
         stayTimes = await Promise.race([
           memberLocationLogService.getStayTimes(mtIdx, date),
-          timeoutPromise
+          timeoutPromise2
         ]) as StayTime[];
         
         console.log('[loadLocationData] ✅ getStayTimes 성공:', {
@@ -2296,12 +2320,23 @@ export default function LogsPage() {
           errorData: stayTimesError?.response?.data
         });
         stayTimes = [];
+        // getStayTimes 실패해도 계속 진행 (mapMarkers만으로도 부분 표시 가능)
       }
       
-      // 모든 API가 실패한 경우 에러 처리
+      // 3. 핵심 API 모두 실패 시에만 에러 처리
       if (!hasAnyApiSuccess) {
         console.error('[loadLocationData] 💥 모든 핵심 API 호출 실패');
         throw new Error('핵심 API 호출이 모두 실패했습니다. 네트워크 상태를 확인해주세요.');
+      }
+      
+      // 4. 부분 성공이라도 데이터가 있으면 진행
+      if (mapMarkers.length === 0 && stayTimes.length === 0) {
+        console.warn('[loadLocationData] ⚠️ 핵심 API는 성공했지만 데이터가 없음 - 빈 데이터로 진행');
+      } else {
+        console.log('[loadLocationData] ✅ 사용 가능한 데이터 확인:', {
+          mapMarkers: mapMarkers.length,
+          stayTimes: stayTimes.length
+        });
       }
 
       // 나머지 API들은 지연 로딩하고 기본값으로 설정
@@ -2310,7 +2345,7 @@ export default function LogsPage() {
       const dailySummary: any[] = [];
       const locationLogSummary = null;
 
-      // 지연 로딩 시작 (1.5초 후)
+      // 지연 로딩 시작 (1.5초 후) - 각 API별로 독립적으로 처리
       setTimeout(async () => {
         try {
           // 초기 자동 로딩인 경우에는 지연 로딩도 계속 진행 (사용자 경험 향상)
@@ -2320,39 +2355,82 @@ export default function LogsPage() {
           }
 
           console.log('[loadLocationData] 보조 API 지연 로딩 시작');
-          const auxiliaryApiPromises = Promise.all([
-            memberLocationLogService.getDailyLocationLogs(mtIdx, date).catch(err => {
-              console.warn('[loadLocationData] getDailyLocationLogs 실패:', err);
-              return []; // 실패 시 빈 배열 반환
-            }),
-            memberLocationLogService.getDailyLocationSummary(mtIdx, date).catch(err => {
-              console.warn('[loadLocationData] getDailyLocationSummary 실패:', err);
-              return null; // 실패 시 null 반환
-            }),
-            memberLocationLogService.getDailySummaryByRange(mtIdx, date, date).catch(err => {
-              console.warn('[loadLocationData] getDailySummaryByRange 실패:', err);
-              return []; // 실패 시 빈 배열 반환
-            }),
-            memberLocationLogService.getLocationLogSummary(mtIdx, date).catch(err => {
-              console.warn('[loadLocationData] getLocationLogSummary 실패:', err);
-              return null; // 실패 시 null 반환
-            })
-          ]);
+          
+          // 각 보조 API를 독립적으로 호출하여 하나가 실패해도 다른 API에 영향 없도록 함
+          const auxiliaryApiTimeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('보조 API 타임아웃 (10초)')), auxiliaryApiTimeout);
+          });
+          
+          // 보조 API 1: getDailyLocationLogs
+          let delayedLogs: any[] = [];
+          try {
+            delayedLogs = await Promise.race([
+              memberLocationLogService.getDailyLocationLogs(mtIdx, date),
+              auxiliaryApiTimeoutPromise
+            ]) as any[];
+            console.log('[loadLocationData] ✅ getDailyLocationLogs 지연 로딩 성공:', delayedLogs.length);
+          } catch (err) {
+            console.warn('[loadLocationData] ❌ getDailyLocationLogs 지연 로딩 실패:', err);
+            delayedLogs = [];
+          }
+          
+          // 보조 API 2: getDailyLocationSummary
+          let delayedSummary: any = null;
+          try {
+            delayedSummary = await Promise.race([
+              memberLocationLogService.getDailyLocationSummary(mtIdx, date),
+              auxiliaryApiTimeoutPromise
+            ]);
+            console.log('[loadLocationData] ✅ getDailyLocationSummary 지연 로딩 성공');
+          } catch (err) {
+            console.warn('[loadLocationData] ❌ getDailyLocationSummary 지연 로딩 실패:', err);
+            delayedSummary = null;
+          }
+          
+          // 보조 API 3: getDailySummaryByRange
+          let delayedDailySummary: any[] = [];
+          try {
+            delayedDailySummary = await Promise.race([
+              memberLocationLogService.getDailySummaryByRange(mtIdx, date, date),
+              auxiliaryApiTimeoutPromise
+            ]) as any[];
+            console.log('[loadLocationData] ✅ getDailySummaryByRange 지연 로딩 성공:', delayedDailySummary.length);
+          } catch (err) {
+            console.warn('[loadLocationData] ❌ getDailySummaryByRange 지연 로딩 실패:', err);
+            delayedDailySummary = [];
+          }
+          
+          // 보조 API 4: getLocationLogSummary
+          let delayedLocationLogSummary: any = null;
+          try {
+            delayedLocationLogSummary = await Promise.race([
+              memberLocationLogService.getLocationLogSummary(mtIdx, date),
+              auxiliaryApiTimeoutPromise
+            ]);
+            console.log('[loadLocationData] ✅ getLocationLogSummary 지연 로딩 성공');
+          } catch (err) {
+            console.warn('[loadLocationData] ❌ getLocationLogSummary 지연 로딩 실패:', err);
+            delayedLocationLogSummary = null;
+          }
 
-          const [delayedLogs, delayedSummary, delayedDailySummary, delayedLocationLogSummary] = await Promise.race([
-            auxiliaryApiPromises,
-            timeoutPromise
-          ]) as any[];
-
-          // 지연 로딩 완료 후 상태 업데이트
+          // 지연 로딩 완료 후 상태 업데이트 (성공한 데이터만 업데이트)
           if (!loadLocationDataExecutingRef.current.cancelled && loadLocationDataExecutingRef.current.currentRequest === executionKey) {
-            console.log('[loadLocationData] 보조 데이터 로딩 완료 - 상태 업데이트');
-            setCurrentLocationLogs(Array.isArray(delayedLogs) ? delayedLogs : []);
-            setDailySummaryData(Array.isArray(delayedDailySummary) ? delayedDailySummary : []);
-            setLocationLogSummaryData(delayedLocationLogSummary || null);
+            console.log('[loadLocationData] 보조 데이터 로딩 완료 - 성공한 데이터만 상태 업데이트');
+            
+            if (Array.isArray(delayedLogs) && delayedLogs.length > 0) {
+              setCurrentLocationLogs(delayedLogs);
+            }
+            
+            if (Array.isArray(delayedDailySummary) && delayedDailySummary.length > 0) {
+              setDailySummaryData(delayedDailySummary);
+            }
+            
+            if (delayedLocationLogSummary) {
+              setLocationLogSummaryData(delayedLocationLogSummary);
+            }
           }
         } catch (auxiliaryError) {
-          console.warn('[loadLocationData] 보조 API 지연 로딩 실패 (핵심 기능에는 영향 없음):', auxiliaryError);
+          console.warn('[loadLocationData] 보조 API 지연 로딩 전체 실패 (핵심 기능에는 영향 없음):', auxiliaryError);
         }
       }, 1500); // 1.5초 후 지연 로딩
 
@@ -2549,7 +2627,7 @@ export default function LogsPage() {
         isOnline: navigator.onLine
       });
       
-      // 네트워크 오류나 타임아웃인 경우 자동 재시도 (최대 3회)
+      // 네트워크 오류나 타임아웃인 경우 스마트 재시도 (최대 2회로 축소)
       const errorMessage = error instanceof Error ? error.message : String(error);
       const isNetworkError = errorMessage.includes('타임아웃') || 
                             errorMessage.includes('Network') || 
@@ -2558,30 +2636,32 @@ export default function LogsPage() {
                             !navigator.onLine ||
                             error?.code === 'NETWORK_ERROR';
       
-      if (isNetworkError && retryCount < 3) {
-        console.log(`[loadLocationData] 🔄 네트워크 오류 감지 - 자동 재시도 (${retryCount + 1}/3):`, errorMessage);
+      // 재시도 조건을 더 엄격하게 설정 (진짜 네트워크 문제일 때만)
+      if (isNetworkError && retryCount < 2 && navigator.onLine) {
+        console.log(`[loadLocationData] 🔄 네트워크 오류 감지 - 스마트 재시도 (${retryCount + 1}/2):`, errorMessage);
         setRetryCount(prev => prev + 1);
         
-        // 점진적 지연 (1초, 2초, 3초)
-        const retryDelay = (retryCount + 1) * 1000;
+        // 적응적 지연 (첫 번째는 2초, 두 번째는 5초)
+        const retryDelay = retryCount === 0 ? 2000 : 5000;
         console.log(`[loadLocationData] ⏰ ${retryDelay}ms 후 재시도 예정`);
         
         setTimeout(() => {
-          console.log(`[loadLocationData] 🚀 재시도 실행 중... (${retryCount + 1}/3)`);
+          console.log(`[loadLocationData] 🚀 스마트 재시도 실행 중... (${retryCount + 1}/2)`);
           loadLocationData(mtIdx, date);
         }, retryDelay);
         return;
       }
       
       // 모든 재시도 실패 또는 네트워크 오류가 아닌 경우
-      if (retryCount >= 3) {
-        console.error(`[loadLocationData] 💔 모든 재시도 실패 (${retryCount}/3):`, errorMessage);
+      if (retryCount >= 2) {
+        console.error(`[loadLocationData] 💔 모든 재시도 실패 (${retryCount}/2):`, errorMessage);
         const retryFailedError = new Error(
-          `네트워크 연결이 불안정합니다. ${retryCount}번 재시도했지만 데이터를 가져올 수 없습니다.`
+          `데이터를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.`
         );
         handleDataError(retryFailedError, 'loadLocationData-retry-failed');
       } else {
-        // 일반 에러 처리
+        // 일반 에러 처리 (단, 부분 실패는 허용)
+        console.warn('[loadLocationData] ⚠️ 일반 에러 처리 - 부분 데이터라도 표시 시도');
         handleDataError(error, 'loadLocationData');
       }
       
@@ -2590,7 +2670,8 @@ export default function LogsPage() {
       setLocationSummary(DEFAULT_LOCATION_SUMMARY);
       setDailySummaryData([]);
       setStayTimesData([]);
-      // setMapMarkersData([]); // 오류 시에도 마커 데이터 초기화하지 않음 - useEffect 무한 루프 방지
+      // 완전 실패 시에만 마커 데이터 초기화 (부분 성공은 유지)
+      setMapMarkersData([]);
       setLocationLogSummaryData(null);
       setSortedLocationData([]);
 

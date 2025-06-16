@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- 앱 기본 정보 -->
+    <key>CFBundleDevelopmentRegion</key>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
+    <key>CFBundleDisplayName</key>
+    <string>SMAP</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>$(PRODUCT_NAME)</string>
+    <key>CFBundlePackageType</key>
+    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    
+    <!-- 🌐 네트워크 보안 설정 (SMAP 최적화) -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <!-- 개발 중에만 사용, 프로덕션에서는 제거 권장 -->
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+        
+        <!-- SMAP 도메인 예외 설정 -->
+        <key>NSExceptionDomains</key>
+        <dict>
+            <!-- next.smap.site 도메인 -->
+            <key>next.smap.site</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.0</string>
+                <key>NSExceptionRequiresForwardSecrecy</key>
+                <false/>
+                <key>NSThirdPartyExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+            </dict>
+            
+            <!-- smap.site 서브도메인 -->
+            <key>smap.site</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.0</string>
+                <key>NSIncludesSubdomains</key>
+                <true/>
+                <key>NSExceptionRequiresForwardSecrecy</key>
+                <false/>
+            </dict>
+            
+            <!-- API 서버 도메인 (필요시) -->
+            <key>api.smap.site</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.0</string>
+            </dict>
+            
+            <!-- 개발 서버 (필요시) -->
+            <key>localhost</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.0</string>
+            </dict>
+        </dict>
+    </dict>
+    
+    <!-- 📱 WebView 최적화 설정 -->
+    <key>WKWebViewDebugEnabled</key>
+    <true/>
+    
+    <!-- iOS 14+ WebView 개선사항 활성화 -->
+    <key>WKWebViewEnhancedPrivacy</key>
+    <true/>
+    
+    <!-- 🎮 햅틱 피드백 권한 -->
+    <key>UIRequiresFullScreen</key>
+    <false/>
+    
+    <!-- 📷 카메라 권한 (필요시) -->
+    <key>NSCameraUsageDescription</key>
+    <string>프로필 사진 촬영 및 위치 기록을 위해 카메라 권한이 필요합니다.</string>
+    
+    <!-- 🎤 마이크 권한 (필요시) -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>음성 메모 및 영상 녹화를 위해 마이크 권한이 필요합니다.</string>
+    
+    <!-- 📍 위치 권한 -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>현재 위치를 지도에 표시하고 위치 기반 서비스를 제공하기 위해 권한이 필요합니다.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>백그라운드에서도 위치 추적이 필요한 경우 권한을 허용해주세요.</string>
+    
+    <!-- 📁 파일 접근 권한 (필요시) -->
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>파일 업로드 및 다운로드를 위해 문서 폴더 접근 권한이 필요합니다.</string>
+    
+    <!-- 📚 사진 라이브러리 권한 (필요시) -->
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>프로필 사진 설정 및 이미지 업로드를 위해 사진 라이브러리 접근 권한이 필요합니다.</string>
+    
+    <!-- 🔔 푸시 알림 권한 -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>remote-notification</string>
+        <string>background-fetch</string>
+    </array>
+    
+    <!-- 📱 지원 기기 설정 -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    
+    <!-- iOS 버전 지원 -->
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    
+    <!-- 🎨 앱 아이콘 및 런치 스크린 -->
+    <key>CFBundleIcons</key>
+    <dict>
+        <key>CFBundlePrimaryIcon</key>
+        <dict>
+            <key>CFBundleIconFiles</key>
+            <array>
+                <string>AppIcon</string>
+            </array>
+            <key>UIPrerenderedIcon</key>
+            <false/>
+        </dict>
+    </dict>
+    
+    <!-- iOS 13+ Scene 지원 -->
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <false/>
+        <key>UISceneConfigurations</key>
+        <dict>
+            <key>UIWindowSceneSessionRoleApplication</key>
+            <array>
+                <dict>
+                    <key>UISceneConfigurationName</key>
+                    <string>Default Configuration</string>
+                    <key>UISceneDelegateClassName</key>
+                    <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+                    <key>UISceneStoryboardFile</key>
+                    <string>Main</string>
+                </dict>
+            </array>
+        </dict>
+    </dict>
+    
+    <!-- 🚀 성능 최적화 설정 -->
+    <key>UILaunchStoryboardName</key>
+    <string>LaunchScreen</string>
+    
+    <!-- 상태바 스타일 -->
+    <key>UIStatusBarStyle</key>
+    <string>UIStatusBarStyleDefault</string>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <true/>
+    
+    <!-- 🔐 보안 설정 -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+    
+    <!-- 🎯 앱 카테고리 -->
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.navigation</string>
+    
+    <!-- 📋 URL 스킴 (필요시) -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.smap.app</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>smap</string>
+            </array>
+        </dict>
+    </array>
+    
+    <!-- 🌐 외부 도메인 허용 -->
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>http</string>
+        <string>https</string>
+        <string>maps</string>
+        <string>googlemaps</string>
+    </array>
+    
+    <!-- 📊 분석 및 크래시 리포팅 (필요시) -->
+    <key>FirebaseAppDelegateProxyEnabled</key>
+    <false/>
+    
+    <!-- 🎮 게임 센터 (필요시) -->
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>armv7</string>
+    </array>
+    
+</dict>
+</plist> 
