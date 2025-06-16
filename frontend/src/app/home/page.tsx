@@ -36,6 +36,7 @@ import {
     AllDayCheckEnum, ShowEnum, ScheduleAlarmCheckEnum, InCheckEnum, ScheduleCheckEnum 
 } from '../../types/enums';
 import { hapticFeedback } from '@/utils/haptic';
+import DebugPanel from '../components/layout/DebugPanel';
 
 declare global {
   interface Window {
@@ -4542,6 +4543,7 @@ export default function HomePage() {
            )}
          </AnimatePresence>
       </motion.div>
+      <DebugPanel />
     </>
   );
 }
