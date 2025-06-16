@@ -37,6 +37,7 @@ import {
 } from '../../types/enums';
 import { hapticFeedback } from '@/utils/haptic';
 import DebugPanel from '../components/layout/DebugPanel';
+import LogParser from '../components/layout/LogParser';
 
 declare global {
   interface Window {
@@ -4542,8 +4543,9 @@ export default function HomePage() {
              </>
            )}
          </AnimatePresence>
-      </motion.div>
-      <DebugPanel />
-    </>
-  );
+              </motion.div>
+        <DebugPanel />
+        <LogParser />
+      </>
+    );
 }

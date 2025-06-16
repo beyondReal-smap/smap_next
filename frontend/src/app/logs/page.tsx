@@ -18,6 +18,7 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 import { hapticFeedback } from '@/utils/haptic';
 import memberService from '@/services/memberService';
 import DebugPanel from '../components/layout/DebugPanel';
+import LogParser from '../components/layout/LogParser';
 
 import groupService, { Group } from '@/services/groupService';
 import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker, LocationLogSummary, DailyCountsResponse, MemberActivityResponse, MemberDailyCount } from '@/services/memberLocationLogService';
@@ -6217,6 +6218,7 @@ export default function LogsPage() {
         duration={7000}
       />
       <DebugPanel />
+      <LogParser />
     </>
   );
 } 
