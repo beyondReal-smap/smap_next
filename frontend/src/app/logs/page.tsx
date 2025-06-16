@@ -5466,11 +5466,7 @@ export default function LogsPage() {
         <motion.header 
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ 
-              duration: 0.5, 
-              ease: [0.22, 1, 0.36, 1],
-              delay: 0.1 
-            }}
+            transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="fixed top-0 left-0 right-0 z-20 backdrop-blur-sm border-b h-16" style={{ background: 'linear-gradient(to right, rgba(240, 249, 255, 0.9), rgba(255, 255, 255, 0.95), rgba(253, 244, 255, 0.9))', borderColor: 'rgba(1, 19, 163, 0.1)' }}
           >
             {/* 헤더 내용 */}
