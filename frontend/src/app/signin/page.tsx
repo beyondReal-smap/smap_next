@@ -382,6 +382,8 @@ export default function SignInPage() {
   }, [showErrorModal, errorModalMessage]);
 
   // AuthContext 에러 감지 및 에러 모달 표시 (한 번만 실행)
+  // 주의: 전화번호 로그인은 catch 블록에서 직접 에러 모달을 표시하므로 
+  // 여기서는 다른 경우(예: 자동 로그인 실패 등)만 처리
   useEffect(() => {
     // 전역 에러 모달 플래그 확인 - 최우선 차단
     if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
@@ -404,18 +406,29 @@ export default function SignInPage() {
       errorProcessed: errorProcessedRef.current 
     });
     
+    // 전화번호 로그인 에러는 catch 블록에서 직접 처리하므로 여기서는 제외
+    // 주로 자동 로그인 실패나 기타 AuthContext 에러만 처리
     if (error && !isLoggedIn && !loading && !showErrorModal && !errorProcessedRef.current) {
-      console.log('[SIGNIN] ⚠️ AuthContext 에러 감지, 에러 모달 표시:', error);
-      errorProcessedRef.current = true; // 에러 처리 완료 플래그 설정
-      blockAllEffectsRef.current = true; // 모든 useEffect 차단
+      console.log('[SIGNIN] ⚠️ AuthContext 에러 감지 (자동 로그인 실패 등):', error);
       
-      // 에러 모달 표시
-      showError(error);
-      
-      // 에러 처리 후 AuthContext 에러 초기화 (setTimeout으로 지연)
-      setTimeout(() => {
+      // 전화번호 로그인 관련 에러가 아닌 경우만 모달 표시
+      if (!error.includes('아이디') && !error.includes('비밀번호') && !error.includes('ID') && !error.includes('password')) {
+        console.log('[SIGNIN] AuthContext 에러 모달 표시:', error);
+        errorProcessedRef.current = true; // 에러 처리 완료 플래그 설정
+        blockAllEffectsRef.current = true; // 모든 useEffect 차단
+        
+        // 에러 모달 표시
+        showError(error);
+        
+        // 에러 처리 후 AuthContext 에러 초기화 (setTimeout으로 지연)
+        setTimeout(() => {
+          setError(null);
+        }, 100);
+      } else {
+        console.log('[SIGNIN] 전화번호 로그인 에러는 catch 블록에서 처리됨, useEffect 무시');
+        // 전화번호 로그인 에러는 catch에서 처리하므로 AuthContext 에러만 초기화
         setError(null);
-      }, 100);
+      }
     }
   }, [error, isLoggedIn, loading, showErrorModal, setError]);
 
@@ -508,9 +521,22 @@ export default function SignInPage() {
       console.error('[SIGNIN] 로그인 오류:', err);
       console.log('[SIGNIN] 에러 메시지:', err.message);
       
-      // AuthContext에서 이미 에러 상태가 설정되므로 여기서는 로딩만 해제
-      // showError는 useEffect에서 AuthContext 에러를 감지해서 처리
-      console.log('[SIGNIN] AuthContext에서 에러 처리 예정, 로딩만 해제');
+      // Google 로그인과 동일하게 에러 모달 표시
+      let errorMessage = err.message || '로그인에 실패했습니다.';
+      
+      // 사용자 친화적 에러 메시지 변환
+      if (errorMessage.includes('아이디') || errorMessage.includes('ID')) {
+        errorMessage = '등록되지 않은 전화번호입니다.';
+      } else if (errorMessage.includes('비밀번호') || errorMessage.includes('password')) {
+        errorMessage = '비밀번호가 일치하지 않습니다.';
+      } else if (errorMessage.includes('네트워크') || errorMessage.includes('network')) {
+        errorMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
+      } else if (errorMessage.includes('서버') || errorMessage.includes('server')) {
+        errorMessage = '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.';
+      }
+      
+      console.log('[SIGNIN] 에러 모달 표시:', errorMessage);
+      showError(errorMessage);
       
     } finally {
       setIsLoading(false);
