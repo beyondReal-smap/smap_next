@@ -2185,7 +2185,8 @@ export default function SignInPage() {
 
   return (
     <motion.div 
-      className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 py-6 px-4 sm:px-6 lg:px-8"
+      className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8"
+      style={{background: 'linear-gradient(to bottom right, #eff6ff, #faf5ff, #fdf2f8)'}}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -2246,21 +2247,34 @@ export default function SignInPage() {
               전화번호
             </label>
             <div className="relative">
-              <FiPhone className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${
-                focusedField === 'phone' || phoneNumber ? 'text-indigo-500' : 'text-gray-400'
-              }`} />
+              <div className="absolute left-4 top-0 bottom-0 flex items-center z-10 pointer-events-none">
+                <FiPhone className={`w-4 h-4 transition-colors duration-200 ${
+                  focusedField === 'phone' || phoneNumber ? '' : 'text-gray-400'
+                }`} 
+                style={focusedField === 'phone' || phoneNumber ? {color: '#0113A3'} : {}} />
+              </div>
               <input
                 type="tel"
                 value={phoneNumber}
                 onChange={handlePhoneNumberChange}
-                onFocus={() => setFocusedField('phone')}
-                onBlur={() => setFocusedField(null)}
+                onFocus={(e) => {
+                  setFocusedField('phone');
+                  if (!formErrors.phoneNumber) {
+                    e.target.style.boxShadow = '0 0 0 2px #0113A3';
+                  }
+                }}
+                onBlur={(e) => {
+                  setFocusedField(null);
+                  if (!formErrors.phoneNumber) {
+                    e.target.style.boxShadow = '';
+                  }
+                }}
                 placeholder="010-1234-5678"
                 maxLength={13}
                 className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent transition-all duration-200 ${
                   formErrors.phoneNumber 
                     ? 'border-red-300 focus:ring-red-500' 
-                    : 'border-gray-200 focus:ring-indigo-500'
+                    : 'border-gray-200'
                 }`}
                 style={{ outline: 'none' }}
               />
@@ -2276,20 +2290,33 @@ export default function SignInPage() {
               비밀번호
             </label>
             <div className="relative">
-              <FiLock className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-4 h-4 transition-colors duration-200 ${
-                focusedField === 'password' || password ? 'text-indigo-500' : 'text-gray-400'
-              }`} />
+              <div className="absolute left-4 top-0 bottom-0 flex items-center z-10 pointer-events-none">
+                <FiLock className={`w-4 h-4 transition-colors duration-200 ${
+                  focusedField === 'password' || password ? '' : 'text-gray-400'
+                }`} 
+                style={focusedField === 'password' || password ? {color: '#0113A3'} : {}} />
+              </div>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                onFocus={() => setFocusedField('password')}
-                onBlur={() => setFocusedField(null)}
+                onFocus={(e) => {
+                  setFocusedField('password');
+                  if (!formErrors.password) {
+                    e.target.style.boxShadow = '0 0 0 2px #0113A3';
+                  }
+                }}
+                onBlur={(e) => {
+                  setFocusedField(null);
+                  if (!formErrors.password) {
+                    e.target.style.boxShadow = '';
+                  }
+                }}
                 placeholder="비밀번호를 입력해주세요"
                 className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent transition-all duration-200 ${
                   formErrors.password 
                     ? 'border-red-300 focus:ring-red-500' 
-                    : 'border-gray-200 focus:ring-indigo-500'
+                    : 'border-gray-200'
                 }`}
                 style={{ outline: 'none' }}
               />
@@ -2316,7 +2343,12 @@ export default function SignInPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-medium rounded-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95 shadow-md"
+            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-medium rounded-lg text-white disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95 shadow-md"
+            style={{backgroundColor: '#0113A3'}}
+            onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#001f87'}
+            onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#0113A3'}
+            onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3, 0 0 0 4px rgba(1, 19, 163, 0.1)'}
+            onBlur={(e) => (e.target as HTMLButtonElement).style.boxShadow = ''}
           >
             {isLoading ? (
               <LoadingSpinner message="로그인 중..." fullScreen={false} />
@@ -2356,7 +2388,9 @@ export default function SignInPage() {
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={isLoading}
-                className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
+                className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
+                onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3'}
+                onBlur={(e) => (e.target as HTMLButtonElement).style.boxShadow = ''}
               >
                 <FcGoogle className="w-5 h-5 mr-3" aria-hidden="true" />
                 Google 계정으로 로그인
@@ -2405,7 +2439,10 @@ export default function SignInPage() {
         >
           <p className="text-sm text-gray-600">
             아직 계정이 없으신가요?{' '}
-            <Link href="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+            <Link href="/register" className="font-medium transition-colors"
+              style={{color: '#0113A3'}}
+              onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#1e40af'}
+              onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#0113A3'}>
               회원가입
             </Link>
           </p>
