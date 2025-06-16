@@ -153,7 +153,7 @@ export default function SignInPageNew() {
     
     console.log('[SIGNIN] ⚡ React 상태 업데이트 완료 - showErrorModal:', true, ', message:', message);
     
-    hapticFeedback.error();
+    hapticFeedback.error({ context: 'modal_show', message });
     
     // iOS 로그 전송
     sendLogToiOS('error', 'showError 함수 호출', { message });
@@ -327,7 +327,7 @@ export default function SignInPageNew() {
       console.log('[SIGNIN] AuthContext 상태 동기화 완료');
       
       // 로그인 성공 햅틱 피드백
-      hapticFeedback.success();
+      hapticFeedback.loginSuccess({ method: 'phone', phone: phoneNumber.replace(/-/g, '').substring(0, 7) + '****' });
       
       // 리다이렉트 플래그 설정
       isRedirectingRef.current = true;
@@ -372,7 +372,7 @@ export default function SignInPageNew() {
       console.log('[SIGNIN] 🔥 showError 함수 호출 시작');
       
       // 로그인 실패 햅틱 피드백
-      hapticFeedback.error();
+      hapticFeedback.loginError({ method: 'phone', error: err.message });
       
       sendLogToiOS('info', '에러 모달 표시 시도', { errorMessage });
       
@@ -482,7 +482,7 @@ export default function SignInPageNew() {
         });
         
         // Google 로그인 환경 오류 햅틱 피드백
-        hapticFeedback.warning();
+        hapticFeedback.googleLogin({ status: 'environment_error', error: 'iOS bridge not available' });
         
         // 에러 모달 강제 표시
         setTimeout(() => {
@@ -588,7 +588,7 @@ export default function SignInPageNew() {
               console.log('[KAKAO LOGIN] AuthContext 상태 동기화 완료');
               
               // 로그인 성공 햅틱 피드백
-              hapticFeedback.success();
+              hapticFeedback.kakaoLogin({ status: 'success', userEmail: data.user?.mt_email?.substring(0, 3) + '***' });
               
               // 리다이렉트 플래그 설정
               isRedirectingRef.current = true;

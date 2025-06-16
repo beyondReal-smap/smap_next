@@ -454,7 +454,7 @@ export default function SignInPage() {
               console.log('[GOOGLE LOGIN] AuthContext 상태 동기화 완료');
               
               // Google 로그인 성공 햅틱 피드백
-              hapticFeedback.success();
+              hapticFeedback.googleLogin({ status: 'success', userEmail: data.user?.mt_email?.substring(0, 3) + '***' });
               
               // 리다이렉트 플래그 설정
               isRedirectingRef.current = true;
@@ -472,7 +472,7 @@ export default function SignInPage() {
           console.error('[GOOGLE LOGIN] 네이티브 Google 로그인 처리 오류:', error);
           
           // Google 로그인 실패 햅틱 피드백
-          hapticFeedback.error();
+          hapticFeedback.googleLogin({ status: 'error', error: error.message });
           
           showError(error.message || 'Google 로그인 처리 중 오류가 발생했습니다.');
         } finally {
@@ -501,7 +501,7 @@ export default function SignInPage() {
         }
         
         // Google 로그인 에러 햅틱 피드백
-        hapticFeedback.error();
+        hapticFeedback.googleLogin({ status: 'callback_error', error: errorMessage });
         
         // 에러 모달 강제 표시 - setTimeout으로 확실히 실행
         console.log('[GOOGLE LOGIN] 에러 모달 강제 표시:', userFriendlyMessage);
@@ -627,6 +627,14 @@ export default function SignInPage() {
     
     console.log('[SIGNIN] 로그인 시도 시작');
     
+    // iOS 로그 전송 - 로그인 시도 시작
+    sendLogToiOS('info', '📱 전화번호 로그인 시도 시작', {
+      timestamp: new Date().toISOString(),
+      phoneNumber: phoneNumber.replace(/-/g, '').replace(/\d/g, '*'), // 마스킹
+      hasPassword: !!password,
+      passwordLength: password.length
+    });
+    
     setIsLoading(true);
     setApiError('');
     setFormErrors({});
@@ -648,6 +656,14 @@ export default function SignInPage() {
 
     if (Object.keys(currentFormErrors).length > 0) {
       console.log('[SIGNIN] 입력 검증 실패:', currentFormErrors);
+      
+      // iOS 로그 전송 - 입력 검증 실패
+      sendLogToiOS('warning', '⚠️ 전화번호 로그인 입력 검증 실패', {
+        timestamp: new Date().toISOString(),
+        errors: currentFormErrors,
+        missingFields: Object.keys(currentFormErrors)
+      });
+      
       setFormErrors(currentFormErrors);
       setIsLoading(false);
       return;
@@ -655,6 +671,13 @@ export default function SignInPage() {
 
     try {
       console.log('[SIGNIN] AuthContext login 호출 시작');
+      
+      // iOS 로그 전송 - API 호출 시작
+      sendLogToiOS('info', '🔄 전화번호 로그인 API 호출 시작', {
+        timestamp: new Date().toISOString(),
+        apiEndpoint: '/api/auth/login',
+        method: 'POST'
+      });
       
       // 전화번호 로그인 시작 시 AuthContext 에러 감지 비활성화
       blockAllEffectsRef.current = true;
@@ -666,24 +689,57 @@ export default function SignInPage() {
         mt_pwd: password,
       });
 
+      // iOS 로그 전송 - API 응답 수신
+      sendLogToiOS('info', '📡 전화번호 로그인 API 응답 수신', {
+        timestamp: new Date().toISOString(),
+        success: response.success,
+        hasMessage: !!response.message,
+        hasUserData: !!(response as any).user || !!(response as any).data?.user
+      });
+
       if (!response.success) {
         throw new Error(response.message || '로그인에 실패했습니다.');
       }
 
       console.log('[SIGNIN] authService 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
       
+      // iOS 로그 전송 - 로그인 성공
+      sendLogToiOS('info', '✅ 전화번호 로그인 성공', {
+        timestamp: new Date().toISOString(),
+        userInfo: {
+          hasUserData: !!authService.getUserData(),
+          hasToken: !!authService.getToken()
+        }
+      });
+      
       // AuthContext 상태를 수동으로 동기화
       await refreshAuthState();
       console.log('[SIGNIN] AuthContext 상태 동기화 완료');
       
+      // iOS 로그 전송 - AuthContext 동기화 완료
+      sendLogToiOS('info', '🔄 AuthContext 상태 동기화 완료', {
+        timestamp: new Date().toISOString(),
+        authState: {
+          isLoggedIn: isLoggedIn,
+          hasUser: !!authService.getUserData()
+        }
+      });
+      
       // 로그인 성공 햅틱 피드백
-      hapticFeedback.success();
+      hapticFeedback.loginSuccess({ method: 'phone', phone: phoneNumber.replace(/-/g, '').substring(0, 7) + '****' });
       
       // 리다이렉트 플래그 설정
       isRedirectingRef.current = true;
       
       // 모든 상태 업데이트 차단
       blockAllEffectsRef.current = true;
+      
+      // iOS 로그 전송 - 리다이렉트 시작
+      sendLogToiOS('info', '🚀 Home 페이지로 리다이렉트 시작', {
+        timestamp: new Date().toISOString(),
+        redirectMethod: 'router.replace',
+        targetPage: '/home'
+      });
       
       // router.replace 사용 (페이지 새로고침 없이 이동)
       router.replace('/home');
@@ -695,12 +751,20 @@ export default function SignInPage() {
       console.log('[SIGNIN] 에러 메시지:', err.message);
       console.log('[SIGNIN] 에러 스택:', err.stack);
       
-      // iOS 로그 전송
-      sendLogToiOS('error', '전화번호 로그인 실패', {
-        errorType: typeof err,
-        errorMessage: err.message,
-        errorStack: err.stack,
-        phoneNumber: phoneNumber.replace(/-/g, '').replace(/\d/g, '*') // 마스킹
+      // iOS 로그 전송 - 상세 에러 정보
+      sendLogToiOS('error', '❌ 전화번호 로그인 실패 - 상세 정보', {
+        timestamp: new Date().toISOString(),
+        errorDetails: {
+          type: typeof err,
+          message: err.message,
+          stack: err.stack,
+          name: err.name,
+          code: err.code
+        },
+        requestInfo: {
+          phoneNumber: phoneNumber.replace(/-/g, '').replace(/\d/g, '*'), // 마스킹
+          hasPassword: !!password
+        }
       });
       
       // Google 로그인과 동일하게 에러 모달 표시
@@ -721,23 +785,45 @@ export default function SignInPage() {
       console.log('[SIGNIN] 🔥 변환된 에러 메시지:', errorMessage);
       console.log('[SIGNIN] 🔥 showError 함수 호출 시작');
       
-      // 로그인 실패 햅틱 피드백
-      hapticFeedback.error();
+      // iOS 로그 전송 - 에러 메시지 변환 및 모달 표시
+      sendLogToiOS('info', '🔄 에러 메시지 변환 및 모달 표시', {
+        timestamp: new Date().toISOString(),
+        originalError: err.message,
+        convertedError: errorMessage,
+        willShowModal: true
+      });
       
-      sendLogToiOS('info', '에러 모달 표시 시도', { errorMessage });
+      // 로그인 실패 햅틱 피드백
+      hapticFeedback.loginError({ method: 'phone', error: err.message });
       
       try {
         showError(errorMessage);
         console.log('[SIGNIN] ✅ showError 함수 호출 완료');
-        sendLogToiOS('info', 'showError 함수 호출 완료');
+        sendLogToiOS('info', '✅ 에러 모달 표시 완료', { 
+          timestamp: new Date().toISOString(),
+          errorMessage 
+        });
       } catch (showErrorErr) {
         console.error('[SIGNIN] ❌ showError 함수 호출 실패:', showErrorErr);
-        sendLogToiOS('error', 'showError 함수 호출 실패', { error: String(showErrorErr) });
+        sendLogToiOS('error', '❌ 에러 모달 표시 실패', { 
+          timestamp: new Date().toISOString(),
+          error: String(showErrorErr) 
+        });
       }
       
     } finally {
       setIsLoading(false);
       console.log('[SIGNIN] 로그인 시도 완료');
+      
+      // iOS 로그 전송 - 로그인 프로세스 완료
+      sendLogToiOS('info', '🏁 전화번호 로그인 프로세스 완료', {
+        timestamp: new Date().toISOString(),
+        finalState: {
+          isLoading: false,
+          isRedirecting: isRedirectingRef.current,
+          blockAllEffects: blockAllEffectsRef.current
+        }
+      });
     }
   };
 
@@ -1252,6 +1338,14 @@ export default function SignInPage() {
   // Google 로그인 핸들러
   const handleGoogleLogin = async () => {
     setIsLoading(true);
+    
+    // iOS 로그 전송 - Google 로그인 시도 시작
+    sendLogToiOS('info', '🔍 Google 로그인 시도 시작', {
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      isIOSWebView: !!(window as any).webkit && !!(window as any).webkit.messageHandlers
+    });
+    
     try {
       console.log('Google 로그인 시도');
       
@@ -1267,11 +1361,31 @@ export default function SignInPage() {
         hasGoogleSignInMethod: !!(window as any).iosBridge?.googleSignIn?.signIn
       });
       
-      if (isIOSWebView) {
-        console.log('[GOOGLE LOGIN] iOS WebView에서 네이티브 Google Sign-In 사용');
-        
-        // iOS 네이티브 Google Sign-In 사용
-        try {
+      // iOS 로그 전송 - 환경 체크 결과
+      sendLogToiOS('info', '🔍 Google 로그인 환경 체크 완료', {
+        timestamp: new Date().toISOString(),
+        environment: {
+          isIOSWebView,
+          hasWebkit: !!(window as any).webkit,
+          hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
+          hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
+          hasIosBridge: !!(window as any).iosBridge,
+          hasGoogleSignIn: !!(window as any).iosBridge?.googleSignIn,
+          hasGoogleSignInMethod: !!(window as any).iosBridge?.googleSignIn?.signIn
+        }
+      });
+      
+              if (isIOSWebView) {
+          console.log('[GOOGLE LOGIN] iOS WebView에서 네이티브 Google Sign-In 사용');
+          
+          // iOS 로그 전송 - 네이티브 Google Sign-In 사용
+          sendLogToiOS('info', '📱 iOS 네이티브 Google Sign-In 사용', {
+            timestamp: new Date().toISOString(),
+            bridgeType: 'iOS WebView'
+          });
+          
+          // iOS 네이티브 Google Sign-In 사용
+          try {
           // ios-bridge.js가 로드될 때까지 최대 3초 대기
           const waitForIosBridge = async (maxWait = 3000) => {
             const startTime = Date.now();
@@ -1284,60 +1398,128 @@ export default function SignInPage() {
             return false;
           };
 
-          // ios-bridge.js의 googleSignIn 메서드 사용 시도
-          if ((window as any).iosBridge?.googleSignIn?.signIn) {
-            console.log('[GOOGLE LOGIN] ios-bridge.js googleSignIn 메서드 사용');
-            (window as any).iosBridge.googleSignIn.signIn();
-            console.log('[GOOGLE LOGIN] ios-bridge 메시지 전송 완료, 콜백 대기 중...');
-            return;
-          }
+                      // ios-bridge.js의 googleSignIn 메서드 사용 시도
+            if ((window as any).iosBridge?.googleSignIn?.signIn) {
+              console.log('[GOOGLE LOGIN] ios-bridge.js googleSignIn 메서드 사용');
+              
+              // iOS 로그 전송 - ios-bridge 메서드 사용
+              sendLogToiOS('info', '🌉 ios-bridge.js googleSignIn 메서드 사용', {
+                timestamp: new Date().toISOString(),
+                method: 'iosBridge.googleSignIn.signIn'
+              });
+              
+              (window as any).iosBridge.googleSignIn.signIn();
+              console.log('[GOOGLE LOGIN] ios-bridge 메시지 전송 완료, 콜백 대기 중...');
+              
+              // iOS 로그 전송 - 콜백 대기
+              sendLogToiOS('info', '⏳ Google Sign-In 콜백 대기 중', {
+                timestamp: new Date().toISOString(),
+                waitingFor: 'native callback'
+              });
+              
+              return;
+            }
 
-          // ios-bridge.js가 아직 로드되지 않았다면 잠시 대기
-          console.log('[GOOGLE LOGIN] ios-bridge.js 로드 대기 중...');
-          const bridgeLoaded = await waitForIosBridge();
-          
-          if (bridgeLoaded) {
-            console.log('[GOOGLE LOGIN] ios-bridge.js 로드 완료, googleSignIn 메서드 사용');
-            (window as any).iosBridge.googleSignIn.signIn();
-            console.log('[GOOGLE LOGIN] ios-bridge 메시지 전송 완료, 콜백 대기 중...');
-            return;
-          }
-          
-          // 직접 메시지 핸들러 사용 (fallback)
-          if ((window as any).webkit?.messageHandlers?.smapIos) {
-            console.log('[GOOGLE LOGIN] 직접 메시지 핸들러 사용 (fallback)');
-            (window as any).webkit.messageHandlers.smapIos.postMessage({
-              type: 'googleSignIn',
-              param: ''
+                      // ios-bridge.js가 아직 로드되지 않았다면 잠시 대기
+            console.log('[GOOGLE LOGIN] ios-bridge.js 로드 대기 중...');
+            
+            // iOS 로그 전송 - ios-bridge 로드 대기
+            sendLogToiOS('info', '⏳ ios-bridge.js 로드 대기 중', {
+              timestamp: new Date().toISOString(),
+              maxWaitTime: '3000ms'
             });
             
-            console.log('[GOOGLE LOGIN] 네이티브 메시지 전송 완료, 콜백 대기 중...');
-            // 로딩 상태는 콜백에서 처리되므로 여기서는 유지
-            return;
-          } else {
-            console.warn('[GOOGLE LOGIN] smapIos 메시지 핸들러를 찾을 수 없음');
+            const bridgeLoaded = await waitForIosBridge();
+            
+            if (bridgeLoaded) {
+              console.log('[GOOGLE LOGIN] ios-bridge.js 로드 완료, googleSignIn 메서드 사용');
+              
+              // iOS 로그 전송 - ios-bridge 로드 완료
+              sendLogToiOS('info', '✅ ios-bridge.js 로드 완료', {
+                timestamp: new Date().toISOString(),
+                method: 'iosBridge.googleSignIn.signIn'
+              });
+              
+              (window as any).iosBridge.googleSignIn.signIn();
+              console.log('[GOOGLE LOGIN] ios-bridge 메시지 전송 완료, 콜백 대기 중...');
+              
+              // iOS 로그 전송 - 콜백 대기
+              sendLogToiOS('info', '⏳ Google Sign-In 콜백 대기 중 (로드 후)', {
+                timestamp: new Date().toISOString(),
+                waitingFor: 'native callback'
+              });
+              
+              return;
+            }
+          
+                      // 직접 메시지 핸들러 사용 (fallback)
+            if ((window as any).webkit?.messageHandlers?.smapIos) {
+              console.log('[GOOGLE LOGIN] 직접 메시지 핸들러 사용 (fallback)');
+              
+              // iOS 로그 전송 - 직접 메시지 핸들러 사용
+              sendLogToiOS('info', '🔄 직접 메시지 핸들러 사용 (fallback)', {
+                timestamp: new Date().toISOString(),
+                handler: 'webkit.messageHandlers.smapIos',
+                messageType: 'googleSignIn'
+              });
+              
+              (window as any).webkit.messageHandlers.smapIos.postMessage({
+                type: 'googleSignIn',
+                param: ''
+              });
+              
+              console.log('[GOOGLE LOGIN] 네이티브 메시지 전송 완료, 콜백 대기 중...');
+              // 로딩 상태는 콜백에서 처리되므로 여기서는 유지
+              
+              // iOS 로그 전송 - 네이티브 메시지 전송 완료
+              sendLogToiOS('info', '📡 네이티브 메시지 전송 완료', {
+                timestamp: new Date().toISOString(),
+                waitingFor: 'native callback'
+              });
+              
+              return;
+            } else {
+              console.warn('[GOOGLE LOGIN] smapIos 메시지 핸들러를 찾을 수 없음');
+              
+              // iOS 로그 전송 - 메시지 핸들러 없음
+              sendLogToiOS('warning', '⚠️ smapIos 메시지 핸들러 없음', {
+                timestamp: new Date().toISOString(),
+                hasWebkit: !!(window as any).webkit,
+                hasMessageHandlers: !!(window as any).webkit?.messageHandlers
+              });
+            }
+                  } catch (e) {
+            console.error('[GOOGLE LOGIN] iOS 네이티브 구글 로그인 요청 실패:', e);
+            
+            // iOS 로그 전송 - 네이티브 요청 실패
+            sendLogToiOS('error', '❌ iOS 네이티브 Google 로그인 요청 실패', {
+              timestamp: new Date().toISOString(),
+              error: e instanceof Error ? e.message : String(e),
+              errorStack: e instanceof Error ? e.stack : undefined
+            });
           }
-        } catch (e) {
-          console.error('[GOOGLE LOGIN] iOS 네이티브 구글 로그인 요청 실패:', e);
-        }
-        
-        // 네이티브 처리가 불가능한 경우 에러 표시
-        console.log('[GOOGLE LOGIN] 네이티브 Google Sign-In을 사용할 수 없음');
-        console.log('[GOOGLE LOGIN] 환경 정보:', {
-          hasWebkit: !!(window as any).webkit,
-          hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
-          hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
-          hasIosBridge: !!(window as any).iosBridge,
-          userAgent: navigator.userAgent
-        });
-        
-        // iOS 로그 전송
-        sendLogToiOS('error', 'Google Sign-In 환경 오류', {
-          hasWebkit: !!(window as any).webkit,
-          hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
-          hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
-          hasIosBridge: !!(window as any).iosBridge
-        });
+          
+          // 네이티브 처리가 불가능한 경우 에러 표시
+          console.log('[GOOGLE LOGIN] 네이티브 Google Sign-In을 사용할 수 없음');
+          console.log('[GOOGLE LOGIN] 환경 정보:', {
+            hasWebkit: !!(window as any).webkit,
+            hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
+            hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
+            hasIosBridge: !!(window as any).iosBridge,
+            userAgent: navigator.userAgent
+          });
+          
+          // iOS 로그 전송 - 네이티브 사용 불가
+          sendLogToiOS('error', '❌ 네이티브 Google Sign-In 사용 불가', {
+            timestamp: new Date().toISOString(),
+            environmentInfo: {
+              hasWebkit: !!(window as any).webkit,
+              hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
+              hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
+              hasIosBridge: !!(window as any).iosBridge,
+              userAgent: navigator.userAgent
+            }
+          });
         
         // Google 로그인 환경 오류 햅틱 피드백
         hapticFeedback.warning();
@@ -1349,13 +1531,20 @@ export default function SignInPage() {
         return;
       }
       
-      // 웹 환경에서는 NextAuth.js를 통한 Google 로그인 (임시 비활성화)
-      console.log('웹 환경에서 Google 로그인 시도');
-      
-      // 에러 모달 강제 표시
-      setTimeout(() => {
-        showError('웹 환경에서는 Google 로그인이 현재 사용할 수 없습니다. 앱에서 이용해주세요.');
-      }, 100);
+              // 웹 환경에서는 NextAuth.js를 통한 Google 로그인 (임시 비활성화)
+        console.log('웹 환경에서 Google 로그인 시도');
+        
+        // iOS 로그 전송 - 웹 환경에서 시도
+        sendLogToiOS('info', '🌐 웹 환경에서 Google 로그인 시도', {
+          timestamp: new Date().toISOString(),
+          environment: 'web',
+          userAgent: navigator.userAgent
+        });
+        
+        // 에러 모달 강제 표시
+        setTimeout(() => {
+          showError('웹 환경에서는 Google 로그인이 현재 사용할 수 없습니다. 앱에서 이용해주세요.');
+        }, 100);
       
       /*
       // NextAuth 관련 코드 임시 비활성화
@@ -1391,52 +1580,107 @@ export default function SignInPage() {
         console.log('[GOOGLE LOGIN] 로그인 성공 - 자동 리다이렉션 대기');
       }
       */
-    } catch (error) {
-      console.error('Google 로그인 실패:', error);
-      
-      // iOS 로그 전송
-      sendLogToiOS('error', 'Google 로그인 catch 블록', { 
-        error: error instanceof Error ? error.message : String(error) 
-      });
-      
-      // 에러 메시지 개선
-      let errorMessage = 'Google 로그인에 실패했습니다.';
-      if (error instanceof Error) {
-        if (error.message.includes('network')) {
-          errorMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
-        } else {
-          errorMessage = `구글 로그인 오류: ${error.message}`;
+          } catch (error) {
+        console.error('Google 로그인 실패:', error);
+        
+        // iOS 로그 전송 - Google 로그인 catch 블록
+        sendLogToiOS('error', '❌ Google 로그인 catch 블록', {
+          timestamp: new Date().toISOString(),
+          error: error instanceof Error ? {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          } : String(error)
+        });
+        
+        // 에러 메시지 개선
+        let errorMessage = 'Google 로그인에 실패했습니다.';
+        if (error instanceof Error) {
+          if (error.message.includes('network')) {
+            errorMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
+          } else {
+            errorMessage = `구글 로그인 오류: ${error.message}`;
+          }
         }
+        
+        // iOS 로그 전송 - 에러 메시지 변환
+        sendLogToiOS('info', '🔄 Google 로그인 에러 메시지 변환', {
+          timestamp: new Date().toISOString(),
+          originalError: error instanceof Error ? error.message : String(error),
+          convertedError: errorMessage
+        });
+        
+        // 에러 모달 강제 표시
+        setTimeout(() => {
+          showError(errorMessage);
+        }, 100);
+      } finally {
+        setIsLoading(false);
+        
+        // iOS 로그 전송 - Google 로그인 프로세스 완료
+        sendLogToiOS('info', '🏁 Google 로그인 프로세스 완료', {
+          timestamp: new Date().toISOString(),
+          finalState: {
+            isLoading: false
+          }
+        });
       }
-      
-      // 에러 모달 강제 표시
-      setTimeout(() => {
-        showError(errorMessage);
-      }, 100);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   // Kakao 로그인 핸들러
   const handleKakaoLogin = async () => {
+    // iOS 로그 전송 - 카카오 로그인 시도 시작
+    sendLogToiOS('info', '💬 카카오 로그인 시도 시작', {
+      timestamp: new Date().toISOString(),
+      hasKakaoSDK: !!window.Kakao,
+      isKakaoInitialized: window.Kakao ? window.Kakao.isInitialized() : false
+    });
+    
     // 카카오 SDK가 로드되었는지 확인
     if (!window.Kakao || !window.Kakao.isInitialized()) {
+      // iOS 로그 전송 - 카카오 SDK 없음
+      sendLogToiOS('error', '❌ 카카오 SDK 로드 실패', {
+        timestamp: new Date().toISOString(),
+        hasKakao: !!window.Kakao,
+        isInitialized: window.Kakao ? window.Kakao.isInitialized() : false
+      });
+      
       showError('카카오 SDK가 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
       return;
     }
 
     setIsLoading(true);
     
+    // iOS 로그 전송 - 카카오 로그인 팝업 시작
+    sendLogToiOS('info', '🚀 카카오 로그인 팝업 시작', {
+      timestamp: new Date().toISOString(),
+      kakaoSDKVersion: window.Kakao ? window.Kakao.VERSION : 'unknown'
+    });
+    
     try {
       // 카카오 로그인 팝업 띄우기
-      window.Kakao.Auth.login({
-        success: async (authObj: any) => {
-          try {
-            console.log('카카오 로그인 성공:', authObj);
-            
-                         // 백엔드 API로 액세스 토큰 전송
-             const response = await fetch('/api/kakao-auth', {
+              window.Kakao.Auth.login({
+          success: async (authObj: any) => {
+            try {
+              console.log('카카오 로그인 성공:', authObj);
+              
+              // iOS 로그 전송 - 카카오 로그인 성공
+              sendLogToiOS('info', '✅ 카카오 로그인 성공 (토큰 획득)', {
+                timestamp: new Date().toISOString(),
+                hasAccessToken: !!authObj.access_token,
+                tokenType: authObj.token_type || 'unknown',
+                expiresIn: authObj.expires_in || 'unknown'
+              });
+              
+              // iOS 로그 전송 - 백엔드 API 호출 시작
+              sendLogToiOS('info', '🔄 백엔드 카카오 인증 API 호출 시작', {
+                timestamp: new Date().toISOString(),
+                apiEndpoint: '/api/kakao-auth',
+                method: 'POST'
+              });
+              
+              // 백엔드 API로 액세스 토큰 전송
+              const response = await fetch('/api/kakao-auth', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -1446,61 +1690,151 @@ export default function SignInPage() {
               }),
             });
 
-            const data = await response.json();
+                          const data = await response.json();
+              
+              // iOS 로그 전송 - 백엔드 API 응답
+              sendLogToiOS('info', '📡 백엔드 카카오 인증 API 응답', {
+                timestamp: new Date().toISOString(),
+                success: data.success,
+                hasUser: !!data.user,
+                hasError: !!data.error,
+                responseStatus: response.status
+              });
 
-            if (data.success) {
-              console.log('[KAKAO LOGIN] 카카오 로그인 성공, 사용자 정보:', data.user);
-              
-              // authService에 사용자 정보 설정 (AuthContext 우회, JWT 토큰은 이미 쿠키에 저장됨)
-              if (data.user) {
-                authService.setUserData(data.user);
-                // 토큰은 쿠키에 저장되므로 별도 설정 불필요
-              }
-              
-              console.log('[KAKAO LOGIN] 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
-              
-              // AuthContext 상태를 수동으로 동기화
-              await refreshAuthState();
-              console.log('[KAKAO LOGIN] AuthContext 상태 동기화 완료');
+              if (data.success) {
+                console.log('[KAKAO LOGIN] 카카오 로그인 성공, 사용자 정보:', data.user);
+                
+                // iOS 로그 전송 - 사용자 정보 저장
+                sendLogToiOS('info', '💾 카카오 사용자 정보 저장', {
+                  timestamp: new Date().toISOString(),
+                  hasUserData: !!data.user,
+                  userEmail: data.user?.mt_email ? data.user.mt_email.substring(0, 3) + '***' : 'unknown'
+                });
+                
+                // authService에 사용자 정보 설정 (AuthContext 우회, JWT 토큰은 이미 쿠키에 저장됨)
+                if (data.user) {
+                  authService.setUserData(data.user);
+                  // 토큰은 쿠키에 저장되므로 별도 설정 불필요
+                }
+                
+                console.log('[KAKAO LOGIN] 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
+                
+                // iOS 로그 전송 - AuthContext 동기화 시작
+                sendLogToiOS('info', '🔄 AuthContext 상태 동기화 시작', {
+                  timestamp: new Date().toISOString(),
+                  authServiceData: {
+                    hasUserData: !!authService.getUserData(),
+                    hasToken: !!authService.getToken()
+                  }
+                });
+                
+                // AuthContext 상태를 수동으로 동기화
+                await refreshAuthState();
+                console.log('[KAKAO LOGIN] AuthContext 상태 동기화 완료');
+                
+                // iOS 로그 전송 - AuthContext 동기화 완료
+                sendLogToiOS('info', '✅ AuthContext 상태 동기화 완료', {
+                  timestamp: new Date().toISOString(),
+                  authState: {
+                    isLoggedIn: isLoggedIn,
+                    hasUser: !!authService.getUserData()
+                  }
+                });
               
               // 카카오 로그인 성공 햅틱 피드백
-              hapticFeedback.success();
+              hapticFeedback.kakaoLogin({ status: 'success', userEmail: data.user?.mt_email?.substring(0, 3) + '***' });
               
               // 리다이렉트 플래그 설정
               isRedirectingRef.current = true;
               
-              // 모든 상태 업데이트 차단
-              blockAllEffectsRef.current = true;
-              
-              // router.replace 사용 (페이지 새로고침 없이 이동)
-              router.replace('/home');
-              return;
+                              // 모든 상태 업데이트 차단
+                blockAllEffectsRef.current = true;
+                
+                // iOS 로그 전송 - 리다이렉트 시작
+                sendLogToiOS('info', '🚀 Home 페이지로 리다이렉트 시작', {
+                  timestamp: new Date().toISOString(),
+                  redirectMethod: 'router.replace',
+                  targetPage: '/home'
+                });
+                
+                // router.replace 사용 (페이지 새로고침 없이 이동)
+                router.replace('/home');
+                return;
             } else {
               throw new Error(data.error || '로그인에 실패했습니다.');
             }
-          } catch (error: any) {
-            console.error('카카오 로그인 처리 오류:', error);
-            
-            // 탈퇴한 사용자 오류 처리
-            if (error.response?.status === 403 && error.response?.data?.isWithdrawnUser) {
-              showError('탈퇴한 계정입니다. 새로운 계정으로 가입해주세요.');
-            } else {
-              showError(error.message || '로그인 처리 중 오류가 발생했습니다.');
+                      } catch (error: any) {
+              console.error('카카오 로그인 처리 오류:', error);
+              
+              // iOS 로그 전송 - 카카오 로그인 처리 오류
+              sendLogToiOS('error', '❌ 카카오 로그인 처리 오류', {
+                timestamp: new Date().toISOString(),
+                error: error instanceof Error ? {
+                  message: error.message,
+                  stack: error.stack,
+                  name: error.name
+                } : String(error),
+                isWithdrawnUser: error.response?.status === 403 && error.response?.data?.isWithdrawnUser
+              });
+              
+              // 탈퇴한 사용자 오류 처리
+              if (error.response?.status === 403 && error.response?.data?.isWithdrawnUser) {
+                // iOS 로그 전송 - 탈퇴한 사용자
+                sendLogToiOS('warning', '⚠️ 탈퇴한 카카오 사용자 로그인 시도', {
+                  timestamp: new Date().toISOString(),
+                  responseStatus: error.response.status
+                });
+                
+                showError('탈퇴한 계정입니다. 새로운 계정으로 가입해주세요.');
+              } else {
+                showError(error.message || '로그인 처리 중 오류가 발생했습니다.');
+              }
+            } finally {
+              setIsLoading(false);
+              
+              // iOS 로그 전송 - 카카오 로그인 success 콜백 완료
+              sendLogToiOS('info', '🏁 카카오 로그인 success 콜백 완료', {
+                timestamp: new Date().toISOString(),
+                isLoading: false
+              });
             }
-          } finally {
-            setIsLoading(false);
+        },
+                  fail: (error: any) => {
+            console.error('카카오 로그인 실패:', error);
+            
+            // iOS 로그 전송 - 카카오 로그인 실패
+            sendLogToiOS('error', '❌ 카카오 로그인 실패 (fail 콜백)', {
+              timestamp: new Date().toISOString(),
+              error: error ? String(error) : 'unknown error'
+            });
+            
+            showError('카카오 로그인에 실패했습니다.');
+          },
+        });
+      } catch (error: any) {
+        console.error('카카오 로그인 오류:', error);
+        
+        // iOS 로그 전송 - 카카오 로그인 catch 블록
+        sendLogToiOS('error', '❌ 카카오 로그인 catch 블록', {
+          timestamp: new Date().toISOString(),
+          error: error instanceof Error ? {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          } : String(error)
+        });
+        
+        showError('카카오 로그인 중 오류가 발생했습니다.');
+      } finally {
+        // iOS 로그 전송 - 카카오 로그인 프로세스 완료
+        sendLogToiOS('info', '🏁 카카오 로그인 프로세스 완료', {
+          timestamp: new Date().toISOString(),
+          finalState: {
+            isLoading: false
           }
-        },
-        fail: (error: any) => {
-          console.error('카카오 로그인 실패:', error);
-          showError('카카오 로그인에 실패했습니다.');
-        },
-      });
-    } catch (error: any) {
-      console.error('카카오 로그인 오류:', error);
-      showError('카카오 로그인 중 오류가 발생했습니다.');
-    }
-  };
+        });
+      }
+    };
 
   // 로딩 스피너 컴포넌트 (통일된 디자인)
   const LoadingSpinner = ({ message, fullScreen = true }: { message: string; fullScreen?: boolean }) => {
