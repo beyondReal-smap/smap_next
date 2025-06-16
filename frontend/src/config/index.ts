@@ -69,15 +69,16 @@ export const API_KEYS = {
 export const MAP_CONFIG = {
   // Naver Maps 설정
   NAVER: {
-    // 네이버 지도 API에 등록된 도메인 목록
-    // 실제 환경에 맞게 업데이트 필요
+    // 네이버 지도 API에 등록된 도메인 목록 (실제 네이버 클라우드 플랫폼 설정과 일치)
     ALLOWED_DOMAINS: [
+      'nextstep.smap.site',  // 현재 운영 도메인
       'app2.smap.site',
       'app.smap.site',
       'smap.site',
+      '118.67.130.71:3000',  // IP 주소 도메인
       // 개발 환경
-      'localhost',
-      '127.0.0.1',
+      'localhost:3000',
+      '127.0.0.1:3000',
     ],
     // 네이버 지도 옵션
     DEFAULT_OPTIONS: {

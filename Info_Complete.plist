@@ -90,6 +90,8 @@
     <key>WKAppBoundDomains</key>
     <array>
         <string>nextstep.smap.site</string>
+        <string>app2.smap.site</string>
+        <string>app.smap.site</string>
         <string>smap.site</string>
         <string>localhost</string>
     </array>

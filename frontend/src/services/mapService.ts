@@ -45,9 +45,9 @@ export const loadNaverMapsAPI = (callback: () => void): void => {
     return;
   }
 
-  // 스크립트 요소 생성 (만약 Next.js Script 컴포넌트를 사용하지 않을 경우)
+  // 스크립트 요소 생성 (올바른 파라미터명과 서브모듈 사용)
   const script = document.createElement('script');
-  script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${MAP_API_KEYS.NAVER_CLIENT_ID}`;
+  script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${MAP_API_KEYS.NAVER_CLIENT_ID}&submodules=geocoder`;
   script.async = true;
   script.defer = true;
   script.onload = callback;

@@ -146,7 +146,7 @@ class EnhancedWebViewController: UIViewController {
         if #available(iOS 14.0, *) {
             config.limitsNavigationsToAppBoundDomains = true
             print("🔐 [WebView] App-Bound Domain 제한 활성화됨")
-            print("🔐 [WebView] 허용된 도메인: nextstep.smap.site, smap.site, localhost")
+            print("🔐 [WebView] 허용된 도메인: nextstep.smap.site, app2.smap.site, app.smap.site, smap.site, localhost")
         }
         
         // 데이터 감지 설정

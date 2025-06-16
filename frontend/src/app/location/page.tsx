@@ -2067,22 +2067,14 @@ export default function LocationPage() {
         return;
       }
       
-      // geocoder 서브모듈 제거로 로딩 속도 개선
+      // geocoder 서브모듈 포함하여 로딩 (위치 검색 필요)
       const script = document.createElement('script');
-      script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEYS.NAVER_MAPS_CLIENT_ID}`;
+      script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEYS.NAVER_MAPS_CLIENT_ID}&submodules=geocoder`;
       script.async = true;
       script.defer = true; // defer 추가로 최적화
       script.onload = () => {
-        console.log('[네이버 지도 로드] 스크립트 로드 완료 (최적화)');
+        console.log('[네이버 지도 로드] 스크립트 로드 완료 (geocoder 포함)');
         setIsMapLoading(false);
-        
-        // geocoder가 필요한 경우 나중에 동적 로딩
-        if (window.naver?.maps && !window.naver.maps.Service) {
-          const geocoderScript = document.createElement('script');
-          geocoderScript.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEYS.NAVER_MAPS_CLIENT_ID}&submodules=geocoder`;
-          geocoderScript.async = true;
-          document.head.appendChild(geocoderScript);
-        }
       };
       script.onerror = () => {
         console.error('네이버 지도 로드 실패');

@@ -1382,12 +1382,12 @@ export default function HomePage() {
     performBackupLoading();
 
     function performBackupLoading() {
-      // 네이버 지도 API 로드용 URL 생성
+      // 네이버 지도 API 로드용 URL 생성 (올바른 파라미터명 사용)
       const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
-      naverMapUrl.searchParams.append('ncpClientId', NAVER_MAPS_CLIENT_ID);
+      naverMapUrl.searchParams.append('ncpKeyId', NAVER_MAPS_CLIENT_ID); // ncpClientId → ncpKeyId
       if (!isIOSWebView) {
         // iOS WebView가 아닌 경우에만 서브모듈 추가 (호환성 문제 방지)
-        naverMapUrl.searchParams.append('submodules', 'panorama,geocoder,drawing,visualization');
+        naverMapUrl.searchParams.append('submodules', 'geocoder,drawing,visualization');
       }
       
       // script 요소 생성 및 로드
@@ -1397,28 +1397,85 @@ export default function HomePage() {
       script.defer = true;
       script.id = 'naver-maps-backup';
       
+      // 네이버 지도 로딩 에러 감지 및 처리
+      let hasErrorOccurred = false;
+      let errorListener: any = null;
+      
+      // 전역 에러 리스너 추가 (401, 500 오류 감지)
+      const handleNaverMapsError = (event: ErrorEvent) => {
+        const errorMessage = event.message || '';
+        const isNaverError = errorMessage.includes('naver') || 
+                           errorMessage.includes('maps') ||
+                           errorMessage.includes('oapi.map.naver.com') ||
+                           errorMessage.includes('Unauthorized') ||
+                           errorMessage.includes('Internal Server Error');
+        
+        if (isNaverError && !hasErrorOccurred) {
+          hasErrorOccurred = true;
+          console.error('[HOME] 네이버 지도 API 인증/서버 오류 감지:', errorMessage);
+          
+          // 즉시 구글 지도로 전환
+          setIsMapLoading(false);
+          setMapType('google');
+          setNaverMapsLoaded(false);
+          
+          // 구글 지도 API 로드
+          if (!apiLoadStatus.google) {
+            console.log('[HOME] 네이버 지도 오류로 인한 구글 지도 로딩 시작');
+            loadGoogleMapsAPI();
+          }
+          
+          // 에러 리스너 제거
+          if (errorListener) {
+            window.removeEventListener('error', errorListener);
+            errorListener = null;
+          }
+        }
+      };
+      
+      // 에러 리스너 등록
+      errorListener = handleNaverMapsError;
+      window.addEventListener('error', errorListener);
+      
       script.onload = () => {
         console.log('[HOME] Naver Maps API 백업 로드 성공');
+        
+        // 로드 성공 후에도 API 호출 오류가 발생할 수 있으므로 일정 시간 동안 에러 감지
+        setTimeout(() => {
+          if (errorListener && !hasErrorOccurred) {
+            window.removeEventListener('error', errorListener);
+            errorListener = null;
+          }
+        }, 5000); // 5초 후 에러 리스너 제거
         
         if (isIOSWebView) {
           console.log('[HOME] iOS WebView - 네이버 지도 스크립트 로드 완료, 최적화 대기');
           // iOS WebView에서는 ios-webview-fix.js의 최적화를 기다림
         } else {
           // 일반 브라우저에서는 즉시 설정
-          apiLoadStatus.naver = true;
-          setNaverMapsLoaded(true);
-          setIsMapLoading(false);
+          if (!hasErrorOccurred) {
+            apiLoadStatus.naver = true;
+            setNaverMapsLoaded(true);
+            setIsMapLoading(false);
+          }
         }
       };
       
       script.onerror = () => {
         console.error('[HOME] 네이버 지도 백업 로드 실패');
+        hasErrorOccurred = true;
         setIsMapLoading(false);
         setMapType('google'); // 로드 실패 시 구글 지도로 전환
         
         // 구글 지도 API 로드
         if (!apiLoadStatus.google) {
           loadGoogleMapsAPI();
+        }
+        
+        // 에러 리스너 제거
+        if (errorListener) {
+          window.removeEventListener('error', errorListener);
+          errorListener = null;
         }
       };
       
@@ -1433,11 +1490,18 @@ export default function HomePage() {
       // iOS WebView에서는 더 긴 타임아웃 설정 (15초)
       const timeout = isIOSWebView ? 15000 : 10000;
       setTimeout(() => {
-        if (!naverMapsLoaded && isIOSWebView) {
-          console.warn(`[HOME] iOS WebView 네이버 지도 로딩 타임아웃 (${timeout}ms) - 구글 지도로 전환`);
+        if (!naverMapsLoaded && !hasErrorOccurred) {
+          console.warn(`[HOME] 네이버 지도 로딩 타임아웃 (${timeout}ms) - 구글 지도로 전환`);
+          hasErrorOccurred = true;
           setMapType('google');
           if (!apiLoadStatus.google) {
             loadGoogleMapsAPI();
+          }
+          
+          // 에러 리스너 제거
+          if (errorListener) {
+            window.removeEventListener('error', errorListener);
+            errorListener = null;
           }
         }
       }, timeout);
