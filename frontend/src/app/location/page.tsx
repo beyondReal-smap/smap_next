@@ -273,16 +273,16 @@ const sidebarVariants = {
     x: '-100%',
     transition: {
       type: 'tween',
-      ease: [0.22, 1, 0.36, 1], // 더 자연스러운 easing curve
-      duration: 0.4 // 조금 더 긴 duration으로 부드럽게
+      ease: [0.22, 1, 0.36, 1],
+      duration: 0.6
     }
   },
   open: {
     x: 0,
     transition: {
       type: 'tween',
-      ease: [0.22, 1, 0.36, 1], // 더 자연스러운 easing curve
-      duration: 0.4 // 조금 더 긴 duration으로 부드럽게
+      ease: [0.22, 1, 0.36, 1],
+      duration: 0.6
     }
   }
 };
@@ -291,14 +291,14 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.3,
+      duration: 0.6,
       ease: [0.22, 1, 0.36, 1]
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.3,
+      duration: 0.6,
       ease: [0.22, 1, 0.36, 1]
     }
   }
@@ -307,34 +307,27 @@ const sidebarOverlayVariants = {
 const sidebarContentVariants = {
   closed: {
     opacity: 0,
-    y: 20, // 살짝 아래에서 위로 올라오는 효과 추가
     transition: {
-      duration: 0.2,
+      duration: 0.3,
       ease: [0.22, 1, 0.36, 1]
     }
   },
   open: {
     opacity: 1,
-    y: 0,
     transition: {
-      delay: 0.15, // 사이드바가 어느정도 나온 후에 콘텐츠 애니메이션 시작
+      delay: 0.1,
       duration: 0.3,
-      ease: [0.22, 1, 0.36, 1],
-      staggerChildren: 0.05 // 자식 요소들이 순차적으로 나타나는 간격을 조금 늘림
+      ease: [0.22, 1, 0.36, 1]
     }
   }
 };
 
 const memberItemVariants = {
   closed: { 
-    opacity: 0, 
-    x: -15, // 조금 더 큰 이동거리로 효과를 명확하게
-    scale: 0.95
+    opacity: 0
   },
   open: { 
-    opacity: 1, 
-    x: 0,
-    scale: 1,
+    opacity: 1,
     transition: {
       type: "tween",
       ease: [0.22, 1, 0.36, 1],
@@ -5349,8 +5342,7 @@ export default function LocationPage() {
                           <motion.div
                             key={member.id}
                             variants={memberItemVariants}
-                            whileHover={{ scale: 1.02, x: 3 }}
-                            whileTap={{ scale: 0.98 }}
+                                                             whileTap={{ scale: 0.98 }}
                             onClick={() => {
                               handleMemberSelect(member.id);
                               // 사이드바는 닫지 않고 유지하여 장소 리스트를 볼 수 있도록 함
@@ -5386,8 +5378,7 @@ export default function LocationPage() {
                                       } as React.CSSProperties
                                     : {}
                                   }
-                                  whileHover={{ scale: 1.1, rotate: 5 }}
-                                  transition={{ type: "spring", stiffness: 300 }}
+                                                                           transition={{ type: "spring", stiffness: 300 }}
                                 >
                                   <img 
                                     src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}

@@ -140,76 +140,11 @@ export default function SignInPage() {
   };
 
   // 🚀 시뮬레이터용 Google SDK 로그인 함수
-  // Google Identity Services SDK 동적 로드 함수
-  const loadGoogleSDK = (): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      // 이미 로드되어 있는지 확인
-      if ((window as any).google?.accounts?.id) {
-        console.log('[GOOGLE SDK] 이미 로드됨');
-        resolve();
-        return;
-      }
-      
-      // 스크립트가 이미 DOM에 있는지 확인
-      if (document.querySelector('script[src*="accounts.google.com"]')) {
-        console.log('[GOOGLE SDK] 스크립트 로딩 중... 대기');
-        // 최대 5초 대기
-        let attempts = 0;
-        const checkGoogleLoad = () => {
-          attempts++;
-          if ((window as any).google?.accounts?.id) {
-            resolve();
-          } else if (attempts < 50) { // 5초 = 50 * 100ms
-            setTimeout(checkGoogleLoad, 100);
-          } else {
-            reject(new Error('Google SDK 로드 타임아웃'));
-          }
-        };
-        checkGoogleLoad();
-        return;
-      }
-      
-      console.log('[GOOGLE SDK] 스크립트 동적 로드 시작');
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      
-      script.onload = () => {
-        console.log('[GOOGLE SDK] 스크립트 로드 완료, 초기화 대기 중...');
-        // Google 객체가 준비될 때까지 대기
-        let attempts = 0;
-        const checkGoogleReady = () => {
-          attempts++;
-          if ((window as any).google?.accounts?.id) {
-            console.log('[GOOGLE SDK] 초기화 완료');
-            resolve();
-          } else if (attempts < 30) { // 3초 = 30 * 100ms
-            setTimeout(checkGoogleReady, 100);
-          } else {
-            reject(new Error('Google SDK 초기화 타임아웃'));
-          }
-        };
-        checkGoogleReady();
-      };
-      
-      script.onerror = () => {
-        console.error('[GOOGLE SDK] 스크립트 로드 실패');
-        reject(new Error('Google SDK 스크립트 로드 실패'));
-      };
-      
-      document.head.appendChild(script);
-    });
-  };
-
-  const handleGoogleSDKLogin = async () => {
-    console.log('[GOOGLE SDK] 웹 Google SDK를 통한 로그인 시작');
+  const handleGoogleSDKLogin = async (retryCount: number = 0) => {
+    console.log('[GOOGLE SDK] 웹 Google SDK를 통한 로그인 시작', retryCount > 0 ? `(재시도 ${retryCount})` : '');
     
     try {
-      // 1단계: Google SDK 로드 (필요시)
-      await loadGoogleSDK();
-      
-      // 2단계: Google Identity Services 초기화
+      // Google Identity Services 초기화 (이미 로드되어 있다고 가정)
       if ((window as any).google?.accounts?.id) {
         const google = (window as any).google;
         
@@ -310,7 +245,7 @@ export default function SignInPage() {
           }
         });
         
-      } else {
+              } else {
         console.error('[GOOGLE SDK] window.google.accounts.id가 없음:', {
           hasWindow: typeof window !== 'undefined',
           hasGoogle: !!(window as any).google,
@@ -318,6 +253,21 @@ export default function SignInPage() {
           hasId: !!(window as any).google?.accounts?.id,
           userAgent: navigator.userAgent
         });
+        
+        // 최대 2회까지만 재시도
+        if (retryCount < 2) {
+          console.log('[GOOGLE SDK] 3초 후 재시도...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          if ((window as any).google?.accounts?.id) {
+            console.log('[GOOGLE SDK] 재시도 성공 - SDK 사용 가능');
+            // 재귀 호출로 다시 시도
+            return handleGoogleSDKLogin(retryCount + 1);
+          } else {
+            console.log('[GOOGLE SDK] 재시도해도 SDK 없음');
+          }
+        }
+        
         throw new Error('Google Identity Services를 사용할 수 없습니다.');
       }
       

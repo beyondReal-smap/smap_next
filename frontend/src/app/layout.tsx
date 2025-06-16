@@ -135,6 +135,9 @@ export default function RootLayout({
         
         {/* iOS 웹뷰 브릿지 */}
         <script src="/ios-bridge.js" async></script>
+        
+        {/* Google Identity Services SDK */}
+        <script src="https://accounts.google.com/gsi/client" async defer></script>
       </head>
       <body className={`${lineSeed.variable} font-sans antialiased`} suppressHydrationWarning>
         <ClientLayout>

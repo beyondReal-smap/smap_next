@@ -149,16 +149,16 @@ const sidebarVariants = {
     x: '-100%',
     transition: {
       type: 'tween',
-      ease: [0.22, 1, 0.36, 1], // 더 자연스러운 easing curve
-      duration: 0.4 // 조금 더 긴 duration으로 부드럽게
+      ease: [0.22, 1, 0.36, 1],
+      duration: 0.6
     }
   },
   open: {
     x: 0,
     transition: {
       type: 'tween',
-      ease: [0.22, 1, 0.36, 1], // 더 자연스러운 easing curve
-      duration: 0.4 // 조금 더 긴 duration으로 부드럽게
+      ease: [0.22, 1, 0.36, 1],
+      duration: 0.6
     }
   }
 };
@@ -167,14 +167,14 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.3,
+      duration: 0.6,
       ease: [0.22, 1, 0.36, 1]
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.3,
+      duration: 0.6,
       ease: [0.22, 1, 0.36, 1]
     }
   }
@@ -183,34 +183,27 @@ const sidebarOverlayVariants = {
 const sidebarContentVariants = {
   closed: {
     opacity: 0,
-    y: 20, // 살짝 아래에서 위로 올라오는 효과 추가
     transition: {
-      duration: 0.2,
+      duration: 0.3,
       ease: [0.22, 1, 0.36, 1]
     }
   },
   open: {
     opacity: 1,
-    y: 0,
     transition: {
-      delay: 0.15, // 사이드바가 어느정도 나온 후에 콘텐츠 애니메이션 시작
+      delay: 0.1,
       duration: 0.3,
-      ease: [0.22, 1, 0.36, 1],
-      staggerChildren: 0.05 // 자식 요소들이 순차적으로 나타나는 간격을 조금 늘림
+      ease: [0.22, 1, 0.36, 1]
     }
   }
 };
 
 const memberItemVariants = {
   closed: { 
-    opacity: 0, 
-    x: -15, // 조금 더 큰 이동거리로 효과를 명확하게
-    scale: 0.95
+    opacity: 0
   },
   open: { 
-    opacity: 1, 
-    x: 0,
-    scale: 1,
+    opacity: 1,
     transition: {
       type: "tween",
       ease: [0.22, 1, 0.36, 1],
@@ -5911,11 +5904,10 @@ export default function LogsPage() {
               {/* 헤더 */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center space-x-3">
-                  <motion.div 
-                    className="p-2 rounded-xl shadow-lg"
-                    style={{ backgroundColor: '#0113A3' }}
-                    whileHover={{ scale: 1.05, rotate: 5 }}
-                    whileTap={{ scale: 0.95 }}
+                                         <motion.div 
+                         className="p-2 rounded-xl shadow-lg"
+                         style={{ backgroundColor: '#0113A3' }}
+                         whileTap={{ scale: 0.95 }}
                   >
                     <FiUser className="w-5 h-5 text-white" />
                   </motion.div>
@@ -5926,9 +5918,8 @@ export default function LogsPage() {
                     <p className="text-sm text-gray-600">멤버를 선택해보세요</p>
                   </div>
                 </div>
-                <motion.button
-                  whileHover={{ scale: 1.05, rotate: 90 }}
-                  whileTap={{ scale: 0.95 }}
+                                     <motion.button
+                       whileTap={{ scale: 0.95 }}
                   onClick={() => setIsSidebarOpen(false)}
                   className="p-2 hover:bg-white/60 rounded-xl transition-all duration-200 backdrop-blur-sm"
                 >
@@ -6174,8 +6165,7 @@ export default function LogsPage() {
                           key={member.id}
                           id={`member-${member.id}`}
                           variants={memberItemVariants}
-                          whileHover={{ scale: 1.02, x: 3 }}
-                          whileTap={{ scale: 0.98 }}
+                                                           whileTap={{ scale: 0.98 }}
                           onClick={(e) => {
                             handleMemberSelect(member.id, e);
                             // 멤버 선택 시 사이드바는 자동으로 닫힘 (handleMemberSelect에서 처리)
@@ -6211,8 +6201,7 @@ export default function LogsPage() {
                                     } as React.CSSProperties
                                   : {}
                                 }
-                                whileHover={{ scale: 1.1, rotate: 5 }}
-                                transition={{ type: "spring", stiffness: 300 }}
+                                                                         transition={{ type: "spring", stiffness: 300 }}
                               >
                                 <img 
                                   src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}
