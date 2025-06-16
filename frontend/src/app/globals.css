@@ -377,3 +377,54 @@ div[style*="zIndex: 9999"] * {
 .fixed.inset-0[style*="z-index: 9999"] {
   z-index: 999999 !important;
 }
+
+/* 통일된 스피너 애니메이션 (iOS WebView 호환) */
+@-webkit-keyframes unified-spin {
+  0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+}
+
+@keyframes unified-spin {
+  0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+}
+
+.unified-animate-spin {
+  -webkit-animation: unified-spin 1s linear infinite !important;
+  animation: unified-spin 1s linear infinite !important;
+  -webkit-transform-origin: center center !important;
+  transform-origin: center center !important;
+  will-change: transform !important;
+  -webkit-backface-visibility: hidden !important;
+  backface-visibility: hidden !important;
+  display: inline-block !important;
+}
+
+/* 연속 스핀 애니메이션 (백업용) */
+@-webkit-keyframes continuous-spin {
+  0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+  25% { -webkit-transform: rotate(90deg); transform: rotate(90deg); }
+  50% { -webkit-transform: rotate(180deg); transform: rotate(180deg); }
+  75% { -webkit-transform: rotate(270deg); transform: rotate(270deg); }
+  100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+}
+
+@keyframes continuous-spin {
+  0% { -webkit-transform: rotate(0deg); transform: rotate(0deg); }
+  25% { -webkit-transform: rotate(90deg); transform: rotate(90deg); }
+  50% { -webkit-transform: rotate(180deg); transform: rotate(180deg); }
+  75% { -webkit-transform: rotate(270deg); transform: rotate(270deg); }
+  100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
+}
+
+/* Tailwind의 animate-spin이 작동하지 않을 때 대체 */
+.animate-spin {
+  -webkit-animation: continuous-spin 1s linear infinite !important;
+  animation: continuous-spin 1s linear infinite !important;
+  -webkit-transform-origin: center center !important;
+  transform-origin: center center !important;
+  will-change: transform !important;
+  -webkit-backface-visibility: hidden !important;
+  backface-visibility: hidden !important;
+  display: inline-block !important;
+}

@@ -70,9 +70,6 @@ export const MapSkeleton: React.FC<MapSkeletonProps> = ({
                   duration: 0.4
                 }}
               >
-                <h3 className="text-sm font-semibold text-gray-900 mb-2 whitespace-nowrap">
-                  지도 로딩 중
-                </h3>
               </motion.div>
 
               <motion.div 
@@ -87,7 +84,14 @@ export const MapSkeleton: React.FC<MapSkeletonProps> = ({
                   duration: 0.4
                 }}
               >
-                <IOSCompatibleSpinner size="md" />
+                <div style={{ 
+                  transform: 'translateZ(0)',
+                  willChange: 'transform',
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden'
+                }}>
+                  <IOSCompatibleSpinner size="md" />
+                </div>
               </motion.div>
             </motion.div>
           </div>

@@ -1259,7 +1259,7 @@ export default function HomePage() {
       console.log('[HOME] iOS WebView 환경 - 네이버 지도 최적화 로딩');
       // iOS WebView에서는 ios-webview-fix.js의 최적화를 기다림
       // 스크립트가 이미 있는지 확인
-      const existingScript = document.querySelector('script[src*="openapi.map.naver.com"]');
+      const existingScript = document.querySelector('script[src*="oapi.map.naver.com"]');
       if (!existingScript) {
         // 스크립트가 없으면 생성
         performBackupLoading();
@@ -1304,7 +1304,7 @@ export default function HomePage() {
 
     function performBackupLoading() {
       // 네이버 지도 API 로드용 URL 생성
-      const naverMapUrl = new URL(`https://openapi.map.naver.com/openapi/v3/maps.js`);
+      const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
       naverMapUrl.searchParams.append('ncpClientId', NAVER_MAPS_CLIENT_ID);
       if (!isIOSWebView) {
         // iOS WebView가 아닌 경우에만 서브모듈 추가 (호환성 문제 방지)

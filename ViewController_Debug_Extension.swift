@@ -83,7 +83,7 @@ extension ViewController {
                     
                     // 네이버 지도 상태
                     naverMapsAvailable: !!(window.naver && window.naver.maps),
-                    naverScriptExists: !!document.querySelector('script[src*="openapi.map.naver.com"]'),
+                    naverScriptExists: !!document.querySelector('script[src*="oapi.map.naver.com"]'),
                     naverMapContainer: !!document.getElementById('naverMapContainer'),
                     
                     // 구글 지도 상태

@@ -201,7 +201,7 @@
       
       // 네이버 지도 API 로딩 상태 확인 및 최적화
       function checkAndOptimizeNaverMaps() {
-        const naverScript = document.querySelector('script[src*="openapi.map.naver.com"]');
+        const naverScript = document.querySelector('script[src*="oapi.map.naver.com"]');
         
         if (naverScript) {
           console.log('Naver Maps script found, optimizing for iOS WebView...');
