@@ -122,7 +122,7 @@ console.log(results);
 ## ✅ 검증 체크리스트
 
 ### 네이버 지도 API 설정
-- [ ] API 키: `unxdi5mt3f` 사용 확인
+- [ ] API 키: `91y2nh0yff` 사용 확인
 - [ ] 파라미터명: `ncpKeyId` 사용 확인 
 - [ ] 도메인 등록: nextstep.smap.site 등록 확인
 - [ ] 서브모듈: geocoder,drawing,visualization 로드 확인
@@ -143,7 +143,7 @@ console.log(results);
 
 ### 401 Unauthorized
 ```
-GET https://oapi.map.naver.com/v3/auth?ncpKeyId=unxdi5mt3f&url=https%3A%2F%2Fnextstep.smap.site%2Fhome&time=1750116168886&callback=__naver_maps_callback__0 net::ERR_ABORTED 401 (Unauthorized)
+GET https://oapi.map.naver.com/v3/auth?ncpKeyId=91y2nh0yff&url=https%3A%2F%2Fnextstep.smap.site%2Fhome&time=1750116168886&callback=__naver_maps_callback__0 net::ERR_ABORTED 401 (Unauthorized)
 ```
 
 **원인**: API 키 또는 도메인 등록 문제  

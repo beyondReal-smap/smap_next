@@ -10,8 +10,8 @@
   "/api/member-location-logs/member-activity/route": "app/api/member-location-logs/member-activity/route.js",
   "/api/member-location-logs/daily-counts/route": "app/api/member-location-logs/daily-counts/route.js",
   "/api/group-members/member/[groupId]/route": "app/api/group-members/member/[groupId]/route.js",
-  "/api/groups/[groupId]/locations/route": "app/api/groups/[groupId]/locations/route.js",
   "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
+  "/api/groups/[groupId]/locations/route": "app/api/groups/[groupId]/locations/route.js",
   "/api/member-location-logs/[mt_idx]/map-markers/route": "app/api/member-location-logs/[mt_idx]/map-markers/route.js",
   "/home/page": "app/home/page.js",
   "/logs/page": "app/logs/page.js"

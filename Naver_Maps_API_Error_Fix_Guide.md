@@ -3,12 +3,12 @@
 ## 📋 현재 발생 중인 문제
 
 ```
-❌ GET https://oapi.map.naver.com/v3/auth?ncpKeyId=unxdi5mt3f&url=https%3A%2F%2Fnextstep.smap.site%2Fhome&time=1750116168886&callback=__naver_maps_callback__0 
+❌ GET https://oapi.map.naver.com/v3/auth?ncpKeyId=91y2nh0yff&url=https%3A%2F%2Fnextstep.smap.site%2Fhome&time=1750116168886&callback=__naver_maps_callback__0 
    net::ERR_ABORTED 401 (Unauthorized)
 
 ❌ NAVER Maps JavaScript API v3 잠시 후에 다시 요청해 주세요.
    Error Code / Error Message: 500 / Internal Server Error (내부 서버 오류)
-   Client ID: unxdi5mt3f
+   Client ID: 91y2nh0yff
    URI: https://nextstep.smap.site/home
 
 ⚠️ 안드로이드 9 이상에서는 HTTP 평문 통신이 기본적으로 사용되지 않습니다.
@@ -18,7 +18,7 @@
 ## 🎯 문제 분석
 
 ### 1. **API 키 관련 문제**
-- **현재 Client ID**: `unxdi5mt3f` (이전: `91y2nh0yff`)
+- **현재 Client ID**: `91y2nh0yff` (이전: `91y2nh0yff`)
 - **401 Unauthorized**: API 키 인증 실패
 - **500 Internal Server Error**: 서버 내부 오류
 
@@ -72,7 +72,7 @@
 #### 1. **API 키 환경변수 설정**
 ```javascript
 // 환경변수로 API 키 관리
-const NAVER_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || 'unxdi5mt3f';
+const NAVER_CLIENT_ID = process.env.NEXT_PUBLIC_NAVER_CLIENT_ID || '91y2nh0yff';
 
 // API 키 검증 로직 추가
 if (!NAVER_CLIENT_ID) {
@@ -239,7 +239,7 @@ const FALLBACK_MAP_SERVICES = [
 ```javascript
 // 백업 API 키 목록
 const NAVER_CLIENT_IDS = [
-  'unxdi5mt3f',  // 현재 키
+  '91y2nh0yff',  // 현재 키
   'backup_key_1', // 백업 키 1
   'backup_key_2'  // 백업 키 2
 ];
@@ -258,7 +258,7 @@ function tryNextApiKey() {
 
 ### ✅ 완료된 설정 확인 체크리스트
 ```
-✅ API 키 설정: unxdi5mt3f
+✅ API 키 설정: 91y2nh0yff
 ✅ API Secret: bKRzkFBbAvfdHDTZB0mJ81jmO8ufULvQavQIQZmp
 ✅ 등록된 도메인:
    - https://nextstep.smap.site ✅
