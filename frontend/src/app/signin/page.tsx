@@ -622,6 +622,7 @@ export default function SignInPage() {
     
     // 전역 플래그 먼저 제거
     delete (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__;
+    delete (window as any).__SIGNIN_ERROR_MESSAGE__;
     
     // 🚫 브라우저 네비게이션 차단 해제
     if (navigationListenersRef.current.beforeunload) {
@@ -667,8 +668,9 @@ export default function SignInPage() {
       blockAllEffectsRef.current = true;
       preventRemountRef.current = true;
       
-      // 전역 플래그 설정 (가장 먼저)
+      // 전역 플래그 설정 (가장 먼저) - 에러 메시지도 함께 저장
       (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+      (window as any).__SIGNIN_ERROR_MESSAGE__ = message;
       console.log('[SIGNIN] 전역 플래그 설정 완료');
       
       // 🚫 페이지 완전 고정
@@ -681,7 +683,7 @@ export default function SignInPage() {
       navigationListenersRef.current.beforeunload = (e: BeforeUnloadEvent) => {
         e.preventDefault();
         e.returnValue = '';
-        return '';
+        // iOS WebView에서 return 문 제거 (JavaScript execution 오류 방지)
       };
       
       navigationListenersRef.current.popstate = (e: PopStateEvent) => {
@@ -697,18 +699,27 @@ export default function SignInPage() {
       window.history.pushState(null, '', window.location.href);
       console.log('[SIGNIN] 브라우저 네비게이션 차단 완료');
       
-      // 에러 모달 표시
+      // 에러 모달 표시 - setTimeout으로 다음 렌더링 사이클에서 실행
       console.log('[SIGNIN] 에러 모달 상태 설정 중...');
-      setErrorModalMessage(message);
-      setShowErrorModal(true);
+      
+      // 즉시 로딩 상태 해제
       setIsLoading(false);
       
+      // 다음 렌더링 사이클에서 에러 모달 표시
+      setTimeout(() => {
+        console.log('[SIGNIN] 에러 모달 상태 설정 (setTimeout)');
+        setErrorModalMessage(message);
+        setShowErrorModal(true);
+        
+        console.log('[SIGNIN] ✅ showError 함수 완료 (setTimeout)');
+        console.log('[SIGNIN] 설정된 상태:', {
+          errorModalMessage: message,
+          showErrorModal: true,
+          isLoading: false
+        });
+      }, 100); // 100ms 후 실행
+      
       console.log('[SIGNIN] ✅ showError 함수 완료');
-      console.log('[SIGNIN] 설정된 상태:', {
-        errorModalMessage: message,
-        showErrorModal: true,
-        isLoading: false
-      });
     } catch (error) {
       console.error('[SIGNIN] ❌ showError 함수 내부 오류:', error);
     }
@@ -1243,19 +1254,30 @@ export default function SignInPage() {
         </motion.div>
       </motion.div>
 
-      {/* 에러 모달 */}
+      {/* 에러 모달 - 전역 플래그와 관계없이 항상 렌더링 */}
       {(() => {
+        // 전역 플래그가 있을 때는 강제로 에러 모달 표시
+        const globalErrorFlag = (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__;
+        const globalErrorMessage = (window as any).__SIGNIN_ERROR_MESSAGE__;
+        const shouldShowModal = showErrorModal || globalErrorFlag;
+        const displayMessage = errorModalMessage || globalErrorMessage || '로그인 중 오류가 발생했습니다.';
+        
         console.log('[SIGNIN] 에러 모달 렌더링 체크:', {
           showErrorModal,
           errorModalMessage,
-          isLoading
+          isLoading,
+          globalErrorFlag,
+          globalErrorMessage,
+          shouldShowModal,
+          displayMessage
         });
+        
         return (
           <AlertModal
-            isOpen={showErrorModal}
+            isOpen={shouldShowModal}
             onClose={closeErrorModal}
             message="로그인 실패"
-            description={errorModalMessage}
+            description={displayMessage}
             buttonText="확인"
             type="error"
           />
