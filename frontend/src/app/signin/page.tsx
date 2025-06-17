@@ -2536,11 +2536,27 @@ export default function SignInPage() {
         nativeFunctions: {
           SMAP_FORCE_HAPTIC: typeof (window as any).SMAP_FORCE_HAPTIC,
           SMAP_CHECK_HANDLERS: typeof (window as any).SMAP_CHECK_HANDLERS
-        }
+        },
+        // 추가 디버깅 정보
+        userAgent: navigator.userAgent.substring(0, 50),
+        webkitDetails: webkit ? {
+          hasUserContentController: !!webkit.messageHandlers,
+          messageHandlersKeys: webkit?.messageHandlers ? Object.keys(webkit.messageHandlers) : 'null',
+          webkitType: typeof webkit
+        } : null
       };
       
       console.log('🎯 [HANDLER MONITOR] 현재 상태:', status);
       sendLogToiOS('info', '[HANDLER MONITOR] 핸들러 상태', status);
+      
+      // WebKit이 있지만 messageHandlers가 없는 경우 경고
+      if (webkit && !webkit.messageHandlers) {
+        console.warn('⚠️ [WEBKIT WARNING] WebKit 존재하지만 messageHandlers 없음!');
+        console.warn('⚠️ [iOS 조치 필요] webView.configuration.userContentController.add(self, name: "smapIos")');
+        sendLogToiOS('warning', '[WEBKIT WARNING] messageHandlers 없음', {
+          suggestion: 'iOS에서 webView.configuration.userContentController.add(self, name: "smapIos") 추가 필요'
+        });
+      }
       
       // 네이티브 체크 함수가 있으면 호출
       if (typeof (window as any).SMAP_CHECK_HANDLERS === 'function') {
@@ -2573,6 +2589,61 @@ export default function SignInPage() {
     return interval;
   };
   
+  // 🔧 WebKit 핸들러 강제 등록 시도
+  const forceRegisterHandlers = () => {
+    console.log('🔧 [FORCE REGISTER] WebKit 핸들러 강제 등록 시도');
+    sendLogToiOS('info', '[FORCE REGISTER] WebKit 핸들러 강제 등록 시도');
+    
+    const webkit = (window as any).webkit;
+    if (!webkit) {
+      console.error('🔧 [FORCE REGISTER] WebKit 없음');
+      return false;
+    }
+    
+    try {
+      // messageHandlers가 없으면 강제로 생성 시도
+      if (!webkit.messageHandlers) {
+        console.log('🔧 [FORCE REGISTER] messageHandlers 없음, 강제 생성 시도');
+        webkit.messageHandlers = {};
+        sendLogToiOS('info', '[FORCE REGISTER] messageHandlers 객체 생성');
+      }
+      
+      // smapIos 핸들러가 없으면 가짜 핸들러 등록
+      if (!webkit.messageHandlers.smapIos) {
+        console.log('🔧 [FORCE REGISTER] smapIos 핸들러 없음, 가짜 핸들러 등록');
+        webkit.messageHandlers.smapIos = {
+          postMessage: function(message: any) {
+            console.log('🔧 [FAKE HANDLER] 가짜 핸들러 메시지 수신:', message);
+            sendLogToiOS('info', '[FAKE HANDLER] 메시지 수신', message);
+            
+            // window 이벤트로 네이티브에 알림
+            window.dispatchEvent(new CustomEvent('smap-haptic-message', { 
+              detail: message 
+            }));
+          }
+        };
+        sendLogToiOS('info', '[FORCE REGISTER] 가짜 smapIos 핸들러 등록 완료');
+        
+        // 등록 후 즉시 테스트
+        webkit.messageHandlers.smapIos.postMessage({
+          type: 'haptic',
+          param: 'success',
+          source: 'force-register-test'
+        });
+        
+        return true;
+      }
+      
+      console.log('🔧 [FORCE REGISTER] smapIos 핸들러 이미 존재');
+      return true;
+      
+    } catch (error) {
+      console.error('🔧 [FORCE REGISTER] 강제 등록 실패:', error);
+      sendLogToiOS('error', '[FORCE REGISTER] 강제 등록 실패', { error: String(error) });
+      return false;
+    }
+  };
+
   // 🚨 긴급 햅틱 테스트 (모든 가능한 방법 동시 시도)
   const emergencyHapticTest = () => {
     console.log('🚨 [EMERGENCY HAPTIC] 긴급 햅틱 테스트 시작');
@@ -2924,6 +2995,15 @@ export default function SignInPage() {
                 🎯 핸들러 실시간 모니터링 (30초)
               </button>
               
+              {/* 강제 핸들러 등록 */}
+              <button
+                type="button"
+                onClick={forceRegisterHandlers}
+                className="w-full py-2 px-3 bg-purple-500 text-white text-sm font-medium rounded-lg hover:bg-purple-600 transition-colors"
+              >
+                🔧 WebKit 핸들러 강제 등록
+              </button>
+              
               {/* 긴급 햅틱 테스트 */}
               <button
                 type="button"
@@ -2946,6 +3026,7 @@ export default function SignInPage() {
               <p><strong>🎮 기본:</strong> 간단한 햅틱 테스트</p>
               <p><strong>🔬 상세:</strong> 모든 햅틱 타입을 2초 간격으로 테스트</p>
               <p><strong>🎯 모니터링:</strong> 핸들러 상태를 5초마다 체크</p>
+              <p><strong>🔧 강제등록:</strong> WebKit 핸들러 강제 생성 시도</p>
               <p><strong>🚨 긴급:</strong> 모든 가능한 방법으로 동시 햅틱 시도</p>
               <p><strong>📱 시뮬레이터:</strong> Google 로그인 시뮬레이터 모드</p>
               <div className="mt-2 pt-2 border-t border-yellow-300">
