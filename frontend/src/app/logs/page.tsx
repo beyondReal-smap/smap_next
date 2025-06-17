@@ -2929,6 +2929,12 @@ export default function LogsPage() {
     console.log('[슬라이더] 드래그 종료');
   };
 
+  // 슬라이더 업데이트 최적화를 위한 변수들
+  const lastUpdateTimeRef = useRef<number>(0);
+  const updateThrottleMs = 16; // 60fps = 16.67ms 간격 (requestAnimationFrame 기반)
+  const animationFrameRef = useRef<number | null>(null);
+  const lastSliderValueRef = useRef<number>(0);
+
   // 지도 중심 이동 최적화를 위한 변수들
   const lastMapCenterRef = useRef<{lat: number, lng: number} | null>(null);
   const mapUpdateThresholdM = 10; // 10m 이상 이동시에만 지도 중심 변경
@@ -2945,48 +2951,73 @@ export default function LogsPage() {
     return R * c;
   };
 
-  const updateSliderValue = (e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => {
+  // 컴포넌트 언마운트시 애니메이션 프레임 정리
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
+    const updateSliderValue = (e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => {
     if (!sliderRef.current || !isSliderDragging) return;
 
-    try {
-      const rect = sliderRef.current.getBoundingClientRect();
-      let clientX: number;
-      
-      // 이벤트 타입에 따라 clientX 추출
-      if ('touches' in e && e.touches.length > 0) {
-        clientX = e.touches[0].clientX;
-      } else if ('changedTouches' in e && e.changedTouches.length > 0) {
-        clientX = e.changedTouches[0].clientX;
-      } else {
-        clientX = (e as MouseEvent).clientX;
-      }
-      
-      // 유효하지 않은 clientX 값 체크
-      if (isNaN(clientX) || !isFinite(clientX)) return;
-      
-      const percentage = Math.max(0, Math.min(90, ((clientX - rect.left) / rect.width) * 100));
-      
-      // 유효하지 않은 percentage 값 체크
-      if (isNaN(percentage) || !isFinite(percentage)) return;
-      
-      // 성능 최적화: 값이 크게 변하지 않으면 업데이트 건너뛰기
-      const currentValue = sliderValue;
-      if (Math.abs(percentage - currentValue) < 0.05) return; // 더욱 민감하게 반응 (0.2 → 0.05)
-      
-      // 슬라이더 이동 햅틱 피드백 (5% 이상 변경 시에만)
-      if (Math.abs(percentage - currentValue) >= 5) {
-        hapticFeedback.sliderMove();
-      }
-      
-      // 상태 업데이트 (React의 배치 처리에 맡김)
-      setSliderValue(percentage);
-      
-      // 경로 진행률 업데이트 (즉시 실행)
-      updatePathProgress(percentage);
-    } catch (error) {
-      console.error('[updateSliderValue] 에러 발생:', error);
+    // 이전 애니메이션 프레임 취소
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
     }
-      };
+
+    // requestAnimationFrame을 사용한 부드러운 업데이트
+    animationFrameRef.current = requestAnimationFrame(() => {
+      if (!sliderRef.current || !isSliderDragging) return;
+
+      // 성능 최적화: throttling 적용 (60fps 제한)
+      const now = performance.now();
+      if (now - lastUpdateTimeRef.current < updateThrottleMs) return;
+      lastUpdateTimeRef.current = now;
+
+      try {
+        const rect = sliderRef.current.getBoundingClientRect();
+        let clientX: number;
+        
+        // 이벤트 타입에 따라 clientX 추출
+        if ('touches' in e && e.touches.length > 0) {
+          clientX = e.touches[0].clientX;
+        } else if ('changedTouches' in e && e.changedTouches.length > 0) {
+          clientX = e.changedTouches[0].clientX;
+        } else {
+          clientX = (e as MouseEvent).clientX;
+        }
+        
+        // 유효하지 않은 clientX 값 체크
+        if (isNaN(clientX) || !isFinite(clientX)) return;
+        
+        const percentage = Math.max(0, Math.min(90, ((clientX - rect.left) / rect.width) * 100));
+        
+        // 유효하지 않은 percentage 값 체크
+        if (isNaN(percentage) || !isFinite(percentage)) return;
+        
+        // 임계값 증가: 0.05% → 0.5%로 변경하여 불필요한 업데이트 감소
+        const previousValue = lastSliderValueRef.current;
+        if (Math.abs(percentage - previousValue) < 0.5) return;
+        lastSliderValueRef.current = percentage;
+        
+        // 햅틱 피드백 최적화: 5% → 10% 이상 변경시에만 실행
+        if (Math.abs(percentage - previousValue) >= 10) {
+          hapticFeedback.sliderMove();
+        }
+        
+        // 상태 업데이트 (React의 배치 처리에 맡김)
+        setSliderValue(percentage);
+        
+        // 경로 진행률 업데이트 (즉시 실행)
+        updatePathProgress(percentage);
+      } catch (error) {
+        console.error('[updateSliderValue] 에러 발생:', error);
+      }
+    });
+  };
 
   // InfoWindow 내용 생성 함수 (성능 최적화를 위해 분리)
   const createInfoWindowContent = (targetIndex: number, totalMarkers: number, currentMarkerData: any): string => {
