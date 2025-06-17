@@ -29,6 +29,71 @@ const getCurrentPageInfo = () => {
 };
 
 /**
+ * 강제 햅틱 메시지 전송 (핸들러가 인식되지 않아도 시도)
+ */
+const forceHapticToWebView = (type: HapticFeedbackType): boolean => {
+  const webkit = (window as any).webkit;
+  if (!webkit) {
+    console.log(`❌ [FORCE-HAPTIC] WebKit 없음`);
+    return false;
+  }
+
+  // 알려진 모든 핸들러 이름으로 시도
+  const possibleHandlers = [
+    'smapIos', 'iosHandler', 'jsToNative', 'webViewHandler', 
+    'nativeHandler', 'hapticHandler', 'messageHandler'
+  ];
+
+  for (const handlerName of possibleHandlers) {
+    try {
+      // 핸들러 존재 여부와 관계없이 시도
+      if (webkit.messageHandlers && webkit.messageHandlers[handlerName]) {
+        const messageFormats = [
+          { type: 'haptic', param: type },
+          { type: 'hapticFeedback', param: JSON.stringify({ feedbackType: type }) },
+          type
+        ];
+
+        for (const message of messageFormats) {
+          try {
+            webkit.messageHandlers[handlerName].postMessage(message);
+            console.log(`✅ [FORCE-HAPTIC] 강제 전송 성공: ${handlerName} | ${type}`);
+            return true;
+          } catch (e) {
+            console.warn(`⚠️ [FORCE-HAPTIC] ${handlerName} 형식 실패:`, e);
+          }
+        }
+      } else {
+        // 핸들러가 인식되지 않아도 직접 시도
+        try {
+          webkit.messageHandlers = webkit.messageHandlers || {};
+          webkit.messageHandlers[handlerName] = webkit.messageHandlers[handlerName] || {
+            postMessage: (msg: any) => {
+              console.log(`🔧 [FORCE-HAPTIC] 직접 메시지 시도: ${handlerName}`, msg);
+              // iOS에서 처리할 수 있도록 window 이벤트 발생
+              window.dispatchEvent(new CustomEvent('smap-ios-haptic', { 
+                detail: { handler: handlerName, message: msg } 
+              }));
+            }
+          };
+          webkit.messageHandlers[handlerName].postMessage({ type: 'haptic', param: type });
+          console.log(`✅ [FORCE-HAPTIC] 직접 생성 성공: ${handlerName} | ${type}`);
+          return true;
+        } catch (e) {
+          console.warn(`⚠️ [FORCE-HAPTIC] 직접 생성 실패: ${handlerName}`, e);
+        }
+      }
+    } catch (error) {
+      console.warn(`⚠️ [FORCE-HAPTIC] ${handlerName} 전체 실패:`, error);
+      continue;
+    }
+  }
+
+  console.log(`❌ [FORCE-HAPTIC] 모든 강제 시도 실패`);
+  return false;
+};
+
+/**
  * 웹뷰 메시지 핸들러 디버깅 함수
  */
 const debugWebViewHandlers = () => {
@@ -80,6 +145,28 @@ const sendHapticToWebView = (type: HapticFeedbackType): boolean => {
   const debugInfo = debugWebViewHandlers();
   
   console.log(`🔍 [WEBVIEW DEBUG] 핸들러 상태:`, debugInfo);
+  
+  // 네이티브 강제 함수 우선 시도
+  if (typeof (window as any).SMAP_FORCE_HAPTIC === 'function') {
+    console.log(`🧪 [NATIVE-FORCE] 네이티브 강제 햅틱 함수 사용`);
+    try {
+      const result = (window as any).SMAP_FORCE_HAPTIC(type);
+      if (result) {
+        console.log(`✅ [NATIVE-FORCE] 네이티브 강제 햅틱 성공: ${type}`);
+        return true;
+      } else {
+        console.warn(`⚠️ [NATIVE-FORCE] 네이티브 강제 햅틱 실패: ${type}`);
+      }
+    } catch (e) {
+      console.error(`❌ [NATIVE-FORCE] 네이티브 강제 햅틱 에러:`, e);
+    }
+  }
+  
+  // 강제 핸들러 시도 (핸들러가 없어도 시도)
+  if (debugInfo.webkitExists) {
+    console.log(`🔧 [WEBVIEW] WebKit 존재, 강제 햅틱 전송 시도`);
+    return forceHapticToWebView(type);
+  }
   
   if (debugInfo.availableHandlers.length === 0) {
     console.log(`❌ [WEBVIEW] 사용 가능한 메시지 핸들러가 없음`);
@@ -172,10 +259,22 @@ const detectIOSEnvironment = () => {
   const hasHandler = !!(window as any).webkit?.messageHandlers?.smapIos;
   const webViewDebug = debugWebViewHandlers();
   
-  // WebView vs Safari 정확한 구분
-  const isWebView = hasWebKit && hasHandler; // 핸들러가 있으면 WebView
-  const isIOSApp = isIOS && hasHandler; // 핸들러가 있으면 앱 내 WebView
-  const isIOSBrowser = isIOS && hasWebKit && !hasHandler; // WebKit 있지만 핸들러 없으면 Safari
+  // 네이티브 디버깅 함수로 정확한 핸들러 상태 확인
+  let nativeCheck = null;
+  if (typeof (window as any).SMAP_CHECK_HANDLERS === 'function') {
+    try {
+      nativeCheck = (window as any).SMAP_CHECK_HANDLERS();
+      console.log(`🔍 [NATIVE-CHECK] 네이티브 핸들러 확인:`, nativeCheck);
+    } catch (e) {
+      console.warn(`⚠️ [NATIVE-CHECK] 네이티브 핸들러 확인 실패:`, e);
+    }
+  }
+  
+  // WebView vs Safari 정확한 구분 (네이티브 체크 결과 활용)
+  const actualHasHandler = nativeCheck?.hasSmapIos || hasHandler;
+  const isWebView = hasWebKit && actualHasHandler; // 핸들러가 있으면 WebView
+  const isIOSApp = isIOS && actualHasHandler; // 핸들러가 있으면 앱 내 WebView
+  const isIOSBrowser = isIOS && hasWebKit && !actualHasHandler; // WebKit 있지만 핸들러 없으면 Safari
   
   const supportsTouchAPI = 'ontouchstart' in window;
   const supportsVibration = 'vibrate' in navigator;
@@ -184,24 +283,26 @@ const detectIOSEnvironment = () => {
   console.log(`🔍 [HAPTIC-ENV] 환경 감지:`, {
     isIOS,
     hasWebKit,
-    hasHandler,
+    hasHandler: actualHasHandler,
     isIOSApp,
     isIOSBrowser,
     isWebView,
     totalHandlers: webViewDebug?.totalHandlers || 0,
-    availableHandlers: webViewDebug?.availableHandlers || []
+    availableHandlers: webViewDebug?.availableHandlers || [],
+    nativeCheck
   });
   
   return { 
     isIOS, 
     hasWebKit, 
-    hasHandler, 
+    hasHandler: actualHasHandler, 
     isIOSApp, 
     isIOSBrowser,
     isWebView,
     supportsTouchAPI,
     supportsVibration,
-    webViewDebug
+    webViewDebug,
+    nativeCheck
   };
 };
 

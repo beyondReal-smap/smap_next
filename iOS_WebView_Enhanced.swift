@@ -172,10 +172,73 @@ class EnhancedWebViewController: UIViewController {
         // 메인 메시지 핸들러
         userContentController.add(self, name: "smapIos")
         
+        // 햅틱을 위한 추가 핸들러들 (여러 이름으로 등록)
+        let hapticHandlerNames = ["iosHandler", "jsToNative", "webViewHandler", "nativeHandler", "hapticHandler", "messageHandler"]
+        for handlerName in hapticHandlerNames {
+            userContentController.add(self, name: handlerName)
+            print("🎮 [HAPTIC-HANDLER] 등록: \(handlerName)")
+        }
+        
         // 디버깅 및 진단용 핸들러
         userContentController.add(self, name: "iosDebug")
         userContentController.add(self, name: "navigationDebug")
         userContentController.add(self, name: "performanceDebug")
+        
+        // 강제 햅틱 이벤트 리스너 스크립트 추가
+        let hapticEventScript = """
+        console.log('🔧 [NATIVE] 햅틱 이벤트 리스너 스크립트 주입');
+        
+        // 사용자 정의 이벤트 리스너 추가
+        window.addEventListener('smap-ios-haptic', function(event) {
+            console.log('🎯 [NATIVE-EVENT] 사용자 정의 햅틱 이벤트 감지:', event.detail);
+            
+            // 가장 확실한 핸들러로 전송
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smapIos) {
+                try {
+                    window.webkit.messageHandlers.smapIos.postMessage(event.detail.message);
+                    console.log('✅ [NATIVE-EVENT] 햅틱 메시지 재전송 성공');
+                } catch (e) {
+                    console.error('❌ [NATIVE-EVENT] 햅틱 메시지 재전송 실패:', e);
+                }
+            }
+        });
+        
+        // 강제 햅틱 테스트 함수
+        window.SMAP_FORCE_HAPTIC = function(type) {
+            console.log('🧪 [FORCE-TEST] 강제 햅틱 테스트:', type);
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smapIos) {
+                try {
+                    window.webkit.messageHandlers.smapIos.postMessage({ type: 'haptic', param: type });
+                    return true;
+                } catch (e) {
+                    console.error('❌ [FORCE-TEST] 햅틱 테스트 실패:', e);
+                    return false;
+                }
+            }
+            return false;
+        };
+        
+        // 핸들러 상태 확인 함수
+        window.SMAP_CHECK_HANDLERS = function() {
+            const webkit = window.webkit;
+            if (!webkit) return { error: 'WebKit 없음' };
+            
+            const handlers = webkit.messageHandlers || {};
+            const availableHandlers = Object.keys(handlers);
+            
+            console.log('🔍 [HANDLER-CHECK] 사용 가능한 핸들러들:', availableHandlers);
+            return { 
+                total: availableHandlers.length, 
+                handlers: availableHandlers,
+                hasSmapIos: !!handlers.smapIos 
+            };
+        };
+        
+        console.log('✅ [NATIVE] 햅틱 이벤트 리스너 및 테스트 함수 등록 완료');
+        """
+        
+        let hapticUserScript = WKUserScript(source: hapticEventScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+        userContentController.addUserScript(hapticUserScript)
         
         config.userContentController = userContentController
         
