@@ -29,11 +29,24 @@ const getCurrentPageInfo = () => {
 };
 
 /**
+ * iOS 환경 감지
+ */
+const detectIOSEnvironment = () => {
+  if (typeof window === 'undefined') return { isIOS: false, hasWebKit: false, hasHandler: false };
+  
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const hasWebKit = !!(window as any).webkit;
+  const hasHandler = !!(window as any).webkit?.messageHandlers?.smapIos;
+  
+  return { isIOS, hasWebKit, hasHandler };
+};
+
+/**
  * iOS 네이티브 로그 전송 함수
  */
 const sendLogToiOS = (level: 'info' | 'error' | 'warning', message: string, data?: any) => {
-  const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
-  if (isIOSWebView && (window as any).webkit?.messageHandlers?.smapIos) {
+  const { hasHandler } = detectIOSEnvironment();
+  if (hasHandler) {
     try {
       const logData = {
         type: 'jsLog',
@@ -52,7 +65,7 @@ const sendLogToiOS = (level: 'info' | 'error' | 'warning', message: string, data
 };
 
 /**
- * 햅틱 피드백 실행 함수
+ * 햅틱 피드백 실행 함수 (통합 및 간소화)
  * @param type 햅틱 피드백 타입
  * @param description 로그용 설명
  * @param context 추가 컨텍스트 정보 (선택사항)
@@ -64,68 +77,59 @@ export const triggerHapticFeedback = (
 ) => {
   try {
     const pageInfo = getCurrentPageInfo();
-    const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
+    const { isIOS, hasWebKit, hasHandler } = detectIOSEnvironment();
     
-    // 상세 로그 정보 구성
-    const logInfo = {
+    // 로그 메시지 구성
+    const logContext = {
       hapticType: type,
       description: description || '',
       page: pageInfo.pageName,
       fullPath: pageInfo.pathname,
-      timestamp: pageInfo.timestamp,
       context: context || {},
-      environment: isIOSWebView ? 'iOS WebView' : 'Web Browser'
+      environment: hasHandler ? 'iOS WebView' : isIOS ? 'iOS Browser' : 'Web Browser'
     };
     
-    // 로그 메시지 포맷팅
-    const logMessage = [
-      `[HAPTIC FEEDBACK]`,
-      `Type: ${type.toUpperCase()}`,
-      `Page: ${pageInfo.pageName} (${pageInfo.pathname})`,
-      description ? `Action: ${description}` : '',
-      context?.action ? `Context: ${context.action}` : '',
-      context?.component ? `Component: ${context.component}` : '',
-      `Time: ${new Date().toLocaleTimeString()}`
-    ].filter(Boolean).join(' | ');
+    // 콘솔 로그 (항상 표시)
+    console.log(`🎮 [HAPTIC] ${type.toUpperCase()} | ${pageInfo.pageName} | ${description || '액션'}`);
     
-    if (isIOSWebView && (window as any).webkit?.messageHandlers?.smapIos) {
-      // iOS 네이티브 햅틱 피드백
-      const hapticData = {
-        type: 'hapticFeedback',
-        param: JSON.stringify({
-          feedbackType: type,
-          description: description || '',
-          pageInfo,
-          context: context || {}
-        })
-      };
-      
-      (window as any).webkit.messageHandlers.smapIos.postMessage(hapticData);
-      
-      // iOS 네이티브 로그 전송
-      sendLogToiOS('info', `햅틱 피드백 실행: ${type}`, logInfo);
-      
-      console.log(`🔥 ${logMessage}`);
+    if (hasHandler) {
+      // 🔥 iOS 네이티브 햅틱 피드백 (단순 방식 - 더 안정적)
+      try {
+        const hapticMessage = {
+          type: 'haptic',
+          param: type
+        };
+        
+        (window as any).webkit.messageHandlers.smapIos.postMessage(hapticMessage);
+        
+        console.log(`✅ [HAPTIC] iOS 네이티브 햅틱 전송: ${type}`);
+        sendLogToiOS('info', `햅틱 피드백 실행: ${type}`, logContext);
+        
+      } catch (iosError) {
+        console.error('❌ [HAPTIC] iOS 메시지 전송 실패:', iosError);
+        
+        // 백업: 웹 바이브레이션
+        fallbackToWebVibration(type);
+      }
+    } else if (isIOS) {
+      // iOS이지만 WebKit 핸들러가 없는 경우
+      console.log(`⚠️ [HAPTIC] iOS 환경이지만 WebKit 핸들러 없음 | WebKit: ${hasWebKit}`);
+      fallbackToWebVibration(type);
     } else {
       // 웹 브라우저 바이브레이션 API 사용
-      if ('vibrate' in navigator) {
-        const vibrationPattern = getVibrationPattern(type);
-        navigator.vibrate(vibrationPattern);
-        console.log(`🔥 ${logMessage} | Vibration: ${vibrationPattern}ms`);
-      } else {
-        console.log(`🔥 ${logMessage} | 햅틱 미지원 환경`);
-      }
+      fallbackToWebVibration(type);
     }
     
-    // 추가 디버그 정보 (개발환경에서만)
+    // 개발 환경에서 추가 디버그 정보
     if (process.env.NODE_ENV === 'development') {
       console.table({
         '햅틱 타입': type,
         '페이지': pageInfo.pageName,
-        '경로': pageInfo.pathname,
         '설명': description || '없음',
-        '환경': isIOSWebView ? 'iOS WebView' : 'Web Browser',
-        '시간': new Date().toLocaleString('ko-KR')
+        '환경': logContext.environment,
+        'iOS': isIOS,
+        'WebKit': hasWebKit,
+        'Handler': hasHandler
       });
     }
     
@@ -133,6 +137,19 @@ export const triggerHapticFeedback = (
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('🔥 [HAPTIC] 햅틱 피드백 실행 실패:', error);
     sendLogToiOS('error', '햅틱 피드백 실행 실패', { error: errorMessage });
+  }
+};
+
+/**
+ * 웹 바이브레이션 백업 함수
+ */
+const fallbackToWebVibration = (type: HapticFeedbackType) => {
+  if ('vibrate' in navigator) {
+    const vibrationPattern = getVibrationPattern(type);
+    navigator.vibrate(vibrationPattern);
+    console.log(`📳 [HAPTIC] 웹 바이브레이션: ${vibrationPattern}ms`);
+  } else {
+    console.log(`⚠️ [HAPTIC] 햅틱 미지원 환경`);
   }
 };
 

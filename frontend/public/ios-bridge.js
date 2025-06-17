@@ -296,7 +296,7 @@ window.iosBridge = {
         }
     },
 
-    // 햅틱 피드백 메서드들
+    // 햅틱 피드백 메서드들 (통합 버전)
     haptic: {
         // 가벼운 햅틱 (버튼 탭, 가벼운 상호작용)
         light() {
@@ -305,6 +305,7 @@ window.iosBridge = {
                     type: 'haptic',
                     param: 'light'
                 });
+                console.log('🎮 iOS 햅틱: light');
             }
         },
 
@@ -315,6 +316,7 @@ window.iosBridge = {
                     type: 'haptic',
                     param: 'medium'
                 });
+                console.log('🎮 iOS 햅틱: medium');
             }
         },
 
@@ -325,6 +327,7 @@ window.iosBridge = {
                     type: 'haptic',
                     param: 'heavy'
                 });
+                console.log('🎮 iOS 햅틱: heavy');
             }
         },
 
@@ -335,6 +338,7 @@ window.iosBridge = {
                     type: 'haptic',
                     param: 'success'
                 });
+                console.log('🎮 iOS 햅틱: success');
             }
         },
 
@@ -345,6 +349,7 @@ window.iosBridge = {
                     type: 'haptic',
                     param: 'warning'
                 });
+                console.log('🎮 iOS 햅틱: warning');
             }
         },
 
@@ -355,6 +360,7 @@ window.iosBridge = {
                     type: 'haptic',
                     param: 'error'
                 });
+                console.log('🎮 iOS 햅틱: error');
             }
         },
 
@@ -365,6 +371,7 @@ window.iosBridge = {
                     type: 'haptic',
                     param: 'selection'
                 });
+                console.log('🎮 iOS 햅틱: selection');
             }
         }
     },

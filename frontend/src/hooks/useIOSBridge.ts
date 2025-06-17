@@ -69,11 +69,11 @@ export function useIOSBridge() {
   useEffect(() => {
     // iOS 환경인지 확인
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) && 
-                       window.webkit?.messageHandlers?.smapIos
+                       !!(window.webkit?.messageHandlers?.smapIos)
     setIsIOS(isIOSDevice)
   }, [])
 
-  // 햅틱 피드백 함수들
+  // 햅틱 피드백 함수들 (통합된 시스템 사용)
   const haptic = {
     // 가벼운 햅틱 (버튼 탭, 가벼운 상호작용)
     light: () => {
@@ -140,8 +140,8 @@ export function useIOSBridge() {
 
   // 공유하기
   const share = (content: string) => {
-    if (isIOS && window.iosBridge?.share) {
-      window.iosBridge.share(content)
+    if (isIOS && window.iosBridge?.share?.content) {
+      window.iosBridge.share.content(content)
     } else {
       // iOS가 아닌 경우 Web Share API 사용
       if (navigator.share) {
@@ -161,8 +161,8 @@ export function useIOSBridge() {
 
   // 디바이스 정보
   const getDeviceInfo = () => {
-    if (isIOS && window.iosBridge?.getDeviceInfo) {
-      window.iosBridge.getDeviceInfo()
+    if (isIOS && window.iosBridge?.device?.getInfo) {
+      window.iosBridge.device.getInfo()
     }
   }
 
