@@ -136,8 +136,73 @@ export default function RootLayout({
         {/* iOS 웹뷰 브릿지 */}
         <script src="/ios-bridge.js" async></script>
         
-        {/* Google Identity Services SDK */}
-        <script src="https://accounts.google.com/gsi/client" async defer></script>
+        {/* Google Identity Services SDK - iOS WebView 호환성 개선 */}
+        <script 
+          src="https://accounts.google.com/gsi/client" 
+          async 
+          defer
+        ></script>
+        
+        {/* iOS WebView에서 스크립트 실행 개선 */}
+        <script 
+          dangerouslySetInnerHTML={{
+            __html: `
+              // iOS WebView 환경에서 안전한 스크립트 실행
+              (function() {
+                const isIOSWebView = /iPad|iPhone|iPod/.test(navigator.userAgent) && 
+                                   !!(window.webkit && window.webkit.messageHandlers);
+                
+                if (isIOSWebView) {
+                  console.log('[iOS WebView] 안전한 스크립트 실행 모드 활성화');
+                  
+                  // 스크립트 오류 무시 설정
+                  window.addEventListener('error', function(e) {
+                    if (e.filename && e.filename.includes('accounts.google.com')) {
+                      console.warn('[iOS WebView] Google GSI 스크립트 오류 무시:', e.message);
+                      e.preventDefault();
+                      return true;
+                    }
+                  });
+                  
+                  // 브라우저 차단 이벤트 최소화
+                  const safePreventDefault = (e) => {
+                    try {
+                      if (e && typeof e.preventDefault === 'function') {
+                        e.preventDefault();
+                      }
+                    } catch (error) {
+                      // 무시
+                    }
+                  };
+                  
+                  // iOS에서 차단되는 이벤트들을 더 안전하게 처리
+                  ['pagehide', 'visibilitychange', 'unload'].forEach(eventType => {
+                    const originalHandler = window['on' + eventType];
+                    
+                    Object.defineProperty(window, 'on' + eventType, {
+                      set: function(handler) {
+                        if (handler) {
+                          const safeHandler = function(e) {
+                            try {
+                              return handler.call(this, e);
+                            } catch (error) {
+                              console.warn('[iOS WebView] 이벤트 처리 중 오류 (무시):', eventType, error);
+                            }
+                          };
+                          
+                          if (originalHandler) {
+                            originalHandler.call(this, safeHandler);
+                          }
+                        }
+                      },
+                      configurable: true
+                    });
+                  });
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body className={`${lineSeed.variable} font-sans antialiased`} suppressHydrationWarning>
         <ClientLayout>

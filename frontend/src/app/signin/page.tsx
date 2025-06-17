@@ -90,6 +90,52 @@ export default function SignInPage() {
     keydown?: (e: KeyboardEvent) => void;
   }>({});
 
+  // iOS WebView 환경 감지 개선
+  const isIOSWebView = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    
+    const userAgent = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+    const hasWebKit = !!(window as any).webkit;
+    const hasMessageHandlers = !!(window as any).webkit?.messageHandlers;
+    
+    console.log('[SIGNIN] 환경 감지:', {
+      userAgent: userAgent.substring(0, 50) + '...',
+      isIOS,
+      hasWebKit,
+      hasMessageHandlers,
+      isWebView: isIOS && hasWebKit && hasMessageHandlers
+    });
+    
+    return isIOS && hasWebKit && hasMessageHandlers;
+  }, []);
+
+  // 안전한 이벤트 등록 함수
+  const safeAddEventListener = (target: any, event: string, handler: any, options?: any) => {
+    try {
+      if (target && typeof target.addEventListener === 'function') {
+        target.addEventListener(event, handler, options);
+        return true;
+      }
+    } catch (error) {
+      console.warn(`[SIGNIN] 🚨 이벤트 리스너 등록 실패 (${event}):`, error);
+    }
+    return false;
+  };
+
+  // 안전한 이벤트 제거 함수
+  const safeRemoveEventListener = (target: any, event: string, handler: any, options?: any) => {
+    try {
+      if (target && typeof target.removeEventListener === 'function') {
+        target.removeEventListener(event, handler, options);
+        return true;
+      }
+    } catch (error) {
+      console.warn(`[SIGNIN] 🚨 이벤트 리스너 제거 실패 (${event}):`, error);
+    }
+    return false;
+  };
+
   // 🧪 햅틱 테스트 함수 (개발용)
   const testHapticFeedback = () => {
     console.log('🧪 [HAPTIC TEST] 햅틱 테스트 시작');
@@ -1131,45 +1177,57 @@ export default function SignInPage() {
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
     
-    // 🚨 즉시 기본 이벤트 차단
+    // 🚨 안전한 기본 이벤트 차단
     const emergencyBlocker = (e: Event) => {
       console.log('[SIGNIN] 🚨 긴급 이벤트 차단:', e.type);
-      e.preventDefault();
-      e.stopImmediatePropagation();
+      try {
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      } catch (error) {
+        console.warn('[SIGNIN] 이벤트 차단 중 오류:', error);
+      }
       return false;
     };
     
-    // 즉시 모든 위험한 이벤트 차단
-    window.addEventListener('beforeunload', emergencyBlocker, { capture: true, passive: false });
-    window.addEventListener('unload', emergencyBlocker, { capture: true, passive: false });
-    window.addEventListener('pagehide', emergencyBlocker, { capture: true, passive: false });
-    document.addEventListener('visibilitychange', emergencyBlocker, { capture: true, passive: false });
+    // 안전한 이벤트 리스너 등록
+    safeAddEventListener(window, 'beforeunload', emergencyBlocker, { capture: true, passive: false });
+    safeAddEventListener(window, 'unload', emergencyBlocker, { capture: true, passive: false });
+    safeAddEventListener(window, 'pagehide', emergencyBlocker, { capture: true, passive: false });
+    safeAddEventListener(document, 'visibilitychange', emergencyBlocker, { capture: true, passive: false });
     
     // 🚨 즉시 히스토리 고정 (여러 번)
     for (let i = 0; i < 20; i++) {
       window.history.pushState(null, '', window.location.href);
     }
     
-    // 🚨 즉시 popstate 차단
+    // 🚨 안전한 popstate 차단
     const emergencyPopstateBlocker = (e: PopStateEvent) => {
       console.log('[SIGNIN] 🚨 긴급 popstate 차단!');
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      window.history.pushState(null, '', window.location.href);
+      try {
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        window.history.pushState(null, '', window.location.href);
+      } catch (error) {
+        console.warn('[SIGNIN] popstate 차단 중 오류:', error);
+      }
       return false;
     };
-    window.addEventListener('popstate', emergencyPopstateBlocker, { capture: true, passive: false });
+    safeAddEventListener(window, 'popstate', emergencyPopstateBlocker, { capture: true, passive: false });
     
-    // 🚨 즉시 키보드 차단
+    // 🚨 안전한 키보드 차단
     const emergencyKeyBlocker = (e: KeyboardEvent) => {
       if (e.key === 'F5' || (e.ctrlKey && e.key === 'r') || (e.ctrlKey && e.key === 'F5') || (e.ctrlKey && e.shiftKey && e.key === 'R')) {
         console.log('[SIGNIN] 🚨 긴급 키보드 차단:', e.key);
-        e.preventDefault();
-        e.stopImmediatePropagation();
+        try {
+          if (e.preventDefault) e.preventDefault();
+          if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        } catch (error) {
+          console.warn('[SIGNIN] 키보드 이벤트 차단 중 오류:', error);
+        }
         return false;
       }
     };
-    window.addEventListener('keydown', emergencyKeyBlocker, { capture: true, passive: false });
+    safeAddEventListener(window, 'keydown', emergencyKeyBlocker, { capture: true, passive: false });
     
     console.log('[SIGNIN] ⚡ 긴급 이벤트 차단 설정 완료');
     
@@ -1185,16 +1243,20 @@ export default function SignInPage() {
       // 🚫 브라우저 네비게이션 차단 (최강 버전)
       console.log('[SIGNIN] 브라우저 네비게이션 차단 설정 중...');
       
-      // beforeunload 이벤트 (새로고침, 창 닫기 차단)
+      // beforeunload 이벤트 (새로고침, 창 닫기 차단) - 안전한 버전
       navigationListenersRef.current.beforeunload = (e: BeforeUnloadEvent) => {
         console.log('[SIGNIN] 🚫 beforeunload 이벤트 차단!');
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        e.returnValue = '에러 모달을 확인해주세요.';
-        // iOS WebView에서는 return 문 제거 (JavaScript execution 오류 방지)
-        const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
-        if (!isIOSWebView) {
-          return false;
+        try {
+          if (e.preventDefault) e.preventDefault();
+          if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+          e.returnValue = '에러 모달을 확인해주세요.';
+          
+          // iOS WebView 환경 체크를 더 안전하게
+          if (!isIOSWebView) {
+            return false;
+          }
+        } catch (error) {
+          console.warn('[SIGNIN] beforeunload 처리 중 오류:', error);
         }
       };
       
@@ -1235,13 +1297,13 @@ export default function SignInPage() {
         }
       };
       
-      // 모든 이벤트 리스너 추가 (capture와 passive 모두)
+      // 모든 이벤트 리스너를 안전하게 추가
       const eventOptions = { capture: true, passive: false };
-      window.addEventListener('beforeunload', navigationListenersRef.current.beforeunload, eventOptions);
-      window.addEventListener('popstate', navigationListenersRef.current.popstate, eventOptions);
-      window.addEventListener('unload', navigationListenersRef.current.unload, eventOptions);
-      window.addEventListener('pagehide', navigationListenersRef.current.pagehide, eventOptions);
-      document.addEventListener('visibilitychange', navigationListenersRef.current.visibilitychange, eventOptions);
+      safeAddEventListener(window, 'beforeunload', navigationListenersRef.current.beforeunload, eventOptions);
+      safeAddEventListener(window, 'popstate', navigationListenersRef.current.popstate, eventOptions);
+      safeAddEventListener(window, 'unload', navigationListenersRef.current.unload, eventOptions);
+      safeAddEventListener(window, 'pagehide', navigationListenersRef.current.pagehide, eventOptions);
+      safeAddEventListener(document, 'visibilitychange', navigationListenersRef.current.visibilitychange, eventOptions);
       
       // 키보드 단축키 차단 (F5, Ctrl+R, Ctrl+F5 등)
       navigationListenersRef.current.keydown = (e: KeyboardEvent) => {
@@ -1275,7 +1337,7 @@ export default function SignInPage() {
         }
       };
       
-      window.addEventListener('keydown', navigationListenersRef.current.keydown, eventOptions);
+      safeAddEventListener(window, 'keydown', navigationListenersRef.current.keydown, eventOptions);
       
       // 현재 히스토리 상태 고정 (더 많이 실행)
       for (let i = 0; i < 10; i++) {
