@@ -29,6 +29,93 @@ const getCurrentPageInfo = () => {
 };
 
 /**
+ * 웹뷰 메시지 핸들러 디버깅 함수
+ */
+const debugWebViewHandlers = () => {
+  if (typeof window === 'undefined') return { 
+    availableHandlers: [] as string[], 
+    webkitExists: false,
+    messageHandlersExists: false,
+    totalHandlers: 0
+  };
+  
+  const webkit = (window as any).webkit;
+  const webkitExists = !!webkit;
+  const availableHandlers: string[] = [];
+  
+  if (webkit?.messageHandlers) {
+    // 알려진 핸들러 이름들 확인
+    const knownHandlers = ['smapIos', 'iosHandler', 'jsToNative', 'webViewHandler', 'nativeHandler'];
+    knownHandlers.forEach(handlerName => {
+      if (webkit.messageHandlers[handlerName]) {
+        availableHandlers.push(handlerName);
+      }
+    });
+    
+    // 전체 핸들러 목록 확인 (가능한 경우)
+    try {
+      const allHandlers = Object.keys(webkit.messageHandlers);
+      allHandlers.forEach(handler => {
+        if (!availableHandlers.includes(handler)) {
+          availableHandlers.push(handler);
+        }
+      });
+    } catch (e) {
+      // Object.keys가 작동하지 않는 경우 무시
+    }
+  }
+  
+  return {
+    webkitExists,
+    messageHandlersExists: !!webkit?.messageHandlers,
+    availableHandlers,
+    totalHandlers: availableHandlers.length
+  };
+};
+
+/**
+ * 다중 핸들러로 햅틱 메시지 전송 시도
+ */
+const sendHapticToWebView = (type: HapticFeedbackType): boolean => {
+  const debugInfo = debugWebViewHandlers();
+  
+  console.log(`🔍 [WEBVIEW DEBUG] 핸들러 상태:`, debugInfo);
+  
+  if (debugInfo.availableHandlers.length === 0) {
+    console.log(`❌ [WEBVIEW] 사용 가능한 메시지 핸들러가 없음`);
+    return false;
+  }
+  
+  // 우선순위에 따라 핸들러 시도
+  const handlerPriority = ['smapIos', 'iosHandler', 'jsToNative', 'webViewHandler', 'nativeHandler'];
+  
+  for (const handlerName of handlerPriority) {
+    if (debugInfo.availableHandlers.includes(handlerName)) {
+      try {
+        const webkit = (window as any).webkit;
+        const message = {
+          type: 'haptic',
+          param: type
+        };
+        
+        webkit.messageHandlers[handlerName].postMessage(message);
+        
+        console.log(`✅ [WEBVIEW] 햅틱 메시지 전송 성공: ${handlerName} | ${type}`);
+        return true;
+        
+      } catch (error) {
+        console.error(`❌ [WEBVIEW] ${handlerName} 핸들러 전송 실패:`, error);
+        continue;
+      }
+    }
+  }
+  
+  // 모든 핸들러 시도 실패
+  console.error(`❌ [WEBVIEW] 모든 햅틱 메시지 핸들러 전송 실패`);
+  return false;
+};
+
+/**
  * iOS 환경 감지 (강화 버전)
  */
 const detectIOSEnvironment = () => {
@@ -38,15 +125,19 @@ const detectIOSEnvironment = () => {
     hasHandler: false, 
     isIOSApp: false, 
     isIOSBrowser: false,
+    isWebView: false,
     supportsTouchAPI: false,
-    supportsVibration: false
+    supportsVibration: false,
+    webViewDebug: null
   };
   
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const hasWebKit = !!(window as any).webkit;
   const hasHandler = !!(window as any).webkit?.messageHandlers?.smapIos;
+  const webViewDebug = debugWebViewHandlers();
+  const isWebView = hasWebKit && (webViewDebug?.totalHandlers || 0) > 0;
   const isIOSApp = isIOS && hasHandler;
-  const isIOSBrowser = isIOS && !hasHandler;
+  const isIOSBrowser = isIOS && !isWebView;
   const supportsTouchAPI = 'ontouchstart' in window;
   const supportsVibration = 'vibrate' in navigator;
   
@@ -56,8 +147,10 @@ const detectIOSEnvironment = () => {
     hasHandler, 
     isIOSApp, 
     isIOSBrowser,
+    isWebView,
     supportsTouchAPI,
-    supportsVibration
+    supportsVibration,
+    webViewDebug
   };
 };
 
@@ -179,6 +272,14 @@ export const triggerHapticFeedback = (
         
       } catch (iosError) {
         console.error('❌ [HAPTIC] iOS 메시지 전송 실패:', iosError);
+        fallbackToWebVibration(type, env);
+      }
+    } else if (env.isWebView) {
+      // 🌐 웹뷰 환경 - 다중 핸들러 시도
+      console.log(`🌐 [HAPTIC] WebView 환경 감지 - 다중 핸들러 시도: ${type}`);
+      const success = sendHapticToWebView(type);
+      if (!success) {
+        console.log(`⚠️ [HAPTIC] WebView 햅틱 전송 실패, 백업 방식 사용`);
         fallbackToWebVibration(type, env);
       }
     } else if (env.isIOSBrowser) {

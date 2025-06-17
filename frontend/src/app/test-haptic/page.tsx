@@ -15,17 +15,33 @@ export default function HapticTestPage() {
     const hasWebKit = !!(window as any).webkit;
     const hasHandler = !!(window as any).webkit?.messageHandlers?.smapIos;
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isIOSApp = isIOSDevice && hasHandler;
-    const isIOSBrowser = isIOSDevice && !hasHandler;
     const supportsTouchAPI = 'ontouchstart' in window;
     const supportsVibration = 'vibrate' in navigator;
     
-    setEnvironment(`
+    // 웹뷰 핸들러 체크
+    const webkit = (window as any).webkit;
+    const availableHandlers: string[] = [];
+    if (webkit?.messageHandlers) {
+      const knownHandlers = ['smapIos', 'iosHandler', 'jsToNative', 'webViewHandler', 'nativeHandler'];
+      knownHandlers.forEach(handlerName => {
+        if (webkit.messageHandlers[handlerName]) {
+          availableHandlers.push(handlerName);
+        }
+      });
+    }
+    
+    const isWebView = hasWebKit && availableHandlers.length > 0;
+    const isIOSApp = isIOSDevice && hasHandler;
+    const isIOSBrowser = isIOSDevice && !isWebView;
+    
+          setEnvironment(`
 환경 정보:
 • 기기: ${isIOSDevice ? 'iOS' : '기타'}
-• 앱 타입: ${isIOSApp ? 'iOS 네이티브 앱' : isIOSBrowser ? 'iOS Safari' : '웹 브라우저'}
+• 앱 타입: ${isIOSApp ? 'iOS 네이티브 앱' : isWebView ? 'WebView' : isIOSBrowser ? 'iOS Safari' : '웹 브라우저'}
 • WebKit: ${hasWebKit ? '있음' : '없음'}
-• 메시지 핸들러: ${hasHandler ? '있음' : '없음'}
+• WebView: ${isWebView ? '있음' : '없음'}
+• 메시지 핸들러: ${hasHandler ? 'smapIos 있음' : '없음'}
+• 사용 가능한 핸들러: ${availableHandlers.length > 0 ? availableHandlers.join(', ') : '없음'}
 • 터치 API: ${supportsTouchAPI ? '지원' : '미지원'}
 • 바이브레이션: ${supportsVibration ? '지원' : '미지원'}
 
@@ -201,18 +217,40 @@ export default function HapticTestPage() {
           </div>
         </div>
 
-        {/* iOS Safari 전용 안내 */}
-        {/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).webkit?.messageHandlers?.smapIos && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="text-sm text-blue-800">
-              <p className="font-semibold mb-1">📱 iOS Safari 모드 감지됨</p>
-              <p className="text-xs">
-                네이티브 햅틱 대신 시각적 피드백과 바이브레이션으로 햅틱을 시뮬레이션합니다.
-                버튼을 누르면 버튼이 살짝 축소되는 효과를 확인할 수 있습니다.
-              </p>
-            </div>
-          </div>
-        )}
+        {/* WebView 모드 안내 */}
+        {(() => {
+          const webkit = (window as any).webkit;
+          const hasHandlers = webkit?.messageHandlers && Object.keys(webkit.messageHandlers).length > 0;
+          const hasSmapIos = !!(window as any).webkit?.messageHandlers?.smapIos;
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          
+          if (isIOS && hasHandlers && !hasSmapIos) {
+            return (
+              <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="text-sm text-orange-800">
+                  <p className="font-semibold mb-1">🌐 WebView 모드 감지됨</p>
+                  <p className="text-xs">
+                    WebKit 메시지 핸들러가 감지되었지만 'smapIos' 핸들러가 없습니다.
+                    다른 핸들러를 통해 햅틱 전송을 시도합니다.
+                  </p>
+                </div>
+              </div>
+            );
+          } else if (isIOS && !hasHandlers) {
+            return (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm text-blue-800">
+                  <p className="font-semibold mb-1">📱 iOS Safari 모드 감지됨</p>
+                  <p className="text-xs">
+                    네이티브 햅틱 대신 시각적 피드백과 바이브레이션으로 햅틱을 시뮬레이션합니다.
+                    버튼을 누르면 버튼이 살짝 축소되는 효과를 확인할 수 있습니다.
+                  </p>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* 도움말 */}
         <div className="text-xs text-gray-500 text-center">
