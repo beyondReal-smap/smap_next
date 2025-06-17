@@ -2650,7 +2650,7 @@ export default function LocationPage() {
     return photoUrl ?? getDefaultImage(gender, index);
   };
 
-  // 지도에 그룹멤버 마커 표시 (home/page.tsx 방식 참고)
+  // 지도에 그룹멤버 마커 표시 (깜빡임 방지 최적화)
   const updateMemberMarkers = (members: GroupMember[]) => {
     if (!map || !window.naver) {
       console.log('[updateMemberMarkers] 지도 또는 네이버 API가 준비되지 않음');
@@ -2659,75 +2659,103 @@ export default function LocationPage() {
 
     console.log('[updateMemberMarkers] 시작 - 기존 마커:', memberMarkers.length, '개, 새 멤버:', members.length, '명');
 
-    // 기존 멤버 마커들 제거
-    memberMarkers.forEach(marker => {
-      if (marker && marker.setMap) {
-        marker.setMap(null);
-      }
-    });
-    setMemberMarkers([]);
-
-    // 새 멤버 마커들 생성
+    // 기존 마커와 새 멤버 비교하여 필요시에만 업데이트
     const newMemberMarkers: NaverMarker[] = [];
     
-    // 모든 그룹멤버에 대해 마커 생성 (home/page.tsx 방식)
     if (members.length > 0) {
       members.forEach((member, index) => {
         // 좌표 안전성 검사 - 실시간 위치(mlt_lat, mlt_long) 우선 사용
         const lat = parseCoordinate(member.mlt_lat) || parseCoordinate(member.location?.lat);
         const lng = parseCoordinate(member.mlt_long) || parseCoordinate(member.location?.lng);
 
-
-
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
           const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
           const position = new window.naver.maps.LatLng(lat, lng);
           // 선택된 멤버는 핑크색 외곽선, 일반 멤버는 인디고 외곽선 (home/page.tsx 스타일)
           const borderColor = member.isSelected ? '#EC4899' : '#0113A3';
-      
-      const marker = new window.naver.maps.Marker({
-            position: position,
-            map: map,
-            title: member.name,
-        icon: {
-          content: `
-            <div style="position: relative; text-align: center;">
-              <div style="width: 28px; height: 28px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
-                <img 
-                  src="${photoForMarker}" 
-                  alt="${member.name}" 
-                  style="width: 100%; height: 100%; object-fit: cover;" 
-                  onerror="this.src='/images/avatar1.png'"
-                />
-              </div>
-              <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px; font-weight: 500;">
-                ${member.name}
-              </div>
-            </div>
-          `,
-          size: new window.naver.maps.Size(60, 50),
-          anchor: new window.naver.maps.Point(30, 32)
-        },
-            zIndex: member.isSelected ? 200 : 150 // 선택된 멤버가 위에 표시되도록
-          });
 
-          // 멤버 마커 클릭 이벤트 - handleMemberSelect만 호출하도록 단순화
-          window.naver.maps.Event.addListener(marker, 'click', () => {
-            handleMemberSelect(member.id);
-          });
+          // 기존 마커가 있고 같은 멤버인지 확인
+          const existingMarker = memberMarkers[index];
+          let marker: NaverMarker;
+
+          if (existingMarker && existingMarker.getTitle() === member.name) {
+            // 기존 마커 재사용 - 위치와 스타일만 업데이트 (깜빡임 방지)
+            marker = existingMarker;
+            marker.setPosition(position);
+            marker.setZIndex(member.isSelected ? 200 : 150);
+            
+            // 아이콘 업데이트 (선택 상태 변경시)
+            marker.setIcon({
+              content: `
+                <div style="position: relative; text-align: center;">
+                  <div style="width: 28px; height: 28px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                    <img 
+                      src="${photoForMarker}" 
+                      alt="${member.name}" 
+                      style="width: 100%; height: 100%; object-fit: cover;" 
+                      onerror="this.src='/images/avatar1.png'"
+                    />
+                  </div>
+                  <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px; font-weight: 500;">
+                    ${member.name}
+                  </div>
+                </div>
+              `,
+              size: new window.naver.maps.Size(60, 50),
+              anchor: new window.naver.maps.Point(30, 32)
+            });
+          } else {
+            // 새 마커 생성 (초기 생성 또는 멤버 변경시)
+            marker = new window.naver.maps.Marker({
+              position: position,
+              map: map,
+              title: member.name,
+              icon: {
+                content: `
+                  <div style="position: relative; text-align: center;">
+                    <div style="width: 28px; height: 28px; background-color: white; border: 2px solid ${borderColor}; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                      <img 
+                        src="${photoForMarker}" 
+                        alt="${member.name}" 
+                        style="width: 100%; height: 100%; object-fit: cover;" 
+                        onerror="this.src='/images/avatar1.png'"
+                      />
+                    </div>
+                    <div style="position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); background-color: rgba(0,0,0,0.8); color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-size: 10px; font-weight: 500;">
+                      ${member.name}
+                    </div>
+                  </div>
+                `,
+                size: new window.naver.maps.Size(60, 50),
+                anchor: new window.naver.maps.Point(30, 32)
+              },
+              zIndex: member.isSelected ? 200 : 150
+            });
+
+            // 멤버 마커 클릭 이벤트 - handleMemberSelect만 호출하도록 단순화
+            window.naver.maps.Event.addListener(marker, 'click', () => {
+              handleMemberSelect(member.id);
+            });
+          }
 
           newMemberMarkers.push(marker);
         } else {
           console.warn('[updateMemberMarkers] 유효하지 않은 멤버 좌표:', member.name);
         }
       });
-
-      // 지도 초기화 시점에 이미 올바른 위치로 설정되므로 추가 이동 불필요
-      // (handleMemberSelect에서만 지도 중심 이동 처리)
     }
 
+    // 사용하지 않는 기존 마커들만 제거
+    memberMarkers.forEach((marker, index) => {
+      if (index >= newMemberMarkers.length || newMemberMarkers[index] !== marker) {
+        if (marker && marker.setMap) {
+          marker.setMap(null);
+        }
+      }
+    });
+
     setMemberMarkers(newMemberMarkers);
-    console.log('[updateMemberMarkers] 멤버 마커 업데이트 완료:', newMemberMarkers.length, '개');
+    console.log('[updateMemberMarkers] 멤버 마커 업데이트 완료:', newMemberMarkers.length, '개 (깜빡임 방지 최적화 적용)');
 
     // 선택된 멤버가 있으면 InfoWindow 자동 표시 (중복 방지)
     const selectedMember = members.find(member => member.isSelected);
@@ -2835,7 +2863,8 @@ export default function LocationPage() {
         `,
         borderWidth: 0,
         backgroundColor: 'transparent',
-        disableAnchor: true
+        disableAnchor: true,
+        pixelOffset: new window.naver.maps.Point(0, -10) // 멤버 InfoWindow를 마커 위로 45px 띄움 (10px 추가)
       });
 
       memberInfoWindow.open(map, selectedMarker);
@@ -3507,14 +3536,14 @@ export default function LocationPage() {
             transform: scale(1.1);
           }
           .delete-button {
-            background: rgba(239, 68, 68, 0.1);
-            color: #dc2626;
+            background: rgba(153, 27, 27, 0.1);
+            color: #991b1b;
             right: 35px;
             z-index: 10000 !important;
             pointer-events: auto !important;
           }
           .delete-button:hover {
-            background: rgba(239, 68, 68, 0.2) !important;
+            background: rgba(153, 27, 27, 0.2) !important;
             transform: scale(1.1);
           }
         </style>
@@ -3547,7 +3576,10 @@ export default function LocationPage() {
             onmouseup="console.log('삭제 버튼 mouseup');"
             style="z-index: 9999; pointer-events: auto;"
             title="장소 삭제">
-            🗑️
+            <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M7 4V2C7 1.45 7.45 1 8 1H16C16.55 1 17 1.45 17 2V4H20C20.55 4 21 4.45 21 5S20.55 6 20 6H19V19C19 20.1 18.1 21 17 21H7C5.9 21 5 20.1 5 19V6H4C3.45 6 3 5.55 3 5S3.45 4 4 4H7ZM9 3V4H15V3H9ZM7 6V19H17V6H7Z"/>
+              <path d="M9 8V17H11V8H9ZM13 8V17H15V8H13Z"/>
+            </svg>
           </button>
           ` : ''}
           
@@ -3579,7 +3611,7 @@ export default function LocationPage() {
       borderWidth: 0,
       backgroundColor: 'transparent',
       disableAnchor: true,
-      pixelOffset: new window.naver.maps.Point(0, -25) // InfoWindow를 마커 위로 25px 띄움
+      pixelOffset: new window.naver.maps.Point(0, -10) // InfoWindow를 마커 위로 35px 띄움
     });
     
     // InfoWindow가 닫힐 때 상태 업데이트
