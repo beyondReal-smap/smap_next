@@ -645,49 +645,120 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         }
     }
     
-    // 기존 햅틱 피드백 처리 (간소화된 버전)
+    // 강화된 햅틱 피드백 처리
     private func handleHapticFeedback(param: Any?) {
-        print("🎮 [Haptic] 햅틱 피드백 요청")
+        print("🎮 [Haptic] 햅틱 피드백 요청 - param type: \(type(of: param))")
+        print("🎮 [Haptic] 햅틱 피드백 요청 - param value: \(String(describing: param))")
         
-        if let paramString = param as? String,
-           let data = paramString.data(using: .utf8),
-           let hapticData = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
-            
-            let feedbackType = hapticData["feedbackType"] as? String ?? "medium"
-            executeHaptic(type: feedbackType)
-            
-        } else if let hapticType = param as? String {
-            executeHaptic(type: hapticType)
+        var hapticType = "medium" // 기본값
+        
+        // 다양한 형식 지원
+        if let paramString = param as? String {
+            // 직접 문자열인 경우 (예: "light", "success")
+            if paramString.contains("{") {
+                // JSON 문자열인 경우
+                if let data = paramString.data(using: .utf8),
+                   let hapticData = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                    hapticType = hapticData["feedbackType"] as? String ?? "medium"
+                    print("🎮 [Haptic] JSON 형식에서 추출: \(hapticType)")
+                } else {
+                    print("🎮 [Haptic] JSON 파싱 실패, 기본값 사용: \(hapticType)")
+                }
+            } else {
+                // 단순 문자열
+                hapticType = paramString
+                print("🎮 [Haptic] 직접 문자열 사용: \(hapticType)")
+            }
+        } else if let paramDict = param as? [String: Any] {
+            // 딕셔너리 형태인 경우
+            hapticType = paramDict["feedbackType"] as? String ?? 
+                        paramDict["type"] as? String ?? 
+                        paramDict["param"] as? String ?? "medium"
+            print("🎮 [Haptic] 딕셔너리에서 추출: \(hapticType)")
+        } else {
+            print("⚠️ [Haptic] 알 수 없는 파라미터 형식, 기본값 사용: \(hapticType)")
         }
+        
+        // 햅틱 실행
+        executeHaptic(type: hapticType)
+        
+        // 웹으로 확인 메시지 전송
+        sendConfirmationToWeb(hapticType: hapticType)
     }
     
     private func executeHaptic(type: String) {
         DispatchQueue.main.async {
-            switch type.lowercased() {
+            let hapticType = type.lowercased()
+            print("🎯 [Haptic] 햅틱 실행 시작: \(hapticType)")
+            
+            switch hapticType {
             case "light", "selection":
                 let generator = UIImpactFeedbackGenerator(style: .light)
+                generator.prepare() // 미리 준비하여 지연 시간 최소화
                 generator.impactOccurred()
+                print("✨ [Haptic] LIGHT 햅틱 실행 완료")
+                
             case "medium":
                 let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.prepare()
                 generator.impactOccurred()
+                print("✨ [Haptic] MEDIUM 햅틱 실행 완료")
+                
             case "heavy":
                 let generator = UIImpactFeedbackGenerator(style: .heavy)
+                generator.prepare()
                 generator.impactOccurred()
+                print("✨ [Haptic] HEAVY 햅틱 실행 완료")
+                
             case "success":
                 let generator = UINotificationFeedbackGenerator()
+                generator.prepare()
                 generator.notificationOccurred(.success)
+                print("✨ [Haptic] SUCCESS 알림 햅틱 실행 완료")
+                
             case "warning":
                 let generator = UINotificationFeedbackGenerator()
+                generator.prepare()
                 generator.notificationOccurred(.warning)
+                print("✨ [Haptic] WARNING 알림 햅틱 실행 완료")
+                
             case "error":
                 let generator = UINotificationFeedbackGenerator()
+                generator.prepare()
                 generator.notificationOccurred(.error)
+                print("✨ [Haptic] ERROR 알림 햅틱 실행 완료")
+                
             default:
                 let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.prepare()
                 generator.impactOccurred()
+                print("✨ [Haptic] DEFAULT (medium) 햅틱 실행 완료 - 입력값: \(type)")
             }
             
-            print("✨ [Haptic] \(type) 햅틱 실행 완료")
+            // 햅틱 실행 로그를 시스템 로그에도 기록
+            os_log("✨ [Haptic] 햅틱 실행: %{public}@", log: Self.debugLog, type: .info, hapticType)
+        }
+    }
+    
+    // 웹으로 햅틱 실행 확인 메시지 전송
+    private func sendConfirmationToWeb(hapticType: String) {
+        DispatchQueue.main.async {
+            let confirmationScript = """
+                if (window.console && window.console.log) {
+                    console.log('🎉 [iOS-NATIVE] 햅틱 실행 확인: \(hapticType)');
+                }
+                if (window.SMAP_HAPTIC_CONFIRMATION) {
+                    window.SMAP_HAPTIC_CONFIRMATION('\(hapticType)');
+                }
+            """
+            
+            self.webView?.evaluateJavaScript(confirmationScript) { result, error in
+                if let error = error {
+                    print("⚠️ [Haptic] 웹 확인 메시지 전송 실패: \(error)")
+                } else {
+                    print("✅ [Haptic] 웹 확인 메시지 전송 완료: \(hapticType)")
+                }
+            }
         }
     }
     

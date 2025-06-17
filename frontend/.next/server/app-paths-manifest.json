@@ -1,9 +1,6 @@
 {
   "/icon/route": "app/icon/route.js",
-  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
-  "/api/member-location-logs/member-activity/route": "app/api/member-location-logs/member-activity/route.js",
-  "/api/member-location-logs/[mt_idx]/map-markers/route": "app/api/member-location-logs/[mt_idx]/map-markers/route.js",
-  "/api/location-logs/stay-times/[memberId]/route": "app/api/location-logs/stay-times/[memberId]/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/logs/page": "app/logs/page.js",
   "/location/page": "app/location/page.js"
 }

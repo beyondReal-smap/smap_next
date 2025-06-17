@@ -74,7 +74,7 @@ const debugWebViewHandlers = () => {
 };
 
 /**
- * 다중 핸들러로 햅틱 메시지 전송 시도
+ * 다중 햅틱 메시지 전송 시도 (강화된 버전)
  */
 const sendHapticToWebView = (type: HapticFeedbackType): boolean => {
   const debugInfo = debugWebViewHandlers();
@@ -93,18 +93,54 @@ const sendHapticToWebView = (type: HapticFeedbackType): boolean => {
     if (debugInfo.availableHandlers.includes(handlerName)) {
       try {
         const webkit = (window as any).webkit;
-        const message = {
-          type: 'haptic',
-          param: type
-        };
         
-        webkit.messageHandlers[handlerName].postMessage(message);
+        // 여러 형식으로 메시지 전송 시도
+        const messageFormats = [
+          // 기본 형식
+          {
+            type: 'haptic',
+            param: type
+          },
+          // 구형 호환성 형식
+          {
+            type: 'hapticFeedback',
+            param: JSON.stringify({ feedbackType: type })
+          },
+          // 직접 전송 형식
+          type
+        ];
         
-        console.log(`✅ [WEBVIEW] 햅틱 메시지 전송 성공: ${handlerName} | ${type}`);
-        return true;
+        for (const message of messageFormats) {
+          try {
+            webkit.messageHandlers[handlerName].postMessage(message);
+            console.log(`✅ [WEBVIEW] 햅틱 메시지 전송 성공: ${handlerName} | ${type} | 형식: ${typeof message === 'string' ? '직접' : message.type}`);
+            
+            // iOS 네이티브 로그 확인용 추가 메시지
+            try {
+              webkit.messageHandlers[handlerName].postMessage({
+                type: 'jsLog',
+                param: JSON.stringify({
+                  level: 'info',
+                  message: `웹에서 햅틱 전송: ${type}`,
+                  data: { hapticType: type, handler: handlerName, timestamp: Date.now() }
+                })
+              });
+            } catch (logError) {
+              // 로그 전송 실패는 무시
+            }
+            
+            return true;
+            
+          } catch (formatError) {
+            console.warn(`⚠️ [WEBVIEW] ${handlerName} 형식 ${typeof message === 'string' ? '직접' : message.type} 실패:`, formatError);
+            continue;
+          }
+        }
+        
+        console.error(`❌ [WEBVIEW] ${handlerName} 모든 형식 전송 실패`);
         
       } catch (error) {
-        console.error(`❌ [WEBVIEW] ${handlerName} 핸들러 전송 실패:`, error);
+        console.error(`❌ [WEBVIEW] ${handlerName} 핸들러 접근 실패:`, error);
         continue;
       }
     }
@@ -225,18 +261,66 @@ export const triggerHapticFeedback = (
     if (env.hasHandler) {
       // 🔥 iOS 네이티브 햅틱 피드백 (앱 내 WebView)
       try {
-        const hapticMessage = {
-          type: 'haptic',
-          param: type
-        };
+        // 여러 형식으로 햅틱 메시지 전송 시도
+        const webkit = (window as any).webkit;
+        let success = false;
         
-        (window as any).webkit.messageHandlers.smapIos.postMessage(hapticMessage);
+        const messageFormats = [
+          // 표준 형식
+          {
+            type: 'haptic',
+            param: type
+          },
+          // 호환성 형식
+          {
+            type: 'hapticFeedback',
+            param: JSON.stringify({ feedbackType: type })
+          },
+          // 단순 형식 (직접 문자열)
+          type
+        ];
         
-        console.log(`✅ [HAPTIC] iOS 네이티브 햅틱 전송: ${type}`);
-        sendLogToiOS('info', `햅틱 피드백 실행: ${type}`, logContext);
+        for (const message of messageFormats) {
+          try {
+            webkit.messageHandlers.smapIos.postMessage(message);
+            console.log(`✅ [HAPTIC] iOS 네이티브 햅틱 전송 성공: ${type} | 형식: ${typeof message === 'string' ? '직접' : message.type}`);
+            success = true;
+            break;
+          } catch (formatError) {
+            console.warn(`⚠️ [HAPTIC] 형식 ${typeof message === 'string' ? '직접' : message.type} 실패:`, formatError);
+            continue;
+          }
+        }
+        
+        if (success) {
+          // 성공 시 iOS 로그 전송
+          sendLogToiOS('info', `햅틱 피드백 실행: ${type}`, logContext);
+          
+          // 추가 확인용 로그 전송
+          try {
+            webkit.messageHandlers.smapIos.postMessage({
+              type: 'jsLog',
+              param: JSON.stringify({
+                level: 'info',
+                message: `[HAPTIC CONFIRM] 웹에서 ${type} 햅틱 요청 완료`,
+                data: { 
+                  hapticType: type, 
+                  timestamp: Date.now(),
+                  page: pageInfo.pageName,
+                  description: description || 'N/A'
+                }
+              })
+            });
+          } catch (logError) {
+            // 로그 실패는 무시
+          }
+        } else {
+          throw new Error('모든 햅틱 메시지 형식 전송 실패');
+        }
         
       } catch (iosError) {
-        console.error('❌ [HAPTIC] iOS 메시지 전송 실패:', iosError);
+        console.error('❌ [HAPTIC] iOS 네이티브 햅틱 전송 실패:', iosError);
+        console.error('❌ [HAPTIC] 전송 시도한 형식들:', ['haptic + param', 'hapticFeedback + JSON', '직접 문자열']);
         fallbackToWebVibration(type, env);
       }
     } else if (env.isWebView) {
@@ -336,6 +420,28 @@ const getVibrationPattern = (type: HapticFeedbackType): number => {
 /**
  * 특정 상황에 맞는 햅틱 피드백 단축 함수들
  */
+/**
+ * iOS 네이티브에서 햅틱 실행 확인 메시지를 받기 위한 글로벌 함수 설정
+ */
+if (typeof window !== 'undefined') {
+  // iOS 네이티브 햅틱 확인 콜백 함수
+  (window as any).SMAP_HAPTIC_CONFIRMATION = (hapticType: string) => {
+    console.log(`🎉 [iOS-NATIVE] 햅틱 실행 확인 수신: ${hapticType}`);
+    
+    // 확인 메시지가 수신되면 추가 로깅
+    const env = detectIOSEnvironment();
+    console.table({
+      '햅틱 타입': hapticType,
+      '확인 시각': new Date().toLocaleTimeString(),
+      '환경': env.isIOSApp ? 'iOS App' : 'Unknown',
+      '핸들러 존재': env.hasHandler,
+      '페이지': getCurrentPageInfo().pageName
+    });
+  };
+  
+  console.log('🎮 [HAPTIC] iOS 네이티브 확인 콜백 함수 등록 완료');
+}
+
 export const hapticFeedback = {
   // 로그인/인증 관련
   loginSuccess: (context?: any) => triggerHapticFeedback(HapticFeedbackType.SUCCESS, '로그인 성공', { action: 'login_success', ...context }),
