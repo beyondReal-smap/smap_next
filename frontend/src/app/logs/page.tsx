@@ -2929,6 +2929,22 @@ export default function LogsPage() {
     console.log('[슬라이더] 드래그 종료');
   };
 
+  // 지도 중심 이동 최적화를 위한 변수들
+  const lastMapCenterRef = useRef<{lat: number, lng: number} | null>(null);
+  const mapUpdateThresholdM = 10; // 10m 이상 이동시에만 지도 중심 변경
+
+  // 두 좌표 간의 거리 계산 (미터 단위)
+  const calculateDistanceInMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const R = 6371000; // 지구 반지름 (미터)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
   const updateSliderValue = (e: React.TouchEvent | React.MouseEvent | MouseEvent | TouchEvent) => {
     if (!sliderRef.current || !isSliderDragging) return;
 
@@ -2970,26 +2986,11 @@ export default function LogsPage() {
     } catch (error) {
       console.error('[updateSliderValue] 에러 발생:', error);
     }
-  };
+      };
 
-  // 현재 위치 마커 생성/업데이트 함수
-  const createOrUpdateCurrentPositionMarker = (lat: number, lng: number, targetIndex: number, totalMarkers: number) => {
-    if (!map.current || !window.naver?.maps) return;
-
-    const position = new window.naver.maps.LatLng(lat, lng);
-
-    // 기존 현재 위치 마커 제거
-    if (currentPositionMarker.current) {
-      // InfoWindow가 있다면 먼저 닫기
-      if (currentPositionMarker.current.infoWindow) {
-        currentPositionMarker.current.infoWindow.close();
-      }
-      currentPositionMarker.current.setMap(null);
-    }
-
-    // 현재 마커 데이터 가져오기
-    const currentMarkerData = sortedLocationData[targetIndex];
-    if (!currentMarkerData) return;
+  // InfoWindow 내용 생성 함수 (성능 최적화를 위해 분리)
+  const createInfoWindowContent = (targetIndex: number, totalMarkers: number, currentMarkerData: any): string => {
+    if (!currentMarkerData) return '<div>데이터 없음</div>';
 
     // 마커 데이터에서 정보 추출
     const speedMs = currentMarkerData.speed || currentMarkerData.mlt_speed || 0; // m/s
@@ -3024,8 +3025,8 @@ export default function LogsPage() {
     const transportIcon = getTransportIcon(speed);
     const transportText = getTransportText(speed);
 
-    // InfoWindow 내용 생성 (모바일 Safari 호환성 강화)
-    const infoContent = `
+    // InfoWindow 내용 생성 (모바일 Safari 호환성 강화 + GPU 가속)
+    return `
       <style>
         /* 모바일 Safari 텍스트 색상 강제 설정 */
         .current-position-info * {
@@ -3043,6 +3044,11 @@ export default function LogsPage() {
         min-width: 140px;
         max-width: 160px;
         color-scheme: light !important;
+        /* GPU 가속 최적화 */
+        transform: translateZ(0);
+        will-change: auto;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
       ">
         <div style="
           background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
@@ -3083,6 +3089,41 @@ export default function LogsPage() {
         </div>
       </div>
     `;
+  };
+
+  // 현재 위치 마커 생성/업데이트 함수 (성능 최적화)
+  const createOrUpdateCurrentPositionMarker = (lat: number, lng: number, targetIndex: number, totalMarkers: number) => {
+    if (!map.current || !window.naver?.maps) return;
+
+    const position = new window.naver.maps.LatLng(lat, lng);
+
+    // 기존 마커가 있다면 위치만 업데이트 (마커 재사용)
+    if (currentPositionMarker.current && currentPositionMarker.current.setPosition) {
+      currentPositionMarker.current.setPosition(position);
+      
+      // InfoWindow 내용만 업데이트 (DOM 조작 최소화)
+      if (currentPositionMarker.current.infoWindow) {
+        const updatedContent = createInfoWindowContent(targetIndex, totalMarkers, sortedLocationData[targetIndex]);
+        currentPositionMarker.current.infoWindow.setContent(updatedContent);
+      }
+      return;
+    }
+
+    // 기존 현재 위치 마커 제거 (최초 생성시에만)
+    if (currentPositionMarker.current) {
+      // InfoWindow가 있다면 먼저 닫기
+      if (currentPositionMarker.current.infoWindow) {
+        currentPositionMarker.current.infoWindow.close();
+      }
+      currentPositionMarker.current.setMap(null);
+    }
+
+    // 현재 마커 데이터 가져오기
+    const currentMarkerData = sortedLocationData[targetIndex];
+    if (!currentMarkerData) return;
+
+    // InfoWindow 내용 생성 (최적화된 함수 사용)
+    const infoContent = createInfoWindowContent(targetIndex, totalMarkers, currentMarkerData);
 
     // 새로운 현재 위치 마커 생성
     currentPositionMarker.current = new window.naver.maps.Marker({
@@ -3103,19 +3144,34 @@ export default function LogsPage() {
             justify-content: center;
             position: relative;
             animation: pulse 2s infinite;
+            /* GPU 가속 최적화 */
+            transform: translateZ(0);
+            will-change: transform, box-shadow;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
           ">
             <div style="
               width: 8px;
               height: 8px;
               background: white;
               border-radius: 50%;
+              transform: translateZ(0);
             "></div>
           </div>
           <style>
             @keyframes pulse {
-              0% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2); }
-              50% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 8px rgba(239,68,68,0.1); }
-              100% { box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2); }
+              0% { 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2);
+                transform: translateZ(0) scale(1);
+              }
+              50% { 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 8px rgba(239,68,68,0.1);
+                transform: translateZ(0) scale(1.05);
+              }
+              100% { 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15), 0 0 0 4px rgba(239,68,68,0.2);
+                transform: translateZ(0) scale(1);
+              }
             }
           </style>
         `,
@@ -3159,20 +3215,24 @@ export default function LogsPage() {
       const lng = targetMarker.longitude || targetMarker.mlt_long || 0;
 
       if (lat && lng) {
-        const center = new window.naver.maps.LatLng(Number(lat), Number(lng));
-        
-        // console.log(`[경로따라가기] 지도 중심 이동 시도: ${percentage.toFixed(1)}% - ${targetIndex + 1}/${totalMarkers}`, {
-        //   lat: Number(lat),
-        //   lng: Number(lng),
-        //   center: { lat: Number(lat), lng: Number(lng) }
-        // });
-        
-        // 1. 마커를 먼저 생성/업데이트 (즉시 반응)
+        // 1. 마커를 먼저 생성/업데이트 (항상 실행)
         createOrUpdateCurrentPositionMarker(Number(lat), Number(lng), targetIndex, totalMarkers);
         
-        // 2. 지도 중심을 부드럽게 이동
-        map.current.setCenter(center);
-        // console.log('[경로따라가기] 지도 중심 이동 완료:', { lat: Number(lat), lng: Number(lng) });
+        // 2. 지도 중심 이동 최적화: 거리 기반 업데이트
+        const shouldUpdateMapCenter = !lastMapCenterRef.current || 
+          calculateDistanceInMeters(
+            lastMapCenterRef.current.lat, 
+            lastMapCenterRef.current.lng, 
+            Number(lat), 
+            Number(lng)
+          ) > mapUpdateThresholdM;
+
+        if (shouldUpdateMapCenter) {
+          const center = new window.naver.maps.LatLng(Number(lat), Number(lng));
+          map.current.setCenter(center);
+          // 좌표 계산 캐싱: 이전 중심 좌표 저장
+          lastMapCenterRef.current = { lat: Number(lat), lng: Number(lng) };
+        }
       }
     }
   };
@@ -5728,24 +5788,37 @@ export default function LogsPage() {
                     >
                       {/* 슬라이더 트랙 */}
                       <div className="absolute w-full h-3 bg-gray-200 rounded-full top-1/2 transform -translate-y-1/2"></div>
-                      {/* 진행 표시 바 */}
-                      <div 
-                        className={`absolute left-0 h-3 bg-blue-500 rounded-full pointer-events-none top-1/2 transform -translate-y-1/2 ${
-                          isSliderDragging ? '' : 'transition-all duration-150 ease-out'
-                        }`}
-                        style={{ width: `${sliderValue}%` }} 
-                      ></div>
-                      {/* 슬라이더 핸들 */}
-                      <div 
-                        className={`absolute w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg transform -translate-x-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing z-10 ${
-                          isSliderDragging ? 'scale-110' : 'transition-all duration-150 ease-out hover:scale-105'
-                        }`}
-                        style={{ 
-                          left: `calc(${sliderValue}% - 5px)`,
-                          top: 'calc(50% - 6px)',
-                          pointerEvents: 'auto'
-                        }}
-                      ></div>
+                                             {/* 진행 표시 바 */}
+                       <div 
+                         className={`absolute left-0 h-3 bg-blue-500 rounded-full pointer-events-none ${
+                           isSliderDragging ? '' : 'transition-all duration-150 ease-out'
+                         }`}
+                         style={{ 
+                           width: `${sliderValue}%`,
+                           top: 'calc(50% + 6px)',
+                           /* GPU 가속 최적화 */
+                           transform: 'translateZ(0) translateY(-50%)',
+                           willChange: isSliderDragging ? 'width' : 'auto',
+                           backfaceVisibility: 'hidden',
+                           WebkitBackfaceVisibility: 'hidden'
+                         }} 
+                       ></div>
+                       {/* 슬라이더 핸들 */}
+                       <div 
+                         className={`absolute w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg cursor-grab active:cursor-grabbing z-10 ${
+                           isSliderDragging ? 'scale-110' : 'transition-all duration-150 ease-out hover:scale-105'
+                         }`}
+                         style={{ 
+                           left: `${sliderValue}%`,
+                           top: 'calc(50% + 6px)',
+                           pointerEvents: 'auto',
+                           /* GPU 가속 최적화 */
+                           transform: 'translateZ(0) translate(-50%, -50%)',
+                           willChange: isSliderDragging ? 'transform' : 'auto',
+                           backfaceVisibility: 'hidden',
+                           WebkitBackfaceVisibility: 'hidden'
+                         }}
+                       ></div>
                     </div>
                     {/* 슬라이더 레이블 */}
                     <div className="flex justify-between text-xs text-gray-500 mt-1">
