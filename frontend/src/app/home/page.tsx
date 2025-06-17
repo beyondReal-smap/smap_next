@@ -42,7 +42,7 @@ import notificationService from '@/services/notificationService';
 import { 
     AllDayCheckEnum, ShowEnum, ScheduleAlarmCheckEnum, InCheckEnum, ScheduleCheckEnum 
 } from '../../types/enums';
-import { hapticFeedback } from '@/utils/haptic';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import DebugPanel from '../components/layout/DebugPanel';
 import LogParser from '../components/layout/LogParser';
 
@@ -1225,7 +1225,10 @@ export default function HomePage() {
           if (isMapLoading) setIsMapLoading(false); 
           console.log("[fetchAllGroupData] 모든 그룹 데이터 로딩 완료");
           // 데이터 로딩 완료 햅틱 피드백
-          hapticFeedback.dataLoadComplete();
+          triggerHapticFeedback(HapticFeedbackType.SUCCESS, '그룹 데이터 로딩 완료', { 
+            component: 'home', 
+            action: 'data-load-complete' 
+          });
         }
       }
     };
@@ -4240,7 +4243,10 @@ export default function HomePage() {
                    whileTap={{ scale: 0.98 }}
                    className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200"
                    onClick={() => {
-                     hapticFeedback.navigation({ component: 'HomePage', action: 'test_page_navigation' });
+                     triggerHapticFeedback(HapticFeedbackType.LIGHT, '햅틱 테스트 페이지 이동', { 
+                       component: 'home', 
+                       action: 'test-page-navigation' 
+                     });
                      router.push('/test-haptic');
                    }}
                    title="햅틱 테스트"

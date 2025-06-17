@@ -17,7 +17,7 @@ import { FcGoogle } from 'react-icons/fc';
 import { RiKakaoTalkFill } from 'react-icons/ri';
 import { FiX, FiAlertTriangle, FiPhone, FiLock, FiEye, FiEyeOff, FiMail, FiUser } from 'react-icons/fi';
 import { AlertModal } from '@/components/ui';
-import { hapticFeedback } from '@/utils/haptic';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 
 // 카카오 SDK 타입 정의
 declare global {
@@ -102,8 +102,8 @@ export default function SignInPage() {
         console.log('🧪 [HAPTIC TEST] 직접 햅틱 함수 호출');
         (window as any).hapticSuccess();
       } else {
-        console.log('🧪 [HAPTIC TEST] hapticFeedback 유틸 사용');
-        hapticFeedback.success({ test: true });
+        console.log('🧪 [HAPTIC TEST] triggerHapticFeedback 유틸 사용');
+        triggerHapticFeedback(HapticFeedbackType.SUCCESS, '햅틱 테스트', { component: 'signin', action: 'test' });
       }
     } catch (error) {
       console.error('🧪 [HAPTIC TEST] 햅틱 테스트 실패:', error);
@@ -193,7 +193,7 @@ export default function SignInPage() {
                 await refreshAuthState();
                 
                 // 성공 햅틱 피드백
-                hapticFeedback.success();
+                triggerHapticFeedback(HapticFeedbackType.SUCCESS, 'Google SDK 로그인 성공', { component: 'signin', action: 'google-sdk-login', userEmail: data.user?.mt_email });
                 console.log('🎮 [SIGNIN] Google 로그인 성공 햅틱 피드백 실행');
                 
                 // 홈으로 이동
@@ -631,7 +631,12 @@ export default function SignInPage() {
               console.log('[GOOGLE LOGIN] AuthContext 상태 동기화 완료');
               
               // Google 로그인 성공 햅틱 피드백
-              hapticFeedback.googleLogin({ status: 'success', userEmail: data.user?.mt_email?.substring(0, 3) + '***' });
+              triggerHapticFeedback(HapticFeedbackType.SUCCESS, 'Google 로그인 성공', { 
+                component: 'signin', 
+                action: 'google-login', 
+                userEmail: data.user?.mt_email?.substring(0, 3) + '***' 
+              });
+              console.log('🎮 [SIGNIN] Google 로그인 성공 햅틱 피드백 실행');
               
               // 리다이렉트 플래그 설정
               isRedirectingRef.current = true;
@@ -649,7 +654,11 @@ export default function SignInPage() {
           console.error('[GOOGLE LOGIN] 네이티브 Google 로그인 처리 오류:', error);
           
           // Google 로그인 실패 햅틱 피드백
-          hapticFeedback.googleLogin({ status: 'error', error: error.message });
+          triggerHapticFeedback(HapticFeedbackType.ERROR, 'Google 로그인 실패', { 
+            component: 'signin', 
+            action: 'google-login-error', 
+            error: error.message 
+          });
           
           showError(error.message || 'Google 로그인 처리 중 오류가 발생했습니다.');
         } finally {
@@ -678,7 +687,11 @@ export default function SignInPage() {
         }
         
         // Google 로그인 에러 햅틱 피드백
-        hapticFeedback.googleLogin({ status: 'callback_error', error: errorMessage });
+        triggerHapticFeedback(HapticFeedbackType.ERROR, 'Google 로그인 콜백 에러', { 
+          component: 'signin', 
+          action: 'google-login-callback-error', 
+          error: errorMessage 
+        });
         
         // 에러 모달 강제 표시 - setTimeout으로 확실히 실행
         console.log('[GOOGLE LOGIN] 에러 모달 강제 표시:', userFriendlyMessage);
@@ -903,7 +916,11 @@ export default function SignInPage() {
       });
       
       // 로그인 성공 햅틱 피드백
-      hapticFeedback.loginSuccess({ method: 'phone', phone: phoneNumber.replace(/-/g, '').substring(0, 7) + '****' });
+      triggerHapticFeedback(HapticFeedbackType.SUCCESS, '전화번호 로그인 성공', { 
+        component: 'signin', 
+        action: 'phone-login', 
+        phone: phoneNumber.replace(/-/g, '').substring(0, 7) + '****' 
+      });
       console.log('🎮 [SIGNIN] 전화번호 로그인 성공 햅틱 피드백 실행');
       
       // 리다이렉트 플래그 설정
@@ -972,7 +989,11 @@ export default function SignInPage() {
       });
       
       // 로그인 실패 햅틱 피드백
-      hapticFeedback.loginError({ method: 'phone', error: err.message });
+      triggerHapticFeedback(HapticFeedbackType.ERROR, '전화번호 로그인 실패', { 
+        component: 'signin', 
+        action: 'phone-login-error', 
+        error: err.message 
+      });
       console.log('🎮 [SIGNIN] 전화번호 로그인 실패 햅틱 피드백 실행');
       
       try {
@@ -1761,7 +1782,10 @@ export default function SignInPage() {
           });
         
         // Google 로그인 환경 오류 햅틱 피드백
-        hapticFeedback.warning();
+        triggerHapticFeedback(HapticFeedbackType.WARNING, 'Google 로그인 환경 오류', { 
+          component: 'signin', 
+          action: 'google-login-env-error' 
+        });
         console.log('🎮 [SIGNIN] Google 로그인 환경 오류 햅틱 피드백 실행');
         
         // 에러 모달 강제 표시
@@ -1982,7 +2006,11 @@ export default function SignInPage() {
                 });
               
               // 카카오 로그인 성공 햅틱 피드백
-              hapticFeedback.kakaoLogin({ status: 'success', userEmail: data.user?.mt_email?.substring(0, 3) + '***' });
+              triggerHapticFeedback(HapticFeedbackType.SUCCESS, '카카오 로그인 성공', { 
+                component: 'signin', 
+                action: 'kakao-login', 
+                userEmail: data.user?.mt_email?.substring(0, 3) + '***' 
+              });
               console.log('🎮 [SIGNIN] 카카오 로그인 성공 햅틱 피드백 실행');
               
               // 리다이렉트 플래그 설정
