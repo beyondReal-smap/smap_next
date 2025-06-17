@@ -3682,155 +3682,121 @@ export default function LogsPage() {
       isMapInitializedLogs,
       groupMembersLength: groupMembers.length,
       hasSelectedMember: groupMembers.some(m => m.isSelected),
-      mapExists: !!map.current,
-      naverMapsExists: !!window.naver?.maps,
       selectedDate,
       firstMemberSelected,
       hasExecuted: hasExecuted.current,
       isMainInstance: isMainInstance.current
     });
     
-    // 컴포넌트 재마운트 시 초기화 강화
-    if (isMapInitializedLogs && groupMembers.length > 0 && !hasExecuted.current) {
-      console.log("[LogsPage] 🔄 컴포넌트 재마운트 감지 - 상태 초기화 강화");
-      
-      // 실행 플래그 설정으로 중복 실행 방지
-      hasExecuted.current = true;
-      isMainInstance.current = true;
-      
-      // 모든 제어 플래그 초기화
-      isDateChangingRef.current = false;
-      isDateChangedRef.current = false;
-      isUserDateSelectionRef.current = false;
-      loadLocationDataExecutingRef.current = { executing: false, cancelled: false };
-      
-      // firstMemberSelected 상태 초기화 (재진입 시 자동 선택이 다시 작동하도록)
-      if (firstMemberSelected) {
-        console.log("[LogsPage] firstMemberSelected 상태 초기화 (재진입 대응)");
-        setFirstMemberSelected(false);
-      }
+    // 메인 인스턴스에서만 실행
+    if (!isMainInstance.current) {
+      console.log("[LogsPage] 서브 인스턴스 - 건너뜀");
+      return;
+    }
+
+    // 모든 조건이 준비되었는지 확인
+    if (!isMapInitializedLogs || groupMembers.length === 0 || !selectedDate) {
+      console.log("[LogsPage] 초기화 조건 미충족:", {
+        isMapInitializedLogs,
+        groupMembersLength: groupMembers.length,
+        selectedDate
+      });
+      return;
     }
     
-    if (isMapInitializedLogs && groupMembers.length > 0) {
-      // 첫 번째 멤버 자동 선택 (선택된 멤버가 없고 아직 자동선택하지 않은 경우)
-      if (!groupMembers.some(m => m.isSelected) && !firstMemberSelected) {
-        console.log("[LogsPage] 🎯 Auto-selection: Setting first member as selected.");
+    // 이미 첫 번째 멤버가 선택되고 데이터 로딩이 완료된 경우 건너뛰기
+    if (firstMemberSelected && groupMembers.some(m => m.isSelected) && !isDateChangedRef.current) {
+      console.log("[LogsPage] 이미 초기화 완료됨 - 건너뜀");
+      return;
+    }
+
+    // 첫 번째 멤버 자동 선택 및 데이터 로딩 통합 처리
+    const initializeFirstMember = async () => {
+      try {
+        console.log("[LogsPage] 🚀 첫 번째 멤버 초기화 시작");
         
-        // 자동 선택 전에 모든 플래그 리셋 (확실히 하기 위해)
+        // 모든 플래그 초기화
         isDateChangingRef.current = false;
         isDateChangedRef.current = false;
         loadLocationDataExecutingRef.current = { executing: false, cancelled: false };
-        console.log("[LogsPage] Auto-selection: 모든 플래그 리셋 완료");
         
-        // 멤버 상태 업데이트 후 마커 생성
-        const updatedMembers = groupMembers.map((member, index) => ({
-          ...member,
-          isSelected: index === 0
-        }));
-        
-        // 지도 중심을 먼저 설정한 후 마커 생성 (부자연스러운 이동 방지)
-        const firstMember = updatedMembers[0];
-                  if (map.current && firstMember) {
+        // 첫 번째 멤버 선택
+        let updatedMembers = groupMembers;
+        if (!groupMembers.some(m => m.isSelected)) {
+          updatedMembers = groupMembers.map((member, index) => ({
+            ...member,
+            isSelected: index === 0
+          }));
+          
+          console.log("[LogsPage] 첫 번째 멤버 자동 선택:", updatedMembers[0].name);
+          setGroupMembers(updatedMembers);
+          
+          // 지도 중심 설정
+          const firstMember = updatedMembers[0];
+          if (map.current && firstMember) {
             const adjustedPosition = new window.naver.maps.LatLng(
               firstMember.location.lat, 
               firstMember.location.lng
             );
-          map.current.setCenter(adjustedPosition);
-          map.current.setZoom(16);
-          console.log("[LogsPage] Auto-selection: 지도 중심 먼저 설정 완료");
+            map.current.setCenter(adjustedPosition);
+            map.current.setZoom(16);
+            console.log("[LogsPage] 지도 중심 설정 완료");
+          }
+          
+          // 멤버 마커 생성
+          updateMemberMarkers(updatedMembers, false);
         }
         
-        setGroupMembers(updatedMembers);
-        
-        // 지연 후 멤버 마커 생성 (지도 중심 설정 후)
-        setTimeout(() => {
-          console.log("[LogsPage] Auto-selection: 지연 후 멤버 마커 생성");
-          updateMemberMarkers(updatedMembers, false);
-        }, 50);
-        
-        // 첫 번째 멤버 자동 선택 시에도 오늘 데이터 바로 로딩 (초기 화면에서 바로 보여주기 위해)
-        const selectedFirstMember = updatedMembers[0];
-        const firstMemberId = selectedFirstMember.id;
-        console.log("[LogsPage] Auto-selection: 첫 번째 멤버 선택 완료 - 오늘 데이터 즉시 로딩:", firstMemberId);
-        
-        // 자동 선택 플래그 설정
-        setFirstMemberSelected(true);
-        
-        // 🎯 핵심: 첫 번째 멤버의 오늘 데이터 즉시 로딩 (복잡한 useEffect 체인 대신 직접 실행)
-        // 요청 취소 플래그 리셋 - 초기 자동 로딩은 취소하지 않음
-        loadLocationDataExecutingRef.current.cancelled = false;
-        loadLocationDataExecutingRef.current.executing = false;
-        
-        // 로딩 상태 즉시 활성화
-        setIsLocationDataLoading(true);
-        
-        // 약간의 지연 후 데이터 로딩 시작 (상태 업데이트 완료 대기)
-        setTimeout(async () => {
-          try {
-            console.log("[LogsPage] 🚀 Auto-selection: 첫 번째 멤버 데이터 로딩 시작:", selectedFirstMember.name, selectedDate);
-            await loadLocationDataWithMapPreset(parseInt(firstMemberId), selectedDate, selectedFirstMember, false);
-            console.log("[LogsPage] ✅ Auto-selection: 첫 번째 멤버 데이터 로딩 완료");
-          } catch (error) {
-            console.error("[LogsPage] ❌ Auto-selection: 첫 번째 멤버 데이터 로딩 실패:", error);
-            setIsLocationDataLoading(false);
+        // 선택된 멤버의 데이터 로딩
+        const selectedMember = updatedMembers.find(m => m.isSelected);
+        if (selectedMember && (!firstMemberSelected || isDateChangedRef.current)) {
+          console.log("[LogsPage] 🚀 선택된 멤버 데이터 로딩:", selectedMember.name, selectedDate);
+          
+          setIsLocationDataLoading(true);
+          
+          // 재시도 로직 포함한 안전한 데이터 로딩
+          let retryCount = 0;
+          const maxRetries = 2;
+          
+          while (retryCount <= maxRetries) {
+            try {
+              await loadLocationDataWithMapPreset(parseInt(selectedMember.id), selectedDate, selectedMember, false);
+              console.log("[LogsPage] ✅ 데이터 로딩 성공");
+              break;
+            } catch (error) {
+              console.error(`[LogsPage] 데이터 로딩 실패 (${retryCount + 1}/${maxRetries + 1}):`, error);
+              
+              if (retryCount === maxRetries) {
+                // 최종 실패 시 기본 처리
+                console.error("[LogsPage] 최대 재시도 초과 - 데이터 로딩 포기");
+                handleDataError(error, '초기 데이터 로딩');
+                break;
+              }
+              
+              // 재시도 전 잠시 대기
+              await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+              retryCount++;
+            }
           }
-        }, 100); // 최소한의 지연으로 상태 업데이트 완료 대기
+          
+          setIsLocationDataLoading(false);
+          setFirstMemberSelected(true);
+          isDateChangedRef.current = false;
+        }
         
-        return; // 상태 업데이트 후 다음 렌더 사이클에서 처리되도록 return
+        console.log("[LogsPage] ✅ 첫 번째 멤버 초기화 완료");
+        
+      } catch (error) {
+        console.error("[LogsPage] ❌ 첫 번째 멤버 초기화 실패:", error);
+        setIsLocationDataLoading(false);
+        handleDataError(error, '초기화');
       }
+    };
 
-      // 선택된 멤버가 있는 경우 지도 업데이트 및 데이터 로딩
-      const selectedMember = groupMembers.find(m => m.isSelected);
-      console.log("[LogsPage] Member selection detected or map initialized with selection.", {
-        selectedMember: selectedMember?.name,
-        firstMemberSelected,
-        isLocationDataLoading,
-        executing: loadLocationDataExecutingRef.current.executing
-      });
-      
-      // 날짜 변경 플래그 확인
-      const isDateChange = isDateChangedRef.current;
-      console.log('[LOGS] useEffect - 날짜 변경 체크:', { 
-        previousDate, 
-        selectedDate, 
-        isDateChange,
-        firstMemberSelected,
-        isDateChangedRefValue: isDateChangedRef.current
-      });
-      
-      // 선택된 멤버가 있고 데이터 로딩이 필요한 경우 (firstMemberSelected가 false이거나 날짜가 변경된 경우)
-      if (selectedMember && (!firstMemberSelected || isDateChange) && !isLocationDataLoading && !loadLocationDataExecutingRef.current.executing) {
-        console.log("[LogsPage] 🚀 선택된 멤버 데이터 로딩 시작:", selectedMember.name, selectedDate);
-        
-        // 플래그들 초기화
-        isDateChangingRef.current = false;
-        isDateChangedRef.current = false;
-        loadLocationDataExecutingRef.current = { executing: false, cancelled: false };
-        
-        // 데이터 로딩 시작
-        setIsLocationDataLoading(true);
-        setFirstMemberSelected(true); // 이후 중복 로딩 방지
-        
-        // 데이터 로딩 실행
-        setTimeout(async () => {
-          try {
-            console.log("[LogsPage] 🔥 선택된 멤버 데이터 로딩 실행:", selectedMember.name, selectedDate);
-            await loadLocationDataWithMapPreset(parseInt(selectedMember.id), selectedDate, selectedMember, false);
-            console.log("[LogsPage] ✅ 선택된 멤버 데이터 로딩 완료");
-          } catch (error) {
-            console.error("[LogsPage] ❌ 선택된 멤버 데이터 로딩 실패:", error);
-            setIsLocationDataLoading(false);
-          }
-        }, 50);
-      }
-      
-      // 자동 재생성 방지 플래그가 설정되어 있으면 리셋
-      if (isDateChangingRef.current) {
-        console.log('[LOGS] useEffect - 자동 재생성 방지 플래그 강제 리셋');
-        isDateChangingRef.current = false;
-      }
-    }
-  }, [groupMembers, isMapInitializedLogs]); // selectedDate 제거 - 날짜 변경 시 지도 조정 중복 방지
+    // 비동기 초기화 실행
+    initializeFirstMember();
+    
+  }, [isMapInitializedLogs, groupMembers.length, selectedDate, firstMemberSelected, groupMembers]);
 
   // 백업 useEffect 제거됨 - 위의 통합 로직에서 처리
 
