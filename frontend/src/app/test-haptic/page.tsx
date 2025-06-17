@@ -10,16 +10,27 @@ export default function HapticTestPage() {
   const [environment, setEnvironment] = useState<string>('');
 
   useEffect(() => {
-    // 환경 정보 설정
+    // 환경 정보 설정 (강화 버전)
     const userAgent = navigator.userAgent;
     const hasWebKit = !!(window as any).webkit;
     const hasHandler = !!(window as any).webkit?.messageHandlers?.smapIos;
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isIOSApp = isIOSDevice && hasHandler;
+    const isIOSBrowser = isIOSDevice && !hasHandler;
+    const supportsTouchAPI = 'ontouchstart' in window;
+    const supportsVibration = 'vibrate' in navigator;
     
     setEnvironment(`
-      UserAgent: ${userAgent}
-      iOS: ${isIOS}
-      WebKit: ${hasWebKit}
-      Handler: ${hasHandler}
+환경 정보:
+• 기기: ${isIOSDevice ? 'iOS' : '기타'}
+• 앱 타입: ${isIOSApp ? 'iOS 네이티브 앱' : isIOSBrowser ? 'iOS Safari' : '웹 브라우저'}
+• WebKit: ${hasWebKit ? '있음' : '없음'}
+• 메시지 핸들러: ${hasHandler ? '있음' : '없음'}
+• 터치 API: ${supportsTouchAPI ? '지원' : '미지원'}
+• 바이브레이션: ${supportsVibration ? '지원' : '미지원'}
+
+기술 정보:
+• UserAgent: ${userAgent.substring(0, 80)}...
     `);
 
     // 콘솔 로그 캡처
@@ -28,7 +39,7 @@ export default function HapticTestPage() {
       originalLog(...args);
       const message = args.join(' ');
       if (message.includes('[HAPTIC]') || message.includes('햅틱')) {
-        setLogs(prev => [...prev.slice(-10), `${new Date().toLocaleTimeString()}: ${message}`]);
+        setLogs(prev => [...prev.slice(-15), `${new Date().toLocaleTimeString()}: ${message}`]);
       }
     };
 
@@ -190,9 +201,23 @@ export default function HapticTestPage() {
           </div>
         </div>
 
+        {/* iOS Safari 전용 안내 */}
+        {/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).webkit?.messageHandlers?.smapIos && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="text-sm text-blue-800">
+              <p className="font-semibold mb-1">📱 iOS Safari 모드 감지됨</p>
+              <p className="text-xs">
+                네이티브 햅틱 대신 시각적 피드백과 바이브레이션으로 햅틱을 시뮬레이션합니다.
+                버튼을 누르면 버튼이 살짝 축소되는 효과를 확인할 수 있습니다.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* 도움말 */}
         <div className="text-xs text-gray-500 text-center">
           <p>💡 팁: iOS 실제 기기에서 사운드가 꺼져있어도 햅틱은 작동합니다.</p>
+          <p>📱 iOS Safari: 시각적 피드백 + 바이브레이션으로 햅틱 효과 제공</p>
           <p>🔧 문제가 있다면 개발자 콘솔을 확인해보세요.</p>
         </div>
       </div>

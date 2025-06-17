@@ -29,16 +29,36 @@ const getCurrentPageInfo = () => {
 };
 
 /**
- * iOS 환경 감지
+ * iOS 환경 감지 (강화 버전)
  */
 const detectIOSEnvironment = () => {
-  if (typeof window === 'undefined') return { isIOS: false, hasWebKit: false, hasHandler: false };
+  if (typeof window === 'undefined') return { 
+    isIOS: false, 
+    hasWebKit: false, 
+    hasHandler: false, 
+    isIOSApp: false, 
+    isIOSBrowser: false,
+    supportsTouchAPI: false,
+    supportsVibration: false
+  };
   
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const hasWebKit = !!(window as any).webkit;
   const hasHandler = !!(window as any).webkit?.messageHandlers?.smapIos;
+  const isIOSApp = isIOS && hasHandler;
+  const isIOSBrowser = isIOS && !hasHandler;
+  const supportsTouchAPI = 'ontouchstart' in window;
+  const supportsVibration = 'vibrate' in navigator;
   
-  return { isIOS, hasWebKit, hasHandler };
+  return { 
+    isIOS, 
+    hasWebKit, 
+    hasHandler, 
+    isIOSApp, 
+    isIOSBrowser,
+    supportsTouchAPI,
+    supportsVibration
+  };
 };
 
 /**
@@ -65,6 +85,58 @@ const sendLogToiOS = (level: 'info' | 'error' | 'warning', message: string, data
 };
 
 /**
+ * iOS Safari용 햅틱 시뮬레이션 (시각적 + 사운드 피드백)
+ */
+const triggerIOSSafariHaptic = (type: HapticFeedbackType) => {
+  // 1. 버튼 시각적 피드백
+  const activeElement = document.activeElement as HTMLElement;
+  if (activeElement) {
+    activeElement.style.transform = 'scale(0.95)';
+    activeElement.style.transition = 'transform 0.1s ease';
+    
+    setTimeout(() => {
+      activeElement.style.transform = '';
+      activeElement.style.transition = '';
+    }, 100);
+  }
+
+  // 2. 웹 바이브레이션 API (iOS에서 제한적이지만 시도)
+  const vibrationPattern = getVibrationPattern(type);
+  if ('vibrate' in navigator) {
+    try {
+      navigator.vibrate(vibrationPattern);
+    } catch (e) {
+      // iOS에서 바이브레이션이 차단되어도 무시
+    }
+  }
+
+  // 3. 터치 이벤트 시뮬레이션 (매우 짧은 터치)
+  try {
+    if ('ontouchstart' in window && activeElement) {
+      const touchEvent = new TouchEvent('touchstart', {
+        bubbles: true,
+        cancelable: true,
+        touches: []
+      });
+      activeElement.dispatchEvent(touchEvent);
+      
+      setTimeout(() => {
+        const touchEndEvent = new TouchEvent('touchend', {
+          bubbles: true,
+          cancelable: true,
+          touches: []
+        });
+        activeElement.dispatchEvent(touchEndEvent);
+      }, 50);
+    }
+  } catch (e) {
+    // 터치 이벤트 생성 실패 시 무시
+  }
+
+  console.log(`📱 [HAPTIC] iOS Safari 햅틱 시뮬레이션: ${type} (시각적 피드백)`);
+};
+
+/**
  * 햅틱 피드백 실행 함수 (통합 및 간소화)
  * @param type 햅틱 피드백 타입
  * @param description 로그용 설명
@@ -77,7 +149,7 @@ export const triggerHapticFeedback = (
 ) => {
   try {
     const pageInfo = getCurrentPageInfo();
-    const { isIOS, hasWebKit, hasHandler } = detectIOSEnvironment();
+    const env = detectIOSEnvironment();
     
     // 로그 메시지 구성
     const logContext = {
@@ -86,14 +158,14 @@ export const triggerHapticFeedback = (
       page: pageInfo.pageName,
       fullPath: pageInfo.pathname,
       context: context || {},
-      environment: hasHandler ? 'iOS WebView' : isIOS ? 'iOS Browser' : 'Web Browser'
+      environment: env.isIOSApp ? 'iOS App' : env.isIOSBrowser ? 'iOS Safari' : 'Web Browser'
     };
     
     // 콘솔 로그 (항상 표시)
     console.log(`🎮 [HAPTIC] ${type.toUpperCase()} | ${pageInfo.pageName} | ${description || '액션'}`);
     
-    if (hasHandler) {
-      // 🔥 iOS 네이티브 햅틱 피드백 (단순 방식 - 더 안정적)
+    if (env.hasHandler) {
+      // 🔥 iOS 네이티브 햅틱 피드백 (앱 내 WebView)
       try {
         const hapticMessage = {
           type: 'haptic',
@@ -107,17 +179,19 @@ export const triggerHapticFeedback = (
         
       } catch (iosError) {
         console.error('❌ [HAPTIC] iOS 메시지 전송 실패:', iosError);
-        
-        // 백업: 웹 바이브레이션
-        fallbackToWebVibration(type);
+        fallbackToWebVibration(type, env);
       }
-    } else if (isIOS) {
-      // iOS이지만 WebKit 핸들러가 없는 경우
-      console.log(`⚠️ [HAPTIC] iOS 환경이지만 WebKit 핸들러 없음 | WebKit: ${hasWebKit}`);
-      fallbackToWebVibration(type);
+    } else if (env.isIOSBrowser) {
+      // 📱 iOS Safari 브라우저 - 특별한 햅틱 시뮬레이션
+      console.log(`📱 [HAPTIC] iOS Safari 감지 - 향상된 햅틱 시뮬레이션 실행: ${type}`);
+      triggerIOSSafariHaptic(type);
+    } else if (env.isIOS) {
+      // 기타 iOS 환경
+      console.log(`⚠️ [HAPTIC] iOS 환경이지만 핸들러 없음 | WebKit: ${env.hasWebKit}`);
+      fallbackToWebVibration(type, env);
     } else {
       // 웹 브라우저 바이브레이션 API 사용
-      fallbackToWebVibration(type);
+      fallbackToWebVibration(type, env);
     }
     
     // 개발 환경에서 추가 디버그 정보
@@ -127,9 +201,13 @@ export const triggerHapticFeedback = (
         '페이지': pageInfo.pageName,
         '설명': description || '없음',
         '환경': logContext.environment,
-        'iOS': isIOS,
-        'WebKit': hasWebKit,
-        'Handler': hasHandler
+        'iOS': env.isIOS,
+        'iOS App': env.isIOSApp,
+        'iOS Safari': env.isIOSBrowser,
+        'WebKit': env.hasWebKit,
+        'Handler': env.hasHandler,
+        '터치 지원': env.supportsTouchAPI,
+        '바이브레이션': env.supportsVibration
       });
     }
     
@@ -141,15 +219,36 @@ export const triggerHapticFeedback = (
 };
 
 /**
- * 웹 바이브레이션 백업 함수
+ * 웹 바이브레이션 백업 함수 (강화 버전)
  */
-const fallbackToWebVibration = (type: HapticFeedbackType) => {
-  if ('vibrate' in navigator) {
+const fallbackToWebVibration = (type: HapticFeedbackType, env: any) => {
+  if (env.supportsVibration) {
     const vibrationPattern = getVibrationPattern(type);
-    navigator.vibrate(vibrationPattern);
-    console.log(`📳 [HAPTIC] 웹 바이브레이션: ${vibrationPattern}ms`);
+    
+    // 안드로이드에서는 일반 바이브레이션
+    if (!env.isIOS) {
+      navigator.vibrate(vibrationPattern);
+      console.log(`📳 [HAPTIC] 웹 바이브레이션: ${vibrationPattern}ms`);
+    } else {
+      // iOS에서는 바이브레이션이 제한적이므로 시각적 피드백도 추가
+      try {
+        navigator.vibrate(vibrationPattern);
+        console.log(`📳 [HAPTIC] iOS 웹 바이브레이션 시도: ${vibrationPattern}ms`);
+      } catch (e) {
+        console.log(`⚠️ [HAPTIC] iOS 바이브레이션 차단됨, 시각적 피드백만 사용`);
+      }
+      
+      // iOS Safari에서 시각적 피드백도 함께 제공
+      triggerIOSSafariHaptic(type);
+    }
   } else {
-    console.log(`⚠️ [HAPTIC] 햅틱 미지원 환경`);
+    if (env.isIOS) {
+      // iOS에서 바이브레이션이 지원되지 않으면 시각적 피드백만
+      console.log(`📱 [HAPTIC] iOS 시각적 햅틱 시뮬레이션: ${type}`);
+      triggerIOSSafariHaptic(type);
+    } else {
+      console.log(`⚠️ [HAPTIC] 햅틱 미지원 환경`);
+    }
   }
 };
 
