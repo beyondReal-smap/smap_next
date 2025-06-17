@@ -76,9 +76,28 @@ export default function SignInPage() {
   // 에러 모달 표시 중 모든 useEffect 차단 플래그
   const blockAllEffectsRef = useRef(false);
   
+  // 핸들러 모니터링 interval 참조
+  const handlerMonitorRef = useRef<NodeJS.Timeout | null>(null);
+  
   // 🔒 컴포넌트 재마운트 방지 플래그들
   const componentMountedRef = useRef(false);
   const preventRemountRef = useRef(false);
+
+  // 🔍 핸들러 모니터링 useEffect (최우선)
+  useEffect(() => {
+    console.log('🔍 [HANDLER MONITOR] 핸들러 모니터링 시작');
+    
+    // 핸들러 모니터링 시작
+    handlerMonitorRef.current = monitorHandlerStatus();
+    
+    // 컴포넌트 언마운트 시 정리
+    return () => {
+      if (handlerMonitorRef.current) {
+        clearInterval(handlerMonitorRef.current);
+        console.log('🔍 [HANDLER MONITOR] 핸들러 모니터링 정리 완료');
+      }
+    };
+  }, []); // 의존성 없음 - 페이지 로드 시 한 번만 실행
   
   // 네비게이션 차단 이벤트 리스너 참조
   const navigationListenersRef = useRef<{
@@ -136,21 +155,132 @@ export default function SignInPage() {
     return false;
   };
 
+  // 🔍 실시간 핸들러 모니터링
+  const monitorHandlerStatus = () => {
+    const checkHandlers = () => {
+      const webkit = (window as any).webkit;
+      const hasWebkit = !!webkit;
+      const hasMessageHandlers = !!webkit?.messageHandlers;
+      const hasSmapIos = !!webkit?.messageHandlers?.smapIos;
+      const hasNativeCheck = typeof (window as any).SMAP_CHECK_HANDLERS === 'function';
+      const hasForceHaptic = typeof (window as any).SMAP_FORCE_HAPTIC === 'function';
+      
+      console.log(`🔍 [HANDLER MONITOR] 핸들러 상태 실시간 체크:`, {
+        hasWebkit,
+        hasMessageHandlers,
+        hasSmapIos,
+        hasNativeCheck,
+        hasForceHaptic,
+        userAgent: navigator.userAgent.substring(0, 30) + '...',
+        timestamp: new Date().toISOString()
+      });
+      
+      // 네이티브 체크 함수가 있으면 호출
+      if (hasNativeCheck) {
+        try {
+          const nativeResult = (window as any).SMAP_CHECK_HANDLERS();
+          console.log(`🔍 [NATIVE CHECK] 네이티브 핸들러 확인 결과:`, nativeResult);
+        } catch (e) {
+          console.warn(`⚠️ [NATIVE CHECK] 네이티브 확인 실패:`, e);
+        }
+      }
+      
+      return hasSmapIos;
+    };
+    
+    // 즉시 체크
+    checkHandlers();
+    
+    // 1초마다 체크 (최대 10번)
+    let checkCount = 0;
+    const interval = setInterval(() => {
+      checkCount++;
+      const hasHandler = checkHandlers();
+      
+      if (hasHandler) {
+        console.log(`✅ [HANDLER MONITOR] 핸들러 발견! (${checkCount}번째 시도)`);
+        clearInterval(interval);
+        
+        // 핸들러 발견 시 즉시 테스트 햅틱 전송
+        testHapticWithHandler();
+      } else if (checkCount >= 10) {
+        console.log(`❌ [HANDLER MONITOR] 10초 후에도 핸들러 없음`);
+        clearInterval(interval);
+      }
+    }, 1000);
+    
+    return interval;
+  };
+
+  // 🧪 핸들러 발견 시 햅틱 테스트
+  const testHapticWithHandler = () => {
+    console.log('🧪 [HAPTIC TEST] 핸들러 발견! 햅틱 테스트 시작');
+    
+    try {
+      // 직접 메시지 전송 테스트
+      const webkit = (window as any).webkit;
+      if (webkit?.messageHandlers?.smapIos) {
+        console.log('🧪 [HAPTIC TEST] 직접 메시지 전송 테스트');
+        webkit.messageHandlers.smapIos.postMessage({
+          type: 'haptic',
+          param: 'success'
+        });
+        
+        webkit.messageHandlers.smapIos.postMessage({
+          type: 'jsLog',
+          param: JSON.stringify({
+            level: 'info',
+            message: '[HAPTIC TEST] 웹에서 테스트 햅틱 요청',
+            data: { test: true, timestamp: Date.now() }
+          })
+        });
+      }
+      
+      // triggerHapticFeedback도 테스트
+      triggerHapticFeedback(HapticFeedbackType.SUCCESS, '핸들러 발견 테스트', { 
+        component: 'signin', 
+        action: 'handler-detected-test' 
+      });
+      
+    } catch (error) {
+      console.error('🧪 [HAPTIC TEST] 햅틱 테스트 실패:', error);
+    }
+  };
+
   // 🧪 햅틱 테스트 함수 (개발용)
   const testHapticFeedback = () => {
-    console.log('🧪 [HAPTIC TEST] 햅틱 테스트 시작');
-    console.log('🧪 [HAPTIC TEST] iOS WebView 확인:', !!(window as any).webkit?.messageHandlers?.smapIos);
-    console.log('🧪 [HAPTIC TEST] hapticSuccess 함수 존재:', typeof (window as any).hapticSuccess);
+    console.log('🧪 [HAPTIC TEST] 수동 햅틱 테스트 시작');
     
-    // 직접 햅틱 함수 호출 테스트
+    // 현재 상태 로그
+    const webkit = (window as any).webkit;
+    console.log('🧪 [HAPTIC TEST] 현재 WebKit 상태:', {
+      hasWebkit: !!webkit,
+      hasMessageHandlers: !!webkit?.messageHandlers,
+      hasSmapIos: !!webkit?.messageHandlers?.smapIos,
+      hasForceHaptic: typeof (window as any).SMAP_FORCE_HAPTIC === 'function'
+    });
+    
+    // 여러 방법으로 햅틱 테스트
     try {
-      if (typeof (window as any).hapticSuccess === 'function') {
-        console.log('🧪 [HAPTIC TEST] 직접 햅틱 함수 호출');
-        (window as any).hapticSuccess();
-      } else {
-        console.log('🧪 [HAPTIC TEST] triggerHapticFeedback 유틸 사용');
-        triggerHapticFeedback(HapticFeedbackType.SUCCESS, '햅틱 테스트', { component: 'signin', action: 'test' });
+      // 1. 강제 네이티브 함수 시도
+      if (typeof (window as any).SMAP_FORCE_HAPTIC === 'function') {
+        console.log('🧪 [HAPTIC TEST] 강제 네이티브 함수 시도');
+        (window as any).SMAP_FORCE_HAPTIC('success');
       }
+      
+      // 2. 직접 메시지 전송 시도  
+      if (webkit?.messageHandlers?.smapIos) {
+        console.log('🧪 [HAPTIC TEST] 직접 메시지 전송 시도');
+        webkit.messageHandlers.smapIos.postMessage({ type: 'haptic', param: 'success' });
+      }
+      
+      // 3. triggerHapticFeedback 유틸 시도
+      console.log('🧪 [HAPTIC TEST] triggerHapticFeedback 유틸 시도');
+      triggerHapticFeedback(HapticFeedbackType.SUCCESS, '수동 햅틱 테스트', { 
+        component: 'signin', 
+        action: 'manual-test' 
+      });
+      
     } catch (error) {
       console.error('🧪 [HAPTIC TEST] 햅틱 테스트 실패:', error);
     }
@@ -2273,6 +2403,243 @@ export default function SignInPage() {
   //   );
   // }
 
+  // 🔬 상세 햅틱 디버깅 함수들 추가
+  const runDetailedHapticDebug = () => {
+    console.log('🔬 [HAPTIC DEBUG] ===== 상세 햅틱 디버깅 시작 =====');
+    sendLogToiOS('info', '[HAPTIC DEBUG] 상세 햅틱 디버깅 시작', { timestamp: Date.now() });
+    
+    // 1. 환경 정보 수집
+    const envInfo = {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent),
+      hasWebKit: !!(window as any).webkit,
+      hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
+      availableHandlers: (window as any).webkit?.messageHandlers ? 
+        Object.keys((window as any).webkit.messageHandlers) : [],
+      hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
+      hasNativeFunctions: {
+        SMAP_FORCE_HAPTIC: typeof (window as any).SMAP_FORCE_HAPTIC === 'function',
+        SMAP_CHECK_HANDLERS: typeof (window as any).SMAP_CHECK_HANDLERS === 'function'
+      }
+    };
+    
+    console.log('🔬 [HAPTIC DEBUG] 환경 정보:', envInfo);
+    sendLogToiOS('info', '[HAPTIC DEBUG] 환경 정보', envInfo);
+    
+    // 2. 각 햅틱 타입별 테스트
+    const hapticTypes = ['success', 'warning', 'error', 'light', 'medium', 'heavy'];
+    
+    hapticTypes.forEach((type, index) => {
+      setTimeout(() => {
+        console.log(`🔬 [HAPTIC DEBUG] ${type.toUpperCase()} 햅틱 테스트 시작`);
+        sendLogToiOS('info', `[HAPTIC DEBUG] ${type.toUpperCase()} 햅틱 테스트`, { 
+          type, 
+          testIndex: index + 1,
+          totalTests: hapticTypes.length 
+        });
+        
+        // 3가지 방법으로 동시 시도
+        testAllHapticMethods(type as HapticFeedbackType);
+        
+      }, index * 2000); // 2초 간격
+    });
+  };
+  
+  const testAllHapticMethods = (type: HapticFeedbackType) => {
+    const webkit = (window as any).webkit;
+    const results = {
+      nativeFunction: false,
+      directMessage: false,
+      utilFunction: false,
+      errors: [] as string[]
+    };
+    
+    // 방법 1: 네이티브 강제 함수
+    try {
+      if (typeof (window as any).SMAP_FORCE_HAPTIC === 'function') {
+        console.log(`🔬 [METHOD 1] 네이티브 강제 함수 시도: ${type}`);
+        const result = (window as any).SMAP_FORCE_HAPTIC(type);
+        results.nativeFunction = !!result;
+        sendLogToiOS('info', `[METHOD 1] 네이티브 강제 함수 결과`, { type, result });
+      }
+         } catch (error) {
+       const errorMsg = `네이티브 함수 에러: ${error}`;
+       results.errors.push(errorMsg);
+       console.error(`🔬 [METHOD 1] ${errorMsg}`);
+       sendLogToiOS('error', `[METHOD 1] ${errorMsg}`, { type, error: String(error) });
+     }
+    
+    // 방법 2: 직접 메시지 전송
+    try {
+      if (webkit?.messageHandlers?.smapIos) {
+        console.log(`🔬 [METHOD 2] 직접 메시지 전송: ${type}`);
+        webkit.messageHandlers.smapIos.postMessage({
+          type: 'haptic',
+          param: type,
+          debug: true,
+          timestamp: Date.now()
+        });
+        results.directMessage = true;
+        sendLogToiOS('info', `[METHOD 2] 직접 메시지 전송 완료`, { type });
+      }
+         } catch (error) {
+       const errorMsg = `직접 메시지 에러: ${error}`;
+       results.errors.push(errorMsg);
+       console.error(`🔬 [METHOD 2] ${errorMsg}`);
+       sendLogToiOS('error', `[METHOD 2] ${errorMsg}`, { type, error: String(error) });
+     }
+    
+    // 방법 3: triggerHapticFeedback 유틸
+    try {
+      console.log(`🔬 [METHOD 3] triggerHapticFeedback 유틸: ${type}`);
+      triggerHapticFeedback(type, `상세 디버그 테스트 - ${type}`, { 
+        component: 'signin-debug', 
+        action: 'detailed-test',
+        debugMode: true
+      });
+      results.utilFunction = true;
+      sendLogToiOS('info', `[METHOD 3] triggerHapticFeedback 완료`, { type });
+         } catch (error) {
+       const errorMsg = `유틸 함수 에러: ${error}`;
+       results.errors.push(errorMsg);
+       console.error(`🔬 [METHOD 3] ${errorMsg}`);
+       sendLogToiOS('error', `[METHOD 3] ${errorMsg}`, { type, error: String(error) });
+     }
+    
+    // 결과 종합
+    const summary = {
+      type,
+      successful: results.nativeFunction || results.directMessage || results.utilFunction,
+      methods: results,
+      timestamp: Date.now()
+    };
+    
+    console.log(`🔬 [HAPTIC DEBUG] ${type} 테스트 결과:`, summary);
+    sendLogToiOS('info', `[HAPTIC DEBUG] ${type} 테스트 결과`, summary);
+  };
+  
+  // 🎯 실시간 핸들러 상태 모니터링
+  const startHandlerMonitoring = () => {
+    console.log('🎯 [HANDLER MONITOR] 실시간 모니터링 시작');
+    sendLogToiOS('info', '[HANDLER MONITOR] 실시간 모니터링 시작');
+    
+    const monitor = () => {
+      const webkit = (window as any).webkit;
+      const status = {
+        timestamp: new Date().toISOString(),
+        webkit: !!webkit,
+        messageHandlers: !!webkit?.messageHandlers,
+        smapIos: !!webkit?.messageHandlers?.smapIos,
+        availableHandlers: webkit?.messageHandlers ? 
+          Object.keys(webkit.messageHandlers) : [],
+        nativeFunctions: {
+          SMAP_FORCE_HAPTIC: typeof (window as any).SMAP_FORCE_HAPTIC,
+          SMAP_CHECK_HANDLERS: typeof (window as any).SMAP_CHECK_HANDLERS
+        }
+      };
+      
+      console.log('🎯 [HANDLER MONITOR] 현재 상태:', status);
+      sendLogToiOS('info', '[HANDLER MONITOR] 핸들러 상태', status);
+      
+      // 네이티브 체크 함수가 있으면 호출
+      if (typeof (window as any).SMAP_CHECK_HANDLERS === 'function') {
+        try {
+          const nativeCheck = (window as any).SMAP_CHECK_HANDLERS();
+          console.log('🎯 [NATIVE CHECK] 네이티브 핸들러 체크:', nativeCheck);
+          sendLogToiOS('info', '[NATIVE CHECK] 네이티브 핸들러 체크', nativeCheck);
+                 } catch (e) {
+           console.error('🎯 [NATIVE CHECK] 에러:', e);
+           sendLogToiOS('error', '[NATIVE CHECK] 체크 실패', { error: String(e) });
+         }
+      }
+      
+      return status;
+    };
+    
+    // 즉시 실행
+    monitor();
+    
+    // 5초마다 모니터링
+    const interval = setInterval(monitor, 5000);
+    
+    // 30초 후 자동 종료
+    setTimeout(() => {
+      clearInterval(interval);
+      console.log('🎯 [HANDLER MONITOR] 모니터링 종료');
+      sendLogToiOS('info', '[HANDLER MONITOR] 모니터링 종료');
+    }, 30000);
+    
+    return interval;
+  };
+  
+  // 🚨 긴급 햅틱 테스트 (모든 가능한 방법 동시 시도)
+  const emergencyHapticTest = () => {
+    console.log('🚨 [EMERGENCY HAPTIC] 긴급 햅틱 테스트 시작');
+    sendLogToiOS('warning', '[EMERGENCY HAPTIC] 긴급 햅틱 테스트 시작');
+    
+    const webkit = (window as any).webkit;
+    const allResults = [];
+    
+    // 1. 모든 가능한 핸들러에 메시지 전송
+    if (webkit?.messageHandlers) {
+      const handlerNames = ['smapIos', 'iosHandler', 'jsToNative', 'webViewHandler', 'nativeHandler'];
+      
+      handlerNames.forEach(handlerName => {
+        if (webkit.messageHandlers[handlerName]) {
+          try {
+            webkit.messageHandlers[handlerName].postMessage({
+              type: 'haptic',
+              param: 'heavy',
+              emergency: true,
+              source: 'emergency-test'
+            });
+            console.log(`🚨 [EMERGENCY] ${handlerName} 메시지 전송 성공`);
+            sendLogToiOS('info', `[EMERGENCY] ${handlerName} 성공`);
+            allResults.push(`${handlerName}: 성공`);
+          } catch (e) {
+            console.error(`🚨 [EMERGENCY] ${handlerName} 실패:`, e);
+            sendLogToiOS('error', `[EMERGENCY] ${handlerName} 실패`, { error: String(e) });
+            allResults.push(`${handlerName}: 실패`);
+          }
+        }
+      });
+    }
+    
+    // 2. window 이벤트 발생
+    try {
+      window.dispatchEvent(new CustomEvent('smap-emergency-haptic', { 
+        detail: { type: 'heavy', source: 'emergency-test' } 
+      }));
+      console.log('🚨 [EMERGENCY] window 이벤트 발생');
+      sendLogToiOS('info', '[EMERGENCY] window 이벤트 발생');
+      allResults.push('window 이벤트: 성공');
+    } catch (e) {
+      console.error('🚨 [EMERGENCY] window 이벤트 실패:', e);
+      allResults.push('window 이벤트: 실패');
+    }
+    
+    // 3. 글로벌 함수 시도
+    const globalFunctions = ['SMAP_FORCE_HAPTIC', 'iosHaptic', 'triggerHaptic', 'nativeHaptic'];
+    globalFunctions.forEach(funcName => {
+      try {
+        if (typeof (window as any)[funcName] === 'function') {
+          (window as any)[funcName]('heavy');
+          console.log(`🚨 [EMERGENCY] ${funcName} 함수 호출 성공`);
+          sendLogToiOS('info', `[EMERGENCY] ${funcName} 함수 성공`);
+          allResults.push(`${funcName}: 성공`);
+        }
+      } catch (e) {
+        console.error(`🚨 [EMERGENCY] ${funcName} 함수 실패:`, e);
+        allResults.push(`${funcName}: 실패`);
+      }
+    });
+    
+    // 결과 요약
+    console.log('🚨 [EMERGENCY] 테스트 결과:', allResults);
+    sendLogToiOS('info', '[EMERGENCY] 테스트 완료', { results: allResults });
+  };
+
   return (
     <motion.div 
       className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8"
@@ -2513,6 +2880,82 @@ export default function SignInPage() {
             </button>
           </div>
         </motion.div>
+
+        {/* 개발 환경 햅틱 테스트 버튼 */}
+        {process.env.NODE_ENV === 'development' && (
+          <motion.div 
+            className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              type: "spring",
+              stiffness: 300,
+              damping: 25,
+              delay: 0.65,
+              duration: 0.4
+            }}
+          >
+            <h3 className="text-sm font-medium text-yellow-800 mb-3">🧪 개발자 도구</h3>
+            <div className="space-y-2">
+              {/* 기본 햅틱 테스트 */}
+              <button
+                type="button"
+                onClick={testHapticFeedback}
+                className="w-full py-2 px-3 bg-yellow-500 text-white text-sm font-medium rounded-lg hover:bg-yellow-600 transition-colors"
+              >
+                🎮 기본 햅틱 테스트
+              </button>
+              
+              {/* 상세 햅틱 디버깅 */}
+              <button
+                type="button"
+                onClick={runDetailedHapticDebug}
+                className="w-full py-2 px-3 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                🔬 상세 햅틱 디버깅 (모든 타입)
+              </button>
+              
+              {/* 핸들러 모니터링 */}
+              <button
+                type="button"
+                onClick={startHandlerMonitoring}
+                className="w-full py-2 px-3 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors"
+              >
+                🎯 핸들러 실시간 모니터링 (30초)
+              </button>
+              
+              {/* 긴급 햅틱 테스트 */}
+              <button
+                type="button"
+                onClick={emergencyHapticTest}
+                className="w-full py-2 px-3 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
+              >
+                🚨 긴급 햅틱 테스트 (모든 방법)
+              </button>
+              
+              {/* 기존 시뮬레이터 버튼 */}
+              <button
+                type="button"
+                onClick={enableSimulatorMode}
+                className="w-full py-2 px-3 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
+              >
+                📱 시뮬레이터 모드 활성화
+              </button>
+            </div>
+            <div className="mt-3 p-2 bg-yellow-100 rounded text-xs text-yellow-700">
+              <p><strong>🎮 기본:</strong> 간단한 햅틱 테스트</p>
+              <p><strong>🔬 상세:</strong> 모든 햅틱 타입을 2초 간격으로 테스트</p>
+              <p><strong>🎯 모니터링:</strong> 핸들러 상태를 5초마다 체크</p>
+              <p><strong>🚨 긴급:</strong> 모든 가능한 방법으로 동시 햅틱 시도</p>
+              <p><strong>📱 시뮬레이터:</strong> Google 로그인 시뮬레이터 모드</p>
+              <div className="mt-2 pt-2 border-t border-yellow-300">
+                <p className="font-medium">📋 Xcode 로그 확인:</p>
+                <p>모든 테스트는 iOS 네이티브로 로그를 전송합니다.</p>
+                <p>Xcode Console에서 "[HAPTIC" 로 필터링하여 확인하세요.</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* 회원가입 링크 */}
         <motion.div 

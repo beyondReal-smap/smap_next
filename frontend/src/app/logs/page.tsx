@@ -5787,11 +5787,12 @@ export default function LogsPage() {
                       <div className="absolute w-full h-3 bg-gray-200 rounded-full top-1/2 transform -translate-y-1/2"></div>
                                              {/* 진행 표시 바 */}
                        <div 
-                         className={`absolute left-0 h-3 bg-blue-500 rounded-full pointer-events-none ${
+                         className={`absolute h-3 bg-blue-500 rounded-full pointer-events-none ${
                            isSliderDragging ? '' : 'transition-all duration-150 ease-out'
                          }`}
                          style={{ 
                            width: `${sliderValue}%`,
+                           left: '8px',
                            top: 'calc(50% + 6px)',
                            /* GPU 가속 최적화 */
                            transform: 'translateZ(0) translateY(-50%)',
@@ -5806,7 +5807,7 @@ export default function LogsPage() {
                            isSliderDragging ? 'scale-110' : 'transition-all duration-150 ease-out hover:scale-105'
                          }`}
                          style={{ 
-                           left: `${sliderValue}%`,
+                           left: `calc(${sliderValue}% + 8px)`,
                            top: 'calc(50% + 6px)',
                            pointerEvents: 'auto',
                            /* GPU 가속 최적화 */
