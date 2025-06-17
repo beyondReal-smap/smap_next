@@ -152,7 +152,7 @@ const sendHapticToWebView = (type: HapticFeedbackType): boolean => {
 };
 
 /**
- * iOS 환경 감지 (강화 버전)
+ * iOS 환경 감지 (강화 버전) - WebView vs Safari 정확한 구분
  */
 const detectIOSEnvironment = () => {
   if (typeof window === 'undefined') return { 
@@ -171,11 +171,26 @@ const detectIOSEnvironment = () => {
   const hasWebKit = !!(window as any).webkit;
   const hasHandler = !!(window as any).webkit?.messageHandlers?.smapIos;
   const webViewDebug = debugWebViewHandlers();
-  const isWebView = hasWebKit && (webViewDebug?.totalHandlers || 0) > 0;
-  const isIOSApp = isIOS && hasHandler;
-  const isIOSBrowser = isIOS && !isWebView;
+  
+  // WebView vs Safari 정확한 구분
+  const isWebView = hasWebKit && hasHandler; // 핸들러가 있으면 WebView
+  const isIOSApp = isIOS && hasHandler; // 핸들러가 있으면 앱 내 WebView
+  const isIOSBrowser = isIOS && hasWebKit && !hasHandler; // WebKit 있지만 핸들러 없으면 Safari
+  
   const supportsTouchAPI = 'ontouchstart' in window;
   const supportsVibration = 'vibrate' in navigator;
+  
+  // 디버그 로깅
+  console.log(`🔍 [HAPTIC-ENV] 환경 감지:`, {
+    isIOS,
+    hasWebKit,
+    hasHandler,
+    isIOSApp,
+    isIOSBrowser,
+    isWebView,
+    totalHandlers: webViewDebug?.totalHandlers || 0,
+    availableHandlers: webViewDebug?.availableHandlers || []
+  });
   
   return { 
     isIOS, 
@@ -258,7 +273,10 @@ export const triggerHapticFeedback = (
     // 콘솔 로그 (항상 표시)
     console.log(`🎮 [HAPTIC] ${type.toUpperCase()} | ${pageInfo.pageName} | ${description || '액션'}`);
     
-    if (env.hasHandler) {
+    // 핸들러 존재 여부를 다시 한번 확인 (실시간)
+    const realtimeHasHandler = !!(window as any).webkit?.messageHandlers?.smapIos;
+    
+    if (realtimeHasHandler || env.hasHandler) {
       // 🔥 iOS 네이티브 햅틱 피드백 (앱 내 WebView)
       try {
         // 여러 형식으로 햅틱 메시지 전송 시도
@@ -321,6 +339,20 @@ export const triggerHapticFeedback = (
       } catch (iosError) {
         console.error('❌ [HAPTIC] iOS 네이티브 햅틱 전송 실패:', iosError);
         console.error('❌ [HAPTIC] 전송 시도한 형식들:', ['haptic + param', 'hapticFeedback + JSON', '직접 문자열']);
+        
+        // 핸들러 실패 시 다중 핸들러 시도
+        console.log(`🔄 [HAPTIC] 메인 핸들러 실패, 다중 핸들러 시도: ${type}`);
+        const fallbackSuccess = sendHapticToWebView(type);
+        if (!fallbackSuccess) {
+          fallbackToWebVibration(type, env);
+        }
+      }
+    } else if (env.hasWebKit && !env.hasHandler) {
+      // 🌐 WebKit은 있지만 핸들러가 없는 경우 (웹뷰일 가능성)
+      console.log(`🌐 [HAPTIC] WebKit 감지, 다중 핸들러 시도: ${type}`);
+      const success = sendHapticToWebView(type);
+      if (!success) {
+        console.log(`⚠️ [HAPTIC] WebKit 햅틱 전송 실패, 백업 방식 사용`);
         fallbackToWebVibration(type, env);
       }
     } else if (env.isWebView) {

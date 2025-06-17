@@ -142,11 +142,11 @@ class EnhancedWebViewController: UIViewController {
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         
-        // 🔐 App-Bound Domain 관련 설정 (iOS 14+)
+        // 🔐 App-Bound Domain 관련 설정 (iOS 14+) - 햅틱 동작을 위해 비활성화
         if #available(iOS 14.0, *) {
-            config.limitsNavigationsToAppBoundDomains = true
-            print("🔐 [WebView] App-Bound Domain 제한 활성화됨")
-            print("🔐 [WebView] 허용된 도메인: nextstep.smap.site, app2.smap.site, app.smap.site, smap.site, localhost")
+            config.limitsNavigationsToAppBoundDomains = false
+            print("🔐 [WebView] App-Bound Domain 제한 비활성화 (햅틱 기능 활성화)")
+            print("🔐 [WebView] 모든 도메인에서 JavaScript 실행 허용")
         }
         
         // 데이터 감지 설정

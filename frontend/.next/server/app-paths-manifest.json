@@ -1,6 +1,7 @@
 {
   "/icon/route": "app/icon/route.js",
   "/_not-found/page": "app/_not-found/page.js",
+  "/api/members/[id]/route": "app/api/members/[id]/route.js",
   "/logs/page": "app/logs/page.js",
   "/location/page": "app/location/page.js"
 }
