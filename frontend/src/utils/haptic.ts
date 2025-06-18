@@ -586,6 +586,26 @@ export const hapticFeedback = {
   backButton: (context?: any) => triggerHapticFeedback(HapticFeedbackType.LIGHT, '뒤로가기', { action: 'back_button', ...context }),
   menuSelect: (context?: any) => triggerHapticFeedback(HapticFeedbackType.LIGHT, '메뉴 선택', { action: 'menu_select', ...context }),
   
+  // 홈 사이드바 전용 햅틱 (강화된 버전)
+  homeSidebarOpen: (context?: any) => {
+    console.log('🏠🔷 [HAPTIC-HOME] 사이드바 열기 - Medium 햅틱 피드백');
+    return triggerHapticFeedback(HapticFeedbackType.MEDIUM, '홈 사이드바 열기', { 
+      action: 'home_sidebar_open', 
+      component: 'home-sidebar',
+      state: 'opening',
+      ...context 
+    });
+  },
+  homeSidebarClose: (context?: any) => {
+    console.log('🏠💡 [HAPTIC-HOME] 사이드바 닫기 - Light 햅틱 피드백');
+    return triggerHapticFeedback(HapticFeedbackType.LIGHT, '홈 사이드바 닫기', { 
+      action: 'home_sidebar_close', 
+      component: 'home-sidebar',
+      state: 'closing',
+      ...context 
+    });
+  },
+  
   // 데이터 로딩 관련
   dataLoadStart: (context?: any) => triggerHapticFeedback(HapticFeedbackType.LIGHT, '데이터 로딩 시작', { action: 'data_load_start', ...context }),
   dataLoadComplete: (context?: any) => triggerHapticFeedback(HapticFeedbackType.SUCCESS, '데이터 로딩 완료', { action: 'data_load_complete', ...context }),

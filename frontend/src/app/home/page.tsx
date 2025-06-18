@@ -42,7 +42,7 @@ import notificationService from '@/services/notificationService';
 import { 
     AllDayCheckEnum, ShowEnum, ScheduleAlarmCheckEnum, InCheckEnum, ScheduleCheckEnum 
 } from '../../types/enums';
-import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import { triggerHapticFeedback, HapticFeedbackType, hapticFeedback } from '@/utils/haptic';
 import DebugPanel from '../components/layout/DebugPanel';
 import LogParser from '../components/layout/LogParser';
 
@@ -4127,16 +4127,41 @@ export default function HomePage() {
     return stats;
   };
 
-    // 사이드바 토글 함수
+    // 사이드바 토글 함수 (강화된 햅틱 피드백)
     const toggleSidebar = () => {
-      setIsSidebarOpen(!isSidebarOpen);
+      const newState = !isSidebarOpen;
+      setIsSidebarOpen(newState);
+      
+      // 햅틱 피드백 - 전용 함수 사용
+      if (newState) {
+        // 사이드바 열릴 때 - Medium 햅틱 (전용 함수 사용)
+        hapticFeedback.homeSidebarOpen({
+          trigger: 'button-click',
+          page: 'home',
+          timestamp: Date.now()
+        });
+      } else {
+        // 사이드바 닫힐 때 - Light 햅틱 (전용 함수 사용)
+        hapticFeedback.homeSidebarClose({
+          trigger: 'button-click', 
+          page: 'home',
+          timestamp: Date.now()
+        });
+      }
     };
   
-    // 사이드바 외부 클릭 시 닫기
+    // 사이드바 외부 클릭 시 닫기 (강화된 햅틱 피드백)
     useEffect(() => {
       const handleSidebarClickOutside = (event: MouseEvent) => {
         if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
           setIsSidebarOpen(false);
+          
+          // 외부 클릭으로 사이드바 닫힐 때 햅틱 피드백 (전용 함수 사용)
+          hapticFeedback.homeSidebarClose({
+            trigger: 'outside-click',
+            page: 'home',
+            timestamp: Date.now()
+          });
         }
       };
   
