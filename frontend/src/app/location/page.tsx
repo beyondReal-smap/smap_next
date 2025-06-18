@@ -2067,7 +2067,7 @@ export default function LocationPage() {
         return;
       }
       
-      // geocoder 서브모듈 포함하여 로딩 (위치 검색 필요)
+      // geocoder 서브모듈 포함하여 로딩 (위치 검색 및 역지오코딩 포함)
       const script = document.createElement('script');
       script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEYS.NAVER_MAPS_CLIENT_ID}&submodules=geocoder`;
       script.async = true;
@@ -2432,7 +2432,7 @@ export default function LocationPage() {
                 
                 <div style="margin-bottom: 6px;">
                   <p style="margin: 0; font-size: 12px; color: #64748b;">
-                    📍 위치: <span style="color: #0113A3; font-weight: 500;">${lat?.toFixed(4)}, ${lng?.toFixed(4)}</span>
+                    📍 위치: <span id="first-member-address-${firstMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3;">주소 변환 중...</span>
                   </p>
                 </div>
                 <div>
@@ -2451,6 +2451,23 @@ export default function LocationPage() {
           setInfoWindow(memberInfoWindow);
           setIsFirstMemberSelectionComplete(true);
           console.log('[초기 InfoWindow] 첫 번째 멤버 InfoWindow 표시 완료:', firstMember.name);
+
+          // 주소 변환 및 업데이트 (비동기 처리)
+          if (lat && lng) {
+            getAddressFromCoordinates(lat, lng).then(address => {
+              const addressElement = document.getElementById(`first-member-address-${firstMember.id}`);
+              if (addressElement) {
+                addressElement.textContent = address;
+                console.log('[첫 번째 InfoWindow] 주소 업데이트 완료:', { member: firstMember.name, address });
+              }
+            }).catch(error => {
+              console.error('[첫 번째 InfoWindow] 주소 변환 실패:', error);
+              const addressElement = document.getElementById(`first-member-address-${firstMember.id}`);
+              if (addressElement) {
+                addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+              }
+            });
+          }
         }
       }
     }
@@ -2650,6 +2667,88 @@ export default function LocationPage() {
     return photoUrl ?? getDefaultImage(gender, index);
   };
 
+  // 네이버 맵 역지오코딩 API를 사용한 좌표 -> 주소 변환
+  const getAddressFromCoordinates = async (lat: number, lng: number): Promise<string> => {
+    try {
+      // 네이버 맵 Service가 로드될 때까지 대기 (최대 5초)
+      let retryCount = 0;
+      const maxRetries = 50; // 5초 (100ms * 50)
+      
+      while (!window.naver?.maps?.Service && retryCount < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retryCount++;
+      }
+      
+      if (!window.naver?.maps?.Service) {
+        console.warn('[getAddressFromCoordinates] 네이버 맵 Service 로드 타임아웃');
+        return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      }
+
+      return new Promise((resolve) => {
+        const coord = new window.naver.maps.LatLng(lat, lng);
+        
+        window.naver.maps.Service.reverseGeocode({
+          coords: coord,
+          orders: [
+            window.naver.maps.Service.OrderType.ADDR,
+            window.naver.maps.Service.OrderType.ROAD_ADDR
+          ].join(',')
+        }, (status: any, response: any) => {
+          if (status === window.naver.maps.Service.Status.ERROR) {
+            console.warn('[getAddressFromCoordinates] 역지오코딩 오류:', status);
+            resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+            return;
+          }
+
+          if (response.v2?.results?.length > 0) {
+            const result = response.v2.results[0];
+            
+            console.log('[getAddressFromCoordinates] 역지오코딩 응답:', result);
+            
+            // 네이버 맵 API 응답 구조에 맞게 수정
+            let address = '';
+            
+            if (result.name) {
+              // 도로명 주소가 있는 경우
+              address = result.name;
+            } else if (result.region) {
+              // 지번 주소 구성
+              const parts = [];
+              if (result.region.area1?.name) parts.push(result.region.area1.name);
+              if (result.region.area2?.name) parts.push(result.region.area2.name);
+              if (result.region.area3?.name) parts.push(result.region.area3.name);
+              if (result.region.area4?.name) parts.push(result.region.area4.name);
+              if (result.land?.name) parts.push(result.land.name);
+              if (result.land?.number1) parts.push(result.land.number1);
+              if (result.land?.number2) parts.push('-' + result.land.number2);
+              
+              address = parts.join(' ');
+            }
+            
+            // 주소가 비어있으면 좌표 표시
+            if (!address.trim()) {
+              address = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+            }
+            
+            console.log('[getAddressFromCoordinates] 주소 변환 성공:', {
+              coordinates: { lat, lng },
+              rawResult: result,
+              finalAddress: address
+            });
+            
+            resolve(address.trim());
+          } else {
+            console.warn('[getAddressFromCoordinates] 주소 결과 없음');
+            resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+          }
+        });
+      });
+    } catch (error) {
+      console.error('[getAddressFromCoordinates] 역지오코딩 에러:', error);
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  };
+
   // 지도에 그룹멤버 마커 표시 (깜빡임 방지 최적화)
   const updateMemberMarkers = (members: GroupMember[]) => {
     if (!map || !window.naver) {
@@ -2782,6 +2881,7 @@ export default function LocationPage() {
       const lat = parseCoordinate(selectedMember.mlt_lat) || parseCoordinate(selectedMember.location?.lat);
       const lng = parseCoordinate(selectedMember.mlt_long) || parseCoordinate(selectedMember.location?.lng);
 
+      // 주소 변환 시작 (비동기적으로 처리)
       const memberInfoWindow = new window.naver.maps.InfoWindow({
         content: `
           <style>
@@ -2851,7 +2951,7 @@ export default function LocationPage() {
             
             <div style="margin-bottom: 6px;">
               <p style="margin: 0; font-size: 12px; color: #64748b;">
-                📍 위치: <span style="color: #0113A3; font-weight: 500;">${lat?.toFixed(4)}, ${lng?.toFixed(4)}</span>
+                📍 위치: <span id="member-address-${selectedMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3;">주소 변환 중...</span>
               </p>
             </div>
             <div>
@@ -2870,6 +2970,23 @@ export default function LocationPage() {
       memberInfoWindow.open(map, selectedMarker);
       setInfoWindow(memberInfoWindow);
       console.log('[updateMemberMarkers] 자동 InfoWindow 표시 완료:', selectedMember.name);
+
+      // 주소 변환 및 업데이트 (비동기 처리)
+      if (lat && lng) {
+        getAddressFromCoordinates(lat, lng).then(address => {
+          const addressElement = document.getElementById(`member-address-${selectedMember.id}`);
+          if (addressElement) {
+            addressElement.textContent = address;
+            console.log('[updateMemberMarkers] 주소 업데이트 완료:', { member: selectedMember.name, address });
+          }
+        }).catch(error => {
+          console.error('[updateMemberMarkers] 주소 변환 실패:', error);
+          const addressElement = document.getElementById(`member-address-${selectedMember.id}`);
+          if (addressElement) {
+            addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+          }
+        });
+      }
     }
   };
 
