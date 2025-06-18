@@ -1,5 +1,41 @@
 import apiClient from './apiClient';
 
+// WebKit 환경 감지 유틸리티
+const isWebKit = () => {
+  if (typeof window === 'undefined') return false;
+  return !!(window as any).webkit || navigator.userAgent.includes('WebKit');
+};
+
+const isIOSWebView = () => {
+  if (typeof window === 'undefined') return false;
+  const webkit = (window as any).webkit;
+  return !!(webkit?.messageHandlers);
+};
+
+// WebKit 환경에서 최적화된 요청 설정
+const getWebKitOptimizedConfig = () => {
+  const isWebKitEnv = isWebKit();
+  const isIOSWebViewEnv = isIOSWebView();
+  
+  if (!isWebKitEnv) return {};
+  
+  const config: any = {
+    timeout: isIOSWebViewEnv ? 20000 : 25000, // WebKit에서 더 긴 타임아웃
+    headers: {
+      'X-WebKit-Request': 'true',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache'
+    }
+  };
+  
+  if (isIOSWebViewEnv) {
+    config.headers['X-iOS-WebView'] = 'true';
+    config.headers['X-Requested-With'] = 'SMAP-iOS-WebView';
+  }
+  
+  return config;
+};
+
 // 기본 위치 로그 인터페이스
 export interface LocationLog {
   log_idx: number;
@@ -459,8 +495,13 @@ class MemberLocationLogService {
     ];
 
     try {
+      const isWebKitEnv = isWebKit();
+      const isIOSWebViewEnv = isIOSWebView();
+      
       console.log('[MemberLocationLogService] 체류시간 분석 조회 시작:', { 
-        memberId, date, minSpeed, maxAccuracy, minDuration 
+        memberId, date, minSpeed, maxAccuracy, minDuration,
+        isWebKit: isWebKitEnv,
+        isIOSWebView: isIOSWebViewEnv
       });
       
       const params = new URLSearchParams({
@@ -471,7 +512,10 @@ class MemberLocationLogService {
       });
       
       const url = `location-logs/stay-times/${memberId}?${params}`;
-      const response = await apiClient.get(url);
+      
+      // WebKit 환경에서 최적화된 설정 적용
+      const webkitConfig = getWebKitOptimizedConfig();
+      const response = await apiClient.get(url, webkitConfig);
 
       if (response.status < 200 || response.status >= 300) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -545,8 +589,13 @@ class MemberLocationLogService {
     ];
 
     try {
+      const isWebKitEnv = isWebKit();
+      const isIOSWebViewEnv = isIOSWebView();
+      
       console.log('[MemberLocationLogService] 지도 마커 데이터 조회 시작:', { 
-        memberId, date, minSpeed, maxAccuracy 
+        memberId, date, minSpeed, maxAccuracy,
+        isWebKit: isWebKitEnv,
+        isIOSWebView: isIOSWebViewEnv
       });
       
       const params = new URLSearchParams({
@@ -556,7 +605,10 @@ class MemberLocationLogService {
       });
       
       const url = `/member-location-logs/${memberId}/map-markers?${params}`;
-      const response = await apiClient.get(url);
+      
+      // WebKit 환경에서 최적화된 설정 적용
+      const webkitConfig = getWebKitOptimizedConfig();
+      const response = await apiClient.get(url, webkitConfig);
 
       if (response.status < 200 || response.status >= 300) {
         throw new Error(`HTTP error! status: ${response.status}`);

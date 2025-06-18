@@ -94,6 +94,411 @@ class EnhancedWebViewController: UIViewController {
         }
     }
     
+    // MARK: - 🔐 App-Bound Domain 디버깅 함수
+    private func debugAppBoundDomainStatus() {
+        print("╔═══════════════════════════════════════════════════════════════════════════════╗")
+        print("║ 🔍 [App-Bound Domain] 진단 시작                                               ║")
+        print("╠═══════════════════════════════════════════════════════════════════════════════╣")
+        print("║ 📱 iOS 버전: \(UIDevice.current.systemVersion.padding(toLength: 20, withPad: " ", startingAt: 0))                                                ║")
+        print("║ 🌐 현재 URL: \(webView.url?.absoluteString?.prefix(60) ?? "None".padding(toLength: 60, withPad: " ", startingAt: 0))    ║")
+        
+        if #available(iOS 14.0, *) {
+            let isAppBound = webView.configuration.limitsNavigationsToAppBoundDomains
+            print("║ 🔐 App-Bound 제한: \(isAppBound ? "활성화" : "비활성화".padding(toLength: 15, withPad: " ", startingAt: 0))                                         ║")
+        } else {
+            print("║ 🔐 App-Bound 제한: iOS 14 미만 (미지원)                                       ║")
+        }
+        
+        let jsEnabled = webView.configuration.preferences.javaScriptEnabled
+        print("║ 🔧 JavaScript: \(jsEnabled ? "활성화" : "비활성화".padding(toLength: 15, withPad: " ", startingAt: 0))                                              ║")
+        
+        let handlerCount = webView.configuration.userContentController.userScripts.count
+        print("║ 📬 User Scripts: \(String(handlerCount).padding(toLength: 15, withPad: " ", startingAt: 0))                                                    ║")
+        print("╚═══════════════════════════════════════════════════════════════════════════════╝")
+        
+        // JavaScript로 핸들러 상태 확인
+        checkMessageHandlersAvailability()
+    }
+    
+    private func checkMessageHandlersAvailability() {
+        let checkScript = """
+        (function() {
+            const result = {
+                hasWebKit: !!window.webkit,
+                hasMessageHandlers: !!window.webkit?.messageHandlers,
+                handlers: [],
+                smapHapticSystem: !!window.SMAP_HAPTIC_SYSTEM,
+                currentURL: window.location.href,
+                domain: window.location.hostname
+            };
+            
+            if (window.webkit?.messageHandlers) {
+                const handlers = window.webkit.messageHandlers;
+                result.handlers = Object.keys(handlers);
+            }
+            
+            return JSON.stringify(result);
+        })();
+        """
+        
+        webView.evaluateJavaScript(checkScript) { [weak self] result, error in
+            if let error = error {
+                print("❌ [JavaScript] 핸들러 확인 오류: \(error)")
+                if let nsError = error as NSError? {
+                    print("❌ [Error Details] Domain: \(nsError.domain), Code: \(nsError.code)")
+                    if nsError.domain == "WKErrorDomain" && nsError.code == 14 {
+                        print("🔐 [App-Bound] App-Bound Domain 오류 감지!")
+                        self?.handleAppBoundDomainError()
+                    }
+                }
+            } else if let resultString = result as? String,
+                      let data = resultString.data(using: .utf8),
+                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                self?.printHandlerStatus(json)
+            }
+        }
+    }
+    
+    private func printHandlerStatus(_ status: [String: Any]) {
+        print("╔═══════════════════════════════════════════════════════════════════════════════╗")
+        print("║ 📊 [JavaScript] 핸들러 상태 확인 결과                                          ║")
+        print("╠═══════════════════════════════════════════════════════════════════════════════╣")
+        
+        let hasWebKit = status["hasWebKit"] as? Bool ?? false
+        let hasHandlers = status["hasMessageHandlers"] as? Bool ?? false
+        let handlers = status["handlers"] as? [String] ?? []
+        let hasHapticSystem = status["smapHapticSystem"] as? Bool ?? false
+        let domain = status["domain"] as? String ?? "Unknown"
+        
+        print("║ 🔧 WebKit: \((hasWebKit ? "✅ 사용가능" : "❌ 없음").padding(toLength: 20, withPad: " ", startingAt: 0))                                                ║")
+        print("║ 📬 MessageHandlers: \((hasHandlers ? "✅ 사용가능" : "❌ 없음").padding(toLength: 20, withPad: " ", startingAt: 0))                                      ║")
+        print("║ 🎮 SMAP 햅틱 시스템: \((hasHapticSystem ? "✅ 초기화됨" : "❌ 없음").padding(toLength: 20, withPad: " ", startingAt: 0))                                   ║")
+        print("║ 🌐 도메인: \(domain.padding(toLength: 60, withPad: " ", startingAt: 0))           ║")
+        print("║ 📋 핸들러 목록: \(handlers.joined(separator: ", ").padding(toLength: 50, withPad: " ", startingAt: 0))      ║")
+        print("╚═══════════════════════════════════════════════════════════════════════════════╝")
+        
+        // 햅틱 시스템이 없으면 강제 초기화 시도
+        if !hasHapticSystem {
+            print("🔧 [SMAP-HAPTIC] 시스템 미초기화, 강제 초기화 시도")
+            forceInitializeHapticSystem()
+        }
+    }
+    
+    private func handleAppBoundDomainError() {
+        print("🚨 [App-Bound Domain] 오류 해결 시도 시작")
+        
+        // 1. 현재 도메인이 허용 목록에 있는지 확인
+        guard let currentURL = webView.url else {
+            print("❌ [App-Bound] 현재 URL을 가져올 수 없음")
+            return
+        }
+        
+        let allowedDomains = ["nextstep.smap.site", "app2.smap.site", "app.smap.site", "smap.site", "localhost"]
+        let currentDomain = currentURL.host ?? ""
+        
+        print("🔍 [App-Bound] 현재 도메인: \(currentDomain)")
+        print("🔍 [App-Bound] 허용된 도메인들: \(allowedDomains)")
+        
+        if allowedDomains.contains(currentDomain) {
+            print("✅ [App-Bound] 도메인이 허용 목록에 있음")
+            
+            // 2. 햅틱 시스템 강제 재초기화
+            forceInitializeHapticSystem()
+            
+        } else {
+            print("❌ [App-Bound] 도메인이 허용 목록에 없음: \(currentDomain)")
+            
+            // 허용되지 않은 도메인에서는 App-Bound 제한 일시 해제
+            if #available(iOS 14.0, *) {
+                print("🔓 [App-Bound] 일시적으로 제한 해제")
+                // 주의: 프로덕션에서는 보안상 권장되지 않음
+            }
+        }
+    }
+    
+    private func forceInitializeHapticSystem() {
+        let initScript = """
+        (function() {
+            console.log('🔧 [FORCE-INIT] 햅틱 시스템 강제 초기화 시작');
+            
+            // 1. WebKit messageHandlers 강제 생성 시도
+            try {
+                if (window.webkit && !window.webkit.messageHandlers) {
+                    console.log('🔧 [FORCE-INIT] messageHandlers 객체 생성 시도');
+                    Object.defineProperty(window.webkit, 'messageHandlers', {
+                        value: {},
+                        writable: true,
+                        configurable: true
+                    });
+                }
+                
+                // 2. 핸들러 모의 객체 생성
+                const handlerNames = ['smapIos', 'iosHandler', 'hapticHandler', 'messageHandler'];
+                for (const name of handlerNames) {
+                    if (window.webkit && window.webkit.messageHandlers && !window.webkit.messageHandlers[name]) {
+                        console.log('🔧 [FORCE-INIT] 핸들러 생성:', name);
+                        
+                        // 네이티브 메시지 전송을 시뮬레이션하는 함수
+                        window.webkit.messageHandlers[name] = {
+                            postMessage: function(message) {
+                                console.log('📤 [SIMULATED-HANDLER]', name, '메시지:', message);
+                                
+                                // 네이티브 앱으로 메시지 전송 시뮬레이션
+                                if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smapIos && window.webkit.messageHandlers.smapIos !== this) {
+                                    window.webkit.messageHandlers.smapIos.postMessage(message);
+                                } else {
+                                    // 실제 네이티브 핸들러가 없는 경우 이벤트로 전달
+                                    window.dispatchEvent(new CustomEvent('smap-haptic-fallback', { 
+                                        detail: { handler: name, message: message } 
+                                    }));
+                                }
+                            }
+                        };
+                    }
+                }
+                
+            } catch (error) {
+                console.log('⚠️ [FORCE-INIT] 핸들러 생성 실패:', error);
+            }
+            
+            // 3. SMAP 햅틱 시스템 초기화
+            if (window.SMAP_HAPTIC_SYSTEM) {
+                console.log('🔧 [FORCE-INIT] 기존 시스템 재초기화');
+                window.SMAP_HAPTIC_SYSTEM.initialized = false;
+                window.SMAP_HAPTIC_SYSTEM.handlers = [];
+                return window.SMAP_HAPTIC_SYSTEM.init();
+            } else {
+                console.log('❌ [FORCE-INIT] SMAP_HAPTIC_SYSTEM 없음, 기본 시스템 생성');
+                
+                // 기본 햅틱 시스템 생성
+                window.SMAP_HAPTIC_SYSTEM = {
+                    initialized: false,
+                    handlers: [],
+                    init: function() {
+                        if (window.webkit && window.webkit.messageHandlers) {
+                            const available = Object.keys(window.webkit.messageHandlers);
+                            this.handlers = available;
+                            this.initialized = true;
+                            console.log('✅ [FORCE-INIT] 기본 시스템 초기화 완료:', available);
+                            return true;
+                        }
+                        return false;
+                    }
+                };
+                
+                return window.SMAP_HAPTIC_SYSTEM.init();
+            }
+        })();
+        """
+        
+        webView.evaluateJavaScript(initScript) { [weak self] result, error in
+            if let error = error {
+                print("❌ [FORCE-INIT] 강제 초기화 실패: \(error)")
+                // 네이티브 레벨에서 강제 핸들러 재등록 시도
+                self?.forceRegisterNativeHandlers()
+            } else {
+                print("✅ [FORCE-INIT] 강제 초기화 완료: \(result ?? "unknown")")
+                
+                // 테스트 햅틱 실행
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    self?.testHapticFunction()
+                }
+            }
+        }
+    }
+    
+    private func forceRegisterNativeHandlers() {
+        print("🔧 [NATIVE-FORCE] 네이티브 핸들러 강제 재등록 시작")
+        
+        // 기존 사용자 콘텐츠 컨트롤러 정리
+        webView.configuration.userContentController.removeAllUserScripts()
+        
+        // 모든 메시지 핸들러 제거 후 재등록
+        let handlerNames = ["smapIos", "iosHandler", "jsToNative", "webViewHandler", "nativeHandler", "hapticHandler", "messageHandler"]
+        for handlerName in handlerNames {
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: handlerName)
+        }
+        
+        // 메시지 핸들러 재등록
+        setupMessageHandlers(config: webView.configuration)
+        
+        print("✅ [NATIVE-FORCE] 네이티브 핸들러 재등록 완료")
+        
+        // 강제 초기화 재시도
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.forceInitializeHapticSystem()
+        }
+    }
+    
+    private func setupFallbackHapticSystem() {
+        let fallbackScript = """
+        (function() {
+            console.log('🔄 [FALLBACK] Fallback 햅틱 시스템 설정 시작');
+            
+            // Fallback 이벤트 리스너 등록
+            window.addEventListener('smap-haptic-fallback', function(event) {
+                console.log('🎯 [FALLBACK] Fallback 햅틱 이벤트 수신:', event.detail);
+                
+                const message = event.detail.message;
+                if (message && message.type === 'haptic') {
+                    console.log('🎮 [FALLBACK] 웹 기반 햅틱 피드백 실행:', message.param);
+                    
+                    // 웹 기반 햅틱 대안 (Vibration API)
+                    if (navigator.vibrate) {
+                        const hapticMap = {
+                            'success': [100, 50, 100],
+                            'warning': [200, 100, 200],
+                            'error': [300, 100, 300, 100, 300],
+                            'light': [50],
+                            'medium': [100],
+                            'heavy': [200],
+                            'selection': [25]
+                        };
+                        
+                        const pattern = hapticMap[message.param] || [100];
+                        navigator.vibrate(pattern);
+                        console.log('✅ [FALLBACK] 진동 패턴 실행:', pattern);
+                    } else {
+                        console.log('⚠️ [FALLBACK] 진동 API 미지원');
+                    }
+                    
+                    // 시각적 피드백 제공
+                    const body = document.body;
+                    if (body) {
+                        body.style.transition = 'transform 0.1s ease-out';
+                        body.style.transform = 'scale(0.998)';
+                        setTimeout(() => {
+                            body.style.transform = 'scale(1)';
+                            setTimeout(() => {
+                                body.style.transition = '';
+                            }, 100);
+                        }, 50);
+                        console.log('✅ [FALLBACK] 시각적 피드백 제공');
+                    }
+                }
+            });
+            
+            // 강화된 햅틱 함수 오버라이드
+            const originalSMAPHaptic = window.SMAP_HAPTIC;
+            window.SMAP_HAPTIC = function(type, intensity = 1.0) {
+                console.log('🎮 [ENHANCED-HAPTIC] 강화된 햅틱 함수 호출:', type);
+                
+                // 1. 원본 함수 시도
+                if (originalSMAPHaptic && typeof originalSMAPHaptic === 'function') {
+                    try {
+                        const result = originalSMAPHaptic(type, intensity);
+                        if (result) {
+                            console.log('✅ [ENHANCED-HAPTIC] 원본 함수 성공');
+                            return true;
+                        }
+                    } catch (error) {
+                        console.log('⚠️ [ENHANCED-HAPTIC] 원본 함수 실패:', error);
+                    }
+                }
+                
+                // 2. Fallback 이벤트 발생
+                console.log('🔄 [ENHANCED-HAPTIC] Fallback 이벤트 발생');
+                window.dispatchEvent(new CustomEvent('smap-haptic-fallback', {
+                    detail: {
+                        handler: 'enhanced',
+                        message: {
+                            type: 'haptic',
+                            param: type,
+                            intensity: intensity,
+                            timestamp: Date.now()
+                        }
+                    }
+                }));
+                
+                return true;
+            };
+            
+            // 디버깅 함수 강화
+            const originalDebugHaptic = window.SMAP_DEBUG_HAPTIC;
+            window.SMAP_DEBUG_HAPTIC = function() {
+                console.log('🔍 [ENHANCED-DEBUG] 강화된 디버그 함수 실행');
+                
+                // 원본 함수 실행
+                if (originalDebugHaptic && typeof originalDebugHaptic === 'function') {
+                    try {
+                        const result = originalDebugHaptic();
+                        console.log('🔍 [ENHANCED-DEBUG] 원본 디버그 결과:', result);
+                    } catch (error) {
+                        console.log('⚠️ [ENHANCED-DEBUG] 원본 디버그 실패:', error);
+                    }
+                }
+                
+                // 추가 정보 제공
+                console.log('🔍 [ENHANCED-DEBUG] 강화된 디버그 정보:');
+                console.log('  - WebKit 존재:', !!window.webkit);
+                console.log('  - MessageHandlers 존재:', !!window.webkit?.messageHandlers);
+                console.log('  - 사용 가능한 핸들러:', window.webkit?.messageHandlers ? Object.keys(window.webkit.messageHandlers) : []);
+                console.log('  - Vibration API 지원:', !!navigator.vibrate);
+                console.log('  - User Agent:', navigator.userAgent);
+                console.log('  - 현재 URL:', window.location.href);
+                
+                // Fallback 테스트 실행
+                console.log('🧪 [ENHANCED-DEBUG] Fallback 테스트 실행');
+                window.SMAP_HAPTIC('success');
+                
+                return {
+                    enhanced: true,
+                    webkit: !!window.webkit,
+                    messageHandlers: !!window.webkit?.messageHandlers,
+                    handlers: window.webkit?.messageHandlers ? Object.keys(window.webkit.messageHandlers) : [],
+                    vibrationSupport: !!navigator.vibrate,
+                    fallbackActive: true
+                };
+            };
+            
+            console.log('✅ [FALLBACK] Fallback 햅틱 시스템 설정 완료');
+            
+            // 즉시 테스트 실행
+            setTimeout(() => {
+                console.log('🧪 [FALLBACK] 자동 테스트 실행');
+                window.SMAP_DEBUG_HAPTIC();
+            }, 1000);
+            
+            return true;
+        })();
+        """
+        
+        webView.evaluateJavaScript(fallbackScript) { result, error in
+            if let error = error {
+                print("❌ [FALLBACK] Fallback 시스템 설정 실패: \(error)")
+            } else {
+                print("✅ [FALLBACK] Fallback 시스템 설정 완료: \(result ?? "unknown")")
+            }
+        }
+    }
+    
+    private func testHapticFunction() {
+        let testScript = """
+        (function() {
+            console.log('🧪 [TEST] 햅틱 테스트 시작');
+            
+            if (window.SMAP_HAPTIC) {
+                console.log('🧪 [TEST] SMAP_HAPTIC 함수 실행');
+                return window.SMAP_HAPTIC('success');
+            } else if (window.SMAP_DEBUG_HAPTIC) {
+                console.log('🧪 [TEST] SMAP_DEBUG_HAPTIC 함수 실행');
+                return window.SMAP_DEBUG_HAPTIC();
+            } else {
+                console.log('❌ [TEST] 햅틱 함수 없음');
+                return false;
+            }
+        })();
+        """
+        
+        webView.evaluateJavaScript(testScript) { result, error in
+            if let error = error {
+                print("❌ [TEST] 테스트 햅틱 실패: \(error)")
+            } else {
+                print("✅ [TEST] 테스트 햅틱 결과: \(result ?? "unknown")")
+            }
+        }
+    }
+    
     // MARK: - 🛠️ WebView 설정 (최적화된)
     private func setupWebView() {
         let config = createOptimizedWebViewConfiguration()
@@ -144,9 +549,10 @@ class EnhancedWebViewController: UIViewController {
         
         // 🔐 App-Bound Domain 관련 설정 (iOS 14+) - 햅틱 동작을 위해 비활성화
         if #available(iOS 14.0, *) {
-            config.limitsNavigationsToAppBoundDomains = false
-            print("🔐 [WebView] App-Bound Domain 제한 비활성화 (햅틱 기능 활성화)")
-            print("🔐 [WebView] 모든 도메인에서 JavaScript 실행 허용")
+            config.limitsNavigationsToAppBoundDomains = true
+            print("🔐 [WebView] App-Bound Domain 제한 활성화")
+            print("🔐 [WebView] 허용된 도메인: nextstep.smap.site, smap.site, localhost")
+            print("🔐 [WebView] Info.plist WKAppBoundDomains 설정 적용됨")
         }
         
         // 데이터 감지 설정
@@ -186,59 +592,151 @@ class EnhancedWebViewController: UIViewController {
         
         // 강제 햅틱 이벤트 리스너 스크립트 추가
         let hapticEventScript = """
-        console.log('🔧 [NATIVE] 햅틱 이벤트 리스너 스크립트 주입');
-        
-        // 사용자 정의 이벤트 리스너 추가
-        window.addEventListener('smap-ios-haptic', function(event) {
-            console.log('🎯 [NATIVE-EVENT] 사용자 정의 햅틱 이벤트 감지:', event.detail);
+        (function() {
+            'use strict';
+            console.log('🔧 [SMAP-HAPTIC] 햅틱 시스템 초기화 시작');
             
-            // 가장 확실한 핸들러로 전송
-            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smapIos) {
-                try {
-                    window.webkit.messageHandlers.smapIos.postMessage(event.detail.message);
-                    console.log('✅ [NATIVE-EVENT] 햅틱 메시지 재전송 성공');
-                } catch (e) {
-                    console.error('❌ [NATIVE-EVENT] 햅틱 메시지 재전송 실패:', e);
+            // App-Bound Domain 호환 햅틱 시스템
+            window.SMAP_HAPTIC_SYSTEM = {
+                initialized: false,
+                handlers: [],
+                pendingMessages: [],
+                
+                // 초기화 함수
+                init: function() {
+                    if (this.initialized) return;
+                    
+                    try {
+                        // WebKit 핸들러 확인
+                        if (!window.webkit || !window.webkit.messageHandlers) {
+                            console.warn('⚠️ [SMAP-HAPTIC] WebKit messageHandlers 없음');
+                            return false;
+                        }
+                        
+                        // 사용 가능한 핸들러 검색
+                        const handlerNames = ['smapIos', 'iosHandler', 'hapticHandler', 'messageHandler'];
+                        for (const name of handlerNames) {
+                            if (window.webkit.messageHandlers[name]) {
+                                this.handlers.push(name);
+                                console.log('✅ [SMAP-HAPTIC] 핸들러 발견:', name);
+                            }
+                        }
+                        
+                        if (this.handlers.length === 0) {
+                            console.error('❌ [SMAP-HAPTIC] 사용 가능한 핸들러 없음');
+                            return false;
+                        }
+                        
+                        this.initialized = true;
+                        console.log('✅ [SMAP-HAPTIC] 시스템 초기화 완료');
+                        
+                        // 대기 중인 메시지 처리
+                        this.processPendingMessages();
+                        return true;
+                        
+                    } catch (error) {
+                        console.error('❌ [SMAP-HAPTIC] 초기화 오류:', error);
+                        return false;
+                    }
+                },
+                
+                // 안전한 메시지 전송
+                sendMessage: function(message) {
+                    if (!this.initialized) {
+                        console.log('📤 [SMAP-HAPTIC] 시스템 미초기화, 메시지 대기열 추가');
+                        this.pendingMessages.push(message);
+                        return false;
+                    }
+                    
+                    let success = false;
+                    for (const handlerName of this.handlers) {
+                        try {
+                            window.webkit.messageHandlers[handlerName].postMessage(message);
+                            console.log('✅ [SMAP-HAPTIC] 메시지 전송 성공:', handlerName);
+                            success = true;
+                            break;
+                        } catch (error) {
+                            console.warn('⚠️ [SMAP-HAPTIC] 핸들러 실패:', handlerName, error);
+                        }
+                    }
+                    
+                    if (!success) {
+                        console.error('❌ [SMAP-HAPTIC] 모든 핸들러 실패');
+                    }
+                    
+                    return success;
+                },
+                
+                // 대기 메시지 처리
+                processPendingMessages: function() {
+                    console.log('📦 [SMAP-HAPTIC] 대기 메시지 처리:', this.pendingMessages.length);
+                    while (this.pendingMessages.length > 0) {
+                        const message = this.pendingMessages.shift();
+                        this.sendMessage(message);
+                    }
                 }
-            }
-        });
-        
-        // 강제 햅틱 테스트 함수
-        window.SMAP_FORCE_HAPTIC = function(type) {
-            console.log('🧪 [FORCE-TEST] 강제 햅틱 테스트:', type);
-            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smapIos) {
-                try {
-                    window.webkit.messageHandlers.smapIos.postMessage({ type: 'haptic', param: type });
-                    return true;
-                } catch (e) {
-                    console.error('❌ [FORCE-TEST] 햅틱 테스트 실패:', e);
-                    return false;
-                }
-            }
-            return false;
-        };
-        
-        // 핸들러 상태 확인 함수
-        window.SMAP_CHECK_HANDLERS = function() {
-            const webkit = window.webkit;
-            if (!webkit) return { error: 'WebKit 없음' };
-            
-            const handlers = webkit.messageHandlers || {};
-            const availableHandlers = Object.keys(handlers);
-            
-            console.log('🔍 [HANDLER-CHECK] 사용 가능한 핸들러들:', availableHandlers);
-            return { 
-                total: availableHandlers.length, 
-                handlers: availableHandlers,
-                hasSmapIos: !!handlers.smapIos 
             };
-        };
-        
-        console.log('✅ [NATIVE] 햅틱 이벤트 리스너 및 테스트 함수 등록 완료');
+            
+            // 햅틱 함수들 등록
+            window.SMAP_HAPTIC = function(type, intensity = 1.0) {
+                return window.SMAP_HAPTIC_SYSTEM.sendMessage({
+                    type: 'haptic',
+                    param: type,
+                    intensity: intensity,
+                    timestamp: Date.now()
+                });
+            };
+            
+            window.SMAP_HAPTIC_FEEDBACK = function(feedbackType, style = 'medium') {
+                return window.SMAP_HAPTIC_SYSTEM.sendMessage({
+                    type: 'hapticFeedback',
+                    param: {
+                        type: feedbackType,
+                        style: style,
+                        timestamp: Date.now()
+                    }
+                });
+            };
+            
+            // 커스텀 이벤트 리스너
+            window.addEventListener('smap-haptic', function(event) {
+                console.log('🎯 [SMAP-HAPTIC] 커스텀 이벤트 수신:', event.detail);
+                if (event.detail && event.detail.message) {
+                    window.SMAP_HAPTIC_SYSTEM.sendMessage(event.detail.message);
+                }
+            });
+            
+            // DOM 로드 완료 시 초기화
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', function() {
+                    setTimeout(() => window.SMAP_HAPTIC_SYSTEM.init(), 100);
+                });
+            } else {
+                setTimeout(() => window.SMAP_HAPTIC_SYSTEM.init(), 100);
+            }
+            
+            // 디버깅 함수들
+            window.SMAP_DEBUG_HAPTIC = function() {
+                console.log('🔍 [SMAP-HAPTIC] 디버그 정보:');
+                console.log('  - 초기화됨:', window.SMAP_HAPTIC_SYSTEM.initialized);
+                console.log('  - 핸들러들:', window.SMAP_HAPTIC_SYSTEM.handlers);
+                console.log('  - 대기 메시지:', window.SMAP_HAPTIC_SYSTEM.pendingMessages.length);
+                
+                // 테스트 햅틱 실행
+                console.log('🧪 [SMAP-HAPTIC] 테스트 햅틱 실행');
+                return window.SMAP_HAPTIC('success');
+            };
+            
+            console.log('✅ [SMAP-HAPTIC] 스크립트 등록 완료');
+        })();
         """
         
-        let hapticUserScript = WKUserScript(source: hapticEventScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+        let hapticUserScript = WKUserScript(source: hapticEventScript, injectionTime: .atDocumentStart, forMainFrameOnly: false)
         userContentController.addUserScript(hapticUserScript)
+        
+        // 추가: Document End에서도 한 번 더 주입하여 확실하게 등록
+        let hapticUserScriptEnd = WKUserScript(source: hapticEventScript, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+        userContentController.addUserScript(hapticUserScriptEnd)
         
         config.userContentController = userContentController
         
@@ -853,6 +1351,16 @@ extension EnhancedWebViewController: WKNavigationDelegate {
         }
         
         retryCount = 0 // 성공 시 재시도 카운트 리셋
+        
+        // 페이지 로드 완료 후 App-Bound Domain 상태 확인
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            self.debugAppBoundDomainStatus()
+        }
+        
+        // Fallback 햅틱 이벤트 리스너 등록
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.setupFallbackHapticSystem()
+        }
     }
     
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {

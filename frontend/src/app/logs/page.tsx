@@ -659,6 +659,10 @@ export default function LogsPage() {
   const [isDailyCountsLoading, setIsDailyCountsLoading] = useState(false);
   const [isMemberActivityLoading, setIsMemberActivityLoading] = useState(false);
   
+  // WebKit 환경 감지 상태
+  const [isWebKitEnv, setIsWebKitEnv] = useState(false);
+  const [isIOSWebViewEnv, setIsIOSWebViewEnv] = useState(false);
+  
   // 멤버별 로그 분포 상태 (14일간의 활동 여부)
   const [memberLogDistribution, setMemberLogDistribution] = useState<Record<string, boolean[]>>({});
   
@@ -681,6 +685,59 @@ export default function LogsPage() {
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
+
+  // WebKit 환경 감지 및 최적화
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const webkit = !!(window as any).webkit || navigator.userAgent.includes('WebKit');
+      const iosWebView = !!(window as any).webkit?.messageHandlers;
+      
+      setIsWebKitEnv(webkit);
+      setIsIOSWebViewEnv(iosWebView);
+      
+      console.log('[LOGS PAGE] 환경 감지 완료:', {
+        isWebKit: webkit,
+        isIOSWebView: iosWebView,
+        userAgent: navigator.userAgent,
+        online: navigator.onLine,
+        connectionType: (navigator as any).connection?.effectiveType || 'unknown',
+        deviceMemory: (navigator as any).deviceMemory || 'unknown'
+      });
+      
+      // WebKit 환경에서 성능 최적화
+      if (webkit) {
+        console.log('[LOGS WEBKIT] WebKit 환경 최적화 적용');
+        
+        // iOS WebView에서 추가 최적화
+        if (iosWebView) {
+          console.log('[LOGS WEBKIT] iOS WebView 추가 최적화 적용');
+          
+          // iOS WebView에서 메모리 경고 리스너 추가
+          window.addEventListener('pagehide', () => {
+            console.log('[LOGS WEBKIT] 페이지 숨김 - 리소스 정리');
+            // 지도 관련 리소스 정리
+            if (map.current) {
+              clearMapMarkersAndPaths(true, true, false);
+            }
+          });
+          
+          // iOS WebView에서 메모리 압박 시 캐시 정리
+          if ('memory' in performance) {
+            const checkMemory = () => {
+              const memInfo = (performance as any).memory;
+              if (memInfo && memInfo.usedJSHeapSize > 50 * 1024 * 1024) { // 50MB 초과시
+                                 console.log('[LOGS WEBKIT] 메모리 사용량 높음 - 캐시 정리');
+                 invalidateCache('memory-pressure');
+              }
+            };
+            
+            const memoryCheckInterval = setInterval(checkMemory, 30000); // 30초마다 체크
+            return () => clearInterval(memoryCheckInterval);
+          }
+        }
+      }
+    }
+  }, []);
 
   // 에러 처리 헬퍼 함수
   const handleDataError = (error: any, context: string) => {
@@ -2261,9 +2318,16 @@ export default function LogsPage() {
       let stayTimes: StayTime[] = [];
       let hasAnyApiSuccess = false;
       
-      // 타임아웃 설정을 개별 API마다 다르게 적용 (핵심 API는 15초, 보조 API는 10초)
-      const coreApiTimeout = 15000; // 15초
-      const auxiliaryApiTimeout = 10000; // 10초
+      // WebKit 환경에 따른 타임아웃 설정 최적화
+      const coreApiTimeout = isWebKitEnv ? (isIOSWebViewEnv ? 20000 : 25000) : 15000; // WebKit: 20-25초, 일반: 15초
+      const auxiliaryApiTimeout = isWebKitEnv ? (isIOSWebViewEnv ? 15000 : 20000) : 10000; // WebKit: 15-20초, 일반: 10초
+      
+      console.log('[loadLocationData] WebKit 최적화 타임아웃 설정:', {
+        isWebKit: isWebKitEnv,
+        isIOSWebView: isIOSWebViewEnv,
+        coreTimeout: coreApiTimeout,
+        auxiliaryTimeout: auxiliaryApiTimeout
+      });
       
       // 1. getMapMarkers API 호출 (핵심 API)
       try {
@@ -6484,6 +6548,18 @@ export default function LogsPage() {
         autoHide={true}
         duration={7000}
       />
+      
+      {/* WebKit 환경 표시 (개발/디버깅용) */}
+      {(isWebKitEnv || isIOSWebViewEnv) && process.env.NODE_ENV === 'development' && (
+        <div className="fixed bottom-2 left-2 bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs border border-yellow-300 z-50">
+          <div className="flex items-center space-x-1">
+            <span>🕸️</span>
+            <span>{isIOSWebViewEnv ? 'iOS WebView' : 'WebKit'}</span>
+            <span className="text-yellow-600">최적화 적용</span>
+          </div>
+        </div>
+      )}
+      
       {/* <DebugPanel />
       <LogParser /> */}
     </>
