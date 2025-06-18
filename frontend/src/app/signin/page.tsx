@@ -87,6 +87,16 @@ export default function SignInPage() {
   useEffect(() => {
     console.log('🔍 [HANDLER MONITOR] 핸들러 모니터링 시작');
     
+    // 🧪 테스트 함수들 등록
+    registerTestFunctions();
+    
+    // iOS 로그 전송
+    sendLogToiOS('info', '📱 로그인 페이지 로드', {
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent.substring(0, 100),
+      currentURL: window.location.href
+    });
+    
     // 핸들러 모니터링 시작
     handlerMonitorRef.current = monitorHandlerStatus();
     
@@ -312,6 +322,29 @@ export default function SignInPage() {
       } catch (e) {
         console.error('iOS 로그 전송 실패:', e);
       }
+    }
+  };
+
+  // Google 로그인 콜백 핸들러
+  const handleGoogleCallback = async (response: any) => {
+    try {
+      console.log('[GOOGLE CALLBACK] 응답 수신:', response);
+      
+      // ID 토큰 추출
+      const idToken = response.credential;
+      if (!idToken) {
+        throw new Error('Google ID 토큰을 받지 못했습니다.');
+      }
+      
+      // 임시로 Google 로그인 기능 비활성화
+      console.log('[GOOGLE CALLBACK] ID 토큰:', idToken);
+      throw new Error('Google 로그인 서버 연동이 아직 구현되지 않았습니다. 전화번호 로그인을 사용해주세요.');
+      
+    } catch (error) {
+      console.error('[GOOGLE CALLBACK] 처리 실패:', error);
+      showError('Google 로그인은 현재 준비 중입니다.\n\n전화번호 로그인을 사용해주세요.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1741,45 +1774,60 @@ export default function SignInPage() {
     try {
       console.log('Google 로그인 시도');
       
-      // 🚨 iOS 시뮬레이터 최적화: 시뮬레이터 환경 감지 로직 개선
-      const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
+      // 🚨 iOS 환경 감지 로직 개선 (운영 환경 대응)
+      const hasWebKit = !!(window as any).webkit;
+      const hasMessageHandlers = !!(window as any).webkit?.messageHandlers;
+      const hasSmapIos = !!(window as any).webkit?.messageHandlers?.smapIos;
+      const hasIosBridge = !!(window as any).iosBridge;
+      const isIOSUserAgent = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      
+      // iOS 앱으로 간주하는 조건들 (더 관대하게 설정)
+      const isIOSWebView = (
+        // 조건 1: WebKit과 messageHandlers가 모두 있음 (정상적인 iOS 앱)
+        (hasWebKit && hasMessageHandlers) ||
+        // 조건 2: iOS User Agent + ios-bridge.js 로드됨 (앱 환경)
+        (isIOSUserAgent && hasIosBridge) ||
+        // 조건 3: 강제 iOS 앱 모드 (테스트용)
+        (window as any).__SMAP_FORCE_IOS_APP__ === true
+      );
+      
       const isIOSSimulator = (
-        // iOS Safari에서 실행 중이고
-        navigator.userAgent.includes('iPhone') &&
-        navigator.userAgent.includes('Safari') &&
-        // 실제 messageHandlers가 없으면서
-        !(window as any).webkit?.messageHandlers?.smapIos &&
-        // ios-bridge가 있으면 시뮬레이터로 간주
-        !!(window as any).iosBridge
+        // iOS User Agent 있지만 실제 핸들러가 없는 경우 (시뮬레이터)
+        isIOSUserAgent && hasIosBridge && !hasSmapIos
       ) || (
         // 또는 개발자가 강제로 활성화 (테스트용)
         (window as any).__SMAP_FORCE_SIMULATOR_MODE__ === true
       );
       
-      console.log('[GOOGLE LOGIN] 환경 체크:', {
+      console.log('[GOOGLE LOGIN] 환경 체크 (강화):', {
         isIOSWebView,
         isIOSSimulator,
-        hasWebkit: !!(window as any).webkit,
-        hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
-        hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
-        hasIosBridge: !!(window as any).iosBridge,
+        hasWebKit,
+        hasMessageHandlers,
+        hasSmapIos,
+        hasIosBridge,
+        isIOSUserAgent,
         hasGoogleSignIn: !!(window as any).iosBridge?.googleSignIn,
         hasGoogleSignInMethod: !!(window as any).iosBridge?.googleSignIn?.signIn,
-        userAgent: navigator.userAgent,
-        environment: process.env.NODE_ENV
+        userAgent: navigator.userAgent.substring(0, 100),
+        environment: process.env.NODE_ENV,
+        currentURL: window.location.href
       });
       
       // iOS 로그 전송 - 환경 체크 결과
-      sendLogToiOS('info', '🔍 Google 로그인 환경 체크 완료', {
+      sendLogToiOS('info', '🔍 Google 로그인 환경 체크 완료 (강화)', {
         timestamp: new Date().toISOString(),
         environment: {
           isIOSWebView,
-          hasWebkit: !!(window as any).webkit,
-          hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
-          hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
-          hasIosBridge: !!(window as any).iosBridge,
+          isIOSSimulator,
+          hasWebKit,
+          hasMessageHandlers,
+          hasSmapIos,
+          hasIosBridge,
+          isIOSUserAgent,
           hasGoogleSignIn: !!(window as any).iosBridge?.googleSignIn,
-          hasGoogleSignInMethod: !!(window as any).iosBridge?.googleSignIn?.signIn
+          hasGoogleSignInMethod: !!(window as any).iosBridge?.googleSignIn?.signIn,
+          currentURL: window.location.href
         }
       });
       
@@ -1987,20 +2035,43 @@ export default function SignInPage() {
         return;
       }
       
-              // 웹 환경에서는 NextAuth.js를 통한 Google 로그인 (임시 비활성화)
-        console.log('웹 환경에서 Google 로그인 시도');
+              // 웹 환경에서 Google SDK를 사용한 로그인
+        console.log('웹 환경에서 Google SDK 로그인 시도');
         
         // iOS 로그 전송 - 웹 환경에서 시도
-        sendLogToiOS('info', '🌐 웹 환경에서 Google 로그인 시도', {
+        sendLogToiOS('info', '🌐 웹 환경에서 Google SDK 로그인 시도', {
           timestamp: new Date().toISOString(),
           environment: 'web',
           userAgent: navigator.userAgent
         });
         
-        // 에러 모달 강제 표시
-        setTimeout(() => {
-          showError('🌐 웹 브라우저 환경\n\nGoogle 로그인은 SMAP iOS 앱에서만 사용 가능합니다.\n\n웹에서는 전화번호 로그인을 사용해주세요.');
-        }, 100);
+        // Google SDK를 사용한 웹 로그인 처리
+        try {
+          // Google SDK가 로드되었는지 확인
+          if (!(window as any).google?.accounts?.id) {
+            console.warn('[GOOGLE LOGIN] Google SDK가 로드되지 않음');
+            throw new Error('Google 로그인 서비스를 초기화할 수 없습니다.');
+          }
+          
+          // Google One Tap 로그인 실행
+          (window as any).google.accounts.id.initialize({
+            client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',
+            callback: (response: any) => {
+              console.log('[GOOGLE LOGIN] 웹에서 Google 로그인 성공:', response);
+              // 여기서 ID 토큰을 서버로 전송하여 로그인 처리
+              handleGoogleCallback(response);
+            }
+          });
+          
+          (window as any).google.accounts.id.prompt();
+          return;
+          
+        } catch (webGoogleError) {
+          console.error('[GOOGLE LOGIN] 웹 Google 로그인 실패:', webGoogleError);
+          setTimeout(() => {
+            showError('Google 로그인에 실패했습니다.\n\n전화번호 로그인을 사용해주세요.');
+          }, 100);
+        }
       
       /*
       // NextAuth 관련 코드 임시 비활성화
@@ -2589,6 +2660,73 @@ export default function SignInPage() {
     return interval;
   };
   
+  // 🧪 빠른 테스트 함수들 (전역으로 등록)
+  const registerTestFunctions = () => {
+    // 햅틱 테스트 함수
+    (window as any).TEST_HAPTIC = (type = 'success') => {
+      console.log(`🧪 [TEST] 햅틱 테스트: ${type}`);
+      
+      // 여러 방법으로 시도
+      const methods = [
+        () => (window as any).iosBridge?.haptic?.[type]?.(),
+        () => (window as any).webkit?.messageHandlers?.smapIos?.postMessage({
+          type: 'haptic', param: type, source: 'TEST_HAPTIC'
+        }),
+        () => (window as any).SMAP_HAPTIC_TEST?.(type)
+      ];
+      
+      methods.forEach((method, i) => {
+        try {
+          console.log(`🧪 방법 ${i + 1} 시도`);
+          method();
+        } catch (e) {
+          console.error(`❌ 방법 ${i + 1} 실패:`, e);
+        }
+      });
+    };
+    
+    // 구글 로그인 테스트 함수
+    (window as any).TEST_GOOGLE = () => {
+      console.log('🧪 [TEST] Google 로그인 테스트');
+      
+      const methods = [
+        () => (window as any).iosBridge?.googleSignIn?.signIn?.(),
+        () => (window as any).webkit?.messageHandlers?.smapIos?.postMessage({
+          type: 'googleSignIn', param: '', source: 'TEST_GOOGLE'
+        }),
+        () => (window as any).SMAP_GOOGLE_TEST?.()
+      ];
+      
+      methods.forEach((method, i) => {
+        try {
+          console.log(`🧪 Google 방법 ${i + 1} 시도`);
+          method();
+        } catch (e) {
+          console.error(`❌ Google 방법 ${i + 1} 실패:`, e);
+        }
+      });
+    };
+    
+    // 환경 정보 출력 함수
+    (window as any).TEST_ENV = () => {
+      const env = {
+        webkit: !!(window as any).webkit,
+        messageHandlers: !!(window as any).webkit?.messageHandlers,
+        smapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
+        iosBridge: !!(window as any).iosBridge,
+        userAgent: navigator.userAgent.substring(0, 100),
+        url: window.location.href
+      };
+      console.log('🔍 [TEST] 환경 정보:', env);
+      return env;
+    };
+    
+    console.log('🧪 [TEST] 테스트 함수 등록 완료:');
+    console.log('  TEST_HAPTIC("success") - 햅틱 테스트');
+    console.log('  TEST_GOOGLE() - 구글 로그인 테스트');
+    console.log('  TEST_ENV() - 환경 정보');
+  };
+
   // 🔧 WebKit 핸들러 강제 등록 시도
   const forceRegisterHandlers = () => {
     console.log('🔧 [FORCE REGISTER] WebKit 핸들러 강제 등록 시도');

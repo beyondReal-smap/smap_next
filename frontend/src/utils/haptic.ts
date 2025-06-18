@@ -521,9 +521,9 @@ const fallbackToWebVibration = (type: HapticFeedbackType, env: any) => {
         console.log(`⚠️ [HAPTIC] iOS 바이브레이션 차단됨`);
       }
     }
-  } else {
-    console.log(`⚠️ [HAPTIC] 햅틱 미지원 환경`);
-  }
+      } else {
+      console.log(`⚠️ [HAPTIC] 햅틱 미지원 환경`);
+    }
 };
 
 /**
@@ -635,7 +635,7 @@ export const hapticFeedback = {
   groupSelect: (context?: any) => triggerHapticFeedback(HapticFeedbackType.LIGHT, '그룹 선택', { action: 'group_select', ...context }),
   locationUpdate: (context?: any) => triggerHapticFeedback(HapticFeedbackType.LIGHT, '위치 업데이트', { action: 'location_update', ...context }),
   markerTap: (context?: any) => triggerHapticFeedback(HapticFeedbackType.MEDIUM, '마커 탭', { action: 'marker_tap', ...context }),
-};
+}; 
 
 /**
  * 전역 테스트용 햅틱 함수들 (웹 콘솔에서 직접 사용 가능)
