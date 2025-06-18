@@ -2009,12 +2009,27 @@ export default function HomePage() {
     // console.log('[createMarker] 시작:', { markerType, index, location, memberData: !!memberData, scheduleData: !!scheduleData });
 
     if (markerType === 'member' && memberData) {
-      // console.log('[createMarker] 멤버 좌표 처리:', { 
-      //   'memberData.location.lat': memberData.location.lat, 
-      //   'memberData.location.lng': memberData.location.lng 
-      // });
-      lat = parseCoordinate(memberData.location.lat);
-      lng = parseCoordinate(memberData.location.lng);
+      // WebKit 환경에서 실시간 GPS 위치(mlt_lat, mlt_long) 우선 사용
+      const isWebKit = typeof window !== 'undefined' && (!!(window as any).webkit || navigator.userAgent.includes('WebKit'));
+      
+      // 실시간 GPS 위치를 우선 사용하고, 없으면 기본 위치 사용
+      const realTimeLat = parseCoordinate(memberData.mlt_lat);
+      const realTimeLng = parseCoordinate(memberData.mlt_long);
+      const defaultLat = parseCoordinate(memberData.location.lat);
+      const defaultLng = parseCoordinate(memberData.location.lng);
+      
+      lat = (realTimeLat !== null && realTimeLat !== 0) ? realTimeLat : defaultLat;
+      lng = (realTimeLng !== null && realTimeLng !== 0) ? realTimeLng : defaultLng;
+      
+      console.log('[createMarker] 멤버 위치 선택:', { 
+        memberName: memberData.name,
+        isWebKit,
+        'realTime GPS': { lat: realTimeLat, lng: realTimeLng, time: memberData.mlt_gps_time },
+        'default location': { lat: defaultLat, lng: defaultLng },
+        'selected': { lat, lng },
+        usingRealTime: (realTimeLat !== null && realTimeLat !== 0),
+        timeSinceLastGPS: memberData.mlt_gps_time ? Math.floor((new Date().getTime() - new Date(memberData.mlt_gps_time).getTime()) / 60000) + '분' : 'unknown'
+      });
     } else if (markerType === 'schedule' && scheduleData) {
       // console.log('[createMarker] 스케줄 좌표 처리:', { 
       //   'scheduleData.sst_location_lat': scheduleData.sst_location_lat, 
@@ -2112,9 +2127,45 @@ export default function HomePage() {
             }
           });
 
-          // 위치 정보 포맷팅
+          // 위치 정보 포맷팅 - WebKit 환경에서 강화된 시간 처리
+          const isWebKit = typeof window !== 'undefined' && (!!(window as any).webkit || navigator.userAgent.includes('WebKit'));
           const gpsTime = memberData.mlt_gps_time ? new Date(memberData.mlt_gps_time) : null;
-          const gpsTimeStr = gpsTime ? format(gpsTime, 'MM/dd HH:mm') : '정보 없음';
+          let gpsTimeStr = '정보 없음';
+          let timeAgoStr = '';
+          
+          if (gpsTime) {
+            const now = new Date();
+            const timeDiff = Math.floor((now.getTime() - gpsTime.getTime()) / 60000); // 분 단위
+            
+            if (timeDiff < 0) {
+              gpsTimeStr = format(gpsTime, 'MM/dd HH:mm');
+              timeAgoStr = '(미래시간)';
+            } else if (timeDiff < 1) {
+              gpsTimeStr = '방금 전';
+              timeAgoStr = '';
+            } else if (timeDiff < 60) {
+              gpsTimeStr = `${timeDiff}분 전`;
+              timeAgoStr = `(${format(gpsTime, 'HH:mm')})`;
+            } else if (timeDiff < 1440) { // 24시간 미만
+              const hours = Math.floor(timeDiff / 60);
+              gpsTimeStr = `${hours}시간 전`;
+              timeAgoStr = `(${format(gpsTime, 'HH:mm')})`;
+            } else {
+              gpsTimeStr = format(gpsTime, 'MM/dd HH:mm');
+              timeAgoStr = '';
+            }
+            
+            // WebKit 환경에서 추가 정보 표시
+            if (isWebKit) {
+              console.log('[InfoWindow] WebKit GPS 시간 분석:', {
+                memberName: memberData.name,
+                gpsTime: gpsTime.toISOString(),
+                currentTime: now.toISOString(),
+                timeDiffMinutes: timeDiff,
+                displayStr: gpsTimeStr
+              });
+            }
+          }
           
           // 배터리 정보
           const batteryLevel = memberData.mlt_battery || 0;
@@ -3132,9 +3183,14 @@ export default function HomePage() {
     // 모든 그룹멤버에 대해 마커 생성
     if (members.length > 0) {
       members.forEach((member, index) => {
-        // 좌표 안전성 검사
-        const lat = parseCoordinate(member.location.lat);
-        const lng = parseCoordinate(member.location.lng);
+        // 좌표 안전성 검사 - 실시간 GPS 위치(mlt_lat, mlt_long) 우선 사용
+        const realTimeLat = parseCoordinate(member.mlt_lat);
+        const realTimeLng = parseCoordinate(member.mlt_long);
+        const defaultLat = parseCoordinate(member.location.lat);
+        const defaultLng = parseCoordinate(member.location.lng);
+        
+        const lat = (realTimeLat !== null && realTimeLat !== 0) ? realTimeLat : defaultLat;
+        const lng = (realTimeLng !== null && realTimeLng !== 0) ? realTimeLng : defaultLng;
 
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
           console.log('[updateMemberMarkers] 멤버 마커 생성:', member.name, { lat, lng });
@@ -3168,8 +3224,14 @@ export default function HomePage() {
     // 선택된 멤버가 있으면 해당 위치로 지도 이동 및 InfoWindow 표시
     const selectedMember = members.find(member => member.isSelected);
     if (selectedMember) {
-      const lat = parseCoordinate(selectedMember.location.lat);
-      const lng = parseCoordinate(selectedMember.location.lng);
+      // 실시간 GPS 위치(mlt_lat, mlt_long) 우선 사용
+      const realTimeLat = parseCoordinate(selectedMember.mlt_lat);
+      const realTimeLng = parseCoordinate(selectedMember.mlt_long);
+      const defaultLat = parseCoordinate(selectedMember.location.lat);
+      const defaultLng = parseCoordinate(selectedMember.location.lng);
+      
+      const lat = (realTimeLat !== null && realTimeLat !== 0) ? realTimeLat : defaultLat;
+      const lng = (realTimeLng !== null && realTimeLng !== 0) ? realTimeLng : defaultLng;
 
       if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
         // 기존 InfoWindow 닫기 (새로운 멤버 선택 시)
