@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const BASE_URL = 'http://localhost:3001';
+const BASE_URL = 'http://localhost:3000';
 
 async function testBackendAPI() {
   console.log('🧪 SMAP 백엔드 API 테스트 시작\n');

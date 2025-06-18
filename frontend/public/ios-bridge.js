@@ -1,27 +1,108 @@
-// iOS-Next.js Bridge
+// iOS-Next.js Bridge (강화된 버전)
 // iOS 웹뷰와 Next.js 애플리케이션 간의 통신 인터페이스
 
+console.log('🌉 [iOS Bridge] 초기화 시작');
+
+// 🔧 WebKit MessageHandler 환경 감지 및 강제 초기화
+(function initializeWebKitHandlers() {
+    const currentURL = window.location.href;
+    const isIOSWebView = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    console.log('🔍 [iOS Bridge] 환경 감지:', {
+        isIOSWebView,
+        currentURL,
+        hasWebKit: !!window.webkit,
+        hasMessageHandlers: !!(window.webkit?.messageHandlers),
+        availableHandlers: window.webkit?.messageHandlers ? 
+            Object.keys(window.webkit.messageHandlers) : [],
+        userAgent: navigator.userAgent.substring(0, 100)
+    });
+    
+    // iOS WebView 환경에서 webkit이 없다면 강제 초기화 시도
+    if (isIOSWebView && !window.webkit) {
+        console.warn('⚠️ [iOS Bridge] iOS WebView 환경인데 webkit 없음 - 임시 객체 생성');
+        window.webkit = {
+            messageHandlers: {}
+        };
+    }
+    
+    // messageHandlers가 없다면 빈 객체로 초기화
+    if (isIOSWebView && window.webkit && !window.webkit.messageHandlers) {
+        console.warn('⚠️ [iOS Bridge] messageHandlers 없음 - 빈 객체 생성');
+        window.webkit.messageHandlers = {};
+    }
+    
+    // 필수 핸들러들이 없다면 가짜 핸들러 등록
+    if (isIOSWebView && window.webkit && window.webkit.messageHandlers) {
+        const requiredHandlers = ['smapIos', 'iosHandler'];
+        
+        requiredHandlers.forEach(handlerName => {
+            if (!window.webkit.messageHandlers[handlerName]) {
+                console.warn(`⚠️ [iOS Bridge] ${handlerName} 핸들러 없음 - 가짜 핸들러 생성`);
+                window.webkit.messageHandlers[handlerName] = {
+                    postMessage: function(message) {
+                        console.log(`📤 [${handlerName}] 메시지:`, message);
+                        // CustomEvent로 네이티브에 알림 시도
+                        window.dispatchEvent(new CustomEvent('smap-ios-message', {
+                            detail: { handler: handlerName, message: message }
+                        }));
+                    }
+                };
+            }
+        });
+    }
+})();
+
 window.SmapApp = {
-    // iOS 네이티브 앱으로 메시지 전송
+    // iOS 네이티브 앱으로 메시지 전송 (강화된 버전)
     sendMessage: function(action, data = {}) {
-        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.iosHandler) {
+        const hasIOSHandler = window.webkit?.messageHandlers?.iosHandler;
+        const hasSmapIos = window.webkit?.messageHandlers?.smapIos;
+        
+        console.log('📤 [iOS Bridge] 메시지 전송 시도:', {
+            action,
+            data,
+            hasIOSHandler,
+            hasSmapIos,
+            url: window.location.href
+        });
+        
+        // smapIos 핸들러 우선 사용
+        if (hasSmapIos) {
+            try {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: action,
+                    param: data,
+                    timestamp: Date.now(),
+                    url: window.location.href
+                });
+                console.log(`✅ [iOS Bridge] smapIos로 메시지 전송 성공: ${action}`);
+                return true;
+            } catch (error) {
+                console.error(`❌ [iOS Bridge] smapIos 메시지 전송 실패: ${action}`, error);
+            }
+        }
+        
+        // iosHandler 백업 사용
+        if (hasIOSHandler) {
             try {
                 window.webkit.messageHandlers.iosHandler.postMessage({
                     action: action,
                     timestamp: Date.now(),
+                    url: window.location.href,
                     ...data
                 });
-                console.log(`[iOS Bridge] 메시지 전송: ${action}`, data);
+                console.log(`✅ [iOS Bridge] iosHandler로 메시지 전송 성공: ${action}`);
+                return true;
             } catch (error) {
-                console.error(`[iOS Bridge] 메시지 전송 실패: ${action}`, error);
-            }
-        } else {
-            console.warn('[iOS Bridge] iOS 네이티브 앱 연결이 없습니다.');
-            // 개발 환경에서 테스트용 로그
-            if (process.env.NODE_ENV === 'development') {
-                console.log(`[iOS Bridge] DEV MODE - Action: ${action}`, data);
+                console.error(`❌ [iOS Bridge] iosHandler 메시지 전송 실패: ${action}`, error);
             }
         }
+        
+        console.warn('⚠️ [iOS Bridge] iOS 네이티브 앱 연결이 없습니다.');
+        console.warn('⚠️ [iOS Bridge] 사용 가능한 핸들러:', window.webkit?.messageHandlers ? Object.keys(window.webkit.messageHandlers) : 'none');
+        
+        return false;
     },
 
     // 디바이스 정보 확인
@@ -262,7 +343,107 @@ window.addEventListener('unhandledrejection', function(event) {
     }
 });
 
-console.log('[iOS Bridge] 초기화 완료');
+// 🧪 강화된 테스트 함수들 (전역 접근 가능)
+window.SMAP_HAPTIC_TEST = function(type = 'success') {
+    console.log(`🧪 [SMAP TEST] 햅틱 테스트 시작: ${type}`);
+    
+    // 여러 방법으로 햅틱 전송 시도
+    const methods = [
+        () => window.iosBridge?.haptic?.[type]?.(),
+        () => window.SmapApp?.sendMessage('hapticFeedback', { style: type }),
+        () => {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'haptic',
+                    param: type,
+                    timestamp: Date.now(),
+                    source: 'SMAP_HAPTIC_TEST'
+                });
+            }
+        }
+    ];
+    
+    methods.forEach((method, index) => {
+        try {
+            console.log(`🧪 [SMAP TEST] 방법 ${index + 1} 시도 중...`);
+            method();
+        } catch (error) {
+            console.error(`❌ [SMAP TEST] 방법 ${index + 1} 실패:`, error);
+        }
+    });
+};
+
+window.SMAP_GOOGLE_TEST = function() {
+    console.log('🧪 [SMAP TEST] Google Sign-In 테스트 시작');
+    
+    // 여러 방법으로 구글 로그인 시도
+    const methods = [
+        () => window.iosBridge?.googleSignIn?.signIn?.(),
+        () => window.SmapApp?.sendMessage('googleSignIn'),
+        () => {
+            if (window.webkit?.messageHandlers?.smapIos) {
+                window.webkit.messageHandlers.smapIos.postMessage({
+                    type: 'googleSignIn',
+                    param: '',
+                    timestamp: Date.now(),
+                    source: 'SMAP_GOOGLE_TEST'
+                });
+            }
+        }
+    ];
+    
+    methods.forEach((method, index) => {
+        try {
+            console.log(`🧪 [SMAP TEST] Google 방법 ${index + 1} 시도 중...`);
+            method();
+        } catch (error) {
+            console.error(`❌ [SMAP TEST] Google 방법 ${index + 1} 실패:`, error);
+        }
+    });
+};
+
+window.SMAP_DEBUG_INFO = function() {
+    const debugInfo = {
+        currentURL: window.location.href,
+        userAgent: navigator.userAgent,
+        isIOSWebView: /iPad|iPhone|iPod/.test(navigator.userAgent),
+        webkit: {
+            exists: !!window.webkit,
+            messageHandlers: !!window.webkit?.messageHandlers,
+            availableHandlers: window.webkit?.messageHandlers ? 
+                Object.keys(window.webkit.messageHandlers) : []
+        },
+        bridge: {
+            SmapApp: !!window.SmapApp,
+            iosBridge: !!window.iosBridge,
+            hapticFunction: !!window.iosBridge?.haptic,
+            googleFunction: !!window.iosBridge?.googleSignIn
+        },
+        tests: {
+            SMAP_HAPTIC_TEST: !!window.SMAP_HAPTIC_TEST,
+            SMAP_GOOGLE_TEST: !!window.SMAP_GOOGLE_TEST,
+            SMAP_DEBUG_INFO: !!window.SMAP_DEBUG_INFO
+        }
+    };
+    
+    console.log('🔍 [SMAP DEBUG] 환경 정보:', debugInfo);
+    return debugInfo;
+};
+
+// 자동 환경 감지 및 디버그 정보 출력
+setTimeout(() => {
+    console.log('🌉 [iOS Bridge] 초기화 완료');
+    
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        console.log('📱 [iOS Bridge] iOS 디바이스 감지됨');
+        window.SMAP_DEBUG_INFO();
+        
+        console.log('💡 [iOS Bridge] 테스트 함수 사용법:');
+        console.log('   SMAP_HAPTIC_TEST("success") - 햅틱 테스트');
+        console.log('   SMAP_GOOGLE_TEST() - Google 로그인 테스트');
+        console.log('   SMAP_DEBUG_INFO() - 디버그 정보 출력');
+    }
+}, 1000);
 
 window.iosBridge = {
     // 기존 메서드들...
@@ -296,83 +477,85 @@ window.iosBridge = {
         }
     },
 
-    // 햅틱 피드백 메서드들 (통합 버전)
+    // 햅틱 피드백 메서드들 (강화된 버전)
     haptic: {
+        // 🎮 통합 햅틱 전송 함수
+        _sendHaptic(type) {
+            const currentURL = window.location.href;
+            console.log(`🎮 [Haptic] ${type} 햅틱 요청 시작:`, { type, url: currentURL });
+            
+            // 1순위: smapIos 핸들러 사용
+            if (window.webkit?.messageHandlers?.smapIos) {
+                try {
+                    window.webkit.messageHandlers.smapIos.postMessage({
+                        type: 'haptic',
+                        param: type,
+                        timestamp: Date.now(),
+                        url: currentURL,
+                        source: 'ios-bridge-haptic'
+                    });
+                    console.log(`✅ [Haptic] smapIos로 ${type} 햅틱 전송 성공`);
+                    return true;
+                } catch (error) {
+                    console.error(`❌ [Haptic] smapIos ${type} 햅틱 전송 실패:`, error);
+                }
+            }
+            
+            // 2순위: iosHandler 백업 사용
+            if (window.webkit?.messageHandlers?.iosHandler) {
+                try {
+                    window.webkit.messageHandlers.iosHandler.postMessage({
+                        action: 'hapticFeedback',
+                        style: type,
+                        timestamp: Date.now(),
+                        url: currentURL,
+                        source: 'ios-bridge-haptic-backup'
+                    });
+                    console.log(`✅ [Haptic] iosHandler로 ${type} 햅틱 전송 성공`);
+                    return true;
+                } catch (error) {
+                    console.error(`❌ [Haptic] iosHandler ${type} 햅틱 전송 실패:`, error);
+                }
+            }
+            
+            console.warn(`⚠️ [Haptic] ${type} 햅틱 전송 실패 - iOS 핸들러 없음`);
+            console.warn('⚠️ [Haptic] 사용 가능한 핸들러:', window.webkit?.messageHandlers ? Object.keys(window.webkit.messageHandlers) : 'none');
+            return false;
+        },
+
         // 가벼운 햅틱 (버튼 탭, 가벼운 상호작용)
         light() {
-            if (window.webkit?.messageHandlers?.smapIos) {
-                window.webkit.messageHandlers.smapIos.postMessage({
-                    type: 'haptic',
-                    param: 'light'
-                });
-                console.log('🎮 iOS 햅틱: light');
-            }
+            return this._sendHaptic('light');
         },
 
         // 중간 햅틱 (중간 정도의 상호작용)
         medium() {
-            if (window.webkit?.messageHandlers?.smapIos) {
-                window.webkit.messageHandlers.smapIos.postMessage({
-                    type: 'haptic',
-                    param: 'medium'
-                });
-                console.log('🎮 iOS 햅틱: medium');
-            }
+            return this._sendHaptic('medium');
         },
 
         // 강한 햅틱 (중요한 액션, 경고)
         heavy() {
-            if (window.webkit?.messageHandlers?.smapIos) {
-                window.webkit.messageHandlers.smapIos.postMessage({
-                    type: 'haptic',
-                    param: 'heavy'
-                });
-                console.log('🎮 iOS 햅틱: heavy');
-            }
+            return this._sendHaptic('heavy');
         },
 
         // 성공 햅틱
         success() {
-            if (window.webkit?.messageHandlers?.smapIos) {
-                window.webkit.messageHandlers.smapIos.postMessage({
-                    type: 'haptic',
-                    param: 'success'
-                });
-                console.log('🎮 iOS 햅틱: success');
-            }
+            return this._sendHaptic('success');
         },
 
         // 경고 햅틱
         warning() {
-            if (window.webkit?.messageHandlers?.smapIos) {
-                window.webkit.messageHandlers.smapIos.postMessage({
-                    type: 'haptic',
-                    param: 'warning'
-                });
-                console.log('🎮 iOS 햅틱: warning');
-            }
+            return this._sendHaptic('warning');
         },
 
         // 에러 햅틱
         error() {
-            if (window.webkit?.messageHandlers?.smapIos) {
-                window.webkit.messageHandlers.smapIos.postMessage({
-                    type: 'haptic',
-                    param: 'error'
-                });
-                console.log('🎮 iOS 햅틱: error');
-            }
+            return this._sendHaptic('error');
         },
 
         // 선택 변경 햅틱 (탭 전환, 선택 변경)
         selection() {
-            if (window.webkit?.messageHandlers?.smapIos) {
-                window.webkit.messageHandlers.smapIos.postMessage({
-                    type: 'haptic',
-                    param: 'selection'
-                });
-                console.log('🎮 iOS 햅틱: selection');
-            }
+            return this._sendHaptic('selection');
         }
     },
 
@@ -386,36 +569,65 @@ window.iosBridge = {
         }
     },
 
-    // Google Sign-In 기능
+    // Google Sign-In 기능 (강화된 버전)
     googleSignIn: {
+        // 🔐 통합 구글 메시지 전송 함수
+        _sendGoogleMessage(type, param = '') {
+            const currentURL = window.location.href;
+            console.log(`🔐 [GoogleSignIn] ${type} 요청 시작:`, { type, param, url: currentURL });
+            
+            // 1순위: smapIos 핸들러 사용
+            if (window.webkit?.messageHandlers?.smapIos) {
+                try {
+                    window.webkit.messageHandlers.smapIos.postMessage({
+                        type: type,
+                        param: param,
+                        timestamp: Date.now(),
+                        url: currentURL,
+                        source: 'ios-bridge-google'
+                    });
+                    console.log(`✅ [GoogleSignIn] smapIos로 ${type} 전송 성공`);
+                    return true;
+                } catch (error) {
+                    console.error(`❌ [GoogleSignIn] smapIos ${type} 전송 실패:`, error);
+                }
+            }
+            
+            // 2순위: iosHandler 백업 사용
+            if (window.webkit?.messageHandlers?.iosHandler) {
+                try {
+                    window.webkit.messageHandlers.iosHandler.postMessage({
+                        action: type,
+                        data: param,
+                        timestamp: Date.now(),
+                        url: currentURL,
+                        source: 'ios-bridge-google-backup'
+                    });
+                    console.log(`✅ [GoogleSignIn] iosHandler로 ${type} 전송 성공`);
+                    return true;
+                } catch (error) {
+                    console.error(`❌ [GoogleSignIn] iosHandler ${type} 전송 실패:`, error);
+                }
+            }
+            
+            console.warn(`⚠️ [GoogleSignIn] ${type} 전송 실패 - iOS 핸들러 없음`);
+            console.warn('⚠️ [GoogleSignIn] 사용 가능한 핸들러:', window.webkit?.messageHandlers ? Object.keys(window.webkit.messageHandlers) : 'none');
+            return false;
+        },
+
         // Google 로그인 시작
         signIn() {
-            if (window.webkit?.messageHandlers?.smapIos) {
-                window.webkit.messageHandlers.smapIos.postMessage({
-                    type: 'googleSignIn',
-                    param: ''
-                });
-            }
+            return this._sendGoogleMessage('googleSignIn');
         },
 
         // Google 로그아웃
         signOut() {
-            if (window.webkit?.messageHandlers?.smapIos) {
-                window.webkit.messageHandlers.smapIos.postMessage({
-                    type: 'googleSignOut',
-                    param: ''
-                });
-            }
+            return this._sendGoogleMessage('googleSignOut');
         },
 
         // 현재 로그인 상태 확인
         checkStatus() {
-            if (window.webkit?.messageHandlers?.smapIos) {
-                window.webkit.messageHandlers.smapIos.postMessage({
-                    type: 'googleSignInStatus',
-                    param: ''
-                });
-            }
+            return this._sendGoogleMessage('googleSignInStatus');
         }
     }
 }; 

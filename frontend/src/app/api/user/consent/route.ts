@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 백엔드 API 호출
-    const backendResponse = await fetch(`${process.env.BACKEND_URL || 'http://localhost:3001'}/api/member/consent`, {
+    const backendResponse = await fetch(`${process.env.BACKEND_URL || 'http://localhost:3000'}/api/member/consent`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

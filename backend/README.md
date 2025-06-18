@@ -181,9 +181,9 @@ npm start
 ```
 
 서버가 실행되면 다음 주소에서 확인할 수 있습니다:
-- 헬스 체크: http://localhost:3001/health
-- 인증 API: http://localhost:3001/api/auth
-- 회원 API: http://localhost:3001/api/member
+- 헬스 체크: http://localhost:3000/health
+- 인증 API: http://localhost:3000/api/auth
+- 회원 API: http://localhost:3000/api/member
 
 ## 아키텍처
 

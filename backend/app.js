@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3001;
 
 // CORS 설정
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  origin: ['http://localhost:3000','https://nextstep.smap.site'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
