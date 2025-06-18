@@ -586,7 +586,39 @@ export default function LogsPage() {
   const isMainInstance = useRef(false);
 
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  // WebKit 환경에서 안정적인 금일 날짜 생성
+  const getTodayDateString = useCallback(() => {
+    const now = new Date();
+    
+    // WebKit 환경 확인 (타입스크립트 오류 방지를 위해 window 체크)
+    const webkit = typeof window !== 'undefined' && (!!(window as any).webkit || navigator.userAgent.includes('WebKit'));
+    
+    // WebKit 환경에서 타임존 처리 보정
+    if (webkit) {
+      // 로컬 타임존 기준으로 명시적 계산
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const todayString = `${year}-${month}-${day}`;
+      
+      console.log('[getTodayDateString] WebKit 환경 금일 날짜:', {
+        originalDate: now.toISOString(),
+        localDate: now.toLocaleDateString(),
+        calculatedToday: todayString,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      });
+      
+      return todayString;
+    }
+    
+    // 일반 환경에서는 기존 방식
+    return format(now, 'yyyy-MM-dd');
+  }, []);
+
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    // 초기 렌더링에서는 기본값 사용, useEffect에서 정확한 날짜로 업데이트
+    return format(new Date(), 'yyyy-MM-dd');
+  });
   const [previousDate, setPreviousDate] = useState<string | null>(null); // 이전 날짜 추적
   const isDateChangedRef = useRef<boolean>(false); // 날짜 변경 플래그
   const isUserDateSelectionRef = useRef<boolean>(false); // 사용자가 직접 날짜를 선택했는지 추적
@@ -704,6 +736,19 @@ export default function LogsPage() {
         deviceMemory: (navigator as any).deviceMemory || 'unknown'
       });
       
+      // 환경 감지 후 정확한 금일 날짜로 업데이트
+      const accurateToday = getTodayDateString();
+      const currentSelected = selectedDate;
+      
+      if (currentSelected !== accurateToday) {
+        console.log('[LOGS PAGE] 금일 날짜 보정:', {
+          기존: currentSelected,
+          보정후: accurateToday,
+          webkit
+        });
+        setSelectedDate(accurateToday);
+      }
+      
       // WebKit 환경에서 성능 최적화
       if (webkit) {
         console.log('[LOGS WEBKIT] WebKit 환경 최적화 적용');
@@ -737,7 +782,56 @@ export default function LogsPage() {
         }
       }
     }
-  }, []);
+  }, [getTodayDateString, selectedDate]);
+
+  // 자정 넘어가면 금일 날짜 자동 업데이트
+  useEffect(() => {
+    const updateDateAtMidnight = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      
+      const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+      
+      const midnightTimer = setTimeout(() => {
+        const newToday = getTodayDateString();
+        const currentSelected = selectedDate;
+        
+        // 현재 선택된 날짜가 어제 날짜인 경우에만 금일로 업데이트
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayString = format(yesterday, 'yyyy-MM-dd');
+        
+        if (currentSelected === yesterdayString) {
+          console.log('[LOGS PAGE] 자정 지남 - 금일 날짜로 자동 업데이트:', {
+            기존: currentSelected,
+            신규: newToday
+          });
+          setSelectedDate(newToday);
+          
+          // 캐시 정리 (어제 데이터는 유지하되 새로운 오늘 데이터를 위해 준비)
+          console.log('[LOGS PAGE] 자정 업데이트 - 데이터 새로고침 준비');
+          
+                     // 현재 선택된 멤버가 있으면 새로운 날짜로 데이터 재로딩
+           const selectedMember = groupMembers.find(m => m.isSelected);
+           if (selectedMember && selectedGroupId) {
+             console.log('[LOGS PAGE] 자정 업데이트 - 선택된 멤버 데이터 재로딩:', selectedMember.name);
+             // 간단한 새로고침 신호만 전송 (실제 로딩은 상태 변경으로 트리거)
+             window.location.reload();
+           }
+        }
+        
+        // 다음 자정을 위한 재귀 설정
+        updateDateAtMidnight();
+      }, timeUntilMidnight);
+      
+      return () => clearTimeout(midnightTimer);
+    };
+    
+    const cleanup = updateDateAtMidnight();
+    return cleanup;
+     }, [getTodayDateString, selectedDate, groupMembers, selectedGroupId]);
 
   // 에러 처리 헬퍼 함수
   const handleDataError = (error: any, context: string) => {
@@ -2151,8 +2245,22 @@ export default function LogsPage() {
 
     // 캐시에서 먼저 확인 (멤버별로 구분하여 확인)
     if (selectedGroupId) {
-      const cachedLocationData = getCachedLocationData(selectedGroupId, date, mtIdx.toString());
-      const isCacheValid_Location = isCacheValid('locationData', selectedGroupId, date);
+      // WebKit 환경에서 금일 날짜 보정
+      let adjustedDate = date;
+      const todayString = getTodayDateString();
+      const isRequestingToday = date === format(new Date(), 'yyyy-MM-dd') || date === todayString;
+      
+      if (isWebKitEnv && isRequestingToday) {
+        adjustedDate = todayString;
+        console.log('[loadLocationData] WebKit 환경 금일 날짜 보정:', {
+          원본요청날짜: date,
+          보정된날짜: adjustedDate,
+          오늘날짜: todayString
+        });
+      }
+      
+      const cachedLocationData = getCachedLocationData(selectedGroupId, adjustedDate, mtIdx.toString());
+      const isCacheValid_Location = isCacheValid('locationData', selectedGroupId, adjustedDate);
       
       if (cachedLocationData && isCacheValid_Location) {
         console.log(`[loadLocationData] 캐시에서 위치 데이터 사용 (멤버 ${mtIdx}):`, date);
@@ -2314,6 +2422,22 @@ export default function LogsPage() {
       // 강화된 API 호출 로직 - 개별 호출로 변경하여 더 정확한 에러 추적
       console.log('[loadLocationData] 🎯 강화된 API 호출 시작');
       
+      // WebKit 환경에서 API 호출용 날짜 정규화
+      let apiDate = date;
+      const todayString = getTodayDateString();
+      const isRequestingToday = date === format(new Date(), 'yyyy-MM-dd') || date === todayString;
+      
+      if (isWebKitEnv && isRequestingToday) {
+        apiDate = todayString;
+        console.log('[loadLocationData] WebKit API 호출 날짜 정규화:', {
+          원본날짜: date,
+          정규화날짜: apiDate,
+          금일날짜: todayString,
+          isWebKit: isWebKitEnv,
+          isIOSWebView: isIOSWebViewEnv
+        });
+      }
+      
       let mapMarkers: MapMarker[] = [];
       let stayTimes: StayTime[] = [];
       let hasAnyApiSuccess = false;
@@ -2337,7 +2461,7 @@ export default function LogsPage() {
         });
         
         mapMarkers = await Promise.race([
-          memberLocationLogService.getMapMarkers(mtIdx, date),
+          memberLocationLogService.getMapMarkers(mtIdx, apiDate),
           timeoutPromise1
         ]) as MapMarker[];
         
@@ -2366,7 +2490,7 @@ export default function LogsPage() {
         });
         
         stayTimes = await Promise.race([
-          memberLocationLogService.getStayTimes(mtIdx, date),
+          memberLocationLogService.getStayTimes(mtIdx, apiDate),
           timeoutPromise2
         ]) as StayTime[];
         
@@ -2550,7 +2674,7 @@ export default function LogsPage() {
           locationLogSummary: validatedData.locationLogSummary,
           members: groupMembers
         };
-        setCachedLocationData(selectedGroupId, date, mtIdx.toString(), locationDataForCache);
+        setCachedLocationData(selectedGroupId, apiDate, mtIdx.toString(), locationDataForCache);
         console.log(`[loadLocationData] 데이터를 캐시에 저장 (멤버 ${mtIdx}):`, date);
       }
       
@@ -5669,6 +5793,24 @@ export default function LogsPage() {
               <div>메인: {isMainInstance.current ? '✅' : '❌'}</div>
               <div>사이드바: {isSidebarOpen ? '열림' : '닫힘'}</div>
               <div>날짜: {selectedDate}</div>
+              {/* WebKit 환경 정보 */}
+              <div className="border-t pt-1 mt-1">
+                <div className="font-bold text-purple-600">🌐 환경 정보</div>
+                <div className="text-xs space-y-1">
+                  <div className={isWebKitEnv ? 'text-green-600' : 'text-gray-400'}>
+                    WebKit: {isWebKitEnv ? '✅ 감지됨' : '❌ 일반환경'}
+                  </div>
+                  <div className={isIOSWebViewEnv ? 'text-green-600' : 'text-gray-400'}>
+                    iOS WebView: {isIOSWebViewEnv ? '✅ 감지됨' : '❌ 일반환경'}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    금일: {getTodayDateString()}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    타임존: {Intl.DateTimeFormat().resolvedOptions().timeZone}
+                  </div>
+                </div>
+              </div>
               {dataError && (
                 <div className="text-red-600 font-bold">에러: {dataError.message}</div>
               )}
