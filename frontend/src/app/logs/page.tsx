@@ -3316,16 +3316,14 @@ export default function LogsPage() {
 
     const position = new window.naver.maps.LatLng(lat, lng);
 
-    // 기존 마커가 있다면 위치만 업데이트 (마커 재사용)
-    if (currentPositionMarker.current && currentPositionMarker.current.setPosition) {
-      currentPositionMarker.current.setPosition(position);
-      
-      // InfoWindow 내용만 업데이트 (DOM 조작 최소화)
+    // 기존 마커가 있다면 새로 생성 (InfoWindow 깜빡임 방지)
+    if (currentPositionMarker.current) {
+      // 기존 InfoWindow 정리
       if (currentPositionMarker.current.infoWindow) {
-        const updatedContent = createInfoWindowContent(targetIndex, totalMarkers, sortedLocationData[targetIndex]);
-        currentPositionMarker.current.infoWindow.setContent(updatedContent);
+        currentPositionMarker.current.infoWindow.close();
       }
-      return;
+      currentPositionMarker.current.setMap(null);
+      currentPositionMarker.current = null;
     }
 
     // 기존 현재 위치 마커 제거 (최초 생성시에만)
