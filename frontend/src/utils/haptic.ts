@@ -521,9 +521,9 @@ const fallbackToWebVibration = (type: HapticFeedbackType, env: any) => {
         console.log(`⚠️ [HAPTIC] iOS 바이브레이션 차단됨`);
       }
     }
-      } else {
-      console.log(`⚠️ [HAPTIC] 햅틱 미지원 환경`);
-    }
+  } else {
+    console.log(`⚠️ [HAPTIC] 햅틱 미지원 환경`);
+  }
 };
 
 /**
@@ -615,4 +615,85 @@ export const hapticFeedback = {
   groupSelect: (context?: any) => triggerHapticFeedback(HapticFeedbackType.LIGHT, '그룹 선택', { action: 'group_select', ...context }),
   locationUpdate: (context?: any) => triggerHapticFeedback(HapticFeedbackType.LIGHT, '위치 업데이트', { action: 'location_update', ...context }),
   markerTap: (context?: any) => triggerHapticFeedback(HapticFeedbackType.MEDIUM, '마커 탭', { action: 'marker_tap', ...context }),
-}; 
+};
+
+/**
+ * 전역 테스트용 햅틱 함수들 (웹 콘솔에서 직접 사용 가능)
+ */
+if (typeof window !== 'undefined') {
+  // 강제 햅틱 테스트 함수
+  (window as any).SMAP_FORCE_HAPTIC = (type: string = 'success') => {
+    console.log(`🎮 [FORCE-HAPTIC-TEST] 강제 햅틱 테스트 시작: ${type}`);
+    
+    const hapticType = type as HapticFeedbackType;
+    const env = detectIOSEnvironment();
+    
+         console.log(`🔍 [HAPTIC-ENV] 환경 감지:`, {
+       isIOS: env.isIOS,
+       isIOSApp: env.isIOSApp, 
+       isIOSBrowser: env.isIOSBrowser,
+       isWebView: env.isWebView,
+       hasWebKit: env.hasWebKit,
+       hasHandler: env.hasHandler,
+       totalHandlers: env.webViewDebug?.totalHandlers || 0,
+       availableHandlers: env.webViewDebug?.availableHandlers || [],
+       nativeCheck: env.nativeCheck
+     });
+    
+    // 강제 햅틱 실행
+    triggerHapticFeedback(hapticType, `강제 햅틱 테스트: ${type}`, { 
+      source: 'console_test',
+      forcedType: type,
+      timestamp: Date.now()
+    });
+    
+    return `✅ 햅틱 테스트 완료: ${type}`;
+  };
+  
+  // 모든 햅틱 타입 순차 테스트 함수
+  (window as any).SMAP_TEST_ALL_HAPTICS = () => {
+    console.log(`🎯 [ALL-HAPTICS-TEST] 모든 햅틱 타입 순차 테스트 시작`);
+    
+    const hapticTypes = ['light', 'medium', 'heavy', 'success', 'warning', 'error', 'selection'];
+    let currentIndex = 0;
+    
+    const testNextHaptic = () => {
+      if (currentIndex < hapticTypes.length) {
+        const type = hapticTypes[currentIndex];
+        console.log(`🔄 [HAPTIC-TEST] ${currentIndex + 1}/${hapticTypes.length} - ${type} 햅틱 테스트`);
+        
+        (window as any).SMAP_FORCE_HAPTIC(type);
+        currentIndex++;
+        
+        // 1.5초 후 다음 햅틱 테스트
+        setTimeout(testNextHaptic, 1500);
+      } else {
+        console.log(`🎉 [ALL-HAPTICS-TEST] 모든 햅틱 테스트 완료!`);
+      }
+    };
+    
+    testNextHaptic();
+    return `🚀 모든 햅틱 타입 순차 테스트 시작됨 (총 ${hapticTypes.length}개)`;
+  };
+  
+  // 간편 햅틱 함수들
+  (window as any).smapHaptic = (type: string = 'success') => {
+    const result = triggerHapticFeedback(
+      type as HapticFeedbackType, 
+      `간편 햅틱: ${type}`, 
+      { source: 'smapHaptic' }
+    );
+    console.log(`✅ [SMAP-HAPTIC] ${type} 햅틱 실행 완료`);
+    return result;
+  };
+  
+  (window as any).lightHaptic = () => (window as any).smapHaptic('light');
+  (window as any).mediumHaptic = () => (window as any).smapHaptic('medium');
+  (window as any).heavyHaptic = () => (window as any).smapHaptic('heavy');
+  (window as any).successHaptic = () => (window as any).smapHaptic('success');
+  (window as any).errorHaptic = () => (window as any).smapHaptic('error');
+  (window as any).warningHaptic = () => (window as any).smapHaptic('warning');
+  
+  console.log('🎮 [HAPTIC-GLOBALS] 전역 햅틱 테스트 함수들 등록 완료');
+  console.log('📋 사용 가능한 함수들: SMAP_FORCE_HAPTIC(type), SMAP_TEST_ALL_HAPTICS(), smapHaptic(type), lightHaptic(), mediumHaptic(), heavyHaptic(), successHaptic(), errorHaptic(), warningHaptic()');
+} 
