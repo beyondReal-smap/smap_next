@@ -1,16 +1,25 @@
-// iOS-Next.js Bridge (강화된 버전)
+// iOS-Next.js Bridge (완전 강화된 버전)
 // iOS 웹뷰와 Next.js 애플리케이션 간의 통신 인터페이스
 
-console.log('🌉 [iOS Bridge] 초기화 시작');
+console.log('🌉 [iOS Bridge] 완전 강화된 초기화 시작');
+console.log('🌉 [iOS Bridge] 현재 URL:', window.location.href);
+console.log('🌉 [iOS Bridge] User Agent:', navigator.userAgent);
 
-// 🔧 WebKit MessageHandler 환경 감지 및 강제 초기화
+// 🔧 WebKit MessageHandler 환경 감지 및 강제 초기화 (대폭 강화)
 (function initializeWebKitHandlers() {
     const currentURL = window.location.href;
     const isIOSWebView = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const isProduction = window.location.hostname === 'nextstep.smap.site';
+    const isSimulator = /Simulator/.test(navigator.userAgent);
     
-    console.log('🔍 [iOS Bridge] 환경 감지:', {
+    console.log('🔍 [iOS Bridge] 완전 강화된 환경 감지:', {
         isIOSWebView,
+        isLocalhost,
+        isProduction,
+        isSimulator,
         currentURL,
+        hostname: window.location.hostname,
         hasWebKit: !!window.webkit,
         hasMessageHandlers: !!(window.webkit?.messageHandlers),
         availableHandlers: window.webkit?.messageHandlers ? 
@@ -18,38 +27,91 @@ console.log('🌉 [iOS Bridge] 초기화 시작');
         userAgent: navigator.userAgent.substring(0, 100)
     });
     
-    // iOS WebView 환경에서 webkit이 없다면 강제 초기화 시도
-    if (isIOSWebView && !window.webkit) {
-        console.warn('⚠️ [iOS Bridge] iOS WebView 환경인데 webkit 없음 - 임시 객체 생성');
-        window.webkit = {
-            messageHandlers: {}
-        };
-    }
-    
-    // messageHandlers가 없다면 빈 객체로 초기화
-    if (isIOSWebView && window.webkit && !window.webkit.messageHandlers) {
-        console.warn('⚠️ [iOS Bridge] messageHandlers 없음 - 빈 객체 생성');
-        window.webkit.messageHandlers = {};
-    }
-    
-    // 필수 핸들러들이 없다면 가짜 핸들러 등록
-    if (isIOSWebView && window.webkit && window.webkit.messageHandlers) {
-        const requiredHandlers = ['smapIos', 'iosHandler'];
+    // 🚨 모든 iOS 환경에서 webkit 강제 초기화
+    if (isIOSWebView) {
+        if (!window.webkit) {
+            console.warn('⚠️ [iOS Bridge] iOS 환경인데 webkit 없음 - 강제 객체 생성');
+            window.webkit = {
+                messageHandlers: {}
+            };
+        }
         
-        requiredHandlers.forEach(handlerName => {
-            if (!window.webkit.messageHandlers[handlerName]) {
-                console.warn(`⚠️ [iOS Bridge] ${handlerName} 핸들러 없음 - 가짜 핸들러 생성`);
-                window.webkit.messageHandlers[handlerName] = {
-                    postMessage: function(message) {
-                        console.log(`📤 [${handlerName}] 메시지:`, message);
-                        // CustomEvent로 네이티브에 알림 시도
-                        window.dispatchEvent(new CustomEvent('smap-ios-message', {
-                            detail: { handler: handlerName, message: message }
-                        }));
-                    }
-                };
-            }
-        });
+        // messageHandlers가 없다면 빈 객체로 초기화
+        if (window.webkit && !window.webkit.messageHandlers) {
+            console.warn('⚠️ [iOS Bridge] messageHandlers 없음 - 강제 객체 생성');
+            window.webkit.messageHandlers = {};
+        }
+        
+        // 필수 핸들러들이 없다면 완전한 가짜 핸들러 등록
+        if (window.webkit && window.webkit.messageHandlers) {
+            const requiredHandlers = ['smapIos', 'iosHandler'];
+            
+            requiredHandlers.forEach(handlerName => {
+                if (!window.webkit.messageHandlers[handlerName]) {
+                    console.warn(`⚠️ [iOS Bridge] ${handlerName} 핸들러 없음 - 완전한 가짜 핸들러 생성`);
+                    window.webkit.messageHandlers[handlerName] = {
+                        postMessage: function(message) {
+                            console.log(`📤 [${handlerName}] 메시지 (가짜 핸들러):`, message);
+                            
+                            // 햅틱 메시지인 경우 특별 처리
+                            if (message && (message.type === 'hapticFeedback' || message.action === 'hapticFeedback')) {
+                                console.log('🎮 [iOS Bridge] 햅틱 메시지 감지 - 특별 처리 시도');
+                                
+                                // 여러 방법으로 햅틱 시도
+                                try {
+                                    // 방법 1: navigator.vibrate (Android/일부 iOS)
+                                    if (navigator.vibrate) {
+                                        const style = message.style || message.param?.style || 'medium';
+                                        const patterns = {
+                                            light: 50,
+                                            medium: 100,
+                                            heavy: 200,
+                                            success: [100, 50, 100],
+                                            warning: [50, 50, 50, 50, 50],
+                                            error: [200, 100, 200]
+                                        };
+                                        navigator.vibrate(patterns[style] || 100);
+                                        console.log('🎮 [iOS Bridge] navigator.vibrate 성공:', style);
+                                    }
+                                    
+                                    // 방법 2: CustomEvent 발송
+                                    window.dispatchEvent(new CustomEvent('ios-haptic-feedback', {
+                                        detail: { style: message.style || message.param?.style || 'medium' }
+                                    }));
+                                    
+                                    // 방법 3: 콘솔에 명확한 로그 출력
+                                    console.log('🎮🎮🎮 [HAPTIC FEEDBACK] 실행됨:', {
+                                        style: message.style || message.param?.style || 'medium',
+                                        timestamp: new Date().toISOString(),
+                                        source: 'ios-bridge fake handler'
+                                    });
+                                    
+                                } catch (error) {
+                                    console.error('🎮 [iOS Bridge] 햅틱 처리 실패:', error);
+                                }
+                            }
+                            
+                            // CustomEvent로 네이티브에 알림 시도
+                            window.dispatchEvent(new CustomEvent('smap-ios-message', {
+                                detail: { handler: handlerName, message: message }
+                            }));
+                        }
+                    };
+                }
+            });
+        }
+        
+        // 강제 환경 플래그 설정
+        window.__SMAP_IOS_ENVIRONMENT__ = {
+            isWebView: true,
+            hasHandlers: true,
+            isSimulator: isSimulator,
+            isLocalhost: isLocalhost,
+            isProduction: isProduction,
+            timestamp: Date.now()
+        };
+        
+        console.log('✅ [iOS Bridge] iOS 환경 강제 설정 완료:', window.__SMAP_IOS_ENVIRONMENT__);
     }
 })();
 
@@ -135,9 +197,59 @@ window.SmapApp = {
     },
 
     feedback: {
-        // 햅틱 피드백
+        // 햅틱 피드백 (강화된 버전)
         impact: function(style = 'medium') {
-            window.SmapApp.sendMessage('hapticFeedback', { style: style });
+            console.log('🎮 [SmapApp.feedback.impact] 햅틱 피드백 요청:', style);
+            
+            // 방법 1: 기본 메시지 전송
+            const success1 = window.SmapApp.sendMessage('hapticFeedback', { style: style });
+            
+            // 방법 2: 백업 직접 webkit 호출
+            try {
+                if (window.webkit?.messageHandlers?.smapIos) {
+                    window.webkit.messageHandlers.smapIos.postMessage({
+                        type: 'hapticFeedback',
+                        param: { style: style },
+                        timestamp: Date.now()
+                    });
+                    console.log('🎮 [SmapApp.feedback.impact] 직접 webkit 호출 성공');
+                }
+            } catch (error) {
+                console.warn('🎮 [SmapApp.feedback.impact] 직접 webkit 호출 실패:', error);
+            }
+            
+            // 방법 3: navigator.vibrate 백업
+            try {
+                if (navigator.vibrate) {
+                    const patterns = {
+                        light: 50,
+                        medium: 100,
+                        heavy: 200,
+                        success: [100, 50, 100],
+                        warning: [50, 50, 50, 50, 50],
+                        error: [200, 100, 200]
+                    };
+                    navigator.vibrate(patterns[style] || 100);
+                    console.log('🎮 [SmapApp.feedback.impact] navigator.vibrate 백업 성공');
+                }
+            } catch (error) {
+                console.warn('🎮 [SmapApp.feedback.impact] navigator.vibrate 백업 실패:', error);
+            }
+            
+            // 방법 4: CustomEvent 발송
+            window.dispatchEvent(new CustomEvent('smap-haptic-request', {
+                detail: { style: style, source: 'SmapApp.feedback.impact' }
+            }));
+            
+            // 명확한 로그 출력
+            console.log('🎮🎮🎮 [HAPTIC FEEDBACK] SmapApp.feedback.impact 실행:', {
+                style: style,
+                timestamp: new Date().toISOString(),
+                success: success1,
+                url: window.location.href
+            });
+            
+            return success1;
         }
     },
 
@@ -430,18 +542,135 @@ window.SMAP_DEBUG_INFO = function() {
     return debugInfo;
 };
 
+// 🚨 강력한 테스트 함수들 추가 (nextstep.smap.site용)
+window.TEST_ENV = function() {
+    const info = {
+        url: window.location.href,
+        hostname: window.location.hostname,
+        userAgent: navigator.userAgent.substring(0, 100) + '...',
+        isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent),
+        hasWebKit: !!window.webkit,
+        hasMessageHandlers: !!window.webkit?.messageHandlers,
+        handlers: window.webkit?.messageHandlers ? Object.keys(window.webkit.messageHandlers) : [],
+        iosBridge: !!window.iosBridge,
+        smapApp: !!window.SmapApp,
+        testFunctions: {
+            SMAP_HAPTIC_TEST: !!window.SMAP_HAPTIC_TEST,
+            SMAP_GOOGLE_TEST: !!window.SMAP_GOOGLE_TEST,
+            SMAP_DEBUG_INFO: !!window.SMAP_DEBUG_INFO,
+            TEST_HAPTIC: !!window.TEST_HAPTIC,
+            TEST_GOOGLE: !!window.TEST_GOOGLE
+        }
+    };
+    
+    console.log('🔍 [TEST_ENV] 환경 정보:', info);
+    return info;
+};
+
+window.TEST_HAPTIC = function(type = 'success') {
+    console.log(`🎮 [TEST_HAPTIC] ${type} 햅틱 테스트 시작`);
+    
+    // 방법 1: SMAP_HAPTIC_TEST 사용
+    if (window.SMAP_HAPTIC_TEST) {
+        console.log('🎮 [TEST_HAPTIC] 방법 1: SMAP_HAPTIC_TEST 사용');
+        window.SMAP_HAPTIC_TEST(type);
+    }
+    
+    // 방법 2: SmapApp.feedback.impact 사용
+    if (window.SmapApp?.feedback?.impact) {
+        console.log('🎮 [TEST_HAPTIC] 방법 2: SmapApp.feedback.impact 사용');
+        window.SmapApp.feedback.impact(type);
+    }
+    
+    // 방법 3: iosBridge.haptic 사용
+    if (window.iosBridge?.haptic?.[type]) {
+        console.log(`🎮 [TEST_HAPTIC] 방법 3: iosBridge.haptic.${type} 사용`);
+        window.iosBridge.haptic[type]();
+    }
+    
+    // 방법 4: 직접 webkit 호출
+    if (window.webkit?.messageHandlers?.smapIos) {
+        console.log('🎮 [TEST_HAPTIC] 방법 4: 직접 webkit 호출');
+        try {
+            window.webkit.messageHandlers.smapIos.postMessage({
+                type: 'haptic',
+                param: type,
+                timestamp: Date.now(),
+                source: 'TEST_HAPTIC'
+            });
+            console.log('🎮 [TEST_HAPTIC] 직접 webkit 호출 성공');
+        } catch (error) {
+            console.error('🎮 [TEST_HAPTIC] 직접 webkit 호출 실패:', error);
+        }
+    }
+    
+    console.log(`🎮 [TEST_HAPTIC] ${type} 햅틱 테스트 완료`);
+};
+
+window.TEST_GOOGLE = function() {
+    console.log('🔍 [TEST_GOOGLE] Google 로그인 테스트 시작');
+    
+    if (window.SMAP_GOOGLE_TEST) {
+        console.log('🔍 [TEST_GOOGLE] SMAP_GOOGLE_TEST 사용');
+        window.SMAP_GOOGLE_TEST();
+    } else {
+        console.log('🔍 [TEST_GOOGLE] 직접 방법들 시도');
+        
+        // 여러 방법 시도
+        const methods = [
+            () => window.iosBridge?.googleSignIn?.signIn?.(),
+            () => window.SmapApp?.sendMessage('googleSignIn'),
+            () => {
+                if (window.webkit?.messageHandlers?.smapIos) {
+                    window.webkit.messageHandlers.smapIos.postMessage({
+                        type: 'googleSignIn',
+                        param: '',
+                        timestamp: Date.now(),
+                        source: 'TEST_GOOGLE'
+                    });
+                }
+            }
+        ];
+        
+        methods.forEach((method, index) => {
+            try {
+                console.log(`🔍 [TEST_GOOGLE] 방법 ${index + 1} 시도`);
+                method();
+            } catch (error) {
+                console.error(`🔍 [TEST_GOOGLE] 방법 ${index + 1} 실패:`, error);
+            }
+        });
+    }
+    
+    console.log('🔍 [TEST_GOOGLE] Google 로그인 테스트 완료');
+};
+
 // 자동 환경 감지 및 디버그 정보 출력
 setTimeout(() => {
-    console.log('🌉 [iOS Bridge] 초기화 완료');
+    console.log('🌉 [iOS Bridge] 완전 강화된 초기화 완료');
+    console.log('🌉 [iOS Bridge] URL:', window.location.href);
     
     if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
         console.log('📱 [iOS Bridge] iOS 디바이스 감지됨');
-        window.SMAP_DEBUG_INFO();
+        window.SMAP_DEBUG_INFO?.();
         
-        console.log('💡 [iOS Bridge] 테스트 함수 사용법:');
-        console.log('   SMAP_HAPTIC_TEST("success") - 햅틱 테스트');
-        console.log('   SMAP_GOOGLE_TEST() - Google 로그인 테스트');
-        console.log('   SMAP_DEBUG_INFO() - 디버그 정보 출력');
+        console.log('💡 [iOS Bridge] 🚨 강화된 테스트 함수 사용법:');
+        console.log('   TEST_ENV() - 환경 정보 전체 출력');
+        console.log('   TEST_HAPTIC("success") - 햅틱 완전 테스트');
+        console.log('   TEST_GOOGLE() - Google 로그인 완전 테스트');
+        console.log('   SMAP_HAPTIC_TEST("success") - 고급 햅틱 테스트');
+        console.log('   SMAP_DEBUG_INFO() - 상세 디버그 정보');
+        
+        // nextstep.smap.site에서 자동 디버그 정보 출력
+        if (window.location.hostname === 'nextstep.smap.site') {
+            console.log('🚨 [AUTO-DEBUG] nextstep.smap.site 감지 - 자동 환경 체크');
+            setTimeout(() => {
+                window.TEST_ENV();
+            }, 2000);
+        }
+    } else {
+        console.log('🌐 [iOS Bridge] 비-iOS 환경, 테스트 함수만 등록');
+        console.log('💡 [iOS Bridge] 테스트 함수: TEST_ENV(), TEST_HAPTIC(), TEST_GOOGLE()');
     }
 }, 1000);
 

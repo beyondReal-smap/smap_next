@@ -119,7 +119,7 @@ export default function SignInPage() {
     keydown?: (e: KeyboardEvent) => void;
   }>({});
 
-  // iOS WebView 환경 감지 개선
+  // iOS WebView 환경 감지 - 모든 제한 제거, 매우 관대한 감지
   const isIOSWebView = React.useMemo(() => {
     if (typeof window === 'undefined') return false;
     
@@ -127,16 +127,30 @@ export default function SignInPage() {
     const isIOS = /iPad|iPhone|iPod/.test(userAgent);
     const hasWebKit = !!(window as any).webkit;
     const hasMessageHandlers = !!(window as any).webkit?.messageHandlers;
+    const hasIosBridge = typeof (window as any).SMAP_FORCE_HAPTIC === 'function';
+    const isLocalhost = window.location.hostname === 'localhost';
+    const isSimulator = /Simulator/.test(userAgent);
     
-    console.log('[SIGNIN] 환경 감지:', {
+    // 🚨 제한 완전 제거 - 아래 조건 중 하나라도 만족하면 iOS 앱으로 인정
+    const conditions = {
+      condition1: isIOS && hasWebKit && hasMessageHandlers, // 표준 WebKit
+      condition2: isIOS && hasIosBridge, // ios-bridge.js가 로드된 iOS
+      condition3: isLocalhost && isIOS, // localhost의 iOS
+      condition4: isSimulator, // iOS 시뮬레이터
+      condition5: (window as any).__FORCE_IOS_MODE__ === true, // 강제 iOS 모드
+      condition6: isIOS // 단순히 iOS면 모두 허용
+    };
+    
+    const result = Object.values(conditions).some(Boolean);
+    
+    console.log('[SIGNIN] 🚨 제한 해제된 환경 감지:', {
       userAgent: userAgent.substring(0, 50) + '...',
-      isIOS,
-      hasWebKit,
-      hasMessageHandlers,
-      isWebView: isIOS && hasWebKit && hasMessageHandlers
+      hostname: window.location.hostname,
+      conditions,
+      finalResult: result
     });
     
-    return isIOS && hasWebKit && hasMessageHandlers;
+    return result;
   }, []);
 
   // 안전한 이벤트 등록 함수
@@ -1831,13 +1845,13 @@ export default function SignInPage() {
         }
       });
       
-              // 🚨 iOS 시뮬레이터 테스트: 시뮬레이터에서도 Google 로그인 허용
-      if (isIOSWebView || isIOSSimulator) {
-          // 🚨 iOS 시뮬레이터 환경 처리: 실제 Google SDK 사용
-        if (isIOSSimulator) {
-          console.log('[GOOGLE LOGIN] 🧪 iOS 시뮬레이터 환경에서 실제 Google SDK 사용');
+              // 🚨 모든 환경에서 Google 로그인 완전 허용
+      if (isIOSWebView || isIOSSimulator || true) { // 모든 환경 허용
+          // 🚨 모든 환경에서 실제 Google SDK 사용 허용
+        if (isIOSSimulator || (!isIOSWebView && /iPad|iPhone|iPod/.test(navigator.userAgent))) {
+          console.log('[GOOGLE LOGIN] 🚨 모든 iOS 환경에서 Google SDK 사용 허용');
           
-          // 시뮬레이터에서는 웹 Google SDK를 사용
+          // 모든 iOS 환경에서 웹 Google SDK 허용
           try {
             // Google SDK 로드 확인
             if (typeof (window as any).google === 'undefined') {
@@ -1857,7 +1871,7 @@ export default function SignInPage() {
               
               script.onerror = () => {
                 console.error('[GOOGLE LOGIN] Google SDK 로드 실패');
-                showError('🧪 시뮬레이터 테스트\n\nGoogle SDK 로드에 실패했습니다.\n\n전화번호 로그인을 사용해주세요.');
+                showError('Google SDK 로드에 실패했습니다.\n\n잠시 후 다시 시도하거나\n전화번호 로그인을 사용해주세요.');
                 setIsLoading(false);
               };
               
@@ -1869,8 +1883,8 @@ export default function SignInPage() {
               return;
             }
           } catch (error) {
-            console.error('[GOOGLE LOGIN] 시뮬레이터 Google SDK 처리 실패:', error);
-            showError('🧪 시뮬레이터 테스트\n\nGoogle 로그인 처리 중 오류가 발생했습니다.\n\n전화번호 로그인을 사용해주세요.');
+            console.error('[GOOGLE LOGIN] Google SDK 처리 실패:', error);
+            showError('Google 로그인 처리 중 오류가 발생했습니다.\n\n잠시 후 다시 시도하거나\n전화번호 로그인을 사용해주세요.');
             setIsLoading(false);
             return;
           }
@@ -2028,50 +2042,30 @@ export default function SignInPage() {
         });
         console.log('🎮 [SIGNIN] Google 로그인 환경 오류 햅틱 피드백 실행');
         
-        // 에러 모달 강제 표시
+        // 🚨 네이티브 실패 시에도 웹 SDK 백업 사용
+        console.log('[GOOGLE LOGIN] 🚨 네이티브 실패, 웹 SDK 백업 사용');
         setTimeout(() => {
-          showError('Google 로그인을 사용할 수 없습니다.\n\n가능한 해결 방법:\n1. 앱을 완전히 종료 후 다시 시작\n2. 네트워크 연결 확인\n3. 앱 업데이트 확인');
+          handleGoogleSDKLogin();
         }, 100);
         return;
       }
       
-              // 웹 환경에서 Google SDK를 사용한 로그인
-        console.log('웹 환경에서 Google SDK 로그인 시도');
-        
-        // iOS 로그 전송 - 웹 환경에서 시도
-        sendLogToiOS('info', '🌐 웹 환경에서 Google SDK 로그인 시도', {
-          timestamp: new Date().toISOString(),
-          environment: 'web',
-          userAgent: navigator.userAgent
-        });
-        
-        // Google SDK를 사용한 웹 로그인 처리
-        try {
-          // Google SDK가 로드되었는지 확인
-          if (!(window as any).google?.accounts?.id) {
-            console.warn('[GOOGLE LOGIN] Google SDK가 로드되지 않음');
-            throw new Error('Google 로그인 서비스를 초기화할 수 없습니다.');
-          }
-          
-          // Google One Tap 로그인 실행
-          (window as any).google.accounts.id.initialize({
-            client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',
-            callback: (response: any) => {
-              console.log('[GOOGLE LOGIN] 웹에서 Google 로그인 성공:', response);
-              // 여기서 ID 토큰을 서버로 전송하여 로그인 처리
-              handleGoogleCallback(response);
-            }
-          });
-          
-          (window as any).google.accounts.id.prompt();
-          return;
-          
-        } catch (webGoogleError) {
-          console.error('[GOOGLE LOGIN] 웹 Google 로그인 실패:', webGoogleError);
-          setTimeout(() => {
-            showError('Google 로그인에 실패했습니다.\n\n전화번호 로그인을 사용해주세요.');
-          }, 100);
-        }
+      // 🚨 모든 환경에서 Google SDK 완전 허용
+      console.log('[GOOGLE LOGIN] 🚨 모든 환경에서 Google SDK 로그인 허용');
+      
+      // iOS 로그 전송 - 모든 환경 허용
+      sendLogToiOS('info', '🌐 모든 환경에서 Google SDK 로그인 허용', {
+        timestamp: new Date().toISOString(),
+        environment: 'universal',
+        userAgent: navigator.userAgent,
+        restriction: 'COMPLETELY REMOVED'
+      });
+      
+      // Google SDK를 사용한 로그인 처리 (모든 환경 허용)
+      setTimeout(() => {
+        handleGoogleSDKLogin();
+      }, 100);
+      return;
       
       /*
       // NextAuth 관련 코드 임시 비활성화
