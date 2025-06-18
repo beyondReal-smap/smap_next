@@ -2430,11 +2430,12 @@ export default function LocationPage() {
                   </div>
                 </div>
                 
-                <div style="margin-bottom: 6px;">
-                  <p style="margin: 0; font-size: 12px; color: #64748b;">
-                    📍 위치: <span id="first-member-address-${firstMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3;">주소 변환 중...</span>
-                  </p>
-                </div>
+                                                                     <div style="margin-bottom: 6px;">
+                     <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
+                       <span style="flex-shrink: 0;">📍 위치: </span>
+                       <span id="first-member-address-${firstMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3; text-indent: hanging; padding-left: 0;">주소 변환 중...</span>
+                     </div>
+                   </div>
                 <div>
                   <p style="margin: 0; font-size: 11px; color: #9ca3af;">
                     🗺️ 현재 위치 정보
@@ -2690,8 +2691,8 @@ export default function LocationPage() {
         window.naver.maps.Service.reverseGeocode({
           coords: coord,
           orders: [
-            window.naver.maps.Service.OrderType.ADDR,
-            window.naver.maps.Service.OrderType.ROAD_ADDR
+            window.naver.maps.Service.OrderType.ROAD_ADDR,
+            window.naver.maps.Service.OrderType.ADDR
           ].join(',')
         }, (status: any, response: any) => {
           if (status === window.naver.maps.Service.Status.ERROR) {
@@ -2700,45 +2701,74 @@ export default function LocationPage() {
             return;
           }
 
-          if (response.v2?.results?.length > 0) {
-            const result = response.v2.results[0];
+          try {
+            console.log('[getAddressFromCoordinates] 전체 응답:', response);
             
-            console.log('[getAddressFromCoordinates] 역지오코딩 응답:', result);
-            
-            // 네이버 맵 API 응답 구조에 맞게 수정
             let address = '';
             
-            if (result.name) {
-              // 도로명 주소가 있는 경우
-              address = result.name;
-            } else if (result.region) {
-              // 지번 주소 구성
-              const parts = [];
-              if (result.region.area1?.name) parts.push(result.region.area1.name);
-              if (result.region.area2?.name) parts.push(result.region.area2.name);
-              if (result.region.area3?.name) parts.push(result.region.area3.name);
-              if (result.region.area4?.name) parts.push(result.region.area4.name);
-              if (result.land?.name) parts.push(result.land.name);
-              if (result.land?.number1) parts.push(result.land.number1);
-              if (result.land?.number2) parts.push('-' + result.land.number2);
-              
-              address = parts.join(' ');
+            // 도로명 주소 우선 처리
+            if (response?.v2?.results) {
+              for (const result of response.v2.results) {
+                console.log('[getAddressFromCoordinates] 결과 항목:', result);
+                
+                // 도로명 주소 확인
+                if (result.name && result.name !== 'addr' && result.name.includes('로') || result.name.includes('길')) {
+                  address = result.name;
+                  console.log('[getAddressFromCoordinates] 도로명 주소 사용:', address);
+                  break;
+                }
+                
+                // 지번 주소 구성 (region 정보 활용)
+                if (result.region && !address) {
+                  const parts = [];
+                  if (result.region.area1?.name) parts.push(result.region.area1.name);
+                  if (result.region.area2?.name) parts.push(result.region.area2.name);
+                  if (result.region.area3?.name) parts.push(result.region.area3.name);
+                  if (result.region.area4?.name) parts.push(result.region.area4.name);
+                  
+                  // 지번 정보 추가
+                  if (result.land) {
+                    if (result.land.name) parts.push(result.land.name);
+                    if (result.land.number1) {
+                      if (result.land.number2) {
+                        parts.push(`${result.land.number1}-${result.land.number2}`);
+                      } else {
+                        parts.push(result.land.number1);
+                      }
+                    }
+                  }
+                  
+                  const regionAddress = parts.filter(part => part && part.trim()).join(' ');
+                  if (regionAddress && regionAddress.length > 5) {
+                    address = regionAddress;
+                    console.log('[getAddressFromCoordinates] 지번 주소 사용:', address);
+                    break;
+                  }
+                }
+              }
             }
             
-            // 주소가 비어있으면 좌표 표시
-            if (!address.trim()) {
+            // 결과가 여전히 없으면 단순한 이름 사용
+            if (!address && response?.v2?.results?.length > 0) {
+              for (const result of response.v2.results) {
+                if (result.name && result.name !== 'addr' && result.name.length > 3) {
+                  address = result.name;
+                  console.log('[getAddressFromCoordinates] 기본 이름 사용:', address);
+                  break;
+                }
+              }
+            }
+            
+            // 최종적으로 주소가 없거나 "addr"인 경우 좌표 표시
+            if (!address || address.trim() === 'addr' || address.trim() === '' || address.length < 3) {
               address = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+              console.log('[getAddressFromCoordinates] 주소 파싱 실패, 좌표 사용:', address);
             }
             
-            console.log('[getAddressFromCoordinates] 주소 변환 성공:', {
-              coordinates: { lat, lng },
-              rawResult: result,
-              finalAddress: address
-            });
-            
+            console.log('[getAddressFromCoordinates] 최종 주소:', address);
             resolve(address.trim());
-          } else {
-            console.warn('[getAddressFromCoordinates] 주소 결과 없음');
+          } catch (parseError) {
+            console.error('[getAddressFromCoordinates] 응답 파싱 오류:', parseError);
             resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
           }
         });
@@ -2949,11 +2979,12 @@ export default function LocationPage() {
               ">선택된 멤버</p>
             </div>
             
-            <div style="margin-bottom: 6px;">
-              <p style="margin: 0; font-size: 12px; color: #64748b;">
-                📍 위치: <span id="member-address-${selectedMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3;">주소 변환 중...</span>
-              </p>
-            </div>
+                         <div style="margin-bottom: 6px;">
+               <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
+                 <span style="flex-shrink: 0;">📍 위치: </span>
+                 <span id="member-address-${selectedMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3; text-indent: hanging; padding-left: 0;">주소 변환 중...</span>
+               </div>
+             </div>
             <div>
               <p style="margin: 0; font-size: 11px; color: #9ca3af;">
                 🗺️ 현재 위치 정보
