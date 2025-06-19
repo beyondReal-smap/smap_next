@@ -1334,6 +1334,8 @@ export default function LogsPage() {
     return distribution;
   }, []);
 
+  
+
   // dailyCountsData 변경 시 멤버별 로그 분포 업데이트
   useEffect(() => {
     if (dailyCountsData && groupMembers.length > 0) {
@@ -1919,7 +1921,125 @@ export default function LogsPage() {
     console.log('[LOGS] ===== 날짜 선택 완료 =====');
   };
 
-  // 네모 캘린더 클릭 시 멤버와 날짜를 순서대로 변경하는 함수
+  // 🚀 네모 캘린더 데이터 강제 재생성 함수
+  const forceRegenerateCalendarData = useCallback(async () => {
+    console.log('[🔄 FORCE REGEN] 네모 캘린더 데이터 강제 재생성 시작');
+    
+    if (!selectedGroupId) {
+      console.warn('[🔄 FORCE REGEN] selectedGroupId가 없어서 중단');
+      return false;
+    }
+
+    try {
+      // 1단계: 일별 카운트 데이터 강제 재조회
+      console.log('[🔄 FORCE REGEN] 1단계: 일별 카운트 데이터 강제 재조회');
+      
+      let dailyCountsResponse = null;
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      while (retryCount < maxRetries && !dailyCountsResponse) {
+        try {
+          console.log(`[🔄 FORCE REGEN] 일별 카운트 조회 시도 ${retryCount + 1}/${maxRetries}`);
+          dailyCountsResponse = await memberLocationLogService.getDailyLocationCounts(selectedGroupId, 14);
+          
+          if (dailyCountsResponse?.member_daily_counts?.length > 0) {
+            console.log(`[🔄 FORCE REGEN] 일별 카운트 조회 성공 (${retryCount + 1}번째 시도):`, dailyCountsResponse.member_daily_counts.length, '명');
+            break;
+          }
+          
+          console.warn(`[🔄 FORCE REGEN] 일별 카운트 조회 결과 없음 (${retryCount + 1}번째 시도)`);
+          retryCount++;
+          
+          if (retryCount < maxRetries) {
+            const backoffDelay = Math.min(500 * Math.pow(2, retryCount), 2000);
+            console.log(`[🔄 FORCE REGEN] ${backoffDelay}ms 후 재시도...`);
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+          }
+        } catch (error) {
+          console.error(`[🔄 FORCE REGEN] 일별 카운트 조회 오류 (${retryCount + 1}번째 시도):`, error);
+          retryCount++;
+          
+          if (retryCount < maxRetries) {
+            const backoffDelay = Math.min(500 * Math.pow(2, retryCount), 2000);
+            console.log(`[🔄 FORCE REGEN] 오류 발생, ${backoffDelay}ms 후 재시도...`);
+            await new Promise(resolve => setTimeout(resolve, backoffDelay));
+          }
+        }
+      }
+      
+      if (!dailyCountsResponse?.member_daily_counts?.length) {
+        console.error('[🔄 FORCE REGEN] 일별 카운트 데이터 재조회 실패');
+        return false;
+      }
+      
+      // 2단계: 상태 업데이트
+      console.log('[🔄 FORCE REGEN] 2단계: 상태 업데이트');
+      setDailyCountsData(dailyCountsResponse);
+      
+      // 3단계: 멤버별 로그 분포 재계산
+      console.log('[🔄 FORCE REGEN] 3단계: 멤버별 로그 분포 재계산');
+      const newDistribution = calculateMemberLogDistribution(groupMembers, dailyCountsResponse);
+      setMemberLogDistribution(newDistribution);
+      
+      console.log('[🔄 FORCE REGEN] 네모 캘린더 데이터 강제 재생성 완료');
+      
+      return true;
+    } catch (error) {
+      console.error('[🔄 FORCE REGEN] 네모 캘린더 데이터 재생성 실패:', error);
+      return false;
+    }
+  }, [selectedGroupId, groupMembers, calculateMemberLogDistribution]);
+
+  // 🔍 데이터 일치성 검증 함수
+  const verifyDataConsistency = useCallback((memberName: string, dateString: string): boolean => {
+    console.log(`[🔍 VERIFY] ${memberName}의 ${dateString} 데이터 일치성 검증 시작`);
+    
+    const member = groupMembers.find(m => m.name === memberName);
+    if (!member) {
+      console.warn(`[🔍 VERIFY] 멤버를 찾을 수 없음: ${memberName}`);
+      return false;
+    }
+    
+    // 네모 캘린더에서 해당 날짜에 데이터가 있는지 확인
+    const today = new Date();
+    const targetDate = new Date(dateString);
+    const daysDiff = Math.floor((today.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysDiff < 0 || daysDiff > 13) {
+      console.warn(`[🔍 VERIFY] 날짜가 14일 범위를 벗어남: ${dateString} (${daysDiff}일 차이)`);
+      return true; // 범위를 벗어나면 검증 통과로 처리
+    }
+    
+    const arrayIndex = 13 - daysDiff;
+    const hasLogInCalendar = Boolean((memberLogDistribution[member.id] || Array(14).fill(false))[arrayIndex]);
+    
+    // 일별 카운트 데이터에서 해당 날짜 확인
+    let hasLogInDailyCount = false;
+    if (dailyCountsData?.member_daily_counts) {
+      const memberData = dailyCountsData.member_daily_counts.find(
+        (memberCount: any) => memberCount.member_id === parseInt(member.id)
+      );
+      
+      if (memberData?.daily_counts) {
+        const shortDateStr = format(targetDate, 'MM.dd');
+        const dayData = memberData.daily_counts.find(
+          (day: any) => day.formatted_date === shortDateStr || day.formatted_date === dateString
+        );
+        hasLogInDailyCount = Boolean(dayData && dayData.count > 0);
+      }
+    }
+    
+    console.log(`[🔍 VERIFY] ${memberName}의 ${dateString} 검증 결과:`, {
+      hasLogInCalendar,
+      hasLogInDailyCount,
+      isConsistent: hasLogInCalendar === hasLogInDailyCount
+    });
+    
+    return hasLogInCalendar === hasLogInDailyCount;
+  }, [groupMembers, memberLogDistribution, dailyCountsData]);
+
+  // 📊 네모 캘린더 클릭 시 멤버와 날짜를 순서대로 변경하는 함수 (데이터 검증 포함)
   const handleCalendarSquareClick = async (member: GroupMember, dateString: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1935,6 +2055,33 @@ export default function LogsPage() {
     clickedElement.style.transition = 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)';
     
     try {
+      // 🔍 0단계: 데이터 일치성 검증
+      const isConsistent = verifyDataConsistency(member.name, dateString);
+      
+      if (!isConsistent) {
+        console.warn(`[네모 캘린더] 데이터 불일치 감지 - 강제 재생성 시도`);
+        
+        // 데이터 불일치 시 강제 재생성
+        const regenerationSuccess = await forceRegenerateCalendarData();
+        
+        if (!regenerationSuccess) {
+          console.error(`[네모 캘린더] 데이터 재생성 실패 - 그대로 진행`);
+        } else {
+          console.log(`[네모 캘린더] 데이터 재생성 성공 - 재검증`);
+          
+          // 재생성 후 다시 검증
+          const isConsistentAfterRegen = verifyDataConsistency(member.name, dateString);
+          if (isConsistentAfterRegen) {
+            console.log(`[네모 캘린더] 재생성 후 데이터 일치성 확인됨`);
+          } else {
+            console.warn(`[네모 캘린더] 재생성 후에도 데이터 불일치`);
+          }
+        }
+        
+        // UI 안정화를 위한 대기
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
       // 1단계: 멤버가 다른 경우 먼저 멤버 변경
       if (!member.isSelected) {
         console.log(`[네모 캘린더] 1단계: 멤버 변경 ${groupMembers.find(m => m.isSelected)?.name} → ${member.name}`);
@@ -6704,4 +6851,4 @@ export default function LogsPage() {
       <LogParser /> */}
     </>
   );
-} 
+    }

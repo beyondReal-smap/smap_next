@@ -12,8 +12,37 @@ console.log('🌉 [iOS Bridge] User Agent:', navigator.userAgent);
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     const isProduction = window.location.hostname === 'nextstep.smap.site';
     const isSimulator = /Simulator/.test(navigator.userAgent);
+    const isDevelopment = isLocalhost || !isProduction;
     
-    console.log('🔍 [iOS Bridge] 완전 강화된 환경 감지:', {
+    // 🚨 IPC 과부하 방지 - 로그 출력 제한
+    const debugLog = (message, data) => {
+        if (isDevelopment) {
+            if (data) {
+                console.log(message, data);
+            } else {
+                console.log(message);
+            }
+        }
+    };
+    
+    // 🚨 메시지 전송 빈도 제한 (Throttling)
+    const messageThrottle = {
+        lastSent: {},
+        interval: 100, // 100ms 간격으로 제한
+        
+        canSend(messageType) {
+            const now = Date.now();
+            const lastTime = this.lastSent[messageType] || 0;
+            
+            if (now - lastTime > this.interval) {
+                this.lastSent[messageType] = now;
+                return true;
+            }
+            return false;
+        }
+    };
+    
+    debugLog('🔍 [iOS Bridge] 완전 강화된 환경 감지:', {
         isIOSWebView,
         isLocalhost,
         isProduction,
@@ -51,47 +80,35 @@ console.log('🌉 [iOS Bridge] User Agent:', navigator.userAgent);
                     console.warn(`⚠️ [iOS Bridge] ${handlerName} 핸들러 없음 - 완전한 가짜 핸들러 생성`);
                     window.webkit.messageHandlers[handlerName] = {
                         postMessage: function(message) {
-                            console.log(`📤 [${handlerName}] 메시지 (가짜 핸들러):`, message);
+                            // 🚨 메시지 전송 빈도 제한
+                            if (!messageThrottle.canSend(handlerName)) {
+                                return; // 너무 빈번한 메시지는 무시
+                            }
+                            
+                            debugLog(`📤 [${handlerName}] 메시지 (가짜 핸들러):`, message);
                             
                             // 햅틱 메시지인 경우 특별 처리
                             if (message && (message.type === 'hapticFeedback' || message.action === 'hapticFeedback')) {
-                                console.log('🎮 [iOS Bridge] 햅틱 메시지 감지 - 특별 처리 시도');
+                                debugLog('🎮 [iOS Bridge] 햅틱 메시지 감지 - 특별 처리 시도');
                                 
-                                // 여러 방법으로 햅틱 시도
+                                // 햅틱 관련 처리는 유지하지만 로그 줄임
                                 try {
-                                    // 방법 1: navigator.vibrate (Android/일부 iOS)
-                                    if (navigator.vibrate) {
-                                        const style = message.style || message.param?.style || 'medium';
-                                        const patterns = {
-                                            light: 50,
-                                            medium: 100,
-                                            heavy: 200,
-                                            success: [100, 50, 100],
-                                            warning: [50, 50, 50, 50, 50],
-                                            error: [200, 100, 200]
-                                        };
-                                        navigator.vibrate(patterns[style] || 100);
-                                        console.log('🎮 [iOS Bridge] navigator.vibrate 성공:', style);
+                                    if (window.navigator && window.navigator.vibrate) {
+                                        window.navigator.vibrate([100, 50, 100]);
                                     }
                                     
-                                    // 방법 2: CustomEvent 발송
-                                    window.dispatchEvent(new CustomEvent('ios-haptic-feedback', {
-                                        detail: { style: message.style || message.param?.style || 'medium' }
-                                    }));
-                                    
-                                    // 방법 3: 콘솔에 명확한 로그 출력
-                                    console.log('🎮🎮🎮 [HAPTIC FEEDBACK] 실행됨:', {
-                                        style: message.style || message.param?.style || 'medium',
-                                        timestamp: new Date().toISOString(),
-                                        source: 'ios-bridge fake handler'
-                                    });
+                                    if (window.triggerHapticFeedback) {
+                                        window.triggerHapticFeedback('medium');
+                                    }
                                     
                                 } catch (error) {
-                                    console.error('🎮 [iOS Bridge] 햅틱 처리 실패:', error);
+                                    if (isDevelopment) {
+                                        console.error('🎮 [iOS Bridge] 햅틱 처리 실패:', error);
+                                    }
                                 }
                             }
                             
-                            // CustomEvent로 네이티브에 알림 시도
+                            // CustomEvent로 네이티브에 알림 시도 (빈도 제한 적용)
                             window.dispatchEvent(new CustomEvent('smap-ios-message', {
                                 detail: { handler: handlerName, message: message }
                             }));
@@ -111,7 +128,7 @@ console.log('🌉 [iOS Bridge] User Agent:', navigator.userAgent);
             timestamp: Date.now()
         };
         
-        console.log('✅ [iOS Bridge] iOS 환경 강제 설정 완료:', window.__SMAP_IOS_ENVIRONMENT__);
+        debugLog('✅ [iOS Bridge] iOS 환경 강제 설정 완료:', window.__SMAP_IOS_ENVIRONMENT__);
     }
 })();
 

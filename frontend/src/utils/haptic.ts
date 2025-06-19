@@ -641,33 +641,45 @@ export const hapticFeedback = {
  * 전역 테스트용 햅틱 함수들 (웹 콘솔에서 직접 사용 가능)
  */
 if (typeof window !== 'undefined') {
-  // 강제 햅틱 테스트 함수
+  // 🚨 강제 햅틱 테스트 함수 (로그 제한 적용)
   (window as any).SMAP_FORCE_HAPTIC = (type: string = 'success') => {
-    console.log(`🎮 [FORCE-HAPTIC-TEST] 강제 햅틱 테스트 시작: ${type}`);
+    // 🚨 중복 실행 방지 (1초 내 동일한 타입 호출 차단)
+    const now = Date.now();
+    const lastCall = (window as any).__LAST_HAPTIC_CALL__ || {};
+    if (lastCall[type] && (now - lastCall[type]) < 1000) {
+      return `⏳ 햅틱 중복 실행 방지: ${type} (1초 대기)`;
+    }
+    
+    (window as any).__LAST_HAPTIC_CALL__ = lastCall;
+    lastCall[type] = now;
+    
+    // 🚨 로그 출력 최소화
+    console.log(`🎮 [FORCE-HAPTIC] ${type} 테스트`);
     
     const hapticType = type as HapticFeedbackType;
-    const env = detectIOSEnvironment();
     
-         console.log(`🔍 [HAPTIC-ENV] 환경 감지:`, {
-       isIOS: env.isIOS,
-       isIOSApp: env.isIOSApp, 
-       isIOSBrowser: env.isIOSBrowser,
-       isWebView: env.isWebView,
-       hasWebKit: env.hasWebKit,
-       hasHandler: env.hasHandler,
-       totalHandlers: env.webViewDebug?.totalHandlers || 0,
-       availableHandlers: env.webViewDebug?.availableHandlers || [],
-       nativeCheck: env.nativeCheck
+    // 🚨 환경 감지 로그 제거 (디버깅 시에만 출력)
+    const debugMode = (window as any).__HAPTIC_DEBUG_MODE__ === true;
+    if (debugMode) {
+      const env = detectIOSEnvironment();
+      console.log(`🔍 [HAPTIC-ENV] 환경 감지:`, {
+        isIOS: env.isIOS,
+        isIOSApp: env.isIOSApp, 
+        isIOSBrowser: env.isIOSBrowser,
+        isWebView: env.isWebView,
+        hasWebKit: env.hasWebKit,
+        hasHandler: env.hasHandler
+      });
+    }
+    
+         // 강제 햅틱 실행 (로그 최소화)
+     triggerHapticFeedback(hapticType, debugMode ? `강제 햅틱 테스트: ${type}` : undefined, { 
+       source: 'console_test',
+       forcedType: type,
+       silent: !debugMode // 🚨 조용한 모드
      });
     
-    // 강제 햅틱 실행
-    triggerHapticFeedback(hapticType, `강제 햅틱 테스트: ${type}`, { 
-      source: 'console_test',
-      forcedType: type,
-      timestamp: Date.now()
-    });
-    
-    return `✅ 햅틱 테스트 완료: ${type}`;
+    return `✅ ${type} 햅틱 완료`;
   };
   
   // 모든 햅틱 타입 순차 테스트 함수

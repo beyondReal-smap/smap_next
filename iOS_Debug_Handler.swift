@@ -5,14 +5,77 @@ import WebKit
 import UIKit
 import os.log
 
+// 🚨 IPC 과부하 방지를 위한 메시지 쓰로틀링 클래스
+class MessageThrottle {
+    private var lastMessageTimes: [String: TimeInterval] = [:]
+    private let minInterval: TimeInterval = 0.1 // 100ms 최소 간격
+    
+    func canProcessMessage(type: String) -> Bool {
+        let now = Date().timeIntervalSince1970
+        
+        if let lastTime = lastMessageTimes[type] {
+            if now - lastTime < minInterval {
+                return false // 너무 빠른 메시지는 무시
+            }
+        }
+        
+        lastMessageTimes[type] = now
+        return true
+    }
+}
+
 extension YourWebViewClass: WKScriptMessageHandler {
+    
+    // 🚨 메시지 쓰로틀링 인스턴스
+    private let messageThrottle = MessageThrottle()
+    
+    // 🚨 개발/프로덕션 환경 감지
+    private var isDevelopment: Bool {
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
+    
+    // 🚨 로그 출력 제한 함수
+    private func debugLog(_ message: String, category: String = "iOS_Debug") {
+        if isDevelopment {
+            print("🔵 [\(category)] \(message)")
+            os_log("%@", log: OSLog(subsystem: "com.smap.app", category: category), type: .debug, message)
+        }
+    }
+    
+    private func infoLog(_ message: String, category: String = "iOS_Debug") {
+        print("ℹ️ [\(category)] \(message)")
+        os_log("%@", log: OSLog(subsystem: "com.smap.app", category: category), type: .info, message)
+    }
+    
+    private func errorLog(_ message: String, category: String = "iOS_Debug") {
+        print("❌ [\(category)] \(message)")
+        os_log("%@", log: OSLog(subsystem: "com.smap.app", category: category), type: .error, message)
+    }
     
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         
-        // 🔍 모든 메시지를 로깅 (디버깅용)
-        print("🔵 [iOS DEBUG] 메시지 수신 시작")
-        print("🔵 [iOS DEBUG] 메시지 이름: \(message.name)")
-        print("🔵 [iOS DEBUG] 메시지 본문: \(message.body)")
+        // 🚨 메시지 타입별 쓰로틀링 적용
+        let messageType = message.name
+        guard messageThrottle.canProcessMessage(type: messageType) else {
+            if isDevelopment {
+                debugLog("메시지 쓰로틀링: \(messageType) 무시됨", category: "MessageThrottle")
+            }
+            return
+        }
+        
+        debugLog("메시지 수신 시작", category: "iOS_DEBUG")
+        debugLog("메시지 이름: \(message.name)", category: "iOS_DEBUG")
+        
+        // 메시지 본문 로깅 (개발 환경에서만)
+        if isDevelopment {
+            debugLog("메시지 본문: \(message.body)", category: "iOS_DEBUG")
+        } else {
+            infoLog("메시지 수신: \(message.name)", category: "iOS_DEBUG")
+        }
         
         // smapIos 핸들러 처리
         if message.name == "smapIos" {
@@ -22,124 +85,109 @@ extension YourWebViewClass: WKScriptMessageHandler {
         
         // 기존 iosHandler 핸들러 처리 (호환성)
         if message.name == "iosHandler" {
-            print("🔵 [iOS DEBUG] iosHandler 메시지 수신")
+            debugLog("iosHandler 메시지 수신", category: "iOS")
             handleIosHandlerMessage(message)
             return
         }
         
         // 기타 핸들러들
         if message.name == "jsToNative" {
-            print("🔵 [iOS DEBUG] jsToNative 메시지 수신")
+            debugLog("jsToNative 메시지 수신", category: "iOS")
             handleJsToNativeMessage(message)
             return
         }
         
         if message.name == "mapDebugHandler" {
-            print("🔵 [iOS DEBUG] mapDebugHandler 메시지 수신")
+            debugLog("mapDebugHandler 메시지 수신", category: "iOS")
             handleMapDebugMessage(message)
             return
         }
         
         // 처리되지 않은 메시지
-        print("⚠️ [iOS DEBUG] 처리되지 않은 메시지: \(message.name)")
+        debugLog("알 수 없는 메시지 타입: \(message.name)", category: "iOS_DEBUG")
     }
     
     // MARK: - smapIos 메시지 처리 (주요 핸들러)
     
     private func handleSmapIosMessage(_ message: WKScriptMessage) {
-        print("🔵 [iOS] smapIos 메시지 처리 시작")
+        debugLog("smapIos 메시지 처리 시작", category: "iOS")
         
         guard let body = message.body as? [String: Any] else {
-            print("❌ [iOS] 메시지 본문 파싱 실패: \(message.body)")
+            errorLog("smapIos 메시지 파싱 실패", category: "iOS")
             return
         }
         
         let type = body["type"] as? String ?? ""
-        let param = body["param"]
+        debugLog("메시지 타입: \(type)", category: "iOS")
         
-        print("🔵 [iOS] 메시지 타입: \(type)")
-        print("🔵 [iOS] 메시지 파라미터: \(param ?? "nil")")
-        
-        // 햅틱 피드백 처리 (JSON 방식)
-        if type == "hapticFeedback" {
-            print("🔵 [iOS] 햅틱 피드백 요청 받음")
-            handleHapticFeedback(param: param)
-            return
-        }
-        
-        // 햅틱 피드백 처리 (단순 방식)
-        if type == "haptic" {
-            print("🔵 [iOS] 단순 햅틱 요청 받음")
-            if let hapticType = param as? String {
-                triggerHaptic(type: hapticType)
-            }
-            return
-        }
-        
-        // Google Sign-In 처리
-        if type == "googleSignIn" {
-            print("🔵 [iOS] Google Sign-In 요청 받음")
+        switch type {
+        case "hapticFeedback":
+            handleHapticFeedback(param: body["param"])
+            
+        case "googleSignIn":
             handleGoogleSignIn()
-            return
-        }
-        
-        // JavaScript 로그 처리
-        if type == "jsLog" {
-            print("🔵 [iOS] JavaScript 로그 수신")
-            handleJavaScriptLog(param: param)
-            return
-        }
-        
-        // 알림 권한 요청
-        if type == "requestNotificationPermission" {
-            print("🔵 [iOS] 알림 권한 요청")
+            
+        case "jsLog":
+            handleJavaScriptLog(param: body["param"])
+            
+        case "requestNotificationPermission":
             handleNotificationPermissionRequest()
-            return
+            
+        default:
+            debugLog("알 수 없는 smapIos 메시지 타입: \(type)", category: "iOS")
         }
-        
-        // 기타 메시지 처리
-        print("⚠️ [iOS] 처리되지 않은 smapIos 메시지 타입: \(type)")
     }
     
     // MARK: - 햅틱 피드백 처리 (강화 버전)
     
     private func handleHapticFeedback(param: Any?) {
-        print("🔵 [iOS] 햅틱 피드백 처리 시작")
+        debugLog("햅틱 피드백 요청 받음", category: "iOS")
+        
+        // 🚨 햅틱 처리도 쓰로틀링 적용
+        guard messageThrottle.canProcessMessage(type: "hapticFeedback") else {
+            debugLog("햅틱 메시지 쓰로틀링됨", category: "iOS")
+            return
+        }
+        
+        var hapticType = "medium" // 기본값
         
         if let paramString = param as? String,
-           let data = paramString.data(using: .utf8),
-           let hapticData = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
-            
-            let feedbackType = hapticData["feedbackType"] as? String ?? ""
-            let description = hapticData["description"] as? String ?? ""
-            
-            print("🔵 [iOS] JSON 햅틱 데이터:")
-            print("🔵 [iOS] - 타입: \(feedbackType)")
-            print("🔵 [iOS] - 설명: \(description)")
-            
-            triggerHaptic(type: feedbackType)
-            
-        } else if let hapticType = param as? String {
-            print("🔵 [iOS] 단순 햅틱 타입: \(hapticType)")
-            triggerHaptic(type: hapticType)
-        } else {
-            print("❌ [iOS] 햅틱 파라미터 파싱 실패: \(param ?? "nil")")
+           let paramData = paramString.data(using: .utf8) {
+            do {
+                if let json = try JSONSerialization.jsonObject(with: paramData) as? [String: Any] {
+                    hapticType = json["feedbackType"] as? String ?? "medium"
+                    
+                    if isDevelopment {
+                        debugLog("JSON 햅틱 데이터:", category: "iOS")
+                        debugLog("- 타입: \(hapticType)", category: "iOS")
+                        if let description = json["description"] as? String {
+                            debugLog("- 설명: \(description)", category: "iOS")
+                        }
+                    }
+                }
+            } catch {
+                errorLog("햅틱 JSON 파싱 실패: \(error)", category: "iOS")
+            }
         }
+        
+        triggerHaptic(type: hapticType)
     }
     
     private func triggerHaptic(type: String) {
-        print("🔵 [iOS] 햅틱 실행 요청: \(type)")
+        infoLog("햅틱 실행 요청: \(type)", category: "iOS")
         
         DispatchQueue.main.async {
             // 디바이스 확인
             guard UIDevice.current.userInterfaceIdiom == .phone else {
-                print("⚠️ [iOS] iPad에서는 햅틱 제한됨")
+                if self.isDevelopment {
+                    self.debugLog("iPad에서는 햅틱 제한됨", category: "iOS")
+                }
                 return
             }
             
             // iOS 버전 확인
             guard #available(iOS 10.0, *) else {
-                print("⚠️ [iOS] 햅틱 미지원 iOS 버전")
+                self.errorLog("햅틱 미지원 iOS 버전", category: "iOS")
                 return
             }
             
@@ -160,7 +208,7 @@ extension YourWebViewClass: WKScriptMessageHandler {
                 self.triggerWarningHaptic()
                 
             default:
-                print("⚠️ [iOS] 알 수 없는 햅틱 타입: \(type)")
+                self.debugLog("알 수 없는 햅틱 타입: \(type)", category: "iOS")
                 self.triggerMediumHaptic()
             }
         }
@@ -173,9 +221,9 @@ extension YourWebViewClass: WKScriptMessageHandler {
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.prepare()
             generator.impactOccurred()
-            print("✅ [iOS] Light 햅틱 실행 완료")
+            infoLog("Light 햅틱 실행 완료", category: "iOS")
         } else {
-            print("❌ [iOS] Light 햅틱 미지원")
+            errorLog("Light 햅틱 미지원", category: "iOS")
         }
     }
     
@@ -184,9 +232,9 @@ extension YourWebViewClass: WKScriptMessageHandler {
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.prepare()
             generator.impactOccurred()
-            print("✅ [iOS] Medium 햅틱 실행 완료")
+            infoLog("Medium 햅틱 실행 완료", category: "iOS")
         } else {
-            print("❌ [iOS] Medium 햅틱 미지원")
+            errorLog("Medium 햅틱 미지원", category: "iOS")
         }
     }
     
@@ -195,9 +243,9 @@ extension YourWebViewClass: WKScriptMessageHandler {
             let generator = UIImpactFeedbackGenerator(style: .heavy)
             generator.prepare()
             generator.impactOccurred()
-            print("✅ [iOS] Heavy 햅틱 실행 완료")
+            infoLog("Heavy 햅틱 실행 완료", category: "iOS")
         } else {
-            print("❌ [iOS] Heavy 햅틱 미지원")
+            errorLog("Heavy 햅틱 미지원", category: "iOS")
         }
     }
     
@@ -206,9 +254,9 @@ extension YourWebViewClass: WKScriptMessageHandler {
             let generator = UINotificationFeedbackGenerator()
             generator.prepare()
             generator.notificationOccurred(.success)
-            print("✅ [iOS] Success 햅틱 실행 완료")
+            infoLog("Success 햅틱 실행 완료", category: "iOS")
         } else {
-            print("❌ [iOS] Success 햅틱 미지원")
+            errorLog("Success 햅틱 미지원", category: "iOS")
         }
     }
     
@@ -217,9 +265,9 @@ extension YourWebViewClass: WKScriptMessageHandler {
             let generator = UINotificationFeedbackGenerator()
             generator.prepare()
             generator.notificationOccurred(.warning)
-            print("✅ [iOS] Warning 햅틱 실행 완료")
+            infoLog("Warning 햅틱 실행 완료", category: "iOS")
         } else {
-            print("❌ [iOS] Warning 햅틱 미지원")
+            errorLog("Warning 햅틱 미지원", category: "iOS")
         }
     }
     
@@ -228,9 +276,9 @@ extension YourWebViewClass: WKScriptMessageHandler {
             let generator = UINotificationFeedbackGenerator()
             generator.prepare()
             generator.notificationOccurred(.error)
-            print("✅ [iOS] Error 햅틱 실행 완료")
+            infoLog("Error 햅틱 실행 완료", category: "iOS")
         } else {
-            print("❌ [iOS] Error 햅틱 미지원")
+            errorLog("Error 햅틱 미지원", category: "iOS")
         }
     }
     
@@ -239,9 +287,9 @@ extension YourWebViewClass: WKScriptMessageHandler {
             let generator = UISelectionFeedbackGenerator()
             generator.prepare()
             generator.selectionChanged()
-            print("✅ [iOS] Selection 햅틱 실행 완료")
+            infoLog("Selection 햅틱 실행 완료", category: "iOS")
         } else {
-            print("❌ [iOS] Selection 햅틱 미지원")
+            errorLog("Selection 햅틱 미지원", category: "iOS")
         }
     }
     
@@ -249,37 +297,40 @@ extension YourWebViewClass: WKScriptMessageHandler {
     
     private func handleIosHandlerMessage(_ message: WKScriptMessage) {
         // 기존 iosHandler 방식 처리
-        print("🔵 [iOS] iosHandler 처리 (호환성 모드)")
+        debugLog("iosHandler 처리 (호환성 모드)", category: "iOS")
     }
     
     private func handleJsToNativeMessage(_ message: WKScriptMessage) {
         // jsToNative 메시지 처리
-        print("🔵 [iOS] jsToNative 처리")
+        debugLog("jsToNative 처리", category: "iOS")
     }
     
     private func handleMapDebugMessage(_ message: WKScriptMessage) {
         // 지도 디버그 메시지 처리
-        print("🔵 [iOS] mapDebugHandler 처리")
+        debugLog("mapDebugHandler 처리", category: "iOS")
     }
     
     private func handleGoogleSignIn() {
-        print("🔵 [iOS] Google Sign-In 처리 시작")
+        infoLog("Google Sign-In 처리 시작", category: "iOS")
         // Google Sign-In 로직 구현
     }
     
     private func handleJavaScriptLog(param: Any?) {
-        print("🔵 [iOS] JavaScript 로그 처리")
+        // 🚨 JavaScript 로그는 개발 환경에서만 출력
+        if isDevelopment {
+            debugLog("JavaScript 로그 처리", category: "iOS")
+        }
         // JS 로그 처리 로직
     }
     
     private func handleNotificationPermissionRequest() {
-        print("🔵 [iOS] 알림 권한 요청 처리")
+        infoLog("알림 권한 요청 처리", category: "iOS")
         // 알림 권한 요청 로직
     }
 }
 
 /*
-WebView 설정 (viewDidLoad에 추가):
+🚨 IPC 과부하 해결을 위한 WebView 설정 (viewDidLoad에 추가):
 
 ```swift
 override func viewDidLoad() {
@@ -289,30 +340,38 @@ override func viewDidLoad() {
     let userContentController = webView.configuration.userContentController
     
     // 주요 핸들러
-    userContentController.add(self, name: "smapIos")
+    let debugHandler = iOS_Debug_Handler()
+    userContentController.add(debugHandler, name: "smapIos")
     
     // 호환성 핸들러들
-    userContentController.add(self, name: "iosHandler")
-    userContentController.add(self, name: "jsToNative")
-    userContentController.add(self, name: "mapDebugHandler")
+    userContentController.add(debugHandler, name: "iosHandler")
+    userContentController.add(debugHandler, name: "jsToNative")
+    userContentController.add(debugHandler, name: "mapDebugHandler")
     
-    print("✅ [iOS] 모든 메시지 핸들러 등록 완료")
+    print("✅ [iOS] 메시지 핸들러 등록 완료 (IPC 과부하 방지 적용)")
     
-    // 햅틱 피드백 허용
-    if #available(iOS 13.0, *) {
-        // iOS 13+ 설정
-    }
+    // 🚨 WebKit 성능 최적화 설정
+    webView.configuration.preferences.javaScriptEnabled = true
+    webView.configuration.allowsInlineMediaPlayback = true
     
-    // 디버깅을 위한 추가 설정
-    webView.configuration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
-    webView.configuration.preferences.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
-    
-    // 개발자 도구 활성화 (디버그 빌드에서만)
-    #if DEBUG
+    // 🚨 개발자 도구 비활성화 (프로덕션에서)
+    #if !DEBUG
     if #available(iOS 16.4, *) {
-        webView.isInspectable = true
+        webView.isInspectable = false
     }
     #endif
+    
+    // 🚨 메모리 압박 시 캐시 정리
+    NotificationCenter.default.addObserver(
+        forName: UIApplication.didReceiveMemoryWarningNotification,
+        object: nil,
+        queue: .main
+    ) { _ in
+        WKWebsiteDataStore.default().removeData(
+            ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache],
+            modifiedSince: Date(timeIntervalSince1970: 0)
+        ) { }
+    }
 }
 
 deinit {
@@ -327,5 +386,5 @@ deinit {
 }
 ```
 
-이제 Xcode 콘솔에서 모든 메시지와 햅틱 실행을 확인할 수 있습니다!
+이제 IPC 메시지 과부하가 대폭 줄어들 것입니다! 🎉
 */ 

@@ -119,7 +119,7 @@ export default function SignInPage() {
     keydown?: (e: KeyboardEvent) => void;
   }>({});
 
-  // iOS WebView 환경 감지 - 모든 제한 제거, 매우 관대한 감지
+  // iOS WebView 환경 감지 - 모든 제한 제거, 시뮬레이터 완전 허용
   const isIOSWebView = React.useMemo(() => {
     if (typeof window === 'undefined') return false;
     
@@ -129,23 +129,28 @@ export default function SignInPage() {
     const hasMessageHandlers = !!(window as any).webkit?.messageHandlers;
     const hasIosBridge = typeof (window as any).SMAP_FORCE_HAPTIC === 'function';
     const isLocalhost = window.location.hostname === 'localhost';
-    const isSimulator = /Simulator/.test(userAgent);
+    const isSimulator = /Simulator/.test(userAgent) || 
+                      navigator.userAgent.includes('iPhone Simulator') ||
+                      navigator.userAgent.includes('iPad Simulator');
     
-    // 🚨 제한 완전 제거 - 아래 조건 중 하나라도 만족하면 iOS 앱으로 인정
+    // 🚨 제한 완전 제거 - 아래 조건 중 하나라도 만족하면 iOS 앱으로 인정 (시뮬레이터 포함)
     const conditions = {
       condition1: isIOS && hasWebKit && hasMessageHandlers, // 표준 WebKit
       condition2: isIOS && hasIosBridge, // ios-bridge.js가 로드된 iOS
       condition3: isLocalhost && isIOS, // localhost의 iOS
-      condition4: isSimulator, // iOS 시뮬레이터
+      condition4: isSimulator, // iOS 시뮬레이터 (완전 허용)
       condition5: (window as any).__FORCE_IOS_MODE__ === true, // 강제 iOS 모드
-      condition6: isIOS // 단순히 iOS면 모두 허용
+      condition6: isIOS, // 단순히 iOS면 모두 허용
+      condition7: isLocalhost, // localhost면 모두 허용
+      condition8: true // 🚨 무조건 허용 모드 (테스트용)
     };
     
     const result = Object.values(conditions).some(Boolean);
     
-    console.log('[SIGNIN] 🚨 제한 해제된 환경 감지:', {
+    console.log('[SIGNIN] 🚨 제한 완전 해제된 환경 감지 (시뮬레이터 허용):', {
       userAgent: userAgent.substring(0, 50) + '...',
       hostname: window.location.hostname,
+      isSimulator,
       conditions,
       finalResult: result
     });
@@ -310,15 +315,36 @@ export default function SignInPage() {
     }
   };
 
-  // 🧪 강제 시뮬레이터 모드 활성화 (테스트용)
+  // 🧪 강제 시뮬레이터 모드 활성화 (Google 로그인 허용)
   const enableSimulatorMode = () => {
+    console.log('🚨 시뮬레이터 모드 강제 활성화 (Google 로그인 허용)');
     (window as any).__SMAP_FORCE_SIMULATOR_MODE__ = true;
-    console.log('🧪 [SIMULATOR] 강제 시뮬레이터 모드 활성화');
-    showError('🧪 시뮬레이터 모드 활성화됨\n\n이제 Google 로그인을 다시 시도해보세요.');
+    (window as any).__SMAP_FORCE_GOOGLE_LOGIN__ = true;
+    (window as any).__SMAP_IGNORE_ALL_RESTRICTIONS__ = true;
+    
+    // iOS 로그 전송 - 시뮬레이터 모드 활성화
+    sendLogToiOS('info', '🚨 시뮬레이터 모드 강제 활성화', {
+      timestamp: new Date().toISOString(),
+      simulatorMode: true,
+      googleLoginForced: true,
+      restrictionsIgnored: true
+    });
+    
+    console.log('🧪 [SIMULATOR] 강제 시뮬레이터 모드 활성화 (Google 로그인 허용)');
+    showError('🧪 시뮬레이터 모드 활성화됨 (Google 로그인 허용)\n\n이제 Google 로그인이 무조건 허용됩니다:\n- 네이티브 실패 시 자동으로 웹 SDK 사용\n- 모든 환경 제한 무시\n- 상세한 오류 메시지 제공\n\nGoogle 로그인을 다시 시도해보세요.');
   };
 
-  // iOS 네이티브 로그 전송 함수
+  // iOS 네이티브 로그 전송 함수 (IPC 과부하 방지)
   const sendLogToiOS = (level: 'info' | 'error' | 'warning', message: string, data?: any) => {
+    // 🚨 IPC 과부하 방지 - 개발 환경에서만 상세 로그
+    const isDevelopment = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost';
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // 프로덕션에서는 에러와 경고만 전송
+    if (isProduction && level === 'info') {
+      return;
+    }
+    
     const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
     if (isIOSWebView && (window as any).webkit?.messageHandlers?.smapIos) {
       try {
@@ -332,11 +358,36 @@ export default function SignInPage() {
           })
         };
         (window as any).webkit.messageHandlers.smapIos.postMessage(logData);
-        console.log(`[iOS LOG SENT] ${level.toUpperCase()}: ${message}`);
+        
+        // 🚨 콘솔 로그도 조건부로 제한
+        if (isDevelopment) {
+          console.log(`[iOS LOG SENT] ${level.toUpperCase()}: ${message}`);
+        }
       } catch (e) {
-        console.error('iOS 로그 전송 실패:', e);
+        if (isDevelopment) {
+          console.error('iOS 로그 전송 실패:', e);
+        }
       }
     }
+  };
+
+  // 🚨 디버깅용 콘솔 로그 래퍼 함수 (IPC 과부하 방지)
+  const debugLog = (message: string, data?: any) => {
+    const isDevelopment = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost';
+    if (isDevelopment) {
+      if (data) {
+        console.log(message, data);
+      } else {
+        console.log(message);
+      }
+    }
+  };
+
+  // 🚨 에러 로그만 허용하는 함수
+  const errorLog = (message: string, error?: any) => {
+    console.error(message, error);
+    // 에러는 항상 iOS로 전송
+    sendLogToiOS('error', message, error);
   };
 
   // Google 로그인 콜백 핸들러
@@ -497,14 +548,16 @@ export default function SignInPage() {
     } catch (error: any) {
       console.error('[GOOGLE SDK] 초기화 실패:', error);
       
-      // 에러 타입별 세부 메시지
+      // 에러 타입별 세부 메시지 (시뮬레이터 허용)
       let errorMessage = 'Google 로그인 SDK 초기화에 실패했습니다.';
       if (error.message.includes('로드 타임아웃')) {
-        errorMessage = 'Google 로그인 서비스 연결에 시간이 너무 오래 걸립니다. 네트워크를 확인해주세요.';
+        errorMessage = 'Google 로그인 서비스 연결에 시간이 너무 오래 걸립니다.\n\n해결 방법:\n1. 네트워크 연결 확인\n2. VPN 연결 해제 후 재시도\n3. WiFi 연결 상태 확인';
       } else if (error.message.includes('스크립트 로드 실패')) {
-        errorMessage = 'Google 로그인 서비스에 연결할 수 없습니다. 인터넷 연결을 확인해주세요.';
+        errorMessage = 'Google 로그인 서비스에 연결할 수 없습니다.\n\n해결 방법:\n1. 인터넷 연결 확인\n2. 방화벽 설정 확인\n3. 브라우저 캐시 삭제 후 재시도';
       } else if (error.message.includes('사용할 수 없습니다')) {
-        errorMessage = 'iOS 시뮬레이터에서 Google 로그인이 제한됩니다. 실제 기기에서 테스트해보세요.';
+        errorMessage = 'Google 로그인 SDK를 사용할 수 없습니다.\n\n상세 오류:\n' + (error.message || '알 수 없는 오류') + '\n\n해결 방법:\n1. 페이지 새로고침 후 재시도\n2. 브라우저 업데이트\n3. 전화번호 로그인 사용';
+      } else {
+        errorMessage = 'Google 로그인 처리 중 오류가 발생했습니다.\n\n상세 오류:\n' + (error.message || error.toString()) + '\n\n해결 방법:\n1. 페이지 새로고침\n2. 브라우저 설정 확인\n3. 전화번호 로그인 사용';
       }
       
       showError(errorMessage);
@@ -1802,7 +1855,9 @@ export default function SignInPage() {
         // 조건 2: iOS User Agent + ios-bridge.js 로드됨 (앱 환경)
         (isIOSUserAgent && hasIosBridge) ||
         // 조건 3: 강제 iOS 앱 모드 (테스트용)
-        (window as any).__SMAP_FORCE_IOS_APP__ === true
+        (window as any).__SMAP_FORCE_IOS_APP__ === true ||
+        // 조건 4: 강제 Google 로그인 모드 (시뮬레이터 허용)
+        (window as any).__SMAP_FORCE_GOOGLE_LOGIN__ === true
       );
       
       const isIOSSimulator = (
@@ -1811,6 +1866,15 @@ export default function SignInPage() {
       ) || (
         // 또는 개발자가 강제로 활성화 (테스트용)
         (window as any).__SMAP_FORCE_SIMULATOR_MODE__ === true
+      ) || (
+        // 🚨 시뮬레이터 패턴 감지 (무조건 허용)
+        /Simulator/.test(navigator.userAgent) || 
+        navigator.userAgent.includes('iPhone Simulator') ||
+        navigator.userAgent.includes('iPad Simulator')
+      ) || (
+        // 🚨 강제 Google 로그인 플래그 (시뮬레이터로 간주)
+        (window as any).__SMAP_FORCE_GOOGLE_LOGIN__ === true ||
+        (window as any).__SMAP_IGNORE_ALL_RESTRICTIONS__ === true
       );
       
       console.log('[GOOGLE LOGIN] 환경 체크 (강화):', {
@@ -1849,7 +1913,7 @@ export default function SignInPage() {
       if (isIOSWebView || isIOSSimulator || true) { // 모든 환경 허용
           // 🚨 모든 환경에서 실제 Google SDK 사용 허용
         if (isIOSSimulator || (!isIOSWebView && /iPad|iPhone|iPod/.test(navigator.userAgent))) {
-          console.log('[GOOGLE LOGIN] 🚨 모든 iOS 환경에서 Google SDK 사용 허용');
+          debugLog('[GOOGLE LOGIN] 🚨 모든 iOS 환경에서 Google SDK 사용 허용');
           
           // 모든 iOS 환경에서 웹 Google SDK 허용
           try {
@@ -2042,24 +2106,36 @@ export default function SignInPage() {
         });
         console.log('🎮 [SIGNIN] Google 로그인 환경 오류 햅틱 피드백 실행');
         
-        // 🚨 네이티브 실패 시에도 웹 SDK 백업 사용
-        console.log('[GOOGLE LOGIN] 🚨 네이티브 실패, 웹 SDK 백업 사용');
+        // 🚨 모든 환경에서 웹 SDK 무조건 백업 사용 (시뮬레이터 포함)
+        console.log('[GOOGLE LOGIN] 🚨 네이티브 실패, 웹 SDK 무조건 백업 사용 (시뮬레이터 허용)');
+        
+        // iOS 로그 전송 - 웹 SDK 백업 사용
+        sendLogToiOS('info', '🌐 웹 SDK 백업 모드 활성화', {
+          timestamp: new Date().toISOString(),
+          reason: 'native_failed',
+          environment: isIOSSimulator ? 'simulator' : 'unknown',
+          fallback: 'web_google_sdk'
+        });
+        
         setTimeout(() => {
           handleGoogleSDKLogin();
         }, 100);
         return;
       }
       
-      // 🚨 모든 환경에서 Google SDK 완전 허용
-      console.log('[GOOGLE LOGIN] 🚨 모든 환경에서 Google SDK 로그인 허용');
-      
-      // iOS 로그 전송 - 모든 환경 허용
-      sendLogToiOS('info', '🌐 모든 환경에서 Google SDK 로그인 허용', {
-        timestamp: new Date().toISOString(),
-        environment: 'universal',
-        userAgent: navigator.userAgent,
-        restriction: 'COMPLETELY REMOVED'
-      });
+      // 🚨 모든 환경에서 Google SDK 완전 허용 (시뮬레이터 포함)
+              debugLog('[GOOGLE LOGIN] 🚨 모든 환경에서 Google SDK 로그인 허용 (시뮬레이터 포함)');
+        
+        // iOS 로그 전송 - 모든 환경 허용 (경고 레벨로 변경)
+        sendLogToiOS('warning', '🌐 모든 환경에서 Google SDK 로그인 허용 (시뮬레이터 포함)', {
+          timestamp: new Date().toISOString(),
+          environment: 'universal_including_simulator',
+          userAgent: navigator.userAgent.substring(0, 50), // UserAgent 길이 제한
+          restriction: 'COMPLETELY_REMOVED',
+          simulator_allowed: true,
+          isIOSSimulator,
+          isIOSWebView
+        });
       
       // Google SDK를 사용한 로그인 처리 (모든 환경 허용)
       setTimeout(() => {
