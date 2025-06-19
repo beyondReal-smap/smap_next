@@ -72,6 +72,17 @@ const TERMS_DATA = [
   }
 ];
 
+// 소셜 로그인 데이터 타입
+interface SocialLoginData {
+  provider: string;
+  email: string;
+  name: string;
+  nickname: string;
+  profile_image?: string;
+  google_id?: string;
+  kakao_id?: string;
+}
+
 interface RegisterData {
   // 약관 동의
   mt_agree1: boolean;
@@ -81,7 +92,7 @@ interface RegisterData {
   mt_agree5: boolean;
   
   // 기본 정보
-  mt_id: string; // 전화번호
+  mt_id: string; // 전화번호 또는 이메일 (소셜 로그인 시)
   mt_pwd: string;
   mt_name: string;
   mt_nickname: string;
@@ -96,6 +107,11 @@ interface RegisterData {
   // 기타
   mt_push1: boolean;
   verification_code: string;
+  
+  // 소셜 로그인 관련
+  isSocialLogin?: boolean;
+  socialProvider?: string;
+  socialId?: string;
 }
 
 export default function RegisterPage() {
@@ -241,8 +257,44 @@ export default function RegisterPage() {
     mt_lat: null,
     mt_long: null,
     mt_push1: true,
-    verification_code: ''
+    verification_code: '',
+    isSocialLogin: false,
+    socialProvider: '',
+    socialId: ''
   });
+
+  // 소셜 로그인 데이터 초기화
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const socialProvider = urlParams.get('social');
+    
+    if (socialProvider) {
+      const socialData = localStorage.getItem('socialLoginData');
+      if (socialData) {
+        try {
+          const parsedData: SocialLoginData = JSON.parse(socialData);
+          
+          setRegisterData(prev => ({
+            ...prev,
+            mt_id: parsedData.email, // 이메일을 아이디로 사용
+            mt_email: parsedData.email,
+            mt_name: parsedData.name,
+            mt_nickname: parsedData.nickname,
+            isSocialLogin: true,
+            socialProvider: parsedData.provider,
+            socialId: parsedData.google_id || parsedData.kakao_id || ''
+          }));
+          
+          // 소셜 로그인 시 약관 동의 단계로 시작
+          setCurrentStep(REGISTER_STEPS.TERMS);
+          
+          console.log(`${parsedData.provider} 소셜 로그인 데이터 로드 완료:`, parsedData);
+        } catch (error) {
+          console.error('소셜 로그인 데이터 파싱 오류:', error);
+        }
+      }
+    }
+  }, []);
 
   // 전화번호 포맷팅 함수
   const formatPhoneNumber = (value: string) => {
@@ -437,6 +489,13 @@ export default function RegisterPage() {
     } else {
       const steps = Object.values(REGISTER_STEPS);
       const currentIndex = steps.indexOf(currentStep);
+      
+      // 소셜 로그인 시 전화번호 인증 단계 건너뛰기
+      if (registerData.isSocialLogin && currentStep === REGISTER_STEPS.BASIC_INFO) {
+        setCurrentStep(REGISTER_STEPS.TERMS);
+        return;
+      }
+      
       if (currentIndex > 0) {
         setCurrentStep(steps[currentIndex - 1]);
       }
@@ -447,6 +506,15 @@ export default function RegisterPage() {
   const handleNext = () => {
     const steps = Object.values(REGISTER_STEPS);
     const currentIndex = steps.indexOf(currentStep);
+    
+    // 소셜 로그인 시 전화번호 인증 단계 건너뛰기
+    if (registerData.isSocialLogin) {
+      if (currentStep === REGISTER_STEPS.TERMS) {
+        setCurrentStep(REGISTER_STEPS.BASIC_INFO);
+        return;
+      }
+    }
+    
     if (currentIndex < steps.length - 1) {
       setCurrentStep(steps[currentIndex + 1]);
     }
@@ -656,26 +724,64 @@ export default function RegisterPage() {
     
     setIsLoading(true);
     try {
-      const requestData = {
+      let requestData: any = {
         ...registerData,
-        mt_id: registerData.mt_id.replace(/-/g, ''), // 전화번호에서 하이픈 제거
-        mt_type: 1, // 일반 회원
+        mt_type: registerData.isSocialLogin ? 
+          (registerData.socialProvider === 'google' ? 4 : 2) : 1, // 구글: 4, 카카오: 2, 일반: 1
         mt_level: 2, // 일반(무료)
         mt_status: 1, // 정상
         mt_onboarding: 'N',
         mt_show: 'Y'
       };
+
+      // 소셜 로그인이 아닌 경우에만 전화번호 하이픈 제거
+      if (!registerData.isSocialLogin) {
+        requestData.mt_id = registerData.mt_id.replace(/-/g, '');
+      }
+
+      // 소셜 로그인 관련 데이터 추가
+      if (registerData.isSocialLogin) {
+        if (registerData.socialProvider === 'google') {
+          requestData.mt_google_id = registerData.socialId;
+        } else if (registerData.socialProvider === 'kakao') {
+          requestData.mt_kakao_id = registerData.socialId;
+        }
+      }
       
       console.log('API 요청 데이터:', requestData);
       
-      // API 호출
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
+      // 소셜 로그인의 경우 소셜 회원가입 API 사용
+      const apiEndpoint = registerData.isSocialLogin ? 
+        `/api/${registerData.socialProvider}-auth` : 
+        '/api/auth/register';
+      
+      let response;
+      
+      if (registerData.isSocialLogin) {
+        // 소셜 로그인 회원가입
+        const socialRegisterData = {
+          ...requestData,
+          action: 'register', // 회원가입 액션 지정
+          isRegister: true
+        };
+        
+        response = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(socialRegisterData),
+        });
+      } else {
+        // 일반 회원가입
+        response = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestData),
+        });
+      }
 
       console.log('API 응답 상태:', response.status);
       
@@ -684,6 +790,10 @@ export default function RegisterPage() {
       
       if (response.ok && data.success) {
         console.log('회원가입 성공:', data);
+        
+        // 소셜 로그인 데이터 정리
+        localStorage.removeItem('socialLoginData');
+        
         setCurrentStep(REGISTER_STEPS.COMPLETE);
       } else {
         throw new Error(data.error || data.message || '회원가입에 실패했습니다.');
@@ -815,9 +925,27 @@ export default function RegisterPage() {
               <div className="text-center mb-4 register-header">
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
                   <FiFileText className="w-6 h-6 text-white" />
-            </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">서비스 이용약관</h2>
-                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>SMAP 서비스 이용을 위해 약관에 동의해주세요</p>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">
+                  {registerData.isSocialLogin ? 
+                    `${registerData.socialProvider === 'google' ? '구글' : '카카오'} 회원가입` : 
+                    '서비스 이용약관'
+                  }
+                </h2>
+                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
+                  {registerData.isSocialLogin ? 
+                    `${registerData.socialProvider === 'google' ? '구글' : '카카오'} 계정으로 간편 회원가입을 진행합니다` :
+                    'SMAP 서비스 이용을 위해 약관에 동의해주세요'
+                  }
+                </p>
+                {registerData.isSocialLogin && (
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-xs text-blue-700" style={{ wordBreak: 'keep-all' }}>
+                      📧 <strong>{registerData.mt_email}</strong><br/>
+                      전화번호 인증 없이 간편하게 가입할 수 있습니다
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-3 pb-4 register-form">
@@ -1256,8 +1384,13 @@ export default function RegisterPage() {
                 {/* 이메일 */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    이메일 (선택)
+                    {registerData.isSocialLogin ? 'ID (이메일)' : '이메일 (선택)'}
                   </label>
+                  {registerData.isSocialLogin && (
+                    <p className="text-xs text-blue-600 mb-2" style={{ wordBreak: 'keep-all' }}>
+                      {registerData.socialProvider === 'google' ? '구글' : '카카오'} 계정의 이메일이 ID로 사용됩니다
+                    </p>
+                  )}
                   <div className="relative register-input-container">
                     <div className="absolute left-4 top-0 bottom-0 flex items-center z-10 pointer-events-none">
                       <FiMail className="w-4 h-4 transition-colors duration-200" 
@@ -1267,20 +1400,26 @@ export default function RegisterPage() {
                       type="email"
                       value={registerData.mt_email}
                       onChange={(e) => {
+                        if (registerData.isSocialLogin) return; // 소셜 로그인 시 변경 불가
                         const email = e.target.value;
                         setRegisterData(prev => ({ ...prev, mt_email: email }));
                         validateEmail(email);
                       }}
                       onFocus={(e) => {
-                        setFocusedField('email');
-                        e.target.style.boxShadow = '0 0 0 2px #0113A3';
+                        if (!registerData.isSocialLogin) {
+                          setFocusedField('email');
+                          e.target.style.boxShadow = '0 0 0 2px #0113A3';
+                        }
                       }}
                       onBlur={(e) => {
                         setFocusedField(null);
                         e.target.style.boxShadow = '';
                       }}
-                      placeholder="example@email.com"
-                      className="w-full pl-8 pr-10 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
+                      placeholder={registerData.isSocialLogin ? '' : 'example@email.com'}
+                      disabled={registerData.isSocialLogin}
+                      className={`w-full pl-8 pr-10 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
+                        registerData.isSocialLogin ? 'bg-gray-50 cursor-not-allowed' : ''
+                      }`}
                       style={{ outline: 'none' }}
                     />
                     {registerData.mt_email && !emailError && (
@@ -1290,15 +1429,15 @@ export default function RegisterPage() {
                         </svg>
                       </div>
                     )}
-                    {emailError && (
+                    {emailError && !registerData.isSocialLogin && (
                       <div className="absolute right-2.5 top-0 bottom-0 flex items-center">
                         <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
-            </div>
+                      </div>
                     )}
                   </div>
-                  {emailError && (
+                  {emailError && !registerData.isSocialLogin && (
                     <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>{emailError}</p>
                   )}
                 </div>

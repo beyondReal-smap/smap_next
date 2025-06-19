@@ -50,36 +50,142 @@ export default function SocialLogin() {
     try {
       console.log(`${provider} 로그인 시도 중...`);
       
-      // 소셜 로그인 API 호출 (데모용으로 가상의 토큰 사용)
-      const response = await fetch('/api/auth/social-login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          provider: provider.toLowerCase(),
-          token: `demo-${provider}-token-${Date.now()}`
-        }),
-      });
+      if (provider === '구글' || provider === 'google') {
+        // 구글 로그인 처리
+        try {
+          const response = await fetch('/api/google-auth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              credential: `demo-google-credential-${Date.now()}`
+            }),
+          });
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || `${provider} 로그인에 실패했습니다.`);
-      }
+          const data = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(data.message || '구글 로그인에 실패했습니다.');
+          }
 
-      if (data.success && data.data) {
-        // AuthService를 통해 토큰과 사용자 정보 저장
-        const authService = await import('@/services/authService');
-        if (data.data.token) {
-          authService.default.setToken(data.data.token);
+          if (data.success && data.data) {
+            if (data.data.isNewUser) {
+              // 신규 회원 - register 페이지로 이동하면서 구글 정보 전달
+              const socialData = {
+                provider: 'google',
+                email: data.data.user.mt_email,
+                name: data.data.user.mt_name,
+                nickname: data.data.user.mt_nickname,
+                profile_image: data.data.user.mt_file1,
+                google_id: data.data.user.google_id
+              };
+              
+              localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+              router.push('/register?social=google');
+            } else {
+              // 기존 회원 - 로그인 처리
+              const authService = await import('@/services/authService');
+              if (data.data.token) {
+                authService.default.setToken(data.data.token);
+              }
+              authService.default.setUserData(data.data.user);
+              
+              console.log('구글 로그인 성공:', data.data.user);
+              router.push('/home');
+            }
+          } else {
+            throw new Error(data.message || '구글 로그인에 실패했습니다.');
+          }
+        } catch (err) {
+          console.error('구글 로그인 API 오류:', err);
+          // 실제 구글 로그인 실패 시 안내 메시지
+          setError('구글 로그인은 실제 구글 SDK 구현이 필요합니다. 데모 모드를 위해 네이버나 애플을 사용해주세요.');
         }
-        authService.default.setUserData(data.data.member);
-        
-        console.log(`${provider} 로그인 성공:`, data.data.member);
-        router.push('/home');
+      } else if (provider === '카카오' || provider === 'kakao') {
+        // 카카오 로그인 처리
+        try {
+          const response = await fetch('/api/kakao-auth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              access_token: `demo-kakao-token-${Date.now()}`
+            }),
+          });
+
+          const data = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(data.message || '카카오 로그인에 실패했습니다.');
+          }
+
+          if (data.success && data.data) {
+            if (data.data.isNewUser) {
+              // 신규 회원 - register 페이지로 이동하면서 카카오 정보 전달
+              const socialData = {
+                provider: 'kakao',
+                email: data.data.user.mt_email,
+                name: data.data.user.mt_name,
+                nickname: data.data.user.mt_nickname,
+                profile_image: data.data.user.mt_file1,
+                kakao_id: data.data.user.kakao_id
+              };
+              
+              localStorage.setItem('socialLoginData', JSON.stringify(socialData));
+              router.push('/register?social=kakao');
+            } else {
+              // 기존 회원 - 로그인 처리
+              const authService = await import('@/services/authService');
+              if (data.data.token) {
+                authService.default.setToken(data.data.token);
+              }
+              authService.default.setUserData(data.data.user);
+              
+              console.log('카카오 로그인 성공:', data.data.user);
+              router.push('/home');
+            }
+          } else {
+            throw new Error(data.message || '카카오 로그인에 실패했습니다.');
+          }
+        } catch (err) {
+          console.error('카카오 로그인 API 오류:', err);
+          // 실제 카카오 로그인 실패 시 안내 메시지
+          setError('카카오 로그인은 실제 카카오 SDK 구현이 필요합니다. 데모 모드를 위해 네이버나 애플을 사용해주세요.');
+        }
       } else {
-        throw new Error(data.message || `${provider} 로그인에 실패했습니다.`);
+        // 기타 소셜 로그인은 데모 모드로 처리
+        const response = await fetch('/api/auth/social-login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            provider: provider.toLowerCase(),
+            token: `demo-${provider}-token-${Date.now()}`
+          }),
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.message || `${provider} 로그인에 실패했습니다.`);
+        }
+
+        if (data.success && data.data) {
+          // AuthService를 통해 토큰과 사용자 정보 저장
+          const authService = await import('@/services/authService');
+          if (data.data.token) {
+            authService.default.setToken(data.data.token);
+          }
+          authService.default.setUserData(data.data.member);
+          
+          console.log(`${provider} 로그인 성공:`, data.data.member);
+          router.push('/home');
+        } else {
+          throw new Error(data.message || `${provider} 로그인에 실패했습니다.`);
+        }
       }
       
     } catch (err: any) {
