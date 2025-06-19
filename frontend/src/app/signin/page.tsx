@@ -18,6 +18,8 @@ import { RiKakaoTalkFill } from 'react-icons/ri';
 import { FiX, FiAlertTriangle, FiPhone, FiLock, FiEye, FiEyeOff, FiMail, FiUser } from 'react-icons/fi';
 import { AlertModal } from '@/components/ui';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import iosLogger, { LogCategory } from '@/utils/iosLogger';
+import '@/utils/fetchLogger'; // Fetch API 자동 로깅 활성화
 
 // 카카오 SDK 타입 정의
 declare global {
@@ -894,6 +896,17 @@ export default function SignInPage() {
 
           if (data.success) {
             console.log('[GOOGLE LOGIN] 네이티브 Google 로그인 성공, 사용자 정보:', data.user);
+            
+            // 🚨 Google 로그인 성공 상세 로깅
+            iosLogger.logGoogleLogin('네이티브 로그인 성공', {
+              hasUser: !!data.user,
+              hasToken: !!data.token,
+              isNewUser: data.isNewUser || false,
+              userEmail: data.user?.mt_email ? data.user.mt_email.substring(0, 3) + '***@' + data.user.mt_email.split('@')[1] : 'unknown',
+              userNickname: data.user?.mt_nickname || 'unknown',
+              userId: data.user?.mt_idx || 'unknown',
+              provider: 'google_native'
+            });
             
             // authService에 사용자 정보 설정 (AuthContext 우회)
             if (data.user && data.token) {
@@ -1831,7 +1844,16 @@ export default function SignInPage() {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     
-    // iOS 로그 전송 - Google 로그인 시도 시작
+    // 🚨 새로운 iOS 로깅 시스템 사용
+    iosLogger.logGoogleLogin('로그인 시도 시작', {
+      userAgent: navigator.userAgent.substring(0, 100),
+      url: window.location.href,
+      isIOSWebView: !!(window as any).webkit && !!(window as any).webkit.messageHandlers,
+      hasGoogleSDK: !!(window as any).google,
+      environment: 'signin_page'
+    });
+    
+    // 레거시 iOS 로그 전송 (호환성 유지)
     sendLogToiOS('info', '🔍 Google 로그인 시도 시작', {
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent,
@@ -2226,7 +2248,16 @@ export default function SignInPage() {
 
   // Kakao 로그인 핸들러
   const handleKakaoLogin = async () => {
-    // iOS 로그 전송 - 카카오 로그인 시도 시작
+    // 🚨 새로운 iOS 로깅 시스템 사용
+    iosLogger.logKakaoLogin('로그인 시도 시작', {
+      hasKakaoSDK: !!window.Kakao,
+      isKakaoInitialized: window.Kakao ? window.Kakao.isInitialized() : false,
+      kakaoVersion: window.Kakao ? window.Kakao.VERSION : 'unknown',
+      url: window.location.href,
+      environment: 'signin_page'
+    });
+    
+    // 레거시 iOS 로그 전송 (호환성 유지)
     sendLogToiOS('info', '💬 카카오 로그인 시도 시작', {
       timestamp: new Date().toISOString(),
       hasKakaoSDK: !!window.Kakao,
@@ -2301,7 +2332,18 @@ export default function SignInPage() {
               if (data.success) {
                 console.log('[KAKAO LOGIN] 카카오 로그인 성공, 사용자 정보:', data.user);
                 
-                // iOS 로그 전송 - 사용자 정보 저장
+                // 🚨 Kakao 로그인 성공 상세 로깅
+                iosLogger.logKakaoLogin('로그인 성공', {
+                  hasUser: !!data.user,
+                  hasToken: !!data.token,
+                  isNewUser: data.isNewUser || false,
+                  userEmail: data.user?.mt_email ? data.user.mt_email.substring(0, 3) + '***@' + data.user.mt_email.split('@')[1] : 'unknown',
+                  userNickname: data.user?.mt_nickname || 'unknown',
+                  userId: data.user?.mt_idx || 'unknown',
+                  provider: 'kakao'
+                });
+                
+                // 레거시 iOS 로그 전송 (호환성 유지)
                 sendLogToiOS('info', '💾 카카오 사용자 정보 저장', {
                   timestamp: new Date().toISOString(),
                   hasUserData: !!data.user,

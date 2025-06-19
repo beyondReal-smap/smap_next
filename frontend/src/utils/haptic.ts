@@ -32,13 +32,25 @@ const getCurrentPageInfo = () => {
  * 강제 햅틱 메시지 전송 (핸들러가 인식되지 않아도 시도)
  */
 const forceHapticToWebView = (type: HapticFeedbackType): boolean => {
+  // 🚨 중복 시도 방지 (1초 내 동일한 타입 호출 차단)
+  const now = Date.now();
+  const forceKey = `force_${type}`;
+  const lastForceCalls = (window as any).__FORCE_HAPTIC_CALLS__ || {};
+  
+  if (lastForceCalls[forceKey] && (now - lastForceCalls[forceKey]) < 1000) {
+    return false; // 중복 시도 방지
+  }
+  
+  (window as any).__FORCE_HAPTIC_CALLS__ = lastForceCalls;
+  lastForceCalls[forceKey] = now;
+
   const webkit = (window as any).webkit;
   if (!webkit) {
     console.log(`❌ [FORCE-HAPTIC] WebKit 없음`);
     return false;
   }
 
-  // 알려진 모든 핸들러 이름으로 시도
+  // 알려진 모든 핸들러 이름으로 시도 (제한적으로)
   const possibleHandlers = [
     'smapIos', 'iosHandler', 'jsToNative', 'webViewHandler', 
     'nativeHandler', 'hapticHandler', 'messageHandler'
@@ -63,8 +75,10 @@ const forceHapticToWebView = (type: HapticFeedbackType): boolean => {
             console.warn(`⚠️ [FORCE-HAPTIC] ${handlerName} 형식 실패:`, e);
           }
         }
-      } else {
-        // 핸들러가 인식되지 않아도 직접 시도
+      } 
+      
+      // 🚨 직접 생성 시도는 첫 번째 핸들러에서만 (무한 객체 생성 방지)
+      if (handlerName === 'smapIos') {
         try {
           webkit.messageHandlers = webkit.messageHandlers || {};
           webkit.messageHandlers[handlerName] = webkit.messageHandlers[handlerName] || {
@@ -97,12 +111,16 @@ const forceHapticToWebView = (type: HapticFeedbackType): boolean => {
  * 웹뷰 메시지 핸들러 디버깅 함수
  */
 const debugWebViewHandlers = () => {
-  if (typeof window === 'undefined') return { 
-    availableHandlers: [] as string[], 
-    webkitExists: false,
-    messageHandlersExists: false,
-    totalHandlers: 0
-  };
+  if (typeof window === 'undefined') {
+    const result = { 
+      availableHandlers: [] as string[], 
+      webkitExists: false,
+      messageHandlersExists: false,
+      totalHandlers: 0
+    };
+    (window as any).__CACHED_DEBUG_INFO__ = result;
+    return result;
+  }
   
   const webkit = (window as any).webkit;
   const webkitExists = !!webkit;
@@ -130,25 +148,42 @@ const debugWebViewHandlers = () => {
     }
   }
   
-  return {
+  const result = {
     webkitExists,
     messageHandlersExists: !!webkit?.messageHandlers,
     availableHandlers,
     totalHandlers: availableHandlers.length
   };
+  
+  // 🚨 캐시에 저장
+  (window as any).__CACHED_DEBUG_INFO__ = result;
+  return result;
 };
 
 /**
  * 다중 햅틱 메시지 전송 시도 (강화된 버전)
  */
 const sendHapticToWebView = (type: HapticFeedbackType): boolean => {
-  const debugInfo = debugWebViewHandlers();
+  // 🚨 WebView 디버그 호출 제한 (1초에 1번만)
+  const now = Date.now();
+  const lastDebugCall = (window as any).__LAST_WEBVIEW_DEBUG__ || 0;
   
-  console.log(`🔍 [WEBVIEW DEBUG] 핸들러 상태:`, debugInfo);
+  let debugInfo;
+  if (now - lastDebugCall > 1000) {
+    debugInfo = debugWebViewHandlers();
+    console.log(`🔍 [WEBVIEW DEBUG] 핸들러 상태:`, debugInfo);
+    (window as any).__LAST_WEBVIEW_DEBUG__ = now;
+  } else {
+    // 캐시된 정보 사용
+    debugInfo = (window as any).__CACHED_DEBUG_INFO__ || { webkitExists: false, totalHandlers: 0 };
+  }
   
-  // 네이티브 강제 함수 우선 시도
-  if (typeof (window as any).SMAP_FORCE_HAPTIC === 'function') {
+  // 네이티브 강제 함수 우선 시도 (제한 적용)
+  const lastForceCall = (window as any).__LAST_FORCE_HAPTIC__ || 0;
+  if (typeof (window as any).SMAP_FORCE_HAPTIC === 'function' && (now - lastForceCall > 500)) {
     console.log(`🧪 [NATIVE-FORCE] 네이티브 강제 햅틱 함수 사용`);
+    (window as any).__LAST_FORCE_HAPTIC__ = now;
+    
     try {
       const result = (window as any).SMAP_FORCE_HAPTIC(type);
       if (result) {
@@ -279,18 +314,23 @@ const detectIOSEnvironment = () => {
   const supportsTouchAPI = 'ontouchstart' in window;
   const supportsVibration = 'vibrate' in navigator;
   
-  // 디버그 로깅
-  console.log(`🔍 [HAPTIC-ENV] 환경 감지:`, {
-    isIOS,
-    hasWebKit,
-    hasHandler: actualHasHandler,
-    isIOSApp,
-    isIOSBrowser,
-    isWebView,
-    totalHandlers: webViewDebug?.totalHandlers || 0,
-    availableHandlers: webViewDebug?.availableHandlers || [],
-    nativeCheck
-  });
+  // 🚨 환경 감지 로그 제한 (5초에 1번만)
+  const now = Date.now();
+  const lastEnvLog = (window as any).__LAST_ENV_LOG__ || 0;
+  if (now - lastEnvLog > 5000) {
+    console.log(`🔍 [HAPTIC-ENV] 환경 감지:`, {
+      isIOS,
+      hasWebKit,
+      hasHandler: actualHasHandler,
+      isIOSApp,
+      isIOSBrowser,
+      isWebView,
+      totalHandlers: webViewDebug?.totalHandlers || 0,
+      availableHandlers: webViewDebug?.availableHandlers || [],
+      nativeCheck
+    });
+    (window as any).__LAST_ENV_LOG__ = now;
+  }
   
   return { 
     isIOS, 
@@ -355,9 +395,21 @@ const triggerIOSSafariHaptic = (type: HapticFeedbackType) => {
 export const triggerHapticFeedback = (
   type: HapticFeedbackType, 
   description?: string, 
-  context?: { action?: string; component?: string; [key: string]: any }
+  context?: { action?: string; component?: string; silent?: boolean; [key: string]: any }
 ) => {
   try {
+    // 🚨 중복 실행 방지 (200ms 내 동일한 타입 호출 차단)
+    const now = Date.now();
+    const hapticKey = `${type}_${context?.component || 'unknown'}`;
+    const lastCalls = (window as any).__HAPTIC_LAST_CALLS__ || {};
+    
+    if (lastCalls[hapticKey] && (now - lastCalls[hapticKey]) < 200) {
+      return; // 무한 루프 방지
+    }
+    
+    (window as any).__HAPTIC_LAST_CALLS__ = lastCalls;
+    lastCalls[hapticKey] = now;
+    
     const pageInfo = getCurrentPageInfo();
     const env = detectIOSEnvironment();
     
@@ -371,8 +423,13 @@ export const triggerHapticFeedback = (
       environment: env.isIOSApp ? 'iOS App' : env.isIOSBrowser ? 'iOS Safari' : 'Web Browser'
     };
     
-    // 콘솔 로그 (항상 표시)
-    console.log(`🎮 [HAPTIC] ${type.toUpperCase()} | ${pageInfo.pageName} | ${description || '액션'}`);
+    // 🚨 조용한 모드 지원
+    const silentMode = context?.silent === true;
+    
+    // 콘솔 로그 (조용한 모드가 아닐 때만)
+    if (!silentMode) {
+      console.log(`🎮 [HAPTIC] ${type.toUpperCase()} | ${pageInfo.pageName} | ${description || '액션'}`);
+    }
     
     // 핸들러 존재 여부를 다시 한번 확인 (실시간)
     const realtimeHasHandler = !!(window as any).webkit?.messageHandlers?.smapIos;
@@ -641,6 +698,9 @@ export const hapticFeedback = {
  * 전역 테스트용 햅틱 함수들 (웹 콘솔에서 직접 사용 가능)
  */
 if (typeof window !== 'undefined') {
+  // 🚨 기본값으로 디버그 모드 OFF (IPC 메시지 과부하 방지)
+  (window as any).__HAPTIC_DEBUG_MODE__ = false;
+  
   // 🚨 강제 햅틱 테스트 함수 (로그 제한 적용)
   (window as any).SMAP_FORCE_HAPTIC = (type: string = 'success') => {
     // 🚨 중복 실행 방지 (1초 내 동일한 타입 호출 차단)
@@ -726,6 +786,39 @@ if (typeof window !== 'undefined') {
   (window as any).errorHaptic = () => (window as any).smapHaptic('error');
   (window as any).warningHaptic = () => (window as any).smapHaptic('warning');
   
+  // 🚨 햅틱 디버그 모드 토글 함수들
+  (window as any).SMAP_HAPTIC_DEBUG_ON = () => {
+    (window as any).__HAPTIC_DEBUG_MODE__ = true;
+    console.log('🔧 [HAPTIC DEBUG] 상세 햅틱 디버그 모드 활성화');
+    console.log('📋 이제 모든 햅틱 로그가 표시됩니다.');
+    return '✅ 햅틱 디버그 모드 ON';
+  };
+  
+  (window as any).SMAP_HAPTIC_DEBUG_OFF = () => {
+    (window as any).__HAPTIC_DEBUG_MODE__ = false;
+    console.log('🔇 [HAPTIC DEBUG] 햅틱 디버그 모드 비활성화');
+    console.log('📋 이제 햅틱 로그가 최소화됩니다.');
+    return '✅ 햅틱 디버그 모드 OFF';
+  };
+  
+  (window as any).SMAP_CLEAR_HAPTIC_CACHE = () => {
+    (window as any).__HAPTIC_LAST_CALLS__ = {};
+    (window as any).__FORCE_HAPTIC_CALLS__ = {};
+    (window as any).__LAST_WEBVIEW_DEBUG__ = 0;
+    (window as any).__LAST_ENV_LOG__ = 0;
+    (window as any).__LAST_HAPTIC_CALL__ = {};
+    (window as any).__LAST_FORCE_HAPTIC__ = 0;
+    (window as any).__CACHED_DEBUG_INFO__ = null;
+    console.log('🧹 [HAPTIC CACHE] 모든 햅틱 캐시 및 제한 초기화 완료');
+    return '✅ 햅틱 캐시 초기화 완료';
+  };
+
   console.log('🎮 [HAPTIC-GLOBALS] 전역 햅틱 테스트 함수들 등록 완료');
-  console.log('📋 사용 가능한 함수들: SMAP_FORCE_HAPTIC(type), SMAP_TEST_ALL_HAPTICS(), smapHaptic(type), lightHaptic(), mediumHaptic(), heavyHaptic(), successHaptic(), errorHaptic(), warningHaptic()');
+  console.log('📋 사용 가능한 함수들:');
+  console.log('   - SMAP_FORCE_HAPTIC(type): 강제 햅틱 테스트');
+  console.log('   - SMAP_TEST_ALL_HAPTICS(): 모든 햅틱 순차 테스트');
+  console.log('   - SMAP_HAPTIC_DEBUG_ON(): 상세 디버그 모드 ON');
+  console.log('   - SMAP_HAPTIC_DEBUG_OFF(): 디버그 모드 OFF (기본값)');
+  console.log('   - SMAP_CLEAR_HAPTIC_CACHE(): 캐시 및 제한 초기화');
+  console.log('   - smapHaptic(type), lightHaptic(), mediumHaptic(), etc.');
 } 

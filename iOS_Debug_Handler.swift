@@ -316,11 +316,176 @@ extension YourWebViewClass: WKScriptMessageHandler {
     }
     
     private func handleJavaScriptLog(param: Any?) {
-        // 🚨 JavaScript 로그는 개발 환경에서만 출력
-        if isDevelopment {
-            debugLog("JavaScript 로그 처리", category: "iOS")
+        // 🚨 JS 로그 처리도 쓰로틀링 적용
+        guard messageThrottle.canProcessMessage(type: "jsLog") else {
+            return // 과도한 로그 출력 차단
         }
-        // JS 로그 처리 로직
+        
+        guard let paramString = param as? String else {
+            if isDevelopment {
+                debugLog("JavaScript 로그 파라미터 형식 오류", category: "iOS")
+            }
+            return
+        }
+        
+        guard let paramData = paramString.data(using: .utf8) else {
+            if isDevelopment {
+                debugLog("JavaScript 로그 UTF-8 변환 실패", category: "iOS")
+            }
+            return
+        }
+        
+        do {
+            if let logEntry = try JSONSerialization.jsonObject(with: paramData) as? [String: Any] {
+                // 새로운 구조화된 로깅 처리
+                handleStructuredJavaScriptLog(logEntry)
+            } else {
+                if isDevelopment {
+                    debugLog("JavaScript 로그 JSON 구조 오류", category: "iOS")
+                }
+            }
+        } catch {
+            if isDevelopment {
+                errorLog("JavaScript 로그 JSON 파싱 실패: \(error)", category: "iOS")
+            }
+        }
+    }
+    
+    // 구조화된 JavaScript 로그 처리
+    private func handleStructuredJavaScriptLog(_ logEntry: [String: Any]) {
+        let level = logEntry["level"] as? String ?? "info"
+        let category = logEntry["category"] as? String ?? "SYSTEM"
+        let message = logEntry["message"] as? String ?? "Unknown message"
+        let timestamp = logEntry["timestamp"] as? String ?? getCurrentTimestamp()
+        let sessionId = logEntry["sessionId"] as? String ?? "unknown"
+        let url = logEntry["url"] as? String ?? "unknown"
+        
+        // 카테고리별 이모지
+        let categoryEmoji: String
+        switch category {
+        case "GOOGLE_LOGIN":
+            categoryEmoji = "🔍"
+        case "KAKAO_LOGIN":
+            categoryEmoji = "💬"
+        case "AUTH":
+            categoryEmoji = "🔐"
+        case "API":
+            categoryEmoji = "🌐"
+        case "NETWORK":
+            categoryEmoji = "📡"
+        case "USER_ACTION":
+            categoryEmoji = "👆"
+        case "SYSTEM":
+            categoryEmoji = "⚙️"
+        default:
+            categoryEmoji = "📄"
+        }
+        
+        // 레벨별 처리
+        let logMessage = "[\(timestamp)] \(categoryEmoji) [\(category)] \(message)"
+        
+        switch level.lowercased() {
+        case "critical":
+            print("🚨 \(logMessage)")
+        case "error":
+            print("❌ \(logMessage)")
+        case "warning":
+            print("⚠️ \(logMessage)")
+        case "info":
+            print("📝 \(logMessage)")
+        case "debug":
+            if isDevelopment {
+                print("🔍 \(logMessage)")
+            }
+        default:
+            print("📄 \(logMessage)")
+        }
+        
+        // 상세 데이터 출력 (개발 환경에서만)
+        if isDevelopment {
+            if let data = logEntry["data"] as? [String: Any], !data.isEmpty {
+                print("   📋 Data:")
+                for (key, value) in data {
+                    // 민감한 데이터는 마스킹하여 출력
+                    let maskedValue = maskSensitiveValue(key: key, value: value)
+                    print("      \(key): \(maskedValue)")
+                }
+            }
+            
+            // URL과 세션 정보 출력
+            if url != "unknown" || sessionId != "unknown" {
+                let shortUrl = String(url.prefix(50))
+                let shortSession = String(sessionId.prefix(20))
+                print("   🔗 Context: URL=\(shortUrl)... | Session=\(shortSession)...")
+            }
+        }
+        
+        // 🎯 로그인 관련 로그는 특별 강조 (항상 출력)
+        if category == "GOOGLE_LOGIN" || category == "KAKAO_LOGIN" {
+            print("🎯 [LOGIN TRACKING] \(category): \(message)")
+            
+            if let data = logEntry["data"] as? [String: Any] {
+                if let step = data["step"] as? String {
+                    print("   📍 Step: \(step)")
+                }
+                if let provider = data["provider"] as? String {
+                    print("   🏢 Provider: \(provider)")
+                }
+                if let hasUser = data["hasUser"] as? Bool {
+                    print("   👤 Has User: \(hasUser)")
+                }
+                if let hasToken = data["hasToken"] as? Bool {
+                    print("   🎫 Has Token: \(hasToken)")
+                }
+                if let userEmail = data["userEmail"] as? String {
+                    print("   📧 User Email: \(userEmail)")
+                }
+                if let userId = data["userId"] as? String {
+                    print("   🆔 User ID: \(userId)")
+                }
+                if let isNewUser = data["isNewUser"] as? Bool {
+                    print("   🆕 Is New User: \(isNewUser)")
+                }
+            }
+        }
+        
+        // 🌐 API 호출 관련 로그도 강조
+        if category == "API" && message.contains("API 호출") {
+            if let data = logEntry["data"] as? [String: Any] {
+                if let method = data["method"] as? String,
+                   let url = data["url"] as? String,
+                   let status = data["responseStatus"] as? Int {
+                    print("🌐 [API CALL] \(method) \(url) → \(status)")
+                    
+                    if let duration = data["duration"] as? Int {
+                        print("   ⏱️ Duration: \(duration)ms")
+                    }
+                }
+            }
+        }
+    }
+    
+    // 민감한 데이터 마스킹
+    private func maskSensitiveValue(key: String, value: Any) -> String {
+        let lowerKey = key.lowercased()
+        let sensitiveKeys = ["token", "password", "credential", "secret", "key", "authorization"]
+        
+        if sensitiveKeys.contains(where: { lowerKey.contains($0) }) {
+            return "***MASKED***"
+        }
+        
+        // 이메일은 부분 마스킹
+        if lowerKey.contains("email"), let emailString = value as? String {
+            if emailString.contains("@") {
+                let parts = emailString.split(separator: "@")
+                if parts.count == 2 && parts[0].count > 3 {
+                    return String(parts[0].prefix(3)) + "***@" + String(parts[1])
+                }
+            }
+            return "***MASKED***"
+        }
+        
+        return String(describing: value)
     }
     
     private func handleNotificationPermissionRequest() {
