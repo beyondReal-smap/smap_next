@@ -630,6 +630,9 @@ const getScheduleStatus = (schedule: Schedule): { name: 'completed' | 'ongoing' 
 };
 
 export default function HomePage() {
+  // 🛡️ 최상위 에러 캐처
+  const [criticalError, setCriticalError] = useState<string | null>(null);
+  
   // 🚨 iOS 시뮬레이터 디버깅 - 즉시 실행 로그
   console.log('🏠 [HOME] HomePage 컴포넌트 시작');
   
@@ -643,6 +646,7 @@ export default function HomePage() {
     });
   } catch (envError) {
     console.error('🏠 [HOME] 환경 체크 중 오류:', envError);
+    setCriticalError(`환경 체크 오류: ${envError}`);
   }
   
   // 🚨 iOS 시뮬레이터 에러 핸들링
@@ -814,7 +818,10 @@ export default function HomePage() {
       setMapApiLoader(apiLoader);
       
       // 네트워크 상태 확인
-      checkNetworkStatus().then(setNetworkStatus);
+      checkNetworkStatus().then(setNetworkStatus).catch(err => {
+        console.error('네트워크 상태 확인 실패:', err);
+        setNetworkStatus(false);
+      });
       
       // 도메인별 진단 정보 수집
       const diagnostics = {
@@ -833,14 +840,21 @@ export default function HomePage() {
       
     } catch (error) {
       console.error('❌ [ENVIRONMENT] 환경 초기화 실패:', error);
+      setCriticalError(`환경 초기화 오류: ${error}`);
     }
   }, []);
   
   // useEffect를 사용하여 클라이언트 사이드에서 날짜 관련 상태 초기화
   useEffect(() => {
-    const today = new Date();
-    setSelectedDate(format(today, 'yyyy-MM-dd'));
-    setDaysForCalendar(getNext7Days());
+    try {
+      const today = new Date();
+      setSelectedDate(format(today, 'yyyy-MM-dd'));
+      setDaysForCalendar(getNext7Days());
+      console.log('🏠 [HOME] 날짜 초기화 완료');
+    } catch (error) {
+      console.error('🏠 [HOME] 날짜 초기화 실패:', error);
+      setCriticalError(`날짜 초기화 오류: ${error}`);
+    }
   }, []); // 빈 배열로 전달하여 마운트 시 1회 실행
 
   // UserContext 데이터가 로딩 완료되면 첫 번째 그룹을 자동 선택
@@ -1195,7 +1209,7 @@ export default function HomePage() {
           let rawSchedules: any[] = [];
           
           if (cachedSchedules && isScheduleCacheValid) {
-            if (Array.isArray(cachedSchedules)) {
+            if (cachedSchedules && Array.isArray(cachedSchedules)) {
               console.log('[fetchAllGroupData] 유효한 캐시된 스케줄 데이터 사용 (배열):', cachedSchedules.length, '개');
               rawSchedules = cachedSchedules;
             } else if (cachedSchedules.data && cachedSchedules.data.schedules) {
@@ -1211,7 +1225,7 @@ export default function HomePage() {
               const isScheduleCacheValidRetry = isCacheValid('scheduleData', parseInt(groupIdToUse), today);
               
               if (cachedSchedulesRetry && isScheduleCacheValidRetry) {
-                if (Array.isArray(cachedSchedulesRetry)) {
+                if (cachedSchedulesRetry && Array.isArray(cachedSchedulesRetry)) {
                   console.log('[fetchAllGroupData] 대기 후 캐시된 스케줄 데이터 발견 (배열):', cachedSchedulesRetry.length, '개');
                   rawSchedules = cachedSchedulesRetry;
                 } else if (cachedSchedulesRetry.data && cachedSchedulesRetry.data.schedules) {
@@ -1243,7 +1257,7 @@ export default function HomePage() {
             const isScheduleCacheValidRetry = isCacheValid('scheduleData', parseInt(groupIdToUse), today);
             
             if (cachedSchedulesRetry && isScheduleCacheValidRetry) {
-              if (Array.isArray(cachedSchedulesRetry)) {
+              if (cachedSchedulesRetry && Array.isArray(cachedSchedulesRetry)) {
                 console.log('[fetchAllGroupData] 대기 후 캐시된 스케줄 데이터 발견 (배열):', cachedSchedulesRetry.length, '개');
                 rawSchedules = cachedSchedulesRetry;
               } else if (cachedSchedulesRetry.data && cachedSchedulesRetry.data.schedules) {
@@ -1521,7 +1535,7 @@ export default function HomePage() {
               
               if (storedGroups) {
                 const groups = JSON.parse(storedGroups);
-                if (Array.isArray(groups) && groups.length > 0) {
+                if (groups && Array.isArray(groups) && groups.length > 0) {
                   console.log('[HOME] 🔥 localStorage에서 그룹 데이터 발견:', groups.length, '개');
                   
                   // UserContext와 동기화되지 않은 경우 직접 데이터 사용
@@ -2200,8 +2214,8 @@ export default function HomePage() {
 
   // 첫 번째 멤버 자동 선택 - 중복 실행 방지 강화
   useEffect(() => {
-    if (groupMembers.length > 0 && 
-        !groupMembers.some(m => m.isSelected) && 
+    if (groupMembers && Array.isArray(groupMembers) && groupMembers.length > 0 && 
+        !(groupMembers && Array.isArray(groupMembers) && groupMembers.some(m => m.isSelected)) && 
         !firstMemberSelected &&
         dataFetchedRef.current.members && 
         dataFetchedRef.current.schedules &&
@@ -2215,7 +2229,7 @@ export default function HomePage() {
       
       setTimeout(() => {
         // 다시 한 번 중복 체크
-        if (!groupMembers.some(m => m.isSelected)) {
+        if (groupMembers && Array.isArray(groupMembers) && !(groupMembers && Array.isArray(groupMembers) && groupMembers.some(m => m.isSelected))) {
           console.log('[HOME] 첫 번째 멤버 자동 선택 실행:', groupMembers[0].id);
           handleMemberSelect(groupMembers[0].id);
         } else {
@@ -2223,7 +2237,7 @@ export default function HomePage() {
       }
       }, 300);
     }
-  }, [groupMembers.length, firstMemberSelected, dataFetchedRef.current.members, dataFetchedRef.current.schedules, mapsInitialized.naver, mapsInitialized.google, mapType]);
+  }, [groupMembers?.length || 0, firstMemberSelected, dataFetchedRef.current.members, dataFetchedRef.current.schedules, mapsInitialized.naver, mapsInitialized.google, mapType]);
 
   // 공통 좌표 파싱 함수
   const parseCoordinate = (coord: any): number | null => {
@@ -2360,16 +2374,18 @@ export default function HomePage() {
           const today = new Date();
           const todayDateStr = format(today, 'yyyy-MM-dd');
           
-          const todaySchedules = memberData.schedules.filter(schedule => {
-            if (!schedule.date) return false;
-            try {
-              const scheduleDate = new Date(schedule.date);
-              const scheduleDateStr = format(scheduleDate, 'yyyy-MM-dd');
-              return scheduleDateStr === todayDateStr;
-            } catch (e) {
-              return false;
-            }
-          });
+          const todaySchedules = (memberData.schedules && Array.isArray(memberData.schedules)) 
+            ? memberData.schedules.filter(schedule => {
+                if (!schedule.date) return false;
+                try {
+                  const scheduleDate = new Date(schedule.date);
+                  const scheduleDateStr = format(scheduleDate, 'yyyy-MM-dd');
+                  return scheduleDateStr === todayDateStr;
+                } catch (e) {
+                  return false;
+                }
+              })
+            : [];
 
           // 위치 정보 포맷팅 - WebKit 환경에서 강화된 시간 처리
           const isWebKit = typeof window !== 'undefined' && (!!(window as any).webkit || navigator.userAgent.includes('WebKit'));
@@ -2771,16 +2787,18 @@ export default function HomePage() {
           const today = new Date();
           const todayDateStr = format(today, 'yyyy-MM-dd');
           
-          const todaySchedules = memberData.schedules.filter(schedule => {
-            if (!schedule.date) return false;
-            try {
-              const scheduleDate = new Date(schedule.date);
-              const scheduleDateStr = format(scheduleDate, 'yyyy-MM-dd');
-              return scheduleDateStr === todayDateStr;
-            } catch (e) {
-              return false;
-            }
-          });
+          const todaySchedules = (memberData.schedules && Array.isArray(memberData.schedules)) 
+            ? memberData.schedules.filter(schedule => {
+                if (!schedule.date) return false;
+                try {
+                  const scheduleDate = new Date(schedule.date);
+                  const scheduleDateStr = format(scheduleDate, 'yyyy-MM-dd');
+                  return scheduleDateStr === todayDateStr;
+                } catch (e) {
+                  return false;
+                }
+              })
+            : [];
 
           // 위치 정보 포맷팅
           const gpsTime = memberData.mlt_gps_time ? new Date(memberData.mlt_gps_time) : null;
@@ -3159,6 +3177,12 @@ export default function HomePage() {
 
   // 그룹 멤버 선택 핸들러 (filteredSchedules 업데이트)
   const handleMemberSelect = (id: string) => {
+    // 안전성 체크
+    if (!groupMembers || groupMembers.length === 0) {
+      console.warn('[handleMemberSelect] groupMembers가 비어있음');
+      return;
+    }
+    
     // 현재 선택된 멤버와 같은 멤버를 재선택하는 경우 아무것도 하지 않음
     const currentSelectedMember = groupMembers.find(member => member.isSelected);
     if (currentSelectedMember && currentSelectedMember.id === id) {
@@ -3196,17 +3220,17 @@ export default function HomePage() {
       let targetDate = selectedDate;
       
       // sgdt_idx를 기준으로 그룹 스케줄에서 해당 멤버의 스케줄 필터링
-      const memberSchedules = groupSchedules.filter(schedule => 
+      const memberSchedules = (groupSchedules && Array.isArray(groupSchedules)) ? groupSchedules.filter(schedule => 
         schedule.sgdt_idx !== null && 
         schedule.sgdt_idx !== undefined && 
         Number(schedule.sgdt_idx) === Number(selectedMember.sgdt_idx) &&
         typeof schedule.date === 'string' && 
         schedule.date!.startsWith(targetDate)
-      );
+      ) : [];
       console.log('[handleMemberSelect] 선택된 멤버의 스케줄:', {
         memberName: selectedMember.name,
         memberSgdtIdx: selectedMember.sgdt_idx,
-        totalMemberSchedules: groupSchedules.filter(s => s.sgdt_idx === selectedMember.sgdt_idx).length,
+        totalMemberSchedules: (groupSchedules && Array.isArray(groupSchedules)) ? groupSchedules.filter(s => s.sgdt_idx === selectedMember.sgdt_idx).length : 0,
         filteredSchedules: memberSchedules.length,
         selectedDate,
         targetDate, // 실제 사용된 날짜
@@ -3358,17 +3382,17 @@ export default function HomePage() {
     }, 50);
     
     setSelectedDate(dateValue);
-    const selectedMember = groupMembers.find(member => member.isSelected);
+    const selectedMember = groupMembers ? groupMembers.find(member => member.isSelected) : null;
     
     if (selectedMember) {
       // sgdt_idx를 기준으로 그룹 스케줄에서 해당 멤버의 스케줄 필터링
-      const memberSchedules = groupSchedules.filter(schedule => 
+      const memberSchedules = (groupSchedules && Array.isArray(groupSchedules)) ? groupSchedules.filter(schedule => 
         schedule.sgdt_idx !== null && 
         schedule.sgdt_idx !== undefined && 
         Number(schedule.sgdt_idx) === Number(selectedMember.sgdt_idx) &&
         typeof schedule.date === 'string' && 
         schedule.date!.startsWith(dateValue)
-      );
+      ) : [];
       console.log('[handleDateSelect] 선택된 멤버의 날짜별 스케줄:', {
         memberName: selectedMember.name,
         memberSgdtIdx: selectedMember.sgdt_idx,
@@ -3392,15 +3416,21 @@ export default function HomePage() {
 
   // 멤버 마커 업데이트 함수 - 모든 그룹멤버 표시
   const updateMemberMarkers = (members: GroupMember[]) => {
+    // 안전성 체크
+    if (!members || members.length === 0) {
+      console.warn('[updateMemberMarkers] members가 비어있음');
+      return;
+    }
+    
     console.log('[updateMemberMarkers] 마커 업데이트 시작:', {
       membersCount: members.length,
-      selectedMember: members.find(m => m.isSelected)?.name || 'none',
+      selectedMember: (members && Array.isArray(members)) ? members.find(m => m.isSelected)?.name || 'none' : 'none',
       currentInfoWindow: currentInfoWindowRef.current ? 'exists' : 'none',
       lastSelectedMember: lastSelectedMemberRef.current
     });
     
     // 선택된 멤버 확인
-    const currentSelectedMember = members.find(member => member.isSelected);
+    const currentSelectedMember = (members && Array.isArray(members)) ? members.find(member => member.isSelected) : null;
     const selectedMemberName = currentSelectedMember?.name || null;
     
     // 같은 멤버가 이미 선택되어 있고 InfoWindow가 열려있으면 중복 실행 방지
@@ -3501,7 +3531,7 @@ export default function HomePage() {
 
           // 선택된 멤버의 InfoWindow 자동 표시 (중복 방지) - 짧은 지연
           setTimeout(() => {
-            const selectedMarkerIndex = members.findIndex(member => member.isSelected);
+            const selectedMarkerIndex = (members && Array.isArray(members)) ? members.findIndex(member => member.isSelected) : -1;
             const selectedMarker = memberMarkers.current[selectedMarkerIndex];
             
             if (selectedMarker && window.naver?.maps?.InfoWindow) {
@@ -3648,7 +3678,7 @@ export default function HomePage() {
 
           // 구글 지도용 InfoWindow 자동 표시 (짧은 지연)
           setTimeout(() => {
-            const selectedMarkerIndex = members.findIndex(member => member.isSelected);
+            const selectedMarkerIndex = (members && Array.isArray(members)) ? members.findIndex(member => member.isSelected) : -1;
             const selectedMarker = memberMarkers.current[selectedMarkerIndex];
             
                                       if (selectedMarker && window.google?.maps?.InfoWindow) {
@@ -4015,14 +4045,14 @@ export default function HomePage() {
   // 첫번째 멤버 자동 선택 - 직접 상태 업데이트 방식
   useEffect(() => {
     // 조건: 멤버가 있고, 선택된 멤버가 없을 때
-    if (groupMembers.length > 0 && 
-        !groupMembers.some(m => m.isSelected) && 
+    if (groupMembers && Array.isArray(groupMembers) && groupMembers.length > 0 && 
+        !(groupMembers && Array.isArray(groupMembers) && groupMembers.some(m => m.isSelected)) && 
         !firstMemberSelected &&
         selectedGroupId) {
       
       console.log('[HOME] 첫번째 멤버 자동 선택 조건 만족:', {
         memberCount: groupMembers.length,
-        hasSelectedMember: groupMembers.some(m => m.isSelected),
+        hasSelectedMember: groupMembers && Array.isArray(groupMembers) ? groupMembers.some(m => m.isSelected) : false,
         firstMemberSelected,
         selectedGroupId
       });
@@ -4035,7 +4065,7 @@ export default function HomePage() {
       console.log('[HOME] 첫번째 멤버 자동 선택 실행:', firstMember.name, firstMember.id);
       
       // 직접 상태 업데이트 (마커 중복 업데이트 방지)
-      const updatedMembers = groupMembers.map(member => ({
+      const updatedMembers = (groupMembers || []).map(member => ({
         ...member,
         isSelected: member.id === firstMember.id
       }));
@@ -4043,13 +4073,13 @@ export default function HomePage() {
       setGroupMembers(updatedMembers);
       
       // 첫번째 멤버의 스케줄 필터링
-      const memberSchedules = groupSchedules.filter(schedule => 
+      const memberSchedules = (groupSchedules && Array.isArray(groupSchedules)) ? groupSchedules.filter(schedule => 
         schedule.sgdt_idx !== null && 
         schedule.sgdt_idx !== undefined && 
         Number(schedule.sgdt_idx) === Number(firstMember.sgdt_idx) &&
         typeof schedule.date === 'string' && 
         schedule.date!.startsWith(selectedDate)
-      );
+      ) : [];
       
       setFilteredSchedules(memberSchedules);
       console.log('[HOME] 첫번째 멤버 자동 선택 완료:', firstMember.name, '스케줄:', memberSchedules.length, '개');
@@ -4059,10 +4089,10 @@ export default function HomePage() {
   // 컴포넌트 마운트 시 초기 상태 체크 (안전장치)
   useEffect(() => {
     console.log('[HOME] 컴포넌트 마운트 후 초기 상태 체크:', {
-      groupMembersLength: groupMembers.length,
+      groupMembersLength: groupMembers?.length || 0,
       selectedGroupId,
       firstMemberSelected,
-      hasSelectedMember: groupMembers.some(m => m.isSelected)
+      hasSelectedMember: groupMembers && Array.isArray(groupMembers) ? groupMembers.some(m => m.isSelected) : false
     });
   }, []);
 
@@ -4164,17 +4194,19 @@ export default function HomePage() {
       const notifications = await notificationService.getMemberPushLogs(user.mt_idx);
       
       // 읽지 않은 알림이 있는지 확인 (plt_read_chk가 'N'인 것)
-      const hasUnread = notifications.some(notification => {
-        return notification.plt_read_chk === 'N' && 
-               notification.plt_show === 'Y' && 
-               notification.plt_status === 2; // 전송 완료된 알림만
-      });
+      const hasUnread = (notifications && Array.isArray(notifications)) 
+        ? notifications.some(notification => {
+            return notification.plt_read_chk === 'N' && 
+                   notification.plt_show === 'Y' && 
+                   notification.plt_status === 2; // 전송 완료된 알림만
+          })
+        : false;
       
       setHasNewNotifications(hasUnread);
       console.log('[HOME] 새로운 알림 확인:', { 
         hasUnread, 
         totalNotifications: notifications.length,
-        unreadCount: notifications.filter(n => n.plt_read_chk === 'N').length
+        unreadCount: (notifications && Array.isArray(notifications)) ? notifications.filter(n => n.plt_read_chk === 'N').length : 0
       });
     } catch (error) {
       console.error('[HOME] 알림 확인 실패:', error);
@@ -4186,15 +4218,15 @@ export default function HomePage() {
   useEffect(() => {
     console.log('[RENDER] 일정 리스트 상태 변경:', {
       filteredSchedulesLength: filteredSchedules.length,
-      selectedMember: groupMembers.find(m => m.isSelected)?.name,
-      selectedMemberSgdtIdx: groupMembers.find(m => m.isSelected)?.sgdt_idx,
+      selectedMember: (groupMembers && Array.isArray(groupMembers)) ? groupMembers.find(m => m.isSelected)?.name : null,
+      selectedMemberSgdtIdx: (groupMembers && Array.isArray(groupMembers)) ? groupMembers.find(m => m.isSelected)?.sgdt_idx : null,
       selectedDate,
-      schedules: filteredSchedules.map(s => ({
+      schedules: (filteredSchedules && Array.isArray(filteredSchedules)) ? filteredSchedules.map(s => ({
         id: s.id,
         title: s.title,
         date: s.date,
         sgdt_idx: s.sgdt_idx
-      }))
+      })) : []
     });
   }, [filteredSchedules, groupMembers, selectedDate]);
 
@@ -4318,7 +4350,7 @@ export default function HomePage() {
       totalGroupSchedules: groupSchedules.length
     });
 
-    const memberSchedules = groupSchedules.filter(schedule => {
+    const memberSchedules = (groupSchedules && Array.isArray(groupSchedules)) ? groupSchedules.filter(schedule => {
       // sgdt_idx 매칭 확인
       const sgdtMatch = schedule.sgdt_idx !== null && 
         schedule.sgdt_idx !== undefined && 
@@ -4339,7 +4371,7 @@ export default function HomePage() {
       }
 
       return sgdtMatch && dateMatch;
-    });
+    }) : [];
 
     console.log('[getMemberTodayScheduleStats] 필터링된 스케줄:', {
       memberName: member.name,
@@ -4495,6 +4527,37 @@ export default function HomePage() {
     }
   };
 
+  // 🚨 Critical Error가 있으면 즉시 에러 화면 표시
+  if (criticalError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Critical Error</h3>
+            <p className="text-sm text-gray-600 mb-4">{criticalError}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
+            >
+              페이지 새로고침
+            </button>
+            <button 
+              onClick={() => setCriticalError(null)}
+              className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              오류 무시하고 계속
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // 🚨 iOS 시뮬레이터 에러 처리 UI
   if (componentError) {
     return (
@@ -4536,16 +4599,18 @@ export default function HomePage() {
     );
   }
 
-  return (
-    <>
-      <style jsx global>{mobileStyles}</style>
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="min-h-screen relative overflow-hidden"
-        style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
-      >
+  // 🛡️ 안전한 렌더링
+  try {
+    return (
+      <>
+        <style jsx global>{mobileStyles}</style>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="min-h-screen relative overflow-hidden"
+          style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
+        >
         {/* 개선된 헤더 - logs/page.tsx 패턴 적용 */}
         <motion.header 
             initial={{ y: -100, opacity: 0 }}
@@ -4652,7 +4717,7 @@ export default function HomePage() {
                  try {
                    const storedGroups = typeof window !== 'undefined' ? localStorage.getItem('user_groups') : null;
                    const groups = storedGroups ? JSON.parse(storedGroups) : [];
-                   return Array.isArray(groups) ? groups.length : 0;
+                   return (groups && Array.isArray(groups)) ? groups.length : 0;
                  } catch {
                    return 0;
                  }
@@ -4660,7 +4725,7 @@ export default function HomePage() {
                  try {
                    const storedGroups = typeof window !== 'undefined' ? localStorage.getItem('user_groups') : null;
                    const groups = storedGroups ? JSON.parse(storedGroups) : [];
-                   return Array.isArray(groups) && groups.length > 0 ? '✅' : '❌';
+                   return (groups && Array.isArray(groups) && groups.length > 0) ? '✅' : '❌';
                  } catch {
                    return '❌';
                  }
@@ -4895,7 +4960,7 @@ export default function HomePage() {
                          <span className="truncate text-gray-700">
                            {isUserDataLoading 
                              ? '로딩 중...' 
-                             : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
+                             : (userGroups && Array.isArray(userGroups)) ? userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택' : '그룹 선택'
                            }
                          </span>
                          <div className="ml-2 flex-shrink-0">
@@ -4921,7 +4986,7 @@ export default function HomePage() {
                              transition={{ duration: 0.2 }}
                              className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
                            >
-                             {userGroups.map((group) => (
+                             {(userGroups && Array.isArray(userGroups)) ? userGroups.map((group) => (
                                <motion.button
                                  key={group.sgt_idx}
                                  whileHover={{ backgroundColor: "rgba(99, 102, 241, 0.05)" }}
@@ -4951,7 +5016,7 @@ export default function HomePage() {
                                    {groupMemberCounts[group.sgt_idx] || 0}명의 멤버
                                  </div>
                                </motion.button>
-                             ))}
+                             )) : []}
                            </motion.div>
                          )}
                        </AnimatePresence>
@@ -5001,7 +5066,9 @@ export default function HomePage() {
                            }
 
                            if (shouldChangeDate && direction) {
-                             const currentIndex = daysForCalendar.findIndex(day => day.value === selectedDate);
+                             const currentIndex = (daysForCalendar && Array.isArray(daysForCalendar)) 
+                             ? daysForCalendar.findIndex(day => day.value === selectedDate)
+                             : -1;
                              
                              if (direction === 'next' && currentIndex < daysForCalendar.length - 1) {
                                handleDateSelect(daysForCalendar[currentIndex + 1].value);
@@ -5025,7 +5092,7 @@ export default function HomePage() {
                            sidebarDateX.set(0);
                          }}
                        >
-                         {daysForCalendar.map((day, index) => (
+                         {(daysForCalendar && Array.isArray(daysForCalendar)) ? daysForCalendar.map((day, index) => (
                            <motion.button
                              key={day.value}
                              whileHover={{ scale: 1.05 }}
@@ -5054,7 +5121,7 @@ export default function HomePage() {
                            >
                              {day.display}
                            </motion.button>
-                         ))}
+                         )) : []}
                        </motion.div>
                      </div>
                    </div>
@@ -5066,11 +5133,11 @@ export default function HomePage() {
                        <h3 className="text-base font-semibold text-gray-800">멤버 목록</h3>
                        <div className="flex-1 h-px bg-gradient-to-r from-emerald-200/50 to-transparent"></div>
                        <span className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-full backdrop-blur-sm">
-                         {groupMembers.length}명
+                         {groupMembers ? groupMembers.length : 0}명
                        </span>
                      </div>
                      <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-16">
-                       {groupMembers.length > 0 ? (
+                       {groupMembers && Array.isArray(groupMembers) && groupMembers.length > 0 ? (
                          <motion.div variants={sidebarContentVariants} className="space-y-2">
                            {groupMembers.map((member, index) => {
                              const stats = getMemberTodayScheduleStats(member);
@@ -5236,4 +5303,40 @@ export default function HomePage() {
         {/* <LogParser /> */}
       </>
     );
+  } catch (renderError) {
+    console.error('🏠 [HOME] 렌더링 오류:', renderError);
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">렌더링 오류</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {renderError instanceof Error ? renderError.message : String(renderError)}
+            </p>
+            <p className="text-xs text-gray-500 mb-4">
+              브라우저 콘솔을 확인해주세요.
+            </p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
+            >
+              페이지 새로고침
+            </button>
+            <button 
+              onClick={() => window.location.href = '/signin'}
+              className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              로그인 페이지로 이동
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }
