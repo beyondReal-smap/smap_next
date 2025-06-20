@@ -142,6 +142,10 @@ export default function SignInPage() {
       forceCreateMessageHandlers();
     }
     
+    // 🚨 강제 웹 SDK 모드 활성화 (임시)
+    console.log('🚨 [EMERGENCY] iOS 앱 빌드 대기 중, 강제 웹 SDK 모드 활성화');
+    (window as any).__FORCE_WEB_SDK_MODE__ = true;
+    
     // 🔍 즉시 강제 핸들러 확인 (더 상세한 디버깅)
     setTimeout(() => {
       console.log('🔍 [FORCE HANDLER CHECK] 5초 후 상세 핸들러 확인');
@@ -2172,12 +2176,14 @@ export default function SignInPage() {
     });
 
     try {
-      // 🚨 nextstep.smap.site에서 MessageHandler가 없는 경우 웹 SDK 강제 사용
+      // 🚨 강제 웹 SDK 모드이거나 nextstep.smap.site에서 MessageHandler가 없는 경우 웹 SDK 강제 사용
       const isNexStepDomain = window.location.hostname === 'nextstep.smap.site';
       const hasNoMessageHandlers = !hasMessageHandlers || !hasSmapIos;
+      const isForceWebMode = !!(window as any).__FORCE_WEB_SDK_MODE__;
       
-      if (isNexStepDomain && hasNoMessageHandlers) {
-        console.log('🌐 [GOOGLE LOGIN] nextstep.smap.site에서 MessageHandler 없음 - 웹 SDK 강제 사용');
+      if (isForceWebMode || (isNexStepDomain && hasNoMessageHandlers)) {
+        const reason = isForceWebMode ? '강제 웹 SDK 모드' : 'MessageHandler 없음';
+        console.log(`🌐 [GOOGLE LOGIN] ${reason} - 웹 SDK 강제 사용`);
         
         // 웹 Google SDK 강제 사용
         setTimeout(() => {
