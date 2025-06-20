@@ -337,7 +337,7 @@ function GroupPageContent() {
       
       const memberData = await memberService.getGroupMembers(group.sgt_idx.toString());
       
-      const transformedMembers: GroupMember[] = memberData.map((member: any, index: number) => ({
+      const transformedMembers: GroupMember[] = (memberData && Array.isArray(memberData)) ? memberData.map((member: any, index: number) => ({
         mt_idx: member.mt_idx,
         mt_type: member.mt_type || 1,
         mt_level: member.mt_level || 2,
@@ -387,7 +387,7 @@ function GroupPageContent() {
         mlt_speed: member.mlt_speed,
         mlt_battery: member.mlt_battery,
         mlt_gps_time: member.mlt_gps_time,
-      }));
+      })) : [];
       
       setGroupMembers(transformedMembers);
       setGroupMemberCounts(prev => ({
@@ -641,7 +641,7 @@ function GroupPageContent() {
       
       // 생성된 그룹을 선택된 그룹으로 설정 (최신 정보 포함)
       const updatedGroups = await groupService.getCurrentUserGroups();
-      const freshGroup = updatedGroups.find(g => g.sgt_idx === createdGroup.sgt_idx);
+      const freshGroup = (updatedGroups && Array.isArray(updatedGroups)) ? updatedGroups.find(g => g.sgt_idx === createdGroup.sgt_idx) : null;
       
       if (freshGroup) {
         const newGroupItem: ExtendedGroup = {
@@ -691,11 +691,11 @@ function GroupPageContent() {
       
       setSelectedGroup(updatedGroupExtended);
       setGroups(prev => 
-        prev.map(group => 
+        (prev && Array.isArray(prev)) ? prev.map(group => 
           group.sgt_idx === selectedGroup.sgt_idx 
             ? updatedGroupExtended 
             : group
-        )
+        ) : []
       );
       
       setIsEditModalOpen(false);
@@ -921,7 +921,7 @@ function GroupPageContent() {
   const isCurrentUserGroupOwner = () => {
     if (!selectedGroup || !groupMembers.length || !user) return false;
     const currentUserId = user.mt_idx;
-    const currentUserMember = groupMembers.find(member => member.mt_idx === currentUserId);
+    const currentUserMember = (groupMembers && Array.isArray(groupMembers)) ? groupMembers.find(member => member.mt_idx === currentUserId) : null;
     return currentUserMember?.sgdt_owner_chk === 'Y';
   };
 
@@ -937,11 +937,11 @@ function GroupPageContent() {
       );
       
       setGroupMembers(prev => 
-        prev.map(member => 
+        (prev && Array.isArray(prev)) ? prev.map(member => 
           member.mt_idx === selectedMember.mt_idx 
             ? { ...member, sgdt_leader_chk: newRole === 'leader' ? 'Y' : 'N' }
             : member
-        )
+        ) : []
       );
       
       setIsMemberManageModalOpen(false);
@@ -967,7 +967,7 @@ function GroupPageContent() {
       );
       
       setGroupMembers(prev => 
-        prev.filter(member => member.mt_idx !== selectedMember.mt_idx)
+        (prev && Array.isArray(prev)) ? prev.filter(member => member.mt_idx !== selectedMember.mt_idx) : []
       );
       
       setIsMemberManageModalOpen(false);
@@ -983,11 +983,11 @@ function GroupPageContent() {
   };
 
   // 검색 필터링
-  const filteredGroups = groups.filter(group => 
+  const filteredGroups = (groups && Array.isArray(groups)) ? groups.filter(group => 
     group.sgt_title.toLowerCase().includes(searchQuery.toLowerCase()) || 
     (group.sgt_content && group.sgt_content.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (group.sgt_memo && group.sgt_memo.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  ) : [];
 
   // 토스트 모달 상태
   const [toastModal, setToastModal] = useState<{
@@ -1179,7 +1179,7 @@ function GroupPageContent() {
                           <h3 className="text-lg font-bold text-gray-900">내 그룹 목록</h3>
                         </div>
                         <div className="p-4 space-y-3">
-                          {filteredGroups.map((group, index) => {
+                          {(filteredGroups && Array.isArray(filteredGroups)) && filteredGroups.map((group, index) => {
                             const memberCount = groupMemberCounts[group.sgt_idx] || 0;
                             
                             return (
@@ -1318,7 +1318,7 @@ function GroupPageContent() {
                         <div className="flex items-center flex-1 pr-12">
                           <div className="p-2 bg-white rounded-xl mr-4">
                             <img 
-                              src={`/images/group${((groups.findIndex(g => g.sgt_idx === selectedGroup.sgt_idx) % 2) + 1)}.webp`}
+                              src={`/images/group${(((groups && Array.isArray(groups)) ? groups.findIndex(g => g.sgt_idx === selectedGroup.sgt_idx) : -1) % 2) + 1}.webp`}
                               alt="그룹 아이콘"
                               className="w-12 h-12 object-cover"
                             />
@@ -1473,7 +1473,7 @@ function GroupPageContent() {
                         ) : (
                           <div className="space-y-3">
                             {groupMembers.length > 0 ? (
-                              groupMembers.map((member, index) => (
+                              (groupMembers && Array.isArray(groupMembers)) && groupMembers.map((member, index) => (
                                 <motion.div 
                                   key={member.mt_idx} 
                                   onClick={() => handleMemberClick(member)}
