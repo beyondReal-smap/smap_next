@@ -2373,14 +2373,46 @@ export default function SignInPage() {
               const webkit = (window as any).webkit;
               const availableHandlers = (window as any).__SMAP_HANDLERS_LIST__ || [];
               
+              // 🔍 상세 디버깅 정보
+              console.log('🔍 [HANDLER-DEBUG] 전역 플래그 상태:', {
+                __SMAP_HANDLERS_READY__: (window as any).__SMAP_HANDLERS_READY__,
+                __SMAP_HANDLERS_LIST__: (window as any).__SMAP_HANDLERS_LIST__,
+                __SMAP_GOOGLE_LOGIN_READY__: (window as any).__SMAP_GOOGLE_LOGIN_READY__
+              });
+              
+              // 🔍 실제 MessageHandler 상태 직접 확인
+              const actualHandlers = webkit?.messageHandlers ? Object.keys(webkit.messageHandlers) : [];
+              console.log('🔍 [HANDLER-DEBUG] 실제 MessageHandler 상태:', {
+                webkit존재: !!webkit,
+                messageHandlers존재: !!webkit?.messageHandlers,
+                실제핸들러목록: actualHandlers,
+                전역핸들러목록: availableHandlers
+              });
+              
               console.log('🎯 [GOOGLE LOGIN] 사용 가능한 핸들러:', availableHandlers);
+              
+              // 🚨 전역 핸들러 목록이 비어있다면 실제 핸들러 목록 사용
+              const finalHandlers = availableHandlers.length > 0 ? availableHandlers : actualHandlers;
               
               // 우선순위: smapIos > iosHandler > messageHandler > hapticHandler
               const priorityOrder = ['smapIos', 'iosHandler', 'messageHandler', 'hapticHandler'];
               let usedHandler = null;
               
+              console.log('🔍 [HANDLER-DEBUG] 핸들러 선택 진행:', {
+                finalHandlers: finalHandlers,
+                priorityOrder: priorityOrder
+              });
+              
               for (const handlerName of priorityOrder) {
-                if (availableHandlers.includes(handlerName) && webkit?.messageHandlers?.[handlerName]) {
+                const isInFinalList = finalHandlers.includes(handlerName);
+                const existsInWebkit = !!webkit?.messageHandlers?.[handlerName];
+                
+                console.log(`🔍 [HANDLER-DEBUG] ${handlerName} 체크:`, {
+                  목록에있음: isInFinalList,
+                  webkit에있음: existsInWebkit
+                });
+                
+                if (isInFinalList && existsInWebkit) {
                   console.log(`✅ [GOOGLE LOGIN] ${handlerName} 핸들러 사용`);
                   webkit.messageHandlers[handlerName].postMessage({
                     type: 'googleSignIn',
@@ -2394,6 +2426,12 @@ export default function SignInPage() {
               
               if (!usedHandler) {
                 console.error('❌ [GOOGLE LOGIN] 사용 가능한 핸들러 없음');
+                console.error('🔍 [HANDLER-DEBUG] 최종 상태:', {
+                  finalHandlers: finalHandlers,
+                  webkit: !!webkit,
+                  messageHandlers: !!webkit?.messageHandlers,
+                  모든MessageHandler: webkit?.messageHandlers ? Object.keys(webkit.messageHandlers) : []
+                });
                 throw new Error('MessageHandler를 찾을 수 없습니다.');
               }
               
