@@ -1,7 +1,5 @@
 {
   "/icon/route": "app/icon/route.js",
-  "/api/kakao-auth/route": "app/api/kakao-auth/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
   "/signin/page": "app/signin/page.js",
   "/home/page": "app/home/page.js"
 }

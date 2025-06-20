@@ -64,7 +64,7 @@ export const API_KEYS = {
   // 소셜/메시징 API 키
   KAKAO_JAVASCRIPT_KEY: 'e7e1c921e506e190875b4c8f4321c5ac',
   KAKAO_NATIVEAPP_KEY: '56b34b5e5e538073805559cabc81e1d8',
-  KAKAO_REST_API_KEY: process.env.NEXT_PUBLIC_KAKAO_MAPS_API_KEY || 'bc7899314df5dc2bebcb2a7960ac89bf', // 카카오 로컬 API용 REST API 키 추가
+  KAKAO_REST_API_KEY: process.env.NEXT_PUBLIC_KAKAO_MAPS_API_KEY || '7fbf60571daf54ca5bee8373a1f31d2d', // 카카오 로컬 API용 REST API 키 추가
   FIREBASEKEY: 'BOCzkX45zE3u0HFfNpfZDbUHH33OHNoe3k5KeTalEesHgnaBqCykjJUxnDcS6mv9MPSxU8EV3QHCL61gmwzkXlE',
   
   // 동적 Google OAuth Client ID (도메인별 자동 선택)

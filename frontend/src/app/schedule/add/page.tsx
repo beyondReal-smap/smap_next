@@ -603,7 +603,7 @@ export default function AddSchedulePage() {
     setIsSearchingLocation(true);
     setLocationSearchResults([]);
 
-    const KAKAO_API_KEY = 'bc7899314df5dc2bebcb2a7960ac89bf'; // 임시 API 키 (주의!)
+    const KAKAO_API_KEY = '7fbf60571daf54ca5bee8373a1f31d2d'; // 임시 API 키 (주의!)
     const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(searchQueryString)}`; // 변환된 문자열 사용
 
     try {

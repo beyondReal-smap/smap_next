@@ -3,8 +3,9 @@ import type { Metadata, Viewport } from 'next'
 // import { Suspense } from 'react' // Suspense는 ClientLayout 내부 또는 필요시 사용
 import { lineSeed } from './fonts'; // LINE SEED 폰트 임포트
 // import { BottomNavBar } from './components/layout' // 직접 사용하지 않음
-import ClientLayout from './ClientLayout'; // ClientLayout import
-import config, { APP_INFO, getLocalizedAppInfo } from '../config'
+  import ClientLayout from './ClientLayout'; // ClientLayout import
+  import config, { APP_INFO, getLocalizedAppInfo } from '../config'
+import Script from 'next/script'
 
 // 언어 설정에 따른 메타데이터 생성
 const getMetadata = (): Metadata => {
@@ -209,15 +210,72 @@ export default function RootLayout({
             `,
           }}
         />
+        
+        {/* iOS WebView Array.isArray 에러 방지 전역 폴리필 */}
+        <Script id="array-polyfill" strategy="beforeInteractive">
+          {`
+            (function() {
+              if (typeof window !== 'undefined') {
+                try {
+                  // Array.isArray 에러 방지 - 전역 폴리필
+                  if (typeof Array === 'undefined' || !Array || typeof Array.isArray !== 'function') {
+                    console.warn('[LAYOUT] Array.isArray 손상 감지 - 글로벌 복구');
+                    
+                    if (!window.Array) {
+                      window.Array = function() {
+                        const arr = [];
+                        for (let i = 0; i < arguments.length; i++) {
+                          arr[i] = arguments[i];
+                        }
+                        return arr;
+                      };
+                    }
+                    
+                    if (!window.Array.isArray) {
+                      window.Array.isArray = function(obj) {
+                        if (obj === null || obj === undefined) return false;
+                        try {
+                          return Object.prototype.toString.call(obj) === '[object Array]';
+                        } catch (e) {
+                          return !!(obj && typeof obj === 'object' && 
+                                   typeof obj.length === 'number' && 
+                                   typeof obj.push === 'function');
+                        }
+                      };
+                    }
+                    
+                    // 전역 스코프에 할당
+                    if (typeof globalThis !== 'undefined') {
+                      globalThis.Array = window.Array;
+                    }
+                    if (typeof self !== 'undefined') {
+                      self.Array = window.Array;
+                    }
+                  }
+                  
+                  console.log('[LAYOUT] Array.isArray 글로벌 폴리필 적용 완료');
+                } catch (error) {
+                  console.error('[LAYOUT] Array.isArray 글로벌 폴리필 실패:', error);
+                }
+              }
+            })();
+          `}
+        </Script>
+        
+        {/* iOS WebView 환경 개선 스크립트 */}
+        <Script src="/ios-webview-fix.js" strategy="beforeInteractive" />
+        
+        {/* 에러 핸들러 스크립트 */}
+        <Script src="/error-handler.js" strategy="beforeInteractive" />
       </head>
-      <body className={`${lineSeed.variable} font-sans antialiased`} suppressHydrationWarning>
-        <ClientLayout>
-          {/* ClientLayout이 children을 받아 내부에서 main 등의 구조를 관리하도록 위임 가능 */} 
-          {/* 또는 여기서 최소한의 구조만 남기고 ClientLayout에 더 많은 책임을 부여 */} 
-          {children} 
-        </ClientLayout>
-        {/* DatePicker 캘린더 포털용 div 추가 */}
-        <div id="root-portal"></div>
+              <body className={`${lineSeed.variable} font-sans antialiased`} suppressHydrationWarning>
+         <ClientLayout>
+           {/* ClientLayout이 children을 받아 내부에서 main 등의 구조를 관리하도록 위임 가능 */} 
+           {/* 또는 여기서 최소한의 구조만 남기고 ClientLayout에 더 많은 책임을 부여 */} 
+           {children} 
+         </ClientLayout>
+         {/* DatePicker 캘린더 포털용 div 추가 */}
+         <div id="root-portal"></div>
         
         {/* 성능 모니터링 (개발 환경에서만) */}
         {process.env.NODE_ENV === 'development' && (

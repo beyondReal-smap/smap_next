@@ -1,5 +1,68 @@
 'use client';
 
+// 🚨 iOS WebView Array.isArray 에러 방지 - 최우선 실행
+if (typeof window !== 'undefined') {
+  try {
+    // Array 객체가 없거나 손상된 경우 즉시 복구
+    if (typeof Array === 'undefined' || !Array || typeof Array.isArray !== 'function') {
+      console.warn('[HOME] 🚨 Array.isArray 손상 감지 - 즉시 복구');
+      
+      // 전역 Array 객체 복구
+      if (!window.Array) {
+        window.Array = function() {
+          const arr = [];
+          for (let i = 0; i < arguments.length; i++) {
+            arr[i] = arguments[i];
+          }
+          return arr;
+        };
+      }
+      
+      // Array.isArray 메소드 복구
+      if (!window.Array.isArray) {
+        window.Array.isArray = function(obj) {
+          if (obj === null || obj === undefined) return false;
+          try {
+            return Object.prototype.toString.call(obj) === '[object Array]';
+          } catch (e) {
+            return !!(obj && typeof obj === 'object' && 
+                     typeof obj.length === 'number' && 
+                     typeof obj.push === 'function');
+          }
+        };
+      }
+      
+      // 전역 범위에도 할당
+      if (typeof globalThis !== 'undefined') {
+        globalThis.Array = window.Array;
+      }
+      if (typeof global !== 'undefined') {
+        global.Array = window.Array;
+      }
+    }
+    
+    // 추가 안전장치: 현재 스코프에서도 Array 확인
+    if (typeof Array === 'undefined' || !Array) {
+      window.Array = window.Array || Array || function() {
+        const arr = [];
+        for (let i = 0; i < arguments.length; i++) {
+          arr[i] = arguments[i];
+        }
+        return arr;
+      };
+    }
+    
+    console.log('[HOME] ✅ Array.isArray 폴리필 적용 완료:', {
+      hasArray: typeof Array !== 'undefined',
+      hasIsArray: typeof Array !== 'undefined' && Array && typeof Array.isArray === 'function',
+      testResult: typeof Array !== 'undefined' && Array && Array.isArray ? Array.isArray([1,2,3]) : 'N/A'
+    });
+    
+  } catch (polyfillError) {
+    console.error('[HOME] 🚨 Array.isArray 폴리필 적용 실패:', polyfillError);
+  }
+}
+
 export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';

@@ -8,7 +8,7 @@
   if (isIOSWebView) {
     console.log('[iOS WebView] 타임아웃 방지 및 최적화 시작...');
     
-    // 0. 전역 객체 초기화 문제 방지 (Array, Object 등)
+    // 0. 전역 객체 초기화 문제 방지 (Array, Object 등) - 강화 버전
     function ensureGlobalObjects() {
       try {
         // Array 객체가 없거나 손상된 경우 복구
@@ -24,11 +24,33 @@
               return arr;
             };
             
-            // Array.isArray 메소드 복구
+            // Array.isArray 메소드 복구 - 강화 버전
             if (!window.Array.isArray) {
               window.Array.isArray = function(obj) {
-                return Object.prototype.toString.call(obj) === '[object Array]';
+                if (obj === null || obj === undefined) return false;
+                try {
+                  return Object.prototype.toString.call(obj) === '[object Array]';
+                } catch (e) {
+                  // Object.prototype.toString도 실패하면 기본 속성 체크
+                  return !!(obj && typeof obj === 'object' && 
+                           typeof obj.length === 'number' && 
+                           typeof obj.push === 'function' &&
+                           typeof obj.slice === 'function');
+                }
               };
+            }
+            
+            // 전역 스코프에도 할당
+            if (typeof globalThis !== 'undefined') {
+              globalThis.Array = window.Array;
+            }
+            if (typeof self !== 'undefined') {
+              self.Array = window.Array;
+            }
+            
+            // 추가 Array 메소드들도 복구
+            if (!window.Array.prototype) {
+              window.Array.prototype = Array.prototype || {};
             }
           }
         }
@@ -38,7 +60,23 @@
           console.warn('[iOS WebView] Object 객체 손상 감지 - 복구 시도');
           // Object는 더 복잡하므로 기본적인 복구만 시도
           if (typeof window !== 'undefined' && !window.Object) {
-            window.Object = {};
+            window.Object = Object || {};
+            if (!window.Object.prototype) {
+              window.Object.prototype = {};
+            }
+            if (!window.Object.prototype.toString) {
+              window.Object.prototype.toString = function() {
+                return '[object Object]';
+              };
+            }
+          }
+        }
+        
+        // Function 객체 확인
+        if (typeof Function === 'undefined' || !Function) {
+          console.warn('[iOS WebView] Function 객체 손상 감지');
+          if (typeof window !== 'undefined' && !window.Function) {
+            window.Function = Function || function() {};
           }
         }
         
@@ -46,19 +84,104 @@
           Array: typeof Array,
           ArrayIsArray: typeof Array !== 'undefined' && Array && typeof Array.isArray === 'function',
           Object: typeof Object,
-          ObjectPrototype: typeof Object !== 'undefined' && Object && Object.prototype && Object.prototype.toString
+          ObjectPrototype: typeof Object !== 'undefined' && Object && Object.prototype && Object.prototype.toString,
+          Function: typeof Function,
+          window: typeof window
         });
       } catch (error) {
         console.error('[iOS WebView] 전역 객체 복구 실패:', error);
+        // 에러가 발생해도 기본적인 복구는 시도
+        try {
+          if (typeof window !== 'undefined') {
+            // 최소한의 Array.isArray만이라도 복구
+            if (!window.Array || !window.Array.isArray) {
+              window.Array = window.Array || Array || function() { return []; };
+              window.Array.isArray = window.Array.isArray || function(obj) {
+                return !!(obj && typeof obj === 'object' && typeof obj.length === 'number');
+              };
+            }
+          }
+        } catch (fallbackError) {
+          console.error('[iOS WebView] 폴백 복구도 실패:', fallbackError);
+        }
       }
+    }
+    
+    // 강화된 에러 핸들링 함수 정의
+    function setupEnhancedErrorHandling() {
+      // 구글 로그인 후 home 진입 시 발생하는 특정 에러들 처리
+      const homePageErrorPatterns = [
+        /null is not an object \(evaluating '.*\.isArray'\)/,
+        /undefined is not an object \(evaluating '.*\.isArray'\)/,
+        /o\.isArray/,
+        /Array\.isArray/,
+        /Cannot read property 'isArray'/,
+        /Cannot read properties of null.*isArray/,
+        /Cannot read properties of undefined.*isArray/
+      ];
+      
+      window.addEventListener('error', function(event) {
+        const errorMessage = event.message || '';
+        const isHomePageError = homePageErrorPatterns.some(pattern => pattern.test(errorMessage));
+        
+        if (isHomePageError) {
+          console.warn('[iOS WebView] Home 페이지 Array.isArray 에러 감지, 복구 시도:', errorMessage);
+          event.preventDefault();
+          
+          // 즉시 전역 객체 복구 재시도
+          ensureGlobalObjects();
+          
+          // 에러가 발생한 페이지가 home이면 약간의 지연 후 새로고침
+          if (window.location.pathname.includes('/home')) {
+            setTimeout(() => {
+              console.log('[iOS WebView] Home 페이지 Array.isArray 에러 복구를 위한 새로고침');
+              window.location.reload();
+            }, 1000);
+          }
+          
+          return false;
+        }
+      });
+      
+      // Promise rejection도 처리
+      window.addEventListener('unhandledrejection', function(event) {
+        const reason = String(event.reason || '');
+        const isArrayError = reason.includes('isArray') || reason.includes('Array');
+        
+        if (isArrayError) {
+          console.warn('[iOS WebView] Promise에서 Array 관련 에러 감지:', reason);
+          event.preventDefault();
+          ensureGlobalObjects();
+          return false;
+        }
+      });
     }
     
     // 즉시 전역 객체 확인 및 복구
     ensureGlobalObjects();
     
+    // 강화된 에러 핸들링 설정
+    setupEnhancedErrorHandling();
+    
     // 페이지 로드 완료 후 다시 한 번 확인
-    document.addEventListener('DOMContentLoaded', ensureGlobalObjects);
-    window.addEventListener('load', ensureGlobalObjects);
+    document.addEventListener('DOMContentLoaded', function() {
+      ensureGlobalObjects();
+      setupEnhancedErrorHandling(); // 추가 안전장치
+    });
+    
+    window.addEventListener('load', function() {
+      ensureGlobalObjects();
+      // home 페이지인 경우 추가 체크
+      if (window.location.pathname.includes('/home')) {
+        console.log('[iOS WebView] Home 페이지 로드 완료, Array.isArray 상태 체크');
+        setTimeout(() => {
+          if (typeof Array === 'undefined' || !Array || !Array.isArray) {
+            console.warn('[iOS WebView] Home 페이지에서 Array.isArray 여전히 문제 있음, 재복구');
+            ensureGlobalObjects();
+          }
+        }, 500);
+      }
+    });
     
     // 1. 즉시 로딩 상태 표시 (백그라운드 작업 타임아웃 방지)
     document.addEventListener('DOMContentLoaded', function() {
@@ -1022,4 +1145,6 @@
 
     console.log('iOS WebView fixes applied successfully');
   }
-})(); 
+})();
+
+ 

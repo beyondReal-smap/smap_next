@@ -992,7 +992,7 @@ export default function SchedulePage() {
     setIsSearchingLocation(true);
     setLocationSearchResults([]);
 
-    const KAKAO_API_KEY = 'bc7899314df5dc2bebcb2a7960ac89bf';
+    const KAKAO_API_KEY = '7fbf60571daf54ca5bee8373a1f31d2d';
     const url = `https://dapi.kakao.com/v2/local/search/keyword.json?query=${encodeURIComponent(searchQueryString)}`;
 
     try {
