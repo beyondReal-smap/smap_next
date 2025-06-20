@@ -161,8 +161,8 @@ export default function SignInPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            id_token: userInfo.idToken,
-            user_info: userInfo.userInfo,
+            idToken: userInfo.idToken,  // ✅ 백엔드가 기대하는 파라미터 이름으로 수정
+            userInfo: userInfo.userInfo,
             source: 'native'
           }),
         });
@@ -249,6 +249,79 @@ export default function SignInPage() {
     };
     
     console.log('✅ [NATIVE CALLBACK] 네이티브 구글 로그인 콜백 함수 등록 완료');
+    
+    // 🚨 네이티브 구글 로그인 데이터 처리 함수
+    const handleNativeGoogleLoginData = async (data: any) => {
+      console.log('🔄 [NATIVE DATA] 네이티브 구글 로그인 데이터 처리 시작', data);
+      
+      try {
+        if (!data.idToken) {
+          throw new Error('ID 토큰이 없습니다');
+        }
+        
+        console.log('📤 [NATIVE DATA] 백엔드 API 호출 시작');
+        
+        // 백엔드 API 호출
+        const response = await fetch('/api/google-auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            idToken: data.idToken,  // ✅ 백엔드가 기대하는 파라미터 이름으로 수정
+            userInfo: data.userInfo,
+            source: 'native_direct'
+          }),
+        });
+
+        const result = await response.json();
+        console.log('📥 [NATIVE DATA] 백엔드 응답:', result);
+
+        if (result.success) {
+          if (result.isNewUser) {
+            console.log('🆕 [NATIVE DATA] 신규 사용자 - 회원가입 페이지로 이동');
+            window.location.href = '/register?social=google';
+          } else {
+            console.log('✅ [NATIVE DATA] 기존 사용자 - 홈으로 이동');
+            window.location.href = '/home';
+          }
+        } else {
+          throw new Error(result.message || '인증 실패');
+        }
+      } catch (error) {
+        console.error('❌ [NATIVE DATA] 처리 중 오류:', error);
+        showError(`네이티브 로그인 처리 중 오류가 발생했습니다: ${error}`);
+      }
+    };
+    
+    // 🚨 전역 변수 모니터링 (iOS 앱에서 직접 저장한 데이터 확인)
+    const checkNativeData = () => {
+      if ((window as any).__NATIVE_GOOGLE_LOGIN_DATA__) {
+        const data = (window as any).__NATIVE_GOOGLE_LOGIN_DATA__;
+        console.log('🎉 [NATIVE DATA] 전역 변수에서 구글 로그인 데이터 발견!', data);
+        
+        // 즉시 처리
+        handleNativeGoogleLoginData(data);
+        
+        // 데이터 사용 후 삭제
+        delete (window as any).__NATIVE_GOOGLE_LOGIN_DATA__;
+      }
+    };
+    
+    // 주기적으로 확인 (1초마다, 최대 10회)
+    let checkCount = 0;
+    const checkInterval = setInterval(() => {
+      checkCount++;
+      checkNativeData();
+      
+      if (checkCount >= 10) {
+        clearInterval(checkInterval);
+        console.log('🔍 [NATIVE DATA] 전역 변수 모니터링 종료');
+      }
+    }, 1000);
+    
+    // 즉시 한 번 확인
+    checkNativeData();
     
     // 🔍 즉시 강제 핸들러 확인 (더 상세한 디버깅)
     setTimeout(() => {
