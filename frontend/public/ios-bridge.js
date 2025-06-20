@@ -413,38 +413,49 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Next.js Router 변경 감지 (Next.js 13+ App Router)
 if (typeof window !== 'undefined') {
-    // 페이지 변경 시 iOS에 알림
+    // 페이지 변경 시 iOS에 알림 (중복 방지 로직 추가)
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
     
-    history.pushState = function(...args) {
-        originalPushState.apply(history, args);
+    // 마지막 전송된 URL 추적
+    let lastSentURL = '';
+    let lastSentTime = 0;
+    const ROUTE_CHANGE_THROTTLE = 1000; // 1초 간격으로 제한
+    
+    const sendRouteChangeIfNeeded = (url, method) => {
+        const now = Date.now();
+        
+        // 같은 URL이고 1초 이내라면 무시
+        if (url === lastSentURL && (now - lastSentTime) < ROUTE_CHANGE_THROTTLE) {
+            console.log('🚫 [iOS Bridge] routeChange 중복 방지:', { url, method, timeSinceLastSent: now - lastSentTime });
+            return;
+        }
+        
+        lastSentURL = url;
+        lastSentTime = now;
+        
         if (window.SmapApp.isIOSApp()) {
+            console.log('📤 [iOS Bridge] routeChange 전송:', { url, method, timestamp: now });
             window.SmapApp.sendMessage('routeChange', {
-                url: window.location.href,
-                method: 'push'
+                url: url,
+                method: method
             });
         }
+    };
+    
+    history.pushState = function(...args) {
+        originalPushState.apply(history, args);
+        sendRouteChangeIfNeeded(window.location.href, 'push');
     };
     
     history.replaceState = function(...args) {
         originalReplaceState.apply(history, args);
-        if (window.SmapApp.isIOSApp()) {
-            window.SmapApp.sendMessage('routeChange', {
-                url: window.location.href,
-                method: 'replace'
-            });
-        }
+        sendRouteChangeIfNeeded(window.location.href, 'replace');
     };
     
     // 뒤로가기/앞으로가기 감지
     window.addEventListener('popstate', function(event) {
-        if (window.SmapApp.isIOSApp()) {
-            window.SmapApp.sendMessage('routeChange', {
-                url: window.location.href,
-                method: 'pop'
-            });
-        }
+        sendRouteChangeIfNeeded(window.location.href, 'pop');
     });
 }
 
