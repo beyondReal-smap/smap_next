@@ -127,10 +127,14 @@ export default function SignInPage() {
       handleGoogleSDKLogin();
     };
     
+    // 카카오 SDK 확인 함수 등록
+    (window as any).__SMAP_CHECK_KAKAO_SDK__ = checkKakaoSDKStatus;
+    
     console.log('🌐 [GLOBAL] 전역 테스트 함수들 등록 완료:');
     console.log('   - window.__SMAP_FORCE_CREATE_HANDLERS__()');
     console.log('   - window.__SMAP_CHECK_HANDLERS__()');
     console.log('   - window.__SMAP_EMERGENCY_GOOGLE_LOGIN__()');
+    console.log('   - window.__SMAP_CHECK_KAKAO_SDK__()');
     console.log('🌐 [GLOBAL] Safari 콘솔에서 위 함수들을 직접 호출할 수 있습니다.');
     
     // 🧪 테스트 함수들 등록
@@ -2853,17 +2857,46 @@ export default function SignInPage() {
       isKakaoInitialized: window.Kakao ? window.Kakao.isInitialized() : false
     });
     
-    // 카카오 SDK가 로드되었는지 확인
-    if (!window.Kakao || !window.Kakao.isInitialized()) {
-      // iOS 로그 전송 - 카카오 SDK 없음
-      sendLogToiOS('error', '❌ 카카오 SDK 로드 실패', {
+    // 카카오 SDK가 로드되었는지 확인 및 자동 초기화
+    if (!window.Kakao) {
+      sendLogToiOS('error', '❌ 카카오 SDK 객체 없음', {
         timestamp: new Date().toISOString(),
         hasKakao: !!window.Kakao,
-        isInitialized: window.Kakao ? window.Kakao.isInitialized() : false
+        hasKakaoGlobal: !!(window as any).Kakao
       });
       
-      showError('카카오 SDK가 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
+      showError('카카오 SDK가 로드되지 않았습니다. 페이지를 새로고침해주세요.');
       return;
+    }
+    
+    // 카카오 SDK가 초기화되지 않은 경우 자동 초기화 시도
+    if (!window.Kakao.isInitialized()) {
+      console.log('⚠️ [KAKAO LOGIN] SDK가 초기화되지 않음, 자동 초기화 시도');
+      
+             const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || '56b34b5e5e538073805559cabc81e1d8';
+       const kakaoAdminKey = process.env.KAKAO_ADMIN_KEY || 'ee1f8631e4c4c488612a526ab6e1facb';
+       try {
+         window.Kakao.init(kakaoAppKey);
+         console.log('✅ [KAKAO LOGIN] 자동 초기화 성공:', kakaoAppKey.substring(0, 8) + '***');
+         console.log('🔧 [KAKAO LOGIN] Admin 키 설정됨:', kakaoAdminKey.substring(0, 8) + '***');
+        
+        sendLogToiOS('info', '✅ 카카오 SDK 자동 초기화 성공', {
+          timestamp: new Date().toISOString(),
+          appKey: kakaoAppKey.substring(0, 8) + '***',
+          isNowInitialized: window.Kakao.isInitialized()
+        });
+      } catch (error) {
+        console.error('❌ [KAKAO LOGIN] 자동 초기화 실패:', error);
+        
+        sendLogToiOS('error', '❌ 카카오 SDK 자동 초기화 실패', {
+          timestamp: new Date().toISOString(),
+          error: String(error),
+          appKey: kakaoAppKey.substring(0, 8) + '***'
+        });
+        
+        showError('카카오 SDK 초기화에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -3124,12 +3157,14 @@ export default function SignInPage() {
       script.onload = () => {
         // 카카오 SDK 초기화
         if (window.Kakao && !window.Kakao.isInitialized()) {
-          const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY;
+          // 🔥 환경 변수가 없을 때 Info.plist에서 가져온 카카오 앱 키 사용
+          const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || '56b34b5e5e538073805559cabc81e1d8';
+          const kakaoAdminKey = process.env.KAKAO_ADMIN_KEY || 'ee1f8631e4c4c488612a526ab6e1facb';
           if (kakaoAppKey) {
             window.Kakao.init(kakaoAppKey);
-            console.log('카카오 SDK 초기화 완료');
+            console.log('✅ 카카오 SDK 초기화 완료:', kakaoAppKey.substring(0, 8) + '***');
           } else {
-            console.error('카카오 앱 키가 설정되지 않았습니다.');
+            console.error('❌ 카카오 앱 키가 설정되지 않았습니다.');
           }
         }
       };
@@ -3201,6 +3236,29 @@ export default function SignInPage() {
   //     </div>
   //   );
   // }
+
+  // 🔍 카카오 SDK 상태 확인 함수
+  const checkKakaoSDKStatus = () => {
+    const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || '56b34b5e5e538073805559cabc81e1d8';
+    const kakaoAdminKey = process.env.KAKAO_ADMIN_KEY || 'ee1f8631e4c4c488612a526ab6e1facb';
+    
+    const status = {
+      hasWindow: typeof window !== 'undefined',
+      hasKakaoGlobal: !!(window as any).Kakao,
+      hasKakaoObject: !!window.Kakao,
+      isInitialized: window.Kakao ? window.Kakao.isInitialized() : false,
+      version: window.Kakao ? window.Kakao.VERSION : 'unknown',
+      availableMethods: window.Kakao ? Object.keys(window.Kakao) : [],
+      appKey: kakaoAppKey.substring(0, 8) + '***',
+      adminKey: kakaoAdminKey.substring(0, 8) + '***',
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('🔍 [KAKAO SDK] 상태 확인:', status);
+    sendLogToiOS('info', '[KAKAO SDK] 상태 확인', status);
+    
+    return status;
+  };
 
   // 🔬 상세 햅틱 디버깅 함수들 추가
   const runDetailedHapticDebug = () => {
