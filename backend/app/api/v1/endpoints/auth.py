@@ -42,6 +42,37 @@ class KakaoLoginResponse(BaseModel):
     message: str
     data: Optional[dict] = None
 
+# Google 로그인 사용자 데이터 조회 모델
+class GoogleUserDataRequest(BaseModel):
+    email: str
+    google_id: Optional[str] = None
+
+class GoogleUserDataResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
+# Google 로그인 요청 모델
+class GoogleLoginRequest(BaseModel):
+    google_id: str
+    email: Optional[str] = None
+    name: Optional[str] = None
+    given_name: Optional[str] = None
+    family_name: Optional[str] = None
+    image: Optional[str] = None
+    id_token: str
+    lookup_strategy: Optional[str] = "email_first"
+    search_by_email: Optional[bool] = True
+    verify_email_match: Optional[bool] = True
+    email_first_lookup: Optional[bool] = True
+    lookup_priority: Optional[str] = "email"
+
+# Google 로그인 응답 모델
+class GoogleLoginResponse(BaseModel):
+    success: bool
+    message: str
+    data: Optional[dict] = None
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
     if expires_delta:
@@ -393,4 +424,230 @@ async def kakao_login(
         return KakaoLoginResponse(
             success=False,
             message="카카오 로그인 처리 중 오류가 발생했습니다."
+        ) 
+
+@router.post("/find-user-by-email", response_model=GoogleUserDataResponse)
+async def find_user_by_email(
+    request: GoogleUserDataRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    이메일로 사용자를 조회하고 관련 데이터를 함께 반환합니다.
+    Google 로그인 후 기존 사용자 확인 및 데이터 조회용
+    """
+    try:
+        from sqlalchemy import text
+        from datetime import datetime, timedelta
+        
+        logger.info(f"🔍 이메일 기반 사용자 조회 시작: {request.email}")
+        
+        # 1. 이메일로 사용자 조회
+        user = crud_auth.get_user_by_email(db, request.email)
+        
+        if not user:
+            logger.info(f"❌ 이메일로 사용자를 찾을 수 없음: {request.email}")
+            return GoogleUserDataResponse(
+                success=False,
+                message="사용자를 찾을 수 없습니다.",
+                data={
+                    "found": False,
+                    "is_new_user": True
+                }
+            )
+        
+        # 2. 계정 상태 확인
+        if user.mt_level == 1:  # 탈퇴한 사용자
+            logger.warning(f"⚠️ 탈퇴한 사용자 조회: {user.mt_idx}")
+            return GoogleUserDataResponse(
+                success=False,
+                message="탈퇴한 계정입니다.",
+                data={
+                    "found": True,
+                    "is_withdrawn": True,
+                    "user": {
+                        "mt_idx": user.mt_idx,
+                        "mt_email": user.mt_email,
+                        "mt_level": user.mt_level
+                    }
+                }
+            )
+        
+        # 3. Google ID 연결 확인 및 업데이트
+        if request.google_id and not user.mt_google_id:
+            user.mt_google_id = request.google_id
+            user.mt_type = 4  # Google 로그인 타입으로 변경
+            user.mt_ldate = datetime.utcnow()
+            db.commit()
+            logger.info(f"🔗 Google ID 연결 완료: {user.mt_idx}")
+        
+        # 4. 사용자의 그룹 정보 조회
+        groups_query = text("""
+            SELECT 
+                sg.sgt_idx,
+                sg.sgt_title,
+                sgd.sgdt_owner_chk,
+                sgd.sgdt_leader_chk,
+                COUNT(DISTINCT sgd2.mt_idx) as member_count
+            FROM smap_group_detail_t sgd
+            JOIN smap_group_t sg ON sgd.sgt_idx = sg.sgt_idx
+            LEFT JOIN smap_group_detail_t sgd2 ON sg.sgt_idx = sgd2.sgt_idx 
+                AND sgd2.sgdt_discharge = 'N' 
+                AND sgd2.sgdt_exit = 'N'
+                AND sgd2.sgdt_show = 'Y'
+            WHERE sgd.mt_idx = :mt_idx
+                AND sgd.sgdt_discharge = 'N'
+                AND sgd.sgdt_exit = 'N'
+                AND sgd.sgdt_show = 'Y'
+                AND sg.sgt_show = 'Y'
+            GROUP BY sg.sgt_idx, sg.sgt_title, sgd.sgdt_owner_chk, sgd.sgdt_leader_chk
+            ORDER BY sgd.sgdt_owner_chk DESC, sgd.sgdt_leader_chk DESC
+            LIMIT 10
+        """)
+        
+        groups_result = db.execute(groups_query, {"mt_idx": user.mt_idx}).fetchall()
+        groups = []
+        for row in groups_result:
+            groups.append({
+                "sgt_idx": row.sgt_idx,
+                "sgt_title": row.sgt_title,
+                "sgt_file1": None,  # 컬럼이 없으므로 기본값
+                "sgdt_owner_chk": row.sgdt_owner_chk,
+                "sgdt_leader_chk": row.sgdt_leader_chk,
+                "member_count": row.member_count,
+                "is_owner": row.sgdt_owner_chk == 'Y',
+                "is_leader": row.sgdt_leader_chk == 'Y'
+            })
+        
+        # 5. 최근 스케줄 조회 (7일 전후)
+        seven_days_ago = datetime.now() - timedelta(days=7)
+        seven_days_later = datetime.now() + timedelta(days=7)
+        
+        schedules_query = text("""
+            SELECT 
+                sst.sst_idx,
+                sst.sst_title,
+                sst.sst_sdate,
+                sst.sst_location_title,
+                sst.sgt_idx,
+                sg.sgt_title as group_title
+            FROM smap_schedule_t sst
+            LEFT JOIN smap_group_t sg ON sst.sgt_idx = sg.sgt_idx
+            WHERE (sst.mt_idx = :mt_idx OR sst.sgt_idx IN (
+                SELECT DISTINCT sgd.sgt_idx 
+                FROM smap_group_detail_t sgd 
+                WHERE sgd.mt_idx = :mt_idx 
+                    AND sgd.sgdt_discharge = 'N' 
+                    AND sgd.sgdt_exit = 'N'
+                    AND sgd.sgdt_show = 'Y'
+            ))
+            AND sst.sst_show = 'Y'
+            AND sst.sst_sdate BETWEEN :start_date AND :end_date
+            ORDER BY sst.sst_sdate ASC
+            LIMIT 20
+        """)
+        
+        schedules_result = db.execute(schedules_query, {
+            "mt_idx": user.mt_idx,
+            "start_date": seven_days_ago.strftime('%Y-%m-%d %H:%M:%S'),
+            "end_date": seven_days_later.strftime('%Y-%m-%d %H:%M:%S')
+        }).fetchall()
+        
+        recent_schedules = []
+        for row in schedules_result:
+            recent_schedules.append({
+                "sst_idx": row.sst_idx,
+                "sst_title": row.sst_title,
+                "sst_sdate": row.sst_sdate.isoformat() if row.sst_sdate else None,
+                "sst_location_title": row.sst_location_title,
+                "sgt_idx": row.sgt_idx,
+                "group_title": row.group_title
+            })
+        
+        # 6. 사용자 기본 정보 구성
+        user_data = {
+            "mt_idx": user.mt_idx,
+            "mt_type": user.mt_type or 1,
+            "mt_level": user.mt_level or 2,
+            "mt_status": user.mt_status or 1,
+            "mt_id": user.mt_id or "",
+            "mt_name": user.mt_name or "",
+            "mt_nickname": user.mt_nickname or "",
+            "mt_hp": user.mt_hp or "",
+            "mt_email": user.mt_email or "",
+            "mt_birth": user.mt_birth.isoformat() if user.mt_birth else "",
+            "mt_gender": user.mt_gender or 1,
+            "mt_file1": user.mt_file1 or "",
+            "mt_lat": float(user.mt_lat) if user.mt_lat else 37.5642,
+            "mt_long": float(user.mt_long) if user.mt_long else 127.0016,
+            "mt_sido": user.mt_sido or "",
+            "mt_gu": user.mt_gu or "",
+            "mt_dong": user.mt_dong or "",
+            "mt_onboarding": user.mt_onboarding or 'Y',
+            "mt_push1": user.mt_push1 or 'Y',
+            "mt_plan_check": user.mt_plan_check or 'N',
+            "mt_plan_date": user.mt_plan_date.isoformat() if user.mt_plan_date else "",
+            "mt_weather_pop": user.mt_weather_pop or "",
+            "mt_weather_sky": user.mt_weather_sky or 8,
+            "mt_weather_tmn": user.mt_weather_tmn or 18,
+            "mt_weather_tmx": user.mt_weather_tmx or 25,
+            "mt_weather_date": user.mt_weather_date.isoformat() if user.mt_weather_date else datetime.utcnow().isoformat(),
+            "mt_ldate": user.mt_ldate.isoformat() if user.mt_ldate else datetime.utcnow().isoformat(),
+            "mt_adate": user.mt_adate.isoformat() if user.mt_adate else datetime.utcnow().isoformat(),
+            "mt_google_id": user.mt_google_id
+        }
+        
+        # 7. 통계 계산
+        group_count = len(groups)
+        schedule_count = len(recent_schedules)
+        has_data = group_count > 0 or schedule_count > 0
+        
+        logger.info(f"✅ 사용자 데이터 조회 완료: {user.mt_idx}, 그룹: {group_count}개, 스케줄: {schedule_count}개")
+        
+        return GoogleUserDataResponse(
+            success=True,
+            message="사용자 데이터 조회 성공",
+            data={
+                "found": True,
+                "is_new_user": False,
+                "user": user_data,
+                "groups": groups,
+                "recent_schedules": recent_schedules,
+                "group_count": group_count,
+                "schedule_count": schedule_count,
+                "has_data": has_data,
+                "lookup_method": "email",
+                "needs_onboarding": user.mt_onboarding == 'N'
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"이메일 기반 사용자 조회 실패: {str(e)}")
+        return GoogleUserDataResponse(
+            success=False,
+            message="서버 오류가 발생했습니다."
+        ) 
+
+@router.post("/google-login", response_model=GoogleLoginResponse)
+async def google_login(
+    google_data: GoogleLoginRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Google 로그인 처리
+    """
+    try:
+        from app.services.member_service import member_service
+        
+        logger.info(f"🔍 Google 로그인 요청: {google_data.email}")
+        
+        # MemberService의 google_login 메소드 호출
+        result = member_service.google_login(db, google_data)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Google 로그인 실패: {str(e)}")
+        return GoogleLoginResponse(
+            success=False,
+            message="Google 로그인 처리 중 오류가 발생했습니다."
         ) 

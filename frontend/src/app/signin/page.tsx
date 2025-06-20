@@ -462,18 +462,53 @@ export default function SignInPage() {
                 
                 // authService에 사용자 정보 저장
                 if (data.user) {
+                  console.log('[GOOGLE SDK] 사용자 데이터 저장 시작');
                   authService.setUserData(data.user);
+                  
+                  // 토큰이 있다면 저장
+                  if (data.token) {
+                    authService.setToken(data.token);
+                    
+                    // localStorage에도 직접 저장 (안전장치)
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('auth-token', data.token);
+                      localStorage.setItem('smap_user_data', JSON.stringify(data.user));
+                      console.log('[GOOGLE SDK] localStorage에 직접 저장 완료');
+                    }
+                  }
                 }
+                
+                console.log('[GOOGLE SDK] AuthContext 상태 동기화 시작');
                 
                 // AuthContext 상태 동기화
                 await refreshAuthState();
+                
+                // 상태 동기화 확인 (최대 3초 대기)
+                let syncAttempts = 0;
+                const maxSyncAttempts = 15; // 3초 (200ms * 15)
+                
+                while (syncAttempts < maxSyncAttempts && !isLoggedIn) {
+                  console.log('[GOOGLE SDK] 인증 상태 동기화 대기 중...', syncAttempts + 1);
+                  await new Promise(resolve => setTimeout(resolve, 200));
+                  await refreshAuthState();
+                  syncAttempts++;
+                }
+                
+                if (isLoggedIn) {
+                  console.log('[GOOGLE SDK] 인증 상태 동기화 성공!');
+                } else {
+                  console.warn('[GOOGLE SDK] 인증 상태 동기화 시간 초과, 강제 진행');
+                }
                 
                 // 성공 햅틱 피드백
                 triggerHapticFeedback(HapticFeedbackType.SUCCESS, 'Google SDK 로그인 성공', { component: 'signin', action: 'google-sdk-login', userEmail: data.user?.mt_email });
                 console.log('🎮 [SIGNIN] Google 로그인 성공 햅틱 피드백 실행');
                 
-                // 홈으로 이동
-                router.push('/home');
+                // 추가 지연 후 홈으로 이동
+                setTimeout(() => {
+                  console.log('[GOOGLE SDK] 홈 페이지로 이동');
+                  router.push('/home');
+                }, 300); // 300ms 추가 지연
               } else {
                 throw new Error(data.error || 'Google 인증 실패');
               }
@@ -888,10 +923,27 @@ export default function SignInPage() {
 
           const data = await response.json();
           console.log('[GOOGLE LOGIN] 서버 응답 데이터:', data);
+          
+          // 🔍 서버 응답 데이터 상세 분석
+          console.log('[GOOGLE LOGIN] 🔍 additionalData 분석:', {
+            hasAdditionalData: !!data.additionalData,
+            groupCount: data.additionalData?.group_count,
+            scheduleCount: data.additionalData?.schedule_count,
+            backendLogGroups: data.additionalData?.backend_log_groups,
+            backendLogSchedules: data.additionalData?.backend_log_schedules,
+            backendLogMembers: data.additionalData?.backend_log_members,
+            groups: data.additionalData?.groups,
+            schedules: data.additionalData?.recent_schedules,
+            rawBackendData: data.additionalData?.raw_backend_data
+          });
+          
           sendLogToiOS('info', 'Google Auth API 성공', {
             success: data.success,
             hasUser: !!data.user,
-            hasToken: !!data.token
+            hasToken: !!data.token,
+            hasAdditionalData: !!data.additionalData,
+            groupCount: data.additionalData?.group_count || 0,
+            scheduleCount: data.additionalData?.schedule_count || 0
           });
 
           if (data.success) {
@@ -902,24 +954,137 @@ export default function SignInPage() {
               hasUser: !!data.user,
               hasToken: !!data.token,
               isNewUser: data.isNewUser || false,
-              userEmail: data.user?.mt_email ? data.user.mt_email.substring(0, 3) + '***@' + data.user.mt_email.split('@')[1] : 'unknown',
-              userNickname: data.user?.mt_nickname || 'unknown',
-              userId: data.user?.mt_idx || 'unknown',
-              provider: 'google_native'
+              userEmail: data.user?.mt_email || data.user?.email || normalizedUserInfo.email || 'unknown',
+              userNickname: data.user?.mt_nickname || data.user?.nickname || normalizedUserInfo.name || 'unknown',
+              userId: data.user?.mt_idx || data.user?.id || 'unknown',
+              provider: 'google_native',
+              requestedEmail: normalizedUserInfo.email,
+              emailMatch: (data.user?.mt_email || data.user?.email) === normalizedUserInfo.email
             });
             
-            // authService에 사용자 정보 설정 (AuthContext 우회)
+            // 🔥 Google 로그인 성공 후 강화된 토큰 및 사용자 정보 저장
             if (data.user && data.token) {
-              authService.setUserData(data.user);
+              console.log('[GOOGLE LOGIN] 🔥 사용자 데이터 및 토큰 저장 시작');
+              sendLogToiOS('info', 'Google 로그인 데이터 저장 시작', {
+                hasUser: !!data.user,
+                hasToken: !!data.token,
+                userId: data.user.mt_idx,
+                userEmail: data.user.email
+              });
+              
+              // 1. authService에 데이터 저장 (그룹 정보 포함)
+              const enhancedUserData = {
+                ...data.user,
+                // 🔥 additionalData를 user 객체에 병합
+                groups: data.additionalData?.groups || [],
+                group_count: data.additionalData?.group_count || 0,
+                schedule_count: data.additionalData?.schedule_count || 0,
+                has_data: data.additionalData?.has_data || false,
+                // 추가 정보
+                additionalData: data.additionalData
+              };
+              
+              authService.setUserData(enhancedUserData);
               authService.setToken(data.token);
+              console.log('[GOOGLE LOGIN] ✅ authService 저장 완료 (그룹 정보 포함):', {
+                userId: enhancedUserData.mt_idx,
+                groupCount: enhancedUserData.groups?.length || 0,
+                hasAdditionalData: !!enhancedUserData.additionalData
+              });
               
-              console.log('[GOOGLE LOGIN] 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
+              // 2. localStorage에도 직접 저장 (안전장치) - 그룹 정보 포함
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('auth-token', data.token);
+                localStorage.setItem('smap_user_data', JSON.stringify(enhancedUserData));
+                // 🔥 그룹 정보 별도 저장
+                localStorage.setItem('user_groups', JSON.stringify(data.additionalData?.groups || []));
+                localStorage.setItem('user_group_count', String(data.additionalData?.group_count || 0));
+                console.log('[GOOGLE LOGIN] ✅ localStorage에 직접 저장 완료');
+                
+                // 🔥 추가 안전장치: 쿠키에서 토큰 확인 및 localStorage 동기화
+                const cookieToken = document.cookie
+                  .split('; ')
+                  .find(row => row.startsWith('client-token='))
+                  ?.split('=')[1];
+                
+                if (cookieToken && cookieToken !== data.token) {
+                  console.log('[GOOGLE LOGIN] 🔄 쿠키 토큰과 다름, 쿠키 토큰으로 동기화');
+                  localStorage.setItem('auth-token', cookieToken);
+                  authService.setToken(cookieToken);
+                }
+              }
               
-              // AuthContext 상태를 수동으로 동기화
+              // 3. 저장 확인 로깅
+              const savedToken = authService.getToken();
+              const savedUserData = authService.getUserData();
+              console.log('[GOOGLE LOGIN] 🔍 저장 확인:', {
+                tokenSaved: !!savedToken,
+                userDataSaved: !!savedUserData,
+                userIdMatch: savedUserData?.mt_idx === data.user.mt_idx
+              });
+              
+              sendLogToiOS('info', 'Google 로그인 데이터 저장 완료', {
+                tokenSaved: !!savedToken,
+                userDataSaved: !!savedUserData,
+                userIdMatch: savedUserData?.mt_idx === data.user.mt_idx
+              });
+              
+              console.log('[GOOGLE LOGIN] 🔄 AuthContext 상태 동기화 시작');
+              
+              // 4. AuthContext 상태를 수동으로 동기화 (그룹 정보 로깅 포함)
+              const currentUser = authService.getUserData();
+              console.log('[GOOGLE LOGIN] 동기화 전 상태:', {
+                isLoggedIn,
+                contextUser: currentUser?.mt_idx,
+                savedUserGroups: enhancedUserData.groups?.length || 0,
+                additionalDataGroupCount: data.additionalData?.group_count || 0
+              });
+              
               await refreshAuthState();
-              console.log('[GOOGLE LOGIN] AuthContext 상태 동기화 완료');
               
-              // Google 로그인 성공 햅틱 피드백
+              const updatedUser = authService.getUserData();
+              console.log('[GOOGLE LOGIN] ✅ AuthContext 상태 동기화 완료 - 그룹 정보:', {
+                isLoggedInAfter: isLoggedIn,
+                contextUserAfter: updatedUser?.mt_idx,
+                userGroups: updatedUser?.groups?.length || 0,
+                additionalData: !!data.additionalData
+              });
+              
+              // 5. 상태 동기화 확인 (최대 3초 대기)
+              let syncAttempts = 0;
+              const maxSyncAttempts = 15; // 3초 (200ms * 15)
+              
+              while (syncAttempts < maxSyncAttempts && !isLoggedIn) {
+                console.log('[GOOGLE LOGIN] ⏳ 인증 상태 동기화 대기 중...', syncAttempts + 1);
+                await new Promise(resolve => setTimeout(resolve, 200));
+                await refreshAuthState();
+                syncAttempts++;
+              }
+              
+              if (isLoggedIn) {
+                console.log('[GOOGLE LOGIN] 🎉 인증 상태 동기화 성공!');
+                sendLogToiOS('info', 'Google 로그인: 네이티브 로그인 성공', {
+                  step: '네이티브 로그인 성공',
+                  timestamp: new Date().toISOString(),
+                  hasUser: !!data.user,
+                  hasToken: !!data.token,
+                  isNewUser: data.isNewUser || false,
+                  userEmail: data.user.email,
+                  userNickname: data.user.nickname || data.user.mt_name,
+                  userId: data.user.mt_idx,
+                  provider: 'google_native',
+                  requestedEmail: data.user.email,
+                  emailMatch: true
+                });
+              } else {
+                console.warn('[GOOGLE LOGIN] ⚠️ 인증 상태 동기화 시간 초과, 강제 진행');
+                sendLogToiOS('warning', 'Google 로그인: 동기화 시간 초과하지만 강제 진행', {
+                  syncAttempts: maxSyncAttempts,
+                  hasStoredData: !!savedUserData && !!savedToken
+                });
+              }
+              
+              // 5. Google 로그인 성공 햅틱 피드백
               triggerHapticFeedback(HapticFeedbackType.SUCCESS, 'Google 로그인 성공', { 
                 component: 'signin', 
                 action: 'google-login', 
@@ -927,14 +1092,33 @@ export default function SignInPage() {
               });
               console.log('🎮 [SIGNIN] Google 로그인 성공 햅틱 피드백 실행');
               
-              // 리다이렉트 플래그 설정
+              // 6. 리다이렉트 플래그 설정
               isRedirectingRef.current = true;
               
-              // 모든 상태 업데이트 차단
+              // 7. 모든 상태 업데이트 차단
               blockAllEffectsRef.current = true;
               
-              // router.replace 사용 (페이지 새로고침 없이 이동)
-              router.replace('/home');
+              // 8. 🔥 강화된 홈 페이지 이동 로직
+              setTimeout(() => {
+                console.log('[GOOGLE LOGIN] 🏠 홈 페이지로 이동');
+                sendLogToiOS('info', 'Google 로그인 홈 페이지 이동', {
+                  userId: data.user.mt_idx,
+                  hasToken: !!authService.getToken(),
+                  hasUser: !!authService.getUserData(),
+                  authContextReady: isLoggedIn
+                });
+                
+                // 즉시 홈 페이지로 이동
+                router.replace('/home');
+                
+                // 🔥 추가 안전장치: 이동이 실패할 경우를 대비한 재시도
+                setTimeout(() => {
+                  if (window.location.pathname !== '/home') {
+                    console.log('[GOOGLE LOGIN] ⚡ 홈 페이지 이동 재시도');
+                    window.location.href = '/home';
+                  }
+                }, 500);
+              }, 300); // 300ms 추가 지연
             }
           } else {
             throw new Error(data.error || '로그인에 실패했습니다.');
@@ -1842,7 +2026,20 @@ export default function SignInPage() {
 
   // Google 로그인 핸들러
   const handleGoogleLogin = async () => {
+    console.log('🚀 [GOOGLE LOGIN] 핸들러 시작됨');
+    
     setIsLoading(true);
+    
+    // 타임아웃 설정 (10초 후 자동으로 로딩 해제)
+    const timeoutId = setTimeout(() => {
+      console.warn('⏰ [GOOGLE LOGIN] 타임아웃 발생 (10초)');
+      sendLogToiOS('warning', '⏰ Google 로그인 타임아웃', {
+        timestamp: new Date().toISOString(),
+        timeout: '10초',
+        action: 'auto_loading_off'
+      });
+      setIsLoading(false);
+    }, 10000);
     
     // 🚨 새로운 iOS 로깅 시스템 사용
     iosLogger.logGoogleLogin('로그인 시도 시작', {
@@ -1854,14 +2051,34 @@ export default function SignInPage() {
     });
     
     // 레거시 iOS 로그 전송 (호환성 유지)
-    sendLogToiOS('info', '🔍 Google 로그인 시도 시작', {
+    sendLogToiOS('info', '🚀 Google 로그인 핸들러 시작', {
       timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      isIOSWebView: !!(window as any).webkit && !!(window as any).webkit.messageHandlers
+      userAgent: navigator.userAgent.substring(0, 100),
+      isIOSWebView: !!(window as any).webkit && !!(window as any).webkit.messageHandlers,
+      step: 'handler_started'
     });
     
     try {
-      console.log('Google 로그인 시도');
+      console.log('🔍 [GOOGLE LOGIN] 환경 체크 시작');
+      
+      // 즉시 환경 정보 로그
+      const environmentInfo = {
+        hasWebkit: !!(window as any).webkit,
+        hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
+        hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
+        hasIosBridge: !!(window as any).iosBridge,
+        hasGoogleSDK: !!(window as any).google,
+        userAgent: navigator.userAgent.substring(0, 100),
+        currentURL: window.location.href
+      };
+      console.log('🔍 [GOOGLE LOGIN] 환경 정보:', environmentInfo);
+      
+      // iOS 로그 전송 - 환경 정보
+      sendLogToiOS('info', '🔍 Google 로그인 환경 정보', {
+        timestamp: new Date().toISOString(),
+        ...environmentInfo,
+        step: 'environment_check'
+      });
       
       // 🚨 iOS 환경 감지 로직 개선 (운영 환경 대응)
       const hasWebKit = !!(window as any).webkit;
@@ -2000,24 +2217,40 @@ export default function SignInPage() {
 
                       // ios-bridge.js의 googleSignIn 메서드 사용 시도
             if ((window as any).iosBridge?.googleSignIn?.signIn) {
-              console.log('[GOOGLE LOGIN] ios-bridge.js googleSignIn 메서드 사용');
+              console.log('🌉 [GOOGLE LOGIN] ios-bridge.js googleSignIn 메서드 사용');
               
               // iOS 로그 전송 - ios-bridge 메서드 사용
               sendLogToiOS('info', '🌉 ios-bridge.js googleSignIn 메서드 사용', {
                 timestamp: new Date().toISOString(),
-                method: 'iosBridge.googleSignIn.signIn'
+                method: 'iosBridge.googleSignIn.signIn',
+                step: 'native_call_attempt'
               });
               
-              (window as any).iosBridge.googleSignIn.signIn();
-              console.log('[GOOGLE LOGIN] ios-bridge 메시지 전송 완료, 콜백 대기 중...');
-              
-              // iOS 로그 전송 - 콜백 대기
-              sendLogToiOS('info', '⏳ Google Sign-In 콜백 대기 중', {
-                timestamp: new Date().toISOString(),
-                waitingFor: 'native callback'
-              });
-              
-              return;
+              try {
+                console.log('📱 [GOOGLE LOGIN] 네이티브 호출 실행 중...');
+                (window as any).iosBridge.googleSignIn.signIn();
+                console.log('✅ [GOOGLE LOGIN] ios-bridge 메시지 전송 완료, 콜백 대기 중...');
+                
+                // iOS 로그 전송 - 네이티브 호출 성공
+                sendLogToiOS('info', '✅ Google Sign-In 네이티브 호출 성공', {
+                  timestamp: new Date().toISOString(),
+                  waitingFor: 'native callback',
+                  step: 'native_call_success'
+                });
+                
+                return;
+              } catch (error) {
+                console.error('❌ [GOOGLE LOGIN] 네이티브 호출 중 오류:', error);
+                
+                // iOS 로그 전송 - 네이티브 호출 오류
+                sendLogToiOS('error', '❌ Google Sign-In 네이티브 호출 오류', {
+                  timestamp: new Date().toISOString(),
+                  error: error?.toString(),
+                  step: 'native_call_error'
+                });
+                
+                // 오류 발생 시 계속 진행
+              }
             }
 
                       // ios-bridge.js가 아직 로드되지 않았다면 잠시 대기
@@ -2235,6 +2468,9 @@ export default function SignInPage() {
         }, 100);
       } finally {
         setIsLoading(false);
+        
+        // 타임아웃 정리 (finally에서도 정리)
+        clearTimeout(timeoutId);
         
         // iOS 로그 전송 - Google 로그인 프로세스 완료
         sendLogToiOS('info', '🏁 Google 로그인 프로세스 완료', {
@@ -2961,6 +3197,113 @@ export default function SignInPage() {
     sendLogToiOS('info', '[EMERGENCY] 테스트 완료', { results: allResults });
   };
 
+  // iOS WebView fetch 폴리필 추가
+  useEffect(() => {
+    // iOS WebView에서만 fetch 폴리필 적용
+    const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
+    
+    if (isIOSWebView && typeof window !== 'undefined') {
+      console.log('[SIGNIN] iOS WebView 환경 감지, fetch 폴리필 적용');
+      
+      // 원본 fetch 저장
+      const originalFetch = window.fetch;
+      
+      // iOS WebView용 fetch 대체 함수
+      window.fetch = function(url: RequestInfo | URL, options: RequestInit = {}): Promise<Response> {
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const method = options.method || 'GET';
+          const urlString = url.toString();
+          
+          xhr.open(method, urlString, true);
+          
+          // 헤더 설정
+          if (options.headers) {
+            const headers = options.headers as Record<string, string>;
+            Object.keys(headers).forEach(key => {
+              xhr.setRequestHeader(key, headers[key]);
+            });
+          }
+          
+          // Content-Type 기본값 설정
+          if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
+            if (!xhr.getResponseHeader('Content-Type')) {
+              xhr.setRequestHeader('Content-Type', 'application/json');
+            }
+          }
+          
+          xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4) {
+              // Response 객체와 유사한 구조 생성
+                             const response = {
+                 ok: xhr.status >= 200 && xhr.status < 300,
+                 status: xhr.status,
+                 statusText: xhr.statusText,
+                 headers: new Map(),
+                 redirected: false,
+                 type: 'basic' as ResponseType,
+                 url: urlString,
+                 clone: () => response,
+                 body: null,
+                 bodyUsed: false,
+                 json: async () => {
+                   try {
+                     return JSON.parse(xhr.responseText);
+                   } catch (e) {
+                     throw new Error('Failed to parse JSON response');
+                   }
+                 },
+                 text: async () => xhr.responseText,
+                 arrayBuffer: async () => {
+                   const encoder = new TextEncoder();
+                   return encoder.encode(xhr.responseText).buffer;
+                 },
+                 blob: async () => new Blob([xhr.responseText]),
+                 formData: async () => new FormData()
+               } as unknown as Response;
+              
+              resolve(response);
+            }
+          };
+          
+          xhr.onerror = function() {
+            reject(new Error('Network request failed'));
+          };
+          
+          xhr.ontimeout = function() {
+            reject(new Error('Request timeout'));
+          };
+          
+          xhr.timeout = 30000; // 30초 타임아웃
+          
+          // 요청 본문 처리
+          let body = null;
+          if (options.body) {
+            if (typeof options.body === 'string') {
+              body = options.body;
+            } else if (options.body instanceof FormData) {
+              body = options.body;
+            } else {
+              body = JSON.stringify(options.body);
+            }
+          }
+          
+          xhr.send(body);
+        });
+      };
+      
+      console.log('[SIGNIN] iOS WebView fetch 폴리필 적용 완료');
+      
+      // 컴포넌트 언마운트 시 원본 fetch 복원
+      return () => {
+        if (originalFetch) {
+          window.fetch = originalFetch;
+          console.log('[SIGNIN] 원본 fetch 복원 완료');
+        }
+      };
+    }
+  }, []);
+
   return (
     <motion.div 
       className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8"
@@ -3164,7 +3507,24 @@ export default function SignInPage() {
             <div className="relative">
               <button
                 type="button"
-                onClick={handleGoogleLogin}
+                onClick={(e) => {
+                  console.log('🔥 [GOOGLE LOGIN] 버튼 클릭됨!');
+                  sendLogToiOS('info', '🔥 Google 로그인 버튼 클릭됨', {
+                    timestamp: new Date().toISOString(),
+                    event: 'button_click',
+                    isLoading: isLoading,
+                    buttonDisabled: isLoading
+                  });
+                  
+                  // 햅틱 피드백 (버튼 클릭 시)
+                  triggerHapticFeedback(HapticFeedbackType.LIGHT, 'Google 로그인 버튼 클릭', { 
+                    component: 'signin', 
+                    action: 'google-login-button-click' 
+                  });
+                  
+                  // 실제 핸들러 호출
+                  handleGoogleLogin();
+                }}
                 disabled={isLoading}
                 className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
                 onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3'}
@@ -3201,92 +3561,6 @@ export default function SignInPage() {
             </button>
           </div>
         </motion.div>
-
-        {/* 개발 환경 햅틱 테스트 버튼 */}
-        {process.env.NODE_ENV === 'development' && (
-          <motion.div 
-            className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              type: "spring",
-              stiffness: 300,
-              damping: 25,
-              delay: 0.65,
-              duration: 0.4
-            }}
-          >
-            <h3 className="text-sm font-medium text-yellow-800 mb-3">🧪 개발자 도구</h3>
-            <div className="space-y-2">
-              {/* 기본 햅틱 테스트 */}
-              <button
-                type="button"
-                onClick={testHapticFeedback}
-                className="w-full py-2 px-3 bg-yellow-500 text-white text-sm font-medium rounded-lg hover:bg-yellow-600 transition-colors"
-              >
-                🎮 기본 햅틱 테스트
-              </button>
-              
-              {/* 상세 햅틱 디버깅 */}
-              <button
-                type="button"
-                onClick={runDetailedHapticDebug}
-                className="w-full py-2 px-3 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                🔬 상세 햅틱 디버깅 (모든 타입)
-              </button>
-              
-              {/* 핸들러 모니터링 */}
-              <button
-                type="button"
-                onClick={startHandlerMonitoring}
-                className="w-full py-2 px-3 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 transition-colors"
-              >
-                🎯 핸들러 실시간 모니터링 (30초)
-              </button>
-              
-              {/* 강제 핸들러 등록 */}
-              <button
-                type="button"
-                onClick={forceRegisterHandlers}
-                className="w-full py-2 px-3 bg-purple-500 text-white text-sm font-medium rounded-lg hover:bg-purple-600 transition-colors"
-              >
-                🔧 WebKit 핸들러 강제 등록
-              </button>
-              
-              {/* 긴급 햅틱 테스트 */}
-              <button
-                type="button"
-                onClick={emergencyHapticTest}
-                className="w-full py-2 px-3 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
-              >
-                🚨 긴급 햅틱 테스트 (모든 방법)
-              </button>
-              
-              {/* 기존 시뮬레이터 버튼 */}
-              <button
-                type="button"
-                onClick={enableSimulatorMode}
-                className="w-full py-2 px-3 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
-              >
-                📱 시뮬레이터 모드 활성화
-              </button>
-            </div>
-            <div className="mt-3 p-2 bg-yellow-100 rounded text-xs text-yellow-700">
-              <p><strong>🎮 기본:</strong> 간단한 햅틱 테스트</p>
-              <p><strong>🔬 상세:</strong> 모든 햅틱 타입을 2초 간격으로 테스트</p>
-              <p><strong>🎯 모니터링:</strong> 핸들러 상태를 5초마다 체크</p>
-              <p><strong>🔧 강제등록:</strong> WebKit 핸들러 강제 생성 시도</p>
-              <p><strong>🚨 긴급:</strong> 모든 가능한 방법으로 동시 햅틱 시도</p>
-              <p><strong>📱 시뮬레이터:</strong> Google 로그인 시뮬레이터 모드</p>
-              <div className="mt-2 pt-2 border-t border-yellow-300">
-                <p className="font-medium">📋 Xcode 로그 확인:</p>
-                <p>모든 테스트는 iOS 네이티브로 로그를 전송합니다.</p>
-                <p>Xcode Console에서 "[HAPTIC" 로 필터링하여 확인하세요.</p>
-              </div>
-            </div>
-          </motion.div>
-        )}
 
         {/* 회원가입 링크 */}
         <motion.div 

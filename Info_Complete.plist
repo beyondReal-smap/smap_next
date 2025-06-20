@@ -213,6 +213,15 @@
                 <string>smap</string>
             </array>
         </dict>
+        <!-- Google Sign-In URL Scheme -->
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>Google Sign-In</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm</string>
+            </array>
+        </dict>
     </array>
     
     <!-- 🌐 외부 도메인 허용 -->
@@ -227,6 +236,10 @@
     <!-- 📊 분석 및 크래시 리포팅 (필요시) -->
     <key>FirebaseAppDelegateProxyEnabled</key>
     <false/>
+    
+    <!-- 🔐 Google Sign-In 설정 -->
+    <key>GIDClientID</key>
+    <string>283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com</string>
     
     <!-- 🎮 게임 센터 (필요시) -->
     <key>UIRequiredDeviceCapabilities</key>

@@ -503,7 +503,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('[AUTH CONTEXT] authService.getUserData():', userData);
         if (userData) {
           console.log('[AUTH CONTEXT] 사용자 데이터 발견, 상태 업데이트:', userData.mt_name);
-          dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+          
+          // 🔥 localStorage에서 그룹 데이터도 확인하여 사용자 객체에 병합
+          let enhancedUserData = { ...userData };
+          try {
+            if (typeof window !== 'undefined') {
+              const storedGroups = localStorage.getItem('user_groups');
+              const groupCount = localStorage.getItem('user_group_count');
+              if (storedGroups) {
+                const groups = JSON.parse(storedGroups);
+                if (Array.isArray(groups) && groups.length > 0) {
+                  console.log('[AUTH CONTEXT] localStorage에서 그룹 데이터 발견:', groups.length, '개');
+                  enhancedUserData = {
+                    ...enhancedUserData,
+                    groups: groups,
+                    group_count: parseInt(groupCount || '0'),
+                    ownedGroups: groups.filter(g => g.myRole?.isOwner || g.is_owner),
+                    joinedGroups: groups.filter(g => !(g.myRole?.isOwner || g.is_owner))
+                  };
+                  console.log('[AUTH CONTEXT] 그룹 정보 병합 완료:', {
+                    totalGroups: groups.length,
+                    ownedGroups: enhancedUserData.ownedGroups?.length || 0,
+                    joinedGroups: enhancedUserData.joinedGroups?.length || 0
+                  });
+                }
+              }
+            }
+          } catch (error) {
+            console.warn('[AUTH CONTEXT] localStorage 그룹 데이터 파싱 실패:', error);
+          }
+          
+          dispatch({ type: 'LOGIN_SUCCESS', payload: enhancedUserData });
           return;
         }
       }

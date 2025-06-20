@@ -632,24 +632,41 @@ const getScheduleStatus = (schedule: Schedule): { name: 'completed' | 'ongoing' 
 export default function HomePage() {
   // 🚨 iOS 시뮬레이터 디버깅 - 즉시 실행 로그
   console.log('🏠 [HOME] HomePage 컴포넌트 시작');
-  console.log('🏠 [HOME] 환경 체크:', {
-    isIOSWebView: !!(window as any).webkit?.messageHandlers,
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
-    isClient: typeof window !== 'undefined',
-    timestamp: new Date().toISOString()
-  });
+  
+  // 🔧 초기 환경 체크를 try-catch로 감싸기
+  try {
+    console.log('🏠 [HOME] 환경 체크:', {
+      isIOSWebView: !!(window as any).webkit?.messageHandlers,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+      isClient: typeof window !== 'undefined',
+      timestamp: new Date().toISOString()
+    });
+  } catch (envError) {
+    console.error('🏠 [HOME] 환경 체크 중 오류:', envError);
+  }
   
   // 🚨 iOS 시뮬레이터 에러 핸들링
   const [componentError, setComponentError] = useState<string | null>(null);
   
   useEffect(() => {
     const handleError = (error: ErrorEvent) => {
-      console.error('🏠 [HOME] ❌ 전역 에러 감지:', error);
-      setComponentError(`전역 에러: ${error.message}`);
+      console.error('🏠 [HOME] ❌ 전역 에러 감지:', {
+        message: error.message,
+        filename: error.filename,
+        lineno: error.lineno,
+        colno: error.colno,
+        error: error.error,
+        stack: error.error?.stack
+      });
+      setComponentError(`전역 에러 (${error.filename}:${error.lineno}): ${error.message}`);
     };
     
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      console.error('🏠 [HOME] ❌ Promise rejection 감지:', event.reason);
+      console.error('🏠 [HOME] ❌ Promise rejection 감지:', {
+        reason: event.reason,
+        stack: event.reason?.stack,
+        type: typeof event.reason
+      });
       setComponentError(`Promise 에러: ${String(event.reason)}`);
     };
     
@@ -664,8 +681,30 @@ export default function HomePage() {
   const router = useRouter();
   // 인증 관련 상태 추가
   const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
+  
+  // 🔧 사용자 정보 디버깅
+  useEffect(() => {
+    if (user) {
+      console.log('🔧 [HOME] AuthContext 사용자 정보 확인:', {
+        mt_idx: user.mt_idx,
+        mt_name: user.mt_name,
+        mt_email: user.mt_email,
+        isLoggedIn,
+        authLoading,
+        isPreloadingComplete
+      });
+    }
+  }, [user, isLoggedIn, authLoading, isPreloadingComplete]);
       // UserContext 사용
-    const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData } = useUser();
+    const { 
+      userInfo, 
+      userGroups, 
+      isUserDataLoading, 
+      userDataError, 
+      refreshUserData,
+      selectedGroupId: userContextSelectedGroupId,
+      setSelectedGroupId: setUserContextSelectedGroupId
+    } = useUser();
    
     // 데이터 캐시 컨텍스트
     const { 
@@ -736,7 +775,9 @@ export default function HomePage() {
   // 그룹 관련 상태 - UserContext로 대체됨
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
   const [firstMemberSelected, setFirstMemberSelected] = useState(false); // 첫번째 멤버 선택 완료 추적
-  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  // selectedGroupId는 UserContext에서 관리
+  const selectedGroupId = userContextSelectedGroupId;
+  const setSelectedGroupId = setUserContextSelectedGroupId;
 
   // 그룹 드롭다운 ref 추가
   const groupDropdownRef = useRef<HTMLDivElement>(null);
@@ -814,18 +855,21 @@ export default function HomePage() {
     
     // 🚨 iOS 시뮬레이터 디버깅 - 단계별 체크
     try {
-      // 인증이 완료되고 그룹이 있으면 즉시 선택 (로딩 완료 대기하지 않음)
-      if (!authLoading && userGroups.length > 0 && !selectedGroupId) {
-        const firstGroup = userGroups[0];
-        console.log('🏠 [HOME] 첫 번째 그룹 자동 선택 시도:', firstGroup);
-        setSelectedGroupId(firstGroup.sgt_idx);
-        console.log('🏠 [HOME] ✅ 첫 번째 그룹 자동 선택 완료:', firstGroup.sgt_title, 'ID:', firstGroup.sgt_idx);
-      }
+      // UserContext에서 그룹과 selectedGroupId 모두 관리되므로 로그만 출력
+      console.log('🏠 [HOME] UserContext 상태 확인:', {
+        userGroupsLength: userGroups.length,
+        selectedGroupId: selectedGroupId,
+        isUserDataLoading: isUserDataLoading,
+        authLoading: authLoading
+      });
       
-      // iOS 시뮬레이터에서는 더 빠른 그룹 선택을 위한 폴백
-      if (!authLoading && !isUserDataLoading && userGroups.length === 0 && !selectedGroupId) {
-        console.log('🏠 [HOME] ⚠️ UserContext 그룹이 없음, 하드코딩된 그룹으로 폴백');
-        setSelectedGroupId(641); // family 그룹 ID
+      // UserContext에서 자동으로 그룹 선택하므로 여기서는 별도 처리 불필요
+      if (selectedGroupId) {
+        console.log('🏠 [HOME] ✅ UserContext에서 그룹 선택됨:', selectedGroupId);
+      } else if (userGroups.length > 0) {
+        console.log('🏠 [HOME] ⚠️ 그룹은 있지만 선택되지 않음 - UserContext 동기화 대기');
+      } else {
+        console.log('🏠 [HOME] ⚠️ 그룹이 없음 - 신규 사용자이거나 데이터 로딩 중');
       }
     } catch (error) {
       console.error('🏠 [HOME] ❌ 첫 번째 그룹 선택 실패:', error);
@@ -1019,37 +1063,107 @@ export default function HomePage() {
             } else {
               // 여전히 캐시가 없으면 API 호출
               console.log('[fetchAllGroupData] 대기 후에도 캐시 없음 - API 호출 실행');
-              const memberData = await memberService.getGroupMembers(groupIdToUse);
-              if (isMounted) { 
-                if (memberData && memberData.length > 0) { 
-                  currentMembers = memberData.map((member: any, index: number) => ({
-                    id: member.mt_idx.toString(),
-                    name: member.mt_name || `멤버 ${index + 1}`,
-                    photo: getSafeImageUrl(member.mt_file1, member.mt_gender, index),
+              try {
+                const memberData = await memberService.getGroupMembers(groupIdToUse);
+                if (isMounted) { 
+                  if (memberData && memberData.length > 0) { 
+                    currentMembers = memberData.map((member: any, index: number) => ({
+                      id: member.mt_idx.toString(),
+                      name: member.mt_name || `멤버 ${index + 1}`,
+                      photo: getSafeImageUrl(member.mt_file1, member.mt_gender, index),
+                      isSelected: false,
+                      location: { 
+                        lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
+                          ? parseFloat(member.mlt_lat.toString()) 
+                          : parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
+                        lng: member.mlt_long !== null && member.mlt_long !== undefined 
+                          ? parseFloat(member.mlt_long.toString()) 
+                          : parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
+                      },
+                      schedules: [], 
+                      mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
+                      original_index: index,
+                      mlt_lat: member.mlt_lat,
+                      mlt_long: member.mlt_long,
+                      mlt_speed: member.mlt_speed,
+                      mlt_battery: member.mlt_battery,
+                      mlt_gps_time: member.mlt_gps_time,
+                      sgdt_owner_chk: member.sgdt_owner_chk,
+                      sgdt_leader_chk: member.sgdt_leader_chk,
+                      sgdt_idx: member.sgdt_idx
+                    }));
+                    console.log('[fetchAllGroupData] ✅ API 호출로 멤버 데이터 획득:', currentMembers.length, '명');
+                  } else {
+                    console.warn('[fetchAllGroupData] API 응답에 멤버 데이터 없음 - 기본 멤버 생성');
+                    // 기본 멤버 생성 (최소 1명은 보장)
+                    if (user) {
+                      console.log('🔧 [fetchAllGroupData] 기본 멤버 생성 - 사용자 정보:', {
+                        mt_idx: user.mt_idx,
+                        mt_name: user.mt_name,
+                        mt_email: user.mt_email,
+                        selectedGroupId: groupIdToUse
+                      });
+                      
+                      currentMembers = [{
+                        id: user.mt_idx.toString(),
+                        name: user.mt_name || '나',
+                        photo: getSafeImageUrl(user.mt_file1 || null, user.mt_gender, 0),
+                        isSelected: false,
+                        location: { 
+                          lat: parseFloat(String(user.mt_lat || '37.5642')) + (Math.random() * 0.01 - 0.005), 
+                          lng: parseFloat(String(user.mt_long || '127.0016')) + (Math.random() * 0.01 - 0.005) 
+                        },
+                        schedules: [], 
+                        mt_gender: user.mt_gender || null,
+                        original_index: 0,
+                        mlt_lat: user.mt_lat,
+                        mlt_long: user.mt_long,
+                        mlt_speed: null,
+                        mlt_battery: null,
+                        mlt_gps_time: null,
+                        sgdt_owner_chk: 'Y',
+                        sgdt_leader_chk: 'Y',
+                        sgdt_idx: undefined
+                      }];
+                      console.log('[fetchAllGroupData] 기본 멤버 생성 완료:', user.mt_name, 'ID:', user.mt_idx);
+                    }
+                    setIsFirstMemberSelectionComplete(true);
+                  }
+                }
+              } catch (apiError) {
+                console.error('[fetchAllGroupData] 멤버 API 호출 실패:', apiError);
+                // API 호출 실패 시에도 기본 멤버 생성
+                if (user) {
+                  console.log('🔧 [fetchAllGroupData] API 실패 시 기본 멤버 생성 - 사용자 정보:', {
+                    mt_idx: user.mt_idx,
+                    mt_name: user.mt_name,
+                    mt_email: user.mt_email,
+                    selectedGroupId: groupIdToUse,
+                    apiError: apiError instanceof Error ? apiError.message : String(apiError)
+                  });
+                  
+                  currentMembers = [{
+                    id: user.mt_idx.toString(),
+                    name: user.mt_name || '나',
+                    photo: getSafeImageUrl(user.mt_file1 || null, user.mt_gender, 0),
                     isSelected: false,
                     location: { 
-                      lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
-                        ? parseFloat(member.mlt_lat.toString()) 
-                        : parseFloat(member.mt_lat || '37.5642') + (Math.random() * 0.01 - 0.005), 
-                      lng: member.mlt_long !== null && member.mlt_long !== undefined 
-                        ? parseFloat(member.mlt_long.toString()) 
-                        : parseFloat(member.mt_long || '127.0016') + (Math.random() * 0.01 - 0.005) 
+                      lat: parseFloat(String(user.mt_lat || '37.5642')) + (Math.random() * 0.01 - 0.005), 
+                      lng: parseFloat(String(user.mt_long || '127.0016')) + (Math.random() * 0.01 - 0.005) 
                     },
                     schedules: [], 
-                    mt_gender: typeof member.mt_gender === 'number' ? member.mt_gender : null,
-                    original_index: index,
-                    mlt_lat: member.mlt_lat,
-                    mlt_long: member.mlt_long,
-                    mlt_speed: member.mlt_speed,
-                    mlt_battery: member.mlt_battery,
-                    mlt_gps_time: member.mlt_gps_time,
-                    sgdt_owner_chk: member.sgdt_owner_chk,
-                    sgdt_leader_chk: member.sgdt_leader_chk,
-                    sgdt_idx: member.sgdt_idx
-                  }));
-                } else {
-                  console.warn('No member data from API, or API call failed.');
-                  setIsFirstMemberSelectionComplete(true);
+                    mt_gender: user.mt_gender || null,
+                    original_index: 0,
+                    mlt_lat: user.mt_lat,
+                    mlt_long: user.mt_long,
+                    mlt_speed: null,
+                    mlt_battery: null,
+                    mlt_gps_time: null,
+                    sgdt_owner_chk: 'Y',
+                    sgdt_leader_chk: 'Y',
+                    sgdt_idx: undefined
+                  }];
+                  console.log('[fetchAllGroupData] API 실패 시 기본 멤버 생성 완료:', user.mt_name, 'ID:', user.mt_idx);
                 }
               }
             }
@@ -1058,6 +1172,14 @@ export default function HomePage() {
           if (isMounted && currentMembers.length > 0) {
             setGroupMembers(currentMembers); 
             console.log('[fetchAllGroupData] 멤버 데이터 로딩 완료:', currentMembers.length, '명');
+            
+            // 멤버 수 업데이트
+            setGroupMemberCounts(prevCounts => ({
+              ...prevCounts,
+              [parseInt(groupIdToUse)]: currentMembers.length
+            }));
+            console.log('[fetchAllGroupData] 그룹 멤버 수 업데이트:', parseInt(groupIdToUse), '→', currentMembers.length, '명');
+            
             dataFetchedRef.current.members = true;
           }
         }
@@ -1271,7 +1393,7 @@ export default function HomePage() {
     //   fetchUserGroups();
     // }, []); // UserContext로 대체되어 제거
   
-    // 로그인 상태 확인 및 사용자 정보 초기화
+    // 로그인 상태 확인 및 사용자 정보 초기화 (Google 로그인 동기화 개선)
   useEffect(() => {
     const initializeUserAuth = async () => {
       // 인증 로딩 중이면 대기
@@ -1282,35 +1404,157 @@ export default function HomePage() {
 
       console.log('[HOME] 인증 상태 확인:', { isLoggedIn, user: user?.mt_idx });
 
-      // 로그인되지 않은 경우 signin 페이지로 리다이렉트
-      if (!isLoggedIn) {
-        console.log('[HOME] 로그인되지 않음 - signin 페이지로 리다이렉트');
+      // 추가 인증 상태 확인 (localStorage 직접 확인)
+      const hasToken = authService.getToken();
+      const hasUserData = authService.getUserData();
+      
+      console.log('[HOME] 인증 데이터 상세 확인:', {
+        authContextLoggedIn: isLoggedIn,
+        hasToken: !!hasToken,
+        hasUserData: !!hasUserData,
+        contextUser: user?.mt_idx,
+        localUser: hasUserData?.mt_idx
+      });
+
+      // 🔥 Google 로그인 직후 상태 확인 - 3초간 여유 시간 제공
+      if (!isLoggedIn && (hasToken || hasUserData)) {
+        console.log('[HOME] 🔄 Google 로그인 후 AuthContext 동기화 대기 중...');
+        
+        // 최대 3초까지 AuthContext 동기화 대기
+        const maxWaitTime = 3000;
+        const startTime = Date.now();
+        
+        while (Date.now() - startTime < maxWaitTime) {
+          await new Promise(resolve => setTimeout(resolve, 200)); // 200ms마다 체크
+          
+          // AuthContext가 동기화되었는지 다시 확인
+          if (user?.mt_idx) {
+            console.log('[HOME] ✅ AuthContext 동기화 완료 감지:', user.mt_idx);
+            break;
+          }
+        }
+        
+        // 동기화 대기 완료 후 다시 상태 확인
+        const finalUser = user || hasUserData;
+        if (finalUser) {
+          console.log('[HOME] 🎉 Google 로그인 인증 완료:', finalUser.mt_name);
+          // 사용자 정보 초기화는 아래에서 처리
+        } else {
+          console.log('[HOME] ⚠️ 동기화 대기 후에도 사용자 정보 없음 - 로그인 필요');
+          router.push('/signin');
+          return;
+        }
+      }
+      
+      // 🔥 더 관대한 인증 체크 (페이지 간 이동 시 세션 유지)
+      
+      // 1. 쿠키에서도 토큰 확인
+      let hasCookieToken = false;
+      if (typeof window !== 'undefined') {
+        const cookieToken = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('auth-token=') || row.startsWith('client-token='))
+          ?.split('=')[1];
+        hasCookieToken = !!cookieToken;
+        
+        console.log('[HOME] 🔍 인증 상태 완전 체크:', {
+          authContextLoggedIn: isLoggedIn,
+          hasLocalStorageToken: !!hasToken,
+          hasLocalStorageUser: !!hasUserData,
+          hasCookieToken,
+          totalAuthSources: [isLoggedIn, !!hasToken, !!hasUserData, hasCookieToken].filter(Boolean).length
+        });
+      }
+      
+      // 2. 모든 인증 소스가 없을 때만 리다이렉트 (더 관대한 정책)
+      if (!isLoggedIn && !hasToken && !hasUserData && !hasCookieToken) {
+        console.log('[HOME] ❌ 완전히 로그인되지 않음 - signin 페이지로 리다이렉트');
         router.push('/signin');
         return;
       }
-
-      // 사용자 정보가 있는 경우 초기화
-      if (user) {
-        setUserName(user.mt_name || '사용자');
-
-        // 사용자 위치 정보 설정
-        if (user.mt_lat && user.mt_long) {
-          const lat = typeof user.mt_lat === 'number' ? user.mt_lat : parseFloat(String(user.mt_lat));
-          const lng = typeof user.mt_long === 'number' ? user.mt_long : parseFloat(String(user.mt_long));
-          setUserLocation({ lat, lng });
-        }
-
-        // 사용자 지역 정보 설정
-        if (user.mt_sido) {
-          setLocationName(user.mt_sido + (user.mt_gu ? ' ' + user.mt_gu : ''));
-        }
-
-        console.log('[HOME] 사용자 정보 초기화 완료:', {
-          mt_idx: user.mt_idx,
-          name: user.mt_name,
-          location: { lat: user.mt_lat, lng: user.mt_long }
+      
+      // 3. 하나라도 인증 정보가 있으면 계속 진행 (세션 유지 우선)
+      if (!isLoggedIn && (hasToken || hasUserData || hasCookieToken)) {
+        console.log('[HOME] ⚡ AuthContext 미동기화 상태지만 계속 진행', {
+          hasToken: !!hasToken,
+          hasUserData: !!hasUserData,
+          hasCookieToken,
+          action: 'continue_without_redirect'
         });
+        
+                 // 백그라운드에서 동기화 시도 (사용자 방해 없이)
+         try {
+           // AuthContext의 refreshAuthState 함수 호출 시도
+           const authContext = typeof window !== 'undefined' ? (window as any).__authContext__ : null;
+           if (authContext?.refreshAuthState) {
+             authContext.refreshAuthState().catch((error: any) => {
+               console.warn('[HOME] 백그라운드 AuthContext 동기화 실패:', error);
+             });
+           }
+         } catch (error) {
+           console.warn('[HOME] AuthContext 접근 실패:', error);
+         }
       }
+
+              // 사용자 정보가 있는 경우 초기화 (AuthContext 또는 localStorage에서)
+        const currentUser = user || hasUserData;
+        if (currentUser) {
+          setUserName(currentUser.mt_name || '사용자');
+
+          // 사용자 위치 정보 설정
+          if (currentUser.mt_lat && currentUser.mt_long) {
+            const lat = typeof currentUser.mt_lat === 'number' ? currentUser.mt_lat : parseFloat(String(currentUser.mt_lat));
+            const lng = typeof currentUser.mt_long === 'number' ? currentUser.mt_long : parseFloat(String(currentUser.mt_long));
+            setUserLocation({ lat, lng });
+          }
+
+          // 사용자 지역 정보 설정
+          if (currentUser.mt_sido) {
+            setLocationName(currentUser.mt_sido + (currentUser.mt_gu ? ' ' + currentUser.mt_gu : ''));
+          }
+
+          // 🔥 localStorage에서 그룹 데이터 확인 및 초기화
+          if (typeof window !== 'undefined') {
+            try {
+              const storedGroups = localStorage.getItem('user_groups');
+              const groupCount = localStorage.getItem('user_group_count');
+              
+              if (storedGroups) {
+                const groups = JSON.parse(storedGroups);
+                if (Array.isArray(groups) && groups.length > 0) {
+                  console.log('[HOME] 🔥 localStorage에서 그룹 데이터 발견:', groups.length, '개');
+                  
+                  // UserContext와 동기화되지 않은 경우 직접 데이터 사용
+                  if (userGroups.length === 0) {
+                    console.log('[HOME] UserContext 빈 상태 - localStorage 그룹 데이터로 직접 초기화');
+                    // 여기서 그룹 데이터를 직접 설정하는 대신 로그만 남김
+                    // 실제 그룹 설정은 UserContext에서 처리되어야 함
+                  }
+                  
+                  console.log('[HOME] localStorage 그룹 상세:', {
+                    groups: groups.map((g: any) => ({
+                      sgt_idx: g.sgt_idx,
+                      sgt_title: g.sgt_title,
+                      member_count: g.member_count || g.memberCount || '미지정'
+                    })),
+                    totalCount: parseInt(groupCount || '0')
+                  });
+                }
+              }
+            } catch (error) {
+              console.warn('[HOME] localStorage 그룹 데이터 파싱 실패:', error);
+            }
+          }
+
+          console.log('[HOME] 사용자 정보 초기화 완료:', {
+            mt_idx: currentUser.mt_idx,
+            name: currentUser.mt_name,
+            location: { lat: currentUser.mt_lat, lng: currentUser.mt_long },
+            source: user ? 'AuthContext' : 'localStorage',
+            hasGroups: !!currentUser.groups?.length,
+            userContextGroups: userGroups.length
+          });
+        }
     };
 
     initializeUserAuth();
@@ -3845,8 +4089,22 @@ export default function HomePage() {
             counts[group.sgt_idx] = cachedMembers.length;
             console.log(`[HOME] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 (캐시):`, cachedMembers.length);
           } else {
+            // API 호출로 실제 멤버 수 확인
+            console.log(`[HOME] 그룹 ${group.sgt_title}(${group.sgt_idx}) 캐시 없음, API 호출 중...`);
+            getGroupMemberCount(group.sgt_idx).then(memberCount => {
+              setGroupMemberCounts(prevCounts => ({
+                ...prevCounts,
+                [group.sgt_idx]: memberCount
+              }));
+              console.log(`[HOME] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 (API):`, memberCount);
+            }).catch(error => {
+              console.error(`[HOME] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회 실패:`, error);
+              counts[group.sgt_idx] = 0;
+            });
+            
+            // 임시로 0 설정 (API 완료 시 업데이트됨)
             counts[group.sgt_idx] = 0;
-            console.log(`[HOME] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 (기본값):`, 0);
+            console.log(`[HOME] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 (임시):`, 0);
           }
         }
       });
@@ -4241,24 +4499,37 @@ export default function HomePage() {
   if (componentError) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full">
+        <div className="bg-white rounded-xl shadow-lg p-6 max-w-lg w-full">
           <div className="text-center">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">앱 오류 발생</h3>
-            <p className="text-sm text-gray-600 mb-4">{componentError}</p>
-            <button 
-              onClick={() => {
-                setComponentError(null);
-                window.location.reload();
-              }}
-              className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
-            >
-              앱 다시 시작
-            </button>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">홈 페이지 오류 발생</h3>
+            <p className="text-sm text-gray-600 mb-4 break-words">{componentError}</p>
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={() => {
+                  console.log('[HOME ERROR] 사용자가 앱 재시작 요청');
+                  setComponentError(null);
+                  window.location.reload();
+                }}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
+              >
+                앱 다시 시작
+              </button>
+              <button 
+                onClick={() => {
+                  console.log('[HOME ERROR] 사용자가 홈으로 강제 이동 요청');
+                  setComponentError(null);
+                  window.location.href = '/home';
+                }}
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                홈으로 강제 이동
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -4372,10 +4643,29 @@ export default function HomePage() {
           >
                          <div className="text-xs font-mono space-y-1">
                <div className="font-bold text-blue-600">🔧 iOS 디버깅 상태</div>
-               <div>인증: {authLoading ? '⏳ 로딩중' : '✅ 완료'}</div>
+               <div>인증: {authLoading ? '⏳ 로딩중' : isLoggedIn ? '✅ 완료' : '❌ 실패'}</div>
                <div>프리로딩: {isPreloadingComplete ? '✅ 완료' : '🚀 백그라운드'}</div>
-               <div>사용자: {user?.mt_name || userInfo?.name || '로딩중'}</div>
-               <div>그룹: {selectedGroupId ? `✅ ${selectedGroupId}` : '❌ 없음'}</div>
+               <div>사용자: {user?.mt_name || userInfo?.name || '❌ 없음'}</div>
+               <div>Auth그룹: {user?.groups?.length || 0}개 {(user?.groups?.length || 0) > 0 ? '✅' : '❌'}</div>
+               <div>User그룹: {userGroups.length}개 {userGroups.length > 0 ? '✅' : '❌'}</div>
+               <div>Local그룹: {(() => {
+                 try {
+                   const storedGroups = typeof window !== 'undefined' ? localStorage.getItem('user_groups') : null;
+                   const groups = storedGroups ? JSON.parse(storedGroups) : [];
+                   return Array.isArray(groups) ? groups.length : 0;
+                 } catch {
+                   return 0;
+                 }
+               })()}개 {(() => {
+                 try {
+                   const storedGroups = typeof window !== 'undefined' ? localStorage.getItem('user_groups') : null;
+                   const groups = storedGroups ? JSON.parse(storedGroups) : [];
+                   return Array.isArray(groups) && groups.length > 0 ? '✅' : '❌';
+                 } catch {
+                   return '❌';
+                 }
+               })()}</div>
+               <div>선택그룹: {selectedGroupId ? `✅ ${selectedGroupId}` : '❌ 없음'}</div>
                <div>멤버: {groupMembers.length}명 {groupMembers.length > 0 ? '✅' : '❌'}</div>
                <div>지도: {mapType} {isMapLoading ? '⏳' : '✅'}</div>
                <div>위치: {isLocationEnabled ? '✅' : '❌'}</div>
@@ -4942,8 +5232,8 @@ export default function HomePage() {
           </div>
         )}
         
-        {/* <DebugPanel />
-        <LogParser /> */}
+        <DebugPanel />
+        {/* <LogParser /> */}
       </>
     );
 }

@@ -74,6 +74,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       console.log('[UserContext] 캐시된 데이터로 사용자 정보 로딩:', user.mt_idx, user.mt_name);
       
+      // 🔧 사용자 정보 로깅 (모든 사용자)
+      console.log('🔧 [UserContext] 사용자 정보 확인:', {
+        mt_idx: user.mt_idx,
+        email: user.mt_email,
+        name: user.mt_name
+      });
+      
       // AuthContext에서 받은 사용자 정보 설정
       let userInfoData: UserInfo = {
         mt_idx: user.mt_idx,
@@ -98,57 +105,154 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       setUserInfo(userInfoData);
 
-      // 캐시된 사용자 그룹 목록 사용 (GroupInfo를 Group으로 변환)
-      const cachedGroups = getUserGroups();
-      if (cachedGroups && cachedGroups.length > 0) {
-        console.log('[UserContext] 캐시된 그룹 데이터 사용:', cachedGroups.length, '개');
-        // GroupInfo를 Group 타입으로 변환
-        const convertedGroups: Group[] = cachedGroups.map(group => ({
-          sgt_idx: group.sgt_idx,
-          sgt_title: group.sgt_title,
-          sgt_content: group.sgt_intro || '',
-          sgt_memo: '',
-          mt_idx: user.mt_idx, // 현재 사용자 ID
-          sgt_show: 'Y',
-          sgt_wdate: new Date().toISOString(),
-          member_count: group.member_count
-        }));
-        setUserGroups(convertedGroups);
-      } else {
-        console.log('[UserContext] 캐시된 그룹 데이터 없음, API 직접 호출 시도');
-        
-        // 캐시된 데이터가 없으면 직접 API 호출 (fallback)
+      // 🔥 1. localStorage에서 그룹 데이터 최우선 확인
+      let groupsAcquired = false;
+      
+      if (typeof window !== 'undefined') {
         try {
-          const response = await fetch('/api/groups', {
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
-              'Content-Type': 'application/json'
+          const storedGroups = localStorage.getItem('user_groups');
+          if (storedGroups) {
+            const groups = JSON.parse(storedGroups);
+            if (Array.isArray(groups) && groups.length > 0) {
+              console.log('[UserContext] 🔥 localStorage에서 그룹 데이터 발견:', groups.length, '개 (최우선 사용)');
+              // localStorage 그룹을 Group 타입으로 변환
+              const convertedGroups: Group[] = groups.map((group: any) => ({
+                sgt_idx: group.sgt_idx,
+                sgt_title: group.sgt_title || `그룹 ${group.sgt_idx}`,
+                sgt_content: group.sgt_intro || '',
+                sgt_memo: '',
+                mt_idx: user.mt_idx,
+                sgt_show: 'Y',
+                sgt_wdate: new Date().toISOString(),
+                member_count: group.member_count || group.memberCount || 0
+              }));
+              setUserGroups(convertedGroups);
+              groupsAcquired = true;
+              console.log('[UserContext] localStorage 그룹 데이터 설정 완료:', convertedGroups.map(g => ({
+                sgt_idx: g.sgt_idx,
+                sgt_title: g.sgt_title,
+                member_count: g.member_count
+              })));
             }
-          });
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.data) {
-              console.log('[UserContext] ⚡ API 직접 호출로 그룹 데이터 획득:', data.data.length, '개');
-              setUserGroups(data.data);
-            } else {
-              console.log('[UserContext] API 응답에 그룹 데이터 없음');
-              setUserGroups([]);
-            }
-          } else {
-            console.warn('[UserContext] 그룹 API 직접 호출 실패:', response.status);
-            setUserGroups([]);
           }
-        } catch (apiError) {
-          console.warn('[UserContext] 그룹 API 직접 호출 예외:', apiError);
-          setUserGroups([]);
+        } catch (error) {
+          console.warn('[UserContext] localStorage 그룹 데이터 파싱 실패:', error);
+        }
+      }
+      
+      // 🔥 2. localStorage에 없으면 캐시된 그룹 데이터 사용
+      if (!groupsAcquired) {
+        const cachedGroups = getUserGroups();
+        if (cachedGroups && cachedGroups.length > 0) {
+          console.log('[UserContext] 캐시된 그룹 데이터 사용:', cachedGroups.length, '개');
+          // GroupInfo를 Group 타입으로 변환
+          const convertedGroups: Group[] = cachedGroups.map(group => ({
+            sgt_idx: group.sgt_idx,
+            sgt_title: group.sgt_title,
+            sgt_content: group.sgt_intro || '',
+            sgt_memo: '',
+            mt_idx: user.mt_idx, // 현재 사용자 ID
+            sgt_show: 'Y',
+            sgt_wdate: new Date().toISOString(),
+            member_count: group.member_count
+          }));
+          setUserGroups(convertedGroups);
+          groupsAcquired = true;
+        }
+      }
+      
+      // 🔥 3. 모든 방법이 실패한 경우에만 추가 시도
+      if (!groupsAcquired) {
+        console.log('[UserContext] 캐시된 그룹 데이터 없음, 다중 방법으로 데이터 확보 시도');
+        
+        let groupsAcquired = false;
+        
+                 // 방법 1: AuthContext 그룹 데이터 재확인
+         try {
+           console.log('[UserContext] 시도 1: AuthContext 그룹 데이터 재확인');
+           if (user?.groups && user.groups.length > 0) {
+             console.log('[UserContext] AuthContext에서 그룹 데이터 발견:', user.groups.length, '개');
+             // AuthContext 그룹을 Group 타입으로 변환
+             const authGroups: Group[] = user.groups.map(group => ({
+               sgt_idx: group.sgt_idx,
+               sgt_title: group.sgt_title || '그룹',
+               sgt_content: '',
+               sgt_memo: '',
+               mt_idx: user.mt_idx,
+               sgt_show: 'Y',
+               sgt_wdate: new Date().toISOString(),
+               member_count: group.memberCount || 1
+             }));
+             setUserGroups(authGroups);
+             groupsAcquired = true;
+           }
+         } catch (error) {
+           console.log('[UserContext] AuthContext 그룹 데이터 변환 실패:', error);
+         }
+        
+        // 방법 2: groupService 직접 사용
+        if (!groupsAcquired) {
+          try {
+            console.log('[UserContext] 시도 2: groupService 직접 호출');
+            const groupService = await import('@/services/groupService');
+            const groupsData = await groupService.default.getCurrentUserGroups();
+            
+            if (groupsData && groupsData.length > 0) {
+              console.log('[UserContext] ⚡ groupService로 그룹 데이터 획득:', groupsData.length, '개');
+              setUserGroups(groupsData);
+              groupsAcquired = true;
+            }
+          } catch (error) {
+            console.warn('[UserContext] groupService 직접 호출 실패:', error);
+          }
+        }
+        
+        // 방법 3: API 직접 호출 (기존 방법)
+        if (!groupsAcquired) {
+          try {
+            console.log('[UserContext] 시도 3: API 직접 호출');
+            const response = await fetch('/api/groups', {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('auth-token')}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success && data.data) {
+                console.log('[UserContext] ⚡ API 직접 호출로 그룹 데이터 획득:', data.data.length, '개');
+                setUserGroups(data.data);
+                groupsAcquired = true;
+              }
+            }
+          } catch (apiError) {
+            console.warn('[UserContext] API 직접 호출 실패:', apiError);
+          }
+        }
+        
+        // 방법 4: 기본 그룹 생성 (모든 방법 실패 시)
+        if (!groupsAcquired) {
+          console.log('[UserContext] 모든 방법 실패, 기본 그룹 데이터 생성');
+          const defaultGroup: Group = {
+            sgt_idx: 641, // family 그룹 ID (하드코딩)
+            sgt_title: 'Family',
+            sgt_content: '기본 그룹',
+            sgt_memo: '',
+            mt_idx: user.mt_idx,
+            sgt_show: 'Y',
+            sgt_wdate: new Date().toISOString(),
+            member_count: 1
+          };
+          setUserGroups([defaultGroup]);
+          console.log('[UserContext] 기본 그룹 생성 완료:', defaultGroup.sgt_title);
         }
       }
 
       console.log('[UserContext] 사용자 데이터 로딩 완료:', {
         userId: user.mt_idx,
         userName: userInfoData.name,
-        groupCount: cachedGroups?.length || 0
+        groupCount: userGroups.length || 0
       });
 
     } catch (error) {

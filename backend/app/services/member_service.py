@@ -236,11 +236,40 @@ class MemberService:
     def google_login(self, db: Session, google_data: GoogleLoginRequest) -> GoogleLoginResponse:
         """Google 로그인 처리"""
         try:
-            # 1. Google ID로 기존 사용자 확인
-            existing_member = db.query(Member).filter(Member.mt_google_id == google_data.google_id).first()
+            # 1. 이메일로 기존 사용자 우선 확인 (이메일 기반 조회 우선)
+            existing_member = None
+            is_new_user = True
+            lookup_method = "none"
+            
+            logger.info(f"🔍 Google 로그인 시작 - email: {google_data.email}, google_id: {google_data.google_id}")
+            
+            # 이메일로 기존 사용자 조회 (우선순위 1)
+            if google_data.email:
+                existing_member = self.crud.get_by_email(db, google_data.email)
+                if existing_member:
+                    logger.info(f"✅ 이메일로 기존 사용자 발견 - mt_idx: {existing_member.mt_idx}, email: {existing_member.mt_email}")
+                    is_new_user = False
+                    lookup_method = "email"
+                    
+                    # Google ID가 없는 경우 추가
+                    if not existing_member.mt_google_id:
+                        existing_member.mt_google_id = google_data.google_id
+                        existing_member.mt_type = 4  # Google 로그인 타입
+                        db.commit()
+                        logger.info(f"🔗 기존 사용자에 Google ID 연결 완료")
+            
+            # Google ID로 사용자 조회 (우선순위 2)
+            if not existing_member:
+                existing_member = db.query(Member).filter(Member.mt_google_id == google_data.google_id).first()
+                if existing_member:
+                    logger.info(f"✅ Google ID로 기존 사용자 발견 - mt_idx: {existing_member.mt_idx}")
+                    is_new_user = False
+                    lookup_method = "google_id"
             
             if existing_member:
-                # 기존 사용자 로그인
+                # 기존 사용자 로그인 처리
+                logger.info(f"👤 기존 사용자 로그인 처리 시작 - mt_idx: {existing_member.mt_idx}")
+                
                 # 계정 상태 확인
                 if not self.crud.is_active(existing_member):
                     return GoogleLoginResponse(
@@ -250,207 +279,94 @@ class MemberService:
 
                 # 로그인 시간 업데이트
                 self.crud.update_login_time(db, user=existing_member)
+                
+                # 프로필 이미지 업데이트 (없는 경우만)
+                if google_data.image and not existing_member.mt_file1:
+                    existing_member.mt_file1 = google_data.image
+                    db.commit()
 
-                # 사용자 정보 구성
-                user_data = {
-                    "mt_idx": existing_member.mt_idx,
-                    "mt_type": existing_member.mt_type or 1,
-                    "mt_level": existing_member.mt_level or 2,
-                    "mt_status": existing_member.mt_status or 1,
-                    "mt_id": existing_member.mt_id or "",
-                    "mt_name": existing_member.mt_name or "",
-                    "mt_nickname": existing_member.mt_nickname or "",
-                    "mt_hp": existing_member.mt_hp or "",
-                    "mt_email": existing_member.mt_email or "",
-                    "mt_birth": existing_member.mt_birth.isoformat() if existing_member.mt_birth else "",
-                    "mt_gender": existing_member.mt_gender or 1,
-                    "mt_file1": existing_member.mt_file1 or "",
-                    "mt_lat": float(existing_member.mt_lat) if existing_member.mt_lat else 37.5642,
-                    "mt_long": float(existing_member.mt_long) if existing_member.mt_long else 127.0016,
-                    "mt_sido": existing_member.mt_sido or "",
-                    "mt_gu": existing_member.mt_gu or "",
-                    "mt_dong": existing_member.mt_dong or "",
-                    "mt_onboarding": existing_member.mt_onboarding or 'Y',
-                    "mt_push1": existing_member.mt_push1 or 'Y',
-                    "mt_plan_check": existing_member.mt_plan_check or 'N',
-                    "mt_plan_date": existing_member.mt_plan_date.isoformat() if existing_member.mt_plan_date else "",
-                    "mt_weather_pop": existing_member.mt_weather_pop or "",
-                    "mt_weather_sky": existing_member.mt_weather_sky or 8,
-                    "mt_weather_tmn": existing_member.mt_weather_tmn or 18,
-                    "mt_weather_tmx": existing_member.mt_weather_tmx or 25,
-                    "mt_weather_date": existing_member.mt_weather_date.isoformat() if existing_member.mt_weather_date else datetime.utcnow().isoformat(),
-                    "mt_ldate": existing_member.mt_ldate.isoformat() if existing_member.mt_ldate else datetime.utcnow().isoformat(),
-                    "mt_adate": existing_member.mt_adate.isoformat() if existing_member.mt_adate else datetime.utcnow().isoformat()
-                }
-
-                logger.info(f"Google 로그인 성공: {existing_member.mt_email} ({existing_member.mt_name})")
+                # 🔥 기존 사용자의 관련 데이터 자동 조회
+                additional_data = self._get_user_additional_data(db, existing_member.mt_idx)
+                
+                # 사용자 기본 정보 구성
+                user_data = self._build_user_data(existing_member)
+                
+                logger.info(f"✅ 기존 사용자 로그인 성공 - mt_idx: {existing_member.mt_idx}")
 
                 return GoogleLoginResponse(
                     success=True,
                     message="Google 로그인 성공",
                     data={
                         "member": user_data,
-                        "token": f"google_token_{existing_member.mt_idx}",  # 실제 JWT 토큰으로 교체 필요
-                        "is_new_user": False
+                        "user": user_data,  # 호환성을 위해 추가
+                        "token": f"google_token_{existing_member.mt_idx}",
+                        "is_new_user": False,
+                        "isNewUser": False,  # 호환성을 위해 추가
+                        "lookup_method": lookup_method,
+                        # 🔥 추가 데이터 포함
+                        "groups": additional_data.get("groups", []),
+                        "recent_schedules": additional_data.get("recent_schedules", []),
+                        "group_count": additional_data.get("group_count", 0),
+                        "schedule_count": additional_data.get("schedule_count", 0),
+                        "has_data": additional_data.get("has_data", False)
                     }
                 )
+            
             else:
-                # 새 사용자 회원가입
-                # 이메일로 기존 계정 확인
-                email_member = self.crud.get_by_email(db, google_data.email)
-                if email_member:
-                    # 기존 이메일 계정에 Google ID 연결
-                    email_member.mt_google_id = google_data.google_id
-                    email_member.mt_type = 4  # Google 로그인으로 변경
-                    email_member.mt_map = 'Y'  # Google 지도 사용으로 변경
-                    email_member.mt_ldate = datetime.utcnow()  # 로그인 시간 업데이트
-                    email_member.mt_adate = datetime.utcnow()  # 최근접속 시간 업데이트
-                    if google_data.image and not email_member.mt_file1:
-                        email_member.mt_file1 = google_data.image  # 프로필 이미지가 없는 경우에만 업데이트
-                    db.commit()
-                    db.refresh(email_member)
-                    
-                    user_data = {
-                        "mt_idx": email_member.mt_idx,
-                        "mt_type": email_member.mt_type or 1,
-                        "mt_level": email_member.mt_level or 2,
-                        "mt_status": email_member.mt_status or 1,
-                        "mt_id": email_member.mt_id or "",
-                        "mt_name": email_member.mt_name or "",
-                        "mt_nickname": email_member.mt_nickname or "",
-                        "mt_hp": email_member.mt_hp or "",
-                        "mt_email": email_member.mt_email or "",
-                        "mt_birth": email_member.mt_birth.isoformat() if email_member.mt_birth else "",
-                        "mt_gender": email_member.mt_gender or 1,
-                        "mt_file1": email_member.mt_file1 or "",
-                        "mt_lat": float(email_member.mt_lat) if email_member.mt_lat else 37.5642,
-                        "mt_long": float(email_member.mt_long) if email_member.mt_long else 127.0016,
-                        "mt_sido": email_member.mt_sido or "",
-                        "mt_gu": email_member.mt_gu or "",
-                        "mt_dong": email_member.mt_dong or "",
-                        "mt_onboarding": email_member.mt_onboarding or 'Y',
-                        "mt_push1": email_member.mt_push1 or 'Y',
-                        "mt_plan_check": email_member.mt_plan_check or 'N',
-                        "mt_plan_date": email_member.mt_plan_date.isoformat() if email_member.mt_plan_date else "",
-                        "mt_weather_pop": email_member.mt_weather_pop or "",
-                        "mt_weather_sky": email_member.mt_weather_sky or 8,
-                        "mt_weather_tmn": email_member.mt_weather_tmn or 18,
-                        "mt_weather_tmx": email_member.mt_weather_tmx or 25,
-                        "mt_weather_date": email_member.mt_weather_date.isoformat() if email_member.mt_weather_date else datetime.utcnow().isoformat(),
-                        "mt_ldate": email_member.mt_ldate.isoformat() if email_member.mt_ldate else datetime.utcnow().isoformat(),
-                        "mt_adate": email_member.mt_adate.isoformat() if email_member.mt_adate else datetime.utcnow().isoformat()
+                # 새 사용자 회원가입 처리
+                logger.info(f"👤 새 사용자 회원가입 처리 시작")
+                
+                # 새 사용자 생성
+                new_member = Member(
+                    mt_id=f"google_{google_data.google_id}",  # Google ID 기반 고유 ID
+                    mt_name=google_data.name or google_data.given_name or "Google User",
+                    mt_nickname=google_data.given_name or google_data.name or "Google User",
+                    mt_email=google_data.email,
+                    mt_google_id=google_data.google_id,
+                    mt_type=4,  # Google 로그인
+                    mt_level=2,  # 일반 회원
+                    mt_status=1,  # 정상
+                    mt_show='Y',  # 노출
+                    mt_map='Y',  # Google 지도 사용
+                    mt_file1=google_data.image,  # 프로필 이미지
+                    mt_wdate=datetime.utcnow(),
+                    mt_ldate=datetime.utcnow(),
+                    mt_adate=datetime.utcnow(),
+                    # 기본 동의 처리 (Google 로그인의 경우 기본 동의로 처리)
+                    mt_agree1='Y',  # 서비스 이용약관
+                    mt_agree2='Y',  # 개인정보 처리방침
+                    mt_agree3='Y',  # 위치기반서비스
+                    mt_onboarding='N'  # 온보딩 필요
+                )
+                
+                db.add(new_member)
+                db.commit()
+                db.refresh(new_member)
+                
+                logger.info(f"✅ 새 사용자 생성 완료 - mt_idx: {new_member.mt_idx}")
+                
+                # 새 사용자 데이터 구성
+                user_data = self._build_user_data(new_member)
+                
+                return GoogleLoginResponse(
+                    success=True,
+                    message="Google 회원가입 및 로그인 성공",
+                    data={
+                        "member": user_data,
+                        "user": user_data,  # 호환성을 위해 추가
+                        "token": f"google_token_{new_member.mt_idx}",
+                        "is_new_user": True,
+                        "isNewUser": True,  # 호환성을 위해 추가
+                        "lookup_method": "new_user",
+                        # 새 사용자는 빈 데이터
+                        "groups": [],
+                        "recent_schedules": [],
+                        "group_count": 0,
+                        "schedule_count": 0,
+                        "has_data": False,
+                        "needs_onboarding": True
                     }
-
-                    return GoogleLoginResponse(
-                        success=True,
-                        message="기존 계정에 Google 연결 완료",
-                        data={
-                            "member": user_data,
-                            "token": f"google_token_{email_member.mt_idx}",
-                            "is_new_user": False
-                        }
-                    )
-                else:
-                    # 완전히 새로운 사용자 생성
-                    current_time = datetime.utcnow()
-                    
-                    # 닉네임 중복 확인 및 고유 닉네임 생성
-                    base_nickname = google_data.name
-                    nickname = base_nickname
-                    counter = 1
-                    while db.query(Member).filter(Member.mt_nickname == nickname).first():
-                        nickname = f"{base_nickname}{counter}"
-                        counter += 1
-                    
-                    new_member = Member(
-                        mt_type=4,  # Google 로그인 구분
-                        mt_level=2,  # 일반(무료) 회원
-                        mt_status=1,  # 정상 상태
-                        mt_id=google_data.email,  # 이메일을 ID로 사용
-                        mt_pwd=None,  # Google 로그인은 비밀번호 없음
-                        mt_pwd_cnt=0,  # 비밀번호 체크 카운터 초기화
-                        mt_name=google_data.name,
-                        mt_nickname=nickname,  # 고유 닉네임
-                        mt_hp=None,  # 전화번호는 나중에 입력
-                        mt_email=google_data.email,
-                        mt_birth=None,  # 생년월일은 나중에 입력
-                        mt_gender=None,  # 성별은 나중에 입력
-                        mt_file1=google_data.image or "",
-                        mt_show='Y',  # 노출
-                        mt_agree1='Y',  # 서비스이용약관 동의 (Google 로그인 시 기본 동의)
-                        mt_agree2='Y',  # 개인정보 처리방침 동의
-                        mt_agree3='Y',  # 위치기반서비스 이용약관 동의
-                        mt_agree4='N',  # 개인정보 제3자 제공 동의 (선택)
-                        mt_agree5='N',  # 마케팅 정보 수집 동의 (선택)
-                        mt_push1='Y',  # 알림수신 동의
-                        mt_lat=None,  # 위치는 나중에 설정
-                        mt_long=None,
-                        mt_sido=None,
-                        mt_gu=None,
-                        mt_dong=None,
-                        mt_onboarding='N',  # 온보딩 미완료
-                        mt_google_id=google_data.google_id,
-                        mt_lang='ko',  # 기본 언어
-                        mt_map='Y',  # Google 지도 사용
-                        mt_recommend_chk='N',  # 추천인 미사용
-                        mt_plan_check='N',  # 플랜 구독 안함
-                        mt_os_check=0,  # 기본값 (AOS)
-                        mt_weather_sky=8,  # 기본 하늘상태
-                        mt_weather_tmn=18,  # 기본 최저기온
-                        mt_weather_tmx=25,  # 기본 최고기온
-                        mt_weather_date=current_time,
-                        mt_wdate=current_time,  # 등록일시
-                        mt_ldate=current_time,  # 로그인일시
-                        mt_adate=current_time,  # 최근접속일시
-                        mt_udate=current_time   # 수정일시
-                    )
-                    
-                    db.add(new_member)
-                    db.commit()
-                    db.refresh(new_member)
-
-                    user_data = {
-                        "mt_idx": new_member.mt_idx,
-                        "mt_type": new_member.mt_type or 1,
-                        "mt_level": new_member.mt_level or 2,
-                        "mt_status": new_member.mt_status or 1,
-                        "mt_id": new_member.mt_id or "",
-                        "mt_name": new_member.mt_name or "",
-                        "mt_nickname": new_member.mt_nickname or "",
-                        "mt_hp": new_member.mt_hp or "",
-                        "mt_email": new_member.mt_email or "",
-                        "mt_birth": new_member.mt_birth.isoformat() if new_member.mt_birth else "",
-                        "mt_gender": new_member.mt_gender or 1,
-                        "mt_file1": new_member.mt_file1 or "",
-                        "mt_lat": float(new_member.mt_lat) if new_member.mt_lat else 37.5642,
-                        "mt_long": float(new_member.mt_long) if new_member.mt_long else 127.0016,
-                        "mt_sido": new_member.mt_sido or "",
-                        "mt_gu": new_member.mt_gu or "",
-                        "mt_dong": new_member.mt_dong or "",
-                        "mt_onboarding": new_member.mt_onboarding or 'Y',
-                        "mt_push1": new_member.mt_push1 or 'Y',
-                        "mt_plan_check": new_member.mt_plan_check or 'N',
-                        "mt_plan_date": new_member.mt_plan_date.isoformat() if new_member.mt_plan_date else "",
-                        "mt_weather_pop": new_member.mt_weather_pop or "",
-                        "mt_weather_sky": new_member.mt_weather_sky or 8,
-                        "mt_weather_tmn": new_member.mt_weather_tmn or 18,
-                        "mt_weather_tmx": new_member.mt_weather_tmx or 25,
-                        "mt_weather_date": new_member.mt_weather_date.isoformat() if new_member.mt_weather_date else datetime.utcnow().isoformat(),
-                        "mt_ldate": new_member.mt_ldate.isoformat() if new_member.mt_ldate else datetime.utcnow().isoformat(),
-                        "mt_adate": new_member.mt_adate.isoformat() if new_member.mt_adate else datetime.utcnow().isoformat()
-                    }
-
-                    logger.info(f"Google 신규 회원가입: {new_member.mt_email} ({new_member.mt_name})")
-
-                    return GoogleLoginResponse(
-                        success=True,
-                        message="Google 회원가입 완료",
-                        data={
-                            "member": user_data,
-                            "token": f"google_token_{new_member.mt_idx}",
-                            "is_new_user": True
-                        }
-                    )
+                )
 
         except Exception as e:
             logger.error(f"Google 로그인 실패: {str(e)}")
@@ -458,6 +374,156 @@ class MemberService:
                 success=False,
                 message="Google 로그인 처리 중 오류가 발생했습니다."
             )
+
+    def _get_user_additional_data(self, db: Session, mt_idx: int) -> dict:
+        """사용자의 추가 데이터를 조회합니다 (그룹, 스케줄 등)"""
+        try:
+            from sqlalchemy import text, func
+            from datetime import datetime, timedelta
+            
+            logger.info(f"📊 사용자 추가 데이터 조회 시작 - mt_idx: {mt_idx}")
+            
+            # 1. 사용자가 속한 그룹 목록 조회
+            groups_query = text("""
+                SELECT 
+                    sg.sgt_idx,
+                    sg.sgt_title,
+                    sgd.sgdt_owner_chk,
+                    sgd.sgdt_leader_chk,
+                    COUNT(DISTINCT sgd2.mt_idx) as member_count
+                FROM smap_group_detail_t sgd
+                JOIN smap_group_t sg ON sgd.sgt_idx = sg.sgt_idx
+                LEFT JOIN smap_group_detail_t sgd2 ON sg.sgt_idx = sgd2.sgt_idx 
+                    AND sgd2.sgdt_discharge = 'N' 
+                    AND sgd2.sgdt_exit = 'N'
+                    AND sgd2.sgdt_show = 'Y'
+                WHERE sgd.mt_idx = :mt_idx
+                    AND sgd.sgdt_discharge = 'N'
+                    AND sgd.sgdt_exit = 'N'
+                    AND sgd.sgdt_show = 'Y'
+                    AND sg.sgt_show = 'Y'
+                GROUP BY sg.sgt_idx, sg.sgt_title, sgd.sgdt_owner_chk, sgd.sgdt_leader_chk
+                ORDER BY sgd.sgdt_owner_chk DESC, sgd.sgdt_leader_chk DESC
+                LIMIT 10
+            """)
+            
+            groups_result = db.execute(groups_query, {"mt_idx": mt_idx}).fetchall()
+            groups = []
+            for row in groups_result:
+                groups.append({
+                    "sgt_idx": row.sgt_idx,
+                    "sgt_title": row.sgt_title,
+                    "sgt_file1": None,  # 컬럼이 없으므로 기본값
+                    "sgdt_owner_chk": row.sgdt_owner_chk,
+                    "sgdt_leader_chk": row.sgdt_leader_chk,
+                    "member_count": row.member_count,
+                    "is_owner": row.sgdt_owner_chk == 'Y',
+                    "is_leader": row.sgdt_leader_chk == 'Y'
+                })
+            
+            # 2. 최근 7일간의 스케줄 조회
+            seven_days_ago = datetime.now() - timedelta(days=7)
+            seven_days_later = datetime.now() + timedelta(days=7)
+            
+            schedules_query = text("""
+                SELECT 
+                    sst.sst_idx,
+                    sst.sst_title,
+                    sst.sst_sdate,
+                    sst.sst_location_title,
+                    sst.sgt_idx,
+                    sg.sgt_title as group_title
+                FROM smap_schedule_t sst
+                LEFT JOIN smap_group_t sg ON sst.sgt_idx = sg.sgt_idx
+                WHERE (sst.mt_idx = :mt_idx OR sst.sgt_idx IN (
+                    SELECT DISTINCT sgd.sgt_idx 
+                    FROM smap_group_detail_t sgd 
+                    WHERE sgd.mt_idx = :mt_idx 
+                        AND sgd.sgdt_discharge = 'N' 
+                        AND sgd.sgdt_exit = 'N'
+                        AND sgd.sgdt_show = 'Y'
+                ))
+                AND sst.sst_show = 'Y'
+                AND sst.sst_sdate BETWEEN :start_date AND :end_date
+                ORDER BY sst.sst_sdate ASC
+                LIMIT 20
+            """)
+            
+            schedules_result = db.execute(schedules_query, {
+                "mt_idx": mt_idx,
+                "start_date": seven_days_ago.strftime('%Y-%m-%d %H:%M:%S'),
+                "end_date": seven_days_later.strftime('%Y-%m-%d %H:%M:%S')
+            }).fetchall()
+            
+            recent_schedules = []
+            for row in schedules_result:
+                recent_schedules.append({
+                    "sst_idx": row.sst_idx,
+                    "sst_title": row.sst_title,
+                    "sst_sdate": row.sst_sdate.isoformat() if row.sst_sdate else None,
+                    "sst_location_title": row.sst_location_title,
+                    "sgt_idx": row.sgt_idx,
+                    "group_title": row.group_title
+                })
+            
+            # 3. 통계 정보
+            group_count = len(groups)
+            schedule_count = len(recent_schedules)
+            has_data = group_count > 0 or schedule_count > 0
+            
+            logger.info(f"📊 추가 데이터 조회 완료 - 그룹: {group_count}개, 스케줄: {schedule_count}개")
+            
+            return {
+                "groups": groups,
+                "recent_schedules": recent_schedules,
+                "group_count": group_count,
+                "schedule_count": schedule_count,
+                "has_data": has_data
+            }
+            
+        except Exception as e:
+            logger.error(f"사용자 추가 데이터 조회 실패: {str(e)}")
+            return {
+                "groups": [],
+                "recent_schedules": [],
+                "group_count": 0,
+                "schedule_count": 0,
+                "has_data": False
+            }
+
+    def _build_user_data(self, member: Member) -> dict:
+        """사용자 데이터를 표준 형식으로 구성합니다"""
+        return {
+            "mt_idx": member.mt_idx,
+            "mt_type": member.mt_type or 4,
+            "mt_level": member.mt_level or 2,
+            "mt_status": member.mt_status or 1,
+            "mt_id": member.mt_id or "",
+            "mt_name": member.mt_name or "",
+            "mt_nickname": member.mt_nickname or "",
+            "mt_hp": member.mt_hp or "",
+            "mt_email": member.mt_email or "",
+            "mt_birth": member.mt_birth.isoformat() if member.mt_birth else "",
+            "mt_gender": member.mt_gender or 1,
+            "mt_file1": member.mt_file1 or "",
+            "mt_lat": float(member.mt_lat) if member.mt_lat else 37.5642,
+            "mt_long": float(member.mt_long) if member.mt_long else 127.0016,
+            "mt_sido": member.mt_sido or "",
+            "mt_gu": member.mt_gu or "",
+            "mt_dong": member.mt_dong or "",
+            "mt_onboarding": member.mt_onboarding or 'N',
+            "mt_push1": member.mt_push1 or 'Y',
+            "mt_plan_check": member.mt_plan_check or 'N',
+            "mt_plan_date": member.mt_plan_date.isoformat() if member.mt_plan_date else "",
+            "mt_weather_pop": member.mt_weather_pop or "",
+            "mt_weather_sky": member.mt_weather_sky or 8,
+            "mt_weather_tmn": member.mt_weather_tmn or 18,
+            "mt_weather_tmx": member.mt_weather_tmx or 25,
+            "mt_weather_date": member.mt_weather_date.isoformat() if member.mt_weather_date else datetime.utcnow().isoformat(),
+            "mt_ldate": member.mt_ldate.isoformat() if member.mt_ldate else datetime.utcnow().isoformat(),
+            "mt_adate": member.mt_adate.isoformat() if member.mt_adate else datetime.utcnow().isoformat(),
+            "mt_google_id": member.mt_google_id
+        }
 
 # 서비스 인스턴스 생성
 member_service = MemberService() 

@@ -36,6 +36,7 @@ import memberService from '@/services/memberService';
 import scheduleService from '@/services/scheduleService';
 import locationService from '@/services/locationService';
 import { useAuth } from '@/contexts/AuthContext';
+import authService from '@/services/authService';
 import Modal from '@/components/ui/Modal';
 import { hapticFeedback } from '@/utils/haptic';
 
@@ -268,7 +269,7 @@ interface GroupForm {
 // 메인 컴포넌트
 function GroupPageContent() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoggedIn, loading: authLoading } = useAuth();
   
   // 상태 관리
   const [groups, setGroups] = useState<Group[]>([]);
@@ -396,6 +397,68 @@ function GroupPageContent() {
     } catch (error) {
       console.error('그룹 멤버 조회 오류:', error);
       setGroupMembers([]);
+      
+      // 오류 발생 시에도 최소한의 기본 멤버 데이터 생성 (그룹 소유자 본인)
+      if (user) {
+        const defaultMember: GroupMember = {
+          mt_idx: user.mt_idx,
+          mt_type: user.mt_type || 1,
+          mt_level: user.mt_level || 2,
+          mt_status: user.mt_status || 1,
+          mt_id: user.mt_id || '',
+          mt_name: user.mt_name || '나',
+          mt_nickname: user.mt_nickname || user.mt_name || '나',
+          mt_hp: user.mt_hp || '',
+          mt_email: user.mt_email || '',
+          mt_birth: user.mt_birth,
+          mt_gender: user.mt_gender || 1,
+          mt_file1: user.mt_file1 || '',
+          mt_lat: parseFloat(user.mt_lat?.toString() || '37.5642'),
+          mt_long: parseFloat(user.mt_long?.toString() || '127.0016'),
+          mt_sido: user.mt_sido || '',
+          mt_gu: user.mt_gu || '',
+          mt_dong: user.mt_dong || '',
+          mt_onboarding: user.mt_onboarding,
+          mt_push1: user.mt_push1,
+          mt_plan_check: user.mt_plan_check,
+          mt_plan_date: user.mt_plan_date,
+          mt_weather_pop: user.mt_weather_pop,
+          mt_weather_sky: user.mt_weather_sky || 1,
+          mt_weather_tmn: user.mt_weather_tmn || 15,
+          mt_weather_tmx: user.mt_weather_tmx || 25,
+          mt_weather_date: user.mt_weather_date || new Date().toISOString(),
+          mt_ldate: user.mt_ldate || new Date().toISOString(),
+          mt_adate: user.mt_adate || new Date().toISOString(),
+          sgdt_idx: 1,
+          sgt_idx: group.sgt_idx,
+          sgdt_owner_chk: 'Y',
+          sgdt_leader_chk: 'N',
+          sgdt_discharge: 'N',
+          sgdt_group_chk: 'Y',
+          sgdt_exit: 'N',
+          sgdt_show: 'Y',
+          sgdt_push_chk: 'Y',
+          sgdt_wdate: new Date().toISOString(),
+          sgdt_udate: new Date().toISOString(),
+          sgdt_ddate: undefined,
+          sgdt_xdate: undefined,
+          sgdt_adate: new Date().toISOString(),
+          photo: user.mt_file1 ? (user.mt_file1.startsWith('http') ? user.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${user.mt_file1}`) : null,
+          original_index: 0,
+          mlt_lat: null,
+          mlt_long: null,
+          mlt_speed: null,
+          mlt_battery: null,
+          mlt_gps_time: null,
+        };
+        
+        console.log('[GROUP] 오류 발생으로 기본 멤버 데이터 생성:', defaultMember.mt_name);
+        setGroupMembers([defaultMember]);
+        setGroupMemberCounts(prev => ({
+          ...prev,
+          [group.sgt_idx]: 1
+        }));
+      }
     } finally {
       setMembersLoading(false);
       // 멤버 데이터 로딩 완료 햅틱 피드백
@@ -473,12 +536,57 @@ function GroupPageContent() {
     }
   };
 
-  // 초기 데이터 로드 - user 정보가 로드된 후에 실행
+  // 인증 상태 확인 및 초기 데이터 로드
   useEffect(() => {
-    if (user) {
-      fetchGroups();
-    }
-  }, [user]);
+    const initializeAuth = async () => {
+      // 인증 로딩 중이면 대기
+      if (authLoading) {
+        console.log('[GROUP] 인증 로딩 중...');
+        return;
+      }
+
+      console.log('[GROUP] 인증 상태 확인:', { isLoggedIn, user: user?.mt_idx });
+
+      // 추가 인증 상태 확인 (localStorage 직접 확인)
+      const hasToken = authService.getToken();
+      const hasUserData = authService.getUserData();
+      
+      console.log('[GROUP] 인증 데이터 상세 확인:', {
+        authContextLoggedIn: isLoggedIn,
+        hasToken: !!hasToken,
+        hasUserData: !!hasUserData,
+        contextUser: user?.mt_idx,
+        localUser: hasUserData?.mt_idx
+      });
+
+      // AuthContext와 localStorage 모두에서 인증 정보가 없을 때만 리다이렉트
+      if (!isLoggedIn && !hasToken && !hasUserData) {
+        console.log('[GROUP] 완전히 로그인되지 않음 - signin 페이지로 리다이렉트');
+        router.push('/signin');
+        return;
+      }
+      
+      // AuthContext는 로그인 안됐지만 localStorage에 데이터가 있다면 동기화 대기
+      if (!isLoggedIn && (hasToken || hasUserData)) {
+        console.log('[GROUP] AuthContext 동기화 필요 - 잠시 대기 후 다시 확인');
+        // 동기화를 위해 잠시 대기
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 동기화 후 다시 확인
+        console.log('[GROUP] 동기화 대기 완료, 다시 상태 확인');
+        return; // 다음 렌더링에서 다시 확인
+      }
+
+      // 사용자 정보가 있는 경우 그룹 데이터 로드 (AuthContext 또는 localStorage에서)
+      const currentUser = user || hasUserData;
+      if (currentUser) {
+        console.log('[GROUP] 사용자 정보 확인됨, 그룹 데이터 로드:', currentUser.mt_idx);
+        fetchGroups();
+      }
+    };
+
+    initializeAuth();
+  }, [authLoading, isLoggedIn, user, router]);
 
   // 선택된 그룹의 멤버 및 통계 조회
   useEffect(() => {

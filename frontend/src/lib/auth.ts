@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 
-// JWT 시크릿 키 (백엔드와 동일하게 설정)
+// JWT 시크릿 키 (다중 시크릿 지원)
 const JWT_SECRET = process.env.JWT_SECRET || 'smap!@super-secret';
+const NEXTAUTH_SECRET = process.env.NEXTAUTH_SECRET || 'default-secret';
 console.log('[AUTH] JWT_SECRET 설정됨, 길이:', JWT_SECRET.length);
+console.log('[AUTH] NEXTAUTH_SECRET 설정됨, 길이:', NEXTAUTH_SECRET.length);
 
 // JWT 토큰 페이로드 인터페이스
 interface JWTPayload {
@@ -31,7 +33,7 @@ interface JWTPayload {
 // 임시 하드코딩된 사용자 정보는 제거됨 - 실제 JWT 토큰만 사용
 
 /**
- * JWT 토큰 검증
+ * JWT 토큰 검증 (다중 시크릿 지원 + 잘못된 토큰 형식 처리)
  * 실제 JWT 토큰을 검증하고 사용자 정보를 반환합니다
  */
 export function verifyJWT(token: string): JWTPayload | null {
@@ -45,12 +47,60 @@ export function verifyJWT(token: string): JWTPayload | null {
     console.log('[AUTH] JWT 토큰 검증 시작, 토큰 길이:', token.length);
     console.log('[AUTH] JWT 토큰 시작 부분:', token.substring(0, 50) + '...');
 
-    // 실제 JWT 토큰 검증
-    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
-    
-    // 토큰이 유효하면 사용자 정보 반환
-    console.log('[AUTH] JWT 토큰 검증 성공:', { mt_idx: decoded.mt_idx, mt_id: decoded.mt_id });
-    return decoded;
+    // URL 인코딩된 JSON 형태인지 확인 (잘못된 토큰 형식)
+    if (token.startsWith('%7B') || token.startsWith('%257B')) {
+      console.log('[AUTH] URL 인코딩된 데이터 감지, JWT 토큰이 아님');
+      try {
+        // 이중 URL 디코딩 시도 (%257B는 %7B의 인코딩된 형태)
+        let decoded = token;
+        if (token.startsWith('%257B')) {
+          decoded = decodeURIComponent(token); // 첫 번째 디코딩
+          console.log('[AUTH] 첫 번째 디코딩 완료, 길이:', decoded.length);
+        }
+        if (decoded.startsWith('%7B')) {
+          decoded = decodeURIComponent(decoded); // 두 번째 디코딩
+          console.log('[AUTH] 두 번째 디코딩 완료, 길이:', decoded.length);
+        }
+        
+        console.log('[AUTH] 최종 디코딩 결과 시작 부분:', decoded.substring(0, 50));
+        const data = JSON.parse(decoded);
+        
+        if (data.userId && typeof data.userId === 'number') {
+          console.log('[AUTH] ✅ 클라이언트 데이터에서 사용자 정보 추출 성공:', { userId: data.userId });
+          // 클라이언트 데이터를 JWT 형태로 변환
+          return {
+            mt_idx: data.userId,
+            userId: data.userId,
+            mt_id: String(data.userId),
+            mt_name: 'User',
+            provider: 'client-data'
+          } as JWTPayload;
+        }
+      } catch (parseError) {
+        console.log('[AUTH] 클라이언트 데이터 파싱 실패:', parseError instanceof Error ? parseError.message : String(parseError));
+      }
+      return null;
+    }
+
+    // 일반적인 JWT 토큰인지 확인 (점으로 구분된 3부분)
+    if (!token.includes('.') || token.split('.').length !== 3) {
+      console.log('[AUTH] JWT 형식이 아님 (점으로 구분된 3부분이 아님)');
+      return null;
+    }
+
+    // 먼저 NEXTAUTH_SECRET으로 시도 (Google 로그인 토큰)
+    try {
+      const decoded = jwt.verify(token, NEXTAUTH_SECRET) as JWTPayload;
+      console.log('[AUTH] NEXTAUTH_SECRET으로 토큰 검증 성공:', { mt_idx: decoded.mt_idx, mt_id: decoded.mt_id });
+      return decoded;
+    } catch (nextAuthError) {
+      console.log('[AUTH] NEXTAUTH_SECRET 검증 실패, JWT_SECRET으로 재시도');
+      
+      // NEXTAUTH_SECRET 실패 시 JWT_SECRET으로 시도
+      const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+      console.log('[AUTH] JWT_SECRET으로 토큰 검증 성공:', { mt_idx: decoded.mt_idx, mt_id: decoded.mt_id });
+      return decoded;
+    }
     
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
@@ -58,7 +108,7 @@ export function verifyJWT(token: string): JWTPayload | null {
     } else if (error instanceof jwt.JsonWebTokenError) {
       console.error('[AUTH] JWT 토큰 형식 오류:', error.message);
     } else {
-      console.error('[AUTH] JWT 검증 실패:', error);
+      console.error('[AUTH] JWT 검증 실패 (모든 시크릿):', error);
     }
     return null;
   }
@@ -99,20 +149,43 @@ export function generateJWT(userInfo: {
 }
 
 /**
- * 요청에서 현재 사용자 정보 가져오기
+ * 요청에서 현재 사용자 정보 가져오기 (개선된 쿠키 처리)
  */
 export function getCurrentUser(request: NextRequest): JWTPayload | null {
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    // 쿠키에서 토큰 확인
-    const cookieToken = request.cookies.get('auth-token')?.value;
-    if (cookieToken) {
-      console.log('[AUTH] 쿠키에서 토큰 발견, 검증 시도');
-      return verifyJWT(cookieToken);
+    // 쿠키에서 토큰 확인 (auth-token 우선, client-token 백업)
+    const authCookieToken = request.cookies.get('auth-token')?.value;
+    const clientCookieToken = request.cookies.get('client-token')?.value;
+    
+    console.log('[AUTH] 쿠키 토큰 확인:', {
+      hasAuthCookie: !!authCookieToken,
+      hasClientCookie: !!clientCookieToken,
+      authCookieLength: authCookieToken?.length || 0,
+      clientCookieLength: clientCookieToken?.length || 0
+    });
+    
+    // auth-token부터 시도
+    if (authCookieToken) {
+      console.log('[AUTH] auth-token 쿠키에서 토큰 발견, 검증 시도');
+      const result = verifyJWT(authCookieToken);
+      if (result) {
+        return result;
+      }
+    }
+    
+    // auth-token 실패 시 client-token 시도
+    if (clientCookieToken) {
+      console.log('[AUTH] client-token 쿠키에서 토큰 발견, 검증 시도');
+      const result = verifyJWT(clientCookieToken);
+      if (result) {
+        return result;
+      }
     }
     
     // 토큰이 없으면 null 반환
+    console.log('[AUTH] 모든 쿠키 토큰 검증 실패 또는 없음');
     return null;
   }
 

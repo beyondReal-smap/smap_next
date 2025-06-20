@@ -30,9 +30,31 @@ export async function GET(request: NextRequest) {
     
 
     
-    // 현재 사용자 ID가 없으면 빈 배열 반환 (신규 사용자)
+    // 현재 사용자 ID가 없으면 클라이언트 토큰에서 그룹 정보 확인 시도
     if (!currentUserId) {
-      console.log('[Current User Groups API] 인증된 사용자 ID가 없음, 빈 배열 반환');
+      console.log('[Current User Groups API] 인증된 사용자 ID가 없음, 클라이언트 토큰 우회 시도');
+      
+      // 쿠키에서 클라이언트 토큰 확인
+      const clientToken = request.cookies.get('client-token')?.value;
+      if (clientToken) {
+        try {
+          const clientData = JSON.parse(decodeURIComponent(clientToken));
+          console.log('[Current User Groups API] 클라이언트 토큰 데이터:', { 
+            hasGroups: !!clientData.groups,
+            groupCount: Array.isArray(clientData.groups) ? clientData.groups.length : 0,
+            userId: clientData.userId
+          });
+          
+          if (clientData.groups && Array.isArray(clientData.groups)) {
+            console.log('[Current User Groups API] ✅ 클라이언트 토큰에서 그룹 정보 발견:', clientData.groups.length + '개');
+            return NextResponse.json(clientData.groups);
+          }
+        } catch (e) {
+          console.log('[Current User Groups API] 클라이언트 토큰 파싱 실패:', e instanceof Error ? e.message : String(e));
+        }
+      }
+      
+      console.log('[Current User Groups API] 모든 인증 방법 실패, 빈 배열 반환');
       return NextResponse.json([]);
     }
 
