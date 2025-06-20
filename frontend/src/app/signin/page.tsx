@@ -148,14 +148,94 @@ export default function SignInPage() {
     (window as any).__FORCE_NATIVE_GOOGLE_LOGIN__ = true;
     
     // 🚨 네이티브 구글 로그인 콜백 함수 등록 (iOS 앱에서 호출 가능)
-    (window as any).onNativeGoogleLoginSuccess = (userInfo: any) => {
+    (window as any).onNativeGoogleLoginSuccess = async (userInfo: any) => {
       console.log('🎯 [NATIVE CALLBACK] iOS 앱에서 구글 로그인 성공 콜백 수신:', userInfo);
       
-      // 로딩 해제
-      setIsLoading(false);
-      
-      // 홈으로 리다이렉트
-      router.replace('/home');
+      try {
+        console.log('🔄 [NATIVE CALLBACK] 백엔드 구글 인증 API 호출 시작');
+        
+        // 백엔드 API로 ID 토큰 전송
+        const response = await fetch('/api/google-auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id_token: userInfo.idToken,
+            user_info: userInfo.userInfo,
+            source: 'native'
+          }),
+        });
+
+        const data = await response.json();
+        
+        console.log('📡 [NATIVE CALLBACK] 백엔드 구글 인증 API 응답:', {
+          success: data.success,
+          hasUser: !!data.user,
+          hasError: !!data.error,
+          responseStatus: response.status
+        });
+
+        if (data.success) {
+          console.log('[NATIVE CALLBACK] 구글 로그인 성공:', {
+            isNewUser: data.isNewUser,
+            hasUser: !!data.user,
+            hasSocialData: !!data.socialLoginData
+          });
+          
+          // 구글 로그인 성공 햅틱 피드백
+          triggerHapticFeedback(HapticFeedbackType.SUCCESS, '구글 로그인 성공', { 
+            component: 'signin', 
+            action: 'native-google-login', 
+            userEmail: data.user?.mt_email?.substring(0, 3) + '***' 
+          });
+          
+          // 리다이렉트 플래그 설정
+          isRedirectingRef.current = true;
+          blockAllEffectsRef.current = true;
+          
+          // 신규회원/기존회원에 따른 분기 처리
+          if (data.isNewUser) {
+            console.log('[NATIVE CALLBACK] 신규회원 - 회원가입 페이지로 이동');
+            
+            // 소셜 로그인 데이터를 sessionStorage에 저장
+            if (data.socialLoginData) {
+              sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
+              console.log('[NATIVE CALLBACK] 소셜 로그인 데이터 저장 완료');
+            }
+            
+            // 회원가입 페이지로 이동
+            router.replace('/register?social=google');
+            return;
+            
+          } else {
+            console.log('[NATIVE CALLBACK] 기존회원 - 홈으로 이동');
+            
+            // authService에 사용자 정보 설정
+            if (data.user) {
+              authService.setUserData(data.user);
+            }
+            
+            console.log('[NATIVE CALLBACK] 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
+            
+            // AuthContext 상태를 수동으로 동기화
+            await refreshAuthState();
+            console.log('[NATIVE CALLBACK] AuthContext 상태 동기화 완료');
+            
+            // home으로 리다이렉션
+            router.replace('/home');
+          }
+        } else {
+          console.error('[NATIVE CALLBACK] 서버 인증 실패:', data.error);
+          showError(data.error || '서버 인증에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('❌ [NATIVE CALLBACK] 백엔드 API 호출 실패:', error);
+        showError('네트워크 오류가 발생했습니다.');
+      } finally {
+        // 로딩 해제
+        setIsLoading(false);
+      }
     };
     
     (window as any).onNativeGoogleLoginError = (error: any) => {
