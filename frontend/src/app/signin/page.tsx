@@ -2380,14 +2380,35 @@ export default function SignInPage() {
                 __SMAP_GOOGLE_LOGIN_READY__: (window as any).__SMAP_GOOGLE_LOGIN_READY__
               });
               
-              // 🔍 실제 MessageHandler 상태 직접 확인
-              const actualHandlers = webkit?.messageHandlers ? Object.keys(webkit.messageHandlers) : [];
+              // 🔍 실제 MessageHandler 상태 직접 확인 (Object.keys 대신 직접 체크)
+              const actualHandlers = [];
+              const candidateHandlers = ['smapIos', 'iosHandler', 'messageHandler', 'hapticHandler'];
+              
+              if (webkit?.messageHandlers) {
+                for (const handlerName of candidateHandlers) {
+                  if (webkit.messageHandlers[handlerName]) {
+                    actualHandlers.push(handlerName);
+                  }
+                }
+              }
+              
               console.log('🔍 [HANDLER-DEBUG] 실제 MessageHandler 상태:', {
                 webkit존재: !!webkit,
                 messageHandlers존재: !!webkit?.messageHandlers,
-                실제핸들러목록: actualHandlers,
+                Object_keys_결과: webkit?.messageHandlers ? Object.keys(webkit.messageHandlers) : [],
+                직접체크_결과: actualHandlers,
                 전역핸들러목록: availableHandlers
               });
+              
+              // 🔍 각 핸들러별 개별 테스트
+              if (webkit?.messageHandlers) {
+                console.log('🔍 [HANDLER-DEBUG] 각 핸들러별 존재 확인:', {
+                  smapIos: !!webkit.messageHandlers.smapIos,
+                  iosHandler: !!webkit.messageHandlers.iosHandler,
+                  messageHandler: !!webkit.messageHandlers.messageHandler,
+                  hapticHandler: !!webkit.messageHandlers.hapticHandler
+                });
+              }
               
               console.log('🎯 [GOOGLE LOGIN] 사용 가능한 핸들러:', availableHandlers);
               
@@ -2425,14 +2446,30 @@ export default function SignInPage() {
               }
               
               if (!usedHandler) {
-                console.error('❌ [GOOGLE LOGIN] 사용 가능한 핸들러 없음');
+                console.error('❌ [GOOGLE LOGIN] 우선순위 핸들러에서 사용 가능한 핸들러 없음');
                 console.error('🔍 [HANDLER-DEBUG] 최종 상태:', {
                   finalHandlers: finalHandlers,
                   webkit: !!webkit,
                   messageHandlers: !!webkit?.messageHandlers,
                   모든MessageHandler: webkit?.messageHandlers ? Object.keys(webkit.messageHandlers) : []
                 });
-                throw new Error('MessageHandler를 찾을 수 없습니다.');
+                
+                // 🚨 마지막 시도: MessageHandler가 존재한다면 강제로 smapIos 사용
+                if (webkit?.messageHandlers?.smapIos) {
+                  console.log('🚨 [GOOGLE LOGIN] 강제 시도: smapIos 핸들러 직접 사용');
+                  const message = {
+                    type: 'googleSignIn',
+                    action: 'googleSignIn',
+                    timestamp: Date.now(),
+                    forceAttempt: true
+                  };
+                  console.log('📤 [GOOGLE LOGIN] 전송할 메시지:', message);
+                  webkit.messageHandlers.smapIos.postMessage(message);
+                  usedHandler = 'smapIos (강제)';
+                  console.log('✅ [GOOGLE LOGIN] 강제 메시지 전송 완료');
+                } else {
+                  throw new Error('MessageHandler를 찾을 수 없습니다.');
+                }
               }
               
             } else if (isForceNativeMode) {
