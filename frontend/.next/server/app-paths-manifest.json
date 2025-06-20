@@ -1,7 +1,5 @@
 {
   "/icon/route": "app/icon/route.js",
-  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
-  "/api/location-logs/stay-times/[memberId]/route": "app/api/location-logs/stay-times/[memberId]/route.js",
   "/_not-found/page": "app/_not-found/page.js",
   "/signin/page": "app/signin/page.js",
   "/logs/page": "app/logs/page.js"

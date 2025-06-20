@@ -323,6 +323,7 @@ export default function SignInPage() {
     (window as any).__SMAP_FORCE_SIMULATOR_MODE__ = true;
     (window as any).__SMAP_FORCE_GOOGLE_LOGIN__ = true;
     (window as any).__SMAP_IGNORE_ALL_RESTRICTIONS__ = true;
+    (window as any).__SMAP_FORCE_WEB_GOOGLE_LOGIN__ = true;
     
     // iOS 로그 전송 - 시뮬레이터 모드 활성화
     sendLogToiOS('info', '🚨 시뮬레이터 모드 강제 활성화', {
@@ -539,13 +540,27 @@ export default function SignInPage() {
           error_callback: (error: any) => {
             console.error('[GOOGLE SDK] 로그인 실패:', error);
             
-            let errorMessage = 'Google 로그인에 실패했습니다.';
+            let errorMessage = 'Google Identity Services를 사용할 수 없습니다.';
+            
             if (window.location.hostname.includes('.smap.site')) {
-              errorMessage += '\n\n프로덕션 환경에서 Google OAuth 설정을 확인해주세요.';
-              errorMessage += '\n\n해결 방법:';
-              errorMessage += '\n1. Google Cloud Console에서 도메인 등록 확인';
-              errorMessage += '\n2. Client ID 설정 확인';
-              errorMessage += '\n3. 전화번호 로그인 사용';
+              errorMessage += '\n\n🔧 해결이 필요한 문제:';
+              errorMessage += `\nGoogle Cloud Console에서 ${window.location.hostname}`;
+              errorMessage += '\n도메인이 승인되지 않았습니다.';
+              errorMessage += '\n\n📋 설정 단계:';
+              errorMessage += '\n1. https://console.cloud.google.com 접속';
+              errorMessage += '\n2. API 및 서비스 > 사용자 인증 정보';
+              errorMessage += '\n3. OAuth 2.0 클라이언트 ID 편집';
+              errorMessage += '\n4. "승인된 JavaScript 출처"에 추가:';
+              errorMessage += `\n   https://${window.location.hostname}`;
+              errorMessage += '\n5. 새 Client ID 발급 및 적용';
+              errorMessage += '\n\n🔄 임시 해결책: 전화번호 로그인 사용';
+              
+              console.error('🚨 [GOOGLE OAUTH ERROR] 도메인 미등록:', {
+                error,
+                currentDomain: window.location.hostname,
+                requiredAction: 'Add domain to Google Cloud Console',
+                consoleUrl: 'https://console.cloud.google.com/apis/credentials'
+              });
             } else {
               errorMessage += '\n\n다시 시도하거나 전화번호 로그인을 사용해주세요.';
             }
@@ -614,16 +629,49 @@ export default function SignInPage() {
     } catch (error: any) {
       console.error('[GOOGLE SDK] 초기화 실패:', error);
       
-      // 에러 타입별 세부 메시지 (시뮬레이터 허용)
-      let errorMessage = 'Google 로그인 SDK 초기화에 실패했습니다.';
-      if (error.message.includes('로드 타임아웃')) {
-        errorMessage = 'Google 로그인 서비스 연결에 시간이 너무 오래 걸립니다.\n\n해결 방법:\n1. 네트워크 연결 확인\n2. VPN 연결 해제 후 재시도\n3. WiFi 연결 상태 확인';
+      // 프로덕션 환경에서는 도메인 관련 안내 우선 제공
+      const isProduction = window.location.hostname.includes('.smap.site');
+      let errorMessage = '';
+      
+      if (isProduction && error.message.includes('사용할 수 없습니다')) {
+        errorMessage = '🚨 Google Identity Services를 사용할 수 없습니다.';
+        errorMessage += '\n\n📋 개발자 조치 필요:';
+        errorMessage += `\nGoogle Cloud Console에서 ${window.location.hostname}`;
+        errorMessage += '\n도메인을 승인된 JavaScript 출처에 추가해야 합니다.';
+        errorMessage += '\n\n🔧 설정 방법:';
+        errorMessage += '\n1. https://console.cloud.google.com 접속';
+        errorMessage += '\n2. API 및 서비스 → 사용자 인증 정보';
+        errorMessage += '\n3. OAuth 2.0 클라이언트 ID 편집';
+        errorMessage += '\n4. "승인된 JavaScript 출처"에 추가:';
+        errorMessage += `\n   https://${window.location.hostname}`;
+        errorMessage += '\n5. 새 Client ID 발급 및 config.ts 업데이트';
+        errorMessage += '\n\n🔄 임시 해결책: 전화번호 로그인 사용';
+        
+        console.error('🚨 [GOOGLE OAUTH] 프로덕션 도메인 미등록 오류:', {
+          error: error.message,
+          currentDomain: window.location.hostname,
+          requiredUrl: `https://${window.location.hostname}`,
+          consoleUrl: 'https://console.cloud.google.com/apis/credentials',
+          action: 'Add domain to authorized JavaScript origins'
+        });
+      } else if (error.message.includes('로드 타임아웃')) {
+        errorMessage = 'Google 로그인 서비스 연결에 시간이 너무 오래 걸립니다.';
+        if (isProduction) {
+          errorMessage += '\n\n이는 도메인 등록 문제일 수 있습니다.';
+          errorMessage += '\n전화번호 로그인을 사용해주세요.';
+        } else {
+          errorMessage += '\n\n해결 방법:\n1. 네트워크 연결 확인\n2. VPN 연결 해제 후 재시도\n3. WiFi 연결 상태 확인';
+        }
       } else if (error.message.includes('스크립트 로드 실패')) {
         errorMessage = 'Google 로그인 서비스에 연결할 수 없습니다.\n\n해결 방법:\n1. 인터넷 연결 확인\n2. 방화벽 설정 확인\n3. 브라우저 캐시 삭제 후 재시도';
-      } else if (error.message.includes('사용할 수 없습니다')) {
-        errorMessage = 'Google 로그인 SDK를 사용할 수 없습니다.\n\n상세 오류:\n' + (error.message || '알 수 없는 오류') + '\n\n해결 방법:\n1. 페이지 새로고침 후 재시도\n2. 브라우저 업데이트\n3. 전화번호 로그인 사용';
       } else {
-        errorMessage = 'Google 로그인 처리 중 오류가 발생했습니다.\n\n상세 오류:\n' + (error.message || error.toString()) + '\n\n해결 방법:\n1. 페이지 새로고침\n2. 브라우저 설정 확인\n3. 전화번호 로그인 사용';
+        errorMessage = 'Google 로그인 처리 중 오류가 발생했습니다.';
+        errorMessage += '\n\n상세 오류: ' + (error.message || error.toString());
+        if (isProduction) {
+          errorMessage += '\n\n전화번호 로그인을 사용해주세요.';
+        } else {
+          errorMessage += '\n\n해결 방법:\n1. 페이지 새로고침\n2. 브라우저 설정 확인\n3. 전화번호 로그인 사용';
+        }
       }
       
       showError(errorMessage);
@@ -2179,8 +2227,25 @@ export default function SignInPage() {
       
               // 🚨 모든 환경에서 Google 로그인 완전 허용
       if (isIOSWebView || isIOSSimulator || true) { // 모든 환경 허용
-          // 🚨 모든 환경에서 실제 Google SDK 사용 허용
-        if (isIOSSimulator || (!isIOSWebView && /iPad|iPhone|iPod/.test(navigator.userAgent))) {
+        
+        // 🚨 iOS 앱에서도 웹 Google SDK를 우선 시도하도록 변경
+        // 시뮬레이터뿐만 아니라 실제 iOS 앱에서도 웹 SDK 허용
+        const shouldUseWebSDK = (
+          isIOSSimulator || // 시뮬레이터
+          !hasSmapIos || // 네이티브 핸들러가 없는 경우
+          !(window as any).iosBridge?.googleSignIn?.signIn || // ios-bridge의 Google 메서드가 없는 경우
+          (window as any).__SMAP_FORCE_WEB_GOOGLE_LOGIN__ === true // 강제 웹 SDK 모드
+        );
+        
+        console.log('[GOOGLE LOGIN] 🚨 Google SDK 사용 결정:', {
+          shouldUseWebSDK,
+          isIOSSimulator,
+          hasSmapIos,
+          hasIosBridgeGoogle: !!(window as any).iosBridge?.googleSignIn?.signIn,
+          forceWebMode: (window as any).__SMAP_FORCE_WEB_GOOGLE_LOGIN__
+        });
+        
+        if (shouldUseWebSDK) {
           debugLog('[GOOGLE LOGIN] 🚨 모든 iOS 환경에서 Google SDK 사용 허용');
           
           // 모든 iOS 환경에서 웹 Google SDK 허용
@@ -2218,11 +2283,29 @@ export default function SignInPage() {
                 console.error('[GOOGLE LOGIN] Google SDK 로드 실패');
                 hasErrorOccurred = true;
                 
-                let errorMessage = 'Google SDK 로드에 실패했습니다.';
+                let errorMessage = 'Google Identity Services를 사용할 수 없습니다.';
+                
                 if (isProduction) {
-                  errorMessage += '\n\n프로덕션 환경에서 Google 서비스에 접근할 수 없습니다.\n도메인 등록을 확인해주세요.';
+                  errorMessage += '\n\n🔧 해결 방법:';
+                  errorMessage += '\n1. Google Cloud Console 설정 확인';
+                  errorMessage += '\n   - console.cloud.google.com 접속';
+                  errorMessage += '\n   - API 및 서비스 > 사용자 인증 정보';
+                  errorMessage += '\n   - OAuth 2.0 클라이언트 ID 편집';
+                  errorMessage += `\n   - "승인된 JavaScript 출처"에`;
+                  errorMessage += `\n     https://${window.location.hostname} 추가`;
+                  errorMessage += '\n\n2. 새 Client ID로 업데이트 필요';
+                  errorMessage += '\n\n3. 또는 전화번호 로그인 사용';
+                  
+                  console.error('🚨 [GOOGLE OAUTH] 프로덕션 환경 설정 필요:', {
+                    currentDomain: window.location.hostname,
+                    needsToBeAdded: `https://${window.location.hostname}`,
+                    consoleUrl: 'https://console.cloud.google.com/apis/credentials'
+                  });
+                } else {
+                  errorMessage += '\n\n네트워크 연결을 확인하고';
+                  errorMessage += '\n잠시 후 다시 시도하거나';
+                  errorMessage += '\n전화번호 로그인을 사용해주세요.';
                 }
-                errorMessage += '\n\n잠시 후 다시 시도하거나\n전화번호 로그인을 사용해주세요.';
                 
                 showError(errorMessage);
                 setIsLoading(false);
@@ -2242,7 +2325,20 @@ export default function SignInPage() {
                 if (typeof (window as any).google === 'undefined' && !hasErrorOccurred) {
                   console.warn(`[GOOGLE LOGIN] SDK 로드 타임아웃 (${timeout}ms)`);
                   hasErrorOccurred = true;
-                  showError(`Google 서비스 연결에 시간이 너무 오래 걸립니다 (${timeout/1000}초).\n\n네트워크 연결을 확인하고\n다시 시도해주세요.`);
+                  
+                  let timeoutMessage = `Google 서비스 연결에 시간이 너무 오래 걸립니다 (${timeout/1000}초).`;
+                  
+                  if (isProduction) {
+                    timeoutMessage += '\n\n이는 Google Cloud Console에서';
+                    timeoutMessage += `\n${window.location.hostname} 도메인이`;
+                    timeoutMessage += '\n등록되지 않았기 때문일 수 있습니다.';
+                    timeoutMessage += '\n\n전화번호 로그인을 사용해주세요.';
+                  } else {
+                    timeoutMessage += '\n\n네트워크 연결을 확인하고';
+                    timeoutMessage += '\n다시 시도해주세요.';
+                  }
+                  
+                  showError(timeoutMessage);
                   setIsLoading(false);
                 }
               }, timeout);
@@ -2400,8 +2496,8 @@ export default function SignInPage() {
             });
           }
           
-          // 네이티브 처리가 불가능한 경우 에러 표시
-          console.log('[GOOGLE LOGIN] 네이티브 Google Sign-In을 사용할 수 없음');
+          // 🚨 네이티브 실패 시 반드시 웹 SDK로 fallback
+          console.log('[GOOGLE LOGIN] ❌ 네이티브 Google Sign-In 실패 → 웹 SDK fallback');
           console.log('[GOOGLE LOGIN] 환경 정보:', {
             hasWebkit: !!(window as any).webkit,
             hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
@@ -2410,39 +2506,45 @@ export default function SignInPage() {
             userAgent: navigator.userAgent
           });
           
-          // iOS 로그 전송 - 네이티브 사용 불가
-          sendLogToiOS('error', '❌ 네이티브 Google Sign-In 사용 불가', {
+          // iOS 로그 전송 - 네이티브 실패로 웹 SDK 전환
+          sendLogToiOS('warning', '🔄 네이티브 실패 → 웹 SDK fallback', {
             timestamp: new Date().toISOString(),
+            fallbackReason: 'native_google_signin_failed',
             environmentInfo: {
               hasWebkit: !!(window as any).webkit,
               hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
               hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
               hasIosBridge: !!(window as any).iosBridge,
-              userAgent: navigator.userAgent
+              hasGoogleBridgeMethod: !!(window as any).iosBridge?.googleSignIn?.signIn,
+              userAgent: navigator.userAgent.substring(0, 50)
             }
           });
         
-        // Google 로그인 환경 오류 햅틱 피드백
-        triggerHapticFeedback(HapticFeedbackType.WARNING, 'Google 로그인 환경 오류', { 
+        // 경고 햅틱 피드백 (네이티브 실패)
+        triggerHapticFeedback(HapticFeedbackType.WARNING, '네이티브 Google 로그인 실패, 웹 SDK 시도', { 
           component: 'signin', 
-          action: 'google-login-env-error' 
+          action: 'native-google-failed-fallback-web' 
         });
-        console.log('🎮 [SIGNIN] Google 로그인 환경 오류 햅틱 피드백 실행');
         
-        // 🚨 모든 환경에서 웹 SDK 무조건 백업 사용 (시뮬레이터 포함)
-        console.log('[GOOGLE LOGIN] 🚨 네이티브 실패, 웹 SDK 무조건 백업 사용 (시뮬레이터 허용)');
+        // 🚨 네이티브 실패 시 강제로 웹 SDK 사용
+        console.log('[GOOGLE LOGIN] 🌐 강제 웹 SDK 모드 활성화 (네이티브 실패)');
         
-        // iOS 로그 전송 - 웹 SDK 백업 사용
-        sendLogToiOS('info', '🌐 웹 SDK 백업 모드 활성화', {
+        // 웹 SDK 사용을 위한 플래그 설정
+        (window as any).__SMAP_FORCE_WEB_GOOGLE_LOGIN__ = true;
+        
+        // iOS 로그 전송 - 강제 웹 SDK 모드
+        sendLogToiOS('info', '🌐 강제 웹 SDK 모드 활성화', {
           timestamp: new Date().toISOString(),
-          reason: 'native_failed',
-          environment: isIOSSimulator ? 'simulator' : 'unknown',
-          fallback: 'web_google_sdk'
+          reason: 'native_completely_failed',
+          forceWebMode: true,
+          nextAction: 'handleGoogleSDKLogin'
         });
         
+        // 즉시 웹 SDK로 시도
         setTimeout(() => {
+          console.log('[GOOGLE LOGIN] 🔄 웹 SDK로 재시도 실행');
           handleGoogleSDKLogin();
-        }, 100);
+        }, 200);
         return;
       }
       
@@ -3137,10 +3239,45 @@ export default function SignInPage() {
       return env;
     };
     
+    // 🚨 iOS 앱용 Google 로그인 강제 테스트 함수들
+    (window as any).FORCE_GOOGLE_TEST = forceGoogleLoginTest;
+    (window as any).ANALYZE_IOS = analyzeIOSEnvironment;
+    (window as any).STEP_GOOGLE_TEST = stepByStepGoogleTest;
+    (window as any).EMERGENCY_HAPTIC = emergencyHapticTest;
+    
+    // 🚨 강제 웹 Google 로그인 활성화 함수
+    (window as any).ENABLE_WEB_GOOGLE = () => {
+      console.log('🚨 [ENABLE WEB GOOGLE] 웹 Google SDK 강제 활성화');
+      (window as any).__SMAP_FORCE_WEB_GOOGLE_LOGIN__ = true;
+      (window as any).__SMAP_FORCE_GOOGLE_LOGIN__ = true;
+      (window as any).__SMAP_IGNORE_ALL_RESTRICTIONS__ = true;
+      sendLogToiOS('warning', '🚨 웹 Google SDK 강제 활성화', {
+        timestamp: new Date().toISOString(),
+        forceFlags: {
+          webGoogle: true,
+          googleLogin: true,
+          ignoreRestrictions: true
+        }
+      });
+    };
+    
+    // 🧪 즉시 Google 로그인 시도 함수
+    (window as any).TRY_GOOGLE_NOW = () => {
+      console.log('🧪 [TRY GOOGLE NOW] 즉시 Google 로그인 시도');
+      (window as any).__SMAP_FORCE_WEB_GOOGLE_LOGIN__ = true;
+      handleGoogleLogin();
+    };
+
     console.log('🧪 [TEST] 테스트 함수 등록 완료:');
     console.log('  TEST_HAPTIC("success") - 햅틱 테스트');
     console.log('  TEST_GOOGLE() - 구글 로그인 테스트');
     console.log('  TEST_ENV() - 환경 정보');
+    console.log('  🚨 FORCE_GOOGLE_TEST() - iOS 앱 강제 Google 로그인');
+    console.log('  🔍 ANALYZE_IOS() - iOS 환경 완전 분석');
+    console.log('  🔧 STEP_GOOGLE_TEST() - Google 로그인 단계별 테스트');
+    console.log('  🚨 EMERGENCY_HAPTIC() - 긴급 햅틱 테스트');
+    console.log('  🚨 ENABLE_WEB_GOOGLE() - 웹 Google SDK 강제 활성화');
+    console.log('  🧪 TRY_GOOGLE_NOW() - 즉시 Google 로그인 시도');
   };
 
   // 🔧 WebKit 핸들러 강제 등록 시도
@@ -3264,6 +3401,149 @@ export default function SignInPage() {
     console.log('🚨 [EMERGENCY] 테스트 결과:', allResults);
     sendLogToiOS('info', '[EMERGENCY] 테스트 완료', { results: allResults });
   };
+
+  // 🚨 iOS 앱용 강제 Google 로그인 테스트 함수
+  const forceGoogleLoginTest = () => {
+    console.log('🚨 [FORCE GOOGLE TEST] iOS 앱 강제 Google 로그인 테스트 시작');
+    
+    // 모든 제한 해제
+    (window as any).__SMAP_FORCE_WEB_GOOGLE_LOGIN__ = true;
+    (window as any).__SMAP_FORCE_GOOGLE_LOGIN__ = true;
+    (window as any).__SMAP_IGNORE_ALL_RESTRICTIONS__ = true;
+    (window as any).__SMAP_FORCE_IOS_APP__ = false; // iOS 앱 감지 해제
+    
+    // iOS 로그 전송
+    sendLogToiOS('warning', '🚨 강제 Google 로그인 테스트 시작', {
+      timestamp: new Date().toISOString(),
+      testMode: true,
+      forcedFlags: {
+        forceWebGoogle: true,
+        forceGoogleLogin: true,
+        ignoreRestrictions: true,
+        disableIOSAppDetection: true
+      }
+    });
+    
+    // 강제로 Google 로그인 실행
+    console.log('🚨 [FORCE GOOGLE TEST] 강제 Google 로그인 실행');
+    handleGoogleLogin();
+  };
+
+  // 🔍 iOS 앱 환경 완전 분석 함수
+  const analyzeIOSEnvironment = () => {
+    console.log('🔍 [IOS ANALYSIS] iOS 앱 환경 완전 분석 시작');
+    
+    const analysis = {
+      userAgent: navigator.userAgent,
+      
+      // WebKit 관련
+      hasWebkit: !!(window as any).webkit,
+      hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
+      messageHandlersList: (window as any).webkit?.messageHandlers ? 
+        Object.keys((window as any).webkit.messageHandlers) : [],
+      
+      // SMAP 관련 핸들러
+      hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
+      hasIosBridge: !!(window as any).iosBridge,
+      iosBridgeMethods: (window as any).iosBridge ? 
+        Object.keys((window as any).iosBridge) : [],
+      
+      // Google 관련
+      hasGoogleSDK: !!(window as any).google,
+      hasGoogleAccounts: !!(window as any).google?.accounts,
+      hasGoogleId: !!(window as any).google?.accounts?.id,
+      hasIosBridgeGoogle: !!(window as any).iosBridge?.googleSignIn,
+      hasIosBridgeGoogleSignIn: !!(window as any).iosBridge?.googleSignIn?.signIn,
+      
+      // 강제 모드 플래그들
+      forceFlags: {
+        forceWebGoogle: (window as any).__SMAP_FORCE_WEB_GOOGLE_LOGIN__,
+        forceGoogle: (window as any).__SMAP_FORCE_GOOGLE_LOGIN__,
+        forceSimulator: (window as any).__SMAP_FORCE_SIMULATOR_MODE__,
+        ignoreRestrictions: (window as any).__SMAP_IGNORE_ALL_RESTRICTIONS__,
+        forceIOSApp: (window as any).__SMAP_FORCE_IOS_APP__
+      },
+      
+      // 브라우저 관련
+      currentURL: window.location.href,
+      hostname: window.location.hostname,
+      protocol: window.location.protocol,
+      
+      // 기타
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('🔍 [IOS ANALYSIS] 분석 결과:', analysis);
+    
+    // iOS로 분석 결과 전송
+    sendLogToiOS('info', '🔍 iOS 환경 완전 분석 결과', analysis);
+    
+    return analysis;
+  };
+
+  // 🔧 Google 로그인 문제 해결 단계별 테스트
+  const stepByStepGoogleTest = () => {
+    console.log('🔧 [STEP TEST] Google 로그인 단계별 테스트 시작');
+    
+    let step = 1;
+    
+    const runStep = (stepName: string, testFunc: () => void) => {
+      console.log(`🔧 [STEP ${step}] ${stepName}`);
+      sendLogToiOS('info', `🔧 단계 ${step}: ${stepName}`, { step, timestamp: new Date().toISOString() });
+      
+      try {
+        testFunc();
+        console.log(`✅ [STEP ${step}] ${stepName} 완료`);
+        sendLogToiOS('info', `✅ 단계 ${step} 완료: ${stepName}`, { step, success: true });
+      } catch (error) {
+        console.error(`❌ [STEP ${step}] ${stepName} 실패:`, error);
+        sendLogToiOS('error', `❌ 단계 ${step} 실패: ${stepName}`, { step, error: String(error) });
+      }
+      
+      step++;
+    };
+    
+    // 단계 1: 환경 분석
+    runStep('환경 분석', () => {
+      analyzeIOSEnvironment();
+    });
+    
+    // 단계 2: 강제 플래그 설정
+    runStep('강제 플래그 설정', () => {
+      (window as any).__SMAP_FORCE_WEB_GOOGLE_LOGIN__ = true;
+      (window as any).__SMAP_FORCE_GOOGLE_LOGIN__ = true;
+      (window as any).__SMAP_IGNORE_ALL_RESTRICTIONS__ = true;
+    });
+    
+    // 단계 3: Google SDK 확인
+    runStep('Google SDK 확인', () => {
+      const hasSDK = !!(window as any).google;
+      console.log('Google SDK 존재:', hasSDK);
+      if (!hasSDK) {
+        console.log('Google SDK 로드 시도');
+        // SDK 로드는 handleGoogleLogin에서 처리
+      }
+    });
+    
+    // 단계 4: 실제 로그인 시도
+    setTimeout(() => {
+      runStep('실제 Google 로그인 시도', () => {
+        handleGoogleLogin();
+      });
+    }, 1000);
+  };
+
+  // 🚨 개발용 테스트 함수들 등록 (즉시 실행)
+  useEffect(() => {
+    console.log('🚨 [SIGNIN LOAD] 페이지 로드됨, 테스트 함수들 등록');
+    registerTestFunctions();
+    
+    // iOS 환경 즉시 분석
+    if ((window as any).webkit || /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+      console.log('🔍 [AUTO ANALYSIS] iOS 환경 감지, 자동 분석 실행');
+      setTimeout(() => analyzeIOSEnvironment(), 1000);
+    }
+  }, []);
 
   // iOS WebView fetch 폴리필 추가
   useEffect(() => {

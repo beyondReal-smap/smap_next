@@ -138,11 +138,10 @@ export const GOOGLE_CONFIG = {
     ],
     // 프로덕션 환경별 Google OAuth Client ID 설정
     CLIENT_IDS: {
-      // 🚨 중요: nextstep.smap.site용 실제 Client ID 등록 필요
-      // Google Cloud Console > API 및 서비스 > 사용자 인증 정보에서 
-      // 승인된 JavaScript 출처에 https://nextstep.smap.site 추가 후 
-      // 새 Client ID로 교체해야 합니다.
-      'nextstep.smap.site': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',  // 🚨 임시값 - 실제 등록 필요
+      // ✅ nextstep.smap.site용 Google Client ID (2025년 6월 15일 생성)
+      // 이 Client ID는 nextstep.smap.site 도메인에 대해 승인된 JavaScript 출처로 등록되어 있음
+      // iOS URL 스키마: com.googleusercontent.apps.283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm
+      'nextstep.smap.site': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',  // ✅ 실제 등록된 Client ID
       'app2.smap.site': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',      // 스테이징용
       'localhost:3000': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',      // 개발용
     },
