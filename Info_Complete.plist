@@ -75,6 +75,48 @@
                 <key>NSExceptionMinimumTLSVersion</key>
                 <string>TLSv1.0</string>
             </dict>
+            
+            <!-- Google OAuth 도메인 (Archive 빌드에서 필요) -->
+            <key>accounts.google.com</key>
+            <dict>
+                <key>NSExceptionRequiresForwardSecrecy</key>
+                <false/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.2</string>
+            </dict>
+            
+            <key>oauth2.googleapis.com</key>
+            <dict>
+                <key>NSExceptionRequiresForwardSecrecy</key>
+                <false/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.2</string>
+            </dict>
+            
+            <key>www.googleapis.com</key>
+            <dict>
+                <key>NSExceptionRequiresForwardSecrecy</key>
+                <false/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.2</string>
+            </dict>
+            
+            <!-- Kakao OAuth 도메인 (Archive 빌드에서 필요) -->
+            <key>kauth.kakao.com</key>
+            <dict>
+                <key>NSExceptionRequiresForwardSecrecy</key>
+                <false/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.2</string>
+            </dict>
+            
+            <key>kapi.kakao.com</key>
+            <dict>
+                <key>NSExceptionRequiresForwardSecrecy</key>
+                <false/>
+                <key>NSExceptionMinimumTLSVersion</key>
+                <string>TLSv1.2</string>
+            </dict>
         </dict>
     </dict>
     
@@ -94,6 +136,8 @@
         <string>app.smap.site</string>
         <string>smap.site</string>
         <string>localhost</string>
+        <string>accounts.google.com</string>
+        <string>kauth.kakao.com</string>
     </array>
     
     <!-- 🎮 햅틱 피드백 권한 -->
@@ -207,19 +251,31 @@
     <array>
         <dict>
             <key>CFBundleURLName</key>
-            <string>com.smap.app</string>
+            <string>com.dmonster.smap</string>
             <key>CFBundleURLSchemes</key>
             <array>
                 <string>smap</string>
+                <string>com.dmonster.smap</string>
             </array>
         </dict>
-        <!-- Google Sign-In URL Scheme -->
+        <!-- Google Sign-In URL Scheme (Bundle ID: com.dmonster.smap용) -->
         <dict>
             <key>CFBundleURLName</key>
             <string>Google Sign-In</string>
             <key>CFBundleURLSchemes</key>
             <array>
+                <!-- ⚠️ iOS Client ID의 Reversed Client ID여야 함 (Archive 빌드용) -->
                 <string>com.googleusercontent.apps.283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm</string>
+            </array>
+        </dict>
+        <!-- Kakao Login URL Scheme -->
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>Kakao Login</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <!-- ⚠️ 카카오 앱 키를 실제 값으로 변경 필요 -->
+                <string>kakao${KAKAO_APP_KEY}</string>
             </array>
         </dict>
     </array>
@@ -231,15 +287,28 @@
         <string>https</string>
         <string>maps</string>
         <string>googlemaps</string>
+        <string>kakaokompass</string>
+        <string>kakaolink</string>
+        <string>kakaotalk</string>
     </array>
     
     <!-- 📊 분석 및 크래시 리포팅 (필요시) -->
     <key>FirebaseAppDelegateProxyEnabled</key>
     <false/>
     
-    <!-- 🔐 Google Sign-In 설정 -->
+    <!-- 🔐 Google Sign-In 설정 (Bundle ID: com.dmonster.smap용) -->
     <key>GIDClientID</key>
     <string>283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com</string>
+    
+    <!-- 🔐 서버 Client ID (Archive 빌드에서 ID 토큰 인증용) -->
+    <key>GIDServerClientID</key>
+    <string>283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com</string>
+    <!-- ⚠️ 위 설정이 올바른지 확인됨 - iOS Client ID가 서버 인증도 처리 -->
+    
+    <!-- 🔐 Kakao Login 설정 (Bundle ID: com.dmonster.smap용) -->
+    <key>KAKAO_APP_KEY</key>
+    <string>YOUR_KAKAO_APP_KEY</string>
+    <!-- ⚠️ 실제 카카오 앱 키로 변경 필요 - 카카오 개발자 콘솔에서 확인 -->
     
     <!-- 🎮 게임 센터 (필요시) -->
     <key>UIRequiredDeviceCapabilities</key>
