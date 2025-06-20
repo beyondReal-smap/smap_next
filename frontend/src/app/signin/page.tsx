@@ -875,7 +875,14 @@ export default function SignInPage() {
       // Google Sign-In 성공 콜백
       (window as any).googleSignInSuccess = async (idToken: string, userInfoJson: any) => {
         try {
-          console.log('[GOOGLE LOGIN] iOS 네이티브 Google Sign-In 성공');
+          // 타임아웃 클리어
+          if ((window as any).__GOOGLE_LOGIN_TIMEOUT__) {
+            clearTimeout((window as any).__GOOGLE_LOGIN_TIMEOUT__);
+            (window as any).__GOOGLE_LOGIN_TIMEOUT__ = null;
+          }
+          
+          console.log('[GOOGLE LOGIN] ✅ iOS 네이티브 Google Sign-In 성공');
+          console.log('[GOOGLE LOGIN] 기기타입:', /Simulator/.test(navigator.userAgent) ? '시뮬레이터' : '실제기기');
           console.log('[GOOGLE LOGIN] 매개변수 타입 확인:', {
             idTokenType: typeof idToken,
             idTokenLength: idToken?.length || 0,
@@ -945,7 +952,9 @@ export default function SignInPage() {
           console.log('[GOOGLE LOGIN] 서버 API 호출 시작');
           sendLogToiOS('info', 'Google Auth API 호출 시작', {
             idTokenLength: idToken.length,
-            userInfo: normalizedUserInfo
+            userInfo: normalizedUserInfo,
+            deviceType: /Simulator/.test(navigator.userAgent) ? 'simulator' : 'real_device',
+            timestamp: new Date().toISOString()
           });
           
           const response = await fetch('/api/google-auth', {
@@ -2206,10 +2215,10 @@ export default function SignInPage() {
         }
       });
       
-              // 🚨 무조건 네이티브 로그인 시도 (웹 SDK 비활성화)
+              // 🚨 시뮬레이터는 네이티브, 실제 기기는 상황에 따라 결정
       if (isIOSWebView || isIOSSimulator || true) { // 모든 환경 허용
-          // 🚨 웹 SDK 사용 조건을 매우 제한적으로 설정 (거의 사용하지 않음)
-        if (false) { // 웹 SDK 사용 비활성화
+          // 🚨 실제 기기에서 네이티브 Google Sign-In 문제 해결 시도
+        if (false) { // 먼저 네이티브로 시도
           debugLog('[GOOGLE LOGIN] 🚨 웹 Google SDK 사용 (비활성화됨)');
           
           // 모든 iOS 환경에서 웹 Google SDK 허용
@@ -2288,11 +2297,29 @@ export default function SignInPage() {
         
         // 실제 iOS 앱에서는 네이티브 로그인 시도
         console.log('[GOOGLE LOGIN] iOS WebView에서 네이티브 Google Sign-In 사용');
+        console.log('[GOOGLE LOGIN] 🔍 상세 환경 분석:', {
+          '현재URL': window.location.href,
+          '기기타입': /Simulator/.test(navigator.userAgent) ? '시뮬레이터' : '실제기기',
+          'WebKit유무': !!window.webkit,
+          'MessageHandler유무': !!window.webkit?.messageHandlers,
+          'SmapIos핸들러': !!window.webkit?.messageHandlers?.smapIos,
+          'IosBridge스크립트': !!window.iosBridge,
+          'GoogleSignIn메서드': !!(window as any).iosBridge?.googleSignIn?.signIn
+        });
           
         // iOS 로그 전송 - 네이티브 Google Sign-In 사용
-        sendLogToiOS('info', '📱 iOS 네이티브 Google Sign-In 사용', {
+        sendLogToiOS('info', '📱 iOS 네이티브 Google Sign-In 사용 (상세분석)', {
           timestamp: new Date().toISOString(),
-          bridgeType: 'iOS WebView'
+          bridgeType: 'iOS WebView',
+          deviceType: /Simulator/.test(navigator.userAgent) ? 'simulator' : 'real_device',
+          detailedEnvironment: {
+            hasWebkit: !!window.webkit,
+            hasMessageHandlers: !!window.webkit?.messageHandlers,
+            hasSmapIos: !!window.webkit?.messageHandlers?.smapIos,
+            hasIosBridge: !!window.iosBridge,
+                         hasGoogleSignInMethod: !!(window as any).iosBridge?.googleSignIn?.signIn,
+            userAgent: navigator.userAgent
+          }
         });
         
         // iOS 네이티브 Google Sign-In 사용
@@ -2387,32 +2414,65 @@ export default function SignInPage() {
             sendLogToiOS('info', '🔄 직접 메시지 핸들러 사용 (fallback)', {
               timestamp: new Date().toISOString(),
               handler: 'webkit.messageHandlers.smapIos',
-              messageType: 'googleSignIn'
+              messageType: 'googleSignIn',
+              deviceType: /Simulator/.test(navigator.userAgent) ? 'simulator' : 'real_device'
             });
             
-            (window as any).webkit.messageHandlers.smapIos.postMessage({
-              type: 'googleSignIn',
-              param: ''
-            });
-            
-            console.log('[GOOGLE LOGIN] 네이티브 메시지 전송 완료, 콜백 대기 중...');
-            // 로딩 상태는 콜백에서 처리되므로 여기서는 유지
-            
-            // iOS 로그 전송 - 네이티브 메시지 전송 완료
-            sendLogToiOS('info', '📡 네이티브 메시지 전송 완료', {
-              timestamp: new Date().toISOString(),
-              waitingFor: 'native callback'
-            });
-            
-            return;
+            try {
+              (window as any).webkit.messageHandlers.smapIos.postMessage({
+                type: 'googleSignIn',
+                param: '',
+                timestamp: Date.now(),
+                deviceType: /Simulator/.test(navigator.userAgent) ? 'simulator' : 'real_device',
+                url: window.location.href
+              });
+              
+              console.log('[GOOGLE LOGIN] ✅ 네이티브 메시지 전송 성공 - 콜백 대기 중...');
+              
+              // iOS 로그 전송 - 네이티브 메시지 전송 완료
+              sendLogToiOS('info', '📡 네이티브 메시지 전송 완료', {
+                timestamp: new Date().toISOString(),
+                waitingFor: 'native callback',
+                deviceType: /Simulator/.test(navigator.userAgent) ? 'simulator' : 'real_device'
+              });
+              
+              // 타임아웃 설정 (10초 후 자동 웹 SDK fallback)
+              const timeoutId = setTimeout(() => {
+                console.warn('[GOOGLE LOGIN] ⏰ 네이티브 Google Sign-In 타임아웃 (10초) - 웹 SDK로 전환');
+                sendLogToiOS('warning', '⏰ 네이티브 Google Sign-In 타임아웃', {
+                  timestamp: new Date().toISOString(),
+                  timeout: '10000ms',
+                  action: 'fallback_to_web_sdk'
+                });
+                
+                // 웹 SDK로 fallback
+                setTimeout(() => {
+                  handleGoogleSDKLogin();
+                }, 100);
+              }, 10000);
+              
+              // 타임아웃 ID를 window에 저장 (콜백에서 clear하기 위해)
+              (window as any).__GOOGLE_LOGIN_TIMEOUT__ = timeoutId;
+              
+              return;
+            } catch (error) {
+              console.error('[GOOGLE LOGIN] ❌ 네이티브 메시지 전송 실패:', error);
+              sendLogToiOS('error', '❌ 네이티브 메시지 전송 실패', {
+                timestamp: new Date().toISOString(),
+                error: error?.toString()
+              });
+            }
           } else {
-            console.warn('[GOOGLE LOGIN] smapIos 메시지 핸들러를 찾을 수 없음');
+            console.warn('[GOOGLE LOGIN] ⚠️ smapIos 메시지 핸들러를 찾을 수 없음');
+            console.warn('[GOOGLE LOGIN] 🔍 사용 가능한 핸들러들:', (window as any).webkit?.messageHandlers ? Object.keys((window as any).webkit.messageHandlers) : 'none');
             
             // iOS 로그 전송 - 메시지 핸들러 없음
             sendLogToiOS('warning', '⚠️ smapIos 메시지 핸들러 없음', {
               timestamp: new Date().toISOString(),
               hasWebkit: !!(window as any).webkit,
-              hasMessageHandlers: !!(window as any).webkit?.messageHandlers
+              hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
+              availableHandlers: (window as any).webkit?.messageHandlers ? Object.keys((window as any).webkit.messageHandlers) : [],
+              deviceType: /Simulator/.test(navigator.userAgent) ? 'simulator' : 'real_device'
             });
           }
         } catch (e) {
