@@ -876,4 +876,200 @@ window.iosBridge = {
             return this._sendGoogleMessage('googleSignInStatus');
         }
     }
-}; 
+};
+
+// 🔥 카카오 로그인 JavaScript 핸들러 함수들 (네이티브 iOS에서 호출)
+window.kakaoSignInSuccess = function(token, userInfo) {
+    console.log('📱 [KAKAO-iOS] 네이티브 카카오 로그인 성공:', {
+        hasToken: !!token,
+        hasUserInfo: !!userInfo,
+        userInfo: userInfo
+    });
+    
+    try {
+        // userInfo가 문자열이면 JSON 파싱
+        let parsedUserInfo = userInfo;
+        if (typeof userInfo === 'string') {
+            parsedUserInfo = JSON.parse(userInfo);
+        }
+        
+        console.log('📱 [KAKAO-iOS] 파싱된 사용자 정보:', parsedUserInfo);
+        
+        // 성공 햅틱 피드백
+        if (window.SmapApp && window.SmapApp.haptic) {
+            window.SmapApp.haptic.success();
+        }
+        
+        // 로그인 성공 처리
+        if (window.handleNativeKakaoLoginSuccess) {
+            window.handleNativeKakaoLoginSuccess(token, parsedUserInfo);
+        } else {
+            // 백업 처리: 현재 페이지가 로그인 페이지라면 바로 처리
+            if (window.location.pathname.includes('/signin')) {
+                console.log('📱 [KAKAO-iOS] 로그인 페이지에서 직접 처리');
+                
+                // 백엔드 API 호출
+                fetch('/api/kakao-auth', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        access_token: token,
+                        nativeUserInfo: parsedUserInfo
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('📱 [KAKAO-iOS] 백엔드 인증 성공, 홈으로 이동');
+                        
+                        // 성공 시 홈으로 리다이렉트
+                        window.location.href = '/home';
+                    } else {
+                        throw new Error(data.error || '로그인 실패');
+                    }
+                })
+                .catch(error => {
+                    console.error('📱 [KAKAO-iOS] 백엔드 인증 실패:', error);
+                    
+                    // 에러 모달 표시
+                    if (window.showError) {
+                        window.showError('로그인 처리 중 오류가 발생했습니다.');
+                    } else {
+                        alert('로그인 처리 중 오류가 발생했습니다: ' + error.message);
+                    }
+                });
+            } else {
+                console.log('📱 [KAKAO-iOS] 비로그인 페이지에서 호출됨, 홈으로 리다이렉트');
+                window.location.href = '/home';
+            }
+        }
+        
+    } catch (error) {
+        console.error('📱 [KAKAO-iOS] 로그인 성공 처리 오류:', error);
+        
+        // 에러 햅틱 피드백
+        if (window.SmapApp && window.SmapApp.haptic) {
+            window.SmapApp.haptic.error();
+        }
+        
+        // 에러 처리
+        if (window.showError) {
+            window.showError('로그인 데이터 처리 중 오류가 발생했습니다.');
+        } else {
+            alert('로그인 데이터 처리 중 오류가 발생했습니다: ' + error.message);
+        }
+    }
+};
+
+window.kakaoSignInError = function(error) {
+    console.error('📱 [KAKAO-iOS] 네이티브 카카오 로그인 실패:', error);
+    
+    try {
+        // 에러 객체가 문자열이면 JSON 파싱 시도
+        let parsedError = error;
+        if (typeof error === 'string') {
+            try {
+                parsedError = JSON.parse(error);
+            } catch (e) {
+                parsedError = { message: error };
+            }
+        }
+        
+        console.error('📱 [KAKAO-iOS] 파싱된 에러:', parsedError);
+        
+        // 에러 햅틱 피드백
+        if (window.SmapApp && window.SmapApp.haptic) {
+            window.SmapApp.haptic.error();
+        }
+        
+        // 에러 처리
+        const errorMessage = parsedError.message || parsedError.localizedDescription || '카카오 로그인에 실패했습니다.';
+        
+        if (window.handleNativeKakaoLoginError) {
+            window.handleNativeKakaoLoginError(parsedError);
+        } else {
+            // 백업 처리
+            if (window.showError) {
+                window.showError(errorMessage);
+            } else {
+                alert(errorMessage);
+            }
+        }
+        
+    } catch (processingError) {
+        console.error('📱 [KAKAO-iOS] 에러 처리 중 오류:', processingError);
+        
+        // 최종 백업
+        const fallbackMessage = '카카오 로그인 중 오류가 발생했습니다.';
+        if (window.showError) {
+            window.showError(fallbackMessage);
+        } else {
+            alert(fallbackMessage);
+        }
+    }
+};
+
+// 🔥 구글 로그인 JavaScript 핸들러 함수들 (네이티브 iOS에서 호출)
+window.googleSignInSuccess = function(token, userInfo) {
+    console.log('📱 [GOOGLE-iOS] 네이티브 구글 로그인 성공:', {
+        hasToken: !!token,
+        hasUserInfo: !!userInfo
+    });
+    
+    try {
+        // userInfo가 문자열이면 JSON 파싱
+        let parsedUserInfo = userInfo;
+        if (typeof userInfo === 'string') {
+            parsedUserInfo = JSON.parse(userInfo);
+        }
+        
+        // 성공 햅틱 피드백
+        if (window.SmapApp && window.SmapApp.haptic) {
+            window.SmapApp.haptic.success();
+        }
+        
+        // 구글 로그인 성공 처리
+        if (window.handleNativeGoogleLoginSuccess) {
+            window.handleNativeGoogleLoginSuccess(token, parsedUserInfo);
+        } else {
+            // 백업 처리
+            console.log('📱 [GOOGLE-iOS] 직접 처리 - 홈으로 이동');
+            window.location.href = '/home';
+        }
+        
+    } catch (error) {
+        console.error('📱 [GOOGLE-iOS] 로그인 성공 처리 오류:', error);
+        window.googleSignInError(error.message);
+    }
+};
+
+window.googleSignInError = function(error) {
+    console.error('📱 [GOOGLE-iOS] 네이티브 구글 로그인 실패:', error);
+    
+    // 에러 햅틱 피드백
+    if (window.SmapApp && window.SmapApp.haptic) {
+        window.SmapApp.haptic.error();
+    }
+    
+    // 에러 처리
+    const errorMessage = typeof error === 'string' ? error : (error.message || '구글 로그인에 실패했습니다.');
+    
+    if (window.handleNativeGoogleLoginError) {
+        window.handleNativeGoogleLoginError(error);
+    } else {
+        // 백업 처리
+        if (window.showError) {
+            window.showError(errorMessage);
+        } else {
+            alert(errorMessage);
+        }
+    }
+};
+
+console.log('✅ [iOS Bridge] 카카오/구글 로그인 JavaScript 핸들러 함수들 등록 완료');
+console.log('  - kakaoSignInSuccess()');
+console.log('  - kakaoSignInError()');
+console.log('  - googleSignInSuccess()');
+console.log('  - googleSignInError()'); 

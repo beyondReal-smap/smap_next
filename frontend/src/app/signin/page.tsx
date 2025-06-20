@@ -3177,6 +3177,141 @@ export default function SignInPage() {
         }
       });
     };
+
+    // 🔥 네이티브 카카오 로그인 성공 핸들러
+    (window as any).handleNativeKakaoLoginSuccess = async (token: string, userInfo: any) => {
+      console.log('📱 [NATIVE-KAKAO] 로그인 성공 핸들러 호출:', {
+        hasToken: !!token,
+        hasUserInfo: !!userInfo,
+        userInfo
+      });
+
+      try {
+        setIsLoading(true);
+        
+        // iOS 로그 전송
+        sendLogToiOS('info', '📱 네이티브 카카오 로그인 성공 처리 시작', {
+          hasToken: !!token,
+          hasUserInfo: !!userInfo,
+          tokenLength: token ? token.length : 0
+        });
+
+        // 백엔드 API 호출
+        const response = await fetch('/api/kakao-auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            access_token: token,
+            nativeUserInfo: userInfo
+          }),
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          console.log('📱 [NATIVE-KAKAO] 백엔드 인증 성공:', data.user);
+          
+          // authService에 사용자 정보 설정
+          if (data.user) {
+            authService.setUserData(data.user);
+          }
+          
+          // AuthContext 상태 동기화
+          await refreshAuthState();
+          
+          // 성공 햅틱 피드백
+          triggerHapticFeedback(HapticFeedbackType.SUCCESS, '네이티브 카카오 로그인 성공', { 
+            component: 'signin', 
+            action: 'native-kakao-login' 
+          });
+          
+          // iOS 로그 전송
+          sendLogToiOS('info', '📱 네이티브 카카오 로그인 완료, 홈으로 이동', {
+            userEmail: data.user?.mt_email?.substring(0, 3) + '***'
+          });
+          
+          // 리다이렉트 플래그 설정
+          isRedirectingRef.current = true;
+          blockAllEffectsRef.current = true;
+          
+          // 홈으로 리다이렉트
+          router.replace('/home');
+          
+        } else {
+          throw new Error(data.error || '로그인에 실패했습니다.');
+        }
+        
+      } catch (error: any) {
+        console.error('📱 [NATIVE-KAKAO] 로그인 처리 오류:', error);
+        
+        // iOS 로그 전송
+        sendLogToiOS('error', '📱 네이티브 카카오 로그인 처리 오류', {
+          error: error.message
+        });
+        
+        // 에러 모달 표시
+        showError(error.message || '로그인 처리 중 오류가 발생했습니다.');
+        
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // 🔥 네이티브 카카오 로그인 실패 핸들러
+    (window as any).handleNativeKakaoLoginError = (error: any) => {
+      console.error('📱 [NATIVE-KAKAO] 로그인 실패 핸들러 호출:', error);
+      
+      // iOS 로그 전송
+      sendLogToiOS('error', '📱 네이티브 카카오 로그인 실패', {
+        error: typeof error === 'string' ? error : error.message
+      });
+      
+      // 에러 모달 표시
+      const errorMessage = typeof error === 'string' ? error : (error.message || '카카오 로그인에 실패했습니다.');
+      showError(errorMessage);
+      
+      setIsLoading(false);
+    };
+
+    // 🔥 네이티브 구글 로그인 성공 핸들러
+    (window as any).handleNativeGoogleLoginSuccess = async (token: string, userInfo: any) => {
+      console.log('📱 [NATIVE-GOOGLE] 로그인 성공 핸들러 호출:', {
+        hasToken: !!token,
+        hasUserInfo: !!userInfo
+      });
+
+      try {
+        setIsLoading(true);
+        
+        // iOS 로그 전송
+        sendLogToiOS('info', '📱 네이티브 구글 로그인 성공 처리 시작', {
+          hasToken: !!token,
+          hasUserInfo: !!userInfo
+        });
+
+        // 구글 로그인 성공 처리 (기존 로직과 동일)
+        // 여기서는 간단히 홈으로 리다이렉트
+        router.replace('/home');
+        
+      } catch (error: any) {
+        console.error('📱 [NATIVE-GOOGLE] 로그인 처리 오류:', error);
+        showError(error.message || '구글 로그인 처리 중 오류가 발생했습니다.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // 🔥 네이티브 구글 로그인 실패 핸들러
+    (window as any).handleNativeGoogleLoginError = (error: any) => {
+      console.error('📱 [NATIVE-GOOGLE] 로그인 실패 핸들러 호출:', error);
+      
+      const errorMessage = typeof error === 'string' ? error : (error.message || '구글 로그인에 실패했습니다.');
+      showError(errorMessage);
+      
+      setIsLoading(false);
+    };
     
     // 환경 정보 출력 함수
     (window as any).TEST_ENV = () => {
@@ -3196,6 +3331,10 @@ export default function SignInPage() {
     console.log('  TEST_HAPTIC("success") - 햅틱 테스트');
     console.log('  TEST_GOOGLE() - 구글 로그인 테스트');
     console.log('  TEST_ENV() - 환경 정보');
+    console.log('  handleNativeKakaoLoginSuccess() - 네이티브 카카오 성공 핸들러');
+    console.log('  handleNativeKakaoLoginError() - 네이티브 카카오 실패 핸들러');
+    console.log('  handleNativeGoogleLoginSuccess() - 네이티브 구글 성공 핸들러');
+    console.log('  handleNativeGoogleLoginError() - 네이티브 구글 실패 핸들러');
   };
 
   // 🔧 WebKit 핸들러 강제 등록 시도
