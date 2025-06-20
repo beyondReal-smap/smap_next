@@ -314,20 +314,43 @@ const detectIOSEnvironment = () => {
   const supportsTouchAPI = 'ontouchstart' in window;
   const supportsVibration = 'vibrate' in navigator;
   
-  // 🚨 환경 감지 로그 제한 (5초에 1번만)
+  // 프로덕션 환경별 추가 감지
+  const currentHost = window.location.hostname;
+  const isProductionDomain = currentHost.includes('.smap.site');
+  const isNexStepDomain = currentHost === 'nextstep.smap.site';
+  
+  // 프로덕션 환경에서는 더 적극적인 WebView 감지
+  let finalIsIOSApp = isIOSApp;
+  let finalHasHandler = actualHasHandler;
+  
+  if (isProductionDomain && isIOS) {
+    // 프로덕션 도메인에서 iOS는 대부분 앱 내 WebView
+    finalIsIOSApp = true;
+    
+    // 핸들러가 없더라도 강제 시도 함수 체크
+    if (!finalHasHandler && typeof (window as any).SMAP_FORCE_HAPTIC === 'function') {
+      console.log(`🔧 [HAPTIC-ENV] 프로덕션에서 강제 햅틱 함수 발견 - WebView 환경으로 간주`);
+      finalHasHandler = true;
+    }
+  }
+
+  // 🚨 환경 감지 로그 제한 (프로덕션에서는 3초에 1번, 개발에서는 5초에 1번)
   const now = Date.now();
+  const logInterval = isProductionDomain ? 3000 : 5000;
   const lastEnvLog = (window as any).__LAST_ENV_LOG__ || 0;
-  if (now - lastEnvLog > 5000) {
-    console.log(`🔍 [HAPTIC-ENV] 환경 감지:`, {
+  if (now - lastEnvLog > logInterval) {
+    console.log(`🔍 [HAPTIC-ENV-${currentHost}] 환경 감지:`, {
       isIOS,
       hasWebKit,
-      hasHandler: actualHasHandler,
-      isIOSApp,
+      hasHandler: finalHasHandler,
+      isIOSApp: finalIsIOSApp,
       isIOSBrowser,
       isWebView,
       totalHandlers: webViewDebug?.totalHandlers || 0,
       availableHandlers: webViewDebug?.availableHandlers || [],
-      nativeCheck
+      nativeCheck,
+      isProductionDomain,
+      isNexStepDomain
     });
     (window as any).__LAST_ENV_LOG__ = now;
   }
@@ -335,14 +358,16 @@ const detectIOSEnvironment = () => {
   return { 
     isIOS, 
     hasWebKit, 
-    hasHandler: actualHasHandler, 
-    isIOSApp, 
+    hasHandler: finalHasHandler, 
+    isIOSApp: finalIsIOSApp, 
     isIOSBrowser,
     isWebView,
     supportsTouchAPI,
     supportsVibration,
     webViewDebug,
-    nativeCheck
+    nativeCheck,
+    isProductionDomain,
+    isNexStepDomain
   };
 };
 

@@ -935,6 +935,91 @@
       });
     });
     
+    // 13. 프로덕션 환경용 강제 햅틱 함수 추가
+    if (window.location.hostname.includes('.smap.site')) {
+      console.log('[iOS WebView] 프로덕션 환경 - 강제 햅틱 함수 설정');
+      
+      // 강제 햅틱 실행 함수
+      window.SMAP_FORCE_HAPTIC = function(hapticType) {
+        console.log(`🚀 [FORCE-HAPTIC] 프로덕션 강제 햅틱 실행: ${hapticType}`);
+        
+        // iOS 네이티브 햅틱 시도
+        try {
+          if (window.webkit && window.webkit.messageHandlers) {
+            const possibleHandlers = ['smapIos', 'iosHandler', 'nativeHandler', 'jsToNative'];
+            
+            for (const handlerName of possibleHandlers) {
+              if (window.webkit.messageHandlers[handlerName]) {
+                try {
+                  // 다양한 메시지 형식으로 시도
+                  const messageFormats = [
+                    { type: 'haptic', param: hapticType },
+                    { type: 'hapticFeedback', param: JSON.stringify({ feedbackType: hapticType }) },
+                    hapticType
+                  ];
+                  
+                  for (const message of messageFormats) {
+                    try {
+                      window.webkit.messageHandlers[handlerName].postMessage(message);
+                      console.log(`✅ [FORCE-HAPTIC] ${handlerName} 성공: ${hapticType} | 형식: ${typeof message === 'string' ? '직접' : message.type}`);
+                      return true;
+                    } catch (formatError) {
+                      console.warn(`⚠️ [FORCE-HAPTIC] ${handlerName} 형식 실패:`, formatError);
+                      continue;
+                    }
+                  }
+                } catch (e) {
+                  console.warn(`⚠️ [FORCE-HAPTIC] ${handlerName} 실패:`, e);
+                  continue;
+                }
+              }
+            }
+          }
+          
+          // 웹 바이브레이션 대체
+          if ('vibrate' in navigator) {
+            const vibrationPattern = hapticType === 'heavy' ? 100 : hapticType === 'medium' ? 50 : 25;
+            navigator.vibrate(vibrationPattern);
+            console.log(`📳 [FORCE-HAPTIC] 웹 바이브레이션 대체: ${vibrationPattern}ms`);
+            return true;
+          }
+          
+          return false;
+        } catch (error) {
+          console.error(`❌ [FORCE-HAPTIC] 에러:`, error);
+          return false;
+        }
+      };
+      
+      // 핸들러 상태 확인 함수
+      window.SMAP_CHECK_HANDLERS = function() {
+        const webkit = window.webkit;
+        const result = {
+          hasWebKit: !!webkit,
+          hasMessageHandlers: !!(webkit && webkit.messageHandlers),
+          hasSmapIos: !!(webkit && webkit.messageHandlers && webkit.messageHandlers.smapIos),
+          availableHandlers: []
+        };
+        
+        if (webkit && webkit.messageHandlers) {
+          const knownHandlers = ['smapIos', 'iosHandler', 'nativeHandler', 'jsToNative'];
+          knownHandlers.forEach(handler => {
+            if (webkit.messageHandlers[handler]) {
+              result.availableHandlers.push(handler);
+            }
+          });
+        }
+        
+        console.log(`🔍 [HANDLER-CHECK] 핸들러 상태:`, result);
+        return result;
+      };
+      
+      // 주기적 핸들러 상태 체크 (프로덕션에서만, 10초마다)
+      setInterval(() => {
+        window.SMAP_CHECK_HANDLERS();
+      }, 10000);
+    }
+
     console.log('iOS WebView fixes applied successfully');
   }
 })(); 

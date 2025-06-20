@@ -1735,12 +1735,22 @@ export default function HomePage() {
     performBackupLoading();
 
     function performBackupLoading() {
+      // 동적 Client ID 가져오기 (도메인별 자동 선택)
+      const dynamicClientId = API_KEYS.NAVER_MAPS_CLIENT_ID;
+      console.log(`🗺️ [HOME] 네이버 지도 Client ID 사용: ${dynamicClientId}`);
+      
       // 네이버 지도 API 로드용 URL 생성 (올바른 파라미터명 사용)
       const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
-      naverMapUrl.searchParams.append('ncpKeyId', NAVER_MAPS_CLIENT_ID); // ncpClientId → ncpKeyId
-      if (!isIOSWebView) {
-        // iOS WebView가 아닌 경우에만 서브모듈 추가 (호환성 문제 방지)
+      naverMapUrl.searchParams.append('ncpKeyId', dynamicClientId); // 동적 Client ID 사용
+      
+      // 프로덕션 환경에서는 서브모듈 최소화 (로딩 속도 최적화)
+      const isProduction = window.location.hostname.includes('.smap.site');
+      if (!isIOSWebView && !isProduction) {
+        // 개발 환경에서만 전체 서브모듈 로드
         naverMapUrl.searchParams.append('submodules', 'geocoder,drawing,visualization');
+      } else if (!isIOSWebView && isProduction) {
+        // 프로덕션에서는 필수 모듈만 로드 (빠른 초기화)
+        naverMapUrl.searchParams.append('submodules', 'geocoder');
       }
       
       // script 요소 생성 및 로드
@@ -5431,7 +5441,7 @@ export default function HomePage() {
           </div>
         )}
         
-        <DebugPanel />
+        {/* <DebugPanel /> */}
         {/* <LogParser /> */}
       </>
     );

@@ -2192,20 +2192,71 @@ export default function LocationPage() {
         return;
       }
       
-      // geocoder 서브모듈 포함하여 로딩 (위치 검색 및 역지오코딩 포함)
+      // 동적 Client ID 가져오기 (도메인별 자동 선택) - Home 페이지와 동일
+      const dynamicClientId = API_KEYS.NAVER_MAPS_CLIENT_ID;
+      console.log(`🗺️ [LOCATION] 네이버 지도 Client ID 사용: ${dynamicClientId}`);
+      
+      // 프로덕션 환경에서는 서브모듈 최소화 (로딩 속도 최적화)
+      const isProduction = window.location.hostname.includes('.smap.site');
+      const isIOSWebView = typeof window !== 'undefined' && 
+                          window.webkit && 
+                          window.webkit.messageHandlers;
+      
+      // 네이버 지도 API 로드용 URL 생성
+      const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
+      naverMapUrl.searchParams.append('ncpKeyId', dynamicClientId);
+      
+      if (!isIOSWebView && !isProduction) {
+        // 개발 환경에서만 전체 서브모듈 로드
+        naverMapUrl.searchParams.append('submodules', 'geocoder,drawing,visualization');
+      } else if (!isIOSWebView && isProduction) {
+        // 프로덕션에서는 필수 모듈만 로드 (빠른 초기화)
+        naverMapUrl.searchParams.append('submodules', 'geocoder');
+      } else {
+        // iOS WebView에서는 최소 모듈만 (호환성 우선)
+        naverMapUrl.searchParams.append('submodules', 'geocoder');
+      }
+      
+      console.log(`🗺️ [LOCATION] 네이버 지도 URL: ${naverMapUrl.toString()}`);
+      
       const script = document.createElement('script');
-      script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${API_KEYS.NAVER_MAPS_CLIENT_ID}&submodules=geocoder`;
+      script.src = naverMapUrl.toString();
       script.async = true;
-      script.defer = true; // defer 추가로 최적화
+      script.defer = true;
+      script.id = 'naver-maps-location';
+      
+      let hasErrorOccurred = false;
+      
       script.onload = () => {
-        console.log('[네이버 지도 로드] 스크립트 로드 완료 (geocoder 포함)');
-        setIsMapLoading(false);
+        console.log('[네이버 지도 로드] 스크립트 로드 완료');
+        if (!hasErrorOccurred) {
+          setIsMapLoading(false);
+        }
       };
+      
       script.onerror = () => {
-        console.error('네이버 지도 로드 실패');
+        console.error('[네이버 지도 로드] 스크립트 로드 실패');
+        hasErrorOccurred = true;
         setIsMapLoading(false);
       };
+      
+      // 중복 로드 방지
+      const existingScript = document.getElementById('naver-maps-location');
+      if (existingScript) {
+        existingScript.remove();
+      }
+      
       document.head.appendChild(script);
+      
+      // 타임아웃 설정 (iOS WebView에서는 더 긴 시간)
+      const timeout = isIOSWebView ? 15000 : 10000;
+      setTimeout(() => {
+        if (!window.naver?.maps && !hasErrorOccurred) {
+          console.warn(`[네이버 지도 로드] 타임아웃 (${timeout}ms)`);
+          hasErrorOccurred = true;
+          setIsMapLoading(false);
+        }
+      }, timeout);
     };
 
     loadNaverMaps();

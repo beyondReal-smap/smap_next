@@ -48,9 +48,16 @@ export const getLocalizedAppInfo = (language: string = 'ko') => {
 export const API_KEYS = {
   // 지도 API 키 - 환경변수 우선, 없으면 하드코딩된 값 사용
   GOOGLE_MAPS_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || 'AIzaSyBkWlND5fvW4tmxaj11y24XNs_LQfplwpw', // com.dmonster.smap
-  // NAVER_MAPS_CLIENT_ID: process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '91y2nh0yff',
-  // NAVER_MAPS_API_KEY: 'bKRzkFBbAvfdHDTZB0mJ81jmO8ufULvQavQIQZmp',
-  NAVER_MAPS_CLIENT_ID: process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '91y2nh0yff',
+  // 동적 네이버 지도 Client ID (도메인별 자동 선택)
+  get NAVER_MAPS_CLIENT_ID() {
+    if (typeof window !== 'undefined') {
+      const currentDomain = window.location.host;
+      const domainClientId = MAP_CONFIG.NAVER.CLIENT_IDS[currentDomain as keyof typeof MAP_CONFIG.NAVER.CLIENT_IDS];
+      console.log(`🗺️ [NAVER MAPS] 도메인: ${currentDomain}, Client ID: ${domainClientId || '기본값'}`);
+      return domainClientId || process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '91y2nh0yff';
+    }
+    return process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '91y2nh0yff';
+  },
   NAVER_MAPS_API_KEY: 'bKRzkFBbAvfdHDTZB0mJ81jmO8ufULvQavQIQZmp',
   MAPBOX_ACCESS_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '',
   
@@ -80,6 +87,12 @@ export const MAP_CONFIG = {
       'localhost:3000',
       '127.0.0.1:3000',
     ],
+    // 프로덕션 환경별 Client ID 설정
+    CLIENT_IDS: {
+      'nextstep.smap.site': '91y2nh0yff',  // 운영 환경용
+      'app2.smap.site': '91y2nh0yff',      // 스테이징용
+      'localhost:3000': '91y2nh0yff',      // 개발용
+    },
     // 네이버 지도 옵션
     DEFAULT_OPTIONS: {
       mapTypeControl: false,
