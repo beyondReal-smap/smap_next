@@ -2247,6 +2247,33 @@ export default function SignInPage() {
     console.log('🚀 [GOOGLE LOGIN] 핸들러 시작됨');
     setIsLoading(true);
     
+    // 🔥 페이지 로드 완료 후 핸들러 준비 상태 확인
+    if (typeof window !== 'undefined') {
+      const isHandlersReady = (window as any).__SMAP_HANDLERS_READY__;
+      const handlersList = (window as any).__SMAP_HANDLERS_LIST__;
+      const isGoogleLoginReady = (window as any).__SMAP_GOOGLE_LOGIN_READY__;
+      
+      if (isHandlersReady && handlersList?.length > 0) {
+        console.log('✅ [HANDLER-FORCE] 페이지 로드 완료 후 핸들러 발견됨:', handlersList);
+        console.log('🔥 [HANDLER-FORCE] 구글 로그인 준비 상태:', isGoogleLoginReady);
+        
+        // 핸들러가 준비되었으므로 강제 네이티브 모드 해제하고 정상 로직 사용
+        console.log('🔄 [HANDLER-FORCE] 핸들러 준비 완료 - 정상 네이티브 로그인 진행');
+      } else if (retryCount === 0) {
+        // 첫 번째 시도에서 핸들러가 준비되지 않았다면 잠시 대기 후 재시도
+        console.log('⏳ [HANDLER-FORCE] 핸들러 준비 대기 중... 1초 후 재시도');
+        clearTimeout(timeoutId);
+        setIsLoading(false);
+        
+        setTimeout(() => {
+          handleGoogleLogin(1); // 재시도 카운트 1로 호출
+        }, 1000);
+        return;
+      } else {
+        console.warn('⚠️ [HANDLER-FORCE] 재시도 후에도 핸들러 준비되지 않음');
+      }
+    }
+    
     // 환경 체크
     console.log('🔍 [GOOGLE LOGIN] 환경 체크 시작');
     
@@ -2285,12 +2312,16 @@ export default function SignInPage() {
       const hasNoMessageHandlers = !hasMessageHandlers || !hasSmapIos;
       const isForceWebMode = !!(window as any).__FORCE_WEB_SDK_MODE__;
       
-      // 🚨 네이티브 강제 모드일 때는 무조건 네이티브 시도
+      // 🚨 네이티브 강제 모드일 때는 무조건 네이티브 시도 (단, 핸들러 준비된 경우 예외)
       const isForceNativeMode = !!(window as any).__FORCE_NATIVE_GOOGLE_LOGIN__;
+      const isHandlersReady = !!(window as any).__SMAP_HANDLERS_READY__;
       
-      if (isForceNativeMode) {
+      if (isForceNativeMode && !isHandlersReady) {
         console.log('🔥 [GOOGLE LOGIN] 네이티브 강제 모드 - MessageHandler 없어도 네이티브 시도');
         // MessageHandler가 없어도 네이티브 로그인 강제 시도
+      } else if (isHandlersReady && hasMessageHandlers) {
+        console.log('✅ [GOOGLE LOGIN] 핸들러 준비 완료 - 정상 네이티브 로그인 진행');
+        // 핸들러가 준비되었으므로 정상 네이티브 로그인 진행
       } else if (isForceWebMode || (isNexStepDomain && hasNoMessageHandlers)) {
         const reason = isForceWebMode ? '강제 웹 SDK 모드' : 'MessageHandler 없음';
         console.log(`🌐 [GOOGLE LOGIN] ${reason} - 웹 SDK 강제 사용`);
@@ -2317,16 +2348,56 @@ export default function SignInPage() {
           'SDK유무': hasGoogleSDK
         });
         
-        // 🚨 네이티브 강제 모드이거나 ios-bridge를 통한 네이티브 Google Sign-In 시도
+        // 🚨 네이티브 강제 모드이거나 핸들러 준비 완료 또는 ios-bridge를 통한 네이티브 Google Sign-In 시도
         const isForceNativeMode = !!(window as any).__FORCE_NATIVE_GOOGLE_LOGIN__;
+        const isHandlersReady = !!(window as any).__SMAP_HANDLERS_READY__;
         
-        if (isForceNativeMode || (hasIosBridge && (window as any).iosBridge.googleSignIn?.signIn)) {
-          console.log(`🌉 [GOOGLE LOGIN] ${isForceNativeMode ? '강제 네이티브 모드' : 'ios-bridge.js googleSignIn 메서드'} 사용`);
+        if (isForceNativeMode || isHandlersReady || (hasIosBridge && (window as any).iosBridge.googleSignIn?.signIn)) {
+          let modeDescription = '';
+          if (isHandlersReady) {
+            modeDescription = '핸들러 준비 완료';
+          } else if (isForceNativeMode) {
+            modeDescription = '강제 네이티브 모드';
+          } else {
+            modeDescription = 'ios-bridge.js googleSignIn 메서드';
+          }
+          console.log(`🌉 [GOOGLE LOGIN] ${modeDescription} 사용`);
           
           try {
             console.log('📱 [GOOGLE LOGIN] 네이티브 호출 실행 중...');
             
-            if (isForceNativeMode) {
+            if (isHandlersReady) {
+              console.log('✅ [GOOGLE LOGIN] 핸들러 준비 완료 - 정상 MessageHandler 사용');
+              
+              // 핸들러가 준비되었으므로 정상적인 MessageHandler 사용
+              const webkit = (window as any).webkit;
+              const availableHandlers = (window as any).__SMAP_HANDLERS_LIST__ || [];
+              
+              console.log('🎯 [GOOGLE LOGIN] 사용 가능한 핸들러:', availableHandlers);
+              
+              // 우선순위: smapIos > iosHandler > messageHandler > hapticHandler
+              const priorityOrder = ['smapIos', 'iosHandler', 'messageHandler', 'hapticHandler'];
+              let usedHandler = null;
+              
+              for (const handlerName of priorityOrder) {
+                if (availableHandlers.includes(handlerName) && webkit?.messageHandlers?.[handlerName]) {
+                  console.log(`✅ [GOOGLE LOGIN] ${handlerName} 핸들러 사용`);
+                  webkit.messageHandlers[handlerName].postMessage({
+                    type: 'googleSignIn',
+                    action: 'googleSignIn',
+                    timestamp: Date.now()
+                  });
+                  usedHandler = handlerName;
+                  break;
+                }
+              }
+              
+              if (!usedHandler) {
+                console.error('❌ [GOOGLE LOGIN] 사용 가능한 핸들러 없음');
+                throw new Error('MessageHandler를 찾을 수 없습니다.');
+              }
+              
+            } else if (isForceNativeMode) {
               console.log('🔥 [GOOGLE LOGIN] 강제 네이티브 모드 - 모든 방법 시도');
               
               // 🚨 1. 직접 MessageHandler 시도 (강제 모드)
