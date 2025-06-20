@@ -215,15 +215,29 @@ export default function SignInPage() {
             if (data.user) {
               console.log('[NATIVE CALLBACK] 사용자 데이터 설정:', data.user);
               
-              // 1. AuthService에 사용자 데이터 설정
+              // 1. AuthService에 토큰 저장 (가장 중요!)
+              if (data.token) {
+                console.log('[NATIVE CALLBACK] JWT 토큰 저장:', data.token ? '토큰 있음' : '토큰 없음');
+                authService.setToken(data.token);
+              } else {
+                console.warn('[NATIVE CALLBACK] ⚠️ 백엔드에서 토큰이 반환되지 않음');
+              }
+              
+              // 2. AuthService에 사용자 데이터 설정
               authService.setUserData(data.user);
               
-              // 2. 로컬 스토리지에도 직접 저장 (백업)
+              // 3. 로컬 스토리지에도 직접 저장 (백업)
               localStorage.setItem('user', JSON.stringify(data.user));
               localStorage.setItem('isLoggedIn', 'true');
               
-              // 3. 세션 스토리지에도 저장
+              // 4. 세션 스토리지에도 저장
               sessionStorage.setItem('authToken', 'authenticated');
+              
+              // 5. 저장 상태 확인
+              console.log('[NATIVE CALLBACK] 저장 상태 확인:');
+              console.log('  - 토큰:', authService.getToken() ? '저장됨' : '없음');
+              console.log('  - 사용자 데이터:', authService.getUserData() ? '저장됨' : '없음');
+              console.log('  - isLoggedIn():', authService.isLoggedIn());
               
               console.log('[NATIVE CALLBACK] 모든 저장소에 인증 상태 저장 완료');
             }
