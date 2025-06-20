@@ -61,7 +61,10 @@ export default function SimpleSignInPage() {
 
       // Google 로그인 실행
       window.google.accounts.id.initialize({
-        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',
+        client_id: (() => {
+          const { API_KEYS } = require('@/config');
+          return API_KEYS.GOOGLE_CLIENT_ID;
+        })(),
         callback: handleGoogleCallback
       })
 

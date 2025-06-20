@@ -3,7 +3,10 @@ import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 
 // Google Client ID (iOS 로그에서 확인된 값)
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com';
+// 동적 Google Client ID (서버 사이드에서는 환경변수 우선)
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 
+                         process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 
+                         '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com';
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // iOS 로그 전송 함수 (서버사이드)

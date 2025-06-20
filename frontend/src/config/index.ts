@@ -67,6 +67,17 @@ export const API_KEYS = {
   KAKAO_REST_API_KEY: process.env.NEXT_PUBLIC_KAKAO_MAPS_API_KEY || 'bc7899314df5dc2bebcb2a7960ac89bf', // 카카오 로컬 API용 REST API 키 추가
   FIREBASEKEY: 'BOCzkX45zE3u0HFfNpfZDbUHH33OHNoe3k5KeTalEesHgnaBqCykjJUxnDcS6mv9MPSxU8EV3QHCL61gmwzkXlE',
   
+  // 동적 Google OAuth Client ID (도메인별 자동 선택)
+  get GOOGLE_CLIENT_ID() {
+    if (typeof window !== 'undefined') {
+      const currentDomain = window.location.host;
+      const domainClientId = GOOGLE_CONFIG.OAUTH.CLIENT_IDS[currentDomain as keyof typeof GOOGLE_CONFIG.OAUTH.CLIENT_IDS];
+      console.log(`🔐 [GOOGLE OAUTH] 도메인: ${currentDomain}, Client ID: ${domainClientId ? domainClientId.substring(0, 12) + '...' : '기본값'}`);
+      return domainClientId || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com';
+    }
+    return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com';
+  },
+  
   // NCP 관련 키
   NCP_ACCESS_KEY: "ncp_iam_BPAMKR5amCXCgRSDodA7",
   NCP_SECRET_KEY: "ncp_iam_BPKMKR3E8B8h1J0FhAafnW8Cw83IKvDohl",
@@ -108,6 +119,33 @@ export const MAP_CONFIG = {
       streetViewControl: false,
       zoom: 16
     }
+  },
+};
+
+// Google 서비스 관련 설정
+export const GOOGLE_CONFIG = {
+  // Google OAuth 설정
+  OAUTH: {
+    // Google Console에 등록된 도메인별 Client ID
+    ALLOWED_DOMAINS: [
+      'nextstep.smap.site',  // 현재 운영 도메인
+      'app2.smap.site',
+      'app.smap.site',
+      'smap.site',
+      // 개발 환경
+      'localhost:3000',
+      '127.0.0.1:3000',
+    ],
+    // 프로덕션 환경별 Google OAuth Client ID 설정
+    CLIENT_IDS: {
+      // 🚨 중요: nextstep.smap.site용 실제 Client ID 등록 필요
+      // Google Cloud Console > API 및 서비스 > 사용자 인증 정보에서 
+      // 승인된 JavaScript 출처에 https://nextstep.smap.site 추가 후 
+      // 새 Client ID로 교체해야 합니다.
+      'nextstep.smap.site': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',  // 🚨 임시값 - 실제 등록 필요
+      'app2.smap.site': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',      // 스테이징용
+      'localhost:3000': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',      // 개발용
+    },
   },
   // Mapbox 설정
   MAPBOX: {
@@ -177,4 +215,5 @@ export default {
   detectLanguage,
   ENV,
   MAP_CONFIG,
+  GOOGLE_CONFIG,
 }; 

@@ -426,17 +426,34 @@ export default function SignInPage() {
         
         console.log('[GOOGLE SDK] Google Identity Services 초기화');
         
-        // Client ID 설정 (환경변수 우선, fallback 제공)
-        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 
-                        process.env.GOOGLE_CLIENT_ID || 
-                        '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com';
+        // 동적 Client ID 설정 (도메인별 자동 선택)
+        const { API_KEYS } = await import('@/config');
+        const clientId = API_KEYS.GOOGLE_CLIENT_ID;
         
         console.log('[GOOGLE SDK] Client ID 확인:', {
           hasPublicEnv: !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
           hasPrivateEnv: !!process.env.GOOGLE_CLIENT_ID,
           usingClientId: clientId.substring(0, 12) + '...',
-          clientIdLength: clientId.length
+          clientIdLength: clientId.length,
+          currentDomain: window.location.hostname,
+          isProduction: window.location.hostname.includes('.smap.site')
         });
+        
+        // 프로덕션 환경에서 추가 도메인 검증
+        if (window.location.hostname.includes('.smap.site')) {
+          console.log('🔐 [GOOGLE OAUTH] 프로덕션 환경 감지 - 도메인 검증 수행');
+          
+          // Google Console에서 nextstep.smap.site 도메인이 등록되어 있는지 확인
+          const allowedDomains = ['nextstep.smap.site', 'app2.smap.site', 'app.smap.site'];
+          const currentDomain = window.location.hostname;
+          
+          if (!allowedDomains.includes(currentDomain)) {
+            console.warn('⚠️ [GOOGLE OAUTH] 등록되지 않은 도메인:', currentDomain);
+            throw new Error(`Google OAuth에 등록되지 않은 도메인입니다: ${currentDomain}`);
+          }
+          
+          console.log('✅ [GOOGLE OAUTH] 도메인 검증 성공:', currentDomain);
+        }
         
         google.accounts.id.initialize({
           client_id: clientId,
@@ -521,7 +538,19 @@ export default function SignInPage() {
           },
           error_callback: (error: any) => {
             console.error('[GOOGLE SDK] 로그인 실패:', error);
-            showError('Google 로그인에 실패했습니다.');
+            
+            let errorMessage = 'Google 로그인에 실패했습니다.';
+            if (window.location.hostname.includes('.smap.site')) {
+              errorMessage += '\n\n프로덕션 환경에서 Google OAuth 설정을 확인해주세요.';
+              errorMessage += '\n\n해결 방법:';
+              errorMessage += '\n1. Google Cloud Console에서 도메인 등록 확인';
+              errorMessage += '\n2. Client ID 설정 확인';
+              errorMessage += '\n3. 전화번호 로그인 사용';
+            } else {
+              errorMessage += '\n\n다시 시도하거나 전화번호 로그인을 사용해주세요.';
+            }
+            
+            showError(errorMessage);
             setIsLoading(false);
           }
         });
@@ -2160,25 +2189,64 @@ export default function SignInPage() {
             if (typeof (window as any).google === 'undefined') {
               console.log('[GOOGLE LOGIN] Google SDK 로드 시작...');
               
+              // 프로덕션 환경 감지
+              const isProduction = window.location.hostname.includes('.smap.site');
+              const isIOSWebView = typeof window !== 'undefined' && 
+                                  window.webkit && 
+                                  window.webkit.messageHandlers;
+              
+              console.log(`🔐 [GOOGLE SDK] 환경: ${isProduction ? '프로덕션' : '개발'}, iOS: ${isIOSWebView}`);
+              
               // Google SDK 동적 로드
               const script = document.createElement('script');
               script.src = 'https://accounts.google.com/gsi/client';
               script.async = true;
               script.defer = true;
+              script.id = 'google-gsi-client';
+              
+              let hasErrorOccurred = false;
               
               script.onload = () => {
                 console.log('[GOOGLE LOGIN] Google SDK 로드 완료');
-                // SDK 로드 후 로그인 재시도
-                setTimeout(() => handleGoogleSDKLogin(), 500);
+                if (!hasErrorOccurred) {
+                  // SDK 로드 후 로그인 재시도
+                  setTimeout(() => handleGoogleSDKLogin(), 500);
+                }
               };
               
               script.onerror = () => {
                 console.error('[GOOGLE LOGIN] Google SDK 로드 실패');
-                showError('Google SDK 로드에 실패했습니다.\n\n잠시 후 다시 시도하거나\n전화번호 로그인을 사용해주세요.');
+                hasErrorOccurred = true;
+                
+                let errorMessage = 'Google SDK 로드에 실패했습니다.';
+                if (isProduction) {
+                  errorMessage += '\n\n프로덕션 환경에서 Google 서비스에 접근할 수 없습니다.\n도메인 등록을 확인해주세요.';
+                }
+                errorMessage += '\n\n잠시 후 다시 시도하거나\n전화번호 로그인을 사용해주세요.';
+                
+                showError(errorMessage);
                 setIsLoading(false);
               };
               
+              // 중복 로드 방지
+              const existingScript = document.getElementById('google-gsi-client');
+              if (existingScript) {
+                existingScript.remove();
+              }
+              
               document.head.appendChild(script);
+              
+              // 타임아웃 설정 (프로덕션에서는 더 긴 시간)
+              const timeout = isProduction ? 15000 : 10000;
+              setTimeout(() => {
+                if (typeof (window as any).google === 'undefined' && !hasErrorOccurred) {
+                  console.warn(`[GOOGLE LOGIN] SDK 로드 타임아웃 (${timeout}ms)`);
+                  hasErrorOccurred = true;
+                  showError(`Google 서비스 연결에 시간이 너무 오래 걸립니다 (${timeout/1000}초).\n\n네트워크 연결을 확인하고\n다시 시도해주세요.`);
+                  setIsLoading(false);
+                }
+              }, timeout);
+              
               return;
             } else {
               // SDK가 이미 로드되어 있으면 바로 실행
