@@ -142,9 +142,33 @@ export default function SignInPage() {
       forceCreateMessageHandlers();
     }
     
-    // 🚨 강제 웹 SDK 모드 활성화 (임시)
-    console.log('🚨 [EMERGENCY] iOS 앱 빌드 대기 중, 강제 웹 SDK 모드 활성화');
-    (window as any).__FORCE_WEB_SDK_MODE__ = true;
+    // 🚨 강제 웹 SDK 모드 비활성화 - 네이티브 로그인 강제 사용
+    console.log('🚨 [NATIVE ONLY] 네이티브 구글 로그인 강제 모드 활성화');
+    (window as any).__FORCE_WEB_SDK_MODE__ = false;
+    (window as any).__FORCE_NATIVE_GOOGLE_LOGIN__ = true;
+    
+    // 🚨 네이티브 구글 로그인 콜백 함수 등록 (iOS 앱에서 호출 가능)
+    (window as any).onNativeGoogleLoginSuccess = (userInfo: any) => {
+      console.log('🎯 [NATIVE CALLBACK] iOS 앱에서 구글 로그인 성공 콜백 수신:', userInfo);
+      
+      // 로딩 해제
+      setIsLoading(false);
+      
+      // 홈으로 리다이렉트
+      router.replace('/home');
+    };
+    
+    (window as any).onNativeGoogleLoginError = (error: any) => {
+      console.error('❌ [NATIVE CALLBACK] iOS 앱에서 구글 로그인 실패 콜백 수신:', error);
+      
+      // 로딩 해제
+      setIsLoading(false);
+      
+      // 에러 표시
+      showError(error?.message || '네이티브 구글 로그인에 실패했습니다.');
+    };
+    
+    console.log('✅ [NATIVE CALLBACK] 네이티브 구글 로그인 콜백 함수 등록 완료');
     
     // 🔍 즉시 강제 핸들러 확인 (더 상세한 디버깅)
     setTimeout(() => {
@@ -2181,7 +2205,13 @@ export default function SignInPage() {
       const hasNoMessageHandlers = !hasMessageHandlers || !hasSmapIos;
       const isForceWebMode = !!(window as any).__FORCE_WEB_SDK_MODE__;
       
-      if (isForceWebMode || (isNexStepDomain && hasNoMessageHandlers)) {
+      // 🚨 네이티브 강제 모드일 때는 무조건 네이티브 시도
+      const isForceNativeMode = !!(window as any).__FORCE_NATIVE_GOOGLE_LOGIN__;
+      
+      if (isForceNativeMode) {
+        console.log('🔥 [GOOGLE LOGIN] 네이티브 강제 모드 - MessageHandler 없어도 네이티브 시도');
+        // MessageHandler가 없어도 네이티브 로그인 강제 시도
+      } else if (isForceWebMode || (isNexStepDomain && hasNoMessageHandlers)) {
         const reason = isForceWebMode ? '강제 웹 SDK 모드' : 'MessageHandler 없음';
         console.log(`🌐 [GOOGLE LOGIN] ${reason} - 웹 SDK 강제 사용`);
         
@@ -2207,20 +2237,98 @@ export default function SignInPage() {
           'SDK유무': hasGoogleSDK
         });
         
-        // ios-bridge를 통한 네이티브 Google Sign-In 시도
-        if (hasIosBridge && (window as any).iosBridge.googleSignIn?.signIn) {
-          console.log('🌉 [GOOGLE LOGIN] ios-bridge.js googleSignIn 메서드 사용');
+        // 🚨 네이티브 강제 모드이거나 ios-bridge를 통한 네이티브 Google Sign-In 시도
+        const isForceNativeMode = !!(window as any).__FORCE_NATIVE_GOOGLE_LOGIN__;
+        
+        if (isForceNativeMode || (hasIosBridge && (window as any).iosBridge.googleSignIn?.signIn)) {
+          console.log(`🌉 [GOOGLE LOGIN] ${isForceNativeMode ? '강제 네이티브 모드' : 'ios-bridge.js googleSignIn 메서드'} 사용`);
           
           try {
             console.log('📱 [GOOGLE LOGIN] 네이티브 호출 실행 중...');
-            (window as any).iosBridge.googleSignIn.signIn();
-            console.log('✅ [GOOGLE LOGIN] ios-bridge 메시지 전송 완료, 콜백 대기 중...');
+            
+            if (isForceNativeMode) {
+              console.log('🔥 [GOOGLE LOGIN] 강제 네이티브 모드 - 모든 방법 시도');
+              
+              // 🚨 1. 직접 MessageHandler 시도 (강제 모드)
+              const webkit = (window as any).webkit;
+              if (webkit?.messageHandlers?.smapIos) {
+                console.log('🎯 [GOOGLE LOGIN] MessageHandler 발견 - 직접 호출');
+                webkit.messageHandlers.smapIos.postMessage({
+                  action: 'googleSignIn',
+                  type: 'googleLogin',
+                  forceMode: true
+                });
+              } else {
+                console.log('🚨 [GOOGLE LOGIN] MessageHandler 없음 - 네이티브 함수 직접 호출 시도');
+                
+                // 🚨 2. 네이티브 함수 직접 호출 시도
+                const nativeFunctions = [
+                  'googleSignIn',
+                  'nativeGoogleLogin', 
+                  'iosGoogleSignIn',
+                  'startGoogleLogin',
+                  'googleLogin'
+                ];
+                
+                let callSuccess = false;
+                for (const funcName of nativeFunctions) {
+                  if (typeof (window as any)[funcName] === 'function') {
+                    console.log(`🎯 [GOOGLE LOGIN] ${funcName}() 함수 발견 - 호출 시도`);
+                    try {
+                      (window as any)[funcName]();
+                      callSuccess = true;
+                      break;
+                    } catch (e) {
+                      console.warn(`⚠️ [GOOGLE LOGIN] ${funcName}() 호출 실패:`, e);
+                    }
+                  }
+                }
+                
+                if (!callSuccess) {
+                  console.log('🚨 [GOOGLE LOGIN] 직접 네이티브 함수 호출 실패 - iOS 브리지 강제 생성 시도');
+                  
+                                     // 🚨 3. iOS 브리지 강제 생성 시도
+                   const windowWebkit = (window as any).webkit;
+                   if (!windowWebkit) {
+                     (window as any).webkit = {};
+                   }
+                   if (!(window as any).webkit.messageHandlers) {
+                     (window as any).webkit.messageHandlers = {};
+                   }
+                   if (!(window as any).webkit.messageHandlers.smapIos) {
+                     (window as any).webkit.messageHandlers.smapIos = {
+                       postMessage: function(message: any) {
+                         console.log('🚨 [FAKE WEBKIT] 가짜 webkit으로 메시지 전송:', message);
+                         // iOS 앱이 직접 감지하길 기대
+                         if (typeof (window as any).handleNativeGoogleLogin === 'function') {
+                           (window as any).handleNativeGoogleLogin(message);
+                         }
+                       }
+                     };
+                   }
+                   
+                   (window as any).webkit.messageHandlers.smapIos.postMessage({
+                     action: 'googleSignIn',
+                     type: 'googleLogin',
+                     forceMode: true,
+                     fake: true
+                   });
+                }
+              }
+              
+            } else {
+              // 기존 ios-bridge 로직
+              (window as any).iosBridge.googleSignIn.signIn();
+            }
+            
+            console.log('✅ [GOOGLE LOGIN] 네이티브 호출 전송 완료, 콜백 대기 중...');
             
             // iOS 로그 전송 - 네이티브 호출 성공
             sendLogToiOS('info', '✅ Google Sign-In 네이티브 호출 성공', {
               timestamp: new Date().toISOString(),
               waitingFor: 'native callback',
-              step: 'native_call_success'
+              step: 'native_call_success',
+              forceMode: isForceNativeMode
             });
             
             return;
@@ -2231,10 +2339,19 @@ export default function SignInPage() {
             sendLogToiOS('error', '❌ Google Sign-In 네이티브 호출 오류', {
               timestamp: new Date().toISOString(),
               error: error?.toString(),
-              step: 'native_call_error'
+              step: 'native_call_error',
+              forceMode: isForceNativeMode
             });
             
-            // 오류 발생 시 웹 SDK로 fallback
+            // 강제 네이티브 모드면 웹 SDK 사용 안함
+            if (isForceNativeMode) {
+              console.log('🚨 [GOOGLE LOGIN] 강제 네이티브 모드 - 웹 SDK 사용 금지');
+              setIsLoading(false);
+              showError('네이티브 구글 로그인을 사용할 수 없습니다. iOS 앱을 다시 빌드해주세요.');
+              return;
+            }
+            
+            // 오류 발생 시 웹 SDK로 fallback (일반 모드만)
           }
         }
 
