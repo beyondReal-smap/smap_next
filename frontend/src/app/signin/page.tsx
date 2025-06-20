@@ -211,19 +211,53 @@ export default function SignInPage() {
           } else {
             console.log('[NATIVE CALLBACK] 기존회원 - 홈으로 이동');
             
-            // authService에 사용자 정보 설정
+            // 🚨 강력한 인증 상태 설정
             if (data.user) {
+              console.log('[NATIVE CALLBACK] 사용자 데이터 설정:', data.user);
+              
+              // 1. AuthService에 사용자 데이터 설정
               authService.setUserData(data.user);
+              
+              // 2. 로컬 스토리지에도 직접 저장 (백업)
+              localStorage.setItem('user', JSON.stringify(data.user));
+              localStorage.setItem('isLoggedIn', 'true');
+              
+              // 3. 세션 스토리지에도 저장
+              sessionStorage.setItem('authToken', 'authenticated');
+              
+              console.log('[NATIVE CALLBACK] 모든 저장소에 인증 상태 저장 완료');
             }
             
             console.log('[NATIVE CALLBACK] 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
             
-            // AuthContext 상태를 수동으로 동기화
-            await refreshAuthState();
-            console.log('[NATIVE CALLBACK] AuthContext 상태 동기화 완료');
+            // 4. AuthContext 상태를 수동으로 동기화
+            try {
+              await refreshAuthState();
+              console.log('[NATIVE CALLBACK] AuthContext 상태 동기화 완료');
+              
+              // 5. 동기화 후 상태 재확인
+              const isLoggedInAfterRefresh = authService.isLoggedIn();
+              console.log('[NATIVE CALLBACK] 동기화 후 로그인 상태:', isLoggedInAfterRefresh);
+              
+              if (!isLoggedInAfterRefresh) {
+                console.warn('[NATIVE CALLBACK] ⚠️ 동기화 후에도 로그인 상태가 false');
+                
+                // 6. 강제로 AuthContext 상태 설정
+                if (typeof refreshAuthState === 'function') {
+                  console.log('[NATIVE CALLBACK] 강제 AuthContext 재설정 시도');
+                  await refreshAuthState();
+                }
+              }
+              
+            } catch (error) {
+              console.error('[NATIVE CALLBACK] AuthContext 동기화 실패:', error);
+            }
             
-            // home으로 리다이렉션
-            router.replace('/home');
+            // 7. 짧은 지연 후 리다이렉션 (상태 안정화 대기)
+            setTimeout(() => {
+              console.log('[NATIVE CALLBACK] 홈으로 리다이렉션 실행');
+              router.replace('/home');
+            }, 500);
           }
         } else {
           console.error('[NATIVE CALLBACK] 서버 인증 실패:', data.error);
@@ -283,7 +317,24 @@ export default function SignInPage() {
             window.location.href = '/register?social=google';
           } else {
             console.log('✅ [NATIVE DATA] 기존 사용자 - 홈으로 이동');
-            window.location.href = '/home';
+            
+            // 🚨 강력한 인증 상태 설정 (전역 변수 버전)
+            if (result.user) {
+              console.log('[NATIVE DATA] 사용자 데이터 설정:', result.user);
+              
+              // AuthService 및 스토리지에 저장
+              authService.setUserData(result.user);
+              localStorage.setItem('user', JSON.stringify(result.user));
+              localStorage.setItem('isLoggedIn', 'true');
+              sessionStorage.setItem('authToken', 'authenticated');
+              
+              console.log('[NATIVE DATA] 모든 저장소에 인증 상태 저장 완료');
+            }
+            
+            // 500ms 후 리다이렉션
+            setTimeout(() => {
+              window.location.href = '/home';
+            }, 500);
           }
         } else {
           throw new Error(result.message || '인증 실패');
