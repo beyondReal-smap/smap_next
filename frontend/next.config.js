@@ -8,14 +8,12 @@ const nextConfig = {
     memoryBasedWorkersCount: true,
   },
   
-  // 개발 모드 설정 - Fast Refresh 비활성화
+  // 개발 모드 설정
   ...(process.env.NODE_ENV === 'development' && {
     onDemandEntries: {
       maxInactiveAge: 25 * 1000,
       pagesBufferLength: 2,
     },
-    // Fast Refresh 완전 비활성화
-    fastRefresh: false,
   }),
   
   // 이미지 최적화 (기본 설정)

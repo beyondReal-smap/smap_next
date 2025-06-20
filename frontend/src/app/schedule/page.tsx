@@ -1064,13 +1064,13 @@ export default function SchedulePage() {
     console.log('[eventsForSelectedDay] 전체 이벤트 수:', events.length);
     console.log('[eventsForSelectedDay] 전체 이벤트 목록:', events);
     
-    const filteredEvents = events
+    const filteredEvents = (events && Array.isArray(events)) ? events
       .filter(event => {
         const matches = event.date === dateString;
         // console.log(`[eventsForSelectedDay] 이벤트 "${event.title}" (${event.date}) - 매칭:`, matches);
         return matches;
       })
-      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+      .sort((a, b) => a.startTime.localeCompare(b.startTime)) : [];
     
     console.log('[eventsForSelectedDay] 필터링된 이벤트:', filteredEvents);
     return filteredEvents;
@@ -1449,7 +1449,7 @@ export default function SchedulePage() {
     }
 
     // 현재 사용자의 권한 확인 (로그인한 사용자)
-    const currentUser = scheduleGroupMembers.find(member => member.isSelected);
+    const currentUser = (scheduleGroupMembers && Array.isArray(scheduleGroupMembers)) ? scheduleGroupMembers.find(member => member.isSelected) : null;
     const isOwnerOrLeader = currentUser && 
       (currentUser.sgdt_owner_chk === 'Y' || currentUser.sgdt_leader_chk === 'Y');
 
@@ -1516,13 +1516,15 @@ export default function SchedulePage() {
               const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
               const selectedWeekdayIndices: string[] = [];
               
-              selectedDays.split(',').forEach(dayName => {
-                const index = dayNames.indexOf(dayName.trim());
-                if (index !== -1) {
-                  // 일요일(0)을 7로 변환, 나머지는 그대로
-                  selectedWeekdayIndices.push(index === 0 ? '7' : index.toString());
-                }
-              });
+              if (selectedDays) {
+                selectedDays.split(',').forEach(dayName => {
+                  const index = dayNames.indexOf(dayName.trim());
+                  if (index !== -1) {
+                    // 일요일(0)을 7로 변환, 나머지는 그대로
+                    selectedWeekdayIndices.push(index === 0 ? '7' : index.toString());
+                  }
+                });
+              }
               
               const weekdaysString = selectedWeekdayIndices.join(',');
               console.log('[getRepeatJson] 🔄 매주 다중 요일 반복 설정:', { 
@@ -1661,7 +1663,7 @@ export default function SchedulePage() {
         
         if (selectedMemberId) {
           // selectedMemberId가 있으면 해당 멤버만 찾기
-          selectedMember = scheduleGroupMembers.find(member => member.id === selectedMemberId);
+          selectedMember = (scheduleGroupMembers && Array.isArray(scheduleGroupMembers)) ? scheduleGroupMembers.find(member => member.id === selectedMemberId) : undefined;
           console.log('[handleSaveEvent] 🎯 selectedMemberId로 멤버 찾기:', {
             selectedMemberId,
             foundMember: selectedMember ? {
@@ -1673,7 +1675,7 @@ export default function SchedulePage() {
           });
         } else {
           // selectedMemberId가 없으면 기본 선택된 멤버 사용
-          selectedMember = scheduleGroupMembers.find(member => member.isSelected);
+          selectedMember = (scheduleGroupMembers && Array.isArray(scheduleGroupMembers)) ? scheduleGroupMembers.find(member => member.isSelected) : undefined;
           console.log('[handleSaveEvent] 🎯 기본 선택된 멤버 사용:', {
             foundMember: selectedMember ? {
               id: selectedMember.id,
@@ -1701,13 +1703,13 @@ export default function SchedulePage() {
       console.log('[handleSaveEvent] 🔍 멤버 선택 디버깅:', {
         selectedMemberId,
         scheduleGroupMembersCount: scheduleGroupMembers.length,
-        scheduleGroupMembers: scheduleGroupMembers.map(m => ({
+        scheduleGroupMembers: (scheduleGroupMembers && Array.isArray(scheduleGroupMembers)) ? scheduleGroupMembers.map(m => ({
           id: m.id,
           name: m.name,
           mt_idx: m.mt_idx,
           sgdt_idx: m.sgdt_idx,
           isSelected: m.isSelected
-        })),
+        })) : [],
         currentMember: currentUser ? {
           id: currentUser.id,
           name: currentUser.name,
@@ -1814,7 +1816,7 @@ export default function SchedulePage() {
           } else {
             // currentEventDetails가 null인 경우 newEvent.id를 사용하여 events에서 찾기
             console.warn('[handleSaveEvent] ⚠️ currentEventDetails가 null, events에서 찾기 시도');
-            const foundEvent = events.find(event => event.id === newEvent.id);
+            const foundEvent = (events && Array.isArray(events)) ? events.find(event => event.id === newEvent.id) : null;
             
             if (foundEvent) {
               originalEventDetails = { ...foundEvent };
@@ -1849,9 +1851,9 @@ export default function SchedulePage() {
           };
           
           // 로컬 상태에서 즉시 업데이트 (UI 즉시 반영)
-          setEvents(prev => prev.map(event => 
+          setEvents(prev => (prev && Array.isArray(prev)) ? prev.map(event => 
             event.id === originalEventId ? updatedEvent : event
-          ));
+          ) : []);
           
           // 캐시에서도 업데이트
           updateCacheForEvent(updatedEvent, 'update');
@@ -1983,9 +1985,9 @@ export default function SchedulePage() {
             isAllDay: newEvent.allDay,
             tgtMtIdx: selectedMember?.mt_idx || null,
             repeatJsonV: repeatData.sst_repeat_json_v,
-            tgtSgdtOwnerChk: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_owner_chk || 'N', // 타겟 멤버의 오너 권한
-            tgtSgdtLeaderChk: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_leader_chk || 'N', // 타겟 멤버의 리더 권한
-            tgtSgdtIdx: scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_idx, // 타겟 멤버의 그룹 상세 인덱스
+            tgtSgdtOwnerChk: (scheduleGroupMembers && Array.isArray(scheduleGroupMembers)) ? (scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_owner_chk || 'N') : 'N', // 타겟 멤버의 오너 권한
+            tgtSgdtLeaderChk: (scheduleGroupMembers && Array.isArray(scheduleGroupMembers)) ? (scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_leader_chk || 'N') : 'N', // 타겟 멤버의 리더 권한
+            tgtSgdtIdx: (scheduleGroupMembers && Array.isArray(scheduleGroupMembers)) ? scheduleGroupMembers.find(m => m.id === selectedMemberId)?.sgdt_idx : undefined, // 타겟 멤버의 그룹 상세 인덱스
             sst_pidx: undefined
           };
           
@@ -2068,7 +2070,7 @@ export default function SchedulePage() {
     }
 
     // 현재 사용자의 권한 확인
-    const currentMember = scheduleGroupMembers.find(member => member.isSelected);
+    const currentMember = (scheduleGroupMembers && Array.isArray(scheduleGroupMembers)) ? scheduleGroupMembers.find(member => member.isSelected) : null;
     const isOwnerOrLeader = currentMember && 
       (currentMember.sgdt_owner_chk === 'Y' || currentMember.sgdt_leader_chk === 'Y');
 
@@ -2100,7 +2102,7 @@ export default function SchedulePage() {
         console.log('[handleDeleteEvent] 스케줄 삭제 성공');
         
         // 로컬 상태에서 즉시 제거 (UI 즉시 반영)
-        setEvents(prev => prev.filter(event => event.id !== selectedEventDetails.id));
+        setEvents(prev => (prev && Array.isArray(prev)) ? prev.filter(event => event.id !== selectedEventDetails.id) : []);
         setSelectedEventDetails(null);
         
         // 캐시에서도 제거  

@@ -133,6 +133,12 @@ export default function RootLayout({
         
         {/* 폰트 프리로드 제거 - CSS에서 필요시 로드되도록 함 */}
         
+        {/* 전역 에러 핸들러 (가장 먼저 로드) */}
+        <script src="/error-handler.js" async></script>
+        
+        {/* iOS 웹뷰 타임아웃 방지 및 최적화 스크립트 */}
+        <script src="/ios-webview-fix.js" async></script>
+        
         {/* iOS 웹뷰 브릿지 */}
         <script src="/ios-bridge.js" async></script>
         

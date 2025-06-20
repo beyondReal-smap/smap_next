@@ -1,3 +1,219 @@
+// iOS WebView 타임아웃 방지 및 빠른 로딩 최적화
+(function() {
+  'use strict';
+  
+  // iOS WebView 감지 및 즉시 최적화 시작
+  const isIOSWebView = window.webkit && window.webkit.messageHandlers;
+  
+  if (isIOSWebView) {
+    console.log('[iOS WebView] 타임아웃 방지 및 최적화 시작...');
+    
+    // 0. 전역 객체 초기화 문제 방지 (Array, Object 등)
+    function ensureGlobalObjects() {
+      try {
+        // Array 객체가 없거나 손상된 경우 복구
+        if (typeof Array === 'undefined' || !Array || typeof Array.isArray !== 'function') {
+          console.warn('[iOS WebView] Array 객체 손상 감지 - 복구 시도');
+          if (typeof window !== 'undefined') {
+            // 네이티브 Array 함수 복구
+            window.Array = window.Array || function() {
+              const arr = [];
+              for (let i = 0; i < arguments.length; i++) {
+                arr[i] = arguments[i];
+              }
+              return arr;
+            };
+            
+            // Array.isArray 메소드 복구
+            if (!window.Array.isArray) {
+              window.Array.isArray = function(obj) {
+                return Object.prototype.toString.call(obj) === '[object Array]';
+              };
+            }
+          }
+        }
+        
+        // Object 객체가 없거나 손상된 경우 복구
+        if (typeof Object === 'undefined' || !Object || !Object.prototype || !Object.prototype.toString) {
+          console.warn('[iOS WebView] Object 객체 손상 감지 - 복구 시도');
+          // Object는 더 복잡하므로 기본적인 복구만 시도
+          if (typeof window !== 'undefined' && !window.Object) {
+            window.Object = {};
+          }
+        }
+        
+        console.log('[iOS WebView] 전역 객체 상태:', {
+          Array: typeof Array,
+          ArrayIsArray: typeof Array !== 'undefined' && Array && typeof Array.isArray === 'function',
+          Object: typeof Object,
+          ObjectPrototype: typeof Object !== 'undefined' && Object && Object.prototype && Object.prototype.toString
+        });
+      } catch (error) {
+        console.error('[iOS WebView] 전역 객체 복구 실패:', error);
+      }
+    }
+    
+    // 즉시 전역 객체 확인 및 복구
+    ensureGlobalObjects();
+    
+    // 페이지 로드 완료 후 다시 한 번 확인
+    document.addEventListener('DOMContentLoaded', ensureGlobalObjects);
+    window.addEventListener('load', ensureGlobalObjects);
+    
+    // 1. 즉시 로딩 상태 표시 (백그라운드 작업 타임아웃 방지)
+    document.addEventListener('DOMContentLoaded', function() {
+      const loadingIndicator = document.createElement('div');
+      loadingIndicator.id = 'ios-loading-indicator';
+      loadingIndicator.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 10000;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        display: none;
+      `;
+      loadingIndicator.innerHTML = `
+        <div style="width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top: 3px solid #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div>
+        <p style="margin: 0; color: #64748b; font-size: 14px;">로딩 중...</p>
+        <style>
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        </style>
+      `;
+      document.body.appendChild(loadingIndicator);
+      
+      // 로딩이 5초 이상 걸리면 표시
+      const showLoadingTimer = setTimeout(() => {
+        loadingIndicator.style.display = 'block';
+      }, 5000);
+      
+      // 페이지 로드 완료 시 숨김
+      window.addEventListener('load', () => {
+        clearTimeout(showLoadingTimer);
+        loadingIndicator.style.display = 'none';
+      });
+      
+      // React 마운트 완료 감지
+      const checkReactMount = setInterval(() => {
+        if (document.querySelector('[data-react-mount]') || 
+            document.querySelector('.min-h-screen') ||
+            document.querySelector('#home-page-container')) {
+          clearTimeout(showLoadingTimer);
+          loadingIndicator.style.display = 'none';
+          clearInterval(checkReactMount);
+        }
+      }, 500);
+    });
+    
+    // 2. 백그라운드 작업 타임아웃 방지
+    let backgroundTaskId = null;
+    
+    function startBackgroundTask() {
+      if (window.webkit?.messageHandlers?.smapIos) {
+        try {
+          window.webkit.messageHandlers.smapIos.postMessage({
+            type: 'startBackgroundTask',
+            data: { reason: 'page_loading' }
+          });
+          console.log('[iOS WebView] 백그라운드 작업 시작');
+        } catch (error) {
+          console.warn('[iOS WebView] 백그라운드 작업 시작 실패:', error);
+        }
+      }
+    }
+    
+    function endBackgroundTask() {
+      if (window.webkit?.messageHandlers?.smapIos) {
+        try {
+          window.webkit.messageHandlers.smapIos.postMessage({
+            type: 'endBackgroundTask',
+            data: {}
+          });
+          console.log('[iOS WebView] 백그라운드 작업 종료');
+        } catch (error) {
+          console.warn('[iOS WebView] 백그라운드 작업 종료 실패:', error);
+        }
+      }
+    }
+    
+    // 페이지 로딩 시작 시 백그라운드 작업 시작
+    startBackgroundTask();
+    
+    // 페이지 로딩 완료 시 백그라운드 작업 종료
+    window.addEventListener('load', endBackgroundTask);
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(endBackgroundTask, 2000); // 2초 후 종료
+    });
+    
+    // 3. 네트워크 요청 타임아웃 단축
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+      const timeoutMs = options.timeout || 8000; // 8초로 단축
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      
+      const fetchOptions = {
+        ...options,
+        signal: controller.signal
+      };
+      
+      return originalFetch(url, fetchOptions)
+        .finally(() => clearTimeout(timeoutId))
+        .catch(error => {
+          if (error.name === 'AbortError') {
+            console.warn('[iOS WebView] 요청 타임아웃:', url);
+            // 타임아웃 시 간단한 재시도
+            return originalFetch(url, { ...options, timeout: 5000 });
+          }
+          throw error;
+        });
+    };
+    
+    // 4. 메모리 최적화
+    function optimizeMemoryForIOS() {
+      // 사용하지 않는 DOM 요소 정리
+      const cleanupElements = document.querySelectorAll('[data-cleanup="true"]');
+      cleanupElements.forEach(el => el.remove());
+      
+      // 가비지 컬렉션 힌트
+      if (window.gc) {
+        setTimeout(() => {
+          try {
+            window.gc();
+          } catch (e) {
+            // 무시
+          }
+        }, 5000);
+      }
+    }
+    
+    // 5초 후 메모리 최적화 실행
+    setTimeout(optimizeMemoryForIOS, 5000);
+    
+    // 5. 페이지 가시성 변경 시 최적화
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) {
+        // 페이지가 숨겨질 때 백그라운드 작업 종료
+        endBackgroundTask();
+      } else {
+        // 페이지가 다시 보일 때 백그라운드 작업 시작
+        startBackgroundTask();
+      }
+    });
+    
+    console.log('[iOS WebView] 타임아웃 방지 및 최적화 설정 완료');
+  }
+})();
+
 // iOS WebView 특화 수정사항
 (function() {
   'use strict';
