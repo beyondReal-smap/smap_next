@@ -269,29 +269,38 @@ export default function RegisterPage() {
     const socialProvider = urlParams.get('social');
     
     if (socialProvider) {
-      const socialData = localStorage.getItem('socialLoginData');
+      // sessionStorage에서 소셜 로그인 데이터 확인
+      const socialData = sessionStorage.getItem('socialLoginData');
       if (socialData) {
         try {
           const parsedData: SocialLoginData = JSON.parse(socialData);
           
+          console.log(`🔥 [REGISTER] ${parsedData.provider} 소셜 로그인 데이터 로드:`, parsedData);
+          
           setRegisterData(prev => ({
             ...prev,
-            mt_id: parsedData.email, // 이메일을 아이디로 사용
-            mt_email: parsedData.email,
-            mt_name: parsedData.name,
-            mt_nickname: parsedData.nickname,
+            mt_id: parsedData.email || '', // 이메일을 아이디로 사용
+            mt_email: parsedData.email || '',
+            mt_name: parsedData.name || '',
+            mt_nickname: parsedData.nickname || '',
             isSocialLogin: true,
             socialProvider: parsedData.provider,
-            socialId: parsedData.google_id || parsedData.kakao_id || ''
+            socialId: parsedData.kakao_id || parsedData.google_id || ''
           }));
           
-          // 소셜 로그인 시 약관 동의 단계로 시작
+          // 소셜 로그인 시 약관 동의 단계로 시작 (소셜 로그인이므로 전화번호 인증은 생략)
           setCurrentStep(REGISTER_STEPS.TERMS);
           
-          console.log(`${parsedData.provider} 소셜 로그인 데이터 로드 완료:`, parsedData);
+          console.log(`🔥 [REGISTER] ${parsedData.provider} 소셜 로그인 데이터 로드 완료`);
+          
+          // 사용 완료 후 sessionStorage에서 제거
+          sessionStorage.removeItem('socialLoginData');
+          
         } catch (error) {
-          console.error('소셜 로그인 데이터 파싱 오류:', error);
+          console.error('🔥 [REGISTER] 소셜 로그인 데이터 파싱 오류:', error);
         }
+      } else {
+        console.warn('🔥 [REGISTER] URL에 social 파라미터가 있지만 socialLoginData가 없음');
       }
     }
   }, []);

@@ -922,10 +922,80 @@ window.kakaoSignInSuccess = function(token, userInfo) {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        console.log('📱 [KAKAO-iOS] 백엔드 인증 성공, 홈으로 이동');
+                        console.log('📱 [KAKAO-iOS] 백엔드 인증 성공:', {
+                            isNewUser: data.isNewUser,
+                            hasUser: !!data.user,
+                            hasSocialData: !!data.socialLoginData
+                        });
                         
-                        // 성공 시 홈으로 리다이렉트
-                        window.location.href = '/home';
+                        // 🔥 신규회원/기존회원에 따른 분기 처리
+                        if (data.isNewUser) {
+                            console.log('📱 [KAKAO-iOS] 신규회원 - 회원가입 페이지로 이동');
+                            
+                            // 소셜 로그인 데이터를 sessionStorage에 저장
+                            if (data.socialLoginData) {
+                                sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
+                                console.log('📱 [KAKAO-iOS] 소셜 로그인 데이터 저장 완료');
+                            }
+                            
+                            // 📱 Continue 모달 강제 닫기 시도
+                            try {
+                                // 모든 가능한 모달 닫기 시도
+                                if (window.closeModal) window.closeModal();
+                                if (window.hideContinueModal) window.hideContinueModal();
+                                
+                                // DOM에서 모달 요소 강제 제거
+                                const modals = document.querySelectorAll('.modal, [role="dialog"], .kakao-modal');
+                                modals.forEach(modal => {
+                                    modal.style.display = 'none';
+                                    modal.remove();
+                                });
+                                
+                                // iOS에 모달 닫기 신호 전송
+                                if (window.SmapApp) {
+                                    window.SmapApp.sendMessage('closeModal', { type: 'kakao-login-complete' });
+                                }
+                                
+                                console.log('📱 [KAKAO-iOS] Continue 모달 강제 닫기 완료');
+                            } catch (modalError) {
+                                console.warn('📱 [KAKAO-iOS] 모달 닫기 시도 중 오류:', modalError);
+                            }
+                            
+                            // 회원가입 페이지로 이동 (약간의 지연 후)
+                            setTimeout(() => {
+                                window.location.href = '/register?social=kakao';
+                            }, 100);
+                        } else {
+                            console.log('📱 [KAKAO-iOS] 기존회원 - 홈으로 이동');
+                            
+                            // 📱 Continue 모달 강제 닫기 시도
+                            try {
+                                // 모든 가능한 모달 닫기 시도
+                                if (window.closeModal) window.closeModal();
+                                if (window.hideContinueModal) window.hideContinueModal();
+                                
+                                // DOM에서 모달 요소 강제 제거
+                                const modals = document.querySelectorAll('.modal, [role="dialog"], .kakao-modal');
+                                modals.forEach(modal => {
+                                    modal.style.display = 'none';
+                                    modal.remove();
+                                });
+                                
+                                // iOS에 모달 닫기 신호 전송
+                                if (window.SmapApp) {
+                                    window.SmapApp.sendMessage('closeModal', { type: 'kakao-login-complete' });
+                                }
+                                
+                                console.log('📱 [KAKAO-iOS] Continue 모달 강제 닫기 완료');
+                            } catch (modalError) {
+                                console.warn('📱 [KAKAO-iOS] 모달 닫기 시도 중 오류:', modalError);
+                            }
+                            
+                            // 기존회원은 홈으로 리다이렉트 (약간의 지연 후)
+                            setTimeout(() => {
+                                window.location.href = '/home';
+                            }, 100);
+                        }
                     } else {
                         throw new Error(data.error || '로그인 실패');
                     }

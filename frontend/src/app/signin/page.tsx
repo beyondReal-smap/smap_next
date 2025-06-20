@@ -2689,7 +2689,11 @@ export default function SignInPage() {
               });
 
               if (data.success) {
-                console.log('[KAKAO LOGIN] 카카오 로그인 성공, 사용자 정보:', data.user);
+                console.log('[KAKAO LOGIN] 카카오 로그인 성공:', {
+                  isNewUser: data.isNewUser,
+                  hasUser: !!data.user,
+                  hasSocialData: !!data.socialLoginData
+                });
                 
                 // 🚨 Kakao 로그인 성공 상세 로깅
                 iosLogger.logKakaoLogin('로그인 성공', {
@@ -2702,67 +2706,90 @@ export default function SignInPage() {
                   provider: 'kakao'
                 });
                 
-                // 레거시 iOS 로그 전송 (호환성 유지)
-                sendLogToiOS('info', '💾 카카오 사용자 정보 저장', {
-                  timestamp: new Date().toISOString(),
-                  hasUserData: !!data.user,
-                  userEmail: data.user?.mt_email ? data.user.mt_email.substring(0, 3) + '***' : 'unknown'
+                // 카카오 로그인 성공 햅틱 피드백
+                triggerHapticFeedback(HapticFeedbackType.SUCCESS, '카카오 로그인 성공', { 
+                  component: 'signin', 
+                  action: 'kakao-login', 
+                  userEmail: data.user?.mt_email?.substring(0, 3) + '***' 
                 });
+                console.log('🎮 [SIGNIN] 카카오 로그인 성공 햅틱 피드백 실행');
                 
-                // authService에 사용자 정보 설정 (AuthContext 우회, JWT 토큰은 이미 쿠키에 저장됨)
-                if (data.user) {
-                  authService.setUserData(data.user);
-                  // 토큰은 쿠키에 저장되므로 별도 설정 불필요
-                }
-                
-                console.log('[KAKAO LOGIN] 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
-                
-                // iOS 로그 전송 - AuthContext 동기화 시작
-                sendLogToiOS('info', '🔄 AuthContext 상태 동기화 시작', {
-                  timestamp: new Date().toISOString(),
-                  authServiceData: {
-                    hasUserData: !!authService.getUserData(),
-                    hasToken: !!authService.getToken()
-                  }
-                });
-                
-                // AuthContext 상태를 수동으로 동기화
-                await refreshAuthState();
-                console.log('[KAKAO LOGIN] AuthContext 상태 동기화 완료');
-                
-                // iOS 로그 전송 - AuthContext 동기화 완료
-                sendLogToiOS('info', '✅ AuthContext 상태 동기화 완료', {
-                  timestamp: new Date().toISOString(),
-                  authState: {
-                    isLoggedIn: isLoggedIn,
-                    hasUser: !!authService.getUserData()
-                  }
-                });
-              
-              // 카카오 로그인 성공 햅틱 피드백
-              triggerHapticFeedback(HapticFeedbackType.SUCCESS, '카카오 로그인 성공', { 
-                component: 'signin', 
-                action: 'kakao-login', 
-                userEmail: data.user?.mt_email?.substring(0, 3) + '***' 
-              });
-              console.log('🎮 [SIGNIN] 카카오 로그인 성공 햅틱 피드백 실행');
-              
-              // 리다이렉트 플래그 설정
-              isRedirectingRef.current = true;
-              
-                              // 모든 상태 업데이트 차단
+                // 리다이렉트 플래그 설정
+                isRedirectingRef.current = true;
                 blockAllEffectsRef.current = true;
                 
-                // iOS 로그 전송 - 리다이렉트 시작
-                sendLogToiOS('info', '🚀 Home 페이지로 리다이렉트 시작', {
-                  timestamp: new Date().toISOString(),
-                  redirectMethod: 'router.replace',
-                  targetPage: '/home'
-                });
-                
-                // router.replace 사용 (페이지 새로고침 없이 이동)
-                router.replace('/home');
-                return;
+                // 🔥 신규회원/기존회원에 따른 분기 처리
+                if (data.isNewUser) {
+                  console.log('[KAKAO LOGIN] 신규회원 - 회원가입 페이지로 이동');
+                  
+                  // 레거시 iOS 로그 전송
+                  sendLogToiOS('info', '📝 카카오 신규회원, 회원가입 페이지로 이동', {
+                    timestamp: new Date().toISOString(),
+                    hasEmail: !!data.socialLoginData?.email,
+                    hasNickname: !!data.socialLoginData?.nickname
+                  });
+                  
+                  // 소셜 로그인 데이터를 sessionStorage에 저장
+                  if (data.socialLoginData) {
+                    sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
+                    console.log('[KAKAO LOGIN] 소셜 로그인 데이터 저장 완료');
+                  }
+                  
+                  // 회원가입 페이지로 이동
+                  router.replace('/register?social=kakao');
+                  return;
+                  
+                } else {
+                  console.log('[KAKAO LOGIN] 기존회원 - 홈으로 이동');
+                  
+                  // 레거시 iOS 로그 전송 (호환성 유지)
+                  sendLogToiOS('info', '💾 카카오 사용자 정보 저장', {
+                    timestamp: new Date().toISOString(),
+                    hasUserData: !!data.user,
+                    userEmail: data.user?.mt_email ? data.user.mt_email.substring(0, 3) + '***' : 'unknown'
+                  });
+                  
+                  // authService에 사용자 정보 설정 (AuthContext 우회, JWT 토큰은 이미 쿠키에 저장됨)
+                  if (data.user) {
+                    authService.setUserData(data.user);
+                    // 토큰은 쿠키에 저장되므로 별도 설정 불필요
+                  }
+                  
+                  console.log('[KAKAO LOGIN] 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
+                  
+                  // iOS 로그 전송 - AuthContext 동기화 시작
+                  sendLogToiOS('info', '🔄 AuthContext 상태 동기화 시작', {
+                    timestamp: new Date().toISOString(),
+                    authServiceData: {
+                      hasUserData: !!authService.getUserData(),
+                      hasToken: !!authService.getToken()
+                    }
+                  });
+                  
+                  // AuthContext 상태를 수동으로 동기화
+                  await refreshAuthState();
+                  console.log('[KAKAO LOGIN] AuthContext 상태 동기화 완료');
+                  
+                  // iOS 로그 전송 - AuthContext 동기화 완료
+                  sendLogToiOS('info', '✅ AuthContext 상태 동기화 완료', {
+                    timestamp: new Date().toISOString(),
+                    authState: {
+                      isLoggedIn: isLoggedIn,
+                      hasUser: !!authService.getUserData()
+                    }
+                  });
+                  
+                  // iOS 로그 전송 - 리다이렉트 시작
+                  sendLogToiOS('info', '🚀 Home 페이지로 리다이렉트 시작', {
+                    timestamp: new Date().toISOString(),
+                    redirectMethod: 'router.replace',
+                    targetPage: '/home'
+                  });
+                  
+                  // router.replace 사용 (페이지 새로고침 없이 이동)
+                  router.replace('/home');
+                  return;
+                }
             } else {
               throw new Error(data.error || '로그인에 실패했습니다.');
             }
@@ -3211,15 +3238,11 @@ export default function SignInPage() {
         const data = await response.json();
         
         if (data.success) {
-          console.log('📱 [NATIVE-KAKAO] 백엔드 인증 성공:', data.user);
-          
-          // authService에 사용자 정보 설정
-          if (data.user) {
-            authService.setUserData(data.user);
-          }
-          
-          // AuthContext 상태 동기화
-          await refreshAuthState();
+          console.log('📱 [NATIVE-KAKAO] 백엔드 인증 성공:', {
+            isNewUser: data.isNewUser,
+            hasUser: !!data.user,
+            hasSocialData: !!data.socialLoginData
+          });
           
           // 성공 햅틱 피드백
           triggerHapticFeedback(HapticFeedbackType.SUCCESS, '네이티브 카카오 로그인 성공', { 
@@ -3227,17 +3250,48 @@ export default function SignInPage() {
             action: 'native-kakao-login' 
           });
           
-          // iOS 로그 전송
-          sendLogToiOS('info', '📱 네이티브 카카오 로그인 완료, 홈으로 이동', {
-            userEmail: data.user?.mt_email?.substring(0, 3) + '***'
-          });
-          
           // 리다이렉트 플래그 설정
           isRedirectingRef.current = true;
           blockAllEffectsRef.current = true;
           
-          // 홈으로 리다이렉트
-          router.replace('/home');
+          // 🔥 신규회원/기존회원에 따른 분기 처리
+          if (data.isNewUser) {
+            console.log('📱 [NATIVE-KAKAO] 신규회원 - 회원가입 페이지로 이동');
+            
+            // iOS 로그 전송
+            sendLogToiOS('info', '📱 네이티브 카카오 신규회원, 회원가입 페이지로 이동', {
+              hasEmail: !!data.socialLoginData?.email,
+              hasNickname: !!data.socialLoginData?.nickname
+            });
+            
+            // 소셜 로그인 데이터를 sessionStorage에 저장
+            if (data.socialLoginData) {
+              sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
+              console.log('📱 [NATIVE-KAKAO] 소셜 로그인 데이터 저장 완료');
+            }
+            
+            // 회원가입 페이지로 이동
+            router.replace('/register?social=kakao');
+            
+          } else {
+            console.log('📱 [NATIVE-KAKAO] 기존회원 - 홈으로 이동');
+            
+            // authService에 사용자 정보 설정
+            if (data.user) {
+              authService.setUserData(data.user);
+            }
+            
+            // AuthContext 상태 동기화
+            await refreshAuthState();
+            
+            // iOS 로그 전송
+            sendLogToiOS('info', '📱 네이티브 카카오 기존회원 로그인 완료, 홈으로 이동', {
+              userEmail: data.user?.mt_email?.substring(0, 3) + '***'
+            });
+            
+            // 홈으로 리다이렉트
+            router.replace('/home');
+          }
           
         } else {
           throw new Error(data.error || '로그인에 실패했습니다.');
