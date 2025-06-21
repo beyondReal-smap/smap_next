@@ -1,7 +1,11 @@
 {
   "/icon/route": "app/icon/route.js",
-  "/api/groups/current-user/route": "app/api/groups/current-user/route.js",
+  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
+  "/api/member-location-logs/[mt_idx]/map-markers/route": "app/api/member-location-logs/[mt_idx]/map-markers/route.js",
+  "/api/location-logs/stay-times/[memberId]/route": "app/api/location-logs/stay-times/[memberId]/route.js",
   "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
-  "/setting/page": "app/setting/page.js",
-  "/location/page": "app/location/page.js"
+  "/home/page": "app/home/page.js",
+  "/schedule/page": "app/schedule/page.js",
+  "/logs/page": "app/logs/page.js",
+  "/group/page": "app/group/page.js"
 }
