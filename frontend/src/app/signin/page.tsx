@@ -1919,8 +1919,12 @@ export default function SignInPage() {
     errorProcessedRef.current = false;
     blockAllEffectsRef.current = false;
     preventRemountRef.current = false;
+    isRedirectingRef.current = false; // 🔄 리다이렉트 플래그도 초기화
     
-    console.log('[SIGNIN] 모든 플래그 리셋 완료');
+    // 🔄 로딩 상태도 안전하게 해제
+    setIsLoading(false);
+    
+    console.log('[SIGNIN] 모든 플래그 리셋 완료 - signin 화면으로 복귀 준비');
   };
 
 
@@ -3083,12 +3087,16 @@ export default function SignInPage() {
                 showError(error.message || '로그인 처리 중 오류가 발생했습니다.');
               }
             } finally {
+              // 🔄 로딩 상태 해제 및 리다이렉트 플래그 초기화
               setIsLoading(false);
+              isRedirectingRef.current = false;
+              blockAllEffectsRef.current = false;
               
               // iOS 로그 전송 - 카카오 로그인 success 콜백 완료
               sendLogToiOS('info', '🏁 카카오 로그인 success 콜백 완료', {
                 timestamp: new Date().toISOString(),
-                isLoading: false
+                isLoading: false,
+                isRedirecting: false
               });
             }
         },
@@ -3101,7 +3109,15 @@ export default function SignInPage() {
               error: error ? String(error) : 'unknown error'
             });
             
+            // 🔄 로딩 상태 해제 및 리다이렉트 플래그 초기화
+            setIsLoading(false);
+            isRedirectingRef.current = false;
+            blockAllEffectsRef.current = false;
+            
+            // 에러 메시지 표시
             showError('카카오 로그인에 실패했습니다.');
+            
+            console.log('🔄 [KAKAO LOGIN] 실패 후 signin 화면으로 복귀');
           },
         });
       } catch (error: any) {
@@ -3117,13 +3133,21 @@ export default function SignInPage() {
           } : String(error)
         });
         
+        // 🔄 로딩 상태 해제 및 리다이렉트 플래그 초기화
+        setIsLoading(false);
+        isRedirectingRef.current = false;
+        blockAllEffectsRef.current = false;
+        
         showError('카카오 로그인 중 오류가 발생했습니다.');
+        
+        console.log('🔄 [KAKAO LOGIN] 오류 후 signin 화면으로 복귀');
       } finally {
         // iOS 로그 전송 - 카카오 로그인 프로세스 완료
         sendLogToiOS('info', '🏁 카카오 로그인 프로세스 완료', {
           timestamp: new Date().toISOString(),
           finalState: {
-            isLoading: false
+            isLoading: false,
+            isRedirecting: false
           }
         });
       }
@@ -4264,12 +4288,35 @@ export default function SignInPage() {
             {/* Kakao 로그인 버튼 */}
             <button
               type="button"
-              onClick={handleKakaoLogin}
+              onClick={(e) => {
+                console.log('💬 [KAKAO LOGIN] 버튼 클릭됨!');
+                sendLogToiOS('info', '💬 Kakao 로그인 버튼 클릭됨', {
+                  timestamp: new Date().toISOString(),
+                  event: 'button_click',
+                  isLoading: isLoading,
+                  buttonDisabled: isLoading
+                });
+                
+                // 햅틱 피드백 (버튼 클릭 시)
+                triggerHapticFeedback(HapticFeedbackType.LIGHT, 'Kakao 로그인 버튼 클릭', { 
+                  component: 'signin', 
+                  action: 'kakao-login-button-click' 
+                });
+                
+                // 실제 핸들러 호출
+                handleKakaoLogin();
+              }}
               disabled={isLoading}
               className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-black bg-[#FEE500] hover:bg-[#F0D900] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
+              onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #FEE500'}
+              onBlur={(e) => (e.target as HTMLButtonElement).style.boxShadow = ''}
             >
               <RiKakaoTalkFill className="w-5 h-5 mr-3" aria-hidden="true" />
-              Kakao 계정으로 로그인
+              {isLoading ? (
+                <LoadingSpinner message="로그인 중..." fullScreen={false} />
+              ) : (
+                'Kakao 계정으로 로그인'
+              )}
             </button>
           </div>
         </motion.div>
