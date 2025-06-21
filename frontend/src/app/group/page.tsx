@@ -1053,41 +1053,82 @@ function GroupPageContent() {
         
 
 
-        {/* 개선된 헤더 */}
+        {/* 개선된 헤더 - AnimatePresence로 감싸서 뷰 변경 시 애니메이션 적용 */}
         <motion.header 
-            initial={{ y: -100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+            key={`header-${currentView}`}
+            initial={currentView === 'detail' ? 
+              { y: -100, opacity: 0, scale: 0.9 } : 
+              { y: -100, opacity: 0 }
+            }
+            animate={currentView === 'detail' ? 
+              { y: 0, opacity: 1, scale: 1 } : 
+              { y: 0, opacity: 1 }
+            }
+            transition={currentView === 'detail' ? {
+              delay: 0.2, 
+              duration: 0.8, 
+              ease: [0.25, 0.46, 0.45, 0.94],
+              opacity: { duration: 0.6 },
+              scale: { duration: 0.6 }
+            } : {
+              delay: 0.1, 
+              duration: 0.4, 
+              ease: [0.25, 0.46, 0.45, 0.94]
+            }}
             className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
           >
             <div className="flex items-center justify-between h-16 px-4">
-              {currentView === 'list' ? (
-                <div className="flex items-center space-x-3">
-                  <div className="flex items-center space-x-3">
-                    <div>
-                      <h1 className="text-lg font-bold text-gray-900">그룹</h1>
-                      <p className="text-xs text-gray-500">나의 소중한 그룹을 관리해보세요</p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-3">
-                  <motion.button 
-                    onClick={handleBackToList}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+              <AnimatePresence mode="wait">
+                {currentView === 'list' ? (
+                  <motion.div 
+                    key="list-header"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    className="flex items-center space-x-3"
                   >
-                    <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
-                  </motion.button>
-                  <div className="flex items-center space-x-3">
-                    <div>
-                      <h1 className="text-lg font-bold text-gray-900">그룹 상세</h1>
-                      <p className="text-xs text-gray-500">멤버들과 함께하는 즐거운 공간</p>
+                    <div className="flex items-center space-x-3">
+                      <div>
+                        <h1 className="text-lg font-bold text-gray-900">그룹</h1>
+                        <p className="text-xs text-gray-500">나의 소중한 그룹을 관리해보세요</p>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )}
+                  </motion.div>
+                                 ) : (
+                   <motion.div 
+                     key="detail-header"
+                     initial={{ opacity: 0, x: -20 }}
+                     animate={{ opacity: 1, x: 0 }}
+                     exit={{ opacity: 0, x: 20 }}
+                     transition={{ delay: 0.4, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+                     className="flex items-center space-x-3"
+                   >
+                     <motion.button 
+                       onClick={handleBackToList}
+                       className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                       whileHover={{ scale: 1.05 }}
+                       whileTap={{ scale: 0.95 }}
+                       initial={{ opacity: 0, scale: 0.8 }}
+                       animate={{ opacity: 1, scale: 1 }}
+                       transition={{ delay: 0.5, duration: 0.4 }}
+                     >
+                       <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
+                     </motion.button>
+                     <motion.div 
+                       className="flex items-center space-x-3"
+                       initial={{ opacity: 0, y: -10 }}
+                       animate={{ opacity: 1, y: 0 }}
+                       transition={{ delay: 0.6, duration: 0.4 }}
+                     >
+                       <div>
+                         <h1 className="text-lg font-bold text-gray-900">그룹 상세</h1>
+                         <p className="text-xs text-gray-500">멤버들과 함께하는 즐거운 공간</p>
+                       </div>
+                     </motion.div>
+                   </motion.div>
+                 )}
+              </AnimatePresence>
               
               <div className="flex items-center space-x-2">
                 {/* 필요시 추가 버튼들을 여기에 배치 */}
