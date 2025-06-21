@@ -2059,18 +2059,18 @@ export default function HomePage() {
       return;
     }
 
-    // 그룹멤버가 없으면 기본 위치로 초기화
+    // 그룹멤버가 있으면 첫 번째 멤버 위치, 없으면 현재 위치로 초기화
     let centerLocation = { lat: userLocation.lat, lng: userLocation.lng };
-    let memberName = '기본 위치';
+    let locationName = '현재 위치';
     
     if (groupMembers.length > 0) {
       const firstMember = groupMembers[0];
       const centerLat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
       const centerLng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
       centerLocation = { lat: centerLat, lng: centerLng };
-      memberName = firstMember.name;
+      locationName = `${firstMember.name} 위치`;
     } else {
-      console.log('Google Maps 초기화: 그룹멤버 데이터 없음 - 기본 위치 사용');
+      console.log('Google Maps 초기화: 그룹멤버 데이터 없음 - 현재 위치 사용');
     }
 
     try {
@@ -2080,14 +2080,14 @@ export default function HomePage() {
         if (marker.current) {
           marker.current.setPosition(centerLocation);
         }
-        console.log('Google Maps 기존 인스턴스 업데이트:', memberName, centerLocation);
+        console.log('Google Maps 기존 인스턴스 업데이트:', locationName, centerLocation);
         return;
       }
       
       console.log('Google Maps 초기화 시작');
       setIsMapLoading(true);
       
-      console.log('Google Maps 초기화 - 중심 위치:', memberName, centerLocation);
+      console.log('Google Maps 초기화 - 중심 위치:', locationName, centerLocation);
       
       // 지도 생성
       const mapOptions = {
@@ -2104,19 +2104,8 @@ export default function HomePage() {
       
       map.current = new window.google.maps.Map(googleMapContainer.current, mapOptions);
 
-      // 첫 번째 그룹멤버 위치에 마커 추가
-      marker.current = new window.google.maps.Marker({
-        position: centerLocation,
-        map: map.current,
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          fillColor: '#4F46E5',
-          fillOpacity: 1,
-          strokeColor: '#FFFFFF',
-          strokeWeight: 2,
-          scale: 8
-        }
-      });
+      // 마커는 그룹 멤버 데이터 로딩 후 생성 (초기 마커 생성 제거)
+      console.log('Google Maps 초기화 완료 - 마커는 그룹 멤버 데이터 로딩 후 생성');
 
       // 지도 로딩 완료
       window.google.maps.event.addListenerOnce(map.current, 'tilesloaded', () => {
@@ -2156,18 +2145,18 @@ export default function HomePage() {
       return;
     }
 
-    // 그룹멤버가 없으면 기본 위치로 초기화
+    // 그룹멤버가 있으면 첫 번째 멤버 위치, 없으면 현재 위치로 초기화
     let centerLat = userLocation.lat;
     let centerLng = userLocation.lng;
-    let memberName = '기본 위치';
+    let locationName = '현재 위치';
     
     if (groupMembers.length > 0) {
       const firstMember = groupMembers[0];
       centerLat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
       centerLng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
-      memberName = firstMember.name;
+      locationName = `${firstMember.name} 위치`;
     } else {
-      console.log('Naver Maps 초기화: 그룹멤버 데이터 없음 - 기본 위치 사용');
+      console.log('Naver Maps 초기화: 그룹멤버 데이터 없음 - 현재 위치 사용');
     }
 
     try {
@@ -2178,7 +2167,7 @@ export default function HomePage() {
         if (naverMarker.current) {
           naverMarker.current.setPosition(latlng);
         }
-        console.log('Naver Maps 기존 인스턴스 업데이트:', memberName, centerLat, centerLng);
+        console.log('Naver Maps 기존 인스턴스 업데이트:', locationName, centerLat, centerLng);
         return;
       }
       
@@ -2205,7 +2194,7 @@ export default function HomePage() {
       });
 
       try {
-        console.log('Naver Maps 초기화 - 중심 위치:', memberName, centerLat, centerLng);
+        console.log('Naver Maps 초기화 - 중심 위치:', locationName, centerLat, centerLng);
         
         // 지도 옵션에 MAP_CONFIG의 기본 설정 사용 + 로고 및 저작권 표시 숨김
         const mapOptions = {
@@ -2224,25 +2213,10 @@ export default function HomePage() {
         
         naverMap.current = new window.naver.maps.Map(naverMapContainer.current, mapOptions);
         
-        // 지도가 로드된 후에만 마커 생성
+        // 지도가 로드된 후 초기화 완료 처리 (마커는 그룹 멤버 데이터에 따라 나중에 생성)
         const initListener = window.naver.maps.Event.addListener(naverMap.current, 'init', () => {
           if (!authFailed && naverMap.current) {
-            // 인증 실패가 아닌 경우에만 마커 생성
-            try {
-              naverMarker.current = new window.naver.maps.Marker({
-                position: new window.naver.maps.LatLng(centerLat, centerLng),
-                map: naverMap.current,
-                icon: {
-                  content: '<div style="width: 16px; height: 16px; background-color: #4F46E5; border: 2px solid #FFFFFF; border-radius: 50%;"></div>',
-                  size: new window.naver.maps.Size(16, 16),
-                  anchor: new window.naver.maps.Point(8, 8)
-                }
-              });
-              
-              console.log('Naver Maps 마커 생성 완료');
-            } catch (markerError) {
-              console.error('네이버 지도 마커 생성 오류:', markerError);
-            }
+            console.log('Naver Maps 초기화 완료 - 마커는 그룹 멤버 데이터 로딩 후 생성');
           }
           
           setIsMapLoading(false);
@@ -4062,7 +4036,67 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapType, mapsInitialized.google, mapsInitialized.naver]);
 
-  // 그룹멤버 데이터 변경 시 마커 업데이트 - Location 페이지와 동일한 방식
+  // 현재 위치 마커 생성 함수
+  const createCurrentLocationMarker = () => {
+    if (!userLocation.lat || !userLocation.lng) {
+      console.log('[createCurrentLocationMarker] 현재 위치 정보 없음');
+      return;
+    }
+
+    console.log('[createCurrentLocationMarker] 현재 위치 마커 생성:', userLocation);
+
+    if (mapType === 'naver' && naverMap.current && window.naver?.maps) {
+      // 기존 현재 위치 마커 제거
+      if (naverMarker.current) {
+        naverMarker.current.setMap(null);
+        naverMarker.current = null;
+      }
+
+      // 새 현재 위치 마커 생성
+      naverMarker.current = new window.naver.maps.Marker({
+        position: new window.naver.maps.LatLng(userLocation.lat, userLocation.lng),
+        map: naverMap.current,
+        icon: {
+          content: '<div style="width: 20px; height: 20px; background-color: #3b82f6; border: 3px solid #FFFFFF; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+          size: new window.naver.maps.Size(20, 20),
+          anchor: new window.naver.maps.Point(10, 10)
+        },
+        zIndex: 100
+      });
+
+      // 지도 중심을 현재 위치로 이동
+      naverMap.current.panTo(new window.naver.maps.LatLng(userLocation.lat, userLocation.lng));
+      naverMap.current.setZoom(16);
+
+    } else if (mapType === 'google' && map.current && window.google?.maps) {
+      // 기존 현재 위치 마커 제거
+      if (marker.current) {
+        marker.current.setMap(null);
+        marker.current = null;
+      }
+
+      // 새 현재 위치 마커 생성
+      marker.current = new window.google.maps.Marker({
+        position: { lat: userLocation.lat, lng: userLocation.lng },
+        map: map.current,
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          fillColor: '#3b82f6',
+          fillOpacity: 1,
+          strokeColor: '#FFFFFF',
+          strokeWeight: 3,
+          scale: 10
+        },
+        zIndex: 100
+      });
+
+      // 지도 중심을 현재 위치로 이동
+      map.current.panTo({ lat: userLocation.lat, lng: userLocation.lng });
+      map.current.setZoom(16);
+    }
+  };
+
+  // 그룹멤버 데이터 변경 시 마커 업데이트 - 멤버가 없을 때 현재 위치 마커 생성
   useEffect(() => {
     // 마커 업데이트 중복 방지
     if (markersUpdating.current) {
@@ -4070,15 +4104,35 @@ export default function HomePage() {
       return;
     }
 
-    if (
-      groupMembers.length > 0 &&
-      ((mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) || 
-       (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps))
-    ) {
-      markersUpdating.current = true;
-      console.log('[HOME] 그룹멤버 데이터 변경 감지 - 마커 업데이트:', groupMembers.length, '명');
+    // 지도가 초기화되지 않았으면 대기
+    if (!((mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) || 
+          (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps))) {
+      console.log('[HOME] 지도 초기화 대기 중');
+      return;
+    }
+
+    // 데이터 로딩이 완료되지 않았으면 대기
+    if (dataFetchedRef.current.loading) {
+      console.log('[HOME] 그룹 데이터 로딩 중이므로 대기');
+      return;
+    }
+
+    markersUpdating.current = true;
+
+    // 그룹 멤버가 있으면 멤버 마커 생성
+    if (groupMembers.length > 0) {
+      console.log('[HOME] 그룹멤버 데이터 변경 감지 - 멤버 마커 업데이트:', groupMembers.length, '명');
       
-      // 300ms 지연으로 마커 업데이트 실행 (깜빡임 방지)
+      // 현재 위치 마커 제거 (멤버 마커가 있을 때)
+      if (mapType === 'naver' && naverMarker.current) {
+        naverMarker.current.setMap(null);
+        naverMarker.current = null;
+      } else if (mapType === 'google' && marker.current) {
+        marker.current.setMap(null);
+        marker.current = null;
+      }
+
+      // 300ms 지연으로 멤버 마커 업데이트 실행 (깜빡임 방지)
       const updateTimer = setTimeout(() => {
         updateMemberMarkers(groupMembers);
         
@@ -4092,8 +4146,18 @@ export default function HomePage() {
         clearTimeout(updateTimer);
         markersUpdating.current = false;
       };
+    } else {
+      // 그룹 멤버가 없으면 현재 위치 마커 생성
+      console.log('[HOME] 그룹멤버 없음 - 현재 위치 마커 생성');
+      
+      // 즉시 현재 위치 마커 생성
+      createCurrentLocationMarker();
+      
+      setTimeout(() => {
+        markersUpdating.current = false;
+      }, 100);
     }
-  }, [groupMembers, mapType, mapsInitialized.naver, mapsInitialized.google]);
+  }, [groupMembers, mapType, mapsInitialized.naver, mapsInitialized.google, dataFetchedRef.current.loading]);
 
   // filteredSchedules 변경 시 일정 마커 업데이트
   useEffect(() => {

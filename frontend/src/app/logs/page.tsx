@@ -6263,7 +6263,7 @@ export default function LogsPage() {
                          }`}
                          style={{ 
                            width: `${sliderValue}%`,
-                           left: '8px',
+                           left: '2px',
                            top: 'calc(50% + 6px)',
                            /* GPU 가속 최적화 */
                            transform: 'translateZ(0) translateY(-50%)',
