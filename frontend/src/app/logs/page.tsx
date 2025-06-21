@@ -1158,19 +1158,29 @@ export default function LogsPage() {
   }, []);
 
   useEffect(() => {
-    if (naverMapsLoaded && mapContainer.current && !map.current && groupMembers.length > 0) {
+    if (naverMapsLoaded && mapContainer.current && !map.current) {
       setIsMapLoading(true);
       try {
-        // 첫 번째 멤버의 위치로 초기 중심점 설정
-        const firstMember = groupMembers[0];
-        const initialLat = firstMember.mlt_lat || firstMember.location.lat || 37.5665;
-        const initialLng = firstMember.mlt_long || firstMember.location.lng || 126.9780;
+        // 기본 위치 설정 (서울 시청)
+        let initialLat = 37.5665;
+        let initialLng = 126.9780;
+        let memberName = '기본 위치';
+        
+        // 멤버 데이터가 있으면 첫 번째 멤버 위치 사용
+        if (groupMembers.length > 0) {
+          const firstMember = groupMembers[0];
+          initialLat = firstMember.mlt_lat || firstMember.location.lat || 37.5665;
+          initialLng = firstMember.mlt_long || firstMember.location.lng || 126.9780;
+          memberName = firstMember.name;
+        }
+        
         const initialCenter = new window.naver.maps.LatLng(initialLat, initialLng);
         
-        console.log('[지도 초기화] 첫 번째 멤버 위치로 초기화:', {
-          memberName: firstMember.name,
+        console.log('[LOGS 지도 초기화] 위치 설정:', {
+          memberName,
           lat: initialLat,
-          lng: initialLng
+          lng: initialLng,
+          hasMemberData: groupMembers.length > 0
         });
         
         const mapOptions = {
@@ -1181,16 +1191,63 @@ export default function LogsPage() {
             mapDataControl: false,
         };
         map.current = new window.naver.maps.Map(mapContainer.current, mapOptions);
+        
         window.naver.maps.Event.addListener(map.current, 'init', () => {
-            console.log('Naver Map initialized for LogsPage with member location');
+            console.log('[LOGS 지도 초기화] 완료 - 데이터 로딩 준비됨');
             setIsMapInitializedLogs(true); // 지도 초기화 완료 상태 설정
+            setIsMapLoading(false);
             if(map.current) map.current.refresh(true);
+            
+            // 지도 초기화 완료 후 멤버 데이터가 있으면 마커 업데이트
+            if (groupMembers.length > 0) {
+              console.log('[LOGS 지도 초기화] 멤버 마커 업데이트 시작');
+              setTimeout(() => {
+                updateMemberMarkers(groupMembers, false);
+              }, 100);
+            }
         });
+        
+        // 지도 로딩 타임아웃 설정 (10초)
+        setTimeout(() => {
+          if (isMapLoading) {
+            console.warn('[LOGS 지도 초기화] 타임아웃 - 강제 완료');
+            setIsMapLoading(false);
+            setIsMapInitializedLogs(true);
+          }
+        }, 10000);
+        
       } catch (error) {
-        console.error('Naver Maps 초기화 중 오류(LogsPage):', error);
+        console.error('[LOGS 지도 초기화] 오류:', error);
         setIsMapLoading(false);
+        setIsMapInitializedLogs(true); // 오류 시에도 초기화 완료로 설정
       }
     }
+  }, [naverMapsLoaded, groupMembers]);
+
+  // 🗺️ 멤버 데이터 로드 후 지도 중심 업데이트
+  useEffect(() => {
+    if (map.current && isMapInitializedLogs && groupMembers.length > 0) {
+      const firstMember = groupMembers[0];
+      const lat = firstMember.mlt_lat || firstMember.location.lat || 37.5665;
+      const lng = firstMember.mlt_long || firstMember.location.lng || 126.9780;
+      const center = new window.naver.maps.LatLng(lat, lng);
+      
+      console.log('[LOGS 지도 업데이트] 멤버 데이터 로드 후 중심 이동:', {
+        memberName: firstMember.name,
+        lat,
+        lng
+      });
+      
+      map.current.setCenter(center);
+      map.current.setZoom(16);
+      
+      // 멤버 마커 업데이트
+      updateMemberMarkers(groupMembers, false);
+    }
+  }, [groupMembers, isMapInitializedLogs]);
+
+  // 🧹 컴포넌트 정리
+  useEffect(() => {
     return () => {
       // 기존 마커들 정리
       memberNaverMarkers.current.forEach(marker => {
@@ -2431,12 +2488,14 @@ export default function LogsPage() {
   const loadLocationData = async (mtIdx: number, date: string) => {
     console.log(`[loadLocationData] 🎯 함수 호출됨: mtIdx=${mtIdx}, date=${date}`);
     
-    if (!mtIdx || !date || !map.current) {
-      console.log('[loadLocationData] ❌ 필수 조건 미충족 - 실행 중단:', { mtIdx, date, mapReady: !!map.current });
+    if (!mtIdx || !date) {
+      console.log('[loadLocationData] ❌ 필수 조건 미충족 - 실행 중단:', { mtIdx, date });
       return;
     }
     
-    console.log(`[loadLocationData] ✅ 필수 조건 충족 - 위치 데이터 로딩 시작`);
+    // 지도가 없어도 데이터는 로드하고, 지도 렌더링은 나중에 처리
+    const hasMap = !!map.current;
+    console.log(`[loadLocationData] ✅ 데이터 로딩 시작 (지도 상태: ${hasMap ? '준비됨' : '대기중'})`);
 
     // 캐시에서 먼저 확인 (멤버별로 구분하여 확인)
     if (selectedGroupId) {
@@ -4128,41 +4187,48 @@ export default function LogsPage() {
           updateMemberMarkers(updatedMembers, false);
         }
         
-        // 선택된 멤버의 데이터 로딩
-        const selectedMember = updatedMembers.find(m => m.isSelected);
-        if (selectedMember && (!firstMemberSelected || isDateChangedRef.current)) {
-          console.log("[LogsPage] 🚀 선택된 멤버 데이터 로딩:", selectedMember.name, selectedDate);
+        // 🚀 모든 멤버의 오늘 데이터 프리로드 (백그라운드)
+        const preloadAllMembersData = async () => {
+          console.log("[LogsPage] 🔄 모든 멤버 오늘 데이터 프리로드 시작");
           
-          setIsLocationDataLoading(true);
-          
-          // 재시도 로직 포함한 안전한 데이터 로딩
-          let retryCount = 0;
-          const maxRetries = 2;
-          
-          while (retryCount <= maxRetries) {
+          const today = getTodayDateString();
+          const preloadPromises = updatedMembers.map(async (member, index) => {
             try {
-              await loadLocationDataWithMapPreset(parseInt(selectedMember.id), selectedDate, selectedMember, false);
-              console.log("[LogsPage] ✅ 데이터 로딩 성공");
-              break;
-            } catch (error) {
-              console.error(`[LogsPage] 데이터 로딩 실패 (${retryCount + 1}/${maxRetries + 1}):`, error);
-              
-              if (retryCount === maxRetries) {
-                // 최종 실패 시 기본 처리
-                console.error("[LogsPage] 최대 재시도 초과 - 데이터 로딩 포기");
-                handleDataError(error, '초기 데이터 로딩');
-                break;
+              // 선택된 멤버는 우선순위로 먼저 로드
+              if (member.isSelected) {
+                console.log(`[LogsPage] 🎯 우선순위 로딩: ${member.name} (${today})`);
+                await loadLocationDataWithMapPreset(parseInt(member.id), today, member, false);
+                return { success: true, member: member.name, priority: true };
+              } else {
+                // 다른 멤버들은 약간의 지연 후 백그라운드 로딩
+                await new Promise(resolve => setTimeout(resolve, index * 500));
+                console.log(`[LogsPage] 🔄 백그라운드 로딩: ${member.name} (${today})`);
+                await loadLocationData(parseInt(member.id), today);
+                return { success: true, member: member.name, priority: false };
               }
-              
-              // 재시도 전 잠시 대기
-              await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
-              retryCount++;
+            } catch (error) {
+              console.warn(`[LogsPage] ⚠️ ${member.name} 데이터 로딩 실패:`, error);
+              return { success: false, member: member.name, error };
             }
-          }
+          });
+          
+          // 모든 프리로드 완료 대기
+          const results = await Promise.allSettled(preloadPromises);
+          const successCount = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+          
+          console.log(`[LogsPage] ✅ 프리로드 완료: ${successCount}/${updatedMembers.length}명`);
           
           setIsLocationDataLoading(false);
           setFirstMemberSelected(true);
           isDateChangedRef.current = false;
+        };
+
+        // 선택된 멤버가 있고 초기화가 필요한 경우에만 프리로드 실행
+        const selectedMember = updatedMembers.find(m => m.isSelected);
+        if (selectedMember && (!firstMemberSelected || isDateChangedRef.current)) {
+          console.log("[LogsPage] 🚀 데이터 프리로드 시작:", selectedMember.name, selectedDate);
+          setIsLocationDataLoading(true);
+          preloadAllMembersData();
         }
         
         console.log("[LogsPage] ✅ 첫 번째 멤버 초기화 완료");

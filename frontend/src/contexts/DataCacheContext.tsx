@@ -234,7 +234,22 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   // 캐시 유효성 검사 (하드 만료와 소프트 만료 구분)
   const isCacheValid = useCallback((type: string, groupId?: number, date?: string, checkSoft = false): boolean => {
     const now = Date.now();
-    const duration = CACHE_DURATION[type as keyof typeof CACHE_DURATION] || 10 * 60 * 1000;
+    let duration = CACHE_DURATION[type as keyof typeof CACHE_DURATION] || 10 * 60 * 1000;
+    
+    // 🕒 위치 데이터의 경우 날짜별 차등 캐시 시간 적용
+    if (type === 'locationData' && date) {
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD 형식
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      
+      if (date === today) {
+        duration = 3 * 60 * 1000; // 오늘: 3분 (자주 업데이트)
+      } else if (date === yesterday) {
+        duration = 15 * 60 * 1000; // 어제: 15분
+      } else {
+        duration = 24 * 60 * 60 * 1000; // 과거 날짜: 24시간 (거의 변경되지 않음)
+      }
+    }
+    
     const actualDuration = checkSoft ? duration * SOFT_EXPIRY_RATIO : duration; // 소프트 체크 시 80% 시점
     
     let isValid = false;
