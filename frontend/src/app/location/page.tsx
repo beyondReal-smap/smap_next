@@ -821,8 +821,10 @@ export default function LocationPage() {
     // InfoWindow 닫기 전역 함수
     (window as any).closeInfoWindow = () => {
       console.log('[InfoWindow 닫기] 닫기 요청');
+      console.log('[InfoWindow 닫기] 현재 infoWindow 상태:', !!infoWindow);
       if (infoWindow) {
         try {
+          console.log('[InfoWindow 닫기] close() 메서드 호출 시작');
           infoWindow.close();
           setInfoWindow(null);
           console.log('[InfoWindow 닫기] 성공');
@@ -830,11 +832,20 @@ export default function LocationPage() {
           console.error('[InfoWindow 닫기] 실패:', error);
           setInfoWindow(null);
         }
+      } else {
+        console.warn('[InfoWindow 닫기] infoWindow가 null이므로 닫을 수 없음');
       }
     };
 
+    // 전역 함수 설정 완료 로그
+    console.log('[전역 함수 설정] 완료:', {
+      handleLocationDeleteFromInfoWindow: typeof (window as any).handleLocationDeleteFromInfoWindow,
+      closeInfoWindow: typeof (window as any).closeInfoWindow
+    });
+
     // 컴포넌트 언마운트 시 전역 함수 정리
     return () => {
+      console.log('[전역 함수 정리] 컴포넌트 언마운트');
       delete (window as any).handleLocationDeleteFromInfoWindow;
       delete (window as any).closeInfoWindow;
     };
@@ -1701,155 +1712,10 @@ export default function LocationPage() {
         setIsFetchingGroupMembers(false);
         setIsLoading(false);
 
-        // 첫번째 멤버의 InfoWindow 자동 표시 (지연 처리)
+        // 첫번째 멤버 자동 선택 완료 (InfoWindow는 표시하지 않음)
         if (convertedMembers.length > 0) {
           const firstSelectedMember = convertedMembers.find(m => m.isSelected) || convertedMembers[0];
-          console.log('[fetchGroupMembersData] 첫번째 멤버 자동 선택 처리:', firstSelectedMember.name);
-          
-          // 더 안정적인 InfoWindow 자동 표시를 위한 여러 단계 시도
-          const showFirstMemberInfoWindow = (attempt: number = 1) => {
-            console.log(`[fetchGroupMembersData] InfoWindow 표시 시도 ${attempt}차:`, {
-              memberName: firstSelectedMember.name,
-              hasMap: !!map,
-              memberMarkersLength: memberMarkers.length,
-              hasNaverMaps: !!window.naver?.maps,
-              isMapReady,
-              isMapInitialized
-            });
-            
-            // 지도와 마커가 모두 준비되었는지 확인
-            if (map && memberMarkers.length > 0 && window.naver?.maps && isMapReady && isMapInitialized) {
-              const memberIndex = convertedMembers.findIndex(m => m.id === firstSelectedMember.id);
-              const selectedMarker = memberMarkers[memberIndex];
-              
-              console.log(`[fetchGroupMembersData] 마커 찾기 결과:`, {
-                memberIndex,
-                hasSelectedMarker: !!selectedMarker,
-                totalMarkers: memberMarkers.length,
-                markerTitle: selectedMarker?.getTitle?.() || '제목없음'
-              });
-              
-              if (selectedMarker) {
-                console.log('[fetchGroupMembersData] 첫번째 멤버 InfoWindow 생성:', firstSelectedMember.name);
-                
-                // 기존 InfoWindow 닫기
-                if (infoWindow) {
-                  infoWindow.close();
-                }
-
-                const lat = parseCoordinate(firstSelectedMember.mlt_lat) || parseCoordinate(firstSelectedMember.location?.lat);
-                const lng = parseCoordinate(firstSelectedMember.mlt_long) || parseCoordinate(firstSelectedMember.location?.lng);
-                
-                const memberInfoWindow = new window.naver.maps.InfoWindow({
-                  content: `
-                    <div style="
-                      padding: 12px 16px;
-                      min-width: 200px;
-                      max-width: 280px;
-                      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                      background: white;
-                      border-radius: 12px;
-                      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                      position: relative;
-                    ">
-                      <button onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-                        position: absolute;
-                        top: 8px;
-                        right: 8px;
-                        background: rgba(0, 0, 0, 0.1);
-                        border: none;
-                        border-radius: 50%;
-                        width: 20px;
-                        height: 20px;
-                        font-size: 14px;
-                        cursor: pointer;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        color: #666;
-                      ">×</button>
-
-                      <div style="margin-bottom: 8px;">
-                        <h3 style="
-                          margin: 0 0 4px 0;
-                          font-size: 16px;
-                          font-weight: 600;
-                          color: #111827;
-                          padding-right: 25px;
-                        ">👤 ${firstSelectedMember.name}</h3>
-                        <p style="
-                          margin: 0;
-                          font-size: 12px;
-                          color: #64748b;
-                        ">상태: 온라인</p>
-                      </div>
-                      
-                      <div style="margin-bottom: 6px;">
-                        <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
-                          <span style="flex-shrink: 0;">📍</span>
-                          <span id="member-address-first-${firstSelectedMember.id}" style="color: #111827; font-weight: 500; word-break: keep-all; line-height: 1.3; margin-left: 4px;">주소 변환 중...</span>
-                        </div>
-                      </div>
-                      <div>
-                        <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                          🗺️ 현재 위치 정보
-                        </p>
-                      </div>
-                    </div>
-                  `,
-                  borderWidth: 0,
-                  backgroundColor: 'transparent',
-                  disableAnchor: true,
-                  pixelOffset: new window.naver.maps.Point(0, -20)
-                });
-
-                memberInfoWindow.open(map, selectedMarker);
-                setInfoWindow(memberInfoWindow);
-                
-                // 주소 변환
-                if (lat && lng) {
-                  getAddressFromCoordinates(lat, lng).then(address => {
-                    const addressElement = document.getElementById(`member-address-first-${firstSelectedMember.id}`);
-                    if (addressElement) {
-                      addressElement.textContent = address;
-                    }
-                  }).catch(error => {
-                    console.error('주소 변환 실패:', error);
-                    const addressElement = document.getElementById(`member-address-first-${firstSelectedMember.id}`);
-                    if (addressElement) {
-                      addressElement.textContent = '주소 정보 없음';
-                    }
-                  });
-                }
-                
-                console.log('[fetchGroupMembersData] 첫번째 멤버 InfoWindow 표시 완료');
-                return true; // 성공
-              } else {
-                console.log(`[fetchGroupMembersData] 마커가 준비되지 않음 (시도 ${attempt})`);
-              }
-                         } else {
-               console.log(`[fetchGroupMembersData] 지도 또는 마커가 준비되지 않음 (시도 ${attempt}):`, {
-                 hasMap: !!map,
-                 memberMarkersLength: memberMarkers.length,
-                 hasNaverMaps: !!window.naver?.maps,
-                 isMapReady,
-                 isMapInitialized
-               });
-             }
-             
-             // 실패한 경우 재시도 (최대 5번으로 증가, 더 긴 간격)
-             if (attempt < 5) {
-               const delay = attempt === 1 ? 800 : attempt === 2 ? 1500 : 2000;
-               console.log(`[fetchGroupMembersData] ${delay}ms 후 ${attempt + 1}차 재시도 예약`);
-               setTimeout(() => showFirstMemberInfoWindow(attempt + 1), delay);
-             } else {
-               console.warn('[fetchGroupMembersData] 최대 재시도 횟수 초과, InfoWindow 자동 표시 포기');
-             }
-             return false;
-           };
-           
-           // 초기 시도 (1.5초 후로 늘림)
-           setTimeout(() => showFirstMemberInfoWindow(1), 1500);
+          console.log('[fetchGroupMembersData] 첫번째 멤버 자동 선택 처리 완료:', firstSelectedMember.name, '- InfoWindow 표시하지 않음');
         }
       } else {
         console.warn('[fetchGroupMembersData] 그룹멤버 데이터가 없거나 비어있습니다.');
@@ -1876,7 +1742,7 @@ export default function LocationPage() {
   };
 
   // 멤버 선택 핸들러
-  const handleMemberSelect = async (memberId: string, openLocationPanel = false, membersArray?: GroupMember[], fromMarkerClick = false) => { 
+  const handleMemberSelect = async (memberId: string, openLocationPanel = false, membersArray?: GroupMember[], fromMarkerClick = false, clickedMarker?: any) => { 
     console.log('[handleMemberSelect] 멤버 선택:', memberId, '패널 열기:', openLocationPanel, '마커 클릭:', fromMarkerClick);
     
     // 즉시 햅틱 피드백 (사용자 응답성 개선)
@@ -1983,25 +1849,10 @@ export default function LocationPage() {
           Math.abs(lat) <= 90 && Math.abs(lng) <= 180 &&
           lat >= 33 && lat <= 43 && lng >= 124 && lng <= 132) { // 한국 영토 범위
         
-        // 현재 지도 중심과 선택된 멤버 위치 거리 계산
-        const currentCenter = map.getCenter();
-        const currentLat = currentCenter.lat();
-        const currentLng = currentCenter.lng();
-        const distance = Math.sqrt(Math.pow(lat - currentLat, 2) + Math.pow(lng - currentLng, 2));
-        
-        console.log('[handleMemberSelect] 지도 이동 필요성 체크:', {
-          member: newlySelectedMember.name,
-          currentCenter: { lat: currentLat, lng: currentLng },
-          newPosition: { lat, lng },
-          distance: distance,
-          shouldMove: distance > 0.01 // 거리 임계값: 약 1km
-        });
-        
-        // 현재 위치와 멤버 위치가 충분히 다른 경우에만 이동
+        // 멤버 위치로 무조건 지도 중심 이동
           const position = new window.naver.maps.LatLng(lat, lng);
-        if (distance > 0.01) { // 약 1km 이상 차이날 때만 이동
           
-          console.log('[handleMemberSelect] 지도 중심 이동 실행:', {
+        console.log('[handleMemberSelect] 지도 중심 이동 실행 (무조건):', {
             member: newlySelectedMember.name,
             position: { lat, lng },
             mapInstance: !!map
@@ -2025,9 +1876,6 @@ export default function LocationPage() {
           }
           
           console.log('[handleMemberSelect] 지도 중심 이동 완료');
-        } else {
-          console.log('[handleMemberSelect] 현재 위치와 가까워 지도 이동 생략');
-        }
         
         // 사이드바 닫기 (멤버 선택 시 사용자 경험 개선) - 마커 클릭이 아닌 경우에만
         if (!fromMarkerClick) {
@@ -2037,16 +1885,317 @@ export default function LocationPage() {
           }, 100); // 빠른 응답성을 위해 짧은 지연
         }
         
-        // 멤버 InfoWindow 제거됨 - 기존 InfoWindow만 닫기
-        setTimeout(() => {
-          // 기존 InfoWindow 즉시 닫기
-          if (infoWindow) {
-            infoWindow.close();
-            setInfoWindow(null);
+        // 기존 InfoWindow 닫기 (마커 클릭인 경우 제외 - 이미 새 InfoWindow가 생성됨)
+        if (infoWindow && !fromMarkerClick) {
+          infoWindow.close();
+          console.log('[handleMemberSelect] 기존 InfoWindow 닫기 (사이드바 선택)');
+        } else if (fromMarkerClick) {
+          console.log('[handleMemberSelect] 마커 클릭으로 인한 호출 - InfoWindow 닫지 않음');
+        }
+        
+        // 멤버 InfoWindow 생성 및 표시 (마커 클릭이 아닌 경우에만 - 마커 클릭은 이미 InfoWindow 생성함)
+        if (!fromMarkerClick) {
+          setTimeout(() => {
+          // 클릭된 마커가 전달되면 사용하고, 아니면 배열에서 찾기
+          let selectedMarker = clickedMarker;
+          let memberIndex = -1;
+          
+          // 클릭된 마커가 없을 경우에만 배열에서 찾기
+          if (!selectedMarker) {
+            memberIndex = updatedMembers.findIndex(m => m.id === memberId);
+            // memberMarkers 상태가 업데이트되기 전일 수 있으므로 실패할 수 있음
+            if (memberIndex >= 0 && memberMarkers.length > memberIndex) {
+              selectedMarker = memberMarkers[memberIndex];
+            }
           }
           
-          console.log('[handleMemberSelect] 멤버 선택 완료 - InfoWindow 없음');
-        }, 100);
+          console.log('[handleMemberSelect] 멤버 InfoWindow 표시 시도:', {
+            memberName: newlySelectedMember.name,
+            hasClickedMarker: !!clickedMarker,
+            hasSelectedMarker: !!selectedMarker,
+            memberIndex,
+            totalMarkers: memberMarkers.length,
+            fromMarkerClick,
+            memberId,
+            selectedMemberIsOnMap: updatedMembers[memberIndex]?.mlt_lat && updatedMembers[memberIndex]?.mlt_long
+          });
+          
+          // 마커가 있고 지도와 네이버 맵스가 로드되었을 때만 InfoWindow 표시
+          if (selectedMarker && map && window.naver?.maps) {
+            const photoForMarker = getSafeImageUrl(newlySelectedMember.photo, newlySelectedMember.mt_gender, newlySelectedMember.original_index);
+            const borderColor = '#f59e0b'; // 선택된 멤버 색상
+
+            const memberInfoWindow = new window.naver.maps.InfoWindow({
+              content: `
+                <style>
+                  @keyframes slideInFromBottom {
+                    0% {
+                      opacity: 0;
+                      transform: translateY(20px) scale(0.95);
+                    }
+                    100% {
+                      opacity: 1;
+                      transform: translateY(0) scale(1);
+                    }
+                  }
+                  .member-info-window-container {
+                    animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+                  }
+                  .close-button {
+                    transition: all 0.2s ease;
+                  }
+                  .close-button:hover {
+                    background: rgba(0, 0, 0, 0.2) !important;
+                    transform: scale(1.1);
+                  }
+                </style>
+                <div class="member-info-window-container" style="
+                  padding: 12px 16px;
+                  min-width: 200px;
+                  max-width: 280px;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                  background: white;
+                  border-radius: 12px;
+                  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                  position: relative;
+                ">
+                  <!-- 닫기 버튼 -->
+                  <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    background: rgba(0, 0, 0, 0.1);
+                    border: none;
+                    border-radius: 50%;
+                    width: 22px;
+                    height: 22px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #666;
+                  ">×</button>
+
+                  <div style="
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 8px;
+                  ">
+                    <div style="
+                      width: 36px;
+                      height: 36px;
+                      border-radius: 50%;
+                      overflow: hidden;
+                      margin-right: 12px;
+                      border: 2px solid ${borderColor};
+                    ">
+                      <img src="${photoForMarker}" 
+                           style="width: 100%; height: 100%; object-fit: cover;" 
+                           alt="${newlySelectedMember.name}" />
+                    </div>
+                    <div style="padding-right: 25px;">
+                      <h3 style="
+                        margin: 0;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: #111827;
+                      ">👤 ${newlySelectedMember.name}</h3>
+                      <p style="
+                        margin: 2px 0 0 0;
+                        font-size: 12px;
+                        color: #64748b;
+                      ">선택된 멤버</p>
+                    </div>
+                  </div>
+                  
+                  <div style="margin-bottom: 6px;">
+                    <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
+                      <span style="flex-shrink: 0;">📍 </span>
+                      <span id="member-address-${newlySelectedMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3; text-indent: hanging; padding-left: 0;">주소 변환 중...</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                      🗺️ 현재 위치 정보
+                    </p>
+                  </div>
+                </div>
+              `,
+              borderWidth: 0,
+              backgroundColor: 'transparent',
+              disableAnchor: true,
+              pixelOffset: new window.naver.maps.Point(0, -20)
+            });
+
+            memberInfoWindow.open(map, selectedMarker);
+            setInfoWindow(memberInfoWindow);
+            console.log('[handleMemberSelect] 멤버 InfoWindow 표시 완료:', newlySelectedMember.name);
+
+            // 주소 변환 및 업데이트 (비동기 처리)
+            if (lat && lng) {
+              getAddressFromCoordinates(lat, lng).then(address => {
+                const addressElement = document.getElementById(`member-address-${newlySelectedMember.id}`);
+                if (addressElement) {
+                  addressElement.textContent = address;
+                  console.log('[handleMemberSelect] InfoWindow 주소 업데이트 완료:', { member: newlySelectedMember.name, address });
+                }
+              }).catch(error => {
+                console.error('[handleMemberSelect] InfoWindow 주소 변환 실패:', error);
+                const addressElement = document.getElementById(`member-address-${newlySelectedMember.id}`);
+                if (addressElement) {
+                  addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                }
+              });
+            }
+        } else {
+            console.warn('[handleMemberSelect] 멤버 마커를 찾을 수 없음 - 좌표로 직접 InfoWindow 표시 시도:', {
+              memberIndex,
+              hasSelectedMarker: !!selectedMarker,
+              totalMarkers: memberMarkers.length,
+              memberName: newlySelectedMember.name,
+              hasValidCoords: lat && lng,
+              coordinates: { lat, lng }
+            });
+            
+            // 마커를 찾을 수 없을 때 좌표로 직접 InfoWindow 표시
+            if (map && window.naver?.maps && lat && lng) {
+              const photoForMarker = getSafeImageUrl(newlySelectedMember.photo, newlySelectedMember.mt_gender, newlySelectedMember.original_index);
+              const borderColor = '#f59e0b'; // 선택된 멤버 색상
+              const memberPosition = new window.naver.maps.LatLng(lat, lng);
+
+              const memberInfoWindow = new window.naver.maps.InfoWindow({
+                content: `
+                  <style>
+                    @keyframes slideInFromBottom {
+                      0% {
+                        opacity: 0;
+                        transform: translateY(20px) scale(0.95);
+                      }
+                      100% {
+                        opacity: 1;
+                        transform: translateY(0) scale(1);
+                      }
+                    }
+                    .member-info-window-container {
+                      animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+                    }
+                    .close-button {
+                      transition: all 0.2s ease;
+                    }
+                    .close-button:hover {
+                      background: rgba(0, 0, 0, 0.2) !important;
+                      transform: scale(1.1);
+                    }
+                  </style>
+                  <div class="member-info-window-container" style="
+                    padding: 12px 16px;
+                    min-width: 200px;
+                    max-width: 280px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    background: white;
+                    border-radius: 12px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    position: relative;
+                  ">
+                    <!-- 닫기 버튼 -->
+                    <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                      position: absolute;
+                      top: 8px;
+                      right: 8px;
+                      background: rgba(0, 0, 0, 0.1);
+                      border: none;
+                      border-radius: 50%;
+                      width: 22px;
+                      height: 22px;
+                      font-size: 14px;
+                      cursor: pointer;
+                      display: flex;
+                      align-items: center;
+                      justify-content: center;
+                      color: #666;
+                    ">×</button>
+
+                    <div style="
+                      display: flex;
+                      align-items: center;
+                      margin-bottom: 8px;
+                    ">
+                      <div style="
+                        width: 36px;
+                        height: 36px;
+                        border-radius: 50%;
+                        overflow: hidden;
+                        margin-right: 12px;
+                        border: 2px solid ${borderColor};
+                      ">
+                        <img src="${photoForMarker}" 
+                             style="width: 100%; height: 100%; object-fit: cover;" 
+                             alt="${newlySelectedMember.name}" />
+                      </div>
+                      <div style="padding-right: 25px;">
+                        <h3 style="
+                          margin: 0;
+                          font-size: 14px;
+                          font-weight: 600;
+                          color: #111827;
+                        ">👤 ${newlySelectedMember.name}</h3>
+                        <p style="
+                          margin: 2px 0 0 0;
+                          font-size: 12px;
+                          color: #64748b;
+                        ">선택된 멤버 (위치기반)</p>
+                      </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 6px;">
+                      <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
+                        <span style="flex-shrink: 0;">📍 </span>
+                        <span id="member-address-${newlySelectedMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3; text-indent: hanging; padding-left: 0;">주소 변환 중...</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                        🗺️ 현재 위치 정보
+                      </p>
+                    </div>
+                  </div>
+                `,
+                borderWidth: 0,
+                backgroundColor: 'transparent',
+                disableAnchor: true,
+                pixelOffset: new window.naver.maps.Point(0, -20)
+              });
+
+              memberInfoWindow.open(map, memberPosition);
+              setInfoWindow(memberInfoWindow);
+              console.log('[handleMemberSelect] 멤버 InfoWindow 좌표로 직접 표시 완료:', newlySelectedMember.name);
+
+              // 주소 변환 및 업데이트 (비동기 처리)
+              getAddressFromCoordinates(lat, lng).then(address => {
+                const addressElement = document.getElementById(`member-address-${newlySelectedMember.id}`);
+                if (addressElement) {
+                  addressElement.textContent = address;
+                  console.log('[handleMemberSelect] InfoWindow 주소 업데이트 완료 (좌표기반):', { member: newlySelectedMember.name, address });
+                }
+              }).catch(error => {
+                console.error('[handleMemberSelect] InfoWindow 주소 변환 실패:', error);
+                const addressElement = document.getElementById(`member-address-${newlySelectedMember.id}`);
+                if (addressElement) {
+                  addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                }
+              });
+            } else {
+              console.error('[handleMemberSelect] InfoWindow 표시 완전 실패 - 지도나 좌표 없음:', {
+                hasMap: !!map,
+                hasNaverMaps: !!window.naver?.maps,
+                hasCoords: !!(lat && lng)
+              });
+            }
+          }
+        }, fromMarkerClick ? 100 : 300); // 마커 클릭인 경우 더 빠르게, 사이드바 선택인 경우 마커 업데이트 대기
+        
+        console.log('[handleMemberSelect] 멤버 선택 완료 - InfoWindow 표시 예정');
       } else {
         console.warn('[handleMemberSelect] 유효하지 않은 좌표 또는 한국 범위 밖:', { lat, lng });
           // 사이드바는 닫기
@@ -2150,147 +2299,8 @@ export default function LocationPage() {
         }
       }
 
-      // 선택된 멤버의 InfoWindow 자동 표시 (마커 업데이트 후)
-      console.log('[handleMemberSelect] 멤버 선택 완료, InfoWindow 자동 표시 준비');
-      
-      // 마커 업데이트가 완료된 후 InfoWindow 표시를 위한 딜레이
-      setTimeout(() => {
-          console.log('[handleMemberSelect] InfoWindow 표시 시도:', {
-            memberName: newlySelectedMember.name,
-          memberId,
-            hasMap: !!map,
-          hasNaverMaps: !!window.naver?.maps,
-          memberMarkersLength: memberMarkers.length,
-          groupMembersLength: groupMembers.length
-        });
-        
-        // 업데이트된 groupMembers에서 선택된 멤버의 인덱스 찾기
-        const updatedMembers = groupMembers.map(m => 
-          m.id === memberId ? { ...m, isSelected: true } : { ...m, isSelected: false }
-        );
-        const selectedMemberIndex = updatedMembers.findIndex(m => m.id === memberId);
-        const selectedMarker = memberMarkers[selectedMemberIndex];
-        
-        console.log('[handleMemberSelect] 마커 정보:', {
-          selectedMemberIndex,
-          hasSelectedMarker: !!selectedMarker,
-          markerTitle: selectedMarker?.getTitle?.() || '제목없음'
-        });
-        
-        if (selectedMarker && map && window.naver?.maps) {
-          console.log('[handleMemberSelect] 멤버 InfoWindow 자동 표시:', newlySelectedMember.name);
-          
-          // 기존 InfoWindow 닫기
-            if (infoWindow) {
-              infoWindow.close();
-            }
-            
-          const lat = parseCoordinate(newlySelectedMember.mlt_lat) || parseCoordinate(newlySelectedMember.location?.lat);
-          const lng = parseCoordinate(newlySelectedMember.mlt_long) || parseCoordinate(newlySelectedMember.location?.lng);
-
-          // 멤버 정보창 생성 및 표시
-          const memberInfoWindow = new window.naver.maps.InfoWindow({
-            content: `
-              <style>
-                @keyframes slideInFromBottom {
-                  0% {
-                    opacity: 0;
-                    transform: translateY(20px) scale(0.95);
-                  }
-                  100% {
-                    opacity: 1;
-                    transform: translateY(0) scale(1);
-                  }
-                }
-                .member-info-window-container {
-                  animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-                }
-                .close-button {
-                  transition: all 0.2s ease;
-                }
-                .close-button:hover {
-                  background: rgba(0, 0, 0, 0.2) !important;
-                  transform: scale(1.1);
-                }
-              </style>
-              <div class="member-info-window-container" style="
-                padding: 12px 16px;
-                min-width: 200px;
-                max-width: 280px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: white;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                position: relative;
-              ">
-                <!-- 닫기 버튼 -->
-                <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-                  position: absolute;
-                  top: 8px;
-                  right: 8px;
-                  background: rgba(0, 0, 0, 0.1);
-                  border: none;
-                  border-radius: 50%;
-                  width: 22px;
-                  height: 22px;
-                  font-size: 14px;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  color: #666;
-                ">×</button>
-
-                <div style="margin-bottom: 8px;">
-                  <h4 style="
-                    margin: 0 0 4px 0;
-                    font-size: 14px;
-                  font-weight: 600;
-                    color: #111827;
-                    padding-right: 25px;
-                  ">👤 ${newlySelectedMember.name}</h4>
-                </div>
-                
-                <div style="margin-bottom: 6px;">
-                  <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
-                    <span style="flex-shrink: 0;">📍 </span>
-                    <span id="member-address-${newlySelectedMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3; text-indent: hanging; padding-left: 0;">주소 변환 중...</span>
-                </div>
-                </div>
-                <div>
-                  <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                    🗺️ 현재 위치 정보
-                  </p>
-              </div>
-              </div>
-            `,
-              borderWidth: 0,
-              backgroundColor: 'transparent',
-              disableAnchor: true,
-              pixelOffset: new window.naver.maps.Point(0, -20)
-            });
-            
-          memberInfoWindow.open(map, selectedMarker);
-          setInfoWindow(memberInfoWindow);
-            
-            // 주소 변환 및 업데이트
-          if (lat && lng) {
-            getAddressFromCoordinates(lat, lng).then(address => {
-              const addressElement = document.getElementById(`member-address-${newlySelectedMember.id}`);
-              if (addressElement) {
-                addressElement.textContent = address;
-                console.log('[handleMemberSelect] 주소 업데이트 완료:', { member: newlySelectedMember.name, address });
-              }
-            }).catch(error => {
-              console.error('[handleMemberSelect] 주소 변환 실패:', error);
-              const addressElement = document.getElementById(`member-address-${newlySelectedMember.id}`);
-              if (addressElement) {
-                addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-              }
-            });
-          }
+      console.log('[handleMemberSelect] 멤버 선택 및 데이터 로딩 완료:', newlySelectedMember.name);
         }
-      }, 300); // 마커 업데이트 완료 후 표시
       }
       
     } else {
@@ -2710,156 +2720,8 @@ export default function LocationPage() {
     console.log('[LOCATION] 첫번째 멤버 자동 선택 완료:', firstMember.name);
   }, [shouldSelectFirstMember, groupMembers]);
 
-  // 첫번째 멤버 선택 후 InfoWindow 자동 표시
-  useEffect(() => {
-    if (memberMarkers.length > 0 && 
-        groupMembers.length > 0 && 
-        firstMemberSelected && 
-        isFirstMemberSelectionComplete && 
-        map &&
-        !infoWindow) { // InfoWindow가 아직 표시되지 않은 경우에만
-      
-      const selectedMember = groupMembers.find(member => member.isSelected);
-      
-      if (selectedMember) {
-        // 선택된 멤버의 마커 찾기
-        const memberIndex = groupMembers.findIndex(member => member.isSelected);
-        const selectedMarker = memberMarkers[memberIndex];
-        
-        if (selectedMarker) {
-          console.log('[LOCATION] 첫번째 멤버 InfoWindow 자동 표시:', selectedMember.name);
-          
-          const lat = parseCoordinate(selectedMember.mlt_lat) || parseCoordinate(selectedMember.location?.lat);
-          const lng = parseCoordinate(selectedMember.mlt_long) || parseCoordinate(selectedMember.location?.lng);
-          const photoForMarker = getSafeImageUrl(selectedMember.photo, selectedMember.mt_gender, selectedMember.original_index);
-          const borderColor = '#f59e0b'; // 선택된 멤버 색상
-
-          const memberInfoWindow = new window.naver.maps.InfoWindow({
-            content: `
-              <style>
-                @keyframes slideInFromBottom {
-                  0% {
-                    opacity: 0;
-                    transform: translateY(20px) scale(0.95);
-                  }
-                  100% {
-                    opacity: 1;
-                    transform: translateY(0) scale(1);
-                  }
-                }
-                .member-info-window-container {
-                  animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-                }
-                .close-button {
-                  transition: all 0.2s ease;
-                }
-                .close-button:hover {
-                  background: rgba(0, 0, 0, 0.2) !important;
-                  transform: scale(1.1);
-                }
-              </style>
-              <div class="member-info-window-container" style="
-                padding: 12px 16px;
-                min-width: 200px;
-                max-width: 280px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: white;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                position: relative;
-              ">
-                <!-- 닫기 버튼 -->
-                <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-                  position: absolute;
-                  top: 8px;
-                  right: 8px;
-                  background: rgba(0, 0, 0, 0.1);
-                  border: none;
-                  border-radius: 50%;
-                  width: 22px;
-                  height: 22px;
-                  font-size: 14px;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  color: #666;
-                ">×</button>
-
-                <div style="
-                  display: flex;
-                  align-items: center;
-                  margin-bottom: 8px;
-                ">
-                  <div style="
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 50%;
-                    overflow: hidden;
-                    margin-right: 12px;
-                    border: 2px solid ${borderColor};
-                  ">
-                    <img src="${photoForMarker}" 
-                         style="width: 100%; height: 100%; object-fit: cover;" 
-                         alt="${selectedMember.name}" />
-                  </div>
-                  <div style="padding-right: 25px;">
-                    <h3 style="
-                      margin: 0;
-                      font-size: 14px;
-                      font-weight: 600;
-                      color: #111827;
-                    ">👤 ${selectedMember.name}</h3>
-                    <p style="
-                      margin: 2px 0 0 0;
-                      font-size: 12px;
-                      color: #64748b;
-                    ">선택된 멤버</p>
-                  </div>
-                </div>
-                
-                <div style="margin-bottom: 6px;">
-                  <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
-                    <span style="flex-shrink: 0;">📍 </span>
-                    <span id="first-member-address-${selectedMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3; text-indent: hanging; padding-left: 0;">주소 변환 중...</span>
-                  </div>
-                </div>
-                <div>
-                  <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                    🗺️ 현재 위치 정보
-                  </p>
-                </div>
-              </div>
-            `,
-            borderWidth: 0,
-            backgroundColor: 'transparent',
-            disableAnchor: true
-          });
-
-          memberInfoWindow.open(map, selectedMarker);
-          setInfoWindow(memberInfoWindow);
-          console.log('[LOCATION] 첫번째 멤버 InfoWindow 표시 완료:', selectedMember.name);
-
-          // 주소 변환 및 업데이트 (비동기 처리)
-          if (lat && lng) {
-            getAddressFromCoordinates(lat, lng).then(address => {
-              const addressElement = document.getElementById(`first-member-address-${selectedMember.id}`);
-              if (addressElement) {
-                addressElement.textContent = address;
-                console.log('[LOCATION] InfoWindow 주소 업데이트 완료:', { member: selectedMember.name, address });
-              }
-            }).catch(error => {
-              console.error('[LOCATION] InfoWindow 주소 변환 실패:', error);
-              const addressElement = document.getElementById(`first-member-address-${selectedMember.id}`);
-              if (addressElement) {
-                addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-              }
-            });
-          }
-        }
-      }
-    }
-  }, [memberMarkers, groupMembers, firstMemberSelected, isFirstMemberSelectionComplete, map, infoWindow]);
+  // 첫번째 멤버 선택 완료 (InfoWindow는 표시하지 않음)
+  // 멤버 InfoWindow 자동 표시는 제거됨
 
   // groupMembers 상태 변경 시 마커 업데이트 (그룹 멤버 리스트에서 선택 시 InfoWindow 표시를 위해)
   // 그룹 멤버 변경 시 마커 업데이트 - updateAllMarkers로 통합됨
@@ -3419,20 +3281,154 @@ export default function LocationPage() {
               infoWindow.close();
             }
             
-            // 멤버 위치로 지도 중심 이동 (마커 클릭 시에는 항상 이동)
+            // 즉시 InfoWindow 생성 및 표시
+            const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
+            const borderColor = '#f59e0b'; // 선택된 멤버 색상
+
+            const memberInfoWindow = new window.naver.maps.InfoWindow({
+              content: `
+                <style>
+                  @keyframes slideInFromBottom {
+                    0% {
+                      opacity: 0;
+                      transform: translateY(20px) scale(0.95);
+                    }
+                    100% {
+                      opacity: 1;
+                      transform: translateY(0) scale(1);
+                    }
+                  }
+                  .member-info-window-container {
+                    animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+                  }
+                  .close-button {
+                    transition: all 0.2s ease;
+                  }
+                  .close-button:hover {
+                    background: rgba(0, 0, 0, 0.2) !important;
+                    transform: scale(1.1);
+                  }
+                </style>
+                <div class="member-info-window-container" style="
+                  padding: 12px 16px;
+                  min-width: 200px;
+                  max-width: 280px;
+                  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                  background: white;
+                  border-radius: 12px;
+                  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                  position: relative;
+                ">
+                  <!-- 닫기 버튼 -->
+                  <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                    position: absolute;
+                    top: 8px;
+                    right: 8px;
+                    background: rgba(0, 0, 0, 0.1);
+                    border: none;
+                    border-radius: 50%;
+                    width: 22px;
+                    height: 22px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #666;
+                  ">×</button>
+
+                  <div style="
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 8px;
+                  ">
+                    <div style="
+                      width: 36px;
+                      height: 36px;
+                      border-radius: 50%;
+                      overflow: hidden;
+                      margin-right: 12px;
+                      border: 2px solid ${borderColor};
+                    ">
+                      <img src="${photoForMarker}" 
+                           style="width: 100%; height: 100%; object-fit: cover;" 
+                           alt="${member.name}" />
+                    </div>
+                    <div style="padding-right: 25px;">
+                    <h3 style="
+                      margin: 0;
+                      font-size: 14px;
+                      font-weight: 600;
+                      color: #111827;
+                    ">👤 ${member.name}</h3>
+                    <p style="
+                      margin: 2px 0 0 0;
+                      font-size: 12px;
+                      color: #64748b;
+                      ">선택된 멤버</p>
+                    </div>
+                  </div>
+                  
+                  <div style="margin-bottom: 6px;">
+                    <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
+                      <span style="flex-shrink: 0;">📍 </span>
+                      <span id="member-address-${member.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3; text-indent: hanging; padding-left: 0;">주소 변환 중...</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p style="margin: 0; font-size: 11px; color: #9ca3af;">
+                      🗺️ 현재 위치 정보
+                    </p>
+                  </div>
+                </div>
+              `,
+              borderWidth: 0,
+              backgroundColor: 'transparent',
+              disableAnchor: true,
+              pixelOffset: new window.naver.maps.Point(0, -20)
+            });
+
+            memberInfoWindow.open(map, marker);
+            setInfoWindow(memberInfoWindow);
+            console.log('[멤버 마커 클릭] 멤버 InfoWindow 즉시 표시 완료:', member.name);
+
+            // 주소 변환 및 업데이트 (비동기 처리)
+              getAddressFromCoordinates(lat, lng).then(address => {
+              const addressElement = document.getElementById(`member-address-${member.id}`);
+                if (addressElement) {
+                  addressElement.textContent = address;
+                console.log('[멤버 마커 클릭] InfoWindow 주소 업데이트 완료:', { member: member.name, address });
+                }
+              }).catch(error => {
+              console.error('[멤버 마커 클릭] InfoWindow 주소 변환 실패:', error);
+              const addressElement = document.getElementById(`member-address-${member.id}`);
+                if (addressElement) {
+                  addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                }
+              });
+            
+            // 멤버 위치로 지도 중심 이동 (InfoWindow 표시 후)
             const memberPosition = new window.naver.maps.LatLng(lat, lng);
             map.panTo(memberPosition, {
               duration: 800,
               easing: 'easeOutCubic'
             });
             
-            console.log('[멤버 마커 클릭] 지도 중심 이동 완료:', { lat, lng });
+            console.log('[멤버 마커 클릭] 지도 중심 이동 시작:', { lat, lng });
             
-            // 멤버 선택 처리 (InfoWindow는 handleMemberSelect에서 처리되지만, 마커 클릭에서는 지도 이동을 우선하므로 별도 처리)
-            // 지도 이동 후 InfoWindow 표시를 위해 약간의 지연
+            // 멤버 선택 UI 업데이트 (InfoWindow는 이미 표시됨)
+            const updatedMembers = members.map(m => ({
+              ...m,
+              isSelected: m.id === member.id
+            }));
+            setGroupMembers(updatedMembers);
+            selectedMemberIdRef.current = member.id;
+            
+            // 사이드바 닫기
             setTimeout(() => {
-              handleMemberSelect(member.id, false, members, true); // fromMarkerClick = true
-            }, 200); // 지도 이동 시작 후 InfoWindow 처리
+              setIsSidebarOpen(false);
+              console.log('[멤버 마커 클릭] 사이드바 닫기 완료');
+            }, 100);
           });
 
           newMemberMarkers.push(marker);
@@ -3618,154 +3614,8 @@ export default function LocationPage() {
       position: marker.getPosition?.() ? { lat: marker.getPosition().lat(), lng: marker.getPosition().lng() } : '위치없음'
     })));
     
-    // 첫번째 멤버 자동 선택 후 InfoWindow 표시
-    if (firstMemberSelected && 
-        isFirstMemberSelectionComplete && 
-        newMemberMarkers.length > 0 && 
-        selectedMember && 
-        !infoWindow) {
-      
-      console.log('[updateAllMarkers] 첫번째 멤버 InfoWindow 자동 표시 준비:', selectedMember.name);
-      
-      // 선택된 멤버의 마커 찾기
-      const selectedMarkerIndex = members.findIndex(member => member.isSelected);
-      const selectedMarker = newMemberMarkers[selectedMarkerIndex];
-      
-      if (selectedMarker) {
-        // 약간의 지연 후 InfoWindow 표시 (마커 렌더링 완료 대기)
-    setTimeout(() => {
-          console.log('[updateAllMarkers] 첫번째 멤버 InfoWindow 표시:', selectedMember.name);
-          
-          const lat = parseCoordinate(selectedMember.mlt_lat) || parseCoordinate(selectedMember.location?.lat);
-          const lng = parseCoordinate(selectedMember.mlt_long) || parseCoordinate(selectedMember.location?.lng);
-          const photoForMarker = getSafeImageUrl(selectedMember.photo, selectedMember.mt_gender, selectedMember.original_index);
-          const borderColor = '#f59e0b'; // 선택된 멤버 색상
-
-          const memberInfoWindow = new window.naver.maps.InfoWindow({
-            content: `
-              <style>
-                @keyframes slideInFromBottom {
-                  0% {
-                    opacity: 0;
-                    transform: translateY(20px) scale(0.95);
-                  }
-                  100% {
-                    opacity: 1;
-                    transform: translateY(0) scale(1);
-                  }
-                }
-                .member-info-window-container {
-                  animation: slideInFromBottom 0.4s cubic-bezier(0.23, 1, 0.32, 1);
-                }
-                .close-button {
-                  transition: all 0.2s ease;
-                }
-                .close-button:hover {
-                  background: rgba(0, 0, 0, 0.2) !important;
-                  transform: scale(1.1);
-                }
-              </style>
-              <div class="member-info-window-container" style="
-                padding: 12px 16px;
-                min-width: 200px;
-                max-width: 280px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: white;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                position: relative;
-              ">
-                <!-- 닫기 버튼 -->
-                <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-                  position: absolute;
-                  top: 8px;
-                  right: 8px;
-                  background: rgba(0, 0, 0, 0.1);
-                  border: none;
-                  border-radius: 50%;
-                  width: 22px;
-                  height: 22px;
-                  font-size: 14px;
-                  cursor: pointer;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  color: #666;
-                ">×</button>
-
-                <div style="
-                  display: flex;
-                  align-items: center;
-                  margin-bottom: 8px;
-                ">
-                  <div style="
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 50%;
-                    overflow: hidden;
-                    margin-right: 12px;
-                    border: 2px solid ${borderColor};
-                  ">
-                    <img src="${photoForMarker}" 
-                         style="width: 100%; height: 100%; object-fit: cover;" 
-                         alt="${selectedMember.name}" />
-                  </div>
-                  <div style="padding-right: 25px;">
-                    <h3 style="
-                      margin: 0;
-                      font-size: 14px;
-                      font-weight: 600;
-                      color: #111827;
-                    ">👤 ${selectedMember.name}</h3>
-                    <p style="
-                      margin: 2px 0 0 0;
-                      font-size: 12px;
-                      color: #64748b;
-                    ">선택된 멤버</p>
-                  </div>
-                </div>
-                
-                <div style="margin-bottom: 6px;">
-                  <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
-                    <span style="flex-shrink: 0;">📍 </span>
-                    <span id="auto-first-member-address-${selectedMember.id}" style="color: #0113A3; font-weight: 500; word-break: keep-all; line-height: 1.3; text-indent: hanging; padding-left: 0;">주소 변환 중...</span>
-                  </div>
-                </div>
-                <div>
-                  <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                    🗺️ 현재 위치 정보
-                  </p>
-                </div>
-              </div>
-            `,
-            borderWidth: 0,
-            backgroundColor: 'transparent',
-            disableAnchor: true
-          });
-
-          memberInfoWindow.open(map, selectedMarker);
-          setInfoWindow(memberInfoWindow);
-          console.log('[updateAllMarkers] 첫번째 멤버 InfoWindow 표시 완료:', selectedMember.name);
-
-          // 주소 변환 및 업데이트 (비동기 처리)
-          if (lat && lng) {
-            getAddressFromCoordinates(lat, lng).then(address => {
-              const addressElement = document.getElementById(`auto-first-member-address-${selectedMember.id}`);
-              if (addressElement) {
-                addressElement.textContent = address;
-                console.log('[updateAllMarkers] InfoWindow 주소 업데이트 완료:', { member: selectedMember.name, address });
-              }
-            }).catch(error => {
-              console.error('[updateAllMarkers] InfoWindow 주소 변환 실패:', error);
-              const addressElement = document.getElementById(`auto-first-member-address-${selectedMember.id}`);
-              if (addressElement) {
-                addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-              }
-            });
-          }
-        }, 300); // 마커 렌더링 완료 대기
-      }
-    }
+    // 첫번째 멤버 선택 완료 (InfoWindow는 표시하지 않음)
+    console.log('[updateAllMarkers] 멤버 마커 생성 완료 - InfoWindow 표시하지 않음');
   };
 
   // 멤버 마커와 선택된 멤버의 장소 마커를 동시 업데이트
@@ -4062,20 +3912,32 @@ export default function LocationPage() {
             top: 8px;
           }
           .close-button {
-            background: rgba(0, 0, 0, 0.1);
-            color: #666;
+            background: rgba(0, 0, 0, 0.1) !important;
+            color: #666 !important;
             right: 8px;
+            z-index: 999999 !important;
+            pointer-events: auto !important;
+            position: absolute !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            touch-action: manipulation !important;
           }
           .close-button:hover {
             background: rgba(0, 0, 0, 0.2) !important;
-            transform: scale(1.1);
+            color: #333 !important;
+            transform: scale(1.1) !important;
+          }
+          .close-button:active {
+            background: rgba(0, 0, 0, 0.3) !important;
+            transform: scale(1.05) !important;
           }
           .delete-button {
             background: rgba(153, 27, 27, 0.1);
             color: #991b1b;
-            right: 35px;
+            right: 38px;
             z-index: 10000 !important;
             pointer-events: auto !important;
+            position: absolute !important;
           }
           .delete-button:hover {
             background: rgba(153, 27, 27, 0.2) !important;
@@ -4119,17 +3981,10 @@ export default function LocationPage() {
           ` : ''}
           
           <!-- 닫기 버튼 -->
-          <button class="info-button close-button" onclick="
-            console.log('닫기 버튼 클릭'); 
-            event.stopPropagation(); 
-            event.preventDefault();
-            if(window.closeInfoWindow) {
-              window.closeInfoWindow();
-            } else {
-              console.error('닫기 함수가 정의되지 않음');
-            }
-            return false;
-          " onmousedown="event.stopPropagation(); return false;" title="닫기">
+          <button class="info-button close-button location-close-btn" 
+                  data-action="close" 
+                  style="z-index: 999999 !important; pointer-events: auto !important;"
+                  title="닫기">
             ×
           </button>
           
@@ -4154,6 +4009,104 @@ export default function LocationPage() {
       console.log('[InfoWindow] 닫힘 이벤트 발생');
       setInfoWindow(null);
     });
+
+    // 대안적 접근법: InfoWindow 자체에 클릭 이벤트 리스너 추가
+    window.naver.maps.Event.addListener(newInfoWindow, 'domready', () => {
+      console.log('[InfoWindow] DOM 준비 완료 - 클릭 이벤트 추가');
+      try {
+        // 네이버 지도 InfoWindow의 DOM 요소 직접 접근
+        const iwContent = newInfoWindow.getContentElement ? newInfoWindow.getContentElement() : null;
+        if (iwContent) {
+          console.log('[InfoWindow] InfoWindow 컨텐트 요소 발견');
+          
+          // 이벤트 위임을 사용하여 닫기 버튼 클릭 감지
+          iwContent.addEventListener('click', (e: Event) => {
+            const target = e.target as HTMLElement;
+            console.log('[InfoWindow] 컨텐트 클릭:', target.className, target.getAttribute('data-action'));
+            
+            if (target.matches('.location-close-btn') || 
+                target.closest('.location-close-btn') ||
+                target.getAttribute('data-action') === 'close') {
+              console.log('[InfoWindow] 닫기 버튼 클릭 감지 - InfoWindow 닫기');
+              e.stopPropagation();
+              e.preventDefault();
+              
+              newInfoWindow.close();
+              setInfoWindow(null);
+            }
+          });
+          
+          console.log('[InfoWindow] 이벤트 위임 추가 완료');
+        }
+      } catch (domReadyError) {
+        console.warn('[InfoWindow] DOM ready 이벤트 처리 실패:', domReadyError);
+      }
+    });
+
+    // InfoWindow 열린 후 DOM 요소에 직접 닫기 이벤트 연결 (개선된 접근법)
+    setTimeout(() => {
+      try {
+        // 더 구체적인 선택자로 장소 InfoWindow의 닫기 버튼만 선택
+        const locationCloseButtons = document.querySelectorAll('.location-close-btn[data-action="close"]');
+        console.log('[DOM 이벤트] 찾은 장소 닫기 버튼 수:', locationCloseButtons.length);
+        
+        locationCloseButtons.forEach((button, index) => {
+          // 기존 이벤트 리스너가 없는 경우에만 추가
+          if (!button.hasAttribute('data-close-attached')) {
+            // 여러 이벤트 타입으로 확실하게 잡기
+            ['click', 'mousedown', 'touchstart'].forEach(eventType => {
+              button.addEventListener(eventType, (e) => {
+                console.log(`[DOM 이벤트] 장소 InfoWindow 닫기 버튼 ${eventType} 이벤트 감지`);
+                e.stopPropagation();
+                e.preventDefault();
+                
+                // 1차: 전역 함수 시도
+                if ((window as any).closeInfoWindow) {
+                  console.log('[DOM 이벤트] 전역 함수로 닫기 시도');
+                  (window as any).closeInfoWindow();
+                } 
+                // 2차: 직접 InfoWindow API 사용
+                else if (newInfoWindow) {
+                  console.log('[DOM 이벤트] 직접 InfoWindow API로 닫기');
+                  newInfoWindow.close();
+                  setInfoWindow(null);
+                }
+                // 3차: DOM 조작으로 강제 숨김
+                else {
+                  console.log('[DOM 이벤트] DOM 조작으로 강제 숨김');
+                  try {
+                    // 네이버 지도 InfoWindow 구조에 맞게 부모 요소들 탐색
+                    let targetElement = button.closest('.location-info-window-container');
+                    if (!targetElement) {
+                      targetElement = button.parentElement;
+                    }
+                    
+                                         // 여러 레벨 위로 올라가면서 InfoWindow 컨테이너 찾기
+                     let current = targetElement;
+                     for (let i = 0; i < 5 && current; i++) {
+                       if (current instanceof HTMLElement) {
+                         current.style.display = 'none';
+                         current.style.visibility = 'hidden';
+                         current.style.opacity = '0';
+                       }
+                       current = current.parentElement;
+                     }
+                    console.log('[DOM 이벤트] InfoWindow 강제 숨김 완료');
+                  } catch (hideError) {
+                    console.error('[DOM 이벤트] InfoWindow 강제 숨김 실패:', hideError);
+                  }
+                }
+              }, { capture: true }); // 캡처링 단계에서 이벤트 잡기
+            });
+            
+            button.setAttribute('data-close-attached', 'true');
+            console.log(`[DOM 이벤트] 장소 닫기 버튼 ${index + 1} 이벤트 리스너 추가됨`);
+          }
+        });
+      } catch (domError) {
+        console.warn('[DOM 이벤트] 장소 닫기 버튼 이벤트 추가 실패:', domError);
+      }
+    }, 200); // 시간을 더 늘려서 DOM이 완전히 렌더링되도록
     
     return newInfoWindow;
   };
@@ -4708,6 +4661,41 @@ export default function LocationPage() {
       };
     }
   }, [infoWindow]);
+
+  // InfoWindow 관련 전역 함수 등록
+  useEffect(() => {
+    // InfoWindow 닫기 함수 등록
+    (window as any).closeInfoWindow = () => {
+      console.log('[window.closeInfoWindow] InfoWindow 닫기 함수 호출됨');
+      if (infoWindow) {
+        infoWindow.close();
+        setInfoWindow(null);
+        console.log('[window.closeInfoWindow] InfoWindow 닫기 완료');
+      } else {
+        console.log('[window.closeInfoWindow] 닫을 InfoWindow가 없음');
+      }
+    };
+
+    // 장소 삭제 함수 등록 (기존 함수 유지)
+    (window as any).handleLocationDeleteFromInfoWindow = (locationId: string) => {
+      console.log('[window.handleLocationDeleteFromInfoWindow] 장소 삭제 함수 호출됨:', locationId);
+      const targetLocation = otherMembersSavedLocations.find(loc => 
+        (loc.slt_idx ? loc.slt_idx.toString() : loc.id) === locationId
+      );
+      
+      if (targetLocation) {
+        openLocationDeleteModal(targetLocation);
+      } else {
+        console.error('[window.handleLocationDeleteFromInfoWindow] 삭제할 장소를 찾을 수 없음:', locationId);
+      }
+    };
+
+    // 컴포넌트 언마운트 시 전역 함수 정리
+    return () => {
+      delete (window as any).closeInfoWindow;
+      delete (window as any).handleLocationDeleteFromInfoWindow;
+    };
+  }, [infoWindow, otherMembersSavedLocations]);
 
   return (
     <>
@@ -5387,113 +5375,10 @@ export default function LocationPage() {
                             // 즉시 사이드바 닫기 (상태 변경 순서 중요)
                             setIsSidebarOpen(false);
                             
-                            // 짧은 딜레이 후 멤버 선택 및 InfoWindow 표시
+                            // 짧은 딜레이 후 멤버 선택 (InfoWindow는 표시하지 않음)
                             setTimeout(() => {
                               handleMemberSelect(member.id);
-                              
-                              // 추가 딜레이 후 InfoWindow 표시 보장
-                              setTimeout(() => {
-                                if (map && memberMarkers.length > 0 && window.naver?.maps) {
-                                  const memberIndex = groupMembers.findIndex(m => m.id === member.id);
-                                  const selectedMarker = memberMarkers[memberIndex];
-                                  
-                                  if (selectedMarker) {
-                                    console.log('[사이드바 멤버 선택] InfoWindow 표시:', member.name);
-                                    
-                                    // 기존 InfoWindow 닫기
-                                    if (infoWindow) {
-                                      infoWindow.close();
-                                    }
-
-                                    const lat = parseCoordinate(member.mlt_lat) || parseCoordinate(member.location?.lat);
-                                    const lng = parseCoordinate(member.mlt_long) || parseCoordinate(member.location?.lng);
-                                    
-                                    const memberInfoWindow = new window.naver.maps.InfoWindow({
-                                      content: `
-                                        <div style="
-                                          padding: 12px 16px;
-                                          min-width: 200px;
-                                          max-width: 280px;
-                                          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                                          background: white;
-                                          border-radius: 12px;
-                                          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                                          position: relative;
-                                        ">
-                                          <button onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
-                                            position: absolute;
-                                            top: 8px;
-                                            right: 8px;
-                                            background: rgba(0, 0, 0, 0.1);
-                                            border: none;
-                                            border-radius: 50%;
-                                            width: 20px;
-                                            height: 20px;
-                                            font-size: 14px;
-                                            cursor: pointer;
-                                            display: flex;
-                                            align-items: center;
-                                            justify-content: center;
-                                            color: #666;
-                                          ">×</button>
-
-                                          <div style="margin-bottom: 8px;">
-                                            <h3 style="
-                                              margin: 0 0 4px 0;
-                                              font-size: 16px;
-                                              font-weight: 600;
-                                              color: #111827;
-                                              padding-right: 25px;
-                                            ">👤 ${member.name}</h3>
-                                            <p style="
-                                              margin: 0;
-                                              font-size: 12px;
-                                              color: #64748b;
-                                            ">상태: 온라인</p>
-                                          </div>
-                                          
-                                          <div style="margin-bottom: 6px;">
-                                            <div style="display: flex; align-items: flex-start; font-size: 12px; color: #64748b;">
-                                              <span style="flex-shrink: 0;">📍</span>
-                                              <span id="member-address-sidebar-${member.id}" style="color: #111827; font-weight: 500; word-break: keep-all; line-height: 1.3; margin-left: 4px;">주소 변환 중...</span>
-                                            </div>
-                                          </div>
-                                          <div>
-                                            <p style="margin: 0; font-size: 11px; color: #9ca3af;">
-                                              🗺️ 현재 위치 정보
-                                            </p>
-                                          </div>
-                                        </div>
-                                      `,
-                                      borderWidth: 0,
-                                      backgroundColor: 'transparent',
-                                      disableAnchor: true,
-                                      pixelOffset: new window.naver.maps.Point(0, -20)
-                                    });
-
-                                    memberInfoWindow.open(map, selectedMarker);
-                                    setInfoWindow(memberInfoWindow);
-                                    
-                                    // 주소 변환
-                                    if (lat && lng) {
-                                      getAddressFromCoordinates(lat, lng).then(address => {
-                                        const addressElement = document.getElementById(`member-address-sidebar-${member.id}`);
-                                        if (addressElement) {
-                                          addressElement.textContent = address;
-                                        }
-                                      }).catch(error => {
-                                        console.error('주소 변환 실패:', error);
-                                        const addressElement = document.getElementById(`member-address-sidebar-${member.id}`);
-                                        if (addressElement) {
-                                          addressElement.textContent = '주소 정보 없음';
-                                        }
-                                      });
-                                    }
-                                    
-                                    console.log('[사이드바 멤버 선택] InfoWindow 표시 완료');
-                                  }
-                                }
-                              }, 300); // handleMemberSelect 완료 후 InfoWindow 표시
+                              console.log('[사이드바 멤버 선택] 멤버 선택 완료 - InfoWindow 표시하지 않음:', member.name);
                             }, 100);
                           }}
                           className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 ${

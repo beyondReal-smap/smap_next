@@ -802,6 +802,29 @@ export default function HomePage() {
       });
     }
   }, [user, isLoggedIn, authLoading, isPreloadingComplete]);
+
+  // InfoWindow 닫기를 위한 전역 함수 설정
+  useEffect(() => {
+    // InfoWindow 닫기 전역 함수
+    (window as any).closeCurrentInfoWindow = () => {
+      console.log('[InfoWindow 닫기] 요청');
+      if (currentInfoWindowRef.current) {
+        try {
+          currentInfoWindowRef.current.close();
+          currentInfoWindowRef.current = null;
+          console.log('[InfoWindow 닫기] 성공');
+        } catch (error) {
+          console.error('[InfoWindow 닫기] 실패:', error);
+          currentInfoWindowRef.current = null;
+        }
+      }
+    };
+
+    // 컴포넌트 언마운트 시 전역 함수 정리
+    return () => {
+      delete (window as any).closeCurrentInfoWindow;
+    };
+  }, []);
       // UserContext 사용
     const { 
       userInfo, 
@@ -2695,7 +2718,7 @@ export default function HomePage() {
                 position: relative;
               ">
                 <!-- 닫기 버튼 -->
-                <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                <button class="close-button" onclick="window.closeCurrentInfoWindow && window.closeCurrentInfoWindow(); event.stopPropagation();" style="
                   position: absolute;
                   top: 8px;
                   right: 8px;
@@ -2710,6 +2733,7 @@ export default function HomePage() {
                   align-items: center;
                   justify-content: center;
                   color: #666;
+                  z-index: 10;
                 ">×</button>
                 
                 <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px;">
@@ -2874,7 +2898,7 @@ export default function HomePage() {
                 box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
                 overflow: hidden;
               ">
-              <button class="schedule-close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+              <button class="schedule-close-button" onclick="window.closeCurrentInfoWindow && window.closeCurrentInfoWindow(); event.stopPropagation();" style="
                 position: absolute;
                 top: 8px;
                 right: 8px;
@@ -2889,7 +2913,7 @@ export default function HomePage() {
                 align-items: center;
                 justify-content: center;
                 color: #666;
-                hover: background-color: rgba(0, 0, 0, 0.2);
+                z-index: 10;
               ">×</button>
               
               <div style="margin-bottom: 8px; padding-right: 25px;">
@@ -3072,7 +3096,7 @@ export default function HomePage() {
                 position: relative;
               ">
                 <!-- 닫기 버튼 -->
-                <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                <button class="close-button" onclick="window.closeCurrentInfoWindow && window.closeCurrentInfoWindow(); event.stopPropagation();" style="
                   position: absolute;
                   top: 8px;
                   right: 8px;
@@ -3087,6 +3111,7 @@ export default function HomePage() {
                   align-items: center;
                   justify-content: center;
                   color: #666;
+                  z-index: 10;
                 ">×</button>
                 
                 <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px;">
@@ -3227,7 +3252,7 @@ export default function HomePage() {
                 box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
                 overflow: hidden;
               ">
-              <button class="google-schedule-close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+              <button class="google-schedule-close-button" onclick="window.closeCurrentInfoWindow && window.closeCurrentInfoWindow(); event.stopPropagation();" style="
                 position: absolute;
                 top: 8px;
                 right: 8px;
@@ -3242,7 +3267,7 @@ export default function HomePage() {
                 align-items: center;
                 justify-content: center;
                 color: #666;
-                hover: background-color: rgba(0, 0, 0, 0.2);
+                z-index: 10;
               ">×</button>
               
               <div style="margin-bottom: 8px; padding-right: 25px;">
@@ -3843,7 +3868,7 @@ export default function HomePage() {
                     position: relative;
                   ">
                     <!-- 닫기 버튼 -->
-                    <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                    <button class="close-button" onclick="window.closeCurrentInfoWindow && window.closeCurrentInfoWindow(); event.stopPropagation();" style="
                       position: absolute;
                       top: 8px;
                       right: 8px;
@@ -3858,6 +3883,7 @@ export default function HomePage() {
                       align-items: center;
                       justify-content: center;
                       color: #666;
+                      z-index: 10;
                     ">×</button>
                     
                     <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px;">
@@ -3990,7 +4016,7 @@ export default function HomePage() {
                     position: relative;
                   ">
                     <!-- 닫기 버튼 -->
-                    <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+                    <button class="close-button" onclick="window.closeCurrentInfoWindow && window.closeCurrentInfoWindow(); event.stopPropagation();" style="
                       position: absolute;
                       top: 8px;
                       right: 8px;
@@ -4005,6 +4031,7 @@ export default function HomePage() {
                       align-items: center;
                       justify-content: center;
                       color: #666;
+                      z-index: 10;
                     ">×</button>
                     
                     <h3 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #111827; padding-right: 25px;">
