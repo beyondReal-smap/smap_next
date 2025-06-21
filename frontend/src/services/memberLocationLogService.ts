@@ -447,7 +447,7 @@ class MemberLocationLogService {
         min_speed: minSpeed.toString()
       });
       
-      const url = `location-logs/daily-summary/${memberId}?${params}`;
+      const url = `/location-logs/daily-summary/${memberId}?${params}`;
       const response = await apiClient.get(url);
 
       if (response.status < 200 || response.status >= 300) {
@@ -536,7 +536,7 @@ class MemberLocationLogService {
         min_duration: minDuration.toString()
       });
       
-      const url = `location-logs/stay-times/${memberId}?${params}`;
+      const url = `/location-logs/stay-times/${memberId}?${params}`;
       
       // WebKit 환경에서 최적화된 설정 적용
       const webkitConfig = getWebKitOptimizedConfig();
@@ -691,7 +691,7 @@ class MemberLocationLogService {
     try {
       console.log('[MemberLocationLogService] PHP 로직 기반 요약 조회 시작:', { memberId, date });
       
-      const response = await apiClient.get(`location-logs/location-summary/${memberId}?date=${date}`);
+      const response = await apiClient.get(`/location-logs/location-summary/${memberId}?date=${date}`);
 
       if (response.status < 200 || response.status >= 300) {
         throw new Error(`HTTP error! status: ${response.status}`);

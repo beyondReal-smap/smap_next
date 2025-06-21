@@ -736,17 +736,26 @@ export default function LogsPage() {
         deviceMemory: (navigator as any).deviceMemory || 'unknown'
       });
       
-      // 환경 감지 후 정확한 금일 날짜로 업데이트
+      // 환경 감지 후 초기 진입 시에만 금일 날짜로 업데이트 (사용자가 선택한 날짜는 유지)
       const accurateToday = getTodayDateString();
       const currentSelected = selectedDate;
       
-      if (currentSelected !== accurateToday) {
-        console.log('[LOGS PAGE] 금일 날짜 보정:', {
+      // 초기 진입 시에만 날짜 보정 (사용자가 의도적으로 선택한 날짜는 변경하지 않음)
+      if (currentSelected !== accurateToday && isInitialEntry) {
+        console.log('[LOGS PAGE] 초기 진입 시 금일 날짜 보정:', {
           기존: currentSelected,
           보정후: accurateToday,
-          webkit
+          webkit,
+          isInitialEntry
         });
         setSelectedDate(accurateToday);
+      } else if (currentSelected !== accurateToday && !isInitialEntry) {
+        console.log('[LOGS PAGE] 사용자가 선택한 날짜 유지:', {
+          선택된날짜: currentSelected,
+          오늘날짜: accurateToday,
+          webkit,
+          isInitialEntry
+        });
       }
       
       // WebKit 환경에서 성능 최적화
@@ -782,7 +791,7 @@ export default function LogsPage() {
         }
       }
     }
-  }, [getTodayDateString, selectedDate]);
+  }, [getTodayDateString, isInitialEntry]);
 
   // 자정 넘어가면 금일 날짜 자동 업데이트
   useEffect(() => {
@@ -1610,7 +1619,7 @@ export default function LogsPage() {
       isHorizontalSwipe: isHorizontalSwipeRef.current
     });
 
-    // 좌우 스와이프: 탭 전환 (home/page.tsx와 동일한 로직)
+    // 좌우 스와이프: 사이드바 제어 비활성화 - 무조건 끝까지 실행
     if (isHorizontalSwipeRef.current === true) {
       const minSwipeDistance = 30; // 최소 스와이프 거리
       if (Math.abs(dragDeltaX) < minSwipeDistance) {
@@ -1624,7 +1633,10 @@ export default function LogsPage() {
         return;
       }
 
-      // 좌우 스와이프는 더 이상 지원하지 않음 (단일 탭)
+      // 좌우 스와이프 액션 감지했지만 사이드바 제어하지 않음 - 액션 완료까지 실행
+      console.log('[DragEnd] 좌우 스와이프 감지 - 사이드바 제어 비활성화, 액션 완료');
+      
+      // 초기화
       isDraggingRef.current = false;
       startDragY.current = null;
       startDragX.current = null;
@@ -1698,6 +1710,11 @@ export default function LogsPage() {
     
     console.log('[LOGS] ===== 멤버 선택 시작 =====');
     console.log('[LOGS] 멤버 ID:', id, isUserManualSelection ? '(사용자 선택)' : '(자동 선택)');
+    
+    // 사용자가 의도적으로 멤버를 선택했음을 표시
+    if (isUserManualSelection) {
+      setIsInitialEntry(false);
+    }
     
     // 현재 선택된 멤버와 같으면 무시 (사용자 수동 선택이 아닌 경우)
     const currentSelectedMember = groupMembers.find(m => m.isSelected);
@@ -1995,6 +2012,9 @@ export default function LogsPage() {
     console.log('[LOGS] ===== 날짜 선택 시작 =====');
     console.log('[LOGS] 새 날짜:', date, '현재 날짜:', selectedDate);
     
+    // 사용자가 의도적으로 날짜를 선택했음을 표시
+    setIsInitialEntry(false);
+    
     // 같은 날짜면 무시
     if (selectedDate === date) {
       console.log('[LOGS] 같은 날짜 선택 - 무시');
@@ -2010,6 +2030,12 @@ export default function LogsPage() {
     try {
       // 통합 함수로 날짜+멤버 데이터 로딩
       await loadDateMemberData(date, undefined, 'date');
+      
+      // 사이드바 날짜 동기화 추가 보장 (loadDateMemberData에서도 호출하지만 추가 보장)
+      setTimeout(() => {
+        scrollSidebarDateToSelected(date);
+        console.log('[handleDateSelect] 사이드바 날짜 동기화 추가 보장:', date);
+      }, 500);
       
       // 사이드바 자동 닫기
       setTimeout(() => {
@@ -2151,6 +2177,9 @@ export default function LogsPage() {
     
     console.log(`[네모 캘린더] 클릭 시작 - 멤버: ${member.name}, 날짜: ${dateString}`);
     console.log(`[네모 캘린더] 현재 상태 - 선택된 멤버: ${groupMembers.find(m => m.isSelected)?.name}, 선택된 날짜: ${selectedDate}`);
+    
+    // 사용자가 의도적으로 네모 캘린더를 클릭했음을 표시
+    setIsInitialEntry(false);
     
     // 클릭된 네모에 시각적 피드백
     const clickedElement = e.currentTarget as HTMLElement;
@@ -3868,11 +3897,16 @@ export default function LogsPage() {
         setPreviousDate(selectedDate);
         setSelectedDate(targetDate);
         
-        // 사이드바 날짜 선택 영역을 새로운 날짜로 스크롤
+        // 사이드바 날짜 선택 영역을 새로운 날짜로 스크롤 (즉시 및 지연 실행)
+        scrollSidebarDateToSelected(targetDate);
         setTimeout(() => {
           scrollSidebarDateToSelected(targetDate);
           console.log('[loadDateMemberData] 사이드바 날짜 스크롤 업데이트 완료:', targetDate);
         }, 100);
+        setTimeout(() => {
+          scrollSidebarDateToSelected(targetDate);
+          console.log('[loadDateMemberData] 사이드바 날짜 스크롤 재확인 완료:', targetDate);
+        }, 300);
       }
       
       // 2단계: 해당 날짜의 멤버 활동 데이터 조회
@@ -3978,12 +4012,13 @@ export default function LogsPage() {
       isMapInitializedLogs,
       mapMarkersDataLength: mapMarkersData.length,
       mapMarkersData: mapMarkersData.slice(0, 2), // 첫 2개만 로그
-      isDateChanging: isDateChangingRef.current
+      isDateChanging: isDateChangingRef.current,
+      firstMemberSelected
     });
     
-    // 날짜 변경 중이면 자동 재생성 완전 방지
-    if (isDateChangingRef.current) {
-      console.log('[LOGS] 날짜 변경 중 - 자동 마커 업데이트 완전 차단!');
+    // 초기 진입 시에는 마커 업데이트 허용 (firstMemberSelected가 false일 때)
+    if (isDateChangingRef.current && firstMemberSelected) {
+      console.log('[LOGS] 날짜 변경 중 - 자동 마커 업데이트 완전 차단! (초기 진입은 제외)');
       return;
     }
     
@@ -4054,8 +4089,8 @@ export default function LogsPage() {
   useEffect(() => {
     if (isMapInitializedLogs && groupMembers.length > 0) {
       console.log('[LOGS] 그룹 멤버 변경 감지 - 멤버 마커 업데이트:', groupMembers.length, '명');
-      // 날짜 변경 중이 아닐 때만 업데이트 (날짜 변경 중에는 자동 재생성 방지)
-      if (!isDateChangingRef.current) {
+      // 초기 진입 시에는 멤버 마커 업데이트 허용, 날짜 변경 중이고 초기화 완료된 경우에만 방지
+      if (!isDateChangingRef.current || !firstMemberSelected) {
         // 로그 데이터가 없고 선택된 멤버가 있으면 지도 중심 먼저 설정
         const selectedMember = groupMembers.find(m => m.isSelected);
         if (selectedMember && sortedLocationData.length === 0 && map.current) {
@@ -4073,10 +4108,10 @@ export default function LogsPage() {
           updateMemberMarkers(groupMembers, false);
         }
       } else {
-        console.log('[LOGS] 날짜 변경 중으로 멤버 마커 업데이트 건너뜀');
+        console.log('[LOGS] 날짜 변경 중으로 멤버 마커 업데이트 건너뜀 (초기화 완료 상태)');
       }
     }
-  }, [groupMembers, isMapInitializedLogs, sortedLocationData]);
+  }, [groupMembers, isMapInitializedLogs, sortedLocationData, firstMemberSelected]);
 
   // 슬라이더 드래그를 위한 전역 이벤트 리스너
   useEffect(() => {
@@ -4206,10 +4241,17 @@ export default function LogsPage() {
                 await loadLocationDataWithMapPreset(parseInt(member.id), today, member, false);
                 return { success: true, member: member.name, priority: true };
               } else {
-                // 다른 멤버들은 약간의 지연 후 백그라운드 로딩
+                // 다른 멤버들은 백그라운드에서 데이터만 로딩 (지도 렌더링 없이)
                 await new Promise(resolve => setTimeout(resolve, index * 500));
-                console.log(`[LogsPage] 🔄 백그라운드 로딩: ${member.name} (${today})`);
-                await loadLocationData(parseInt(member.id), today);
+                console.log(`[LogsPage] 🔄 백그라운드 로딩: ${member.name} (${today}) - 데이터만`);
+                // 지도에 렌더링하지 않고 데이터만 캐시에 저장
+                try {
+                  const mapMarkers = await memberLocationLogService.getMapMarkers(parseInt(member.id), today);
+                  const stayTimes = await memberLocationLogService.getStayTimes(parseInt(member.id), today);
+                  console.log(`[LogsPage] 📦 ${member.name} 데이터 캐시 완료: 마커 ${mapMarkers.length}개, 체류 ${stayTimes.length}개`);
+                } catch (error) {
+                  console.warn(`[LogsPage] ⚠️ ${member.name} 백그라운드 로딩 실패:`, error);
+                }
                 return { success: true, member: member.name, priority: false };
               }
             } catch (error) {
@@ -4224,9 +4266,13 @@ export default function LogsPage() {
           
           console.log(`[LogsPage] ✅ 프리로드 완료: ${successCount}/${updatedMembers.length}명`);
           
-          setIsLocationDataLoading(false);
-          setFirstMemberSelected(true);
-          isDateChangedRef.current = false;
+          // 선택된 멤버의 마커가 완전히 로딩된 후에 플래그 설정
+          setTimeout(() => {
+            setIsLocationDataLoading(false);
+            setFirstMemberSelected(true);
+            isDateChangedRef.current = false;
+            console.log('[LogsPage] 🎯 초기 진입 완료 - firstMemberSelected 설정');
+          }, 500);
         };
 
         // 선택된 멤버가 있고 초기화가 필요한 경우에만 프리로드 실행
@@ -4889,9 +4935,13 @@ export default function LogsPage() {
   // 사이드바 날짜를 선택된 날짜로 스크롤하는 함수
   const scrollSidebarDateToSelected = (targetDate?: string) => {
     const dateToScroll = targetDate || selectedDate;
+    console.log(`[사이드바 날짜] 스크롤 시도: ${dateToScroll}, sidebarDateX 존재: ${!!sidebarDateX}`);
+    
     if (sidebarDateX && dateToScroll) {
       const recentDays = getRecentDays();
       const targetIndex = recentDays.findIndex(day => day.value === dateToScroll);
+      
+      console.log(`[사이드바 날짜] 날짜 검색 결과: ${dateToScroll} -> 인덱스 ${targetIndex}, 전체 날짜 수: ${recentDays.length}`);
       
       if (targetIndex !== -1) {
         const itemWidth = 85; // 각 버튼 width (min-w-[75px] + gap)
@@ -4905,7 +4955,7 @@ export default function LogsPage() {
         sidebarDateX.set(-targetScroll);
         lastScrolledIndexRef.current = targetIndex;
         
-        console.log(`[사이드바 날짜] 선택된 날짜(${dateToScroll})로 스크롤 완료`, { 
+        console.log(`[사이드바 날짜] ✅ 선택된 날짜(${dateToScroll})로 스크롤 완료`, { 
           targetIndex, 
           targetScroll, 
           totalWidth, 
@@ -4914,18 +4964,25 @@ export default function LogsPage() {
         });
       } else {
         // 선택된 날짜가 범위에 없으면 오늘 날짜로 폴백
+        console.log(`[사이드바 날짜] ⚠️ 선택된 날짜(${dateToScroll})가 범위에 없음. 범위: ${recentDays[0]?.value} ~ ${recentDays[recentDays.length-1]?.value}`);
         scrollSidebarDateToToday();
-        console.log(`[사이드바 날짜] 선택된 날짜(${dateToScroll})가 범위에 없어 오늘 날짜로 폴백`);
+        console.log(`[사이드바 날짜] 오늘 날짜로 폴백 완료`);
       }
+    } else {
+      console.warn(`[사이드바 날짜] 스크롤 불가: sidebarDateX=${!!sidebarDateX}, dateToScroll=${dateToScroll}`);
     }
   };
 
-  // 사이드바 토글 함수
+  // 사이드바 토글 함수 - 플로팅 버튼 전용
   const toggleSidebar = () => {
+    const wasOpen = isSidebarOpen;
     setIsSidebarOpen(!isSidebarOpen);
     
-    // 사이드바가 열릴 때 선택된 멤버로 스크롤하고 선택된 날짜로 스크롤 조정
-    if (!isSidebarOpen) {
+    if (wasOpen) {
+      console.log('[사이드바] 플로팅 버튼으로 닫기');
+    } else {
+      console.log('[사이드바] 플로팅 버튼으로 열기');
+      // 사이드바가 열릴 때 선택된 멤버로 스크롤하고 선택된 날짜로 스크롤 조정
       setTimeout(() => {
         // 사이드바 날짜 스크롤을 선택된 날짜로 조정
         scrollSidebarDateToSelected();
@@ -4947,31 +5004,43 @@ export default function LogsPage() {
 
   // 사이드바 외부 클릭 처리
   useEffect(() => {
-    const handleSidebarClickOutside = (event: MouseEvent) => {
+    const handleSidebarClickOutside = (event: MouseEvent | TouchEvent) => {
       if (isSidebarOpen && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+        console.log('[사이드바] 외부 클릭/터치 감지 - 사이드바 닫기');
         setIsSidebarOpen(false);
       }
     };
 
     if (isSidebarOpen) {
-      document.addEventListener('mousedown', handleSidebarClickOutside);
+      // 마우스와 터치 이벤트 모두 처리하여 확실한 외부 클릭 감지
+      document.addEventListener('mousedown', handleSidebarClickOutside, { passive: false });
+      document.addEventListener('touchstart', handleSidebarClickOutside, { passive: false });
     } else {
       document.removeEventListener('mousedown', handleSidebarClickOutside);
+      document.removeEventListener('touchstart', handleSidebarClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleSidebarClickOutside);
+      document.removeEventListener('touchstart', handleSidebarClickOutside);
     };
   }, [isSidebarOpen]);
 
-  // 사이드바가 열릴 때 날짜 스크롤 초기화
+  // 사이드바가 열릴 때 선택된 날짜로 스크롤 (오늘 날짜가 아닌)
   useEffect(() => {
     if (isSidebarOpen) {
       setTimeout(() => {
-        scrollSidebarDateToToday();
+        // 선택된 날짜가 있으면 해당 날짜로, 없으면 오늘 날짜로 스크롤
+        if (selectedDate) {
+          scrollSidebarDateToSelected(selectedDate);
+          console.log(`[사이드바] 열릴 때 선택된 날짜로 스크롤: ${selectedDate}`);
+        } else {
+          scrollSidebarDateToToday();
+          console.log(`[사이드바] 열릴 때 오늘 날짜로 스크롤 (선택된 날짜 없음)`);
+        }
       }, 150);
     }
-  }, [isSidebarOpen]);
+  }, [isSidebarOpen, selectedDate]);
 
   // 첫번째 멤버 자동 선택 및 위치 데이터 로딩 - 메인 인스턴스에서만
   // 첫번째 멤버 자동 선택 - 위의 통합 useEffect에서 처리하므로 제거
@@ -6384,7 +6453,10 @@ export default function LogsPage() {
             animate="open"
             exit="closed"
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
-            onClick={() => setIsSidebarOpen(false)}
+            onClick={() => {
+              console.log('[사이드바] 오버레이 클릭으로 닫기');
+              setIsSidebarOpen(false);
+            }}
             style={{
               // 모바일 사파리 최적화
               transform: 'translateZ(0)',
@@ -6419,16 +6491,7 @@ export default function LogsPage() {
               WebkitPerspective: 1000,
               WebkitTransform: 'translateZ(0)'
             }}
-            drag="x"
-            dragConstraints={{ left: -320, right: 0 }}
-            dragElastic={0.2}
-            onDragEnd={(e, info) => {
-              // 왼쪽으로 스와이프하면 사이드바 닫기
-              if (info.offset.x < -100 || info.velocity.x < -300) {
-                setIsSidebarOpen(false);
-                console.log('[사이드바] 왼쪽 스와이프로 닫기');
-              }
-            }}
+            // 사이드바 드래그 비활성화 - 플로팅 버튼과 외부 클릭/X버튼으로만 제어
           >
             <motion.div
               variants={sidebarContentVariants}
@@ -6456,7 +6519,10 @@ export default function LogsPage() {
                 </div>
                                      <motion.button
                        whileTap={{ scale: 0.95 }}
-                  onClick={() => setIsSidebarOpen(false)}
+                  onClick={() => {
+                    console.log('[사이드바] X 버튼으로 닫기');
+                    setIsSidebarOpen(false);
+                  }}
                   className="p-2 hover:bg-white/60 rounded-xl transition-all duration-200 backdrop-blur-sm"
                 >
                   <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
