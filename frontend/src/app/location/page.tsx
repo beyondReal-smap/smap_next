@@ -1982,18 +1982,6 @@ export default function LocationPage() {
                     align-items: center;
                     margin-bottom: 8px;
                   ">
-                    <div style="
-                      width: 36px;
-                      height: 36px;
-                      border-radius: 50%;
-                      overflow: hidden;
-                      margin-right: 12px;
-                      border: 2px solid ${borderColor};
-                    ">
-                      <img src="${photoForMarker}" 
-                           style="width: 100%; height: 100%; object-fit: cover;" 
-                           alt="${newlySelectedMember.name}" />
-                    </div>
                     <div style="padding-right: 25px;">
                       <h3 style="
                         margin: 0;
@@ -2001,11 +1989,6 @@ export default function LocationPage() {
                         font-weight: 600;
                         color: #111827;
                       ">👤 ${newlySelectedMember.name}</h3>
-                      <p style="
-                        margin: 2px 0 0 0;
-                        font-size: 12px;
-                        color: #64748b;
-                      ">선택된 멤버</p>
                     </div>
                   </div>
                   
