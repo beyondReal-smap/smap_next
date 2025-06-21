@@ -1737,15 +1737,19 @@ export default function HomePage() {
   useEffect(() => {
     if (groupMembers.length > 0) {
       console.log('[HOME] 그룹멤버 데이터 변경 - 지도 업데이트');
-      if (mapType === 'naver' && naverMapsLoaded && naverMap.current) {
+      if (mapType === 'naver' && naverMapsLoaded && naverMap.current && window.naver?.maps?.LatLng) {
         // 네이버맵 업데이트
         const firstMember = groupMembers[0];
         const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
         const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
-        const latlng = new window.naver.maps.LatLng(lat, lng);
-        naverMap.current.setCenter(latlng);
-        if (naverMarker.current) {
-          naverMarker.current.setPosition(latlng);
+        try {
+          const latlng = new window.naver.maps.LatLng(lat, lng);
+          naverMap.current.setCenter(latlng);
+          if (naverMarker.current) {
+            naverMarker.current.setPosition(latlng);
+          }
+        } catch (error) {
+          console.error('[HOME] 네이버 지도 위치 업데이트 실패:', error);
         }
       } else if (mapType === 'google' && googleMapsLoaded && map.current) {
         // 구글맵 업데이트
@@ -2161,14 +2165,19 @@ export default function HomePage() {
 
     try {
       // 기존 네이버 지도 인스턴스가 있으면 마커만 업데이트
-      if (naverMap.current) {
-        const latlng = new window.naver.maps.LatLng(centerLat, centerLng);
-        naverMap.current.setCenter(latlng);
-        if (naverMarker.current) {
-          naverMarker.current.setPosition(latlng);
+      if (naverMap.current && window.naver?.maps?.LatLng) {
+        try {
+          const latlng = new window.naver.maps.LatLng(centerLat, centerLng);
+          naverMap.current.setCenter(latlng);
+          if (naverMarker.current) {
+            naverMarker.current.setPosition(latlng);
+          }
+          console.log('Naver Maps 기존 인스턴스 업데이트:', locationName, centerLat, centerLng);
+          return;
+        } catch (error) {
+          console.error('[HOME] 네이버 지도 인스턴스 업데이트 실패:', error);
+          return;
         }
-        console.log('Naver Maps 기존 인스턴스 업데이트:', locationName, centerLat, centerLng);
-        return;
       }
       
       console.log('Naver Maps 초기화 시작');
@@ -2197,6 +2206,12 @@ export default function HomePage() {
         console.log('Naver Maps 초기화 - 중심 위치:', locationName, centerLat, centerLng);
         
         // 지도 옵션에 MAP_CONFIG의 기본 설정 사용 + 로고 및 저작권 표시 숨김
+        if (!window.naver?.maps?.LatLng) {
+          console.error('[HOME] Naver Maps API가 완전히 로드되지 않음');
+          setIsMapLoading(false);
+          return;
+        }
+        
         const mapOptions = {
           ...MAP_CONFIG.NAVER.DEFAULT_OPTIONS,
           center: new window.naver.maps.LatLng(centerLat, centerLng),
@@ -2444,6 +2459,20 @@ export default function HomePage() {
     return isNaN(num) ? null : num;
   };
 
+  // 안전한 LatLng 객체 생성 헬퍼 함수
+  const createSafeLatLng = (lat: number, lng: number): any | null => {
+    if (!window.naver?.maps?.LatLng) {
+      console.error('[HOME] Naver Maps API가 로드되지 않음');
+      return null;
+    }
+    try {
+      return new window.naver.maps.LatLng(lat, lng);
+    } catch (error) {
+      console.error('[HOME] LatLng 객체 생성 실패:', error);
+      return null;
+    }
+  };
+
   // 공통 마커 생성 함수 - 위치 페이지에서 가져온 개선된 로직
   const createMarker = (
     location: any,
@@ -2515,7 +2544,11 @@ export default function HomePage() {
     // console.log('[createMarker] 검증된 좌표:', { validLat, validLng });
 
     if (mapType === 'naver' && naverMap.current && window.naver?.maps) {
-      const naverPos = new window.naver.maps.LatLng(validLat, validLng);
+      const naverPos = createSafeLatLng(validLat, validLng);
+      if (!naverPos) {
+        console.error('[createMarker] LatLng 객체 생성 실패');
+        return null;
+      }
       
       if (markerType === 'member' && memberData) {
         // 안전한 이미지 URL 사용
@@ -3715,10 +3748,13 @@ export default function HomePage() {
 
         if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
           // 네이버 지도 이동 및 줌 레벨 조정 (즉시 실행)
-                        naverMap.current.panTo(new window.naver.maps.LatLng(lat, lng), {
-            duration: 300,
-            easing: 'easeOutCubic'
-          });
+          const targetLatLng = createSafeLatLng(lat, lng);
+          if (targetLatLng) {
+            naverMap.current.panTo(targetLatLng, {
+              duration: 300,
+              easing: 'easeOutCubic'
+            });
+          }
             naverMap.current.setZoom(16);
             console.log('네이버 지도 중심 이동:', selectedMember.name, { lat, lng });
 
@@ -4053,8 +4089,14 @@ export default function HomePage() {
       }
 
       // 새 현재 위치 마커 생성
+      const currentPosition = createSafeLatLng(userLocation.lat, userLocation.lng);
+      if (!currentPosition) {
+        console.error('[createCurrentLocationMarker] 현재 위치 LatLng 생성 실패');
+        return;
+      }
+
       naverMarker.current = new window.naver.maps.Marker({
-        position: new window.naver.maps.LatLng(userLocation.lat, userLocation.lng),
+        position: currentPosition,
         map: naverMap.current,
         icon: {
           content: '<div style="width: 20px; height: 20px; background-color: #3b82f6; border: 3px solid #FFFFFF; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
@@ -4065,7 +4107,7 @@ export default function HomePage() {
       });
 
       // 지도 중심을 현재 위치로 이동
-      naverMap.current.panTo(new window.naver.maps.LatLng(userLocation.lat, userLocation.lng));
+      naverMap.current.panTo(currentPosition);
       naverMap.current.setZoom(16);
 
     } else if (mapType === 'google' && map.current && window.google?.maps) {
@@ -4195,12 +4237,14 @@ export default function HomePage() {
           setLocationName("현재 위치");
           
           if (mapType === 'naver' && naverMap.current && naverMapsLoaded) {
-            const naverLatLng = new window.naver.maps.LatLng(latitude, longitude);
-            naverMap.current.setCenter(naverLatLng);
-            naverMap.current.setZoom(16);
-            
-            if (naverMarker.current) {
-              naverMarker.current.setPosition(naverLatLng);
+            const naverLatLng = createSafeLatLng(latitude, longitude);
+            if (naverLatLng) {
+              naverMap.current.setCenter(naverLatLng);
+              naverMap.current.setZoom(16);
+              
+              if (naverMarker.current) {
+                naverMarker.current.setPosition(naverLatLng);
+              }
             }
           } else if (mapType === 'google' && map.current && googleMapsLoaded) {
             map.current.panTo({ lat: latitude, lng: longitude });
@@ -4571,7 +4615,11 @@ export default function HomePage() {
     
     // 지도 타입에 따른 포커스 이동
     if (mapType === 'naver' && naverMap.current) {
-      const location = new window.naver.maps.LatLng(lat, lng);
+      const location = createSafeLatLng(lat, lng);
+      if (!location) {
+        console.error('[handleScheduleSelect] LatLng 객체 생성 실패');
+        return;
+      }
       naverMap.current.panTo(location, {
         duration: 800,
         easing: 'easeOutCubic'
