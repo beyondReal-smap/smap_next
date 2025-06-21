@@ -9,7 +9,7 @@ if (typeof window !== 'undefined') {
       
       // 전역 Array 객체 복구
       if (!window.Array) {
-        window.Array = function() {
+        (window as any).Array = function() {
           const arr = [];
           for (let i = 0; i < arguments.length; i++) {
             arr[i] = arguments[i];
@@ -20,7 +20,7 @@ if (typeof window !== 'undefined') {
       
       // Array.isArray 메소드 복구
       if (!window.Array.isArray) {
-        window.Array.isArray = function(obj) {
+        (window.Array as any).isArray = function(obj: any): obj is any[] {
           if (obj === null || obj === undefined) return false;
           try {
             return Object.prototype.toString.call(obj) === '[object Array]';
