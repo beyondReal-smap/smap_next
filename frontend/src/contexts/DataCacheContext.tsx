@@ -284,23 +284,29 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     
     // 타임스탬프 검증 및 수정
     let correctedLastUpdate = lastUpdate;
+    let timestampCorrected = false;
     
     // lastUpdate가 초 단위로 저장된 경우 (10자리 숫자) 밀리초로 변환
     if (lastUpdate > 0 && lastUpdate < 9999999999) { // 10자리 미만이면 초 단위
       correctedLastUpdate = lastUpdate * 1000;
+      timestampCorrected = true;
       console.warn(`[DATA CACHE] ⚠️ 타임스탬프 형식 오류 감지 및 수정: ${lastUpdate} → ${correctedLastUpdate}`);
     }
     
-    const elapsedMs = now - correctedLastUpdate;
-    const elapsedSeconds = Math.round(elapsedMs / 1000);
-    const maxSeconds = Math.round(actualDuration / 1000);
-    const status = isValid ? '유효' : '만료';
-    const softCheck = checkSoft ? ' (소프트)' : '';
+    // 수정된 타임스탬프로 유효성 재계산
+    const correctedElapsedMs = now - correctedLastUpdate;
+    const correctedIsValid = correctedElapsedMs < actualDuration;
     
-    console.log(`[DATA CACHE] 캐시 유효성 검사: ${type}${groupId ? `(${groupId})` : ''}${date ? `[${date}]` : ''}${softCheck} - ${status} (${elapsedSeconds}초/${maxSeconds}초)`);
+    const elapsedSeconds = Math.round(correctedElapsedMs / 1000);
+    const maxSeconds = Math.round(actualDuration / 1000);
+    const status = correctedIsValid ? '유효' : '만료';
+    const softCheck = checkSoft ? ' (소프트)' : '';
+    const correctionNote = timestampCorrected ? ' (타임스탬프 수정됨)' : '';
+    
+    console.log(`[DATA CACHE] 캐시 유효성 검사: ${type}${groupId ? `(${groupId})` : ''}${date ? `[${date}]` : ''}${softCheck} - ${status} (${elapsedSeconds}초/${maxSeconds}초)${correctionNote}`);
     
     // 타임스탬프가 수정되었고 캐시가 만료된 경우 캐시 무효화
-    if (correctedLastUpdate !== lastUpdate && !isValid) {
+    if (timestampCorrected && !correctedIsValid) {
       console.log(`[DATA CACHE] 🔄 잘못된 타임스탬프로 인한 캐시 무효화: ${type}${groupId ? `(${groupId})` : ''}`);
       // 해당 캐시 항목의 타임스탬프를 0으로 리셋하여 다음에 새로 로드하도록 함
       setTimeout(() => {
@@ -308,7 +314,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       }, 0);
     }
     
-    return isValid;
+    return correctedIsValid;
   }, [cache.lastUpdated]);
 
   // 사용자 프로필

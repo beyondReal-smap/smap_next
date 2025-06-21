@@ -1678,14 +1678,116 @@ export default function HomePage() {
     initializeUserAuth();
   }, [authLoading, isLoggedIn, user, router]);
 
-  // 🗺️ 네이버맵 우선 로딩 - 컴포넌트 마운트 시 즉시 시작
+  // 🗺️ 지도 API 로딩 및 초기화 - 컴포넌트 마운트 시 시작
   useEffect(() => {
-    // 네이버맵을 기본으로 우선 로딩
-    if (mapType === 'naver' && !naverMapsLoaded && !apiLoadStatus.naver) {
-      console.log('[HOME] 🗺️ 네이버맵 우선 로딩 시작');
-      loadNaverMapsAPI();
+    console.log('[HOME] 🗺️ 지도 초기화 시작 - 재방문 시에도 안전하게 처리');
+    
+    // 페이지 재방문 시에도 지도가 제대로 표시되도록 강제 초기화
+    const forceMapInitialization = () => {
+      // API 로드 상태 재검증
+      const isNaverReady = window.naver?.maps && naverMapsLoaded;
+      const isGoogleReady = window.google?.maps && googleMapsLoaded;
+      
+      if (mapType === 'naver') {
+        if (isNaverReady) {
+          console.log('[HOME] 네이버맵 API 이미 준비됨 - 즉시 초기화');
+          setNaverMapsLoaded(true);
+          apiLoadStatus.naver = true;
+          setIsMapLoading(false);
+        } else if (!apiLoadStatus.naver) {
+          console.log('[HOME] 🗺️ 네이버맵 우선 로딩 시작');
+          loadNaverMapsAPI();
+        }
+      } else if (mapType === 'google') {
+        if (isGoogleReady) {
+          console.log('[HOME] 구글맵 API 이미 준비됨 - 즉시 초기화');
+          setGoogleMapsLoaded(true);
+          apiLoadStatus.google = true;
+          setIsMapLoading(false);
+        } else if (!apiLoadStatus.google) {
+          console.log('[HOME] 🗺️ 구글맵 로딩 시작');
+          loadGoogleMapsAPI();
+        }
+      }
+    };
+
+    // 즉시 실행 및 약간의 지연 후 재실행 (페이지 전환 후 상태 안정화 대기)
+    forceMapInitialization();
+    const initTimeout = setTimeout(forceMapInitialization, 500);
+    
+    return () => clearTimeout(initTimeout);
+  }, [mapType]); // mapType 변경 시에도 재실행
+
+  // 🗺️ 지도 API 로드 완료 시 자동 초기화
+  useEffect(() => {
+    if (mapType === 'naver' && naverMapsLoaded && window.naver?.maps) {
+      console.log('[HOME] 네이버맵 API 로드 완료 - 자동 초기화');
+      setTimeout(() => initNaverMap(), 100); // DOM 안정화 대기
     }
-  }, []);
+  }, [naverMapsLoaded, mapType]);
+
+  useEffect(() => {
+    if (mapType === 'google' && googleMapsLoaded && window.google?.maps) {
+      console.log('[HOME] 구글맵 API 로드 완료 - 자동 초기화');
+      setTimeout(() => initGoogleMap(), 100); // DOM 안정화 대기
+    }
+  }, [googleMapsLoaded, mapType]);
+
+  // 🗺️ 그룹멤버 데이터 변경 시 지도 업데이트
+  useEffect(() => {
+    if (groupMembers.length > 0) {
+      console.log('[HOME] 그룹멤버 데이터 변경 - 지도 업데이트');
+      if (mapType === 'naver' && naverMapsLoaded && naverMap.current) {
+        // 네이버맵 업데이트
+        const firstMember = groupMembers[0];
+        const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
+        const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
+        const latlng = new window.naver.maps.LatLng(lat, lng);
+        naverMap.current.setCenter(latlng);
+        if (naverMarker.current) {
+          naverMarker.current.setPosition(latlng);
+        }
+      } else if (mapType === 'google' && googleMapsLoaded && map.current) {
+        // 구글맵 업데이트
+        const firstMember = groupMembers[0];
+        const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
+        const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
+        const centerLocation = { lat, lng };
+        map.current.setCenter(centerLocation);
+        if (marker.current) {
+          marker.current.setPosition(centerLocation);
+        }
+      }
+    }
+  }, [groupMembers, mapType]);
+
+  // 🧹 컴포넌트 언마운트 시 지도 상태 정리
+  useEffect(() => {
+    return () => {
+      console.log('[HOME] 컴포넌트 언마운트 - 지도 상태 정리');
+      
+      // 지도 인스턴스 정리
+      if (map.current) {
+        map.current = null;
+      }
+      if (naverMap.current) {
+        naverMap.current = null;
+      }
+      if (marker.current) {
+        marker.current = null;
+      }
+      if (naverMarker.current) {
+        naverMarker.current = null;
+      }
+      
+      // 로딩 상태 초기화
+      setIsMapLoading(false);
+      setMapsInitialized({ naver: false, google: false });
+      
+      // API 로드 상태는 유지 (재방문 시 빠른 로딩을 위해)
+      console.log('[HOME] 지도 상태 정리 완료 - API 로드 상태는 유지');
+    };
+  }, []); // 컴포넌트 마운트 시 한 번만 등록
 
   // Google Maps API 로드 함수 (프리로딩 최적화)
   const loadGoogleMapsAPI = async () => {
@@ -1957,37 +2059,35 @@ export default function HomePage() {
       return;
     }
 
-    // 그룹멤버가 없으면 초기화하지 않음
-    if (groupMembers.length === 0) {
-      console.log('Google Maps 초기화: 그룹멤버 데이터 대기 중');
-      return;
+    // 그룹멤버가 없으면 기본 위치로 초기화
+    let centerLocation = { lat: userLocation.lat, lng: userLocation.lng };
+    let memberName = '기본 위치';
+    
+    if (groupMembers.length > 0) {
+      const firstMember = groupMembers[0];
+      const centerLat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
+      const centerLng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
+      centerLocation = { lat: centerLat, lng: centerLng };
+      memberName = firstMember.name;
+    } else {
+      console.log('Google Maps 초기화: 그룹멤버 데이터 없음 - 기본 위치 사용');
     }
 
     try {
       // 기존 구글 지도 인스턴스가 있으면 마커만 업데이트
       if (map.current) {
-        // 첫 번째 그룹멤버 위치로 업데이트
-        const firstMember = groupMembers[0];
-        const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
-        const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
-        const centerLocation = { lat, lng };
         map.current.setCenter(centerLocation);
         if (marker.current) {
           marker.current.setPosition(centerLocation);
         }
+        console.log('Google Maps 기존 인스턴스 업데이트:', memberName, centerLocation);
         return;
       }
       
       console.log('Google Maps 초기화 시작');
       setIsMapLoading(true);
       
-      // 첫 번째 그룹멤버 위치를 지도 중심으로 설정
-      const firstMember = groupMembers[0];
-      const centerLat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
-      const centerLng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
-      const centerLocation = { lat: centerLat, lng: centerLng };
-      
-      console.log('Google Maps 초기화 - 첫 번째 멤버 위치:', firstMember.name, centerLocation);
+      console.log('Google Maps 초기화 - 중심 위치:', memberName, centerLocation);
       
       // 지도 생성
       const mapOptions = {
@@ -2056,24 +2156,29 @@ export default function HomePage() {
       return;
     }
 
-    // 그룹멤버가 없으면 초기화하지 않음
-    if (groupMembers.length === 0) {
-      console.log('Naver Maps 초기화: 그룹멤버 데이터 대기 중');
-      return;
+    // 그룹멤버가 없으면 기본 위치로 초기화
+    let centerLat = userLocation.lat;
+    let centerLng = userLocation.lng;
+    let memberName = '기본 위치';
+    
+    if (groupMembers.length > 0) {
+      const firstMember = groupMembers[0];
+      centerLat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
+      centerLng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
+      memberName = firstMember.name;
+    } else {
+      console.log('Naver Maps 초기화: 그룹멤버 데이터 없음 - 기본 위치 사용');
     }
 
     try {
       // 기존 네이버 지도 인스턴스가 있으면 마커만 업데이트
       if (naverMap.current) {
-        // 첫 번째 그룹멤버 위치로 업데이트
-        const firstMember = groupMembers[0];
-        const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
-        const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
-        const latlng = new window.naver.maps.LatLng(lat, lng);
+        const latlng = new window.naver.maps.LatLng(centerLat, centerLng);
         naverMap.current.setCenter(latlng);
         if (naverMarker.current) {
           naverMarker.current.setPosition(latlng);
         }
+        console.log('Naver Maps 기존 인스턴스 업데이트:', memberName, centerLat, centerLng);
         return;
       }
       
@@ -2100,12 +2205,7 @@ export default function HomePage() {
       });
 
       try {
-        // 첫 번째 그룹멤버 위치를 지도 중심으로 설정
-        const firstMember = groupMembers[0];
-        const centerLat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat) || userLocation.lat;
-        const centerLng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng) || userLocation.lng;
-        
-        console.log('Naver Maps 초기화 - 첫 번째 멤버 위치:', firstMember.name, centerLat, centerLng);
+        console.log('Naver Maps 초기화 - 중심 위치:', memberName, centerLat, centerLng);
         
         // 지도 옵션에 MAP_CONFIG의 기본 설정 사용 + 로고 및 저작권 표시 숨김
         const mapOptions = {
