@@ -271,11 +271,9 @@ export default function SignInPage() {
               console.error('[NATIVE CALLBACK] AuthContext 동기화 실패:', error);
             }
             
-            // 7. 짧은 지연 후 리다이렉션 (상태 안정화 대기)
-            setTimeout(() => {
-              console.log('[NATIVE CALLBACK] 홈으로 리다이렉션 실행');
-              router.replace('/home');
-            }, 500);
+            // 7. 즉시 리다이렉션 (상태 안정화 완료)
+            console.log('[NATIVE CALLBACK] 홈으로 즉시 리다이렉션 실행');
+            router.replace('/home');
           }
         } else {
           console.error('[NATIVE CALLBACK] 서버 인증 실패:', data.error);
@@ -349,10 +347,9 @@ export default function SignInPage() {
               console.log('[NATIVE DATA] 모든 저장소에 인증 상태 저장 완료');
             }
             
-            // 500ms 후 리다이렉션
-            setTimeout(() => {
-              window.location.href = '/home';
-            }, 500);
+            // 즉시 리다이렉션
+            console.log('[NATIVE DATA] 홈으로 즉시 리다이렉션 실행');
+            window.location.href = '/home';
           }
         } else {
           throw new Error(result.message || '인증 실패');
@@ -1441,27 +1438,17 @@ export default function SignInPage() {
               // 7. 모든 상태 업데이트 차단
               blockAllEffectsRef.current = true;
               
-              // 8. 🔥 강화된 홈 페이지 이동 로직
-              setTimeout(() => {
-                console.log('[GOOGLE LOGIN] 🏠 홈 페이지로 이동');
-                sendLogToiOS('info', 'Google 로그인 홈 페이지 이동', {
-                  userId: data.user.mt_idx,
-                  hasToken: !!authService.getToken(),
-                  hasUser: !!authService.getUserData(),
-                  authContextReady: isLoggedIn
-                });
-                
-                // 즉시 홈 페이지로 이동
-                router.replace('/home');
-                
-                // 🔥 추가 안전장치: 이동이 실패할 경우를 대비한 재시도
-                setTimeout(() => {
-                  if (window.location.pathname !== '/home') {
-                    console.log('[GOOGLE LOGIN] ⚡ 홈 페이지 이동 재시도');
-                    window.location.href = '/home';
-                  }
-                }, 500);
-              }, 300); // 300ms 추가 지연
+              // 8. 🔥 즉시 홈 페이지 이동 로직
+              console.log('[GOOGLE LOGIN] 🏠 홈 페이지로 즉시 이동');
+              sendLogToiOS('info', 'Google 로그인 홈 페이지 이동', {
+                userId: data.user.mt_idx,
+                hasToken: !!authService.getToken(),
+                hasUser: !!authService.getUserData(),
+                authContextReady: isLoggedIn
+              });
+              
+              // 즉시 홈 페이지로 이동
+              router.replace('/home');
             }
           } else {
             throw new Error(data.error || '로그인에 실패했습니다.');

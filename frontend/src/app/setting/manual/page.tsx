@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FiBook, FiPlay } from 'react-icons/fi';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 
 const videos = [
   { title: '소개1', url: 'https://www.youtube.com/embed/fRLxsHCvwuQ' },
@@ -129,6 +130,11 @@ export default function ManualPage() {
   }, []);
 
   const handleBack = () => {
+    // 🎮 뒤로가기 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '사용 가이드 뒤로가기', { 
+      component: 'manual', 
+      action: 'back-navigation' 
+    });
     router.back();
   };
 

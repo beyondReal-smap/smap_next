@@ -26,6 +26,7 @@ import {
 import { HiSparkles, HiCheckCircle } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
 import authService from '@/services/authService';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 
 // 모바일 최적화된 CSS 애니메이션 (노란색 테마)
 const pageAnimations = `
@@ -453,17 +454,34 @@ export default function TermsPage() {
 
   // 뒤로가기 핸들러
   const handleBack = () => {
+    // 🎮 뒤로가기 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '약관 및 정책 뒤로가기', { 
+      component: 'terms', 
+      action: 'back-navigation' 
+    });
     router.back();
   };
 
   // 약관 상세 보기
   const handleViewTerm = (term: Term) => {
+    // 🎮 약관 상세보기 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '약관 상세보기', { 
+      component: 'terms', 
+      action: 'view-term',
+      termId: term.id 
+    });
     // 외부 링크로 새 탭에서 열기
     window.open(term.link, '_blank', 'noopener,noreferrer');
   };
 
   // 약관 미리보기
   const handlePreviewTerm = (term: Term) => {
+    // 🎮 약관 미리보기 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '약관 미리보기', { 
+      component: 'terms', 
+      action: 'preview-term',
+      termId: term.id 
+    });
     setSelectedTerm(term);
     setShowPreviewModal(true);
   };
@@ -482,9 +500,23 @@ export default function TermsPage() {
 
     // 필수 약관은 변경할 수 없음
     if (term.isRequired) {
+      // 🎮 필수 약관 변경 시도 시 경고 햅틱 피드백
+      triggerHapticFeedback(HapticFeedbackType.ERROR, '필수 약관 변경 불가', { 
+        component: 'terms', 
+        action: 'required-term-warning',
+        termId: term.id 
+      });
       alert('필수 약관은 변경할 수 없습니다.');
       return;
     }
+
+    // 🎮 동의 상태 변경 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, `약관 동의 ${term.isConsented ? '해제' : '설정'}`, { 
+      component: 'terms', 
+      action: 'consent-toggle',
+      termId: term.id,
+      newState: !term.isConsented 
+    });
 
     // 즉시 UI 업데이트 (낙관적 업데이트)
     setTerms(prevTerms => 

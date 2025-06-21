@@ -30,7 +30,7 @@ import {
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
-import { hapticFeedback } from '@/utils/haptic';
+import { hapticFeedback, triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 
 // 기본 이미지 가져오기 함수 (schedule/page.tsx에서 가져옴)
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
@@ -397,6 +397,11 @@ export default function SettingsPage() {
 
   // 뒤로가기 핸들러
   const handleBack = () => {
+    // 🎮 뒤로가기 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '설정 페이지 뒤로가기', { 
+      component: 'setting', 
+      action: 'back-navigation' 
+    });
     router.back();
   };
 
@@ -484,6 +489,14 @@ export default function SettingsPage() {
                       key={item.label}
                       href={item.href}
                       className={`flex items-center px-4 py-4 menu-item-hover mobile-button ${itemIdx !== section.items.length - 1 ? 'border-b border-gray-50' : ''}`}
+                      onClick={() => {
+                        // 🎮 설정 메뉴 진입 햅틱 피드백
+                        triggerHapticFeedback(HapticFeedbackType.SELECTION, `${item.label} 메뉴 진입`, { 
+                          component: 'setting', 
+                          action: 'navigate-to-menu',
+                          menu: item.label 
+                        });
+                      }}
                     >
                       <div className={`w-10 h-10 ${item.color} rounded-xl flex items-center justify-center mr-4 shadow-sm`}>
                         <IconComponent className="w-5 h-5 text-white" />

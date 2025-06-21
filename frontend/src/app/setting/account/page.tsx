@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 
 // 기본 이미지 가져오기 함수
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
@@ -373,11 +374,23 @@ export default function AccountSettingsPage() {
 
   // 뒤로가기 핸들러
   const handleBack = () => {
+    // 🎮 뒤로가기 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '계정설정 뒤로가기', { 
+      component: 'account-setting', 
+      action: 'back-navigation' 
+    });
     router.back();
   };
 
   // 메뉴 아이템 클릭 핸들러
   const handleMenuClick = (item: any) => {
+    // 🎮 계정 메뉴 클릭 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, `${item.label} 메뉴 클릭`, { 
+      component: 'account-setting', 
+      action: 'menu-click',
+      menu: item.label 
+    });
+    
     if (item.onClick) {
       item.onClick();
     } else {

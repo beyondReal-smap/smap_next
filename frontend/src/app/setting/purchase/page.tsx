@@ -17,6 +17,7 @@ import {
 import { HiSparkles, HiCheckCircle } from 'react-icons/hi2';
 import { Order, OrderSummary, OrderListResponse, OrderStatus, OrderStatusLabels, PaymentType, PaymentTypeLabels } from '@/types/order';
 import authService from '@/services/authService';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 
 // 모바일 최적화된 CSS 애니메이션 (초록색 테마)
 const pageAnimations = `
@@ -294,6 +295,11 @@ export default function PurchasePage() {
 
   // 뒤로가기 핸들러
   const handleBack = () => {
+    // 🎮 뒤로가기 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '구독 내역 뒤로가기', { 
+      component: 'purchase', 
+      action: 'back-navigation' 
+    });
     router.back();
   };
 
@@ -341,6 +347,12 @@ export default function PurchasePage() {
 
   // 영수증 다운로드
   const handleDownloadReceipt = (order: Order) => {
+    // 🎮 영수증 다운로드 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '영수증 다운로드', { 
+      component: 'purchase', 
+      action: 'download-receipt',
+      orderId: order.ot_idx 
+    });
     console.log('영수증 다운로드:', order);
     // 실제 다운로드 로직 구현
   };
@@ -480,7 +492,15 @@ export default function PurchasePage() {
                       {STATUS_FILTERS.map(({ key, label }) => (
                         <button
                           key={key}
-                          onClick={() => setFilterStatus(key)}
+                          onClick={() => {
+                            // 🎮 필터 변경 햅틱 피드백
+                            triggerHapticFeedback(HapticFeedbackType.SELECTION, `필터 변경: ${label}`, { 
+                              component: 'purchase', 
+                              action: 'filter-change',
+                              filter: key 
+                            });
+                            setFilterStatus(key);
+                          }}
                           className={`px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors mobile-button ${
                             filterStatus === key 
                               ? 'bg-green-600 text-white' 

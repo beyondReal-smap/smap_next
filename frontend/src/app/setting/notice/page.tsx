@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FiBell, FiCalendar } from 'react-icons/fi';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 
 // 공지사항 인터페이스
 interface Notice {
@@ -273,6 +274,11 @@ export default function NoticePage() {
   }, []);
 
   const handleBack = () => {
+    // 🎮 뒤로가기 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '공지사항 뒤로가기', { 
+      component: 'notice', 
+      action: 'back-navigation' 
+    });
     router.back();
   };
 
@@ -455,7 +461,18 @@ export default function NoticePage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.2 + (0.1 * idx), duration: 0.6 }}
                       >
-                        <Link href={`/setting/notice/${notice.nt_idx}`} className="block">
+                        <Link 
+                          href={`/setting/notice/${notice.nt_idx}`} 
+                          className="block"
+                          onClick={() => {
+                            // 🎮 공지사항 상세 진입 햅틱 피드백
+                            triggerHapticFeedback(HapticFeedbackType.SELECTION, '공지사항 상세 진입', { 
+                              component: 'notice', 
+                              action: 'view-detail',
+                              noticeId: notice.nt_idx 
+                            });
+                          }}
+                        >
                           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 card-hover mobile-button">
                             <div className="flex items-start justify-between">
                               <div className="flex items-start space-x-3 flex-1">

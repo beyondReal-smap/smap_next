@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FiMail, FiSend, FiMessageSquare, FiCheck } from 'react-icons/fi';
 import { AlertModal, ConfirmModal } from '@/components/ui';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 
 const INQUIRY_CATEGORIES = [
   { value: 'general', label: '일반 문의', icon: '💬' },
@@ -143,6 +144,11 @@ export default function InquiryPage() {
   }, []);
 
   const handleBack = () => {
+    // 🎮 뒤로가기 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '1:1 문의 뒤로가기', { 
+      component: 'inquiry', 
+      action: 'back-navigation' 
+    });
     router.back();
   };
 
