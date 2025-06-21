@@ -1143,6 +1143,204 @@
       }, 10000);
     }
 
+    // 14. iOS 웹뷰 고정 요소 (헤더/네비게이션) 최적화
+    function enforceFixedElements() {
+      console.log('[iOS WebView] 고정 요소 (헤더/네비게이션) 최적화...');
+      
+      // CSS 고정 요소 최적화 스타일 추가
+      const fixedElementStyle = document.createElement('style');
+      fixedElementStyle.id = 'ios-fixed-element-style';
+      if (!document.getElementById('ios-fixed-element-style')) {
+        fixedElementStyle.textContent = `
+          /* iOS 웹뷰 헤더 고정 보장 */
+          .header-fixed, header[class*="fixed"] {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 9999 !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            transform: translateZ(0) !important;
+            -webkit-transform: translateZ(0) !important;
+            will-change: transform !important;
+            -webkit-perspective: 1000 !important;
+            -webkit-backface-visibility: hidden !important;
+          }
+          
+          /* iOS 웹뷰 네비게이션 고정 보장 */
+          .navigation-fixed, nav[class*="fixed"], nav[class*="bottom"] {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 9999 !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            transform: translateZ(0) !important;
+            -webkit-transform: translateZ(0) !important;
+            will-change: transform !important;
+            -webkit-perspective: 1000 !important;
+            -webkit-backface-visibility: hidden !important;
+          }
+          
+          /* iOS Safe Area 대응 */
+          @supports (padding: max(0px)) {
+            .header-fixed, header[class*="fixed"] {
+              padding-top: max(16px, env(safe-area-inset-top)) !important;
+            }
+            
+            .navigation-fixed, nav[class*="fixed"], nav[class*="bottom"] {
+              padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+            }
+          }
+          
+          /* 모든 고정 요소에 대한 iOS 최적화 */
+          .fixed, [style*="position: fixed"], [style*="position:fixed"] {
+            transform: translateZ(0) !important;
+            -webkit-transform: translateZ(0) !important;
+            will-change: transform !important;
+            -webkit-perspective: 1000 !important;
+            -webkit-backface-visibility: hidden !important;
+          }
+        `;
+        document.head.appendChild(fixedElementStyle);
+      }
+      
+      // 헤더 요소 강제 고정
+      function fixHeaders() {
+        const headerSelectors = [
+          'header', 
+          '.header-fixed', 
+          '[class*="header"]',
+          'motion.header',
+          '[data-framer-component*="header"]'
+        ];
+        
+        headerSelectors.forEach(selector => {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach(header => {
+            if (header.offsetTop <= 100) { // 상단 근처 요소만
+              header.style.position = 'fixed';
+              header.style.top = '0';
+              header.style.left = '0';
+              header.style.right = '0';
+              header.style.zIndex = '9999';
+              header.style.background = 'rgba(255, 255, 255, 0.95)';
+              header.style.backdropFilter = 'blur(20px)';
+              header.style.webkitBackdropFilter = 'blur(20px)';
+              header.style.transform = 'translateZ(0)';
+              header.style.webkitTransform = 'translateZ(0)';
+              header.style.willChange = 'transform';
+              header.style.webkitPerspective = '1000';
+              header.style.webkitBackfaceVisibility = 'hidden';
+            }
+          });
+        });
+      }
+      
+      // 네비게이션 요소 강제 고정
+      function fixNavigations() {
+        const navSelectors = [
+          'nav', 
+          '.navigation-fixed', 
+          '[class*="navigation"]',
+          '[class*="bottom-nav"]',
+          '[class*="BottomNavigation"]'
+        ];
+        
+        navSelectors.forEach(selector => {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach(nav => {
+            // 하단 네비게이션으로 보이는 요소들만
+            const rect = nav.getBoundingClientRect();
+            const isBottomNav = rect.bottom >= window.innerHeight - 100 || 
+                              nav.style.bottom === '0' || 
+                              nav.className.includes('bottom') ||
+                              nav.className.includes('navigation');
+            
+            if (isBottomNav) {
+              nav.style.position = 'fixed';
+              nav.style.bottom = '0';
+              nav.style.left = '0';
+              nav.style.right = '0';
+              nav.style.zIndex = '9999';
+              nav.style.background = 'rgba(255, 255, 255, 0.95)';
+              nav.style.backdropFilter = 'blur(20px)';
+              nav.style.webkitBackdropFilter = 'blur(20px)';
+              nav.style.transform = 'translateZ(0)';
+              nav.style.webkitTransform = 'translateZ(0)';
+              nav.style.willChange = 'transform';
+              nav.style.webkitPerspective = '1000';
+              nav.style.webkitBackfaceVisibility = 'hidden';
+            }
+          });
+        });
+      }
+      
+      // 초기 적용
+      fixHeaders();
+      fixNavigations();
+      
+      // DOM 변화 감지하여 재적용
+      const observer = new MutationObserver((mutations) => {
+        let shouldReapply = false;
+        mutations.forEach(mutation => {
+          if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+            for (const node of mutation.addedNodes) {
+              if (node.nodeType === 1) { // Element node
+                const tagName = node.tagName?.toLowerCase();
+                if (tagName === 'header' || tagName === 'nav' || 
+                    node.className?.includes('header') || 
+                    node.className?.includes('navigation')) {
+                  shouldReapply = true;
+                  break;
+                }
+              }
+            }
+          }
+        });
+        
+        if (shouldReapply) {
+          setTimeout(() => {
+            fixHeaders();
+            fixNavigations();
+          }, 100);
+        }
+      });
+      
+      // 감지 시작
+      if (document.body) {
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true
+        });
+      }
+      
+      // 주기적 체크 (안전장치)
+      setInterval(() => {
+        fixHeaders();
+        fixNavigations();
+      }, 5000);
+    }
+    
+    // DOM 준비되면 고정 요소 최적화 시작
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', enforceFixedElements);
+    } else {
+      enforceFixedElements();
+    }
+    
+    // 페이지 로드 완료 후에도 다시 한 번
+    window.addEventListener('load', enforceFixedElements);
+    
+    // 방향 변경 시 재적용
+    window.addEventListener('orientationchange', () => {
+      setTimeout(enforceFixedElements, 300);
+    });
+
     console.log('iOS WebView fixes applied successfully');
   }
 })();

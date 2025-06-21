@@ -100,15 +100,16 @@ const getMetadata = (): Metadata => {
   }
 }
 
-// Viewport 설정을 별도 export로 분리
+// Viewport 설정을 별도 export로 분리 - iOS 웹뷰 최적화
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover', // iOS Safe Area 완전 활용
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#22C55D' },
-    { media: '(prefers-color-scheme: dark)', color: '#16A34A' },
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#1f2937' },
   ],
   colorScheme: 'light',
 }

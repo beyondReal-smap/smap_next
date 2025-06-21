@@ -180,6 +180,85 @@ html, body {
   overflow-x: hidden;
   position: relative;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* iOS 웹뷰 최적화 */
+  -webkit-text-size-adjust: 100%;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* iOS 웹뷰 고정 헤더 최적화 */
+.header-fixed {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999 !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  will-change: transform !important;
+  transform: translateZ(0) !important;
+  /* iOS Safari 상단 노치 대응 */
+  padding-top: env(safe-area-inset-top, 0px);
+  /* iOS 웹뷰에서 고정 요소 최적화 */
+  -webkit-transform: translateZ(0);
+  -webkit-perspective: 1000;
+  -webkit-backface-visibility: hidden;
+}
+
+/* iOS 웹뷰 하단 네비게이션 최적화 */
+.navigation-fixed {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999 !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  will-change: transform !important;
+  transform: translateZ(0) !important;
+  /* iOS Safari 하단 노치 대응 */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* iOS 웹뷰에서 고정 요소 최적화 */
+  -webkit-transform: translateZ(0);
+  -webkit-perspective: 1000;
+  -webkit-backface-visibility: hidden;
+}
+
+/* iOS Safe Area 대응 */
+.safe-area-padding-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-area-padding-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-area-padding-left {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+
+.safe-area-padding-right {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* iOS 웹뷰 전용 viewport 최적화 */
+@supports (-webkit-touch-callout: none) {
+  .header-fixed {
+    -webkit-position: sticky;
+    -webkit-position: -webkit-sticky;
+    position: sticky;
+    position: fixed;
+  }
+  
+  .navigation-fixed {
+    -webkit-position: sticky;
+    -webkit-position: -webkit-sticky;
+    position: sticky;
+    position: fixed;
+  }
 }
 
 .hide-scrollbar {
@@ -193,6 +272,7 @@ html, body {
 
 .glass-effect {
   backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
@@ -1061,6 +1141,11 @@ export default function HomePage() {
             // 기본 위치로 폴백
             setUserLocation({ lat: 37.5642, lng: 127.0016 });
             setLocationName("서울시");
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 300000 // 5분간 캐시
           }
         );
       } else {
@@ -1236,7 +1321,7 @@ export default function HomePage() {
                     console.log('[fetchAllGroupData] ✅ API 호출로 멤버 데이터 획득:', currentMembers.length, '명');
                   } else {
                     console.warn('[fetchAllGroupData] API 응답에 멤버 데이터 없음 - 기본 멤버 생성');
-                    // 기본 멤버 생성 (최소 1명은 보장)
+                    // 기본 멤버 생성 (최소 1명은 보장) - 현재 위치 사용
                     if (user) {
                       console.log('🔧 [fetchAllGroupData] 기본 멤버 생성 - 사용자 정보:', {
                         mt_idx: user.mt_idx,
@@ -1245,35 +1330,70 @@ export default function HomePage() {
                         selectedGroupId: groupIdToUse
                       });
                       
+                      // 현재 위치를 우선적으로 사용, 없으면 기본값
+                      let memberLat = parseFloat(String(user.mt_lat || '37.5642'));
+                      let memberLng = parseFloat(String(user.mt_long || '127.0016'));
+                      
+                      // 현재 위치가 있으면 사용
+                      if (userLocation.lat && userLocation.lng) {
+                        memberLat = userLocation.lat;
+                        memberLng = userLocation.lng;
+                        console.log('🔧 [fetchAllGroupData] 현재 GPS 위치로 멤버 생성:', { lat: memberLat, lng: memberLng });
+                      } else {
+                        // 현재 위치 시도
+                        if (navigator.geolocation) {
+                          navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                              const { latitude, longitude } = position.coords;
+                              console.log('🔧 [fetchAllGroupData] 실시간 GPS 위치 획득:', { latitude, longitude });
+                              
+                              // 멤버 위치 업데이트
+                              setGroupMembers(prevMembers =>
+                                prevMembers.map(member => ({
+                                  ...member,
+                                  location: { lat: latitude, lng: longitude },
+                                  mlt_lat: latitude,
+                                  mlt_long: longitude
+                                }))
+                              );
+                            },
+                            (error) => {
+                              console.warn('🔧 [fetchAllGroupData] GPS 위치 획득 실패:', error);
+                            },
+                            { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+                          );
+                        }
+                      }
+                      
                       currentMembers = [{
                         id: user.mt_idx.toString(),
                         name: user.mt_name || '나',
                         photo: getSafeImageUrl(user.mt_file1 || null, user.mt_gender, 0),
                         isSelected: false,
                         location: { 
-                          lat: parseFloat(String(user.mt_lat || '37.5642')) + (Math.random() * 0.01 - 0.005), 
-                          lng: parseFloat(String(user.mt_long || '127.0016')) + (Math.random() * 0.01 - 0.005) 
+                          lat: memberLat, 
+                          lng: memberLng 
                         },
                         schedules: [], 
                         mt_gender: user.mt_gender || null,
                         original_index: 0,
-                        mlt_lat: user.mt_lat,
-                        mlt_long: user.mt_long,
+                        mlt_lat: memberLat,
+                        mlt_long: memberLng,
                         mlt_speed: null,
                         mlt_battery: null,
-                        mlt_gps_time: null,
+                        mlt_gps_time: new Date().toISOString(),
                         sgdt_owner_chk: 'Y',
                         sgdt_leader_chk: 'Y',
                         sgdt_idx: undefined
                       }];
-                      console.log('[fetchAllGroupData] 기본 멤버 생성 완료:', user.mt_name, 'ID:', user.mt_idx);
+                      console.log('[fetchAllGroupData] 기본 멤버 생성 완료:', user.mt_name, 'ID:', user.mt_idx, '위치:', { lat: memberLat, lng: memberLng });
                     }
                     setIsFirstMemberSelectionComplete(true);
                   }
                 }
               } catch (apiError) {
                 console.error('[fetchAllGroupData] 멤버 API 호출 실패:', apiError);
-                // API 호출 실패 시에도 기본 멤버 생성
+                // API 호출 실패 시에도 기본 멤버 생성 - 현재 위치 사용
                 if (user) {
                   console.log('🔧 [fetchAllGroupData] API 실패 시 기본 멤버 생성 - 사용자 정보:', {
                     mt_idx: user.mt_idx,
@@ -1283,28 +1403,39 @@ export default function HomePage() {
                     apiError: apiError instanceof Error ? apiError.message : String(apiError)
                   });
                   
+                  // 현재 위치를 우선적으로 사용, 없으면 기본값
+                  let memberLat = parseFloat(String(user.mt_lat || '37.5642'));
+                  let memberLng = parseFloat(String(user.mt_long || '127.0016'));
+                  
+                  // 현재 위치가 있으면 사용
+                  if (userLocation.lat && userLocation.lng) {
+                    memberLat = userLocation.lat;
+                    memberLng = userLocation.lng;
+                    console.log('🔧 [fetchAllGroupData] API 실패 - 현재 GPS 위치로 멤버 생성:', { lat: memberLat, lng: memberLng });
+                  }
+                  
                   currentMembers = [{
                     id: user.mt_idx.toString(),
                     name: user.mt_name || '나',
                     photo: getSafeImageUrl(user.mt_file1 || null, user.mt_gender, 0),
                     isSelected: false,
                     location: { 
-                      lat: parseFloat(String(user.mt_lat || '37.5642')) + (Math.random() * 0.01 - 0.005), 
-                      lng: parseFloat(String(user.mt_long || '127.0016')) + (Math.random() * 0.01 - 0.005) 
+                      lat: memberLat, 
+                      lng: memberLng 
                     },
                     schedules: [], 
                     mt_gender: user.mt_gender || null,
                     original_index: 0,
-                    mlt_lat: user.mt_lat,
-                    mlt_long: user.mt_long,
+                    mlt_lat: memberLat,
+                    mlt_long: memberLng,
                     mlt_speed: null,
                     mlt_battery: null,
-                    mlt_gps_time: null,
+                    mlt_gps_time: new Date().toISOString(),
                     sgdt_owner_chk: 'Y',
                     sgdt_leader_chk: 'Y',
                     sgdt_idx: undefined
                   }];
-                  console.log('[fetchAllGroupData] API 실패 시 기본 멤버 생성 완료:', user.mt_name, 'ID:', user.mt_idx);
+                  console.log('[fetchAllGroupData] API 실패 시 기본 멤버 생성 완료:', user.mt_name, 'ID:', user.mt_idx, '위치:', { lat: memberLat, lng: memberLng });
                 }
               }
             }
@@ -1487,6 +1618,60 @@ export default function HomePage() {
         if (isMounted && dataFetchedRef.current.members && dataFetchedRef.current.schedules) {
           if (isMapLoading) setIsMapLoading(false); 
           console.log("[fetchAllGroupData] 모든 그룹 데이터 로딩 완료");
+          
+          // 🎯 첫 번째 멤버 자동 선택 (한 번만 실행)
+          if (!isFirstMemberSelectionComplete && groupMembers.length > 0) {
+            setTimeout(() => {
+              console.log('[fetchAllGroupData] 🎯 첫 번째 멤버 자동 선택 시작:', groupMembers[0]?.name);
+              
+              // 첫 번째 멤버를 선택된 상태로 설정
+              setGroupMembers(prevMembers => {
+                if (!prevMembers || prevMembers.length === 0) return prevMembers;
+                
+                const updatedMembers = prevMembers.map((member, index) => ({
+                  ...member,
+                  isSelected: index === 0
+                }));
+                
+                console.log('[fetchAllGroupData] 첫 번째 멤버 선택 상태 업데이트:', updatedMembers[0]?.name);
+                return updatedMembers;
+              });
+              
+              setIsFirstMemberSelectionComplete(true);
+              
+              // 추가로 지도를 첫 번째 멤버 위치로 이동
+              const firstMember = groupMembers[0];
+              if (firstMember) {
+                const realTimeLat = parseCoordinate(firstMember.mlt_lat);
+                const realTimeLng = parseCoordinate(firstMember.mlt_long);
+                const defaultLat = parseCoordinate(firstMember.location.lat);
+                const defaultLng = parseCoordinate(firstMember.location.lng);
+                
+                const lat = (realTimeLat !== null && realTimeLat !== 0) ? realTimeLat : defaultLat;
+                const lng = (realTimeLng !== null && realTimeLng !== 0) ? realTimeLng : defaultLng;
+                
+                if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
+                  // 지도 위치 이동
+                  if (mapType === 'naver' && naverMap.current && window.naver?.maps) {
+                    const targetLatLng = createSafeLatLng(lat, lng);
+                    if (targetLatLng) {
+                      naverMap.current.panTo(targetLatLng, {
+                        duration: 1000,
+                        easing: 'easeOutCubic'
+                      });
+                      naverMap.current.setZoom(16);
+                    }
+                  } else if (mapType === 'google' && map.current && window.google?.maps) {
+                    map.current.panTo({ lat, lng });
+                    map.current.setZoom(16);
+                  }
+                  
+                  console.log('[fetchAllGroupData] 첫 번째 멤버 위치로 지도 이동:', firstMember.name, { lat, lng });
+                }
+              }
+            }, 1000); // 지도 초기화와 마커 생성을 위한 충분한 지연
+          }
+          
           // 데이터 로딩 완료 햅틱 피드백
           triggerHapticFeedback(HapticFeedbackType.SUCCESS, '그룹 데이터 로딩 완료', { 
             component: 'home', 
@@ -3673,11 +3858,22 @@ export default function HomePage() {
       return;
     }
     
-    console.log('[updateMemberMarkers] 마커 업데이트 시작:', {
+    console.log('[updateMemberMarkers] 🎯 마커 업데이트 시작:', {
       membersCount: members.length,
       selectedMember: (members && safeArrayCheck(members)) ? members.find(m => m.isSelected)?.name || 'none' : 'none',
       currentInfoWindow: currentInfoWindowRef.current ? 'exists' : 'none',
-      lastSelectedMember: lastSelectedMemberRef.current
+      lastSelectedMember: lastSelectedMemberRef.current,
+      mapType: mapType,
+      mapInitialized: mapType === 'naver' ? !!naverMap.current : !!map.current,
+      membersWithValidLocation: members.filter(m => {
+        const realTimeLat = parseCoordinate(m.mlt_lat);
+        const realTimeLng = parseCoordinate(m.mlt_long);
+        const defaultLat = parseCoordinate(m.location.lat);
+        const defaultLng = parseCoordinate(m.location.lng);
+        const lat = (realTimeLat !== null && realTimeLat !== 0) ? realTimeLat : defaultLat;
+        const lng = (realTimeLng !== null && realTimeLng !== 0) ? realTimeLng : defaultLng;
+        return lat !== null && lng !== null && lat !== 0 && lng !== 0;
+      }).length
     });
     
     // 선택된 멤버 확인
@@ -4247,6 +4443,57 @@ export default function HomePage() {
       updateScheduleMarkers(filteredSchedules);
     }
   }, [filteredSchedules, mapType, mapsInitialized.naver, mapsInitialized.google]);
+
+  // 🎯 초기 로딩 완료 후 마커 강제 업데이트 (구글 로그인 후 마커 표시 보장)
+  useEffect(() => {
+    // 모든 조건이 만족되고 첫 번째 멤버 선택이 완료된 후 마커 강제 업데이트
+    if (
+      isFirstMemberSelectionComplete &&
+      groupMembers.length > 0 &&
+      ((mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) || 
+       (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)) &&
+      !dataFetchedRef.current.loading &&
+      !markersUpdating.current
+    ) {
+      console.log('[HOME] 🎯 초기 로딩 완료 후 마커 강제 업데이트 실행');
+      
+      setTimeout(() => {
+        console.log('[HOME] 📍 마커 강제 업데이트:', {
+          groupMembersCount: groupMembers.length,
+          mapType,
+          selectedMember: groupMembers.find(m => m.isSelected)?.name || 'none',
+          firstMemberName: groupMembers[0]?.name
+        });
+        
+        markersUpdating.current = true;
+        
+        // 멤버 마커 강제 업데이트
+        updateMemberMarkers(groupMembers);
+        
+        // 선택된 멤버의 일정 마커도 업데이트
+        const selectedMember = groupMembers.find(m => m.isSelected);
+        if (selectedMember && selectedMember.schedules) {
+          const today = new Date().toISOString().split('T')[0];
+          const todaySchedules = selectedMember.schedules.filter(schedule => 
+            schedule.date && schedule.date.startsWith(today)
+          );
+          setFilteredSchedules(todaySchedules);
+          updateScheduleMarkers(todaySchedules);
+        }
+        
+        setTimeout(() => {
+          markersUpdating.current = false;
+        }, 500);
+      }, 500); // 안정적인 마커 업데이트를 위한 지연
+    }
+  }, [
+    isFirstMemberSelectionComplete,
+    groupMembers.length,
+    mapType,
+    mapsInitialized.naver,
+    mapsInitialized.google,
+    dataFetchedRef.current.loading
+  ]);
 
   // 지도 타입 변경 핸들러
   const handleMapTypeChange = () => {
@@ -5067,16 +5314,23 @@ export default function HomePage() {
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="fixed top-0 left-0 right-0 z-[60] glass-effect header-fixed"
+            className="header-fixed glass-effect safe-area-padding-top"
             style={{ 
               position: 'fixed', 
               top: 0,
               left: 0,
               right: 0,
-              zIndex: 60,
+              zIndex: 9999,
+              background: 'rgba(255, 255, 255, 0.95)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
               transform: 'translateZ(0)',
-              willChange: 'transform'
-            }}
+              WebkitTransform: 'translateZ(0)',
+              willChange: 'transform',
+              WebkitPerspective: 1000,
+              WebkitBackfaceVisibility: 'hidden',
+              paddingTop: 'max(16px, env(safe-area-inset-top))'
+            } as React.CSSProperties}
           >
             <div className="flex items-center justify-between h-16 px-4">
               <div className="flex items-center space-x-3">

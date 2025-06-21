@@ -1815,7 +1815,18 @@ export default function LocationPage() {
         ...member,
         isSelected: member.id === memberId
     }));
-    setGroupMembers(updatedMembers); // 이 호출이 updateMemberMarkers를 트리거 (useEffect를 통해)
+    
+    // InfoWindow 보존을 위해 setGroupMembers 호출을 지연
+    // 이렇게 하면 InfoWindow가 생성된 후 마커 업데이트가 진행됨
+    if (fromMarkerClick) {
+      // 마커 클릭인 경우 즉시 업데이트 (이미 InfoWindow가 생성됨)
+      setGroupMembers(updatedMembers);
+    } else {
+      // 사이드바 선택인 경우 InfoWindow 생성 후 업데이트
+      setTimeout(() => {
+        setGroupMembers(updatedMembers);
+      }, 400); // InfoWindow 생성보다 약간 늦게
+    }
   
     if (map && window.naver?.maps) {
       // 장소 선택 중이거나 마커 클릭인 경우 지도 이동 방지 (마커 클릭에서 이미 이동했음)
@@ -1882,19 +1893,32 @@ export default function LocationPage() {
           setTimeout(() => {
             setIsSidebarOpen(false);
             console.log('[handleMemberSelect] 사이드바 닫기 완료');
-          }, 100); // 빠른 응답성을 위해 짧은 지연
+          }, 300); // 마커 업데이트 완료 후 InfoWindow 생성
         }
         
-        // 기존 InfoWindow 닫기 (마커 클릭인 경우 제외 - 이미 새 InfoWindow가 생성됨)
+        // 기존 InfoWindow 처리 (마커 클릭인 경우 제외)
         if (infoWindow && !fromMarkerClick) {
-          infoWindow.close();
-          console.log('[handleMemberSelect] 기존 InfoWindow 닫기 (사이드바 선택)');
+          try {
+            // 기존 InfoWindow가 장소 InfoWindow인 경우에만 닫기
+            const infoWindowContent = infoWindow.getContent();
+            const isMemberInfoWindow = infoWindowContent && infoWindowContent.includes('member-info-window-container');
+            
+            if (!isMemberInfoWindow) {
+              infoWindow.close();
+              console.log('[handleMemberSelect] 기존 장소 InfoWindow 닫기');
+            } else {
+              console.log('[handleMemberSelect] 기존 멤버 InfoWindow 유지');
+            }
+          } catch (error) {
+            console.error('[handleMemberSelect] InfoWindow 처리 오류:', error);
+          }
         } else if (fromMarkerClick) {
           console.log('[handleMemberSelect] 마커 클릭으로 인한 호출 - InfoWindow 닫지 않음');
         }
         
         // 멤버 InfoWindow 생성 및 표시 (마커 클릭이 아닌 경우에만 - 마커 클릭은 이미 InfoWindow 생성함)
         if (!fromMarkerClick) {
+          // 마커 업데이트가 완료된 후 InfoWindow 생성하도록 약간의 지연 추가
           setTimeout(() => {
           // 클릭된 마커가 전달되면 사용하고, 아니면 배열에서 찾기
           let selectedMarker = clickedMarker;
@@ -3202,13 +3226,25 @@ export default function LocationPage() {
     setMemberMarkers([]);
     setMarkers([]);
     
-    // 6. InfoWindow도 닫기
+    // 6. InfoWindow 처리 - 멤버 InfoWindow는 보존, 장소 InfoWindow만 닫기
     if (infoWindow) {
       try {
-        infoWindow.close();
-        setInfoWindow(null);
+        // InfoWindow 내용을 확인하여 멤버 InfoWindow인지 장소 InfoWindow인지 판단
+        const infoWindowContent = infoWindow.getContent();
+        const isMemberInfoWindow = infoWindowContent && infoWindowContent.includes('member-info-window-container');
+        
+        if (isMemberInfoWindow && selectedMember) {
+          // 멤버 InfoWindow는 보존 (사이드바에서 멤버 선택 시 InfoWindow 유지)
+          console.log('[updateAllMarkers] 멤버 InfoWindow 보존:', selectedMember.name);
+        } else {
+          // 장소 InfoWindow나 기타 InfoWindow는 닫기
+          infoWindow.close();
+          setInfoWindow(null);
+          console.log('[updateAllMarkers] 장소/기타 InfoWindow 닫기');
+        }
       } catch (error) {
-        console.error('[updateAllMarkers] InfoWindow 닫기 실패:', error);
+        console.error('[updateAllMarkers] InfoWindow 처리 실패:', error);
+        // 에러 발생 시 안전하게 InfoWindow 상태만 리셋
         setInfoWindow(null);
       }
     }

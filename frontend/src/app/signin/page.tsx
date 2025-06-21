@@ -1914,6 +1914,13 @@ export default function SignInPage() {
     console.log('[SIGNIN] 모든 플래그 리셋 완료 - signin 화면으로 복귀 준비');
   };
 
+  // 🚨 카카오 에러 시 홈으로 이동하는 함수
+  const handleErrorAndGoHome = () => {
+    console.log('[SIGNIN] 에러 처리 후 홈으로 이동');
+    closeErrorModal();
+    recoverFromKakaoError();
+  };
+
 
 
   // 에러 표시 헬퍼 함수 - 즉시 차단!
@@ -2830,106 +2837,174 @@ export default function SignInPage() {
       }
   };
 
-  // Kakao 로그인 핸들러
-  const handleKakaoLogin = async () => {
-    // 🚨 새로운 iOS 로깅 시스템 사용
-    iosLogger.logKakaoLogin('로그인 시도 시작', {
-      hasKakaoSDK: !!window.Kakao,
-      isKakaoInitialized: window.Kakao ? window.Kakao.isInitialized() : false,
-      kakaoVersion: window.Kakao ? window.Kakao.VERSION : 'unknown',
-      url: window.location.href,
-      environment: 'signin_page'
-    });
-    
-    // 레거시 iOS 로그 전송 (호환성 유지)
-    sendLogToiOS('info', '💬 카카오 로그인 시도 시작', {
-      timestamp: new Date().toISOString(),
-      hasKakaoSDK: !!window.Kakao,
-      isKakaoInitialized: window.Kakao ? window.Kakao.isInitialized() : false
-    });
-    
-    // 카카오 SDK가 로드되었는지 확인 및 자동 초기화
-    if (!window.Kakao) {
-      sendLogToiOS('error', '❌ 카카오 SDK 객체 없음', {
-        timestamp: new Date().toISOString(),
-        hasKakao: !!window.Kakao,
-        hasKakaoGlobal: !!(window as any).Kakao
-      });
-      
-      showError('카카오 SDK가 로드되지 않았습니다. 페이지를 새로고침해주세요.');
-      return;
-    }
-    
-    // 카카오 SDK가 초기화되지 않은 경우 자동 초기화 시도
-    if (!window.Kakao.isInitialized()) {
-      console.log('⚠️ [KAKAO LOGIN] SDK가 초기화되지 않음, 자동 초기화 시도');
-      
-             const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || '56b34b5e5e538073805559cabc81e1d8';
-       const kakaoAdminKey = process.env.KAKAO_ADMIN_KEY || 'ee1f8631e4c4c488612a526ab6e1facb';
-       try {
-         window.Kakao.init(kakaoAppKey);
-         console.log('✅ [KAKAO LOGIN] 자동 초기화 성공:', kakaoAppKey.substring(0, 8) + '***');
-         console.log('🔧 [KAKAO LOGIN] Admin 키 설정됨:', kakaoAdminKey.substring(0, 8) + '***');
-        
-        sendLogToiOS('info', '✅ 카카오 SDK 자동 초기화 성공', {
-          timestamp: new Date().toISOString(),
-          appKey: kakaoAppKey.substring(0, 8) + '***',
-          isNowInitialized: window.Kakao.isInitialized()
-        });
-      } catch (error) {
-        console.error('❌ [KAKAO LOGIN] 자동 초기화 실패:', error);
-        
-        sendLogToiOS('error', '❌ 카카오 SDK 자동 초기화 실패', {
-          timestamp: new Date().toISOString(),
-          error: String(error),
-          appKey: kakaoAppKey.substring(0, 8) + '***'
-        });
-        
-        showError('카카오 SDK 초기화에 실패했습니다. 잠시 후 다시 시도해주세요.');
-        return;
-      }
-    }
-
-    setIsLoading(true);
-    
-    // iOS 로그 전송 - 카카오 로그인 팝업 시작
-    sendLogToiOS('info', '🚀 카카오 로그인 팝업 시작', {
-      timestamp: new Date().toISOString(),
-      kakaoSDKVersion: window.Kakao ? window.Kakao.VERSION : 'unknown'
-    });
+  // 🚨 카카오 로그인 강제 종료 함수
+  const forceCloseKakaoLogin = () => {
+    console.log('🚨 [KAKAO] 강제 종료 시작');
     
     try {
+      // 1. 카카오 팝업 강제 종료
+      if (window.Kakao && window.Kakao.Auth) {
+        try {
+          window.Kakao.Auth.cleanup();
+        } catch (e) {
+          console.log('카카오 Auth cleanup 실패:', e);
+        }
+      }
+      
+      // 2. 모든 팝업 윈도우 강제 종료
+      if (window.opener) {
+        try {
+          window.close();
+        } catch (e) {
+          console.log('팝업 윈도우 닫기 실패:', e);
+        }
+      }
+      
+      // 3. 로딩 상태 해제
+      setIsLoading(false);
+      setApiError('');
+      
+      // 4. 강제 홈페이지 이동
+      router.replace('/home');
+      
+    } catch (error) {
+      console.error('강제 종료 중 오류:', error);
+      // 최후의 수단: 페이지 새로고침
+      window.location.href = '/home';
+    }
+  };
+
+  // 🚨 에러 복구 함수
+  const recoverFromKakaoError = () => {
+    console.log('🔄 [KAKAO] 에러 복구 시작');
+    
+    setIsLoading(false);
+    setApiError('');
+    
+    // 홈페이지로 안전하게 이동
+    router.replace('/home');
+  };
+
+  // 전역 카카오 에러 복구 함수 등록
+  useEffect(() => {
+    (window as any).forceCloseKakaoLogin = forceCloseKakaoLogin;
+    (window as any).recoverFromKakaoError = recoverFromKakaoError;
+    
+    return () => {
+      delete (window as any).forceCloseKakaoLogin;
+      delete (window as any).recoverFromKakaoError;
+    };
+  }, []);
+
+  // Kakao 로그인 핸들러
+  const handleKakaoLogin = async () => {
+    // 🚨 에러 복구 타이머 설정 (30초 후 자동 복구)
+    const errorRecoveryTimer = setTimeout(() => {
+      console.log('🚨 [KAKAO] 30초 타임아웃 - 자동 복구 실행');
+      recoverFromKakaoError();
+    }, 30000);
+
+    try {
+      // 🚨 새로운 iOS 로깅 시스템 사용
+      iosLogger.logKakaoLogin('로그인 시도 시작', {
+        hasKakaoSDK: !!window.Kakao,
+        isKakaoInitialized: window.Kakao ? window.Kakao.isInitialized() : false,
+        kakaoVersion: window.Kakao ? window.Kakao.VERSION : 'unknown',
+        url: window.location.href,
+        environment: 'signin_page'
+      });
+      
+      // 레거시 iOS 로그 전송 (호환성 유지)
+      sendLogToiOS('info', '💬 카카오 로그인 시도 시작', {
+        timestamp: new Date().toISOString(),
+        hasKakaoSDK: !!window.Kakao,
+        isKakaoInitialized: window.Kakao ? window.Kakao.isInitialized() : false
+      });
+    
+      // 카카오 SDK가 로드되었는지 확인 및 자동 초기화
+      if (!window.Kakao) {
+        clearTimeout(errorRecoveryTimer);
+        sendLogToiOS('error', '❌ 카카오 SDK 객체 없음', {
+          timestamp: new Date().toISOString(),
+          hasKakao: !!window.Kakao,
+          hasKakaoGlobal: !!(window as any).Kakao
+        });
+        
+        showError('카카오 SDK가 로드되지 않았습니다. 페이지를 새로고침해주세요.');
+        return;
+      }
+    
+      // 카카오 SDK가 초기화되지 않은 경우 자동 초기화 시도
+      if (!window.Kakao.isInitialized()) {
+        console.log('⚠️ [KAKAO LOGIN] SDK가 초기화되지 않음, 자동 초기화 시도');
+        
+        const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || '56b34b5e5e538073805559cabc81e1d8';
+        const kakaoAdminKey = process.env.KAKAO_ADMIN_KEY || 'ee1f8631e4c4c488612a526ab6e1facb';
+        try {
+          window.Kakao.init(kakaoAppKey);
+          console.log('✅ [KAKAO LOGIN] 자동 초기화 성공:', kakaoAppKey.substring(0, 8) + '***');
+          console.log('🔧 [KAKAO LOGIN] Admin 키 설정됨:', kakaoAdminKey.substring(0, 8) + '***');
+          
+          sendLogToiOS('info', '✅ 카카오 SDK 자동 초기화 성공', {
+            timestamp: new Date().toISOString(),
+            appKey: kakaoAppKey.substring(0, 8) + '***',
+            isNowInitialized: window.Kakao.isInitialized()
+          });
+        } catch (error) {
+          clearTimeout(errorRecoveryTimer);
+          console.error('❌ [KAKAO LOGIN] 자동 초기화 실패:', error);
+          
+          sendLogToiOS('error', '❌ 카카오 SDK 자동 초기화 실패', {
+            timestamp: new Date().toISOString(),
+            error: String(error),
+            appKey: kakaoAppKey.substring(0, 8) + '***'
+          });
+          
+          showError('카카오 SDK 초기화에 실패했습니다. 잠시 후 다시 시도해주세요.');
+          return;
+        }
+      }
+
+      setIsLoading(true);
+      
+      // iOS 로그 전송 - 카카오 로그인 팝업 시작
+      sendLogToiOS('info', '🚀 카카오 로그인 팝업 시작', {
+        timestamp: new Date().toISOString(),
+        kakaoSDKVersion: window.Kakao ? window.Kakao.VERSION : 'unknown'
+      });
+      
       // 카카오 로그인 팝업 띄우기
-              window.Kakao.Auth.login({
-          success: async (authObj: any) => {
-            try {
-              console.log('카카오 로그인 성공:', authObj);
-              
-              // iOS 로그 전송 - 카카오 로그인 성공
-              sendLogToiOS('info', '✅ 카카오 로그인 성공 (토큰 획득)', {
-                timestamp: new Date().toISOString(),
-                hasAccessToken: !!authObj.access_token,
-                tokenType: authObj.token_type || 'unknown',
-                expiresIn: authObj.expires_in || 'unknown'
-              });
-              
-              // iOS 로그 전송 - 백엔드 API 호출 시작
-              sendLogToiOS('info', '🔄 백엔드 카카오 인증 API 호출 시작', {
-                timestamp: new Date().toISOString(),
-                apiEndpoint: '/api/kakao-auth',
-                method: 'POST'
-              });
-              
-              // 백엔드 API로 액세스 토큰 전송
-              const response = await fetch('/api/kakao-auth', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                access_token: authObj.access_token,
-              }),
+      window.Kakao.Auth.login({
+        success: async (authObj: any) => {
+          clearTimeout(errorRecoveryTimer);
+          try {
+            console.log('카카오 로그인 성공:', authObj);
+            
+            // iOS 로그 전송 - 카카오 로그인 성공
+            sendLogToiOS('info', '✅ 카카오 로그인 성공 (토큰 획득)', {
+              timestamp: new Date().toISOString(),
+              hasAccessToken: !!authObj.access_token,
+              tokenType: authObj.token_type || 'unknown',
+              expiresIn: authObj.expires_in || 'unknown'
             });
+            
+            // iOS 로그 전송 - 백엔드 API 호출 시작
+            sendLogToiOS('info', '🔄 백엔드 카카오 인증 API 호출 시작', {
+              timestamp: new Date().toISOString(),
+              apiEndpoint: '/api/kakao-auth',
+              method: 'POST'
+            });
+            
+            // 백엔드 API로 액세스 토큰 전송
+            const response = await fetch('/api/kakao-auth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              access_token: authObj.access_token,
+            }),
+          });
 
                           const data = await response.json();
               
@@ -3087,27 +3162,41 @@ export default function SignInPage() {
               });
             }
         },
-                  fail: (error: any) => {
-            console.error('카카오 로그인 실패:', error);
+                          fail: (error: any) => {
+          clearTimeout(errorRecoveryTimer);
+          console.error('카카오 로그인 실패:', error);
+          
+          // iOS 로그 전송 - 카카오 로그인 실패
+          sendLogToiOS('error', '❌ 카카오 로그인 실패 (fail 콜백)', {
+            timestamp: new Date().toISOString(),
+            error: error ? String(error) : 'unknown error',
+            errorCode: error?.error_code || 'unknown',
+            errorDescription: error?.error_description || 'unknown'
+          });
+          
+          // 🔄 로딩 상태 해제 및 리다이렉트 플래그 초기화
+          setIsLoading(false);
+          isRedirectingRef.current = false;
+          blockAllEffectsRef.current = false;
+          
+          // KOE006 에러 특별 처리
+          if (error?.error_code === 'KOE006' || String(error).includes('KOE006')) {
+            showError('카카오 앱 설정 오류입니다. 잠시 후 자동으로 홈페이지로 이동합니다.');
             
-            // iOS 로그 전송 - 카카오 로그인 실패
-            sendLogToiOS('error', '❌ 카카오 로그인 실패 (fail 콜백)', {
-              timestamp: new Date().toISOString(),
-              error: error ? String(error) : 'unknown error'
-            });
-            
-            // 🔄 로딩 상태 해제 및 리다이렉트 플래그 초기화
-            setIsLoading(false);
-            isRedirectingRef.current = false;
-            blockAllEffectsRef.current = false;
-            
-            // 에러 메시지 표시
-            showError('카카오 로그인에 실패했습니다.');
-            
-            console.log('🔄 [KAKAO LOGIN] 실패 후 signin 화면으로 복귀');
-          },
+            // 5초 후 자동으로 홈페이지로 이동
+            setTimeout(() => {
+              console.log('🚨 [KAKAO] KOE006 에러 - 자동 홈페이지 이동');
+              recoverFromKakaoError();
+            }, 5000);
+          } else {
+            showError('카카오 로그인에 실패했습니다. 다시 시도해주세요.');
+          }
+          
+          console.log('🔄 [KAKAO LOGIN] 실패 후 signin 화면으로 복귀');
+        },
         });
       } catch (error: any) {
+        clearTimeout(errorRecoveryTimer);
         console.error('카카오 로그인 오류:', error);
         
         // iOS 로그 전송 - 카카오 로그인 catch 블록
@@ -3125,7 +3214,13 @@ export default function SignInPage() {
         isRedirectingRef.current = false;
         blockAllEffectsRef.current = false;
         
-        showError('카카오 로그인 중 오류가 발생했습니다.');
+        showError('카카오 로그인 중 오류가 발생했습니다. 잠시 후 자동으로 홈페이지로 이동합니다.');
+        
+        // 3초 후 자동 복구
+        setTimeout(() => {
+          console.log('🚨 [KAKAO] catch 블록 - 자동 홈페이지 이동');
+          recoverFromKakaoError();
+        }, 3000);
         
         console.log('🔄 [KAKAO LOGIN] 오류 후 signin 화면으로 복귀');
       } finally {
@@ -4351,16 +4446,70 @@ export default function SignInPage() {
           displayMessage
         });
         
-                  return (
-            <AlertModal
-              isOpen={shouldShowModal}
-              onClose={closeErrorModal}
-              message="로그인 실패"
-              description={displayMessage}
-              buttonText="확인"
-              type="error"
-            />
-          );
+                          return (
+          <AnimatePresence>
+            {shouldShowModal && (
+              <>
+                {/* 배경 오버레이 */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+                  onClick={closeErrorModal}
+                />
+                
+                {/* 에러 모달 */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                >
+                  <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
+                    <div className="p-6">
+                      {/* 에러 아이콘 */}
+                      <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-4">
+                        <FiAlertTriangle className="w-6 h-6 text-red-600" />
+                      </div>
+                      
+                      {/* 제목 */}
+                      <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                        로그인 실패
+                      </h3>
+                      
+                      {/* 메시지 */}
+                      <p className="text-gray-600 text-center mb-6">
+                        {displayMessage}
+                      </p>
+                      
+                      {/* 버튼들 */}
+                      <div className="flex flex-col space-y-3">
+                        {/* KOE006 에러인 경우 홈으로 이동 버튼 표시 */}
+                        {(displayMessage.includes('카카오 앱 설정') || displayMessage.includes('KOE006')) && (
+                          <button
+                            onClick={handleErrorAndGoHome}
+                            className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                          >
+                            홈으로 이동
+                          </button>
+                        )}
+                        
+                        {/* 확인 버튼 */}
+                        <button
+                          onClick={closeErrorModal}
+                          className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                        >
+                          확인
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
+        );
       })()}
 
       {/* 전체 화면 로딩 스피너 */}

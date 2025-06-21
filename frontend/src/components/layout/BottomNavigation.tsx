@@ -45,7 +45,25 @@ export default function BottomNavigation() {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-area-padding-bottom z-[60] navigation-fixed">
+    <nav 
+      className="navigation-fixed safe-area-padding-bottom border-t border-gray-200"
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 9999,
+        background: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
+        willChange: 'transform',
+        WebkitPerspective: 1000,
+        WebkitBackfaceVisibility: 'hidden',
+        paddingBottom: 'max(8px, env(safe-area-inset-bottom))'
+      } as React.CSSProperties}
+    >
       <div className="flex items-center justify-around py-2">
         {navigationItems.map((item) => {
           const isActive = pathname === item.href

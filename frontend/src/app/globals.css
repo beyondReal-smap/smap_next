@@ -53,6 +53,34 @@ body {
   /* 한글 텍스트 줄바꿈 최적화 */
   word-break: keep-all;
   word-wrap: break-word;
+  /* iOS 웹뷰 최적화 */
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* iOS 스크롤 최적화 */
+  -webkit-overflow-scrolling: touch;
+  /* iOS 터치 이벤트 최적화 */
+  touch-action: manipulation;
+}
+
+/* iOS 웹뷰에서 고정 요소 최적화 */
+html {
+  /* iOS 웹뷰 뷰포트 최적화 */
+  -webkit-text-size-adjust: 100%;
+  height: 100%;
+  /* iOS 스크롤 바운스 방지 */
+  overscroll-behavior: none;
+}
+
+/* iOS Safe Area 전역 적용 */
+@supports (padding: max(0px)) {
+  .header-fixed {
+    padding-top: max(16px, env(safe-area-inset-top)) !important;
+  }
+  
+  .navigation-fixed {
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  }
 }
 
 .font-suite {
