@@ -61,7 +61,11 @@ export default function BottomNavigation() {
         willChange: 'transform',
         WebkitPerspective: 1000,
         WebkitBackfaceVisibility: 'hidden',
-        paddingBottom: 'max(8px, env(safe-area-inset-bottom))'
+        paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
+        borderTopLeftRadius: '20px !important',
+        borderTopRightRadius: '20px !important',
+        borderRadius: '20px 20px 0 0 !important',
+        overflow: 'hidden'
       } as React.CSSProperties}
     >
       <div className="flex items-center justify-around py-2">

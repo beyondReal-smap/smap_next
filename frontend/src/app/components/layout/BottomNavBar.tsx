@@ -34,7 +34,7 @@ export default function BottomNavBar() {
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-[9999] !important"
+      className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-[9999] rounded-t-2xl !important"
       id="bottom-navigation-bar"
       style={{
         position: 'fixed',
@@ -48,7 +48,11 @@ export default function BottomNavBar() {
         transform: 'none',
         WebkitTransform: 'none',
         backfaceVisibility: 'visible',
-        WebkitBackfaceVisibility: 'visible'
+        WebkitBackfaceVisibility: 'visible',
+        borderTopLeftRadius: '16px',
+        borderTopRightRadius: '16px',
+        borderRadius: '16px 16px 0 0',
+        overflow: 'hidden'
       }}
     >
       <nav className="flex justify-around items-center py-3">
@@ -70,7 +74,7 @@ export default function BottomNavBar() {
                >
                  {/* 아이콘 컨테이너 */}
                  <motion.div 
-                   className="w-6 h-6 flex items-center justify-center relative"
+                   className="w-5 h-5 flex items-center justify-center relative"
                    animate={isActive ? {
                      scale: [1, 1.2, 1],
                      rotate: [0, 5, -5, 0]
@@ -150,7 +154,7 @@ export default function BottomNavBar() {
                   
                   {icon === 'home' && (
                     <svg 
-                      className="w-6 h-6 relative z-10" 
+                      className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -160,7 +164,7 @@ export default function BottomNavBar() {
                   )}
                   {icon === 'users' && (
                     <svg 
-                      className="w-6 h-6 relative z-10" 
+                      className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -169,7 +173,7 @@ export default function BottomNavBar() {
                   )}
                   {icon === 'calendar' && (
                     <svg 
-                      className="w-6 h-6 relative z-10" 
+                      className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -180,7 +184,7 @@ export default function BottomNavBar() {
                   {icon === 'map-pin' && (
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
-                      className="h-6 w-6 relative z-10"
+                      className="h-5 w-5 relative z-10"
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -189,7 +193,7 @@ export default function BottomNavBar() {
                   )}
                   {icon === 'document' && (
                     <svg 
-                      className="w-6 h-6 relative z-10" 
+                      className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >

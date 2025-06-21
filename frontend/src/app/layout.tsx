@@ -20,7 +20,7 @@ const getMetadata = (): Metadata => {
     description: localizedInfo.DESCRIPTION,
     authors: [{ name: localizedInfo.APP_AUTHOR }],
     keywords: [
-      '스맵', 'SMAP', '스케줄', '지도', '일정관리', '위치공유', 
+      'SMAP', '스케줄', '지도', '일정관리', '위치공유', 
       '그룹관리', '모바일앱', '실시간위치', '가족앱', '친구앱'
     ],
     metadataBase: new URL(APP_INFO.DOMAIN),

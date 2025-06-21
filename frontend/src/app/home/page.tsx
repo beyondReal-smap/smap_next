@@ -5329,10 +5329,10 @@ export default function HomePage() {
               willChange: 'transform',
               WebkitPerspective: 1000,
               WebkitBackfaceVisibility: 'hidden',
-              paddingTop: 'max(16px, env(safe-area-inset-top))'
+              paddingTop: 'env(safe-area-inset-top)'
             } as React.CSSProperties}
           >
-            <div className="flex items-center justify-between h-16 px-4">
+            <div className="flex items-center justify-between h-14 px-4">
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-3">
                   <div>

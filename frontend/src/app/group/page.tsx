@@ -1076,8 +1076,9 @@ function GroupPageContent() {
               ease: [0.25, 0.46, 0.45, 0.94]
             }}
             className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
-            <div className="flex items-center justify-between h-16 px-4">
+            <div className="flex items-center justify-between h-14 px-4">
               <AnimatePresence mode="wait">
                 {currentView === 'list' ? (
                   <motion.div 

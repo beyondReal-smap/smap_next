@@ -54,8 +54,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
     }
   }
   
-  // main 태그의 상단 마진 클래스를 조건부로 설정
-  const mainMarginTopClass = isNoHeader ? '' : (isHomePage || isSimplifiedHeader ? 'mt-12' : 'mt-16');
+  // main 태그의 상단 마진 클래스를 조건부로 설정 (헤더 높이 h-14로 통일)
+  const mainMarginTopClass = isNoHeader ? '' : 'mt-14';
 
   // /schedule/add 페이지인지 확인
   const isScheduleAddPage = pathname === '/schedule/add';
@@ -77,11 +77,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       {/* 헤더 (조건부 렌더링) */}
       {!isNoHeader && (
-        <header className="bg-white shadow-sm fixed top-0 left-0 right-0 z-10">
+        <header className="bg-white shadow-sm fixed top-0 left-0 right-0 z-10" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {isSimplifiedHeader ? (
               // 간소화된 헤더 (그룹, 일정, 내장소, 로그 페이지, /schedule/add 포함)
-              <div className="flex items-center h-12">
+              <div className="flex items-center h-14">
                 <Link href="/home" className="flex items-center mr-2">
                   <Image 
                     src="/images/smap_logo.webp" 
@@ -107,7 +107,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </div>
             ) : isHomePage ? (
               // 홈 페이지 헤더 (홈 텍스트 없이, 높이 동일하게)
-              <div className="flex justify-between items-center h-12">
+              <div className="flex justify-between items-center h-14">
                 {/* 로고 */}
                 <Link href="/home" className="flex items-center">
                   <img 
@@ -142,7 +142,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </div>
             ) : (
               // 기타 페이지 헤더 (기본 레이아웃)
-              <div className="flex justify-between items-center h-16">
+              <div className="flex justify-between items-center h-14">
                 {/* 로고 */}
                 <Link href="/home" className="flex items-center">
                   <img 

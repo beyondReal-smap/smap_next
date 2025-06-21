@@ -75,11 +75,14 @@ html {
 /* iOS Safe Area 전역 적용 */
 @supports (padding: max(0px)) {
   .header-fixed {
-    padding-top: max(16px, env(safe-area-inset-top)) !important;
+    padding-top: env(safe-area-inset-top) !important;
   }
   
   .navigation-fixed {
     padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    border-top-left-radius: 20px !important;
+    border-top-right-radius: 20px !important;
+    overflow: hidden !important;
   }
 }
 
@@ -328,6 +331,10 @@ div[style*="zIndex: 99999"] {
   backface-visibility: visible !important;
   -webkit-backface-visibility: visible !important;
   will-change: auto !important;
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  border-radius: 16px 16px 0 0 !important;
+  overflow: hidden !important;
 }
 
 /* schedule 페이지 전용 스타일 */
@@ -455,4 +462,21 @@ div[style*="zIndex: 9999"] * {
   -webkit-backface-visibility: hidden !important;
   backface-visibility: hidden !important;
   display: inline-block !important;
+}
+
+/* 하단 네비게이션 라운드 처리 강제 적용 */
+nav.navigation-fixed,
+.navigation-fixed {
+  border-top-left-radius: 20px !important;
+  border-top-right-radius: 20px !important;
+  border-radius: 20px 20px 0 0 !important;
+  overflow: hidden !important;
+}
+
+/* 더 구체적인 선택자로 강제 적용 */
+nav[class*="navigation-fixed"] {
+  border-top-left-radius: 20px !important;
+  border-top-right-radius: 20px !important;
+  border-radius: 20px 20px 0 0 !important;
+  overflow: hidden !important;
 }
