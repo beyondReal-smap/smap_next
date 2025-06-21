@@ -32,6 +32,7 @@ declare global {
   interface Window {
     naver: any;
     gradientPolylines?: any[];
+    blueProgressPolyline?: any;
     getRecentDaysDebugLogged?: boolean;
     // google: any; // google은 logs 페이지에서 아직 사용하지 않으므로 주석 처리 또는 필요시 추가
   }
@@ -1822,12 +1823,18 @@ export default function LogsPage() {
       }
       
       // 그라데이션 경로들 정리
-      if (window.gradientPolylines) {
-        window.gradientPolylines.forEach((polyline: any) => {
-          try { polyline.setMap(null); } catch (e) { console.error('Error removing gradient polyline:', e); }
-        });
-        window.gradientPolylines = [];
-      }
+          if (window.gradientPolylines) {
+      window.gradientPolylines.forEach((polyline: any) => {
+        try { polyline.setMap(null); } catch (e) { console.error('Error removing gradient polyline:', e); }
+      });
+      window.gradientPolylines = [];
+    }
+
+    // 파란색 진행 경로도 정리
+    if (window.blueProgressPolyline) {
+      try { window.blueProgressPolyline.setMap(null); } catch (e) { console.error('Error removing blue progress polyline:', e); }
+      window.blueProgressPolyline = null;
+    }
       
              // 혹시 모를 다른 경로들도 정리
        if (window.naver?.maps && map.current) {
@@ -3565,6 +3572,51 @@ export default function LogsPage() {
   };
 
   // 현재 위치 마커 생성/업데이트 함수 (성능 최적화)
+  // 파란색 진행 경로 업데이트 함수 (시작부분을 더 길게)
+  const updateBlueProgressPath = (currentIndex: number) => {
+    if (!map.current || !window.naver?.maps || sortedLocationData.length === 0) return;
+
+    // 기존 파란색 진행 경로 제거
+    if (window.blueProgressPolyline) {
+      window.blueProgressPolyline.setMap(null);
+      window.blueProgressPolyline = null;
+    }
+
+    // 진행 경로 계산 (시작부분을 더 길게 - 현재 위치보다 15% 더 앞서 나가게)
+    const extendedIndex = Math.min(
+      Math.floor(currentIndex + (sortedLocationData.length * 0.15)), // 15% 더 앞서 나가기
+      sortedLocationData.length - 1
+    );
+
+    if (extendedIndex > 0) {
+      // 시작부터 확장된 인덱스까지의 경로 좌표 생성
+      const progressPath = [];
+      for (let i = 0; i <= extendedIndex; i++) {
+        const point = sortedLocationData[i];
+        const lat = point.latitude || point.mlt_lat || 0;
+        const lng = point.longitude || point.mlt_long || 0;
+        if (lat && lng) {
+          progressPath.push(new window.naver.maps.LatLng(lat, lng));
+        }
+      }
+
+      // 파란색 진행 경로 생성
+      if (progressPath.length > 1) {
+        window.blueProgressPolyline = new window.naver.maps.Polyline({
+          map: map.current,
+          path: progressPath,
+          strokeColor: '#3b82f6', // 파란색
+          strokeOpacity: 0.8,
+          strokeWeight: 6, // 기존 무지개 경로보다 약간 두껍게
+          strokeStyle: 'solid',
+          zIndex: 100 // 무지개 경로 위에 표시
+        });
+
+        console.log(`[파란색 진행 경로] 업데이트: ${currentIndex} → ${extendedIndex} (${progressPath.length}개 지점)`);
+      }
+    }
+  };
+
   const createOrUpdateCurrentPositionMarker = (lat: number, lng: number, targetIndex: number, totalMarkers: number) => {
     if (!map.current || !window.naver?.maps) return;
 
@@ -3689,7 +3741,10 @@ export default function LogsPage() {
         // 1. 마커를 먼저 생성/업데이트 (항상 실행)
         createOrUpdateCurrentPositionMarker(Number(lat), Number(lng), targetIndex, totalMarkers);
         
-        // 2. 지도 중심 이동 최적화: 거리 기반 업데이트
+        // 2. 파란색 진행 경로 업데이트 (시작부분을 더 길게)
+        updateBlueProgressPath(targetIndex);
+        
+        // 3. 지도 중심 이동 최적화: 거리 기반 업데이트
         const shouldUpdateMapCenter = !lastMapCenterRef.current || 
           calculateDistanceInMeters(
             lastMapCenterRef.current.lat, 
@@ -3867,6 +3922,12 @@ export default function LogsPage() {
         console.log('[loadDateMemberData] 날짜 상태 업데이트:', selectedDate, '->', targetDate);
         setPreviousDate(selectedDate);
         setSelectedDate(targetDate);
+        
+        // 사이드바 날짜 선택 영역을 새로운 날짜로 스크롤
+        setTimeout(() => {
+          scrollSidebarDateToSelected(targetDate);
+          console.log('[loadDateMemberData] 사이드바 날짜 스크롤 업데이트 완료:', targetDate);
+        }, 100);
       }
       
       // 2단계: 해당 날짜의 멤버 활동 데이터 조회
@@ -4939,22 +5000,34 @@ export default function LogsPage() {
     }
   };
 
-  // 사이드바 외부 클릭 처리
+  // 사이드바 외부 클릭 처리 - 무조건 끝까지 진행 (닫기)
   useEffect(() => {
     const handleSidebarClickOutside = (event: MouseEvent) => {
       if (isSidebarOpen && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
         setIsSidebarOpen(false);
+        console.log('[사이드바] 외부 클릭으로 무조건 닫기');
+      }
+    };
+
+    const handleSidebarTouchOutside = (event: TouchEvent) => {
+      if (isSidebarOpen && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+        setIsSidebarOpen(false);
+        console.log('[사이드바] 외부 터치로 무조건 닫기');
       }
     };
 
     if (isSidebarOpen) {
       document.addEventListener('mousedown', handleSidebarClickOutside);
+      // 터치 이벤트도 추가하여 모바일에서도 동작하도록 함
+      document.addEventListener('touchstart', handleSidebarTouchOutside);
     } else {
       document.removeEventListener('mousedown', handleSidebarClickOutside);
+      document.removeEventListener('touchstart', handleSidebarTouchOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleSidebarClickOutside);
+      document.removeEventListener('touchstart', handleSidebarTouchOutside);
     };
   }, [isSidebarOpen]);
 
@@ -5835,6 +5908,12 @@ export default function LogsPage() {
         });
     }
     window.gradientPolylines = [];
+
+    // 기존 파란색 진행 경로도 정리
+    if (window.blueProgressPolyline) {
+        try { window.blueProgressPolyline.setMap(null); } catch (e) { console.error('Error removing blue progress polyline:', e); }
+        window.blueProgressPolyline = null;
+    }
     
     if (sortedTimePoints.length > 1) {
         const pathCoordinates = sortedTimePoints.map(point => new window.naver.maps.LatLng(point.lat, point.lng));
@@ -6415,12 +6494,16 @@ export default function LogsPage() {
             }}
             drag="x"
             dragConstraints={{ left: -320, right: 0 }}
-            dragElastic={0.2}
+            dragElastic={0}
             onDragEnd={(e, info) => {
-              // 왼쪽으로 스와이프하면 사이드바 닫기
-              if (info.offset.x < -100 || info.velocity.x < -300) {
+              // 좌우 스와이프 시 무조건 끝까지 진행 (닫기)
+              // 최소한의 스와이프 거리나 속도로도 반응하도록 임계값을 낮춤
+              if (info.offset.x < -30 || info.velocity.x < -100) {
                 setIsSidebarOpen(false);
-                console.log('[사이드바] 왼쪽 스와이프로 닫기');
+                console.log('[사이드바] 왼쪽 스와이프로 무조건 닫기 - offset:', info.offset.x, 'velocity:', info.velocity.x);
+              } else if (info.offset.x > 30 || info.velocity.x > 100) {
+                // 오른쪽 스와이프 시에도 반응 (이미 열린 상태이므로 그대로 유지하거나, 필요시 다른 액션)
+                console.log('[사이드바] 오른쪽 스와이프 감지 - offset:', info.offset.x, 'velocity:', info.velocity.x);
               }
             }}
           >
@@ -6430,6 +6513,8 @@ export default function LogsPage() {
               animate="open"
               exit="closed"
               className="p-6 h-full flex flex-col relative z-10"
+              onClick={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
             >
               {/* 헤더 */}
               <div className="flex items-center justify-between mb-6">
