@@ -21,6 +21,7 @@ export default function RootLayout({
       <head>
         <script src="/error-handler.js" defer></script>
         <script src="/ios-webview-fix.js" defer></script>
+        <script src="/ios-scroll-fix.js"></script>
       </head>
       <body className={inter.className}>
         <ErrorBoundary>

@@ -153,7 +153,7 @@ export default function ManualPage() {
             opacity: { duration: 0.6 },
             scale: { duration: 0.6 }
           }}
-          className="fixed top-0 left-0 right-0 z-50 glass-effect"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
           style={{ position: 'fixed', zIndex: 9999 }}
         >
           <motion.div 

@@ -257,17 +257,18 @@ html, body {
 
 /* 지도 화면 전체 차지하기 위한 스타일 */
 .full-map-container {
-  position: fixed;
-  top: 0; /* 헤더 아래부터 시작하지 않고 화면 최상단부터 시작 */
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100vw;
-  height: 100vh;
-  margin: 0;
-  padding: 0;
-  overflow: visible; /* 지도 터치 이벤트를 위해 visible로 변경 */
-  touch-action: manipulation; /* 지도 조작을 위한 터치 이벤트 허용 */
+  position: fixed !important;
+  top: 0 !important; /* 헤더 아래부터 시작하지 않고 화면 최상단부터 시작 */
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important; /* 지도 터치 이벤트를 위해 visible로 변경 */
+  touch-action: manipulation !important; /* 지도 조작을 위한 터치 이벤트 허용 */
+  z-index: 1 !important; /* 헤더와 네비게이션보다 낮게 설정 */
 }
 
 /* 지도 헤더 스타일 */
@@ -4827,8 +4828,16 @@ export default function HomePage() {
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="fixed top-0 left-0 right-0 z-[60] glass-effect"
-            style={{ position: 'fixed' }}
+            className="fixed top-0 left-0 right-0 z-[60] glass-effect header-fixed"
+            style={{ 
+              position: 'fixed', 
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 60,
+              transform: 'translateZ(0)',
+              willChange: 'transform'
+            }}
           >
             <div className="flex items-center justify-between h-16 px-4">
               <div className="flex items-center space-x-3">

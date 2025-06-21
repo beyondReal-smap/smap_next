@@ -413,7 +413,7 @@ export default function AccountSettingsPage() {
             opacity: { duration: 0.6 },
             scale: { duration: 0.6 }
           }}
-          className="fixed top-0 left-0 right-0 z-20 glass-effect"
+          className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
         >
           <motion.div 
             initial={{ opacity: 0, x: -20 }}

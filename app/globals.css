@@ -21,29 +21,40 @@ input, textarea, select {
   min-height: -webkit-fill-available;
 }
 
+/* iOS WebView 스크롤 완전 차단 - 최우선 적용 */
 html {
-  height: -webkit-fill-available;
-  /* iOS WebView에서 전체 스크롤 방지 */
-  overflow: hidden;
-  position: fixed;
-  width: 100%;
-  overscroll-behavior: none;
-  -webkit-overscroll-behavior: none;
+  height: 100vh !important;
+  height: -webkit-fill-available !important;
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  top: 0 !important;
+  left: 0 !important;
+  overscroll-behavior: none !important;
+  -webkit-overscroll-behavior: none !important;
+  /* iOS WebView 터치 스크롤 완전 차단 */
+  touch-action: none !important;
+  -webkit-overflow-scrolling: auto !important;
 }
 
-/* iOS WebView에서 스크롤 개선 */
+/* iOS WebView에서 스크롤 완전 차단 */
 body {
-  -webkit-overflow-scrolling: touch;
-  overflow-scrolling: touch;
-  /* iOS WebView에서 전체 페이지 스크롤 방지 - 네이티브 앱처럼 고정 */
-  overflow: hidden;
-  height: 100vh;
-  height: -webkit-fill-available;
-  position: fixed;
-  width: 100%;
+  overflow: hidden !important;
+  height: 100vh !important;
+  height: -webkit-fill-available !important;
+  position: fixed !important;
+  width: 100% !important;
+  top: 0 !important;
+  left: 0 !important;
   /* iOS WebView 스크롤 바운스 효과 완전 제거 */
-  overscroll-behavior: none;
-  -webkit-overscroll-behavior: none;
+  overscroll-behavior: none !important;
+  -webkit-overscroll-behavior: none !important;
+  /* iOS WebView 터치 스크롤 완전 차단 */
+  touch-action: none !important;
+  -webkit-overflow-scrolling: auto !important;
+  /* 추가 보안 설정 */
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* iOS WebView에서 폰트 렌더링 개선 */
@@ -387,10 +398,38 @@ body {
 .google-spinner-dot:nth-child(12) { -webkit-animation-delay: 1.1s; animation-delay: 1.1s; }
 
 /* 스크롤이 필요한 컨테이너만 스크롤 허용 */
+/* Next.js 앱 컨테이너 스크롤 차단 */
+#__next {
+  overflow: hidden !important;
+  height: 100vh !important;
+  height: -webkit-fill-available !important;
+  position: fixed !important;
+  width: 100% !important;
+  top: 0 !important;
+  left: 0 !important;
+  touch-action: none !important;
+}
+
+/* 메인 앱 컨테이너 스크롤 차단 */
+main, 
+.main-container,
+[data-nextjs-scroll-focus-boundary] {
+  overflow: hidden !important;
+  height: 100vh !important;
+  height: -webkit-fill-available !important;
+  position: fixed !important;
+  width: 100% !important;
+  top: 0 !important;
+  left: 0 !important;
+  touch-action: none !important;
+}
+
+/* 스크롤이 필요한 컨테이너만 허용 (지도 제외) */
 .scrollable-content {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  height: 100%;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  height: 100% !important;
+  touch-action: pan-y !important;
 }
 
 /* 지도 컨테이너는 터치 이벤트 허용 */
@@ -400,4 +439,52 @@ body {
 #naverMapContainer {
   overflow: visible !important;
   touch-action: manipulation !important;
+  position: relative !important;
+}
+
+/* 헤더와 네비게이션 완전 고정 */
+.header-fixed {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 60 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  -webkit-backface-visibility: hidden !important;
+  backface-visibility: hidden !important;
+}
+
+.navigation-fixed {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 60 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  -webkit-backface-visibility: hidden !important;
+  backface-visibility: hidden !important;
+}
+
+/* iOS WebView 스크롤 방지를 위한 추가 설정 */
+* {
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  -moz-user-drag: none !important;
+  -o-user-drag: none !important;
+  user-drag: none !important;
+}
+
+/* 전체 페이지 드래그 방지 */
+html, body, #__next, main {
+  -webkit-user-drag: none !important;
+  -khtml-user-drag: none !important;
+  -moz-user-drag: none !important;
+  -o-user-drag: none !important;
+  user-drag: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-text-size-adjust: none !important;
 } 
