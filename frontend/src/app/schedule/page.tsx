@@ -5571,60 +5571,145 @@ export default function SchedulePage() {
               className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col"
               onClick={e => e.stopPropagation()}
               onWheel={e => e.stopPropagation()}
-              onTouchMove={e => e.stopPropagation()}
               variants={modalVariants}
               initial="hidden"
               animate="visible"
               exit="exit"
-              drag="y"
-              dragElastic={0.1}
-              dragMomentum={false}
-              onDrag={(event, info) => {
-                // 드래그 중 실시간 피드백
-                if (info.offset.y > 20) {
-                  const target = event.currentTarget as HTMLElement;
-                  if (target) {
-                    target.style.opacity = String(Math.max(0.5, 1 - info.offset.y / 150));
-                  }
-                }
-              }}
-              onDragEnd={(event, info) => {
-                // 매우 민감한 조건으로 설정
-                if (info.offset.y > 25 || info.velocity.y > 150) {
-                  closeAddModal();
-                } else {
-                  // 원래 위치로 복귀
-                  const target = event.currentTarget as HTMLElement;
-                  if (target) {
-                    target.style.opacity = '1';
-                  }
-                }
-              }}
-              whileDrag={{ 
-                scale: 0.99,
-                transition: { duration: 0.05 }
-              }}
             >
-              {/* 모달 핸들 - 고정 영역 */}
-              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-6 flex-shrink-0"></div>
+                             {/* 모달 핸들 - 고정 영역 (드래그 가능) */}
+               <motion.div 
+                 className="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-6 flex-shrink-0 cursor-grab active:cursor-grabbing"
+                 drag="y"
+                 dragElastic={0.1}
+                 dragMomentum={false}
+                 dragConstraints={{ top: 0, bottom: 0 }}
+                 onDrag={(event, info) => {
+                   // 핸들 드래그 중 바텀시트 전체에 피드백 적용
+                   if (info.offset.y > 20) {
+                     const target = event.currentTarget as HTMLElement;
+                     if (target) {
+                       const modalElement = target.closest('.add-event-modal') as HTMLElement;
+                       if (modalElement) {
+                         modalElement.style.opacity = String(Math.max(0.5, 1 - info.offset.y / 150));
+                         modalElement.style.transform = `translateY(${Math.max(0, info.offset.y)}px)`;
+                       }
+                     }
+                   }
+                 }}
+                 onDragEnd={(event, info) => {
+                   // 핸들 드래그 종료 시 바텀시트 닫기 조건 확인
+                   const target = event.currentTarget as HTMLElement;
+                   if (target) {
+                     const modalElement = target.closest('.add-event-modal') as HTMLElement;
+                     
+                     if (info.offset.y > 50 || info.velocity.y > 200) {
+                       // 바텀시트 닫기
+                       closeAddModal();
+                     } else {
+                       // 원래 위치로 복귀
+                       if (modalElement) {
+                         modalElement.style.opacity = '1';
+                         modalElement.style.transform = 'translateY(0px)';
+                       }
+                     }
+                   }
+                 }}
+                 whileDrag={{ 
+                   scale: 1.2,
+                   backgroundColor: '#9CA3AF',
+                   transition: { duration: 0.1 }
+                 }}
+               />
               
-              {/* 모달 헤더 - 고정 영역 */}
-              <div className="px-6 pb-4 border-b border-gray-100 flex-shrink-0">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-gray-900">
-                    {newEvent.id ? '일정 수정' : '새 일정 추가'}
-                  </h3>
-                  <button
-                    onClick={closeAddModal}
-                    className="p-2 hover:bg-gray-100 rounded-full mobile-button"
-                  >
-                    <FiX className="w-5 h-5 text-gray-500" />
-                  </button>
-                </div>
-              </div>
+                             {/* 모달 헤더 - 고정 영역 (드래그 가능) */}
+               <motion.div 
+                 className="px-6 pb-4 border-b border-gray-100 flex-shrink-0 cursor-grab active:cursor-grabbing"
+                 drag="y"
+                 dragElastic={0.1}
+                 dragMomentum={false}
+                 dragConstraints={{ top: 0, bottom: 0 }}
+                 onDrag={(event, info) => {
+                   // 헤더 드래그 중 바텀시트 전체에 피드백 적용
+                   if (info.offset.y > 20) {
+                     const target = event.currentTarget as HTMLElement;
+                     if (target) {
+                       const modalElement = target.closest('.add-event-modal') as HTMLElement;
+                       if (modalElement) {
+                         modalElement.style.opacity = String(Math.max(0.5, 1 - info.offset.y / 150));
+                         modalElement.style.transform = `translateY(${Math.max(0, info.offset.y)}px)`;
+                       }
+                     }
+                   }
+                 }}
+                 onDragEnd={(event, info) => {
+                   // 헤더 드래그 종료 시 바텀시트 닫기 조건 확인
+                   const target = event.currentTarget as HTMLElement;
+                   if (target) {
+                     const modalElement = target.closest('.add-event-modal') as HTMLElement;
+                     
+                     if (info.offset.y > 50 || info.velocity.y > 200) {
+                       // 바텀시트 닫기
+                       closeAddModal();
+                     } else {
+                       // 원래 위치로 복귀
+                       if (modalElement) {
+                         modalElement.style.opacity = '1';
+                         modalElement.style.transform = 'translateY(0px)';
+                       }
+                     }
+                   }
+                 }}
+               >
+                 <div className="flex items-center justify-between">
+                   <h3 className="text-xl font-bold text-gray-900">
+                     {newEvent.id ? '일정 수정' : '새 일정 추가'}
+                   </h3>
+                   <button
+                     onClick={closeAddModal}
+                     className="p-2 hover:bg-gray-100 rounded-full mobile-button"
+                   >
+                     <FiX className="w-5 h-5 text-gray-500" />
+                   </button>
+                 </div>
+               </motion.div>
 
               {/* 스크롤 가능한 폼 영역 */}
-              <div className="flex-1 overflow-y-auto">
+              <div 
+                className="flex-1 overflow-y-auto"
+                onTouchStart={(e) => {
+                  // 터치 시작점 기록 (스크롤과 드래그 구분용)
+                  const touch = e.touches[0];
+                  (e.currentTarget as any).touchStartY = touch.clientY;
+                  (e.currentTarget as any).touchStartX = touch.clientX;
+                  (e.currentTarget as any).scrollTop = (e.currentTarget as HTMLElement).scrollTop;
+                }}
+                onTouchMove={(e) => {
+                  const touch = e.touches[0];
+                  const startY = (e.currentTarget as any).touchStartY;
+                  const startX = (e.currentTarget as any).touchStartX;
+                  const startScrollTop = (e.currentTarget as any).scrollTop;
+                  const currentScrollTop = (e.currentTarget as HTMLElement).scrollTop;
+                  
+                  if (startY && startX) {
+                    const deltaY = touch.clientY - startY;
+                    const deltaX = touch.clientX - startX;
+                    
+                    // 수직 스크롤인지 확인 (수직 이동이 수평 이동보다 큰 경우)
+                    const isVerticalScroll = Math.abs(deltaY) > Math.abs(deltaX);
+                    
+                    // 스크롤 가능한 상태인지 확인
+                    const element = e.currentTarget as HTMLElement;
+                    const canScrollUp = currentScrollTop > 0;
+                    const canScrollDown = currentScrollTop < (element.scrollHeight - element.clientHeight);
+                    
+                    // 수직 스크롤이고 스크롤 가능한 상태라면 스크롤 허용
+                    if (isVerticalScroll && (canScrollUp || canScrollDown)) {
+                      // 스크롤 영역에서의 정상적인 스크롤 - 이벤트 전파 중지
+                      e.stopPropagation();
+                    }
+                  }
+                }}
+              >
                 <form 
                   className="px-6 py-6 space-y-6" 
                   onSubmit={(e) => { e.preventDefault(); handleSaveEvent(); }}

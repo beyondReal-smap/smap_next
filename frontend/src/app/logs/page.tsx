@@ -6063,94 +6063,7 @@ export default function LogsPage() {
           </motion.header>
 
         {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
-        {process.env.NODE_ENV === 'development' && (
-          <motion.div
-            initial={{ x: -350, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ delay: 1.0, duration: 0.5 }}
-            className="fixed top-20 right-4 z-50 bg-white/90 backdrop-blur-sm rounded-lg p-3 max-w-sm shadow-lg border"
-          >
-            <div className="text-xs font-mono space-y-1">
-              <div className="font-bold text-purple-600">🔧 LOGS 디버깅 상태</div>
-              <div>그룹: {selectedGroupId || '선택안됨'}</div>
-              <div>멤버: {groupMembers.length}명 / 선택: {groupMembers.find(m => m.isSelected)?.name || '없음'}</div>
-              <div>일별카운트: {dailyCountsData ? '✅ 로드됨' : '❌ 없음'}</div>
-              <div>멤버활동: {memberActivityData ? '✅ 로드됨' : '❌ 없음'}</div>
-              <div className={mapMarkersData.length > 0 ? 'text-green-600 font-bold' : 'text-red-600'}>
-                지도마커: {mapMarkersData.length}개 {mapMarkersData.length > 0 ? '✅' : '❌'}
-              </div>
-              <div className={stayTimesData.length > 0 ? 'text-green-600' : 'text-gray-500'}>
-                체류시간: {stayTimesData.length}개
-              </div>
-              <div>위치로딩: {isLocationDataLoading ? '⏳' : '✅'}</div>
-              <div>지도로딩: {isMapLoading ? '⏳' : '✅'}</div>
-              {/* 데이터 일치성 확인 */}
-              <div className="border-t pt-1 mt-1">
-                <div className="font-bold text-indigo-600">📊 데이터 상태 체크</div>
-                {(() => {
-                  const selectedMember = groupMembers.find(m => m.isSelected);
-                  if (!selectedMember || !dailyCountsData) return <div className="text-gray-400">데이터 없음</div>;
-                  
-                  const memberMtIdx = parseInt(selectedMember.id);
-                  const memberData = dailyCountsData.member_daily_counts?.find(
-                    member => member.member_id === memberMtIdx
-                  );
-                  
-                  if (!memberData?.daily_counts) return <div className="text-gray-400">일별카운트 없음</div>;
-                  
-                  const shortDateString = format(new Date(selectedDate), 'MM.dd');
-                  const dayData = memberData.daily_counts.find(
-                    day => day.formatted_date === shortDateString
-                  );
-                  
-                  const hasDailyCount = dayData && dayData.count > 0;
-                  const hasMapMarkers = mapMarkersData.length > 0;
-                  
-                  return (
-                    <div className="text-xs space-y-1">
-                      <div className={hasDailyCount ? 'text-green-600' : 'text-gray-400'}>
-                        일별: {hasDailyCount ? `${dayData.count}건 ✅` : '없음 ❌'}
-                      </div>
-                      <div className={hasMapMarkers ? 'text-green-600' : 'text-gray-400'}>
-                        마커: {hasMapMarkers ? `${mapMarkersData.length}개 ✅` : '없음 ❌'}
-                      </div>
-                      <div className={hasDailyCount && hasMapMarkers ? 'text-green-600 font-bold' : 
-                                     hasDailyCount || hasMapMarkers ? 'text-yellow-600' : 'text-red-600'}>
-                        {hasDailyCount && hasMapMarkers ? '🎯 모든 데이터 OK' :
-                         hasDailyCount || hasMapMarkers ? '⚠️ 부분 데이터' : '❌ 데이터 없음'}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-              <div>인스턴스: {instanceId.current}</div>
-              <div>메인: {isMainInstance.current ? '✅' : '❌'}</div>
-              <div>사이드바: {isSidebarOpen ? '열림' : '닫힘'}</div>
-              <div>날짜: {selectedDate}</div>
-              {/* WebKit 환경 정보 */}
-              <div className="border-t pt-1 mt-1">
-                <div className="font-bold text-purple-600">🌐 환경 정보</div>
-                <div className="text-xs space-y-1">
-                  <div className={isWebKitEnv ? 'text-green-600' : 'text-gray-400'}>
-                    WebKit: {isWebKitEnv ? '✅ 감지됨' : '❌ 일반환경'}
-                  </div>
-                  <div className={isIOSWebViewEnv ? 'text-green-600' : 'text-gray-400'}>
-                    iOS WebView: {isIOSWebViewEnv ? '✅ 감지됨' : '❌ 일반환경'}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    금일: {getTodayDateString()}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    타임존: {Intl.DateTimeFormat().resolvedOptions().timeZone}
-                  </div>
-                </div>
-              </div>
-              {dataError && (
-                <div className="text-red-600 font-bold">에러: {dataError.message}</div>
-              )}
-            </div>
-          </motion.div>
-        )}
+        
 
         {/* 지도 영역 */}
         <div 
@@ -6170,6 +6083,38 @@ export default function LogsPage() {
           )}
 
           <div ref={mapContainer} className="w-full h-full" />
+          
+          {/* 커스텀 줌 컨트롤 */}
+          {map.current && (
+            <div className="absolute top-[160px] right-[10px] z-30 flex flex-col">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (map.current) {
+                    const currentZoom = map.current.getZoom();
+                    map.current.setZoom(currentZoom + 1);
+                  }
+                }}
+                className="w-10 h-10 bg-white border border-gray-300 rounded-t-lg shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-lg font-bold">+</span>
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  if (map.current) {
+                    const currentZoom = map.current.getZoom();
+                    map.current.setZoom(currentZoom - 1);
+                  }
+                }}
+                className="w-10 h-10 bg-white border border-gray-300 rounded-b-lg shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-lg font-bold">−</span>
+              </motion.button>
+            </div>
+          )}
           
           {/* 플로팅 통합 정보 카드 - jin의 기록 + 위치기록 요약 한 줄 */}
           <AnimatePresence>
@@ -6332,7 +6277,7 @@ export default function LogsPage() {
                          }`}
                          style={{ 
                            width: `${sliderValue}%`,
-                           left: '2px',
+                           left: '1px',
                            top: 'calc(50% + 6px)',
                            /* GPU 가속 최적화 */
                            transform: 'translateZ(0) translateY(-50%)',

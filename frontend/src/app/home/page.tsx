@@ -5213,6 +5213,44 @@ export default function HomePage() {
           ></div>
         </div>
         
+        {/* 커스텀 줌 컨트롤 */}
+        {((mapType === 'naver' && naverMap.current) || (mapType === 'google' && map.current)) && (
+          <div className="absolute top-[160px] right-[10px] z-30 flex flex-col">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                if (mapType === 'naver' && naverMap.current) {
+                  const currentZoom = naverMap.current.getZoom();
+                  naverMap.current.setZoom(currentZoom + 1);
+                } else if (mapType === 'google' && map.current) {
+                  const currentZoom = map.current.getZoom();
+                  map.current.setZoom(currentZoom + 1);
+                }
+              }}
+              className="w-10 h-10 bg-white border border-gray-300 rounded-t-lg shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <span className="text-lg font-bold">+</span>
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                if (mapType === 'naver' && naverMap.current) {
+                  const currentZoom = naverMap.current.getZoom();
+                  naverMap.current.setZoom(currentZoom - 1);
+                } else if (mapType === 'google' && map.current) {
+                  const currentZoom = map.current.getZoom();
+                  map.current.setZoom(currentZoom - 1);
+                }
+              }}
+              className="w-10 h-10 bg-white border border-gray-300 rounded-b-lg shadow-lg flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <span className="text-lg font-bold">−</span>
+            </motion.button>
+          </div>
+        )}
+        
         {/* 지도 컨트롤 버튼들 - 바텀시트 상태에 따라 위치 변경 */}
         <div className={`${getControlsClassName()} map-controls`}>
             <button 
