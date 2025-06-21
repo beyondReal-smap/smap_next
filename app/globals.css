@@ -23,12 +23,27 @@ input, textarea, select {
 
 html {
   height: -webkit-fill-available;
+  /* iOS WebView에서 전체 스크롤 방지 */
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  overscroll-behavior: none;
+  -webkit-overscroll-behavior: none;
 }
 
 /* iOS WebView에서 스크롤 개선 */
 body {
   -webkit-overflow-scrolling: touch;
   overflow-scrolling: touch;
+  /* iOS WebView에서 전체 페이지 스크롤 방지 - 네이티브 앱처럼 고정 */
+  overflow: hidden;
+  height: 100vh;
+  height: -webkit-fill-available;
+  position: fixed;
+  width: 100%;
+  /* iOS WebView 스크롤 바운스 효과 완전 제거 */
+  overscroll-behavior: none;
+  -webkit-overscroll-behavior: none;
 }
 
 /* iOS WebView에서 폰트 렌더링 개선 */
@@ -369,4 +384,20 @@ body {
 .google-spinner-dot:nth-child(9) { -webkit-animation-delay: 0.8s; animation-delay: 0.8s; }
 .google-spinner-dot:nth-child(10) { -webkit-animation-delay: 0.9s; animation-delay: 0.9s; }
 .google-spinner-dot:nth-child(11) { -webkit-animation-delay: 1.0s; animation-delay: 1.0s; }
-.google-spinner-dot:nth-child(12) { -webkit-animation-delay: 1.1s; animation-delay: 1.1s; } 
+.google-spinner-dot:nth-child(12) { -webkit-animation-delay: 1.1s; animation-delay: 1.1s; }
+
+/* 스크롤이 필요한 컨테이너만 스크롤 허용 */
+.scrollable-content {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  height: 100%;
+}
+
+/* 지도 컨테이너는 터치 이벤트 허용 */
+.map-container, 
+.full-map-container,
+#googleMapContainer,
+#naverMapContainer {
+  overflow: visible !important;
+  touch-action: manipulation !important;
+} 

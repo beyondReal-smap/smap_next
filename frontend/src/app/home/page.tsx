@@ -266,7 +266,8 @@ html, body {
   height: 100vh;
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  overflow: visible; /* 지도 터치 이벤트를 위해 visible로 변경 */
+  touch-action: manipulation; /* 지도 조작을 위한 터치 이벤트 허용 */
 }
 
 /* 지도 헤더 스타일 */
@@ -1676,6 +1677,15 @@ export default function HomePage() {
     initializeUserAuth();
   }, [authLoading, isLoggedIn, user, router]);
 
+  // 🗺️ 네이버맵 우선 로딩 - 컴포넌트 마운트 시 즉시 시작
+  useEffect(() => {
+    // 네이버맵을 기본으로 우선 로딩
+    if (mapType === 'naver' && !naverMapsLoaded && !apiLoadStatus.naver) {
+      console.log('[HOME] 🗺️ 네이버맵 우선 로딩 시작');
+      loadNaverMapsAPI();
+    }
+  }, []);
+
   // Google Maps API 로드 함수 (프리로딩 최적화)
   const loadGoogleMapsAPI = async () => {
     // 이미 로드된 경우 중복 로드 방지
@@ -1729,7 +1739,7 @@ export default function HomePage() {
       } catch (error) {
         console.error('[HOME] Google Maps API 백업 로드 실패:', error);
         setIsMapLoading(false);
-        setMapType('naver'); // 로드 실패 시 네이버 지도로 전환
+        // 구글맵 로드 실패 시에도 네이버맵을 유지 (이미 기본값이 naver)
       }
     }
   };
@@ -1840,16 +1850,15 @@ export default function HomePage() {
           hasErrorOccurred = true;
           console.error('[HOME] 네이버 지도 API 인증/서버 오류 감지:', errorMessage);
           
-          // 즉시 구글 지도로 전환
+          // 구글맵으로 전환하지 않고 네이버맵 재시도
           setIsMapLoading(false);
-          setMapType('google');
           setNaverMapsLoaded(false);
           
-          // 구글 지도 API 로드
-          if (!apiLoadStatus.google) {
-            console.log('[HOME] 네이버 지도 오류로 인한 구글 지도 로딩 시작');
-            loadGoogleMapsAPI();
-          }
+          // 네이버맵 재시도
+          setTimeout(() => {
+            console.log('[HOME] 네이버 지도 오류 후 재시도...');
+            loadNaverMapsAPI();
+          }, 5000);
           
           // 에러 리스너 제거
           if (errorListener) {
@@ -1888,15 +1897,17 @@ export default function HomePage() {
       };
       
       script.onerror = () => {
-        console.error('[HOME] 네이버 지도 백업 로드 실패');
+        console.error('[HOME] 네이버 지도 백업 로드 실패 - 재시도 중...');
         hasErrorOccurred = true;
         setIsMapLoading(false);
-        setMapType('google'); // 로드 실패 시 구글 지도로 전환
         
-        // 구글 지도 API 로드
-        if (!apiLoadStatus.google) {
-          loadGoogleMapsAPI();
-        }
+        // 네이버맵 로딩 재시도 (구글맵으로 전환하지 않음)
+        setTimeout(() => {
+          if (!naverMapsLoaded) {
+            console.log('[HOME] 네이버맵 재시도 중...');
+            loadNaverMapsAPI();
+          }
+        }, 2000);
         
         // 에러 리스너 제거
         if (errorListener) {
@@ -1917,12 +1928,16 @@ export default function HomePage() {
       const timeout = isIOSWebView ? 15000 : 10000;
       setTimeout(() => {
         if (!naverMapsLoaded && !hasErrorOccurred) {
-          console.warn(`[HOME] 네이버 지도 로딩 타임아웃 (${timeout}ms) - 구글 지도로 전환`);
+          console.warn(`[HOME] 네이버 지도 로딩 타임아웃 (${timeout}ms) - 재시도 중...`);
           hasErrorOccurred = true;
-          setMapType('google');
-          if (!apiLoadStatus.google) {
-            loadGoogleMapsAPI();
-          }
+          
+          // 네이버맵 재시도 (구글맵으로 전환하지 않음)
+          setTimeout(() => {
+            if (!naverMapsLoaded) {
+              console.log('[HOME] 네이버맵 타임아웃 후 재시도...');
+              loadNaverMapsAPI();
+            }
+          }, 3000);
           
           // 에러 리스너 제거
           if (errorListener) {
@@ -2030,14 +2045,11 @@ export default function HomePage() {
     if (!naverMapContainer.current || !naverMapsLoaded || !window.naver || !window.naver.maps) {
       console.log('Naver Maps 초기화를 위한 조건이 충족되지 않음');
       
-      // iOS WebView에서 지도 로딩 실패 시 구글 지도로 폴백
+      // iOS WebView에서 네이버맵 로딩 재시도
       if ((window as any).webkit && (window as any).webkit.messageHandlers) {
-        console.log('iOS WebView에서 Naver Maps 로딩 실패, Google Maps로 전환');
+        console.log('iOS WebView에서 Naver Maps 로딩 재시도');
         setTimeout(() => {
-          setMapType('google');
-          if (!apiLoadStatus.google) {
-            loadGoogleMapsAPI();
-          }
+          loadNaverMapsAPI();
         }, 2000);
       }
       return;
@@ -2189,11 +2201,11 @@ export default function HomePage() {
     const handleMapTypeFallback = (event: CustomEvent) => {
       console.log('Map type fallback event received:', event.detail);
       if (event.detail.from === 'naver' && event.detail.to === 'google') {
-        console.log('Switching from Naver to Google Maps due to auth failure');
-        setMapType('google');
-        if (!apiLoadStatus.google) {
-          loadGoogleMapsAPI();
-        }
+        console.log('네이버맵 인증 실패 - 네이버맵 재시도');
+        // 구글맵으로 전환하지 않고 네이버맵 재시도
+        setTimeout(() => {
+          loadNaverMapsAPI();
+        }, 3000);
       }
     };
 
@@ -2201,22 +2213,16 @@ export default function HomePage() {
     const handleNaverMapsFallback = (event: CustomEvent) => {
       console.log('[iOS WebView] Naver Maps fallback event:', event.detail);
       
-      // 네이버 지도 로딩 실패 시 구글 지도로 전환
+      // 네이버 지도 로딩 실패 시 재시도 (구글맵으로 전환하지 않음)
       if (event.detail.reason) {
-        console.log(`[iOS WebView] Naver Maps failed: ${event.detail.reason}, switching to Google Maps`);
-        setMapType('google');
+        console.log(`[iOS WebView] Naver Maps failed: ${event.detail.reason}, 재시도 중...`);
         setNaverMapsLoaded(false);
         
-        // 구글 지도 API 로드
-        if (!apiLoadStatus.google) {
-          console.log('[iOS WebView] Loading Google Maps API as fallback');
-          loadGoogleMapsAPI();
-        } else if (googleMapsLoaded) {
-          // 이미 로드된 경우 바로 초기화
-          setTimeout(() => {
-            initGoogleMap();
-          }, 500);
-        }
+        // 네이버맵 재시도
+        setTimeout(() => {
+          console.log('[iOS WebView] 네이버맵 재시도 중...');
+          loadNaverMapsAPI();
+        }, 3000);
       }
     };
 
@@ -4821,7 +4827,8 @@ export default function HomePage() {
             initial={{ y: -100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="fixed top-0 left-0 right-0 z-50 glass-effect"
+            className="fixed top-0 left-0 right-0 z-[60] glass-effect"
+            style={{ position: 'fixed' }}
           >
             <div className="flex items-center justify-between h-16 px-4">
               <div className="flex items-center space-x-3">
@@ -4959,7 +4966,9 @@ export default function HomePage() {
           className="full-map-container" 
           style={{ 
             paddingTop: '0px',
-            position: 'relative'
+            position: 'relative',
+            touchAction: 'manipulation',
+            overflow: 'visible'
           }}
         >
           {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}

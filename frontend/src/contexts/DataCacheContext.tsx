@@ -165,9 +165,50 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   React.useEffect(() => {
     if (!isInitialized) {
       console.log('[DATA CACHE] 🚀 DataCacheProvider 초기화');
+      
+      // 기존 캐시에서 잘못된 타임스탬프 데이터 정리
+      const now = Date.now();
+      let needsCleanup = false;
+      
+      // 각 타임스탬프 검사 및 수정
+      const cleanedLastUpdated = { ...cache.lastUpdated };
+      
+      // userProfile 타임스탬프 검사
+      if (cleanedLastUpdated.userProfile > 0 && cleanedLastUpdated.userProfile < 9999999999) {
+        console.warn('[DATA CACHE] ⚠️ userProfile 타임스탬프 수정:', cleanedLastUpdated.userProfile);
+        cleanedLastUpdated.userProfile = 0; // 무효화
+        needsCleanup = true;
+      }
+      
+      // userGroups 타임스탬프 검사
+      if (cleanedLastUpdated.userGroups > 0 && cleanedLastUpdated.userGroups < 9999999999) {
+        console.warn('[DATA CACHE] ⚠️ userGroups 타임스탬프 수정:', cleanedLastUpdated.userGroups);
+        cleanedLastUpdated.userGroups = 0; // 무효화
+        needsCleanup = true;
+      }
+      
+      // groupMembers 타임스탬프 검사
+      Object.keys(cleanedLastUpdated.groupMembers).forEach(groupId => {
+        const timestamp = cleanedLastUpdated.groupMembers[groupId];
+        if (timestamp > 0 && timestamp < 9999999999) {
+          console.warn(`[DATA CACHE] ⚠️ groupMembers(${groupId}) 타임스탬프 수정:`, timestamp);
+          cleanedLastUpdated.groupMembers[groupId] = 0; // 무효화
+          needsCleanup = true;
+        }
+      });
+      
+      // 정리가 필요한 경우 캐시 업데이트
+      if (needsCleanup) {
+        console.log('[DATA CACHE] 🔧 잘못된 타임스탬프 데이터 정리 완료');
+        setCache(prev => ({
+          ...prev,
+          lastUpdated: cleanedLastUpdated,
+        }));
+      }
+      
       setIsInitialized(true);
     }
-  }, [isInitialized]);
+  }, [isInitialized, cache.lastUpdated]);
 
   // 캐시 상태 변화 추적 (디바운스 적용)
   React.useEffect(() => {
@@ -241,12 +282,32 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
         return false;
     }
     
-    const elapsedSeconds = Math.round((now - lastUpdate) / 1000);
+    // 타임스탬프 검증 및 수정
+    let correctedLastUpdate = lastUpdate;
+    
+    // lastUpdate가 초 단위로 저장된 경우 (10자리 숫자) 밀리초로 변환
+    if (lastUpdate > 0 && lastUpdate < 9999999999) { // 10자리 미만이면 초 단위
+      correctedLastUpdate = lastUpdate * 1000;
+      console.warn(`[DATA CACHE] ⚠️ 타임스탬프 형식 오류 감지 및 수정: ${lastUpdate} → ${correctedLastUpdate}`);
+    }
+    
+    const elapsedMs = now - correctedLastUpdate;
+    const elapsedSeconds = Math.round(elapsedMs / 1000);
     const maxSeconds = Math.round(actualDuration / 1000);
     const status = isValid ? '유효' : '만료';
     const softCheck = checkSoft ? ' (소프트)' : '';
     
     console.log(`[DATA CACHE] 캐시 유효성 검사: ${type}${groupId ? `(${groupId})` : ''}${date ? `[${date}]` : ''}${softCheck} - ${status} (${elapsedSeconds}초/${maxSeconds}초)`);
+    
+    // 타임스탬프가 수정되었고 캐시가 만료된 경우 캐시 무효화
+    if (correctedLastUpdate !== lastUpdate && !isValid) {
+      console.log(`[DATA CACHE] 🔄 잘못된 타임스탬프로 인한 캐시 무효화: ${type}${groupId ? `(${groupId})` : ''}`);
+      // 해당 캐시 항목의 타임스탬프를 0으로 리셋하여 다음에 새로 로드하도록 함
+      setTimeout(() => {
+        invalidateCache(type, groupId, date);
+      }, 0);
+    }
+    
     return isValid;
   }, [cache.lastUpdated]);
 
@@ -312,7 +373,8 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   }, [cache.groupMembers, isCacheValid]);
   
   const setGroupMembers = useCallback((groupId: number, members: GroupMember[]) => {
-    console.log(`[DATA CACHE] 💾 그룹 멤버 캐시 저장 (${groupId}):`, members.length, '명');
+    const timestamp = Date.now();
+    console.log(`[DATA CACHE] 💾 그룹 멤버 캐시 저장 (${groupId}):`, members.length, '명', `타임스탬프: ${timestamp}`);
     setCache(prev => ({
       ...prev,
       groupMembers: {
@@ -323,7 +385,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
         ...prev.lastUpdated,
         groupMembers: {
           ...prev.lastUpdated.groupMembers,
-          [groupId]: Date.now(),
+          [groupId]: timestamp,
         },
       },
     }));
@@ -571,6 +633,29 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     console.log('[DATA CACHE] 🧹 모든 캐시 삭제');
     setCache(initialCache);
   }, []);
+
+  // 디버그: 타임스탬프 상태 확인
+  const debugTimestamps = useCallback(() => {
+    const now = Date.now();
+    console.log('[DATA CACHE] 🔍 타임스탬프 디버그 정보:');
+    console.log('현재 시간:', now, new Date(now).toISOString());
+    console.log('userProfile:', cache.lastUpdated.userProfile, cache.lastUpdated.userProfile > 0 ? new Date(cache.lastUpdated.userProfile).toISOString() : 'N/A');
+    console.log('userGroups:', cache.lastUpdated.userGroups, cache.lastUpdated.userGroups > 0 ? new Date(cache.lastUpdated.userGroups).toISOString() : 'N/A');
+    console.log('groupMembers:', cache.lastUpdated.groupMembers);
+    console.log('scheduleData:', cache.lastUpdated.scheduleData);
+    console.log('dailyLocationCounts:', cache.lastUpdated.dailyLocationCounts);
+  }, [cache.lastUpdated]);
+
+  // 전역 디버그 함수 등록
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__SMAP_DEBUG_CACHE__ = {
+        debugTimestamps,
+        clearAllCache,
+        cache: cache,
+      };
+    }
+  }, [debugTimestamps, clearAllCache, cache]);
 
   const value: DataCacheContextType = {
     cache,
