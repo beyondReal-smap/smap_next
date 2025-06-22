@@ -4062,7 +4062,67 @@ export default function SchedulePage() {
                   {/* 일정 목록 */}
                   <div className="p-4">
                     <AnimatePresence mode="wait">
-                      {eventsForSelectedDay.length > 0 ? (
+                      {isMonthChanging ? (
+                        /* 스켈레톤 로딩 */
+                        <motion.div 
+                          key="skeleton-loading"
+                          className="space-y-4"
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                        >
+                          {[1, 2, 3].map((index) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, y: 15 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.1, duration: 0.4 }}
+                              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-300"
+                            >
+                              {/* 상단: 시간 정보와 상태 배지 스켈레톤 */}
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-10 h-10 bg-gray-200 rounded-xl animate-pulse"></div>
+                                  <div>
+                                    <div className="h-6 bg-gray-200 rounded w-20 mb-1 animate-pulse"></div>
+                                    <div className="h-3 bg-gray-200 rounded w-12 animate-pulse"></div>
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end space-y-1">
+                                  <div className="h-6 bg-gray-200 rounded-full w-12 animate-pulse"></div>
+                                  <div className="h-4 bg-gray-200 rounded-full w-8 animate-pulse"></div>
+                                </div>
+                              </div>
+
+                              {/* 제목 스켈레톤 */}
+                              <div className="mb-4">
+                                <div className="h-5 bg-gray-200 rounded w-3/4 mb-2 animate-pulse"></div>
+                                <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse"></div>
+                              </div>
+
+                              {/* 장소 정보 스켈레톤 */}
+                              <div className="bg-gray-100 rounded-xl p-4 animate-pulse">
+                                <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
+                                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                              </div>
+                            </motion.div>
+                          ))}
+                          
+                          {/* 로딩 메시지 */}
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.4, duration: 0.5 }}
+                            className="text-center py-4"
+                          >
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 animate-pulse">
+                              <FiCalendar className="w-4 h-4 text-blue-500" />
+                            </div>
+                            <p className="text-gray-500 text-sm">일정을 불러오는 중...</p>
+                          </motion.div>
+                        </motion.div>
+                      ) : eventsForSelectedDay.length > 0 ? (
                         <motion.div 
                           key={selectedDay.format('YYYY-MM-DD')}
                           className="space-y-3"
