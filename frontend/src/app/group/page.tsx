@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useCallback, useMemo, memo } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamicImport from 'next/dynamic';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FaUsers, 
@@ -37,9 +39,15 @@ import scheduleService from '@/services/scheduleService';
 import locationService from '@/services/locationService';
 import { useAuth } from '@/contexts/AuthContext';
 import authService from '@/services/authService';
-import Modal from '@/components/ui/Modal';
 import { hapticFeedback } from '@/utils/haptic';
-import AnimatedHeader from '../../components/common/AnimatedHeader';
+
+// Dynamic imports for performance optimization
+const Modal = dynamicImport(() => import('@/components/ui/Modal'), {
+  loading: () => <div className="animate-pulse bg-gray-200 rounded-lg h-32" />
+});
+const AnimatedHeader = dynamicImport(() => import('../../components/common/AnimatedHeader'), {
+  loading: () => <div className="h-14 bg-white/95 backdrop-blur-sm" />
+});
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +90,136 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
   }
   return `/images/avatar${(index % 3) + 1}.png`;
 };
+
+// 검색 컴포넌트 메모이제이션
+const SearchSection = memo<{
+  searchQuery: string;
+  onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+}>(({ searchQuery, onSearchChange, onFocus, onBlur }) => (
+  <div className="px-4 pb-4">
+    <motion.div 
+      className="relative"
+      whileFocus={{ scale: 1.02 }}
+      transition={{ duration: 0.2 }}
+    >
+      <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+      <input
+        type="text"
+        placeholder="그룹 검색..."
+        value={searchQuery}
+        onChange={onSearchChange}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        className="w-full pl-12 pr-4 py-4 bg-white border rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
+        style={{ 
+          borderColor: 'rgba(1, 19, 163, 0.2)',
+          '--tw-ring-color': '#0113A3'
+        } as React.CSSProperties}
+      />
+    </motion.div>
+  </div>
+));
+
+// 통계 카드 컴포넌트 메모이제이션
+const StatsCards = memo<{
+  groupsCount: number;
+  totalMembers: number;
+}>(({ groupsCount, totalMembers }) => (
+  <div className="px-4 mb-4">
+    <div className="grid grid-cols-2 gap-3">
+      <motion.div 
+        className="rounded-2xl p-4 text-white shadow-lg"
+        style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        custom={0}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-blue-100 text-sm">총 그룹</p>
+            <p className="text-2xl font-bold">{groupsCount}개</p>
+          </div>
+          <FaLayerGroup className="w-8 h-8 text-blue-200" />
+        </div>
+      </motion.div>
+      <motion.div 
+        className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg"
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        custom={1}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-pink-100 text-sm">총 멤버</p>
+            <p className="text-2xl font-bold">{totalMembers}명</p>
+          </div>
+          <FaUsers className="w-8 h-8 text-pink-200" />
+        </div>
+      </motion.div>
+    </div>
+  </div>
+));
+
+// 그룹 카드 컴포넌트 메모이제이션
+const GroupCard = memo<{
+  group: ExtendedGroup;
+  index: number;
+  memberCount: number;
+  onSelect: (group: ExtendedGroup) => void;
+}>(({ group, index, memberCount, onSelect }) => (
+  <motion.div
+    key={group.sgt_idx}
+    onClick={() => onSelect(group)}
+    className="rounded-xl p-4 cursor-pointer"
+    style={{ background: 'linear-gradient(to right, rgba(240, 249, 255, 0.8), rgba(219, 234, 254, 0.8))' }}
+    variants={groupCardVariants}
+    initial="hidden"
+    animate="visible"
+    whileHover="hover"
+    whileTap="tap"
+  >
+    <div className="flex items-center justify-between">
+      <div className="flex items-center flex-1 mr-3">
+        <div className="p-2 bg-white rounded-xl mr-4">
+          <Image 
+            src={`/images/group${(index % 2) + 1}.webp`}
+            alt="그룹 아이콘"
+            width={48}
+            height={48}
+            className="w-12 h-12 object-cover rounded-lg"
+            priority={index < 2}
+            placeholder="blur"
+            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
+          />
+        </div>
+        <div className="flex-1">
+          <h4 className="font-normal text-lg text-gray-800 mb-1">
+            {group.sgt_title}
+          </h4>
+          <p className="text-gray-600 text-sm line-clamp-2 mb-2">
+            {group.sgt_memo || group.sgt_content || '그룹 설명이 없습니다'}
+          </p>
+          <div className="flex items-center space-x-4 text-xs" style={{ color: '#0113A3' }}>
+            <span className="flex items-center">
+              <FaUsers className="w-3 h-3 mr-1" />
+              {memberCount}명
+            </span>
+            <span className="text-blue-500">
+              {new Date(group.sgt_wdate).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
+      </div>
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </div>
+  </motion.div>
+));
 
 // SSL 인증서 오류가 있는 URL인지 확인하는 함수
 // 안전한 이미지 URL을 반환하는 함수 - location/home과 동일한 로직
@@ -603,11 +741,11 @@ function GroupPageContent() {
   }, [selectedGroup, groupMembers, membersLoading]);
 
   // 이벤트 핸들러들
-  const handleGroupSelect = (group: ExtendedGroup) => {
+  const handleGroupSelect = useCallback((group: ExtendedGroup) => {
     setSelectedGroup(group);
     setCurrentView('detail');
     setShowGroupActions(false);
-  };
+  }, []);
 
   const handleBackToList = () => {
     setCurrentView('list');
@@ -617,9 +755,9 @@ function GroupPageContent() {
     router.back();
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-  };
+  }, []);
 
   // 새 그룹 생성
   const handleSaveGroup = async () => {
@@ -983,12 +1121,19 @@ function GroupPageContent() {
     }
   };
 
-  // 검색 필터링
-  const filteredGroups = (groups && Array.isArray(groups)) ? groups.filter(group => 
-    group.sgt_title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (group.sgt_content && group.sgt_content.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (group.sgt_memo && group.sgt_memo.toLowerCase().includes(searchQuery.toLowerCase()))
-  ) : [];
+  // 검색 필터링 (useMemo로 최적화)
+  const filteredGroups = useMemo(() => {
+    if (!groups || !Array.isArray(groups)) return [];
+    
+    if (!searchQuery.trim()) return groups;
+    
+    const query = searchQuery.toLowerCase();
+    return groups.filter(group => 
+      group.sgt_title.toLowerCase().includes(query) || 
+      (group.sgt_content && group.sgt_content.toLowerCase().includes(query)) ||
+      (group.sgt_memo && group.sgt_memo.toLowerCase().includes(query))
+    );
+  }, [groups, searchQuery]);
 
   // 토스트 모달 상태
   const [toastModal, setToastModal] = useState<{
@@ -1120,7 +1265,7 @@ function GroupPageContent() {
           </AnimatedHeader>
 
         {/* 메인 컨텐츠 */}
-          <div className="pb-safe pt-18 h-screen flex flex-col">
+          <div className="pb-safe pt-16 h-screen flex flex-col" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 80px)' }}>
             <AnimatePresence mode="wait">
               {currentView === 'list' ? (
                 <motion.div
@@ -1131,65 +1276,18 @@ function GroupPageContent() {
                   transition={{ duration: 0.3 }}
                 >
                   {/* 검색 섹션 */}
-                  <div className="px-4 pb-4">
-                    <motion.div 
-                      className="relative"
-                      whileFocus={{ scale: 1.02 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input
-                        type="text"
-                        placeholder="그룹 검색..."
-                        value={searchQuery}
-                        onChange={handleSearchChange}
-                        onFocus={() => setIsSearchFocused(true)}
-                        onBlur={() => setIsSearchFocused(false)}
-                        className="w-full pl-12 pr-4 py-4 bg-white border rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
-                        style={{ 
-                          borderColor: 'rgba(1, 19, 163, 0.2)',
-                          '--tw-ring-color': '#0113A3'
-                        } as React.CSSProperties}
-                      />
-                    </motion.div>
-                  </div>
+                  <SearchSection
+                    searchQuery={searchQuery}
+                    onSearchChange={handleSearchChange}
+                    onFocus={() => setIsSearchFocused(true)}
+                    onBlur={() => setIsSearchFocused(false)}
+                  />
 
                   {/* 통계 카드 */}
-                  <div className="px-4 mb-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <motion.div 
-                        className="rounded-2xl p-4 text-white shadow-lg"
-                        style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
-                        variants={cardVariants}
-                        initial="hidden"
-                        animate="visible"
-                        custom={0}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-blue-100 text-sm">총 그룹</p>
-                            <p className="text-2xl font-bold">{groups.length}개</p>
-                          </div>
-                          <FaLayerGroup className="w-8 h-8 text-blue-200" />
-                        </div>
-                      </motion.div>
-                      <motion.div 
-                        className="bg-gradient-to-r from-pink-600 to-pink-700 rounded-2xl p-4 text-white shadow-lg"
-                        variants={cardVariants}
-                        initial="hidden"
-                        animate="visible"
-                        custom={1}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-pink-100 text-sm">총 멤버</p>
-                            <p className="text-2xl font-bold">{Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}명</p>
-                          </div>
-                          <FaUsers className="w-8 h-8 text-pink-200" />
-                        </div>
-                      </motion.div>
-                    </div>
-                  </div>
+                  <StatsCards
+                    groupsCount={groups.length}
+                    totalMembers={Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}
+                  />
 
                   {/* 그룹 목록 */}
                   <div className="px-4 space-y-3">
@@ -1207,49 +1305,13 @@ function GroupPageContent() {
                             const memberCount = groupMemberCounts[group.sgt_idx] || 0;
                             
                             return (
-                              <motion.div
+                              <GroupCard
                                 key={group.sgt_idx}
-                                onClick={() => handleGroupSelect(group as ExtendedGroup)}
-                                className="rounded-xl p-4 cursor-pointer"
-                                style={{ background: 'linear-gradient(to right, rgba(240, 249, 255, 0.8), rgba(219, 234, 254, 0.8))' }}
-                                variants={groupCardVariants}
-                                initial="hidden"
-                                animate="visible"
-                                whileHover="hover"
-                                whileTap="tap"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center flex-1 mr-3">
-                                    <div className="p-2 bg-white rounded-xl mr-4">
-                                      <img 
-                                        src={`/images/group${(index % 2) + 1}.webp`}
-                                        alt="그룹 아이콘"
-                                        className="w-12 h-12 object-cover"
-                                      />
-                                    </div>
-                                    <div className="flex-1">
-                                      <h4 className="font-normal text-lg text-gray-800 mb-1">
-                                        {group.sgt_title}
-                                      </h4>
-                                      <p className="text-gray-600 text-sm line-clamp-2 mb-2">
-                                        {group.sgt_memo || group.sgt_content || '그룹 설명이 없습니다'}
-                                      </p>
-                                      <div className="flex items-center space-x-4 text-xs" style={{ color: '#0113A3' }}>
-                                        <span className="flex items-center">
-                                          <FaUsers className="w-3 h-3 mr-1" />
-                                          {memberCount}명
-                                        </span>
-                                        <span className="text-blue-500">
-                                          {new Date(group.sgt_wdate).toLocaleDateString()}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                  </svg>
-                                </div>
-                              </motion.div>
+                                group={group as ExtendedGroup}
+                                index={index}
+                                memberCount={memberCount}
+                                onSelect={handleGroupSelect}
+                              />
                             );
                           })}
                         </div>

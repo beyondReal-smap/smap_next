@@ -27,6 +27,7 @@ import ErrorDisplay from './components/ErrorDisplay';
 import ErrorToast from './components/ErrorToast';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
 import InitialLoadingOverlay from './components/InitialLoadingOverlay';
+import { retryDataFetch, retryMapApiLoad, retryMapInitialization } from '@/utils/retryUtils';
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
 declare global {
@@ -1327,46 +1328,26 @@ export default function LogsPage() {
       const date = subDays(new Date(), 13 - i);
       const dateString = format(date, 'yyyy-MM-dd');
       
-      // 선택된 멤버 찾기
-      const selectedMember = groupMembers.find(m => m.isSelected);
-      
-      // 실제 데이터에서 해당 날짜의 로그 개수 확인
+      // 실제 데이터에서 해당 날짜의 전체 그룹 로그 개수 확인 (모든 멤버 기준)
       let hasLogs = false;
-      let dayCount = 0;
-      let dayData = null;
+      let totalDayCount = 0;
       
-      if (dailyCountsData && selectedMember) {
-        // mt_idx 기준으로 멤버 데이터 찾기
-        const memberMtIdx = parseInt(selectedMember.id);
-        const memberData = dailyCountsData.member_daily_counts.find(
-          member => member.member_id === memberMtIdx
-        );
+      if (dailyCountsData && dailyCountsData.member_daily_counts) {
+        // 날짜 형식 맞추기: 2025-06-06 -> 06.06
+        const shortDateString = format(date, 'MM.dd');
         
-        if (memberData) {
-          // 날짜 형식 맞추기: 2025-06-06 -> 06.06
-          const shortDateString = format(date, 'MM.dd');
-          
-          dayData = memberData.daily_counts.find(
+        // 모든 멤버의 해당 날짜 데이터를 확인하여 하나라도 활동이 있으면 hasLogs = true
+        for (const memberData of dailyCountsData.member_daily_counts) {
+          const dayData = memberData.daily_counts.find(
             day => day.formatted_date === shortDateString || day.formatted_date === dateString
           );
-          if (dayData) {
-            dayCount = dayData.count;
-            hasLogs = dayCount > 0;
+          if (dayData && dayData.count > 0) {
+            totalDayCount += dayData.count;
+            hasLogs = true;
           }
         }
       } else {
-        // 🚨 iOS 시뮬레이터 디버깅: dailyCountsData 상태 확인
-        console.log(`🔍 [네모 캘린더] ${dateString} 비교:`, {
-          dateString,
-          selectedDate,
-          isSelected: dateString === selectedDate,
-          dayIndex: i,
-          hasLog: hasLogs,
-          dailyCountsDataExists: !!dailyCountsData,
-          selectedMemberExists: !!selectedMember
-        });
-        
-        // dailyCountsData가 없거나 선택된 멤버가 없는 경우 - 초기 로딩 시에는 모든 날짜 활성화
+        // dailyCountsData가 없는 경우 - 초기 로딩 시에는 모든 날짜 활성화
         // 사용자가 데이터를 조회할 수 있도록 허용하고, 실제로 데이터가 없으면 API에서 처리
         hasLogs = true; // 모든 날짜를 클릭 가능하게 변경
       }
@@ -1387,7 +1368,7 @@ export default function LogsPage() {
         value: dateString,
         display: displayString,
         hasLogs: finalHasLogs,
-        count: dayCount,
+        count: totalDayCount,
         isToday: isToday,
       };
     });
@@ -2737,17 +2718,23 @@ export default function LogsPage() {
         auxiliaryTimeout: auxiliaryApiTimeout
       });
       
-      // 1. getMapMarkers API 호출 (핵심 API)
+      // 1. getMapMarkers API 호출 (핵심 API) - 재시도 로직 적용
       try {
         console.log('[loadLocationData] 📍 getMapMarkers 호출 중...');
-        const timeoutPromise1 = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('getMapMarkers API 타임아웃 (15초)')), coreApiTimeout);
-        });
         
-        mapMarkers = await Promise.race([
-          memberLocationLogService.getMapMarkers(mtIdx, apiDate),
-          timeoutPromise1
-        ]) as MapMarker[];
+        mapMarkers = await retryDataFetch(
+          async () => {
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('getMapMarkers API 타임아웃 (15초)')), coreApiTimeout);
+            });
+            
+            return await Promise.race([
+              memberLocationLogService.getMapMarkers(mtIdx, apiDate),
+              timeoutPromise
+            ]) as MapMarker[];
+          },
+          'MAP_MARKERS'
+        );
         
         console.log('[loadLocationData] ✅ getMapMarkers 성공:', {
           count: mapMarkers?.length || 0,
@@ -2766,17 +2753,23 @@ export default function LogsPage() {
         // getMapMarkers 실패해도 계속 진행 (stayTimes만으로도 부분 표시 가능)
       }
       
-      // 2. getStayTimes API 호출 (핵심 API)
+      // 2. getStayTimes API 호출 (핵심 API) - 재시도 로직 적용
       try {
         console.log('[loadLocationData] ⏱️ getStayTimes 호출 중...');
-        const timeoutPromise2 = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('getStayTimes API 타임아웃 (15초)')), coreApiTimeout);
-        });
         
-        stayTimes = await Promise.race([
-          memberLocationLogService.getStayTimes(mtIdx, apiDate),
-          timeoutPromise2
-        ]) as StayTime[];
+        stayTimes = await retryDataFetch(
+          async () => {
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('getStayTimes API 타임아웃 (15초)')), coreApiTimeout);
+            });
+            
+            return await Promise.race([
+              memberLocationLogService.getStayTimes(mtIdx, apiDate),
+              timeoutPromise
+            ]) as StayTime[];
+          },
+          'STAY_TIMES'
+        );
         
         console.log('[loadLocationData] ✅ getStayTimes 성공:', {
           count: stayTimes?.length || 0,
@@ -4534,48 +4527,11 @@ export default function LogsPage() {
             console.log('[LOGS] 캐시 미스 - API에서 그룹 멤버 데이터 조회');
             
             try {
-              // 재시도 로직으로 무조건 성공하게 개선
-              let memberData = null;
-              let retryCount = 0;
-              const maxRetries = 3;
-              
-              while (retryCount < maxRetries && !memberData) {
-                try {
-                  console.log(`[LOGS] 그룹 멤버 조회 시도 ${retryCount + 1}/${maxRetries}:`, groupIdToUse);
-                  memberData = await memberService.getGroupMembers(groupIdToUse);
-                  
-                  if (memberData && memberData.length > 0) {
-                    console.log(`[LOGS] 그룹 멤버 조회 성공 (${retryCount + 1}번째 시도):`, memberData.length, '명');
-                    break;
-                  }
-                  
-                  console.warn(`[LOGS] 그룹 멤버 조회 결과 없음 (${retryCount + 1}번째 시도)`);
-                  retryCount++;
-                  
-                  if (retryCount < maxRetries) {
-                    const backoffDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // 최대 5초
-                    console.log(`[LOGS] ${backoffDelay}ms 후 재시도...`);
-                    await new Promise(resolve => setTimeout(resolve, backoffDelay));
-                  }
-                } catch (memberError) {
-                  console.error(`[LOGS] 그룹 멤버 조회 오류 (${retryCount + 1}번째 시도):`, memberError);
-                  retryCount++;
-                  
-                  if (retryCount < maxRetries) {
-                    const backoffDelay = Math.min(1000 * Math.pow(2, retryCount), 5000); // 최대 5초
-                    console.log(`[LOGS] 오류 발생, ${backoffDelay}ms 후 재시도...`);
-                    await new Promise(resolve => setTimeout(resolve, backoffDelay));
-                  } else {
-                    // 최종 실패 시에도 기존 캐시 데이터 확인
-                    console.warn('[LOGS] 모든 재시도 실패, 만료된 캐시 데이터 확인 중...');
-                    const expiredCachedMembers = getCachedGroupMembers(selectedGroupId);
-                    if (expiredCachedMembers && expiredCachedMembers.length > 0) {
-                      console.log('[LOGS] 만료된 캐시 데이터 사용:', expiredCachedMembers.length, '명');
-                      memberData = expiredCachedMembers;
-                    }
-                  }
-                }
-              }
+              // 재시도 로직 적용
+              const memberData = await retryDataFetch(
+                () => memberService.getGroupMembers(groupIdToUse),
+                'LOGS_GROUP_MEMBERS'
+              );
               
               if (isMounted && memberData && memberData.length > 0) { 
                 // 캐시에 저장 (타입 변환)

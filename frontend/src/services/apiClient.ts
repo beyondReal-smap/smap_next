@@ -103,7 +103,7 @@ const createApiClientConfig = (): AxiosRequestConfig => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         'X-Requested-With': 'SMAP-iOS-WebView',
-        'User-Agent': navigator.userAgent,
+        'X-Client-Info': navigator.userAgent, // User-Agent 대신 커스텀 헤더 사용
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0'
@@ -174,7 +174,7 @@ apiClient.interceptors.request.use(
       if (isIOSWebViewEnv) {
         (config.headers as any)['X-Requested-With'] = 'SMAP-iOS-WebView';
         (config.headers as any)['X-iOS-WebView'] = 'true';
-        (config.headers as any)['User-Agent'] = navigator.userAgent;
+        (config.headers as any)['X-Client-Info'] = navigator.userAgent; // User-Agent 대신 커스텀 헤더 사용
       }
     }
     

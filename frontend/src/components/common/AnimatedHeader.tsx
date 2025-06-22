@@ -60,6 +60,7 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
   delay,
   duration
 }) => {
+  const [hasAnimated, setHasAnimated] = React.useState(false);
   const animation = headerAnimations[variant];
   
   // 커스텀 delay나 duration이 제공된 경우 사용
@@ -69,11 +70,22 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
     ...(duration !== undefined && { duration })
   };
 
+  // 한 번 애니메이션이 실행된 후에는 더 이상 초기 애니메이션을 실행하지 않음
+  React.useEffect(() => {
+    if (!hasAnimated) {
+      const timer = setTimeout(() => {
+        setHasAnimated(true);
+      }, (customTransition.delay || 0) * 1000 + (customTransition.duration || 0.4) * 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [hasAnimated, customTransition.delay, customTransition.duration]);
+
   return (
     <motion.header
-      initial={animation.initial}
+      initial={hasAnimated ? animation.animate : animation.initial}
       animate={animation.animate}
-      transition={customTransition}
+      transition={hasAnimated ? { duration: 0 } : customTransition}
       className={className}
       style={{
         ...defaultHeaderStyle,

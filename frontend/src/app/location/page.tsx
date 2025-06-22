@@ -43,6 +43,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
 import { hapticFeedback } from '@/utils/haptic';
 import AnimatedHeader from '../../components/common/AnimatedHeader';
+import { retryDataFetch, retryMapApiLoad, retryMapInitialization } from '@/utils/retryUtils';
 
 // 모바일 최적화된 CSS 스타일
 const mobileStyles = `
@@ -1553,7 +1554,10 @@ export default function LocationPage() {
 
     try {
       console.log('[fetchGroupMembersData] 시작, 그룹ID:', selectedGroupId);
-      const membersData = await memberService.getGroupMembers(selectedGroupId.toString());
+      const membersData = await retryDataFetch(
+        () => memberService.getGroupMembers(selectedGroupId.toString()),
+        'LOCATION_GROUP_MEMBERS'
+      );
       console.log('[fetchGroupMembersData] 멤버 데이터 조회 완료:', membersData);
 
       if (membersData && membersData.length > 0) {
@@ -1622,7 +1626,10 @@ export default function LocationPage() {
           (async () => {
             try {
               setIsLoadingOtherLocations(true);
-              const memberLocationsRaw = await locationService.getOtherMembersLocations(firstMember.id);
+              const memberLocationsRaw = await retryDataFetch(
+                () => locationService.getOtherMembersLocations(firstMember.id),
+                'FIRST_MEMBER_LOCATIONS'
+              );
               console.log("[fetchGroupMembersData] 첫 번째 멤버 장소 조회 완료:", memberLocationsRaw.length, '개');
               
               // LocationData 형식으로 변환
