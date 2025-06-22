@@ -198,13 +198,14 @@ export default function ContactPage() {
           opacity: { duration: 0.6 },
           scale: { duration: 0.6 }
         }}
-        className="fixed top-0 left-0 right-0 z-20 bg-white/70 backdrop-blur-xl border-b border-white/20 shadow-sm"
+        className="fixed top-0 left-0 right-0 z-20 bg-white/70 backdrop-blur-xl border-b border-white/20 shadow-sm header-fixed"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.4, duration: 0.5 }}
-          className="flex items-center justify-between h-16 px-4"
+          className="flex items-center justify-between h-14 px-4"
         >
           <div className="flex items-center space-x-3">
             <motion.button 
@@ -240,7 +241,7 @@ export default function ContactPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="px-4 pt-20 space-y-6 pb-20"
+        className="px-4 pt-16 space-y-6 pb-20"
       >
         {/* 연락처 정보 안내 카드 */}
         <motion.div 

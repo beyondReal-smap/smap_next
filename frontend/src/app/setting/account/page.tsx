@@ -18,6 +18,7 @@ import {
 import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import AnimatedHeader from '../../../components/common/AnimatedHeader';
 
 // 기본 이미지 가져오기 함수
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
@@ -402,24 +403,16 @@ export default function AccountSettingsPage() {
     <>
       <style jsx global>{pageAnimations}</style>
       <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        {/* 헤더 - 위에서 슬라이드 내려오는 애니메이션 */}
-        <motion.header 
-          initial={{ y: -100, opacity: 0, scale: 0.9 }}
-          animate={{ y: 0, opacity: 1, scale: 1 }}
-          transition={{ 
-            delay: 0.2, 
-            duration: 0.8, 
-            ease: [0.25, 0.46, 0.45, 0.94],
-            opacity: { duration: 0.6 },
-            scale: { duration: 0.6 }
-          }}
+        {/* 통일된 헤더 애니메이션 */}
+        <AnimatedHeader 
+          variant="enhanced"
           className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
         >
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4, duration: 0.5 }}
-            className="flex items-center justify-between h-16 px-4"
+            className="flex items-center justify-between h-14 px-4"
           >
             <div className="flex items-center space-x-3">
               <motion.button 
@@ -449,7 +442,7 @@ export default function AccountSettingsPage() {
             </div>
 
           </motion.div>
-        </motion.header>
+        </AnimatedHeader>
 
         {/* 스크롤 가능한 메인 컨텐츠 */}
         <motion.div

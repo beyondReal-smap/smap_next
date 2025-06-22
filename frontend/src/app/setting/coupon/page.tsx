@@ -19,6 +19,7 @@ import {
   FiStar
 } from 'react-icons/fi';
 import { HiSparkles, HiCheckCircle } from 'react-icons/hi2';
+import AnimatedHeader from '../../../components/common/AnimatedHeader';
 
 // 모바일 최적화된 CSS 애니메이션
 const mobileAnimations = `
@@ -398,14 +399,11 @@ export default function CouponPage() {
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
         className="bg-gradient-to-br from-pink-50 via-white to-purple-50 min-h-screen pb-10"
       >
-        {/* 헤더 */}
-        <motion.header 
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        {/* 통일된 헤더 애니메이션 */}
+        <AnimatedHeader 
           className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
         >
-          <div className="flex items-center justify-between h-16 px-4">
+                      <div className="flex items-center justify-between h-14 px-4">
             <div className="flex items-center space-x-3">
               <motion.button 
                 onClick={handleBack}
@@ -442,7 +440,7 @@ export default function CouponPage() {
               <FiPlus className="w-5 h-5" />
             </motion.button>
           </div>
-        </motion.header>
+        </AnimatedHeader>
 
         {/* 통계 카드 */}
         <motion.div 

@@ -42,6 +42,7 @@ import scheduleService, { Schedule, UserPermission } from '@/services/scheduleSe
 import pushNotificationService, { ScheduleNotificationContext, GroupMemberInfo } from '@/services/pushNotificationService';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { hapticFeedback } from '@/utils/haptic';
+import AnimatedHeader from '../../components/common/AnimatedHeader';
 
 dayjs.extend(isBetween);
 dayjs.locale('ko');
@@ -3939,11 +3940,9 @@ export default function SchedulePage() {
     <>
       <style jsx global>{pageStyles}</style>
       <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        {/* 개선된 헤더 - password 페이지와 동일한 고정 스타일 */}
-        <motion.header 
-            initial={{ y: -100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+        {/* 통일된 헤더 애니메이션 */}
+        <AnimatedHeader 
+            variant="simple"
             className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
@@ -3961,7 +3960,7 @@ export default function SchedulePage() {
                 {/* 필요시 추가 버튼들을 여기에 배치 */}
               </div>
             </div>
-          </motion.header>
+          </AnimatedHeader>
 
         {/* 메인 컨텐츠 */}
           <motion.div

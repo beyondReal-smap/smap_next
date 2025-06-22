@@ -383,7 +383,7 @@ export default function PurchasePage() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4, duration: 0.5 }}
-            className="flex items-center justify-between h-16 px-4"
+            className="flex items-center justify-between h-14 px-4"
           >
             <div className="flex items-center space-x-3">
               <motion.button 

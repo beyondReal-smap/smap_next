@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { FiBell, FiCalendar } from 'react-icons/fi';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import AnimatedHeader from '../../../components/common/AnimatedHeader';
 
 // 공지사항 인터페이스
 interface Notice {
@@ -286,17 +287,9 @@ export default function NoticePage() {
     <>
       <style jsx global>{pageAnimations}</style>
       <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        {/* 헤더 - setting 페이지와 완전히 동일한 구조 */}
-        <motion.header 
-          initial={{ y: -100, opacity: 0, scale: 0.9 }}
-          animate={{ y: 0, opacity: 1, scale: 1 }}
-          transition={{ 
-            delay: 0.2, 
-            duration: 0.8, 
-            ease: [0.25, 0.46, 0.45, 0.94],
-            opacity: { duration: 0.6 },
-            scale: { duration: 0.6 }
-          }}
+        {/* 통일된 헤더 애니메이션 */}
+        <AnimatedHeader 
+          variant="enhanced"
           className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
           data-fixed="true"
         >
@@ -304,7 +297,7 @@ export default function NoticePage() {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4, duration: 0.5 }}
-            className="flex items-center justify-between h-16 px-4"
+            className="flex items-center justify-between h-14 px-4"
           >
             <div className="flex items-center space-x-3">
               <motion.button 
@@ -333,7 +326,7 @@ export default function NoticePage() {
               </motion.div>
             </div>
           </motion.div>
-        </motion.header>
+        </AnimatedHeader>
 
         {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
         <motion.div

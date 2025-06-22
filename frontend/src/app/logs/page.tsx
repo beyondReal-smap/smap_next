@@ -19,6 +19,7 @@ import { hapticFeedback } from '@/utils/haptic';
 import memberService from '@/services/memberService';
 import DebugPanel from '../components/layout/DebugPanel';
 import LogParser from '../components/layout/LogParser';
+import AnimatedHeader from '../../components/common/AnimatedHeader';
 
 import groupService, { Group } from '@/services/groupService';
 import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker, LocationLogSummary, DailyCountsResponse, MemberActivityResponse, MemberDailyCount } from '@/services/memberLocationLogService';
@@ -6030,12 +6031,11 @@ export default function LogsPage() {
         exit="out"
         className="min-h-screen relative overflow-hidden" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
       >
-        {/* 통합 헤더 - 내용만 변경됨 */}
-        <motion.header 
-            initial={{ y: -100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="fixed top-0 left-0 right-0 z-20 backdrop-blur-sm border-b h-14 header-fixed" style={{ background: 'linear-gradient(to right, rgba(240, 249, 255, 0.9), rgba(255, 255, 255, 0.95), rgba(253, 244, 255, 0.9))', borderColor: 'rgba(1, 19, 163, 0.1)', paddingTop: 'env(safe-area-inset-top)' }}
+        {/* 통일된 헤더 애니메이션 */}
+        <AnimatedHeader 
+            variant="simple"
+            className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             {/* 헤더 내용 */}
             {showHeader && (
@@ -6060,7 +6060,7 @@ export default function LogsPage() {
 
                         {/* 날짜 선택 내용 */}
 
-          </motion.header>
+          </AnimatedHeader>
 
         {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
         
@@ -6086,7 +6086,7 @@ export default function LogsPage() {
           
           {/* 커스텀 줌 컨트롤 */}
           {map.current && (
-            <div className="absolute top-[160px] right-[10px] z-30 flex flex-col">
+            <div className="absolute top-[70px] right-[10px] z-30 flex flex-col">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

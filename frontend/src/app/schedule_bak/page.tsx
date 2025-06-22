@@ -1569,9 +1569,10 @@ export default function SchedulePage() {
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="fixed top-0 left-0 right-0 z-20 glass-effect"
+          className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
-          <div className="flex items-center justify-between h-16 px-4">
+                      <div className="flex items-center justify-between h-14 px-4">
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-3">
                 <motion.div

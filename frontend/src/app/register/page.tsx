@@ -26,6 +26,7 @@ import {
   FiChevronLeft,
   FiChevronRight
 } from 'react-icons/fi';
+import AnimatedHeader from '../../components/common/AnimatedHeader';
 
 // 회원가입 단계 정의
 const REGISTER_STEPS = {
@@ -863,20 +864,18 @@ export default function RegisterPage() {
 
   return (
           <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative" style={{background: 'linear-gradient(to bottom right, #eff6ff, #ffffff, #faf5ff)'}}>
-      {/* 헤더 */}
-      <motion.header 
-        initial={{ y: -100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      {/* 통일된 헤더 애니메이션 */}
+      <AnimatedHeader 
         className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-lg border-b border-gray-100/50 shadow-sm header-fixed"
         style={{
           backdropFilter: 'blur(10px)',
           background: 'rgba(255, 255, 255, 0.7)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)'
+          boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
+          paddingTop: 'env(safe-area-inset-top)'
         }}
       >
-        <div className="flex items-center justify-between h-16 px-4">
+        <div className="flex items-center justify-between h-14 px-4">
           <div className="flex items-center space-x-3">
             <motion.button 
               onClick={handleBack}
@@ -915,10 +914,10 @@ export default function RegisterPage() {
             />
         </div>
         )}
-      </motion.header>
+      </AnimatedHeader>
 
       {/* 메인 콘텐츠 */}
-      <div className="flex-1 flex flex-col pt-16 pb-24 px-6 overflow-y-auto register-main register-scroll">
+      <div className="flex-1 flex flex-col pt-14 pb-24 px-6 overflow-y-auto register-main register-scroll">
         <div className="flex-1 flex items-center justify-center min-h-0">
           <div className="w-full max-w-md mx-auto py-4 register-content">
             <AnimatePresence mode="wait">

@@ -139,7 +139,7 @@ export default function SecurityPage() {
           transition={{ delay: 0.1, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
         >
-          <div className="flex items-center justify-between h-16 px-4">
+          <div className="flex items-center justify-between h-14 px-4">
             <div className="flex items-center space-x-3">
               <motion.button 
                 onClick={handleBack}

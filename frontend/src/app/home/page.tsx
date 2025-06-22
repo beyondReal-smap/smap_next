@@ -108,6 +108,7 @@ import {
 import { triggerHapticFeedback, HapticFeedbackType, hapticFeedback } from '@/utils/haptic';
 import DebugPanel from '../components/layout/DebugPanel';
 import LogParser from '../components/layout/LogParser';
+import AnimatedHeader from '../../components/common/AnimatedHeader';
 
 declare global {
   interface Window {
@@ -5309,29 +5310,12 @@ export default function HomePage() {
           data-react-mount="true"
           id="home-page-container"
         >
-        {/* 개선된 헤더 - logs/page.tsx 패턴 적용 */}
-        <motion.header 
-            initial={{ y: -100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="header-fixed glass-effect safe-area-padding-top"
-            style={{ 
-              position: 'fixed', 
-              top: 0,
-              left: 0,
-              right: 0,
-              zIndex: 9999,
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-              transform: 'translateZ(0)',
-              WebkitTransform: 'translateZ(0)',
-              willChange: 'transform',
-              WebkitPerspective: 1000,
-              WebkitBackfaceVisibility: 'hidden',
-              paddingTop: 'env(safe-area-inset-top)'
-            } as React.CSSProperties}
-          >
+        {/* 통일된 헤더 애니메이션 */}
+        <AnimatedHeader 
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        >
             <div className="flex items-center justify-between h-14 px-4">
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-3">
@@ -5417,7 +5401,7 @@ export default function HomePage() {
                </motion.button>
              </div>
             </div>
-          </motion.header>
+          </AnimatedHeader>
 
         {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
         {process.env.NODE_ENV === 'development' && (

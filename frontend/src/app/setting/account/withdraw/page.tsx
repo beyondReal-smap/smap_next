@@ -358,21 +358,22 @@ export default function WithdrawPage() {
           opacity: { duration: 0.6 },
           scale: { duration: 0.6 }
         }}
-        className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-sm"
+        className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-sm header-fixed"
         style={{ 
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           zIndex: 9999,
-          width: '100%'
+          width: '100%',
+          paddingTop: 'env(safe-area-inset-top)'
         }}
       >
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.4, duration: 0.5 }}
-          className="flex items-center justify-between h-16 px-4"
+          className="flex items-center justify-between h-14 px-4"
         >
           <div className="flex items-center space-x-3">
             <motion.button 
@@ -416,7 +417,7 @@ export default function WithdrawPage() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="px-4 pt-20 space-y-4 pb-20"
+        className="px-4 pt-16 space-y-4 pb-20"
       >
         {/* 경고 안내 카드 - password 페이지 스타일과 유사하게 */}
         <motion.div 
