@@ -666,6 +666,7 @@ type NaverMarker = any;
 type NaverInfoWindow = any; 
 type NaverService = any; 
 
+
 // 이미지 로딩 상태 관리 훅
 const useImageWithFallback = (src: string | null, fallbackSrc: string) => {
   const [imageSrc, setImageSrc] = useState<string>(src || fallbackSrc);
@@ -844,9 +845,7 @@ export default function LocationPage() {
   const [isFirstInfoWindowShown, setIsFirstInfoWindowShown] = useState(false);
 
   useEffect(() => {
-    // 이미 최초 InfoWindow를 띄웠으면 return
-    if (isFirstInfoWindowShown) return;
-
+    if (isFirstInfoWindowShown || infoWindow) return;
     if (
       isMapReady &&
       map &&
@@ -859,18 +858,11 @@ export default function LocationPage() {
       const selectedMember = groupMembers.find(m => m.isSelected);
       if (selectedMember) {
         setTimeout(() => {
-          // 이미 띄웠으면 중복 방지
-          if (isFirstInfoWindowShown) return;
-
+          if (infoWindow || isFirstInfoWindowShown) return;
           const lat = parseCoordinate(selectedMember.mlt_lat) || parseCoordinate(selectedMember.location?.lat);
           const lng = parseCoordinate(selectedMember.mlt_long) || parseCoordinate(selectedMember.location?.lng);
-
           if (lat && lng) {
-            const memberMarker = memberMarkers.find(marker => {
-              const markerTitle = marker.getTitle?.();
-              return markerTitle === selectedMember.name;
-            });
-
+            const memberMarker = memberMarkers.find(marker => marker.getTitle?.() === selectedMember.name);
             if (memberMarker) {
               createMemberInfoWindow(selectedMember, memberMarker);
             } else {
@@ -882,19 +874,12 @@ export default function LocationPage() {
               });
               createMemberInfoWindow(selectedMember, tempMarker);
             }
-            setIsFirstInfoWindowShown(true); // 최초 1회만 실행!
+            setIsFirstInfoWindowShown(true);
           }
         }, 1000);
       }
     }
-  }, [
-    isMapReady,
-    map,
-    groupMembers,
-    isFirstMemberSelectionComplete,
-    memberMarkers,
-    isFirstInfoWindowShown // 이 state도 의존성에 추가
-  ]);
+  }, [isMapReady, map, groupMembers, isFirstMemberSelectionComplete, memberMarkers]);
 
   // 컴팩트 토스트 모달 상태 추가
   const [toastModal, setToastModal] = useState<{
@@ -912,6 +897,42 @@ export default function LocationPage() {
     progress: 0,
     autoClose: true
   });
+
+  useEffect(() => {
+    if (!infoWindow) return;
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!infoWindow || !isFirstInfoWindowShown) return;
+      const isDeleteButton = target.classList.contains('delete-button') ||
+        target.closest('.delete-button') ||
+        target.textContent?.includes('삭제') ||
+        target.getAttribute('title') === '삭제';
+      const isCloseButton = target.classList.contains('close-button') ||
+        target.closest('.close-button') ||
+        target.textContent?.includes('×') ||
+        target.getAttribute('title') === '닫기';
+      const isInfoWindowButton = isDeleteButton || isCloseButton;
+      if (isDeleteButton) return;
+      if (isCloseButton) return;
+      const isInfoWindowElement = target.closest('.location-info-window-container') ||
+        target.closest('.iw_container') ||
+        target.closest('.iw_content') ||
+        target.classList.contains('info-button') ||
+        target.parentElement?.classList.contains('iw_container') ||
+        target.classList.contains('iw_container') ||
+        isInfoWindowButton;
+      if (!isInfoWindowElement && infoWindow) {
+        infoWindow.close();
+        setInfoWindow(null);
+      }
+    };
+    document.addEventListener('click', handleDocumentClick, true);
+    document.addEventListener('mousedown', handleDocumentClick, true);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick, true);
+      document.removeEventListener('mousedown', handleDocumentClick, true);
+    };
+  }, [infoWindow, isFirstInfoWindowShown]);
 
   // (컴포넌트 함수 내부, return문 위, useEffect들 사이에 위치해야 함)
   useEffect(() => {
@@ -982,7 +1003,7 @@ export default function LocationPage() {
         }, 1000);
       }
     }
-  }, [isMapReady, map, groupMembers, isFirstMemberSelectionComplete, memberMarkers, infoWindow, isFirstInfoWindowShown]);
+  }, [isMapReady, map, groupMembers, isFirstMemberSelectionComplete, memberMarkers]);
 
   // InfoWindow에서 삭제 버튼 클릭 시 호출되는 전역 함수
   useEffect(() => {
@@ -1925,31 +1946,31 @@ export default function LocationPage() {
           console.log('[fetchGroupMembersData] 첫번째 멤버 자동 선택 처리 완료:', firstSelectedMember.name, '- InfoWindow 표시하지 않음');
           
           // 지도가 준비되면 첫 번째 멤버의 InfoWindow 표시
-          if (map && window.naver?.maps && isMapReady) {
-            setTimeout(() => {
-              const lat = parseCoordinate(firstSelectedMember.mlt_lat) || parseCoordinate(firstSelectedMember.location?.lat);
-              const lng = parseCoordinate(firstSelectedMember.mlt_long) || parseCoordinate(firstSelectedMember.location?.lng);
+          // if (map && window.naver?.maps && isMapReady) {
+          //   setTimeout(() => {
+          //     const lat = parseCoordinate(firstSelectedMember.mlt_lat) || parseCoordinate(firstSelectedMember.location?.lat);
+          //     const lng = parseCoordinate(firstSelectedMember.mlt_long) || parseCoordinate(firstSelectedMember.location?.lng);
               
-              if (lat && lng) {
-                // 첫 번째 멤버 위치로 지도 중심 이동
-                const position = new window.naver.maps.LatLng(lat, lng);
-                map.panTo(position, {
-                  duration: 1000,
-                  easing: 'easeOutCubic'
-                });
+          //     if (lat && lng) {
+          //       // 첫 번째 멤버 위치로 지도 중심 이동
+          //       const position = new window.naver.maps.LatLng(lat, lng);
+          //       map.panTo(position, {
+          //         duration: 1000,
+          //         easing: 'easeOutCubic'
+          //       });
                 
-                // 적절한 줌 레벨 설정
-                setTimeout(() => {
-                  map.setZoom(15, {
-                    duration: 500,
-                    easing: 'easeOutQuad'
-                  });
-                }, 600);
+          //       // 적절한 줌 레벨 설정
+          //       setTimeout(() => {
+          //         map.setZoom(15, {
+          //           duration: 500,
+          //           easing: 'easeOutQuad'
+          //         });
+          //       }, 600);
                 
-                console.log('[fetchGroupMembersData] 첫 번째 멤버 위치로 지도 이동 완료:', firstSelectedMember.name);
-              }
-            }, 1000); // 지도 로딩 완료 후 1초 대기
-          }
+          //       console.log('[fetchGroupMembersData] 첫 번째 멤버 위치로 지도 이동 완료:', firstSelectedMember.name);
+          //     }
+          //   }, 1000); // 지도 로딩 완료 후 1초 대기
+          // }
         }
       } else {
         console.warn('[fetchGroupMembersData] 그룹멤버 데이터가 없거나 비어있습니다.');
@@ -3043,6 +3064,14 @@ export default function LocationPage() {
     // 멤버 정보창 생성 함수
     const createMemberInfoWindow = (member: GroupMember, marker: NaverMarker) => {
       if (!map || !window.naver) return;
+        // 이미 같은 멤버의 InfoWindow가 열려있으면 중복 실행 방지
+        if (infoWindow) {
+          const currentContent = infoWindow.getContent?.();
+          if (currentContent && currentContent.includes(`member-address-${member.id}`)) {
+            return;
+          }
+          infoWindow.close();
+        }
   
       // 좌표 파싱
       const lat = parseCoordinate(member.mlt_lat) || parseCoordinate(member.location?.lat);
@@ -3145,9 +3174,9 @@ export default function LocationPage() {
       setInfoWindow(newInfoWindow);
       
       // 주소 변환 및 업데이트 (비동기 처리)
-          if (lat && lng) {
+      if (lat && lng) {
         getAddressFromCoordinates(lat, lng).then(address => {
-          const addressElement = document.getElementById(`member-address-${member.id}`);
+        const addressElement = document.getElementById(`member-address-${member.id}`);
           if (addressElement) {
             addressElement.textContent = address;
             console.log('[createMemberInfoWindow] InfoWindow 주소 업데이트 완료:', { member: member.name, address });
@@ -3179,9 +3208,9 @@ export default function LocationPage() {
   const updateAllMarkers = (members: GroupMember[], locations: LocationData[] | null) => {
     if (!map || !window.naver || !isMapReady) {
       console.log('[updateAllMarkers] 지도가 준비되지 않음');
-      return;
-    }
-
+          return;
+        }
+        
     // 선택된 멤버 확인
     const selectedMember = members.find(member => member.isSelected);
     console.log('[updateAllMarkers] 시작 - 멤버:', members.length, '명, 선택된 멤버:', selectedMember?.name || '없음', '장소:', locations?.length || 0, '개');
@@ -4455,71 +4484,71 @@ export default function LocationPage() {
   }, [isGroupSelectorOpen]);
 
   // InfoWindow 외부 클릭 시 닫기
-useEffect(() => {
-  const handleDocumentClick = (e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-    
-    // InfoWindow가 없거나 이미 최초 InfoWindow를 띄웠으면 닫지 않음
-    if (!infoWindow || !isFirstInfoWindowShown) {
-      return;
-    }
-
-    // 삭제 버튼인지 확인
-    const isDeleteButton = target.classList.contains('delete-button') ||
-                          target.closest('.delete-button') ||
-                          target.textContent?.includes('삭제') ||
-                          target.getAttribute('title') === '삭제';
-    
-    // 닫기 버튼 클릭인지 확인
-    const isCloseButton = target.classList.contains('close-button') ||
-                         target.closest('.close-button') ||
-                         target.textContent?.includes('×') ||
-                         target.getAttribute('title') === '닫기';
-    
-    // 모든 InfoWindow 관련 버튼인지 확인
-    const isInfoWindowButton = isDeleteButton || isCloseButton;
-    
-    if (isDeleteButton) {
-      console.log('[InfoWindow 외부 클릭] 삭제 버튼 클릭 감지, InfoWindow 닫기 방지');
-      // 다음 클릭도 무시하도록 플래그 설정
-      (window as any).ignoreInfoWindowClick = true;
-      return;
-    }
-    
-    if (isCloseButton) {
-      console.log('[InfoWindow 외부 클릭] 닫기 버튼 클릭 감지');
-      return; // 닫기 버튼은 자체적으로 처리
-    }
-    
-    // InfoWindow 내부 요소인지 확인
-    const isInfoWindowElement = target.closest('.location-info-window-container') ||
-                                target.closest('.iw_container') || 
-                                target.closest('.iw_content') ||
-                                target.classList.contains('info-button') ||
-                                target.parentElement?.classList.contains('iw_container') ||
-                                target.classList.contains('iw_container') ||
-                                isInfoWindowButton;
-    
-    if (!isInfoWindowElement && infoWindow) {
-      console.log('[InfoWindow 외부 클릭] InfoWindow 닫기 시도');
-      if (infoWindow.close) {
-        infoWindow.close();
+  useEffect(() => {
+    const handleDocumentClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      
+      // InfoWindow가 없거나 이미 최초 InfoWindow를 띄웠으면 닫지 않음
+      if (!infoWindow || !isFirstInfoWindowShown) {
+        return;
       }
-      setInfoWindow(null);
-    }
-  };
+
+      // 삭제 버튼인지 확인
+      const isDeleteButton = target.classList.contains('delete-button') ||
+                            target.closest('.delete-button') ||
+                            target.textContent?.includes('삭제') ||
+                            target.getAttribute('title') === '삭제';
+      
+      // 닫기 버튼 클릭인지 확인
+      const isCloseButton = target.classList.contains('close-button') ||
+                           target.closest('.close-button') ||
+                           target.textContent?.includes('×') ||
+                           target.getAttribute('title') === '닫기';
+      
+      // 모든 InfoWindow 관련 버튼인지 확인
+      const isInfoWindowButton = isDeleteButton || isCloseButton;
+      
+      if (isDeleteButton) {
+        console.log('[InfoWindow 외부 클릭] 삭제 버튼 클릭 감지, InfoWindow 닫기 방지');
+        // 다음 클릭도 무시하도록 플래그 설정
+        (window as any).ignoreInfoWindowClick = true;
+        return;
+      }
+      
+      if (isCloseButton) {
+        console.log('[InfoWindow 외부 클릭] 닫기 버튼 클릭 감지');
+        return; // 닫기 버튼은 자체적으로 처리
+      }
+      
+      // InfoWindow 내부 요소인지 확인
+      const isInfoWindowElement = target.closest('.location-info-window-container') ||
+                                  target.closest('.iw_container') || 
+                                  target.closest('.iw_content') ||
+                                  target.classList.contains('info-button') ||
+                                  target.parentElement?.classList.contains('iw_container') ||
+                                  target.classList.contains('iw_container') ||
+                                  isInfoWindowButton;
+      
+      if (!isInfoWindowElement && infoWindow) {
+        console.log('[InfoWindow 외부 클릭] InfoWindow 닫기 시도');
+        if (infoWindow.close) {
+          infoWindow.close();
+        }
+        setInfoWindow(null);
+      }
+    };
 
   // 즉시 이벤트 리스너 등록 (지연 없음)
-  console.log('[InfoWindow useEffect] 외부 클릭 리스너 등록');
+    console.log('[InfoWindow useEffect] 외부 클릭 리스너 등록');
   document.addEventListener('click', handleDocumentClick, true); // capture 단계에서 처리
   document.addEventListener('mousedown', handleDocumentClick, true); // capture 단계에서 처리
 
-  return () => {
-    console.log('[InfoWindow useEffect] 외부 클릭 리스너 제거');
-    document.removeEventListener('click', handleDocumentClick, true);
-    document.removeEventListener('mousedown', handleDocumentClick, true);
-  };
-}, [infoWindow, isFirstInfoWindowShown]); // isFirstInfoWindowShown 의존성 추가
+    return () => {
+      console.log('[InfoWindow useEffect] 외부 클릭 리스너 제거');
+      document.removeEventListener('click', handleDocumentClick, true);
+      document.removeEventListener('mousedown', handleDocumentClick, true);
+    };
+}, [infoWindow]);
 
   // ESC 키로 InfoWindow 닫기
   useEffect(() => {
