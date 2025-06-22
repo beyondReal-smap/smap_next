@@ -5710,13 +5710,22 @@ useEffect(() => {
                       </div>
                     }>
                       <GroupSelector
-                        userGroups={userGroups}
-                        selectedGroupId={selectedGroupId}
-                        isGroupSelectorOpen={isGroupSelectorOpen}
-                        groupMemberCounts={groupMemberCounts}
-                        onToggleSelector={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
-                        onGroupSelect={handleGroupSelect}
-                      />
+  userGroups={userGroups}
+  selectedGroupId={selectedGroupId}
+  isGroupSelectorOpen={isGroupSelectorOpen}
+  groupMemberCounts={groupMemberCounts}
+  onOpen={() => setIsGroupSelectorOpen(true)}
+  onClose={() => setIsGroupSelectorOpen(false)}
+  onGroupSelect={(groupId) => {
+    // 1. 드롭다운을 즉시 닫습니다.
+    setIsGroupSelectorOpen(false);
+    
+    // 2. 다른 그룹이 선택되었을 때만 데이터 로딩을 시작합니다.
+    if (selectedGroupId !== groupId) {
+      handleGroupSelect(groupId);
+    }
+  }}
+/>
                     </Suspense>
                   </div>
                 </div>
