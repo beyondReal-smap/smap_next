@@ -5480,7 +5480,7 @@ export default function HomePage() {
         
         {/* 커스텀 줌 컨트롤 */}
         {((mapType === 'naver' && naverMap.current) || (mapType === 'google' && map.current)) && (
-          <div className="absolute top-[160px] right-[10px] z-30 flex flex-col">
+          <div className="absolute top-[70px] right-[10px] z-30 flex flex-col">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

@@ -32,9 +32,10 @@ interface MemberCardProps {
   onMemberSelect: (memberId: string) => void;
   onLocationSelect: (location: LocationData) => void;
   getDefaultImage: (gender: number | null | undefined, index: number) => string;
+  savedLocations: LocationData[];
 }
 
-const MemberCard = memo(({ member, onMemberSelect, onLocationSelect, getDefaultImage }: MemberCardProps) => {
+const MemberCard = memo(({ member, onMemberSelect, onLocationSelect, getDefaultImage, savedLocations }: MemberCardProps) => {
   const memberItemVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 }
@@ -125,7 +126,7 @@ const MemberCard = memo(({ member, onMemberSelect, onLocationSelect, getDefaultI
           </div>
           
           {/* 선택된 멤버의 장소 리스트 표시 */}
-          {member.isSelected && member.savedLocations && member.savedLocations.length > 0 && (
+          {member.isSelected && savedLocations && savedLocations.length > 0 && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
@@ -134,7 +135,7 @@ const MemberCard = memo(({ member, onMemberSelect, onLocationSelect, getDefaultI
               className="mt-3"
             >
               <div className="max-h-48 overflow-y-auto hide-scrollbar space-y-2 pr-1">
-                {member.savedLocations.map((location, locationIndex) => (
+                {savedLocations.map((location, locationIndex) => (
                   <motion.div
                     key={location.id}
                     initial={{ opacity: 0, x: -10 }}
@@ -160,9 +161,9 @@ const MemberCard = memo(({ member, onMemberSelect, onLocationSelect, getDefaultI
                   </motion.div>
                 ))}
               </div>
-              {member.savedLocations.length > 5 && (
+              {savedLocations.length > 5 && (
                 <div className="text-xs text-gray-400 text-center pt-2 border-t border-gray-200/50 mt-2">
-                  총 {member.savedLocations.length}개의 장소
+                  총 {savedLocations.length}개의 장소
                 </div>
               )}
             </motion.div>
