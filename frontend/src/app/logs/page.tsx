@@ -2181,7 +2181,6 @@ export default function LogsPage() {
       currentPositionMarker.current = null;
     }
 
-    // 8. 멤버 마커들 완전 정리 (선택적 - 날짜 변경 시에만)
     // 8. 멤버 마커들 조건부 정리
     if (clearMemberMarkers) {
       try {
@@ -5307,14 +5306,28 @@ export default function LogsPage() {
             if (foundRecentDate && foundRecentDate !== selectedDate) {
               console.log(`[LOGS] 초기 진입 - 날짜 자동 변경: ${selectedDate} → ${foundRecentDate}`);
               setSelectedDate(foundRecentDate);
-            } else {
-              console.log(`[LOGS] 초기 진입 - 현재 날짜(${selectedDate}) 유지`);
-              // 현재 날짜 유지인 경우에도 위치 데이터 강제 로딩
+              
+              // 사이드바 날짜도 동기화
               setTimeout(() => {
-                if (!loadLocationDataExecutingRef.current.executing) {
-                  console.log(`[LOGS] 초기 진입 - 현재 날짜 위치 데이터 강제 로딩`);
-                  loadLocationData(memberMtIdx, selectedDate);
-                }
+                scrollSidebarDateToSelected(foundRecentDate);
+                console.log(`[LOGS] 초기 진입 - 사이드바 날짜 동기화 완료: ${foundRecentDate}`);
+              }, 100);
+            } else if (foundRecentDate) {
+              // 날짜는 같지만 사이드바 동기화 확인
+              console.log(`[LOGS] 초기 진입 - 날짜 일치 확인: ${foundRecentDate}`);
+              setTimeout(() => {
+                scrollSidebarDateToSelected(foundRecentDate);
+                console.log(`[LOGS] 초기 진입 - 사이드바 날짜 동기화 확인 완료: ${foundRecentDate}`);
+              }, 100);
+            } else {
+              // 활동 날짜가 없으면 오늘 날짜로 설정
+              const todayDate = format(new Date(), 'yyyy-MM-dd');
+              console.log(`[LOGS] 초기 진입 - 활동 날짜 없음, 오늘 날짜로 설정: ${todayDate}`);
+              setSelectedDate(todayDate);
+              
+              setTimeout(() => {
+                scrollSidebarDateToToday();
+                console.log(`[LOGS] 초기 진입 - 사이드바 오늘 날짜로 동기화 완료`);
               }, 100);
             }
           } else {
@@ -5374,6 +5387,37 @@ export default function LogsPage() {
                 console.log(`[LOGS] ✅ 일별 카운트에는 없지만 지도 마커 데이터 있음: ${mapMarkersData.length}개`);
               } else {
                 console.log(`[LOGS] ⚠️ 현재 선택된 날짜(${selectedDate})에 데이터 없음 (일별/지도 모두)`);
+                
+                // 데이터가 없으면 최근 활동 날짜로 자동 변경
+                const recentDays = Array.from({ length: 15 }, (_, i) => {
+                  const date = subDays(new Date(), 14 - i);
+                  return format(date, 'yyyy-MM-dd');
+                });
+                
+                let foundRecentDate = null;
+                for (let i = recentDays.length - 1; i >= 0; i--) {
+                  const dateString = recentDays[i];
+                  const shortDate = format(new Date(dateString), 'MM.dd');
+                  const dayData = memberData.daily_counts.find(
+                    day => day.formatted_date === shortDate
+                  );
+                  
+                  if (dayData && dayData.count > 0) {
+                    foundRecentDate = dateString;
+                    break;
+                  }
+                }
+                
+                if (foundRecentDate && foundRecentDate !== selectedDate) {
+                  console.log(`[LOGS] 날짜 동기화 - 자동 변경: ${selectedDate} → ${foundRecentDate}`);
+                  setSelectedDate(foundRecentDate);
+                  
+                  // 사이드바 날짜도 동기화
+                  setTimeout(() => {
+                    scrollSidebarDateToSelected(foundRecentDate);
+                    console.log(`[LOGS] 날짜 동기화 - 사이드바 업데이트 완료: ${foundRecentDate}`);
+                  }, 100);
+                }
               }
             }
           }
@@ -5382,7 +5426,73 @@ export default function LogsPage() {
         }
       }
     }
-  }, [dailyCountsData, groupMembers, isInitialEntry, selectedDate]);
+  }, [dailyCountsData, groupMembers, isInitialEntry]);
+
+  // dailyCountsData와 selectedDate 동기화 확인 및 수정
+  useEffect(() => {
+    if (dailyCountsData && selectedDate && !isInitialEntry) {
+      console.log(`[LOGS] 날짜 동기화 확인 - selectedDate: ${selectedDate}`);
+      
+      // 선택된 멤버의 해당 날짜 데이터 확인
+      const selectedMember = groupMembers.find(m => m.isSelected);
+      if (selectedMember) {
+        const memberMtIdx = parseInt(selectedMember.id);
+        const memberData = dailyCountsData.member_daily_counts?.find(
+          member => member.member_id === memberMtIdx
+        );
+        
+        if (memberData?.daily_counts) {
+          const shortDateString = format(new Date(selectedDate), 'MM.dd');
+          const dayData = memberData.daily_counts.find(
+            day => day.formatted_date === shortDateString
+          );
+          
+          // 해당 날짜에 데이터가 없으면 최근 활동 날짜로 자동 변경
+          if (!dayData || dayData.count === 0) {
+            console.log(`[LOGS] 날짜 동기화 - ${selectedDate}에 데이터 없음, 최근 활동 날짜로 변경`);
+            
+            // 최근 활동 날짜 찾기
+            const recentDays = Array.from({ length: 15 }, (_, i) => {
+              const date = subDays(new Date(), 14 - i);
+              return format(date, 'yyyy-MM-dd');
+            });
+            
+            let foundRecentDate = null;
+            for (let i = recentDays.length - 1; i >= 0; i--) {
+              const dateString = recentDays[i];
+              const shortDate = format(new Date(dateString), 'MM.dd');
+              const dayData = memberData.daily_counts.find(
+                day => day.formatted_date === shortDate
+              );
+              
+              if (dayData && dayData.count > 0) {
+                foundRecentDate = dateString;
+                break;
+              }
+            }
+            
+            if (foundRecentDate && foundRecentDate !== selectedDate) {
+              console.log(`[LOGS] 날짜 동기화 - 자동 변경: ${selectedDate} → ${foundRecentDate}`);
+              setSelectedDate(foundRecentDate);
+              
+              // 사이드바 날짜도 동기화
+              setTimeout(() => {
+                scrollSidebarDateToSelected(foundRecentDate);
+                console.log(`[LOGS] 날짜 동기화 - 사이드바 업데이트 완료: ${foundRecentDate}`);
+              }, 100);
+            }
+          } else {
+            // 데이터가 있으면 사이드바 동기화만 확인
+            console.log(`[LOGS] 날짜 동기화 - ${selectedDate}에 데이터 확인됨 (${dayData.count}건)`);
+            setTimeout(() => {
+              scrollSidebarDateToSelected(selectedDate);
+              console.log(`[LOGS] 날짜 동기화 - 사이드바 동기화 확인 완료: ${selectedDate}`);
+            }, 100);
+          }
+        }
+      }
+    }
+  }, [dailyCountsData, selectedDate, groupMembers, isInitialEntry]);
 
   // 🚨 NEW: mapMarkersData 변경 감지 및 실시간 디버깅 업데이트
   useEffect(() => {
@@ -6392,7 +6502,7 @@ export default function LogsPage() {
                              className="w-full h-full object-cover member-image"
                              priority={true}
                              placeholder="blur"
-                             blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
+                             blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
                              onError={(e) => {
                                const img = e.target as HTMLImageElement;
                                const member = groupMembers.find(m => m.isSelected);
@@ -6925,7 +7035,7 @@ export default function LogsPage() {
                                   className="w-full h-full object-cover member-image"
                                   placeholder="blur"
                                   priority={member.isSelected}
-                                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
+                                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
                                   onError={(e) => {
                                     const img = e.target as HTMLImageElement;
                                     const fallbackUrl = getDefaultImage(member.mt_gender, member.original_index);
