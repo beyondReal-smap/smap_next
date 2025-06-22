@@ -621,7 +621,7 @@ const pageStyles = `
 `;
 
 // 백엔드 이미지 저장 경로의 기본 URL
-const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/';
+
 
 // 애니메이션 variants 추가 (home/page.tsx에서 가져옴)
 const memberAvatarVariants = {
@@ -709,27 +709,21 @@ const loadingTextVariants = {
   }
 };
 
-// 기본 이미지 생성 함수 - home/page.tsx와 동일한 로직 (업데이트됨)
+// 기본 이미지 생성 함수 - home/page.tsx와 동일한 로직
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  const imageNumber = (index % 4) + 1;
-  if (gender === 1) {
-    return `/images/male_${imageNumber}.png`;
-  } else if (gender === 2) {
-    return `/images/female_${imageNumber}.png`;
-  }
-  return `/images/avatar${(index % 3) + 1}.png`;
+  const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png', '/images/male_4.png'];
+  const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png', '/images/female_4.png'];
+  const defaultImages = ['/images/avatar1.png', '/images/avatar2.png', '/images/avatar3.png', '/images/avatar4.png'];
+  
+  if (gender === 1) return maleImages[index % maleImages.length];
+  if (gender === 2) return femaleImages[index % femaleImages.length];
+  return defaultImages[index % defaultImages.length];
 };
 
 // 안전한 이미지 URL을 반환하는 함수 - home/page.tsx와 동일한 로직
 const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  if (photoUrl && photoUrl.trim() !== '') {
-    // 백엔드 URL이 포함되어 있지 않으면 추가
-    if (!photoUrl.startsWith('http') && !photoUrl.startsWith('data:')) {
-      return `${BACKEND_STORAGE_BASE_URL}${photoUrl}`;
-    }
-    return photoUrl;
-  }
-  return getDefaultImage(gender, index);
+  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
+  return photoUrl ?? getDefaultImage(gender, index);
 };
 
 // 색상 보간 함수
@@ -4201,7 +4195,7 @@ export default function LogsPage() {
         return {
           id: memberActivity.member_id.toString(),
           name: memberActivity.member_name || `멤버 ${index + 1}`,
-          photo: memberActivity.member_photo ? (memberActivity.member_photo.startsWith('http') ? memberActivity.member_photo : `${BACKEND_STORAGE_BASE_URL}${memberActivity.member_photo}`) : null,
+          photo: memberActivity.member_photo,
           isSelected: memberActivity.member_id.toString() === selectedMemberId,
           location: { 
             lat: existingMember?.location.lat || 37.5665, 
@@ -4758,7 +4752,7 @@ export default function LogsPage() {
               return {
                 id: member.mt_idx.toString(),
                 name: member.mt_name || `멤버 ${index + 1}`,
-                photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
+                photo: member.mt_file1,
                 isSelected: index === 0,
                 location: { lat, lng },
                 schedules: [], 
@@ -4821,7 +4815,7 @@ export default function LogsPage() {
                   return {
                     id: member.mt_idx.toString(),
                     name: member.mt_name || `멤버 ${index + 1}`,
-                    photo: member.mt_file1 ? (member.mt_file1.startsWith('http') ? member.mt_file1 : `${BACKEND_STORAGE_BASE_URL}${member.mt_file1}`) : null,
+                    photo: member.mt_file1,
                     isSelected: index === 0, // 첫 번째 멤버만 자동 선택
                     location: { lat, lng },
                     schedules: [], 
@@ -6399,6 +6393,16 @@ export default function LogsPage() {
                              priority={true}
                              placeholder="blur"
                              blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
+                             onError={(e) => {
+                               const img = e.target as HTMLImageElement;
+                               const member = groupMembers.find(m => m.isSelected);
+                               if (member) {
+                                 const fallbackUrl = getDefaultImage(member.mt_gender, member.original_index);
+                                 if (img.src !== fallbackUrl) {
+                                   img.src = fallbackUrl;
+                                 }
+                               }
+                             }}
                            />
                         </div>
                         <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
@@ -6616,7 +6620,7 @@ export default function LogsPage() {
             initial="closed"
             animate="open"
             exit="closed"
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[500] z-sidebar-overlay"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]"
             onClick={() => {
               console.log('[사이드바] 오버레이 클릭으로 닫기');
               setIsSidebarOpen(false);
@@ -6641,12 +6645,11 @@ export default function LogsPage() {
             initial="closed"
             animate="open"
             exit="closed"
-            className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[600] z-sidebar flex flex-col"
+            className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[9999] flex flex-col"
             style={{ 
               background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
               borderColor: 'rgba(1, 19, 163, 0.1)',
-              bottom: '60px',
-              height: 'calc(100vh - 60px)',
+              height: '95vh',
               // 모바일 사파리 최적화
               transform: 'translateZ(0)',
               willChange: 'transform',
@@ -6923,6 +6926,13 @@ export default function LogsPage() {
                                   placeholder="blur"
                                   priority={member.isSelected}
                                   blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
+                                  onError={(e) => {
+                                    const img = e.target as HTMLImageElement;
+                                    const fallbackUrl = getDefaultImage(member.mt_gender, member.original_index);
+                                    if (img.src !== fallbackUrl) {
+                                      img.src = fallbackUrl;
+                                    }
+                                  }}
                                 />
                               </motion.div>
                               

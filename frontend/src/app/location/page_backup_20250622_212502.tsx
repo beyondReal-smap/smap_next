@@ -1,4 +1,4 @@
- 'use client';
+'use client';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback, memo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
@@ -1825,6 +1825,22 @@ export default function LocationPage() {
   const handleMemberSelect = async (memberId: string, openLocationPanel = false, membersArray?: GroupMember[], fromMarkerClick = false, clickedMarker?: any) => { 
     console.log('[handleMemberSelect] 멤버 선택:', memberId, '패널 열기:', openLocationPanel, '마커 클릭:', fromMarkerClick);
     
+    // 선택된 멤버의 장소 데이터 디버깅
+    const debugMembersArray = membersArray || groupMembers;
+    const targetMember = debugMembersArray.find(member => member.id === memberId);
+    if (targetMember) {
+      console.log('[handleMemberSelect] 🔍 선택된 멤버 장소 데이터 분석:', {
+        name: targetMember.name,
+        id: targetMember.id,
+        savedLocations: targetMember.savedLocations,
+        savedLocationCount: targetMember.savedLocations?.length || 0,
+        hasLocations: !!(targetMember.savedLocations && targetMember.savedLocations.length > 0),
+        isValidForPreview: !!(targetMember.savedLocations && targetMember.savedLocations.length > 0)
+      });
+    } else {
+      console.warn('[handleMemberSelect] ⚠️ 멤버를 찾을 수 없음:', memberId);
+    }
+    
     // 즉시 햅틱 피드백 (사용자 응답성 개선)
     try {
       hapticFeedback.menuSelect();
@@ -1875,10 +1891,65 @@ export default function LocationPage() {
     const isSelectingSameMember = currentlySelectedMember?.id === memberId;
     
     if (!isSelectingSameMember) {
-      console.log('[handleMemberSelect] 다른 멤버 선택 - 장소 상태 초기화');
+      console.log('[handleMemberSelect] 🔄 다른 멤버 선택 - 장소 상태 초기화:', {
+        previousMember: currentlySelectedMember?.name,
+        newMember: newlySelectedMember.name,
+        previousSelectedMemberSavedLocations: selectedMemberSavedLocations?.length || 0,
+        newMemberSavedLocations: newlySelectedMember.savedLocations?.length || 0
+      });
       setSelectedLocationId(null);
       selectedLocationIdRef.current = null;
-      setSelectedMemberSavedLocations(null);
+      
+      // 새로 선택된 멤버의 장소 데이터 확인 및 로딩
+      if (newlySelectedMember.savedLocations && newlySelectedMember.savedLocations.length > 0) {
+        // 이미 장소 데이터가 있으면 바로 사용
+        setSelectedMemberSavedLocations(newlySelectedMember.savedLocations);
+        console.log('[handleMemberSelect] ✅ 기존 장소 데이터 사용:', newlySelectedMember.savedLocations.length, '개');
+      } else {
+        // 장소 데이터가 없으면 즉시 로딩
+        console.log('[handleMemberSelect] 🔄 장소 데이터 없음 - 즉시 로딩 시작:', newlySelectedMember.name);
+        setSelectedMemberSavedLocations([]);
+        
+        // 비동기로 장소 데이터 로딩
+        (async () => {
+          try {
+            const memberLocationsRaw = await locationService.getOtherMembersLocations(newlySelectedMember.id);
+            console.log("[handleMemberSelect] 멤버 장소 조회 완료:", newlySelectedMember.name, memberLocationsRaw.length, '개');
+            
+            // LocationData 형식으로 변환
+            const convertedLocations = memberLocationsRaw.map(loc => ({
+              id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
+              name: loc.name || loc.slt_title || '제목 없음',
+              address: loc.address || loc.slt_add || '주소 정보 없음',
+              coordinates: [
+                parseFloat(String(loc.slt_long || '0')) || 0,
+                parseFloat(String(loc.slt_lat || '0')) || 0
+              ] as [number, number],
+              category: loc.category || '기타',
+              memo: loc.memo || '',
+              favorite: loc.favorite || false,
+              notifications: loc.notifications !== undefined ? loc.notifications : ((loc as any).slt_enter_alarm === 'Y' || (loc as any).slt_enter_alarm === undefined)
+            }));
+            
+            // 상태 업데이트
+            setSelectedMemberSavedLocations(convertedLocations);
+            
+            // 멤버 객체에도 장소 데이터 업데이트
+            setGroupMembers(prevMembers => 
+              prevMembers.map(member => 
+                member.id === newlySelectedMember.id 
+                  ? { ...member, savedLocations: convertedLocations, savedLocationCount: convertedLocations.length }
+                  : member
+              )
+            );
+            
+            console.log('[handleMemberSelect] ✅ 장소 데이터 로딩 완료:', newlySelectedMember.name, convertedLocations.length, '개');
+          } catch (error) {
+            console.error('[handleMemberSelect] 장소 데이터 로딩 실패:', error);
+            setSelectedMemberSavedLocations([]);
+          }
+        })();
+      }
       
       // 기존 장소 마커들 제거
       if (markers.length > 0) {
@@ -1968,12 +2039,12 @@ export default function LocationPage() {
           
           console.log('[handleMemberSelect] 지도 중심 이동 완료');
         
-        // 사이드바 닫기 (멤버 선택 시 사용자 경험 개선) - 마커 클릭이 아닌 경우에만
+        // 사이드바 닫기 (멤버 선택 시 장소 리스트를 잠시 보여준 후 닫기) - 마커 클릭이 아닌 경우에만
         if (!fromMarkerClick) {
           setTimeout(() => {
             setIsSidebarOpen(false);
-            console.log('[handleMemberSelect] 사이드바 닫기 완료');
-          }, 300); // 마커 업데이트 완료 후 InfoWindow 생성
+            console.log('[handleMemberSelect] 장소 리스트 표시 후 사이드바 닫기 완료');
+          }, 1500); // 장소 리스트를 1.5초간 보여준 후 닫기
         }
         
         // 기존 InfoWindow 처리 (마커 클릭인 경우 제외)
@@ -2352,19 +2423,32 @@ export default function LocationPage() {
           
           console.log("[handleMemberSelect] 변환된 장소 데이터:", convertedLocations);
           
-          // 상태 업데이트
-          setSelectedMemberSavedLocations(convertedLocations);
-          setOtherMembersSavedLocations(memberLocationsRaw);
-          setActiveView('selectedMemberPlaces');
-          
-          // 그룹멤버 상태의 savedLocations와 savedLocationCount도 업데이트 (다음에는 API 호출 없이 사용하기 위해)
-          setGroupMembers(prevMembers => 
-            prevMembers.map(member => 
-              member.id === memberId 
-                ? { ...member, savedLocations: convertedLocations, savedLocationCount: convertedLocations.length }
-                : member
-            )
-          );
+                  // 상태 업데이트
+        console.log('[handleMemberSelect] 🔄 상태 업데이트 시작:', {
+          memberId,
+          memberName: newlySelectedMember.name,
+          convertedLocationsLength: convertedLocations.length,
+          previousSelectedMemberSavedLocations: selectedMemberSavedLocations?.length || 0
+        });
+        
+        setSelectedMemberSavedLocations(convertedLocations);
+        setOtherMembersSavedLocations(memberLocationsRaw);
+        setActiveView('selectedMemberPlaces');
+        
+        // 그룹멤버 상태의 savedLocations와 savedLocationCount도 업데이트 (다음에는 API 호출 없이 사용하기 위해)
+        setGroupMembers(prevMembers => 
+          prevMembers.map(member => 
+            member.id === memberId 
+              ? { ...member, savedLocations: convertedLocations, savedLocationCount: convertedLocations.length }
+              : member
+          )
+        );
+        
+        console.log('[handleMemberSelect] ✅ 상태 업데이트 완료:', {
+          memberId,
+          memberName: newlySelectedMember.name,
+          newSelectedMemberSavedLocations: convertedLocations.length
+        });
           
         } catch (error) {
           console.error("Failed to fetch selected member's locations in handleMemberSelect:", error);
@@ -3376,7 +3460,8 @@ export default function LocationPage() {
             console.log('[멤버 마커 클릭] 멤버 선택 시작:', member.name);
             
             // handleMemberSelect 함수 호출 (사이드바와 동일한 로직 사용)
-            handleMemberSelect(member.id, false, members, true, marker);
+            // groupMembers 상태를 전달하여 최신 멤버 데이터 사용
+            handleMemberSelect(member.id, false, groupMembers, true, marker);
             
             console.log('[멤버 마커 클릭] handleMemberSelect 호출 완료:', member.name);
           });
@@ -5166,7 +5251,8 @@ export default function LocationPage() {
               style={{ 
                 background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                 borderColor: 'rgba(1, 19, 163, 0.1)',
-                height: '98vh',
+                bottom: '60px',
+                height: 'calc(100vh - 60px)',
                 // 모바일 사파리 최적화
                 transform: 'translateZ(0)',
                 willChange: 'transform',
@@ -5262,7 +5348,7 @@ export default function LocationPage() {
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: -10, scale: 0.95 }}
                           transition={{ duration: 0.2 }}
-                          className="absolute top-full left-0 right-0 z-[9999] mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
+                          className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
                         >
                           {userGroups.map((group) => (
                             <motion.button
@@ -5320,14 +5406,9 @@ export default function LocationPage() {
                             // 햅틱 피드백 추가
                             hapticFeedback.navigation();
                             
-                            // 즉시 사이드바 닫기 (상태 변경 순서 중요)
-                            setIsSidebarOpen(false);
-                            
-                            // 짧은 딜레이 후 멤버 선택 (InfoWindow는 표시하지 않음)
-                            setTimeout(() => {
-                              handleMemberSelect(member.id);
-                              console.log('[사이드바 멤버 선택] 멤버 선택 완료 - InfoWindow 표시하지 않음:', member.name);
-                            }, 100);
+                            // 먼저 멤버 선택 (미리보기 표시)
+                            handleMemberSelect(member.id);
+                            console.log('[사이드바 멤버 선택] 멤버 선택 완료 - 미리보기 표시:', member.name);
                           }}
                           className={`p-3 rounded-xl border cursor-pointer transition-all duration-200 ${
                             member.isSelected 
@@ -5383,6 +5464,105 @@ export default function LocationPage() {
                       </div>
                     )}
                   </div>
+                  
+                                    {/* 선택된 멤버의 장소 리스트 (하단에 추가) - 디버깅 강화 */}
+                  {(() => {
+                    const selectedMember = groupMembers.find(member => member.isSelected);
+                    const placesToShow = selectedMemberSavedLocations || selectedMember?.savedLocations || [];
+                    const hasPlaces = placesToShow.length > 0;
+                    
+                    console.log('[사이드바] 🔍 장소 리스트 렌더링 체크:', {
+                      hasSelectedMember: !!selectedMember,
+                      memberName: selectedMember?.name,
+                      memberSavedLocations: selectedMember?.savedLocations?.length || 0,
+                      selectedMemberSavedLocations: selectedMemberSavedLocations?.length || 0,
+                      placesToShow: placesToShow.length,
+                      hasPlaces,
+                      willRender: !!(selectedMember && hasPlaces),
+                      // 디버깅을 위한 추가 정보
+                      selectedMemberSavedLocationsIsNull: selectedMemberSavedLocations === null,
+                      memberSavedLocationsDetails: selectedMember?.savedLocations,
+                      placesToShowSource: selectedMemberSavedLocations ? 'selectedMemberSavedLocations' : selectedMember?.savedLocations ? 'memberSavedLocations' : 'empty'
+                    });
+                    
+                    // 명시적인 조건부 렌더링
+                    if (!selectedMember) {
+                      console.log('[사이드바] ❌ 선택된 멤버 없음');
+                      return null;
+                    }
+                    
+                    if (!hasPlaces) {
+                      console.log('[사이드바] ❌ 표시할 장소 없음');
+                      return null;
+                    }
+                    
+                    console.log('[사이드바] ✅ 장소 리스트 렌더링!', placesToShow.slice(0, 5).map(p => p.name));
+                    
+                    return (
+                      <div className="mt-6 pt-4 border-t border-gray-200" style={{ backgroundColor: '#f0f9ff' }}>
+                        <div className="flex items-center space-x-2 mb-3">
+                          <div className="w-2 h-2 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full"></div>
+                          <h3 className="text-base font-semibold text-gray-800">{selectedMember.name}의 장소 ({placesToShow.length}개)</h3>
+                        </div>
+                        
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {placesToShow.slice(0, 5).map((location) => (
+                            <motion.div
+                              key={location.id}
+                              whileHover={{ scale: 1.02, y: -1 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={() => {
+                                hapticFeedback.navigation();
+                                setIsSidebarOpen(false);
+                                setTimeout(() => {
+                                  handleLocationSelect(location);
+                                }, 100);
+                              }}
+                              className={`p-2 rounded-lg border cursor-pointer transition-all duration-200 ${
+                                selectedLocationId === location.id 
+                                  ? 'bg-white shadow-md border-pink-300'
+                                  : 'bg-white/60 hover:bg-white/80 border-gray-200'
+                              }`}
+                            >
+                              <div className="flex items-center space-x-2">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                                  selectedLocationId === location.id 
+                                    ? 'bg-pink-100' 
+                                    : 'bg-gray-100'
+                                }`}>
+                                  <svg className={`w-3 h-3 ${
+                                    selectedLocationId === location.id 
+                                      ? 'text-pink-600' 
+                                      : 'text-gray-600'
+                                  }`} fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z"/>
+                                  </svg>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium truncate ${
+                                    selectedLocationId === location.id ? 'text-gray-900' : 'text-gray-700'
+                                  }`}>
+                                    {location.name}
+                                  </p>
+                                  <p className="text-xs text-gray-500 truncate">
+                                    {location.address}
+                                  </p>
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+                          
+                          {placesToShow.length > 5 && (
+                            <div className="text-center py-2">
+                              <p className="text-xs text-gray-500">
+                                +{placesToShow.length - 5}개 더 있음
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </motion.div>
             </motion.div>
@@ -5718,7 +5898,8 @@ export default function LocationPage() {
               style={{ 
                 background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                 borderColor: 'rgba(1, 19, 163, 0.1)',
-                height: '98vh'
+                bottom: '60px', // 네비게이션 바 높이만큼 여유 공간
+                height: 'calc(100vh - 60px)'
               }}
             >
               <motion.div

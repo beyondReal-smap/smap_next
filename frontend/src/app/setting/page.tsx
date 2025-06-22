@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -32,10 +32,9 @@ import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
 import { hapticFeedback, triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 
-// Dynamic imports for performance optimization
-const AnimatedHeader = lazy(() => import('../../components/common/AnimatedHeader'));
+import AnimatedHeader from '../../components/common/AnimatedHeader';
 
-// Loading components for Suspense fallbacks
+// Loading component for fallbacks (kept for potential future use)
 const LoadingFallback = memo(() => (
   <div className="flex items-center justify-center p-4">
     <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
@@ -43,18 +42,8 @@ const LoadingFallback = memo(() => (
 ));
 LoadingFallback.displayName = 'LoadingFallback';
 
-const HeaderLoadingFallback = memo(() => (
-  <div className="h-14 bg-white/95 backdrop-blur-sm animate-pulse">
-    <div className="flex items-center justify-between h-full px-4">
-      <div className="h-4 bg-gray-200 rounded w-24"></div>
-      <div className="h-4 bg-gray-200 rounded w-16"></div>
-    </div>
-  </div>
-));
-HeaderLoadingFallback.displayName = 'HeaderLoadingFallback';
-
-// Memoized utility functions
-const getDefaultImage = useCallback((gender: number | null | undefined, index: number): string => {
+// Utility functions (non-memoized for component external use)
+const getDefaultImage = (gender: number | null | undefined, index: number): string => {
   // frontend/public/images/ 폴더의 기본 이미지 사용
   if (gender === 2) { // 여성
     const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png'];
@@ -63,36 +52,36 @@ const getDefaultImage = useCallback((gender: number | null | undefined, index: n
     const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png'];
     return maleImages[index % maleImages.length];
   }
-}, []);
+};
 
 // 안전한 이미지 URL 가져오기 함수
-const getSafeImageUrl = useCallback((photoUrl: string | null, gender: number | null | undefined, index: number): string => {
+const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
   // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
   return photoUrl ?? getDefaultImage(gender, index);
-}, [getDefaultImage]);
+};
 
 // 이메일 형식 확인 함수
-const isEmail = useCallback((str: string): boolean => {
+const isEmail = (str: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(str);
-}, []);
+};
 
 // 사용자 레벨에 따른 등급 반환 함수
-const getUserLevel = useCallback((mtLevel: number | null | undefined): string => {
+const getUserLevel = (mtLevel: number | null | undefined): string => {
   if (mtLevel === 5) return 'VIP';
   if (mtLevel === 2) return '일반';
   return '일반'; // 기본값
-}, []);
+};
 
 // 사용자 레벨에 따른 플랜 반환 함수
-const getUserPlan = useCallback((mtLevel: number | null | undefined): string => {
+const getUserPlan = (mtLevel: number | null | undefined): string => {
   if (mtLevel === 5) return '프리미엄 플랜';
   if (mtLevel === 2) return '베이직 플랜';
   return '베이직 플랜'; // 기본값
-}, []);
+};
 
 // 로그인 타입에 따른 로그인 방법 반환 함수
-const getLoginMethod = useCallback((mtType: number | null | undefined): { method: string; icon: string } => {
+const getLoginMethod = (mtType: number | null | undefined): { method: string; icon: string } => {
   switch (mtType) {
     case 1:
       return { method: '일반 로그인', icon: '🔐' };
@@ -105,7 +94,7 @@ const getLoginMethod = useCallback((mtType: number | null | undefined): { method
     default:
       return { method: '일반 로그인', icon: '🔐' };
   }
-}, []);
+};
 
 // Optimized mobile CSS with better performance
 const mobileStyles = `
@@ -565,32 +554,30 @@ function SettingsPageContent() {
       
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <Suspense fallback={<HeaderLoadingFallback />}>
-          <AnimatedHeader 
-            variant="simple"
-            className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200"
-            style={{ paddingTop: 'env(safe-area-inset-top)' }}
-          >
-            <div className="flex items-center justify-between h-14 px-4">
-              <div className="flex items-center space-x-3">
-                <motion.button
-                  onClick={handleBack}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </motion.button>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">설정</h1>
-                  <p className="text-xs text-gray-500">계정 및 앱 설정을 관리하세요</p>
-                </div>
+        <AnimatedHeader 
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+        >
+          <div className="flex items-center justify-between h-14 px-4">
+            <div className="flex items-center space-x-3">
+              <motion.button
+                onClick={handleBack}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </motion.button>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">설정</h1>
+                <p className="text-xs text-gray-500">계정 및 앱 설정을 관리하세요</p>
               </div>
             </div>
-          </AnimatedHeader>
-        </Suspense>
+          </div>
+        </AnimatedHeader>
 
         {/* Main Content */}
         <div className="pt-16 pb-safe px-4 space-y-6" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 80px)' }}>
@@ -697,20 +684,11 @@ class SettingsErrorBoundary extends React.Component<
   }
 }
 
-// Main export with Suspense wrapper
+// Main export with Error Boundary
 export default function SettingsPage() {
   return (
     <SettingsErrorBoundary>
-      <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">설정을 불러오는 중...</p>
-          </div>
-        </div>
-      }>
-        <SettingsPageContent />
-      </Suspense>
+      <SettingsPageContent />
     </SettingsErrorBoundary>
   );
 } 

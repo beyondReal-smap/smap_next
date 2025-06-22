@@ -5313,7 +5313,7 @@ export default function HomePage() {
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+          className={`fixed top-0 left-0 right-0 glass-effect header-fixed ${isSidebarOpen ? 'z-40' : 'z-50'}`}
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
             <div className="flex items-center justify-between h-14 px-4">
@@ -5610,7 +5610,7 @@ export default function HomePage() {
                  initial="closed"
                  animate="open"
                  exit="closed"
-                 className="fixed inset-0 bg-black bg-opacity-50 z-40"
+                 className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999]"
                  onClick={() => setIsSidebarOpen(false)}
                  style={{
                    // 모바일 사파리 최적화
@@ -5628,12 +5628,11 @@ export default function HomePage() {
                    initial="closed"
                    animate="open"
                    exit="closed"
-                   className="fixed left-0 top-0 w-80 shadow-2xl border-r z-50 flex flex-col"
+                   className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[9999] flex flex-col"
                    style={{ 
                      background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                      borderColor: 'rgba(1, 19, 163, 0.1)',
-                     bottom: '60px', // 네비게이션 바 높이만큼 여유 공간
-                     height: 'calc(100vh - 60px)',
+                     height: '100vh',
                      // 모바일 사파리 최적화
                      transform: 'translateZ(0)',
                      willChange: 'transform',
@@ -5649,6 +5648,10 @@ export default function HomePage() {
                      animate="open"
                      exit="closed"
                      className="p-6 h-full flex flex-col relative z-10"
+                     style={{
+                       paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)',
+                       paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)'
+                     }}
                    >
                    {/* 개선된 헤더 */}
                    <div className="flex items-center justify-between mb-6">
@@ -5729,7 +5732,12 @@ export default function HomePage() {
                              animate={{ opacity: 1, y: 0, scale: 1 }}
                              exit={{ opacity: 0, y: -10, scale: 0.95 }}
                              transition={{ duration: 0.2 }}
-                             className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
+                             className="absolute top-full left-0 right-0 z-[9999] mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
+                             style={{
+                               backgroundColor: '#ffffff',
+                               backdropFilter: 'blur(10px)',
+                               boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                             }}
                            >
                              {(userGroups && safeArrayCheck(userGroups)) ? userGroups.map((group) => (
                                <motion.button
