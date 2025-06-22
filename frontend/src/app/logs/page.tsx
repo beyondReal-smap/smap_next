@@ -1,8 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format, addDays, subDays } from 'date-fns';
@@ -11,15 +9,85 @@ import { motion, useMotionValue, AnimatePresence } from 'framer-motion';
 import { PageContainer, Button } from '../components/layout';
 import { FiPlus, FiTrendingUp, FiClock, FiZap, FiPlayCircle, FiSettings, FiUser, FiLoader, FiChevronDown, FiActivity } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
+import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { API_KEYS, MAP_CONFIG } from '../../config'; 
 import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { hapticFeedback } from '@/utils/haptic';
 import memberService from '@/services/memberService';
-import DebugPanel from '../components/layout/DebugPanel';
-import LogParser from '../components/layout/LogParser';
-import AnimatedHeader from '../../components/common/AnimatedHeader';
+
+// Dynamic Imports for better code splitting
+const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
+  loading: () => (
+    <div className="h-14 bg-gradient-to-r from-[#667eea] to-[#764ba2] animate-pulse" />
+  ),
+  ssr: false
+});
+
+const DebugPanel = dynamic(() => import('../components/layout/DebugPanel'), {
+  loading: () => (
+    <div className="fixed bottom-4 right-4 w-48 h-32 bg-gray-100 rounded-lg animate-pulse" />
+  ),
+  ssr: false
+});
+
+const LogParser = dynamic(() => import('../components/layout/LogParser'), {
+  loading: () => (
+    <div className="w-full h-24 bg-gray-100 rounded-lg animate-pulse" />
+  ),
+  ssr: false
+});
+
+const MemberCalendar = dynamic(() => import('../../components/logs/MemberCalendar'), {
+  loading: () => (
+    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-white/50 shadow-lg animate-pulse">
+      <div className="flex items-center space-x-3 mb-4">
+        <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+        <div className="flex-1">
+          <div className="h-4 bg-gray-200 rounded mb-2"></div>
+          <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+        </div>
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {Array.from({ length: 35 }).map((_, i) => (
+          <div key={i} className="aspect-square bg-gray-200 rounded-lg"></div>
+        ))}
+      </div>
+    </div>
+  ),
+  ssr: false
+});
+
+const LocationSummaryCard = dynamic(() => import('../../components/logs/LocationSummaryCard'), {
+  loading: () => (
+    <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-lg animate-pulse">
+      <div className="grid grid-cols-3 gap-4">
+        {[1, 2, 3].map((index) => (
+          <div key={index} className="text-center">
+            <div className="w-12 h-12 bg-gray-200 rounded-full mx-auto mb-3"></div>
+            <div className="h-4 bg-gray-200 rounded mb-2"></div>
+            <div className="h-6 bg-gray-200 rounded"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ),
+  ssr: false
+});
+
+const GroupSelectorDropdown = dynamic(() => import('../../components/logs/GroupSelectorDropdown'), {
+  loading: () => (
+    <div className="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 animate-pulse">
+      <div className="flex items-center justify-between">
+        <div className="h-4 bg-gray-200 rounded flex-1 mr-2"></div>
+        <div className="w-4 h-4 bg-gray-200 rounded"></div>
+      </div>
+    </div>
+  ),
+  ssr: false
+});
 
 import groupService, { Group } from '@/services/groupService';
 import memberLocationLogService, { LocationLog, LocationSummary as APILocationSummary, LocationPathData, DailySummary, StayTime, MapMarker, LocationLogSummary, DailyCountsResponse, MemberActivityResponse, MemberDailyCount } from '@/services/memberLocationLogService';
@@ -70,7 +138,7 @@ interface LocationSummary {
   steps: string;
 }
 
-// 기본 위치기록 요약 데이터
+  // 기본 위치기록 요약 데이터
 const DEFAULT_LOCATION_SUMMARY: LocationSummary = {
   distance: '0 km',
   time: '0분',
@@ -144,23 +212,105 @@ const MOCK_LOGS = [
   }
 ];
 
-// pageStyles with section styles from home/page.tsx
-// 사이드바 애니메이션 variants (웹뷰 환경 최적화 - 더 자연스럽고 부드러운 애니메이션)
+// 최적화된 애니메이션 variants - 순차적이고 부드러운 애니메이션
+const pageVariants = {
+  initial: { 
+    opacity: 0
+  },
+  in: { 
+    opacity: 1,
+    transition: {
+      duration: 0.4,
+      ease: [0.25, 0.46, 0.45, 0.94],
+      staggerChildren: 0.1,
+      delayChildren: 0.2
+    }
+  },
+  out: { 
+    opacity: 0,
+    transition: {
+      duration: 0.3,
+      ease: [0.55, 0.06, 0.68, 0.19]
+    }
+  }
+};
+
+// 헤더 애니메이션 - 가장 먼저 나타남
+const headerVariants = {
+  initial: { 
+    opacity: 0, 
+    y: -20 
+  },
+  animate: { 
+    opacity: 1, 
+    y: 0,
+    transition: {
+      duration: 0.5,
+      ease: [0.25, 0.46, 0.45, 0.94]
+    }
+  }
+};
+
+// 지도 컨테이너 애니메이션 - 헤더 다음
+const mapContainerVariants = {
+  initial: { 
+    opacity: 0, 
+    scale: 0.95 
+  },
+  animate: { 
+    opacity: 1, 
+    scale: 1,
+    transition: {
+      duration: 0.6,
+      ease: [0.25, 0.46, 0.45, 0.94],
+      delay: 0.3
+    }
+  }
+};
+
+// 플로팅 카드 애니메이션 - 지도 다음
+const floatingCardVariants = {
+  initial: { 
+    opacity: 0, 
+    y: -30, 
+    scale: 0.9 
+  },
+  animate: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: {
+      duration: 0.5,
+      ease: [0.25, 0.46, 0.45, 0.94],
+      delay: 0.6
+    }
+  },
+  exit: { 
+    opacity: 0, 
+    y: -30, 
+    scale: 0.9,
+    transition: {
+      duration: 0.3
+    }
+  }
+};
+
+// 사이드바 애니메이션 - 더 부드럽고 자연스럽게
 const sidebarVariants = {
   closed: {
     x: '-100%',
     transition: {
       type: 'tween',
-      ease: [0.22, 1, 0.36, 1],
-      duration: 0.6
+      ease: [0.25, 0.46, 0.45, 0.94],
+      duration: 0.4
     }
   },
   open: {
     x: 0,
     transition: {
       type: 'tween',
-      ease: [0.22, 1, 0.36, 1],
-      duration: 0.6
+      ease: [0.25, 0.46, 0.45, 0.94],
+      duration: 0.4
     }
   }
 };
@@ -169,15 +319,15 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      duration: 0.3,
+      ease: [0.25, 0.46, 0.45, 0.94]
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      duration: 0.3,
+      ease: [0.25, 0.46, 0.45, 0.94]
     }
   }
 };
@@ -186,35 +336,80 @@ const sidebarContentVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      duration: 0.2
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      duration: 0.4,
+      delay: 0.1,
+      staggerChildren: 0.05,
+      delayChildren: 0.1
     }
   }
 };
 
+// 멤버 아이템 애니메이션 - 순차적으로 나타남
 const memberItemVariants = {
   closed: { 
-    opacity: 1
+    opacity: 0,
+    x: -20,
+    scale: 0.95
   },
-  open: { 
-    opacity: 1
+  open: (index: number) => ({ 
+    opacity: 1,
+    x: 0,
+    scale: 1,
+    transition: {
+      duration: 0.3,
+      ease: [0.25, 0.46, 0.45, 0.94],
+      delay: index * 0.05
+    }
+  })
+};
+
+// 플로팅 버튼 애니메이션 - 마지막에 나타남
+const floatingButtonVariants = {
+  initial: { 
+    scale: 0, 
+    opacity: 0 
+  },
+  animate: { 
+    scale: 1, 
+    opacity: 1,
+    transition: {
+      type: "spring",
+      stiffness: 260,
+      damping: 20,
+      delay: 1.0
+    }
+  },
+  hover: { 
+    scale: 1.1,
+    transition: { 
+      duration: 0.2,
+      ease: "easeOut"
+    }
+  },
+  tap: { 
+    scale: 0.95,
+    transition: { 
+      duration: 0.1 
+    }
   }
 };
 
 const pageStyles = `
+/* 최적화된 애니메이션 */
 @keyframes slideUp {
   from {
     transform: translateY(100%);
+    opacity: 0;
   }
   to {
     transform: translateY(0);
+    opacity: 1;
   }
 }
 
@@ -228,11 +423,21 @@ const pageStyles = `
 }
 
 .animate-slideUp {
-  animation: slideUp 1s ease-out forwards;
+  animation: slideUp 0.6s ease-out forwards;
 }
 
 .animate-fadeIn {
-  animation: fadeIn 1s ease-out forwards;
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* 하드웨어 가속 최적화 */
+.hardware-accelerated {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  perspective: 1000px;
+  -webkit-perspective: 1000px;
 }
 
 /* glass-effect 스타일 추가 */
@@ -242,6 +447,8 @@ const pageStyles = `
   -webkit-backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+  position: fixed !important;
+  z-index: 9999 !important;
 }
 
 .full-map-container {
@@ -364,36 +571,57 @@ const pageStyles = `
 
 
 
+/* 이미지 로딩 최적화 */
+.member-image {
+  transition: opacity 0.3s ease;
+}
+
+.member-image.loading {
+  opacity: 0.7;
+}
+
+.member-image.loaded {
+  opacity: 1;
+}
+
+/* 성능 최적화 */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+/* 터치 최적화 */
+.touch-optimized {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+
 @media (max-width: 640px) {
   .member-avatar {
     width: 48px; 
     height: 48px; 
   }
 }
+
+/* 접근성 개선 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 `;
 
-const pageVariants = {
-  initial: { 
-    opacity: 0, 
-    y: 20
-  },
-  in: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
-    }
-  },
-  out: { 
-    opacity: 0, 
-    y: -20,
-    transition: {
-      duration: 0.2,
-      ease: [0.22, 1, 0.36, 1]
-    }
-  }
-};
+// 백엔드 이미지 저장 경로의 기본 URL
+const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/';
 
 // 애니메이션 variants 추가 (home/page.tsx에서 가져옴)
 const memberAvatarVariants = {
@@ -481,24 +709,27 @@ const loadingTextVariants = {
   }
 };
 
-// Helper 함수들 추가 (home/page.tsx에서 가져옴)
-const BACKEND_STORAGE_BASE_URL = 'https://118.67.130.71:8000/storage/';
-
+// 기본 이미지 생성 함수 - home/page.tsx와 동일한 로직 (업데이트됨)
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
-  const maleImages = ['/images/male_1.png', '/images/male_2.png', '/images/male_3.png', '/images/male_4.png'];
-  const femaleImages = ['/images/female_1.png', '/images/female_2.png', '/images/female_3.png', '/images/female_4.png'];
-  const defaultImages = ['/images/avatar1.png', '/images/avatar2.png', '/images/avatar3.png', '/images/avatar4.png'];
-  
-  if (gender === 1) return maleImages[index % maleImages.length];
-  if (gender === 2) return femaleImages[index % femaleImages.length];
-  return defaultImages[index % defaultImages.length];
+  const imageNumber = (index % 4) + 1;
+  if (gender === 1) {
+    return `/images/male_${imageNumber}.png`;
+  } else if (gender === 2) {
+    return `/images/female_${imageNumber}.png`;
+  }
+  return `/images/avatar${(index % 3) + 1}.png`;
 };
 
-// SSL 인증서 오류가 있는 URL인지 확인하는 함수 (home/page.tsx와 동일)
-// 안전한 이미지 URL을 반환하는 함수 - location/home과 동일한 로직
+// 안전한 이미지 URL을 반환하는 함수 - home/page.tsx와 동일한 로직
 const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-  // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
-  return photoUrl ?? getDefaultImage(gender, index);
+  if (photoUrl && photoUrl.trim() !== '') {
+    // 백엔드 URL이 포함되어 있지 않으면 추가
+    if (!photoUrl.startsWith('http') && !photoUrl.startsWith('data:')) {
+      return `${BACKEND_STORAGE_BASE_URL}${photoUrl}`;
+    }
+    return photoUrl;
+  }
+  return getDefaultImage(gender, index);
 };
 
 // 색상 보간 함수
@@ -638,6 +869,7 @@ export default function LogsPage() {
   const sliderRef = useRef<HTMLDivElement>(null); // 슬라이더 요소를 위한 ref
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true);
+  const [isWaitingForMembers, setIsWaitingForMembers] = useState(true);
   const [isMapInitializedLogs, setIsMapInitializedLogs] = useState(false); // Logs 페이지용 지도 초기화 상태
   const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false); // 초기 데이터 로딩 상태 추가
 
@@ -719,6 +951,29 @@ export default function LogsPage() {
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
+
+  // 메모이제이션된 계산 값들
+  const selectedMember = useMemo(() => {
+    return groupMembers.find(member => member.isSelected) || null;
+  }, [groupMembers]);
+
+  const selectedGroup = useMemo(() => {
+    return userGroups.find(group => group.sgt_idx === selectedGroupId) || null;
+  }, [userGroups, selectedGroupId]);
+
+  const currentMonthData = useMemo(() => {
+    const now = new Date();
+    return {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      firstDay: new Date(now.getFullYear(), now.getMonth(), 1),
+      lastDay: new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    };
+  }, []);
+
+  const isLoadingComplete = useMemo(() => {
+    return !isLocationDataLoading && !isMapLoading && !isInitialLoading;
+  }, [isLocationDataLoading, isMapLoading, isInitialLoading]);
 
   // WebKit 환경 감지 및 최적화
   useEffect(() => {
@@ -1168,20 +1423,32 @@ export default function LogsPage() {
     loadNaverMapsAPI();
   }, []);
 
+  // 멤버 데이터 로드 감지
   useEffect(() => {
-    if (naverMapsLoaded && mapContainer.current && !map.current) {
+    if (groupMembers.length > 0) {
+      setIsWaitingForMembers(false);
+      console.log('[LOGS 지도] 멤버 데이터 로드 완료, 지도 초기화 준비');
+    }
+  }, [groupMembers]);
+
+  useEffect(() => {
+    // 멤버 데이터가 로드된 후에만 지도 초기화
+    if (naverMapsLoaded && mapContainer.current && !map.current && !isWaitingForMembers && groupMembers.length > 0) {
       setIsMapLoading(true);
       try {
-        // 기본 위치 설정 (서울 시청)
-        let initialLat = 37.5665;
-        let initialLng = 126.9780;
+        const firstMember = groupMembers[0];
+        let initialLat = 37.5665; // 기본값 (서울 시청)
+        let initialLng = 126.9780; // 기본값 (서울 시청)
         let memberName = '기본 위치';
         
-        // 멤버 데이터가 있으면 첫 번째 멤버 위치 사용
-        if (groupMembers.length > 0) {
-          const firstMember = groupMembers[0];
-          initialLat = firstMember.mlt_lat || firstMember.location.lat || 37.5665;
-          initialLng = firstMember.mlt_long || firstMember.location.lng || 126.9780;
+        // 첫 번째 멤버의 위치 데이터 우선 사용
+        if (firstMember.mlt_lat && firstMember.mlt_long) {
+          initialLat = firstMember.mlt_lat;
+          initialLng = firstMember.mlt_long;
+          memberName = firstMember.name;
+        } else if (firstMember.location.lat && firstMember.location.lng) {
+          initialLat = firstMember.location.lat;
+          initialLng = firstMember.location.lng;
           memberName = firstMember.name;
         }
         
@@ -1233,29 +1500,16 @@ export default function LogsPage() {
         setIsMapInitializedLogs(true); // 오류 시에도 초기화 완료로 설정
       }
     }
-  }, [naverMapsLoaded, groupMembers]);
+  }, [naverMapsLoaded, isWaitingForMembers, groupMembers]);
 
-  // 🗺️ 멤버 데이터 로드 후 지도 중심 업데이트
+  // 🗺️ 지도 초기화 완료 후 멤버 마커 업데이트
   useEffect(() => {
     if (map.current && isMapInitializedLogs && groupMembers.length > 0) {
-      const firstMember = groupMembers[0];
-      const lat = firstMember.mlt_lat || firstMember.location.lat || 37.5665;
-      const lng = firstMember.mlt_long || firstMember.location.lng || 126.9780;
-      const center = new window.naver.maps.LatLng(lat, lng);
-      
-      console.log('[LOGS 지도 업데이트] 멤버 데이터 로드 후 중심 이동:', {
-        memberName: firstMember.name,
-        lat,
-        lng
-      });
-      
-      map.current.setCenter(center);
-      map.current.setZoom(16);
-      
+      console.log('[LOGS 지도] 초기화 완료 후 멤버 마커 업데이트');
       // 멤버 마커 업데이트
       updateMemberMarkers(groupMembers, false);
     }
-  }, [groupMembers, isMapInitializedLogs]);
+  }, [isMapInitializedLogs]);
 
   // 🧹 컴포넌트 정리
   useEffect(() => {
@@ -1311,6 +1565,10 @@ export default function LogsPage() {
          map.current.destroy();
       }
       map.current = null;
+      
+      // 상태 초기화
+      setIsWaitingForMembers(true);
+      setIsMapLoading(true);
     };
   }, [naverMapsLoaded, groupMembers]);
 
@@ -1678,7 +1936,7 @@ export default function LogsPage() {
     return format(new Date(), 'yyyy-MM-dd'); // 활동이 없으면 오늘 반환
   };
 
-  const handleMemberSelect = async (id: string, e?: React.MouseEvent | null): Promise<void> => {
+  const handleMemberSelect = useCallback(async (id: string, e?: React.MouseEvent | null): Promise<void> => {
     // 이벤트 전파 중단 (이벤트 객체가 유효한 경우에만)
     if (e && typeof e.preventDefault === 'function') {
       e.preventDefault();
@@ -1739,7 +1997,7 @@ export default function LogsPage() {
     }
     
     console.log('[LOGS] ===== 멤버 선택 완료 =====');
-  };
+  }, [groupMembers, selectedDate, setIsInitialEntry, setIsSidebarOpen, setLocationSummary, setIsLocationDataLoading, setIsMapLoading]);
 
   // 위치 로그 마커를 지도에 업데이트하는 함수 (새 함수로 대체)
   // const updateLocationLogMarkers = async (markers: MapMarker[]): Promise<void> => { /* ... */ };
@@ -1990,7 +2248,7 @@ export default function LogsPage() {
     console.log('[clearMapMarkersAndPaths] ===== 완전 초기화 완료 =====');
   };
 
-  const handleDateSelect = async (date: string) => {
+  const handleDateSelect = useCallback(async (date: string) => {
     console.log('[LOGS] ===== 날짜 선택 시작 =====');
     console.log('[LOGS] 새 날짜:', date, '현재 날짜:', selectedDate);
     
@@ -2032,7 +2290,7 @@ export default function LogsPage() {
     }
     
     console.log('[LOGS] ===== 날짜 선택 완료 =====');
-  };
+  }, [selectedDate, setIsInitialEntry, setIsSidebarOpen, setLocationSummary, setIsLocationDataLoading, setIsMapLoading]);
 
   // 🚀 네모 캘린더 데이터 강제 재생성 함수
   const forceRegenerateCalendarData = useCallback(async () => {
@@ -4724,7 +4982,7 @@ export default function LogsPage() {
   }, [selectedGroupId, groupMembers.length, isUserDataLoading, userGroups.length]);
 
   // 그룹 선택 핸들러 - 메인 인스턴스에서만
-  const handleGroupSelect = async (groupId: number) => {
+  const handleGroupSelect = useCallback(async (groupId: number) => {
     if (!isMainInstance.current) {
       console.log(`[${instanceId.current}] 서브 인스턴스 - 그룹 선택 건너뜀`);
       return;
@@ -4761,7 +5019,7 @@ export default function LogsPage() {
     setMemberActivityData(null);
     
     console.log(`[${instanceId.current}] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작`);
-  };
+  }, [setSelectedGroupId, setGroupMembers, setSelectedDate, setDailyCountsData, setMemberActivityData]);
 
   // 그룹별 멤버 수 조회 - 지연 로딩으로 최적화 (메인 인스턴스에서만)
   useEffect(() => {
@@ -4931,7 +5189,7 @@ export default function LogsPage() {
   };
 
   // 사이드바 토글 함수 - 플로팅 버튼 전용
-  const toggleSidebar = () => {
+  const toggleSidebar = useCallback(() => {
     const wasOpen = isSidebarOpen;
     setIsSidebarOpen(!isSidebarOpen);
     
@@ -4957,7 +5215,7 @@ export default function LogsPage() {
         }, 200);
       }, 100); // 사이드바 애니메이션 시작 후 바로 실행
     }
-  };
+  }, [isSidebarOpen, setIsSidebarOpen, scrollSidebarDateToSelected, scrollToSelectedDate, scrollToTodayDate, scrollToSelectedMember, selectedDate]);
 
   // 사이드바 외부 클릭 처리
   useEffect(() => {
@@ -5985,14 +6243,29 @@ export default function LogsPage() {
         initial="initial"
         animate="in"
         exit="out"
-        className="min-h-screen relative overflow-hidden" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
+        className="min-h-screen relative overflow-hidden hardware-accelerated" 
+        style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
       >
         {/* 통일된 헤더 애니메이션 */}
-        <AnimatedHeader 
-            variant="simple"
-            className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
-            style={{ paddingTop: 'env(safe-area-inset-top)' }}
-          >
+        <motion.div
+          variants={headerVariants}
+          initial="initial"
+          animate="animate"
+          className="fixed top-0 left-0 right-0 logs-header-container z-header"
+          style={{ 
+            zIndex: 10000,
+            position: 'fixed'
+          }}
+        >
+          <AnimatedHeader 
+              variant="simple"
+              className="fixed top-0 left-0 right-0 z-[9999] glass-effect header-fixed"
+              style={{ 
+                paddingTop: 'env(safe-area-inset-top)',
+                position: 'fixed',
+                zIndex: 9999
+              }}
+            >
             {/* 헤더 내용 */}
             {showHeader && (
               <motion.div 
@@ -6004,7 +6277,6 @@ export default function LogsPage() {
               >
               <div className="flex items-center space-x-3">
                 <div className="flex items-center space-x-3">
-
                   <div>
                     <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
                     <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
@@ -6013,36 +6285,49 @@ export default function LogsPage() {
               </div>
               </motion.div>
             )}
-
-                        {/* 날짜 선택 내용 */}
-
           </AnimatedHeader>
+        </motion.div>
 
         {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
         
 
         {/* 지도 영역 */}
-        <div 
-          className="full-map-container" 
+        <motion.div 
+          variants={mapContainerVariants}
+          initial="initial"
+          animate="animate"
+          className="full-map-container hardware-accelerated" 
           style={{ 
             paddingTop: '0px', // 지도 영역을 화면 전체로 확장
-            position: 'relative' // 로딩 오버레이를 위한 relative 포지션
+            position: 'relative', // 로딩 오버레이를 위한 relative 포지션
+            zIndex: 1 // 헤더보다 낮은 z-index
           }}
         >
-          {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
-          {isMapLoading && (
-            <MapSkeleton 
-              showControls={true} 
-              showMemberList={false}
-              className="absolute top-0 left-0 w-full h-full z-5" 
-            />
+          {/* 스켈레톤 UI - 지도 로딩 중이거나 멤버 데이터 대기 중일 때 표시 */}
+          {(isMapLoading || isWaitingForMembers) && (
+            <div className="absolute top-0 left-0 w-full h-full z-5">
+              <MapSkeleton 
+                showControls={true} 
+                showMemberList={false}
+                className="w-full h-full"
+              />
+              {/* 로딩 상태 메시지 */}
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-sm font-medium text-gray-700">
+                    {isWaitingForMembers ? "멤버 데이터 로딩 중..." : "지도 초기화 중..."}
+                  </span>
+                </div>
+              </div>
+            </div>
           )}
 
-          <div ref={mapContainer} className="w-full h-full" />
+          <div ref={mapContainer} className="w-full h-full logs-map-container z-map" />
           
           {/* 커스텀 줌 컨트롤 */}
           {map.current && (
-            <div className="absolute top-[70px] right-[10px] z-30 flex flex-col">
+            <div className="absolute top-[150px] right-[10px] z-[200] z-zoom-control flex flex-col">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -6076,16 +6361,11 @@ export default function LogsPage() {
           <AnimatePresence>
             {groupMembers.some(m => m.isSelected) && selectedDate && (
               <motion.div
-                initial={{ opacity: 0, y: -20, scale: 0.9 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -20, scale: 0.9 }}
-                transition={{ 
-                  type: "spring", 
-                  stiffness: 300, 
-                  damping: 25,
-                  duration: 0.6 
-                }}
-                className="absolute top-20 left-0 right-0 z-20 flex justify-center px-4"
+                variants={floatingCardVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="absolute top-20 left-0 right-0 z-[100] z-floating-card flex justify-center px-4"
               >
                 <motion.div
                    whileHover={{ 
@@ -6107,21 +6387,18 @@ export default function LogsPage() {
                       {/* 선택된 멤버 아바타 */}
                       <div className="relative">
                         <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-white shadow-sm">
-                          <img 
+                          <Image 
                              src={(() => {
                                const member = groupMembers.find(m => m.isSelected);
-                               return member ? getSafeImageUrl(member.photo || null, member.mt_gender, member.original_index) : '';
+                               return member ? getSafeImageUrl(member.photo, member.mt_gender, member.original_index) : '';
                              })()}
                              alt={groupMembers.find(m => m.isSelected)?.name || ''} 
-                             className="w-full h-full object-cover"
-                             onError={(e) => {
-                               const target = e.target as HTMLImageElement;
-                               const member = groupMembers.find(m => m.isSelected);
-                               if (member) {
-                                 const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
-                                 target.src = defaultImg;
-                               }
-                             }}
+                             width={32}
+                             height={32}
+                             className="w-full h-full object-cover member-image"
+                             priority={true}
+                             placeholder="blur"
+                             blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
                            />
                         </div>
                         <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
@@ -6271,34 +6548,20 @@ export default function LogsPage() {
             )}
           </AnimatePresence>
 
-        </div>
+        </motion.div>
 
 
       </motion.div>
 
       {/* 플로팅 사이드바 토글 버튼 */}
       <motion.button
-        initial={{ y: 100, opacity: 0, scale: 0.8 }}
-        animate={{ 
-          y: 0, 
-          opacity: 1, 
-          scale: 1,
-          transition: {
-            delay: 0.2,
-            type: "spring",
-            stiffness: 120,
-            damping: 25,
-            duration: 1.0
-          }
-        }}
-        whileHover={{ 
-          scale: 1.1,
-          y: -2,
-          transition: { duration: 0.2 }
-        }}
-        whileTap={{ scale: 0.9 }}
+        variants={floatingButtonVariants}
+        initial="initial"
+        animate="animate"
+        whileHover="hover"
+        whileTap="tap"
         onClick={toggleSidebar}
-        className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
+        className="fixed bottom-20 right-4 z-[400] z-floating-button w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white touch-optimized"
         style={{
           background: '#0113A3',
           boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)'
@@ -6353,7 +6616,7 @@ export default function LogsPage() {
             initial="closed"
             animate="open"
             exit="closed"
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[500] z-sidebar-overlay"
             onClick={() => {
               console.log('[사이드바] 오버레이 클릭으로 닫기');
               setIsSidebarOpen(false);
@@ -6378,7 +6641,7 @@ export default function LogsPage() {
             initial="closed"
             animate="open"
             exit="closed"
-            className="fixed left-0 top-0 w-80 shadow-2xl border-r z-50 flex flex-col"
+            className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[600] z-sidebar flex flex-col"
             style={{ 
               background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
               borderColor: 'rgba(1, 19, 163, 0.1)',
@@ -6439,85 +6702,29 @@ export default function LogsPage() {
                   <h3 className="text-base font-semibold text-gray-800">그룹 목록</h3>
                 </div>
                 
-                <div className="relative">
-                  <motion.button
-                    whileHover={{ scale: 1.02, y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsGroupSelectorOpen(!isGroupSelectorOpen);
-                    }}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-white/70 backdrop-blur-sm border rounded-xl text-sm font-medium hover:bg-white/90 hover:shadow-md transition-all duration-200"
-                    style={{ 
-                      borderColor: 'rgba(1, 19, 163, 0.2)',
-                      '--hover-border-color': 'rgba(1, 19, 163, 0.4)'
-                    } as React.CSSProperties}
-                    disabled={isUserDataLoading}
-                  >
-                    <span className="truncate text-gray-700">
-                      {isUserDataLoading 
-                        ? '로딩 중...' 
-                        : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
-                      }
-                    </span>
-                    <div className="ml-2 flex-shrink-0">
-                      {isUserDataLoading ? (
-                        <FiLoader className="animate-spin text-gray-400" size={14} />
-                      ) : (
-                        <motion.div
-                          animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          <FiChevronDown className="text-gray-400" size={14} />
-                        </motion.div>
-                      )}
+                <Suspense fallback={
+                  <div className="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 animate-pulse">
+                    <div className="flex items-center justify-between">
+                      <div className="h-4 bg-gray-200 rounded flex-1 mr-2"></div>
+                      <div className="w-4 h-4 bg-gray-200 rounded"></div>
                     </div>
-                  </motion.button>
-
-                  <AnimatePresence>
-                    {isGroupSelectorOpen && userGroups.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                        className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
-                      >
-                        {userGroups.map((group) => (
-                          <motion.button
-                            key={group.sgt_idx}
-                            whileHover={{ backgroundColor: "rgba(99, 102, 241, 0.05)" }}
-                            onClick={() => {
-                              if (selectedGroupId !== group.sgt_idx) {
-                                handleGroupSelect(group.sgt_idx);
-                              }
-                              setIsGroupSelectorOpen(false);
-                            }}
-                            className={`w-full px-3 py-2 text-left text-xs focus:outline-none transition-colors ${
-                              selectedGroupId === group.sgt_idx 
-                                ? 'font-semibold' 
-                                : 'text-gray-900 hover:bg-blue-50'
-                            }`}
-                            style={selectedGroupId === group.sgt_idx 
-                              ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' }
-                              : {}
-                            }
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="truncate">{group.sgt_title}</span>
-                              {selectedGroupId === group.sgt_idx && (
-                                <span className="ml-2" style={{ color: '#0113A3' }}>✓</span>
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {groupMemberCounts[group.sgt_idx] || 0}명의 멤버
-                            </div>
-                          </motion.button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                  </div>
+                }>
+                  <GroupSelectorDropdown
+                    userGroups={userGroups}
+                    selectedGroupId={selectedGroupId}
+                    isGroupSelectorOpen={isGroupSelectorOpen}
+                    isLoadingGroups={isUserDataLoading}
+                    groupMemberCounts={groupMemberCounts}
+                    onToggleSelector={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
+                    onGroupSelect={(groupId) => {
+                      if (selectedGroupId !== groupId) {
+                        handleGroupSelect(groupId);
+                      }
+                      setIsGroupSelectorOpen(false);
+                    }}
+                  />
+                </Suspense>
               </div>
 
                 {/* 날짜 선택 섹션 */}
@@ -6668,12 +6875,13 @@ export default function LogsPage() {
                           key={member.id}
                           id={`member-${member.id}`}
                           variants={memberItemVariants}
-                                                           whileTap={{ scale: 0.98 }}
+                          custom={index}
+                          whileTap={{ scale: 0.98 }}
                           onClick={(e) => {
                             handleMemberSelect(member.id, e);
                             // 멤버 선택 시 사이드바는 자동으로 닫힘 (handleMemberSelect에서 처리)
                           }}
-                          className={`p-4 rounded-xl cursor-pointer transition-all duration-300 backdrop-blur-sm ${
+                          className={`p-4 rounded-xl cursor-pointer transition-all duration-300 backdrop-blur-sm touch-optimized will-change-transform ${
                             member.isSelected 
                               ? 'border-2 shadow-lg' 
                               : 'bg-white/60 hover:bg-white/90 border hover:shadow-md'
@@ -6706,15 +6914,15 @@ export default function LogsPage() {
                                 }
                                                                          transition={{ type: "spring", stiffness: 300 }}
                               >
-                                <img 
-                                  src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}
+                                <Image 
+                                  src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
                                   alt={member.name} 
-                                  className="w-full h-full object-cover"
-                                  onError={(e) => {
-                                    const target = e.target as HTMLImageElement;
-                                    const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
-                                    target.src = defaultImg;
-                                  }}
+                                  width={48}
+                                  height={48}
+                                  className="w-full h-full object-cover member-image"
+                                  placeholder="blur"
+                                  priority={member.isSelected}
+                                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
                                 />
                               </motion.div>
                               
@@ -6936,6 +7144,77 @@ export default function LogsPage() {
       
       {/* <DebugPanel />
       <LogParser /> */}
+      
+      <style jsx global>{`
+        /* 헤더 최상위 z-index 보장 */
+        .logs-header-container {
+          z-index: 10000 !important;
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+        }
+        
+        /* 지도 컨테이너 z-index 설정 */
+        .logs-map-container {
+          z-index: 1 !important;
+          position: relative !important;
+        }
+        
+        /* 하드웨어 가속 최적화 */
+        .hardware-accelerated {
+          transform: translateZ(0);
+          will-change: transform, opacity;
+          backface-visibility: hidden;
+          perspective: 1000px;
+        }
+        
+        /* 터치 최적화 */
+        .touch-optimized {
+          -webkit-touch-callout: none;
+          -webkit-user-select: none;
+          -khtml-user-select: none;
+          -moz-user-select: none;
+          -ms-user-select: none;
+          user-select: none;
+          touch-action: manipulation;
+        }
+        
+        /* 멤버 이미지 로딩 최적화 */
+        .member-image {
+          image-rendering: -webkit-optimize-contrast;
+          image-rendering: crisp-edges;
+          transition: opacity 0.3s ease;
+        }
+        
+        /* 접근성 - 모션 감소 선호 사용자 대응 */
+        @media (prefers-reduced-motion: reduce) {
+          * {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
+        
+        /* 스크롤바 숨기기 */
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        
+        /* 계층적 z-index 구조 */
+        .z-header { z-index: 10000; }
+        .z-sidebar { z-index: 600; }
+        .z-sidebar-overlay { z-index: 500; }
+        .z-floating-button { z-index: 400; }
+        .z-zoom-control { z-index: 200; }
+        .z-floating-card { z-index: 100; }
+        .z-map { z-index: 1; }
+      `}</style>
     </>
   );
     }

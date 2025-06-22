@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, memo, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
@@ -24,6 +24,7 @@ import {
   FiMenu
 } from 'react-icons/fi';
 import { FaSearch as FaSearchSolid, FaTrash, FaCrown } from 'react-icons/fa';
+import Image from 'next/image';
 import dynamic from 'next/dynamic';
 
 
@@ -42,8 +43,62 @@ import groupService, { Group } from '@/services/groupService';
 import { useAuth } from '@/contexts/AuthContext';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
 import { hapticFeedback } from '@/utils/haptic';
-import AnimatedHeader from '../../components/common/AnimatedHeader';
 import { retryDataFetch, retryMapApiLoad, retryMapInitialization } from '@/utils/retryUtils';
+
+// Dynamic Imports for better code splitting
+const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
+  loading: () => (
+    <div className="h-14 bg-gradient-to-r from-[#667eea] to-[#764ba2] animate-pulse" />
+  ),
+  ssr: false
+});
+
+const MemberCard = dynamic(() => import('../../components/location/MemberCard'), {
+  loading: () => (
+    <div className="p-4 rounded-xl bg-white/60 animate-pulse">
+      <div className="flex items-center space-x-4">
+        <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+        <div className="flex-1">
+          <div className="h-4 bg-gray-200 rounded mb-2"></div>
+          <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+        </div>
+      </div>
+    </div>
+  ),
+  ssr: false
+});
+
+const LocationCard = dynamic(() => import('../../components/location/LocationCard'), {
+  loading: () => (
+    <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 animate-pulse">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center space-x-3 flex-1">
+          <div className="w-8 h-8 bg-gray-200 rounded-lg"></div>
+          <div className="flex-1">
+            <div className="h-4 bg-gray-200 rounded mb-1"></div>
+            <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  ),
+  ssr: false
+});
+
+const GroupSelector = dynamic(() => import('../../components/location/GroupSelector'), {
+  loading: () => (
+    <div className="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 animate-pulse">
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <div className="h-4 bg-gray-200 rounded mb-1"></div>
+          <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+        </div>
+        <div className="w-5 h-5 bg-gray-200 rounded"></div>
+      </div>
+    </div>
+  ),
+  ssr: false
+});
 
 // 모바일 최적화된 CSS 스타일
 const mobileStyles = `
@@ -628,7 +683,7 @@ const useImageWithFallback = (src: string | null, fallbackSrc: string) => {
     setIsLoading(true);
     setHasError(false);
     
-    const img = new Image();
+    const img = new window.Image();
     img.onload = () => {
       setImageSrc(src);
       setIsLoading(false);
@@ -750,6 +805,23 @@ export default function LocationPage() {
 
   // 멤버 선택 관련 상태
   const [firstMemberSelected, setFirstMemberSelected] = useState(false);
+
+  // 메모이제이션된 계산 값들
+  const selectedMember = useMemo(() => {
+    return groupMembers.find(member => member.isSelected) || null;
+  }, [groupMembers]);
+
+  const selectedGroup = useMemo(() => {
+    return userGroups.find(group => group.sgt_idx === selectedGroupId) || null;
+  }, [userGroups, selectedGroupId]);
+
+  const filteredLocations = useMemo(() => {
+    if (activeView === 'selectedMemberPlaces') {
+      return selectedMemberSavedLocations || [];
+    } else {
+      return otherMembersSavedLocations || [];
+    }
+  }, [activeView, selectedMemberSavedLocations, otherMembersSavedLocations]);
   
   // 장소 선택 시 멤버 위치로 지도 이동 방지 플래그
   const isLocationSelectingRef = useRef(false);
@@ -864,12 +936,12 @@ export default function LocationPage() {
   }, [groupMembers]);
   
   // 뒤로가기 핸들러
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     setIsExiting(true);
     setTimeout(() => {
       router.back();
     }, 300);
-  };
+  }, [router]);
 
   // 모달 열기 함수 수정
   const openModal = (
@@ -1488,7 +1560,7 @@ export default function LocationPage() {
   };
 
   // 그룹 선택 핸들러
-  const handleGroupSelect = async (groupId: number) => {
+  const handleGroupSelect = useCallback(async (groupId: number) => {
     console.log('[handleGroupSelect] 그룹 선택:', groupId, '현재 선택된 그룹:', selectedGroupId);
     
     // 현재 선택된 그룹과 동일한 그룹을 선택한 경우 드롭다운만 닫기
@@ -1541,7 +1613,7 @@ export default function LocationPage() {
     
     console.log('[handleGroupSelect] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작');
     // fetchGroupMembersData()는 selectedGroupId useEffect에 의해 호출될 것임
-  };
+  }, [selectedGroupId, map, memberMarkers, infoWindow, markers]);
 
   const fetchGroupMembersData = async () => {
     if (!selectedGroupId) {
@@ -2870,7 +2942,7 @@ export default function LocationPage() {
   }, [userGroups]);
 
   // 사용자 그룹 목록 불러오기
-  const fetchUserGroups = async () => {
+  const fetchUserGroups = useCallback(async () => {
     setIsLoadingGroups(true);
     try {
       const groups = await groupService.getCurrentUserGroups();
@@ -2895,7 +2967,7 @@ export default function LocationPage() {
       // 그룹 목록 로딩 완료 햅틱 피드백
       hapticFeedback.dataLoadComplete();
     }
-  };
+  }, [selectedGroupId]);
 
   // 그룹 멤버 수를 가져오는 함수
   const getGroupMemberCount = async (groupId: number): Promise<number> => {
@@ -4160,9 +4232,9 @@ export default function LocationPage() {
   };
 
   // 사이드바 토글 함수
-  const toggleSidebar = () => {
+  const toggleSidebar = useCallback(() => {
     setIsSidebarOpen(!isSidebarOpen);
-  };
+  }, [isSidebarOpen]);
 
   // 장소 선택 핸들러 (사이드바에서 장소 클릭 시)
   const handleLocationSelect = (location: LocationData) => {
@@ -5270,13 +5342,17 @@ export default function LocationPage() {
                         >
                           <div className="flex items-center space-x-3">
                             <div className="relative">
-                                                             <img
-                                 src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
-                                 alt={member.name}
-                                 className={`w-10 h-10 rounded-full object-cover transition-all duration-200 ${
-                                   member.isSelected ? 'ring-2 ring-blue-600' : ''
-                                 }`}
-                               />
+                              <Image
+                                src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
+                                alt={member.name}
+                                width={40}
+                                height={40}
+                                className={`w-10 h-10 rounded-full object-cover transition-all duration-200 ${
+                                  member.isSelected ? 'ring-2 ring-blue-600' : ''
+                                }`}
+                                placeholder="blur"
+                                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
+                              />
                               {member.isSelected && (
                                 <div 
                                   className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center"
@@ -5690,81 +5766,27 @@ export default function LocationPage() {
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#0113A3' }}></div>
                     <h3 className="text-base font-semibold text-gray-800">그룹 목록</h3>
                   </div>
-                  <div className="relative" ref={groupDropdownRef}>
-                    <motion.button
-                      whileHover={{ scale: 1.02, y: -1 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
-                      className="w-full flex items-center justify-between px-4 py-3 bg-white/70 backdrop-blur-sm border rounded-xl text-sm font-medium hover:bg-white/90 hover:shadow-md transition-all duration-200"
-                      style={{ 
-                        borderColor: 'rgba(1, 19, 163, 0.2)',
-                        '--hover-border-color': 'rgba(1, 19, 163, 0.4)'
-                      } as React.CSSProperties}
-                      disabled={isLoadingGroups}
-                    >
-                      <span className="truncate text-gray-700">
-                        {isLoadingGroups 
-                          ? '로딩 중...' 
-                          : userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹 선택'
-                        }
-                      </span>
-                      <div className="ml-2 flex-shrink-0">
-                        {isLoadingGroups ? (
-                          <FiLoader className="unified-animate-spin text-blue-600" size={14} />
-                        ) : (
-                          <motion.div
-                            animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-                            transition={{ duration: 0.2 }}
-                          >
-                            <FiChevronDown className="text-gray-400" size={14} />
-                          </motion.div>
-                        )}
+                  <div ref={groupDropdownRef}>
+                    <Suspense fallback={
+                      <div className="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 animate-pulse">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="h-4 bg-gray-200 rounded mb-1"></div>
+                            <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                          </div>
+                          <div className="w-5 h-5 bg-gray-200 rounded"></div>
+                        </div>
                       </div>
-                    </motion.button>
-
-                    <AnimatePresence>
-                      {isGroupSelectorOpen && userGroups.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                          transition={{ duration: 0.2 }}
-                          className="absolute top-full left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-32 overflow-y-auto"
-                        >
-                          {userGroups.map((group) => (
-                            <motion.button
-                              key={group.sgt_idx}
-                              whileHover={{ backgroundColor: "rgba(99, 102, 241, 0.05)" }}
-                              onClick={() => {
-                                if (selectedGroupId !== group.sgt_idx) {
-                                  handleGroupSelect(group.sgt_idx);
-                                }
-                                setIsGroupSelectorOpen(false);
-                              }}
-                              className={`w-full px-3 py-2 text-left text-xs focus:outline-none transition-colors ${
-                                selectedGroupId === group.sgt_idx 
-                                  ? 'font-semibold' 
-                                  : 'text-gray-900 hover:bg-blue-50'
-                              }`}
-                              style={selectedGroupId === group.sgt_idx 
-                                ? { backgroundColor: 'rgba(1, 19, 163, 0.1)', color: '#0113A3' }
-                                : {}
-                              }
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="truncate">{group.sgt_title}</span>
-                                {selectedGroupId === group.sgt_idx && (
-                                  <span className="ml-2" style={{ color: '#0113A3' }}>✓</span>
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-500 mt-0.5">
-                                {groupMemberCounts[group.sgt_idx] || 0}명의 멤버
-                              </div>
-                            </motion.button>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                    }>
+                      <GroupSelector
+                        userGroups={userGroups}
+                        selectedGroupId={selectedGroupId}
+                        isGroupSelectorOpen={isGroupSelectorOpen}
+                        groupMemberCounts={groupMemberCounts}
+                        onToggleSelector={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
+                        onGroupSelect={handleGroupSelect}
+                      />
+                    </Suspense>
                   </div>
                 </div>
 
@@ -5782,134 +5804,24 @@ export default function LocationPage() {
                     {groupMembers.length > 0 ? (
                       <motion.div variants={sidebarContentVariants} className="space-y-2">
                         {groupMembers.map((member, index) => (
-                          <motion.div
-                            key={member.id}
-                            variants={memberItemVariants}
-                                                             whileTap={{ scale: 0.98 }}
-                            onClick={() => {
-                              handleMemberSelect(member.id);
-                              // 사이드바는 닫지 않고 유지하여 장소 리스트를 볼 수 있도록 함
-                            }}
-                            className={`p-4 rounded-xl cursor-pointer transition-all duration-300 backdrop-blur-sm ${
-                              member.isSelected 
-                                ? 'border-2 shadow-lg' 
-                                : 'bg-white/60 hover:bg-white/90 border hover:shadow-md'
-                            }`}
-                            style={member.isSelected 
-                              ? { 
-                                  background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.8), rgba(253, 244, 255, 0.8))',
-                                  borderColor: 'rgba(1, 19, 163, 0.3)',
-                                  boxShadow: '0 10px 25px rgba(1, 19, 163, 0.1)'
-                                }
-                              : { 
-                                  borderColor: 'rgba(1, 19, 163, 0.1)'
-                                }
-                            }
-                          >
-                            <div className="flex items-center space-x-4">
-                              <div className="relative">
-                                <motion.div 
-                                  className={`w-12 h-12 rounded-full overflow-hidden ${
-                                    member.isSelected 
-                                      ? 'ring-3 shadow-lg' 
-                                      : 'ring-2 ring-white/50'
-                                  }`}
-                                  style={member.isSelected 
-                                    ? { 
-                                        '--tw-ring-color': 'rgba(1, 19, 163, 0.3)',
-                                        boxShadow: '0 10px 25px rgba(1, 19, 163, 0.2)'
-                                      } as React.CSSProperties
-                                    : {}
-                                  }
-                                                                           transition={{ type: "spring", stiffness: 300 }}
-                                >
-                                  <img 
-                                    src={member.photo || getDefaultImage(member.mt_gender, member.original_index)}
-                                    alt={member.name} 
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                      const target = e.target as HTMLImageElement;
-                                      const defaultImg = getDefaultImage(member.mt_gender, member.original_index);
-                                      target.src = defaultImg;
-                                    }}
-                                  />
-                                </motion.div>
-                                
-                                {/* 리더/오너 왕관 표시 */}
-                                {member.sgdt_owner_chk === 'Y' && (
-                                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full flex items-center justify-center shadow-lg">
-                                    <FaCrown className="w-2.5 h-2.5 text-white" />
-                                  </div>
-                                )}
-                                {member.sgdt_owner_chk !== 'Y' && member.sgdt_leader_chk === 'Y' && (
-                                  <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-gray-300 to-gray-500 rounded-full flex items-center justify-center shadow-lg">
-                                    <FaCrown className="w-2.5 h-2.5 text-white" />
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                  <h4 className={`font-normal text-sm ${member.isSelected ? 'text-gray-900' : 'text-gray-900'} truncate`}>
-                                    {member.name}
-                                  </h4>
-                                  {/* 총 장소 수 */}
-                                  <div className="flex items-center space-x-1">
-                                    <span className="text-xs text-gray-500">📍</span>
-                                    <span className={`text-xs font-normal ${
-                                      member.isSelected ? 'text-gray-700' : 'text-gray-700'
-                                    }`}>
-                                      {member.savedLocationCount ?? member.savedLocations?.length ?? 0}개
-                                    </span>
-                                  </div>
+                          <Suspense key={member.id} fallback={
+                            <div className="p-4 rounded-xl bg-white/60 animate-pulse">
+                              <div className="flex items-center space-x-4">
+                                <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+                                <div className="flex-1">
+                                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                                  <div className="h-3 bg-gray-200 rounded w-2/3"></div>
                                 </div>
-                                
-                                {/* 선택된 멤버의 장소 리스트 표시 */}
-                                {member.isSelected && member.savedLocations && member.savedLocations.length > 0 && (
-                                  <motion.div
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="mt-3"
-                                  >
-                                    <div className="max-h-48 overflow-y-auto hide-scrollbar space-y-2 pr-1">
-                                      {member.savedLocations.map((location, locationIndex) => (
-                                        <motion.div
-                                          key={location.id}
-                                          initial={{ opacity: 0, x: -10 }}
-                                          animate={{ opacity: 1, x: 0 }}
-                                          transition={{ delay: locationIndex * 0.1 }}
-                                          className="flex items-center space-x-2 p-2 bg-white/40 rounded-lg backdrop-blur-sm border border-white/30 hover:bg-white/60 transition-colors cursor-pointer"
-                                          whileHover={{ scale: 1.02 }}
-                                          whileTap={{ scale: 0.98 }}
-                                          onClick={() => handleLocationSelect(location)}
-                                        >
-                                          <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 flex-shrink-0"></div>
-                                          <span className="text-xs text-gray-600 truncate flex-1">
-                                            {location.name}
-                                          </span>
-                                          {/* <span className="text-xs text-gray-400 flex-shrink-0">
-                                            {location.category}
-                                          </span> */}
-                                          <div className="w-3 h-3 flex items-center justify-center flex-shrink-0">
-                                            <svg className="w-2.5 h-2.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                            </svg>
-                                          </div>
-                                        </motion.div>
-                                      ))}
-                                    </div>
-                                    {member.savedLocations.length > 5 && (
-                                      <div className="text-xs text-gray-400 text-center pt-2 border-t border-gray-200/50 mt-2">
-                                        총 {member.savedLocations.length}개의 장소
-                                      </div>
-                                    )}
-                                  </motion.div>
-                                )}
                               </div>
                             </div>
-                          </motion.div>
+                          }>
+                            <MemberCard
+                              member={member}
+                              onMemberSelect={handleMemberSelect}
+                              onLocationSelect={handleLocationSelect}
+                              getDefaultImage={getDefaultImage}
+                            />
+                          </Suspense>
                         ))}
                       </motion.div>
                     ) : (

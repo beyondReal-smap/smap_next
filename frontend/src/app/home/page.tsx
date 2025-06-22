@@ -109,8 +109,6 @@ import { triggerHapticFeedback, HapticFeedbackType, hapticFeedback } from '@/uti
 import DebugPanel from '../components/layout/DebugPanel';
 import LogParser from '../components/layout/LogParser';
 import AnimatedHeader from '../../components/common/AnimatedHeader';
-import { retryDataFetch, retryMapApiLoad, retryMapInitialization } from '@/utils/retryUtils';
-import RetryButton from '../../components/common/RetryButton';
 
 declare global {
   interface Window {
@@ -814,74 +812,6 @@ const getScheduleStatus = (schedule: Schedule): { name: 'completed' | 'ongoing' 
   return { name: 'default', text: statusNameMap.default, color: statusColorMap.default, bgColor: statusBgColorMap.default };
 };
 
-// 헤더 컴포넌트를 메모이제이션하여 불필요한 리렌더링 방지
-const HeaderContent = React.memo<{
-  hasNewNotifications: boolean;
-  onNotificationClick: () => void;
-  onSettingClick: () => void;
-  onHapticTestClick: () => void;
-}>(({ hasNewNotifications, onNotificationClick, onSettingClick, onHapticTestClick }) => {
-  return (
-    <div className="flex items-center justify-between h-14 px-4">
-      <div className="flex items-center space-x-3">
-        <div className="flex items-center space-x-3">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">홈</h1>
-            <p className="text-xs text-gray-500">그룹 멤버들과 실시간으로 소통해보세요</p>
-          </div>
-        </div>
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <motion.button
-         whileTap={{ scale: 0.98 }}
-         className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200 relative"
-         onClick={onNotificationClick}
-       >
-         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="gray">
-           <path fillRule="evenodd" d="M5.25 9a6.75 6.75 0 0 1 13.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 1 1-7.48 0 24.585 24.585 0 0 1-4.831-1.244.75.75 0 0 1-.298-1.205A8.217 8.217 0 0 0 5.25 9.75V9Zm4.502 8.9a2.25 2.25 0 1 0 4.496 0 25.057 25.057 0 0 1-4.496 0Z" clipRule="evenodd" />
-         </svg>
-         {/* 읽지 않은 알림이 있을 때만 빨간색 점 표시 */}
-         {hasNewNotifications && (
-           <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse">
-         </div>
-         )}
-       </motion.button>
-       
-       {/* 햅틱 테스트 버튼 (개발 환경에서만 표시) */}
-       {process.env.NODE_ENV === 'development' && (
-         <motion.button
-           whileHover={{ scale: 1.02 }}
-           whileTap={{ scale: 0.98 }}
-           className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200"
-           onClick={onHapticTestClick}
-           title="햅틱 테스트"
-         >
-           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="gray" strokeWidth="2">
-             <path d="M9 12l2 2 4-4"/>
-             <path d="M21 12c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-             <path d="M3 12c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-             <path d="M12 21c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-             <path d="M12 3c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
-           </svg>
-         </motion.button>
-       )}
-       
-       <motion.button
-         whileHover={{ scale: 1.02 }}
-         whileTap={{ scale: 0.98 }}
-         className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200"
-         onClick={onSettingClick}
-       >
-         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="gray">
-           <path fillRule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 0 0-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 0 0-2.282.819l-.922 1.597a1.875 1.875 0 0 0 .432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 0 0 0 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 0 0-.432 2.385l.922 1.597a1.875 1.875 0 0 0 2.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.570.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 0 0 2.28-.819l.923-1.597a1.875 1.875 0 0 0-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 0 0 0-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 0 0-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 0 0-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 0 0-1.85-1.567h-1.843ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" clipRule="evenodd" />
-         </svg>
-       </motion.button>
-     </div>
-    </div>
-  );
-});
-
 export default function HomePage() {
   // 🛡️ 최상위 에러 캐처
   const [criticalError, setCriticalError] = useState<string | null>(null);
@@ -1052,11 +982,6 @@ export default function HomePage() {
   const [isFirstMemberSelectionComplete, setIsFirstMemberSelectionComplete] = useState(false); // 첫번째 멤버 선택 완료 상태 추가
   const [groupMemberCounts, setGroupMemberCounts] = useState<Record<number, number>>({}); // 그룹별 멤버 수 캐시
   const [hasNewNotifications, setHasNewNotifications] = useState(false); // 새로운 알림 여부
-
-  // 재시도 관련 상태
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [lastError, setLastError] = useState<string | null>(null);
-  const [hasDataLoadError, setHasDataLoadError] = useState(false);
 
   // 그룹 관련 상태 - UserContext로 대체됨
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
@@ -1297,22 +1222,13 @@ export default function HomePage() {
           const cachedMembers = getGroupMembers(parseInt(groupIdToUse));
           const isMemberCacheValid = isCacheValid('groupMembers', parseInt(groupIdToUse));
           
-          console.log('[fetchAllGroupData] 캐시 상태 확인:', {
-            groupId: parseInt(groupIdToUse),
-            cachedMembersExists: !!cachedMembers,
-            cachedMembersLength: cachedMembers?.length || 0,
-            isMemberCacheValid,
-            cachedMembersType: Array.isArray(cachedMembers) ? 'array' : typeof cachedMembers
-          });
-          
           if (cachedMembers && cachedMembers.length > 0 && isMemberCacheValid) {
             console.log('[fetchAllGroupData] 유효한 캐시된 멤버 데이터 사용:', cachedMembers.length, '명');
-            console.log('[fetchAllGroupData] 캐시된 멤버 원본 데이터 샘플:', cachedMembers[0]);
             currentMembers = (cachedMembers && safeArrayCheck(cachedMembers)) ? cachedMembers.map((member: any, index: number) => ({
               id: member.mt_idx.toString(),
               name: member.mt_name || `멤버 ${index + 1}`,
               photo: getSafeImageUrl(member.mt_file1, member.mt_gender, index),
-              isSelected: index === 0, // 첫 번째 멤버만 자동 선택
+              isSelected: false,
               location: { 
                 lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
                   ? parseFloat(member.mlt_lat.toString()) 
@@ -1350,7 +1266,7 @@ export default function HomePage() {
                 id: member.mt_idx.toString(),
                 name: member.mt_name || `멤버 ${index + 1}`,
                 photo: getSafeImageUrl(member.mt_file1, member.mt_gender, index),
-                isSelected: index === 0, // 첫 번째 멤버만 자동 선택
+                isSelected: false,
                 location: { 
                   lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
                     ? parseFloat(member.mlt_lat.toString()) 
@@ -1372,20 +1288,17 @@ export default function HomePage() {
                 sgdt_idx: member.sgdt_idx
               })) : [];
             } else {
-              // 여전히 캐시가 없으면 API 호출 (재시도 로직 적용)
+              // 여전히 캐시가 없으면 API 호출
               console.log('[fetchAllGroupData] 대기 후에도 캐시 없음 - API 호출 실행');
               try {
-                const memberData = await retryDataFetch(
-                  () => memberService.getGroupMembers(groupIdToUse),
-                  'GROUP_MEMBERS'
-                );
+                const memberData = await memberService.getGroupMembers(groupIdToUse);
                 if (isMounted) { 
                   if (memberData && memberData.length > 0) { 
                     currentMembers = (memberData && safeArrayCheck(memberData)) ? memberData.map((member: any, index: number) => ({
                       id: member.mt_idx.toString(),
                       name: member.mt_name || `멤버 ${index + 1}`,
                       photo: getSafeImageUrl(member.mt_file1, member.mt_gender, index),
-                      isSelected: index === 0, // 첫 번째 멤버만 자동 선택
+                      isSelected: false,
                       location: { 
                         lat: member.mlt_lat !== null && member.mlt_lat !== undefined 
                           ? parseFloat(member.mlt_lat.toString()) 
@@ -1457,7 +1370,7 @@ export default function HomePage() {
                         id: user.mt_idx.toString(),
                         name: user.mt_name || '나',
                         photo: getSafeImageUrl(user.mt_file1 || null, user.mt_gender, 0),
-                        isSelected: true, // 기본 멤버는 항상 선택
+                        isSelected: false,
                         location: { 
                           lat: memberLat, 
                           lng: memberLng 
@@ -1506,7 +1419,7 @@ export default function HomePage() {
                     id: user.mt_idx.toString(),
                     name: user.mt_name || '나',
                     photo: getSafeImageUrl(user.mt_file1 || null, user.mt_gender, 0),
-                    isSelected: true, // 기본 멤버는 항상 선택
+                    isSelected: false,
                     location: { 
                       lat: memberLat, 
                       lng: memberLng 
@@ -1529,18 +1442,9 @@ export default function HomePage() {
             }
           }
           
-          // 디버깅: currentMembers 상태 확인
-          console.log('[fetchAllGroupData] 멤버 데이터 상태 확인:', {
-            isMounted,
-            currentMembersLength: currentMembers.length,
-            currentMembersData: currentMembers.map(m => ({ id: m.id, name: m.name, location: m.location })),
-            groupIdToUse,
-            dataFetchedRefMembers: dataFetchedRef.current.members
-          });
-          
           if (isMounted && currentMembers.length > 0) {
             setGroupMembers(currentMembers); 
-            console.log('[fetchAllGroupData] ✅ 멤버 데이터 로딩 완료:', currentMembers.length, '명');
+            console.log('[fetchAllGroupData] 멤버 데이터 로딩 완료:', currentMembers.length, '명');
             
             // 멤버 수 업데이트
             setGroupMemberCounts(prevCounts => ({
@@ -1550,17 +1454,6 @@ export default function HomePage() {
             console.log('[fetchAllGroupData] 그룹 멤버 수 업데이트:', parseInt(groupIdToUse), '→', currentMembers.length, '명');
             
             dataFetchedRef.current.members = true;
-          } else {
-            console.warn('[fetchAllGroupData] ⚠️ 멤버 데이터 설정 건너뛰기:', {
-              isMounted,
-              currentMembersLength: currentMembers.length,
-              reason: !isMounted ? 'component unmounted' : 'no members'
-            });
-            
-            // 멤버가 없어도 dataFetched 플래그는 설정
-            if (isMounted) {
-              dataFetchedRef.current.members = true;
-            }
           }
         }
 
@@ -1631,12 +1524,9 @@ export default function HomePage() {
                 rawSchedules = cachedSchedulesRetry.data.schedules;
               }
             } else {
-              // 여전히 캐시가 없으면 API 호출 (재시도 로직 적용)
+              // 여전히 캐시가 없으면 API 호출
               console.log('[fetchAllGroupData] 대기 후에도 캐시 없음 - API 호출 실행');
-              const scheduleResponse = await retryDataFetch(
-                () => scheduleService.getGroupSchedules(parseInt(groupIdToUse)),
-                'GROUP_SCHEDULES'
-              ); 
+              const scheduleResponse = await scheduleService.getGroupSchedules(parseInt(groupIdToUse)); 
               if (scheduleResponse && scheduleResponse.data && scheduleResponse.data.schedules) {
                 rawSchedules = scheduleResponse.data.schedules;
               }
@@ -1719,9 +1609,6 @@ export default function HomePage() {
         }
       } catch (error) {
         console.error('[HOME PAGE] 그룹 데이터(멤버 또는 스케줄) 조회 오류:', error);
-        setHasDataLoadError(true);
-        setLastError(error instanceof Error ? error.message : '데이터 로딩 중 오류가 발생했습니다.');
-        
         if (isMounted && !dataFetchedRef.current.members) {
           dataFetchedRef.current.members = true;
           setIsFirstMemberSelectionComplete(true);
@@ -1821,42 +1708,6 @@ export default function HomePage() {
 
     return () => { isMounted = false; };
   }, [selectedGroupId, authLoading, isPreloadingComplete]); // 캐시 함수들은 의존성에서 제거 (안정적인 참조 유지)
-
-  // 재시도 함수
-  const handleRetryDataLoad = async () => {
-    if (isRetrying) return;
-    
-    setIsRetrying(true);
-    setHasDataLoadError(false);
-    setLastError(null);
-    
-    try {
-      // 데이터 페칭 상태 초기화
-      dataFetchedRef.current.members = false;
-      dataFetchedRef.current.schedules = false;
-      dataFetchedRef.current.loading = false;
-      dataFetchedRef.current.currentGroupId = null;
-      
-      // 상태 초기화
-      setGroupMembers([]);
-      setGroupSchedules([]);
-      setFilteredSchedules([]);
-      setIsFirstMemberSelectionComplete(false);
-      
-      // 잠시 대기 후 데이터 재로딩
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // fetchAllGroupData가 useEffect에 의해 자동으로 호출됨
-      console.log('[HOME] 수동 재시도 완료 - 자동 데이터 로딩 대기 중');
-      
-    } catch (error) {
-      console.error('[HOME] 재시도 중 오류:', error);
-      setLastError(error instanceof Error ? error.message : '재시도 중 오류가 발생했습니다.');
-      setHasDataLoadError(true);
-    } finally {
-      setIsRetrying(false);
-    }
-  };
 
   // 컴포넌트 마운트 시 초기 지도 타입 설정
   useEffect(() => {
@@ -2361,43 +2212,18 @@ export default function HomePage() {
         }
       };
       
-              script.onerror = () => {
-          console.error('[HOME] 네이버 지도 백업 로드 실패 - 재시도 중...');
-          hasErrorOccurred = true;
-          setIsMapLoading(false);
-          
-          // 재시도 로직 적용
-          retryMapApiLoad(
-            async () => {
-              // 기존 스크립트 제거 후 재로드
-              const existingScript = document.getElementById('naver-maps-backup');
-              if (existingScript) existingScript.remove();
-              
-              return new Promise<void>((resolve, reject) => {
-                const retryScript = document.createElement('script');
-                retryScript.src = naverMapUrl.toString();
-                retryScript.async = true;
-                retryScript.defer = true;
-                retryScript.id = 'naver-maps-backup';
-                
-                retryScript.onload = () => {
-                  if (!hasErrorOccurred) {
-                    apiLoadStatus.naver = true;
-                    setNaverMapsLoaded(true);
-                    setIsMapLoading(false);
-                  }
-                  resolve();
-                };
-                
-                retryScript.onerror = () => reject(new Error('네이버 지도 스크립트 로드 실패'));
-                document.head.appendChild(retryScript);
-              });
-            },
-            'naver'
-          ).catch((error) => {
-            console.error('[HOME] 네이버 지도 재시도 최종 실패:', error);
-            setIsMapLoading(false);
-          });
+      script.onerror = () => {
+        console.error('[HOME] 네이버 지도 백업 로드 실패 - 재시도 중...');
+        hasErrorOccurred = true;
+        setIsMapLoading(false);
+        
+        // 네이버맵 로딩 재시도 (구글맵으로 전환하지 않음)
+        setTimeout(() => {
+          if (!naverMapsLoaded) {
+            console.log('[HOME] 네이버맵 재시도 중...');
+            loadNaverMapsAPI();
+          }
+        }, 2000);
         
         // 에러 리스너 제거
         if (errorListener) {
@@ -4027,91 +3853,9 @@ export default function HomePage() {
 
   // 멤버 마커 업데이트 함수 - 모든 그룹멤버 표시
   const updateMemberMarkers = (members: GroupMember[]) => {
-    // 멤버가 없을 때 현재 사용자 위치에 기본 마커 생성
+    // 안전성 체크
     if (!members || members.length === 0) {
-      console.warn('[updateMemberMarkers] members가 비어있음 - 현재 사용자 위치에 기본 마커 생성');
-      
-      // 기존 마커 삭제
-      if (memberMarkers.current.length > 0) {
-        memberMarkers.current.forEach(marker => {
-          if (marker && marker.setMap) {
-            marker.setMap(null);
-          }
-        });
-        memberMarkers.current = [];
-      }
-      
-      // 현재 사용자 위치에 기본 마커 생성
-      if (user && userLocation.lat && userLocation.lng) {
-        console.log('[updateMemberMarkers] 현재 사용자 위치에 기본 마커 생성:', { lat: userLocation.lat, lng: userLocation.lng });
-        
-        const defaultMarker = createMarker(
-          { lat: userLocation.lat, lng: userLocation.lng },
-          0,
-          'member',
-          true,
-          {
-            id: user.mt_idx.toString(),
-            name: user.mt_name || '나',
-            photo: getSafeImageUrl(user.mt_file1 || null, user.mt_gender, 0),
-            isSelected: true,
-            location: { lat: userLocation.lat, lng: userLocation.lng },
-            schedules: [],
-            mt_gender: user.mt_gender || null,
-            original_index: 0,
-            mlt_lat: userLocation.lat,
-            mlt_long: userLocation.lng,
-            mlt_speed: null,
-            mlt_battery: null,
-            mlt_gps_time: new Date().toISOString(),
-            sgdt_owner_chk: 'Y',
-            sgdt_leader_chk: 'Y',
-            sgdt_idx: undefined
-          },
-          undefined
-        );
-        
-        if (defaultMarker) {
-          memberMarkers.current.push(defaultMarker);
-        }
-      } else if (user) {
-        // GPS 위치가 없으면 기본 위치 사용
-        const defaultLat = parseFloat(String(user.mt_lat || '37.5642'));
-        const defaultLng = parseFloat(String(user.mt_long || '127.0016'));
-        
-        console.log('[updateMemberMarkers] 기본 위치에 사용자 마커 생성:', { lat: defaultLat, lng: defaultLng });
-        
-        const defaultMarker = createMarker(
-          { lat: defaultLat, lng: defaultLng },
-          0,
-          'member',
-          true,
-          {
-            id: user.mt_idx.toString(),
-            name: user.mt_name || '나',
-            photo: getSafeImageUrl(user.mt_file1 || null, user.mt_gender, 0),
-            isSelected: true,
-            location: { lat: defaultLat, lng: defaultLng },
-            schedules: [],
-            mt_gender: user.mt_gender || null,
-            original_index: 0,
-            mlt_lat: defaultLat,
-            mlt_long: defaultLng,
-            mlt_speed: null,
-            mlt_battery: null,
-            mlt_gps_time: new Date().toISOString(),
-            sgdt_owner_chk: 'Y',
-            sgdt_leader_chk: 'Y',
-            sgdt_idx: undefined
-          },
-          undefined
-        );
-        
-        if (defaultMarker) {
-          memberMarkers.current.push(defaultMarker);
-        }
-      }
-      
+      console.warn('[updateMemberMarkers] members가 비어있음');
       return;
     }
     
@@ -4552,9 +4296,73 @@ export default function HomePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapType, mapsInitialized.google, mapsInitialized.naver]);
 
-  // 현재 위치 마커 생성 함수 제거됨 - 멤버 마커만 사용
+  // 현재 위치 마커 생성 함수
+  const createCurrentLocationMarker = () => {
+    if (!userLocation.lat || !userLocation.lng) {
+      console.log('[createCurrentLocationMarker] 현재 위치 정보 없음');
+      return;
+    }
 
-  // 그룹멤버 데이터 변경 시 마커 업데이트 - 멤버 마커만 표시
+    console.log('[createCurrentLocationMarker] 현재 위치 마커 생성:', userLocation);
+
+    if (mapType === 'naver' && naverMap.current && window.naver?.maps) {
+      // 기존 현재 위치 마커 제거
+      if (naverMarker.current) {
+        naverMarker.current.setMap(null);
+        naverMarker.current = null;
+      }
+
+      // 새 현재 위치 마커 생성
+      const currentPosition = createSafeLatLng(userLocation.lat, userLocation.lng);
+      if (!currentPosition) {
+        console.error('[createCurrentLocationMarker] 현재 위치 LatLng 생성 실패');
+        return;
+      }
+
+      naverMarker.current = new window.naver.maps.Marker({
+        position: currentPosition,
+        map: naverMap.current,
+        icon: {
+          content: '<div style="width: 20px; height: 20px; background-color: #3b82f6; border: 3px solid #FFFFFF; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
+          size: new window.naver.maps.Size(20, 20),
+          anchor: new window.naver.maps.Point(10, 10)
+        },
+        zIndex: 100
+      });
+
+      // 지도 중심을 현재 위치로 이동
+      naverMap.current.panTo(currentPosition);
+      naverMap.current.setZoom(16);
+
+    } else if (mapType === 'google' && map.current && window.google?.maps) {
+      // 기존 현재 위치 마커 제거
+      if (marker.current) {
+        marker.current.setMap(null);
+        marker.current = null;
+      }
+
+      // 새 현재 위치 마커 생성
+      marker.current = new window.google.maps.Marker({
+        position: { lat: userLocation.lat, lng: userLocation.lng },
+        map: map.current,
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          fillColor: '#3b82f6',
+          fillOpacity: 1,
+          strokeColor: '#FFFFFF',
+          strokeWeight: 3,
+          scale: 10
+        },
+        zIndex: 100
+      });
+
+      // 지도 중심을 현재 위치로 이동
+      map.current.panTo({ lat: userLocation.lat, lng: userLocation.lng });
+      map.current.setZoom(16);
+    }
+  };
+
+  // 그룹멤버 데이터 변경 시 마커 업데이트 - 멤버가 없을 때 현재 위치 마커 생성
   useEffect(() => {
     // 마커 업데이트 중복 방지
     if (markersUpdating.current) {
@@ -4577,32 +4385,44 @@ export default function HomePage() {
 
     markersUpdating.current = true;
 
-    // 그룹 멤버 상태에 따라 마커 업데이트 (0명이어도 기본 마커 생성)
-    console.log('[HOME] 그룹멤버 데이터 변경 감지 - 멤버 마커 업데이트:', groupMembers.length, '명');
-    
-    // 기존 마커들 정리
-    if (mapType === 'naver' && naverMarker.current) {
-      naverMarker.current.setMap(null);
-      naverMarker.current = null;
-    } else if (mapType === 'google' && marker.current) {
-      marker.current.setMap(null);
-      marker.current = null;
-    }
-
-    // 300ms 지연으로 멤버 마커 업데이트 실행 (깜빡임 방지)
-    const updateTimer = setTimeout(() => {
-      updateMemberMarkers(groupMembers); // 0명이어도 호출하여 기본 마커 생성
+    // 그룹 멤버가 있으면 멤버 마커 생성
+    if (groupMembers.length > 0) {
+      console.log('[HOME] 그룹멤버 데이터 변경 감지 - 멤버 마커 업데이트:', groupMembers.length, '명');
       
-      // 마커 업데이트 완료 후 플래그 해제
+      // 현재 위치 마커 제거 (멤버 마커가 있을 때)
+      if (mapType === 'naver' && naverMarker.current) {
+        naverMarker.current.setMap(null);
+        naverMarker.current = null;
+      } else if (mapType === 'google' && marker.current) {
+        marker.current.setMap(null);
+        marker.current = null;
+      }
+
+      // 300ms 지연으로 멤버 마커 업데이트 실행 (깜빡임 방지)
+      const updateTimer = setTimeout(() => {
+        updateMemberMarkers(groupMembers);
+        
+        // 마커 업데이트 완료 후 플래그 해제
+        setTimeout(() => {
+          markersUpdating.current = false;
+        }, 500);
+      }, 300);
+      
+      return () => {
+        clearTimeout(updateTimer);
+        markersUpdating.current = false;
+      };
+    } else {
+      // 그룹 멤버가 없으면 현재 위치 마커 생성
+      console.log('[HOME] 그룹멤버 없음 - 현재 위치 마커 생성');
+      
+      // 즉시 현재 위치 마커 생성
+      createCurrentLocationMarker();
+      
       setTimeout(() => {
         markersUpdating.current = false;
-      }, 500);
-    }, 300);
-    
-    return () => {
-      clearTimeout(updateTimer);
-      markersUpdating.current = false;
-    };
+      }, 100);
+    }
   }, [groupMembers, mapType, mapsInitialized.naver, mapsInitialized.google, dataFetchedRef.current.loading]);
 
   // filteredSchedules 변경 시 일정 마커 업데이트
@@ -4627,13 +4447,14 @@ export default function HomePage() {
 
   // 🎯 초기 로딩 완료 후 마커 강제 업데이트 (구글 로그인 후 마커 표시 보장)
   useEffect(() => {
-    // 모든 조건이 만족되면 마커 강제 업데이트 (멤버가 0명이어도 실행)
+    // 모든 조건이 만족되고 첫 번째 멤버 선택이 완료된 후 마커 강제 업데이트
     if (
+      isFirstMemberSelectionComplete &&
+      groupMembers.length > 0 &&
       ((mapType === 'naver' && naverMap.current && mapsInitialized.naver && window.naver?.maps) || 
        (mapType === 'google' && map.current && mapsInitialized.google && window.google?.maps)) &&
       !dataFetchedRef.current.loading &&
-      !markersUpdating.current &&
-      user // 사용자 정보가 있어야 기본 마커 생성 가능
+      !markersUpdating.current
     ) {
       console.log('[HOME] 🎯 초기 로딩 완료 후 마커 강제 업데이트 실행');
       
@@ -4642,26 +4463,23 @@ export default function HomePage() {
           groupMembersCount: groupMembers.length,
           mapType,
           selectedMember: groupMembers.find(m => m.isSelected)?.name || 'none',
-          firstMemberName: groupMembers[0]?.name || 'none',
-          userLocation: userLocation
+          firstMemberName: groupMembers[0]?.name
         });
         
         markersUpdating.current = true;
         
-        // 멤버 마커 강제 업데이트 (0명이어도 기본 마커 생성)
+        // 멤버 마커 강제 업데이트
         updateMemberMarkers(groupMembers);
         
-        // 멤버가 있고 선택된 멤버의 일정 마커도 업데이트
-        if (groupMembers.length > 0) {
-          const selectedMember = groupMembers.find(m => m.isSelected);
-          if (selectedMember && selectedMember.schedules) {
-            const today = new Date().toISOString().split('T')[0];
-            const todaySchedules = selectedMember.schedules.filter(schedule => 
-              schedule.date && schedule.date.startsWith(today)
-            );
-            setFilteredSchedules(todaySchedules);
-            updateScheduleMarkers(todaySchedules);
-          }
+        // 선택된 멤버의 일정 마커도 업데이트
+        const selectedMember = groupMembers.find(m => m.isSelected);
+        if (selectedMember && selectedMember.schedules) {
+          const today = new Date().toISOString().split('T')[0];
+          const todaySchedules = selectedMember.schedules.filter(schedule => 
+            schedule.date && schedule.date.startsWith(today)
+          );
+          setFilteredSchedules(todaySchedules);
+          updateScheduleMarkers(todaySchedules);
         }
         
         setTimeout(() => {
@@ -4670,32 +4488,13 @@ export default function HomePage() {
       }, 500); // 안정적인 마커 업데이트를 위한 지연
     }
   }, [
+    isFirstMemberSelectionComplete,
+    groupMembers.length,
     mapType,
     mapsInitialized.naver,
     mapsInitialized.google,
-    dataFetchedRef.current.loading,
-    user,
-    userLocation
+    dataFetchedRef.current.loading
   ]);
-
-  // 첫 번째 멤버 선택 시 자동으로 해당 멤버의 일정 표시
-  useEffect(() => {
-    if (groupMembers.length > 0 && isFirstMemberSelectionComplete) {
-      const selectedMember = groupMembers.find(m => m.isSelected);
-      if (selectedMember) {
-        console.log('[HOME] 첫 번째 멤버 선택됨 - 일정 필터링:', selectedMember.name);
-        
-        // 선택된 멤버의 오늘 일정 필터링
-        const today = new Date().toISOString().split('T')[0];
-        const memberTodaySchedules = selectedMember.schedules.filter(schedule => 
-          schedule.date && schedule.date.startsWith(today)
-        );
-        
-        setFilteredSchedules(memberTodaySchedules);
-        console.log('[HOME] 첫 번째 멤버 일정 설정 완료:', memberTodaySchedules.length, '개');
-      }
-    }
-  }, [groupMembers, isFirstMemberSelectionComplete]);
 
   // 지도 타입 변경 핸들러
   const handleMapTypeChange = () => {
@@ -5517,41 +5316,92 @@ export default function HomePage() {
           className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
-          <HeaderContent 
-            hasNewNotifications={hasNewNotifications}
-            onNotificationClick={async () => {
-              // 알림 페이지로 이동하면서 모든 알림을 읽음 처리
-              try {
-                if (user?.mt_idx && hasNewNotifications) {
-                  await notificationService.markAllAsRead(user.mt_idx);
-                  console.log('[HOME] 모든 알림 읽음 처리 완료');
-                }
-                setHasNewNotifications(false);
-                router.push('/notice');
-              } catch (error) {
-                console.error('[HOME] 알림 읽음 처리 실패:', error);
-                // 실패해도 페이지는 이동
-                setHasNewNotifications(false);
-                router.push('/notice');
-              }
-            }}
-            onSettingClick={() => {
-              // 🎮 설정 페이지 이동 햅틱 피드백
-              triggerHapticFeedback(HapticFeedbackType.SELECTION, '설정 페이지 이동', { 
-                component: 'home', 
-                action: 'navigate-to-setting' 
-              });
-              router.push('/setting');
-            }}
-            onHapticTestClick={() => {
-              triggerHapticFeedback(HapticFeedbackType.LIGHT, '햅틱 테스트 페이지 이동', { 
-                component: 'home', 
-                action: 'test-page-navigation' 
-              });
-              router.push('/test-haptic');
-            }}
-          />
-        </AnimatedHeader>
+            <div className="flex items-center justify-between h-14 px-4">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3">
+                  <div>
+                    <h1 className="text-lg font-semibold text-gray-900">홈</h1>
+                    <p className="text-xs text-gray-500">그룹 멤버들과 실시간으로 소통해보세요</p>
+                  </div>
+                </div>
+              </div>
+              
+                                            <div className="flex items-center space-x-2">
+                <motion.button
+                 whileTap={{ scale: 0.98 }}
+                 className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200 relative"
+                 onClick={async () => {
+                   // 알림 페이지로 이동하면서 모든 알림을 읽음 처리
+                   try {
+                     if (user?.mt_idx && hasNewNotifications) {
+                       await notificationService.markAllAsRead(user.mt_idx);
+                       console.log('[HOME] 모든 알림 읽음 처리 완료');
+                     }
+                     setHasNewNotifications(false);
+                     router.push('/notice');
+                   } catch (error) {
+                     console.error('[HOME] 알림 읽음 처리 실패:', error);
+                     // 실패해도 페이지는 이동
+                     setHasNewNotifications(false);
+                     router.push('/notice');
+                   }
+                 }}
+               >
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="gray">
+                   <path fillRule="evenodd" d="M5.25 9a6.75 6.75 0 0 1 13.5 0v.75c0 2.123.8 4.057 2.118 5.52a.75.75 0 0 1-.297 1.206c-1.544.57-3.16.99-4.831 1.243a3.75 3.75 0 1 1-7.48 0 24.585 24.585 0 0 1-4.831-1.244.75.75 0 0 1-.298-1.205A8.217 8.217 0 0 0 5.25 9.75V9Zm4.502 8.9a2.25 2.25 0 1 0 4.496 0 25.057 25.057 0 0 1-4.496 0Z" clipRule="evenodd" />
+                 </svg>
+                 {/* 읽지 않은 알림이 있을 때만 빨간색 점 표시 */}
+                 {hasNewNotifications && (
+                   <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse">
+                 </div>
+                 )}
+               </motion.button>
+               
+               {/* 햅틱 테스트 버튼 (개발 환경에서만 표시) */}
+               {process.env.NODE_ENV === 'development' && (
+                 <motion.button
+                   whileHover={{ scale: 1.02 }}
+                   whileTap={{ scale: 0.98 }}
+                   className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200"
+                   onClick={() => {
+                     triggerHapticFeedback(HapticFeedbackType.LIGHT, '햅틱 테스트 페이지 이동', { 
+                       component: 'home', 
+                       action: 'test-page-navigation' 
+                     });
+                     router.push('/test-haptic');
+                   }}
+                   title="햅틱 테스트"
+                 >
+                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="gray" strokeWidth="2">
+                     <path d="M9 12l2 2 4-4"/>
+                     <path d="M21 12c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
+                     <path d="M3 12c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
+                     <path d="M12 21c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
+                     <path d="M12 3c.552 0 1-.448 1-1s-.448-1-1-1-1 .448-1 1 .448 1 1 1z"/>
+                   </svg>
+                 </motion.button>
+               )}
+               
+               <motion.button
+                 whileHover={{ scale: 1.02 }}
+                 whileTap={{ scale: 0.98 }}
+                 className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200"
+                 onClick={() => {
+                   // 🎮 설정 페이지 이동 햅틱 피드백
+                   triggerHapticFeedback(HapticFeedbackType.SELECTION, '설정 페이지 이동', { 
+                     component: 'home', 
+                     action: 'navigate-to-setting' 
+                   });
+                   router.push('/setting');
+                 }}
+               >
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="gray">
+                   <path fillRule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 0 0-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 0 0-2.282.819l-.922 1.597a1.875 1.875 0 0 0 .432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 0 0 0 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 0 0-.432 2.385l.922 1.597a1.875 1.875 0 0 0 2.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.570.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 0 0 2.28-.819l.923-1.597a1.875 1.875 0 0 0-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 0 0 0-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 0 0-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 0 0-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 0 0-1.85-1.567h-1.843ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" clipRule="evenodd" />
+                 </svg>
+               </motion.button>
+             </div>
+            </div>
+          </AnimatedHeader>
 
         {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
         {process.env.NODE_ENV === 'development' && (
@@ -5616,19 +5466,6 @@ export default function HomePage() {
             />
           )}
 
-          {/* 데이터 로딩 실패 시 재시도 UI */}
-          {hasDataLoadError && !isMapLoading && (
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10">
-              <RetryButton
-                variant="card"
-                onRetry={handleRetryDataLoad}
-                isRetrying={isRetrying}
-                error={lastError || undefined}
-                className="max-w-sm mx-4"
-              />
-            </div>
-          )}
-
           <div 
             ref={googleMapContainer} 
             className="w-full h-full absolute top-0 left-0" 
@@ -5643,7 +5480,7 @@ export default function HomePage() {
         
         {/* 커스텀 줌 컨트롤 */}
         {((mapType === 'naver' && naverMap.current) || (mapType === 'google' && map.current)) && (
-          <div className="absolute top-[80px] right-[10px] z-30 flex flex-col">
+          <div className="absolute top-[160px] right-[10px] z-30 flex flex-col">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -5679,44 +5516,18 @@ export default function HomePage() {
           </div>
         )}
         
-        {/* 지도 컨트롤 버튼들 - 선택된 멤버 위치로 이동 */}
-        {groupMembers.length > 0 && (
-          <div className={`${getControlsClassName()} map-controls`}>
+        {/* 지도 컨트롤 버튼들 - 바텀시트 상태에 따라 위치 변경 */}
+        <div className={`${getControlsClassName()} map-controls`}>
             <button 
-              onClick={() => {
-                const selectedMember = groupMembers.find(m => m.isSelected);
-                if (selectedMember) {
-                  const realTimeLat = parseCoordinate(selectedMember.mlt_lat);
-                  const realTimeLng = parseCoordinate(selectedMember.mlt_long);
-                  const defaultLat = parseCoordinate(selectedMember.location.lat);
-                  const defaultLng = parseCoordinate(selectedMember.location.lng);
-                  
-                  const lat = (realTimeLat !== null && realTimeLat !== 0) ? realTimeLat : defaultLat;
-                  const lng = (realTimeLng !== null && realTimeLng !== 0) ? realTimeLng : defaultLng;
-
-                  if (lat !== null && lng !== null) {
-                    if (mapType === 'naver' && naverMap.current) {
-                      const targetLatLng = createSafeLatLng(lat, lng);
-                      if (targetLatLng) {
-                        naverMap.current.panTo(targetLatLng, { duration: 500 });
-                        naverMap.current.setZoom(17);
-                      }
-                    } else if (mapType === 'google' && map.current) {
-                      map.current.panTo({ lat, lng });
-                      map.current.setZoom(17);
-                    }
-                  }
-                }
-              }}
+              onClick={() => updateMapPosition()}
               className="map-control-button"
-              aria-label="선택된 멤버 위치로 이동"
+              aria-label="내 위치로 이동"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="m11.54 22.351.07.04.028.016a.76.76 0 0 0 .723 0l.028-.015.071-.041a16.975 16.975 0 0 0 1.144-.742 19.58 19.58 0 0 0 2.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 0 0-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 0 0 2.682 2.282 16.975 16.975 0 0 0 1.145.742ZM12 13.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clipRule="evenodd" />
               </svg>
             </button>
-          </div>
-        )}
+                      </div>
 
          {/* 플로팅 사이드바 토글 버튼 - 네비게이션 바 오른쪽 아래 */}
          <motion.button
