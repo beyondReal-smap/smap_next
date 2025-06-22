@@ -170,6 +170,7 @@ const GroupSelector = memo(({
                 onClick={(e) => {
                   e.stopPropagation();
                   onGroupSelect(group.sgt_idx);
+                  onClose();
                 }}
                 className={`w-full px-4 py-3 text-left text-sm focus:outline-none transition-colors flex items-center justify-between border-b border-gray-100 last:border-b-0 ${
                   selectedGroupId === group.sgt_idx 

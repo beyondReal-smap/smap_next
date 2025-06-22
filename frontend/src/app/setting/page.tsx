@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
+import { motion } from 'framer-motion';
 import { 
   FiUser, 
   FiSettings, 
@@ -31,18 +31,9 @@ import {
 import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
 import { hapticFeedback, triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
-
 import AnimatedHeader from '../../components/common/AnimatedHeader';
 
-// Loading component for fallbacks (kept for potential future use)
-const LoadingFallback = memo(() => (
-  <div className="flex items-center justify-center p-4">
-    <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
-  </div>
-));
-LoadingFallback.displayName = 'LoadingFallback';
-
-// Utility functions (non-memoized for component external use)
+// 기본 이미지 가져오기 함수 (schedule/page.tsx에서 가져옴)
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
   // frontend/public/images/ 폴더의 기본 이미지 사용
   if (gender === 2) { // 여성
@@ -96,60 +87,54 @@ const getLoginMethod = (mtType: number | null | undefined): { method: string; ic
   }
 };
 
-// Optimized mobile CSS with better performance
-const mobileStyles = `
+// 모바일 최적화된 CSS 애니메이션
+const pageAnimations = `
 html, body {
   width: 100%;
   overflow-x: hidden;
   position: relative;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-text-size-adjust: 100%;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
-/* Performance optimized animations */
 @keyframes slideInFromRight {
   from {
-    transform: translate3d(30px, 0, 0);
+    transform: translateX(30px);
     opacity: 0;
   }
   to {
-    transform: translate3d(0, 0, 0);
+    transform: translateX(0);
     opacity: 1;
   }
 }
 
 @keyframes slideOutToRight {
   from {
-    transform: translate3d(0, 0, 0);
+    transform: translateX(0);
     opacity: 1;
   }
   to {
-    transform: translate3d(-30px, 0, 0);
+    transform: translateX(-30px);
     opacity: 0;
   }
 }
 
 @keyframes slideInFromBottom {
   from {
-    transform: translate3d(0, 100%, 0);
+    transform: translateY(100%);
     opacity: 0;
   }
   to {
-    transform: translate3d(0, 0, 0);
+    transform: translateY(0);
     opacity: 1;
   }
 }
 
 @keyframes slideOutToBottom {
   from {
-    transform: translate3d(0, 0, 0);
+    transform: translateY(0);
     opacity: 1;
   }
   to {
-    transform: translate3d(0, 100%, 0);
+    transform: translateY(100%);
     opacity: 0;
   }
 }
@@ -157,538 +142,387 @@ html, body {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translate3d(0, 10px, 0);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    transform: translateY(0);
   }
 }
 
 @keyframes scaleIn {
   from {
-    transform: scale3d(0.95, 0.95, 1);
+    transform: scale(0.95);
     opacity: 0;
   }
   to {
-    transform: scale3d(1, 1, 1);
+    transform: scale(1);
     opacity: 1;
   }
 }
 
-/* Hardware accelerated classes */
 .animate-slideInFromRight {
   animation: slideInFromRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-  will-change: transform, opacity;
 }
 
 .animate-slideOutToRight {
   animation: slideOutToRight 0.4s cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards;
-  will-change: transform, opacity;
 }
 
 .animate-slideInFromBottom {
   animation: slideInFromBottom 0.3s ease-out forwards;
-  will-change: transform, opacity;
 }
 
 .animate-slideOutToBottom {
   animation: slideOutToBottom 0.3s ease-in forwards;
-  will-change: transform, opacity;
 }
 
 .animate-fadeIn {
   animation: fadeIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-  will-change: transform, opacity;
 }
 
 .animate-scaleIn {
   animation: scaleIn 0.2s ease-out forwards;
-  will-change: transform, opacity;
 }
 
 .initial-hidden {
   opacity: 0;
-  transform: translate3d(100%, 0, 0);
+  transform: translateX(100%);
   position: relative;
   width: 100%;
   overflow: hidden;
 }
 
-/* Touch optimized buttons */
 .mobile-button {
   transition: all 0.2s ease;
   touch-action: manipulation;
   user-select: none;
-  -webkit-tap-highlight-color: transparent;
-  will-change: transform, box-shadow;
 }
 
 .mobile-button:active {
-  transform: scale3d(0.98, 0.98, 1);
+  transform: scale(0.98);
 }
 
-/* Memory efficient gradients */
 .gradient-bg {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  background-attachment: fixed;
 }
 
-/* Optimized scrolling */
-.optimized-scroll {
-  -webkit-overflow-scrolling: touch;
-  overflow-scrolling: touch;
-  contain: layout style paint;
+.glass-effect {
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
 }
 
-/* Container queries preparation */
-.container-optimized {
-  contain: layout style paint;
-  content-visibility: auto;
-  contain-intrinsic-size: 200px;
+.menu-item-hover {
+  transition: all 0.2s ease;
 }
 
-/* Reduce motion for accessibility */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+.menu-item-hover:hover {
+  transform: translateX(4px);
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.profile-glow {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
 }
 `;
 
-// Validation schema with better performance
+// 설정 스키마 정의
 const settingsSchema = z.object({
-  name: z.string().min(1, '이름을 입력해주세요').max(50, '이름은 50자 이내로 입력해주세요'),
-  email: z.string().email('올바른 이메일 형식을 입력해주세요').optional().or(z.literal('')),
-  phone: z.string().optional(),
-  bio: z.string().max(200, '자기소개는 200자 이내로 입력해주세요').optional(),
-  notifications: z.boolean().default(true),
-  location: z.boolean().default(true),
-  marketing: z.boolean().default(false),
+  name: z.string().min(1, '이름을 입력해주세요.'),
+  nickname: z.string().min(1, '닉네임을 입력해주세요.'),
+  gender: z.enum(['male', 'female', 'other']),
+  email: z.string().email('유효한 이메일 주소를 입력해주세요.'),
+  phone: z.string().regex(/^01([0|1|6|7|8|9])-?([0-9]{3,4})-?([0-9]{4})$/, '유효한 전화번호를 입력해주세요.')
 });
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
 
-// Memoized Setting Item Component
-const SettingItem = memo<{
-  icon: React.ReactNode;
-  title: string;
-  description?: string;
-  href?: string;
-  onClick?: () => void;
-  rightElement?: React.ReactNode;
-  badge?: string;
-  className?: string;
-}>(({ icon, title, description, href, onClick, rightElement, badge, className = '' }) => {
-  const handleClick = useCallback(() => {
-    if (onClick) {
-      onClick();
-      hapticFeedback.menuSelect();
-    }
-  }, [onClick]);
+// 기본값 (로딩 중일 때 사용)
+const DEFAULT_USER_SETTINGS = {
+  name: '',
+  nickname: '',
+  gender: 'other' as const,
+  email: '',
+  phone: ''
+};
 
-  const content = (
-    <div className={`flex items-center p-4 bg-white rounded-xl border border-gray-100 hover:shadow-md transition-all duration-200 mobile-button ${className}`}>
-      <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mr-4">
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center">
-          <h3 className="font-medium text-gray-900 truncate">{title}</h3>
-          {badge && (
-            <span className="ml-2 px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
-              {badge}
-            </span>
-          )}
-        </div>
-        {description && (
-          <p className="text-sm text-gray-500 mt-1 line-clamp-2">{description}</p>
-        )}
-      </div>
-      <div className="flex-shrink-0 ml-4">
-        {rightElement || <FiChevronRight className="w-5 h-5 text-gray-400" />}
-      </div>
-    </div>
-  );
+// 성별 옵션
+const GENDER_OPTIONS = [
+  { value: 'male', label: '남성' },
+  { value: 'female', label: '여성' },
+  { value: 'other', label: '선택안함' }
+];
 
-  if (href) {
-    return (
-      <Link href={href} className="block">
-        {content}
-      </Link>
-    );
-  }
-
-  return (
-    <button onClick={handleClick} className="w-full text-left">
-      {content}
-    </button>
-  );
-});
-SettingItem.displayName = 'SettingItem';
-
-// Memoized Profile Section Component
-const ProfileSection = memo<{
-  user: any;
-  onEditProfile: () => void;
-}>(({ user, onEditProfile }) => {
-  const loginMethod = useMemo(() => getLoginMethod(user?.mt_type), [user?.mt_type]);
-  const userLevel = useMemo(() => getUserLevel(user?.mt_level), [user?.mt_level]);
-  const userPlan = useMemo(() => getUserPlan(user?.mt_level), [user?.mt_level]);
-
-  return (
-    <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-      <div className="flex items-center space-x-4">
-        <div className="relative">
-          <div className="w-20 h-20 rounded-full overflow-hidden border-4 border-gray-100">
-            <Image
-              src={getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, 0)}
-              alt="프로필 사진"
-              width={80}
-              height={80}
-              className="w-full h-full object-cover"
-              priority
-              placeholder="blur"
-              blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=="
-            />
-          </div>
-          <motion.button
-            onClick={onEditProfile}
-            className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-          >
-            <FiCamera className="w-4 h-4 text-white" />
-          </motion.button>
-        </div>
-        
-        <div className="flex-1">
-          <div className="flex items-center space-x-2 mb-1">
-            <h2 className="text-xl font-bold text-gray-900">
-              {user?.mt_nickname || user?.mt_name || '사용자'}
-            </h2>
-            {user?.mt_level === 5 && (
-              <div className="flex items-center px-2 py-1 bg-gradient-to-r from-yellow-400 to-yellow-600 rounded-full">
-                <FiStar className="w-3 h-3 text-white mr-1" />
-                <span className="text-xs font-medium text-white">VIP</span>
-              </div>
-            )}
-          </div>
-          
-          <div className="space-y-1">
-            <p className="text-sm text-gray-600">
-              {isEmail(user?.mt_id || '') ? user?.mt_id : `${loginMethod.icon} ${loginMethod.method}`}
-            </p>
-            <p className="text-xs text-gray-500">{userPlan}</p>
-          </div>
-        </div>
-      </div>
-      
-      <div className="mt-4 pt-4 border-t border-gray-100">
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <p className="text-lg font-bold text-gray-900">0</p>
-            <p className="text-xs text-gray-500">활동 일수</p>
-          </div>
-          <div>
-            <p className="text-lg font-bold text-gray-900">0</p>
-            <p className="text-xs text-gray-500">참여 그룹</p>
-          </div>
-          <div>
-            <p className="text-lg font-bold text-gray-900">0</p>
-            <p className="text-xs text-gray-500">완료 일정</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-});
-ProfileSection.displayName = 'ProfileSection';
-
-// Main Settings Page Component
-function SettingsPageContent() {
+export default function SettingsPage() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   
-  // Form handling with React Hook Form
-  const { control, handleSubmit, formState: { errors } } = useForm<SettingsFormData>({
+  const { control, handleSubmit, reset, formState: { errors, isDirty } } = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: {
-      name: user?.mt_name || '',
-      email: user?.mt_email || '',
-      phone: user?.mt_hp || '',
-      bio: '',
-      notifications: true,
-      location: true,
-      marketing: false,
-    },
+    defaultValues: DEFAULT_USER_SETTINGS
   });
 
-  // Memoized handlers
-  const handleEditProfile = useCallback(() => {
-    hapticFeedback.menuSelect();
-    router.push('/setting/account');
-  }, [router]);
+  // 사용자 설정 가져오기
+  useEffect(() => {
+    if (user) {
+      const userSettings: SettingsFormData = {
+        name: user.mt_name || user.mt_nickname || '',
+        nickname: user.mt_nickname || user.mt_name || '',
+        gender: user.mt_gender === 1 ? 'male' : user.mt_gender === 2 ? 'female' : 'other',
+        email: user.mt_email || '',
+        phone: user.mt_id || '' // mt_id가 전화번호로 사용됨
+      };
+      reset(userSettings);
+      
 
-  const handleBack = useCallback(() => {
-    hapticFeedback.backButton();
-    router.back();
-  }, [router]);
-
-  const handleLogout = useCallback(async () => {
-    try {
-      hapticFeedback.menuSelect();
-      await logout();
-      router.push('/signin');
-    } catch (error) {
-      console.error('로그아웃 실패:', error);
     }
-  }, [logout, router]);
+  }, [user, reset]);
 
-  const onSubmit = useCallback(async (data: SettingsFormData) => {
+  // 설정 저장
+  const onSubmit = async (data: SettingsFormData) => {
+    setIsLoading(true);
+    setSaveSuccess(false);
+    
     try {
-      console.log('설정 저장:', data);
+      // 모의 저장 (API 연동 전 테스트용)
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error('설정 저장 중 오류가 발생했습니다.', error);
+    } finally {
+      setIsLoading(false);
+      // 설정 저장 완료 햅틱 피드백
       hapticFeedback.dataLoadComplete();
-    } catch (error) {
-      console.error('설정 저장 실패:', error);
-      hapticFeedback.dataLoadError();
     }
-  }, []);
+  };
 
-  // Memoized setting items
-  const settingItems = useMemo(() => [
+  // 프로필 데이터 (실제 사용자 정보 기반)
+  const loginInfo = getLoginMethod(user?.mt_type);
+  const profile = {
+    avatar: getSafeImageUrl(user?.mt_file1 || null, user?.mt_gender, user?.mt_idx || 0),
+    name: user?.mt_name || user?.mt_nickname || '사용자',
+    plan: getUserPlan(user?.mt_level),
+    loginMethod: loginInfo.method,
+    loginIcon: loginInfo.icon,
+    memberSince: user?.mt_wdate ? new Date(user.mt_wdate).getFullYear() + '년 ' + (new Date(user.mt_wdate).getMonth() + 1) + '월' : '2024년 1월',
+    level: getUserLevel(user?.mt_level)
+  };
+
+  // 개선된 메뉴 데이터 (아이콘과 색상 포함)
+  const menuSections = [
     {
-      category: '계정 관리',
+      title: '계정 관리',
       items: [
-        {
-          icon: <FiUser className="w-5 h-5 text-blue-600" />,
-          title: '계정 정보',
-          description: '개인정보 및 계정 설정을 관리합니다',
-          href: '/setting/account'
+        { 
+          label: '계정설정', 
+          href: '/setting/account', 
+          icon: FiUser,
+          color: 'bg-blue-500',
+          description: '프로필 및 개인정보 관리'
         },
-        {
-          icon: <FiShield className="w-5 h-5 text-green-600" />,
-          title: '보안 설정',
-          description: '비밀번호 변경 및 보안 설정',
-          href: '/setting/security'
-        },
-        {
-          icon: <FiBell className="w-5 h-5 text-orange-600" />,
-          title: '알림 설정',
-          description: '푸시 알림 및 이메일 알림 설정',
-          href: '/setting/notification'
-        }
       ]
     },
     {
-      category: '서비스',
+      title: '약관 & 정책',
       items: [
-        {
-          icon: <FiCreditCard className="w-5 h-5 text-purple-600" />,
-          title: '구독 관리',
-          description: '플랜 변경 및 결제 관리',
-          href: '/setting/subscription',
-          badge: user?.mt_level === 5 ? undefined : 'NEW'
+        { 
+          label: '약관 및 정책', 
+          href: '/setting/terms', 
+          icon: FiFileText,
+          color: 'bg-yellow-500',
+          description: '이용약관 및 개인정보처리방침'
         },
-        {
-          icon: <FiGift className="w-5 h-5 text-pink-600" />,
-          title: '쿠폰함',
-          description: '사용 가능한 쿠폰을 확인하세요',
-          href: '/setting/coupon'
-        },
-        {
-          icon: <FiUserPlus className="w-5 h-5 text-indigo-600" />,
-          title: '친구 초대',
-          description: '친구를 초대하고 리워드를 받으세요',
-          href: '/setting/referrer'
-        }
       ]
     },
     {
-      category: '고객 지원',
+      title: '고객 지원',
       items: [
-        {
-          icon: <FiBook className="w-5 h-5 text-teal-600" />,
-          title: '사용 가이드',
-          description: '앱 사용법을 자세히 알아보세요',
-          href: '/setting/manual'
+        { 
+          label: '사용 가이드', 
+          href: '/setting/manual', 
+          icon: FiBook,
+          color: 'bg-purple-500',
+          description: '앱 사용법 및 도움말'
         },
-        {
-          icon: <FiMessageSquare className="w-5 h-5 text-blue-600" />,
-          title: '문의하기',
-          description: '궁금한 점이 있으시면 언제든 문의하세요',
-          href: '/setting/inquiry'
+        { 
+          label: '1:1 문의', 
+          href: '/setting/inquiry', 
+          icon: FiMail,
+          color: 'bg-orange-500',
+          description: '궁금한 점을 문의하세요'
         },
-        {
-          icon: <FiFileText className="w-5 h-5 text-gray-600" />,
-          title: '공지사항',
-          description: '최신 소식과 업데이트를 확인하세요',
-          href: '/setting/notice'
-        }
+        { 
+          label: '공지사항', 
+          href: '/setting/notice', 
+          icon: FiBell,
+          color: 'bg-red-500',
+          description: '최신 소식 및 업데이트'
+        },
       ]
     },
     {
-      category: '약관 및 정책',
+      title: '혜택 & 결제',
       items: [
-        {
-          icon: <FiFileText className="w-5 h-5 text-gray-600" />,
-          title: '이용약관',
-          description: '서비스 이용약관을 확인하세요',
-          href: '/setting/terms/service'
+        // { 
+        //   label: '쿠폰함', 
+        //   href: '/setting/coupon', 
+        //   icon: FiGift,
+        //   color: 'bg-pink-500',
+        //   description: '사용 가능한 쿠폰 확인'
+        // },
+        // { 
+        //   label: '친구 초대', 
+        //   href: '/setting/referrer', 
+        //   icon: FiUserPlus,
+        //   color: 'bg-indigo-500',
+        //   description: '친구 초대하고 혜택 받기'
+        // },
+        { 
+          label: '구독 내역', 
+          href: '/setting/purchase', 
+          icon: FiShoppingBag,
+          color: 'bg-emerald-500',
+          description: '결제 및 구독 이력'
         },
-        {
-          icon: <FiShield className="w-5 h-5 text-gray-600" />,
-          title: '개인정보처리방침',
-          description: '개인정보 처리방침을 확인하세요',
-          href: '/setting/terms/privacy'
-        }
       ]
-    }
-  ], [user?.mt_level]);
+    },
+  ];
+
+
+
+  // 뒤로가기 핸들러
+  const handleBack = () => {
+    // 🎮 뒤로가기 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '설정 페이지 뒤로가기', { 
+      component: 'setting', 
+      action: 'back-navigation' 
+    });
+    router.back();
+  };
 
   return (
     <>
-      <style jsx global>{mobileStyles}</style>
-      
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
+      <style jsx global>{pageAnimations}</style>
+      <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+        {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
-          variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200"
-          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+          variant="enhanced"
+          className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
         >
-          <div className="flex items-center justify-between h-14 px-4">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
+            className="flex items-center justify-between h-14 px-4"
+          >
             <div className="flex items-center space-x-3">
-              <motion.button
+              <motion.button 
                 onClick={handleBack}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.5, duration: 0.4 }}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
-                <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </motion.button>
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">설정</h1>
-                <p className="text-xs text-gray-500">계정 및 앱 설정을 관리하세요</p>
-              </div>
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.4 }}
+                className="flex items-center space-x-3"
+              >
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">설정</h1>
+                  <p className="text-xs text-gray-500">앱 설정과 계정 관리</p>
+                </div>
+              </motion.div>
             </div>
-          </div>
+
+          </motion.div>
         </AnimatedHeader>
 
-        {/* Main Content */}
-        <div className="pt-16 pb-safe px-4 space-y-6" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 80px)' }}>
-          {/* Profile Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            <ProfileSection user={user} onEditProfile={handleEditProfile} />
-          </motion.div>
+        {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="schedule-page-content px-4 pt-20 space-y-6"
+        >
 
-          {/* Settings Sections */}
-          {settingItems.map((section, sectionIndex) => (
-            <motion.div
-              key={section.category}
+
+          {/* 메뉴 섹션들 */}
+          <div className="space-y-6">
+          {menuSections.map((section, sectionIdx) => (
+            <motion.div 
+              key={sectionIdx}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: (sectionIndex + 1) * 0.1 }}
-              className="space-y-3"
+              transition={{ delay: 0.3 + (sectionIdx * 0.1), duration: 0.6 }}
             >
-              <h3 className="text-sm font-medium text-gray-500 px-2">{section.category}</h3>
-              <div className="space-y-2">
-                {section.items.map((item, itemIndex) => (
-                  <motion.div
-                    key={item.title}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: (sectionIndex + 1) * 0.1 + itemIndex * 0.05 }}
-                  >
-                    <SettingItem {...item} />
-                  </motion.div>
-                ))}
+              <h3 className="text-lg font-semibold text-gray-900 mb-3 px-2 flex items-center">
+                <span>{section.title}</span>
+                <div className="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent ml-3"></div>
+              </h3>
+              
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                {section.items.map((item, itemIdx) => {
+                  const IconComponent = item.icon;
+                  return (
+                    <Link
+                      key={item.label}
+                      href={item.href}
+                      className={`flex items-center px-4 py-4 menu-item-hover mobile-button ${itemIdx !== section.items.length - 1 ? 'border-b border-gray-50' : ''}`}
+                      onClick={() => {
+                        // 🎮 설정 메뉴 진입 햅틱 피드백
+                        triggerHapticFeedback(HapticFeedbackType.SELECTION, `${item.label} 메뉴 진입`, { 
+                          component: 'setting', 
+                          action: 'navigate-to-menu',
+                          menu: item.label 
+                        });
+                      }}
+                    >
+                      <div className={`w-10 h-10 ${item.color} rounded-xl flex items-center justify-center mr-4 shadow-sm`}>
+                        <IconComponent className="w-5 h-5 text-white" />
+                      </div>
+                      
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900 mb-0.5">{item.label}</h4>
+                        <p className="text-xs text-gray-500">{item.description}</p>
+                      </div>
+                      
+                      <FiChevronRight className="w-5 h-5 text-gray-400" />
+                    </Link>
+                  );
+                })}
               </div>
             </motion.div>
           ))}
-
-          {/* Logout Button */}
-          <motion.div
+          
+          {/* 앱 정보 카드 */}
+          <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.8 }}
-            className="pt-4"
+            transition={{ delay: 0.7, duration: 0.6 }}
+            className="bg-gray-50 rounded-2xl p-4 text-center"
           >
-            <motion.button
-              onClick={handleLogout}
-              className="w-full p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 font-medium mobile-button"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              로그아웃
-            </motion.button>
+            <div className="text-sm text-gray-600 mb-1">SMAP</div>
+            <div className="text-xs text-gray-500">버전 1.0.0</div>
           </motion.div>
-
-          {/* Version Info */}
-          <div className="text-center py-4">
-            <p className="text-xs text-gray-400">
-              SMAP v1.0.0 • Made with ❤️ in Korea
-            </p>
-          </div>
         </div>
+
+
+        </motion.div>
       </div>
     </>
-  );
-}
-
-// Error Boundary Component
-class SettingsErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error: Error | null }
-> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('[SETTINGS] Error Boundary caught an error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="text-center">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">오류가 발생했습니다</h2>
-            <p className="text-gray-600 mb-4">페이지를 새로고침해주세요.</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              새로고침
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-// Main export with Error Boundary
-export default function SettingsPage() {
-  return (
-    <SettingsErrorBoundary>
-      <SettingsPageContent />
-    </SettingsErrorBoundary>
   );
 } 

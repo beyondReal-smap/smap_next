@@ -1714,12 +1714,10 @@ export default function LocationPage() {
     // 현재 선택된 그룹과 동일한 그룹을 선택한 경우 드롭다운만 닫기
     if (selectedGroupId === groupId) {
       console.log('[handleGroupSelect] 동일한 그룹 선택 - 드롭다운만 닫음');
-      setIsGroupSelectorOpen(false);
       return;
     }
     
     setSelectedGroupId(groupId);
-    setIsGroupSelectorOpen(false);
     
     // *** 기존 마커 및 데이터 초기화 강화 ***
     // 1. 현재 지도에 있는 모든 멤버 마커 즉시 제거
@@ -4463,7 +4461,6 @@ export default function LocationPage() {
         // 그룹 드롭다운 관련 요소가 아닌 외부 클릭인 경우에만 닫기
         if (!isGroupDropdownContainer && !isGroupDropdownButton && !isGroupDropdownMenu) {
           console.log('[handleClickOutside] 그룹 드롭다운 외부 클릭 감지 - 드롭다운 닫기');
-          setIsGroupSelectorOpen(false);
         }
       }
     };
@@ -5234,7 +5231,6 @@ export default function LocationPage() {
                                 if (selectedGroupId !== group.sgt_idx) {
                                   handleGroupSelect(group.sgt_idx);
                                 }
-                                setIsGroupSelectorOpen(false);
                               }}
                               className={`w-full px-3 py-2 text-left text-xs focus:outline-none transition-colors ${
                                 selectedGroupId === group.sgt_idx 
@@ -5747,7 +5743,6 @@ export default function LocationPage() {
   onClose={() => setIsGroupSelectorOpen(false)}
   onGroupSelect={(groupId) => {
     // 1. 드롭다운을 즉시 닫습니다.
-    setIsGroupSelectorOpen(false);
     
     // 2. 다른 그룹이 선택되었을 때만 데이터 로딩을 시작합니다.
     if (selectedGroupId !== groupId) {
