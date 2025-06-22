@@ -2,6 +2,9 @@
   "/icon/route": "app/icon/route.js",
   "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
   "/api/member-location-logs/daily-counts/route": "app/api/member-location-logs/daily-counts/route.js",
+  "/api/member-location-logs/member-activity/route": "app/api/member-location-logs/member-activity/route.js",
+  "/api/member-location-logs/[mt_idx]/map-markers/route": "app/api/member-location-logs/[mt_idx]/map-markers/route.js",
+  "/api/groups/current-user/route": "app/api/groups/current-user/route.js",
   "/schedule/page": "app/schedule/page.js",
   "/logs/page": "app/logs/page.js",
   "/group/page": "app/group/page.js"
