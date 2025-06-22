@@ -1,8 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, memo, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -36,13 +34,48 @@ import {
 import { HiSparkles, HiCalendarDays, HiArrowPath, HiBell, HiUserGroup } from 'react-icons/hi2';
 import { FaTrash, FaCrown } from 'react-icons/fa';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import memberService from '@/services/memberService';
 import groupService, { Group } from '@/services/groupService';
 import scheduleService, { Schedule, UserPermission } from '@/services/scheduleService';
 import pushNotificationService, { ScheduleNotificationContext, GroupMemberInfo } from '@/services/pushNotificationService';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { hapticFeedback } from '@/utils/haptic';
-import AnimatedHeader from '../../components/common/AnimatedHeader';
+
+// Dynamic Imports for better code splitting
+const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
+  loading: () => (
+    <div className="h-14 bg-gradient-to-r from-[#0113A3] to-[#001a8a] animate-pulse" />
+  ),
+  ssr: false
+});
+
+const EventCard = dynamic(() => import('../../components/schedule/EventCard'), {
+  loading: () => (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 animate-pulse">
+      <div className="h-4 bg-gray-200 rounded mb-2"></div>
+      <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+    </div>
+  ),
+  ssr: false
+});
+
+const MemberSelector = dynamic(() => import('../../components/schedule/MemberSelector'), {
+  loading: () => (
+    <div className="bg-indigo-50 rounded-xl p-4 animate-pulse">
+      <div className="h-6 bg-gray-200 rounded mb-4"></div>
+      <div className="grid grid-cols-4 gap-3">
+        {[1,2,3,4].map(i => (
+          <div key={i} className="flex flex-col items-center">
+            <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+            <div className="h-3 bg-gray-200 rounded w-12 mt-2"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  ),
+  ssr: false
+});
 
 dayjs.extend(isBetween);
 dayjs.locale('ko');
@@ -434,7 +467,7 @@ interface NewEvent {
 
 // 일정 상태 판단 함수
 // Portal 컴포넌트 - 모든 모달을 body에 렌더링
-function Portal({ children }: { children: React.ReactNode }) {
+const Portal = memo(({ children }: { children: React.ReactNode }) => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -443,7 +476,7 @@ function Portal({ children }: { children: React.ReactNode }) {
   }, []);
 
   return mounted ? createPortal(children, document.body) : null;
-}
+});
 
 function getEventStatus(event: ScheduleEvent): { text: string; color: string; bgColor: string } {
   const now = dayjs();
@@ -461,7 +494,7 @@ function getEventStatus(event: ScheduleEvent): { text: string; color: string; bg
 }
 
 // 커스텀 캘린더 컴포넌트
-function MobileCalendar({ 
+const MobileCalendar = memo(({ 
   selectedDay, 
   onDayClick, 
   events,
@@ -471,7 +504,7 @@ function MobileCalendar({
   onDayClick: (day: Dayjs) => void;
   events: ScheduleEvent[];
   onMonthChange?: (year: number, month: number) => void; // 월 변경 콜백 프롭 추가
-}) {
+}) => {
   const [currentMonth, setCurrentMonth] = useState(dayjs());
   const [isAnimating, setIsAnimating] = useState(false);
   const [animationDirection, setAnimationDirection] = useState<'left' | 'right'>('right');
@@ -646,7 +679,7 @@ function MobileCalendar({
       </AnimatePresence>
     </div>
   );
-}
+});
 
 export default function SchedulePage() {
   const router = useRouter();
@@ -1416,7 +1449,7 @@ export default function SchedulePage() {
 
 
   // 일정 저장 - 실제 백엔드 API 사용
-  const handleSaveEvent = async () => {
+  const handleSaveEvent = useCallback(async () => {
     // selectedEventDetails를 함수 시작 부분에서 미리 저장 (안전성 확보)
     const currentEventDetails = selectedEventDetails;
     
@@ -2052,7 +2085,7 @@ export default function SchedulePage() {
       console.error('[handleSaveEvent] 💥 스케줄 저장 중 예외 발생:', error);
       openSuccessModal('일정 저장 실패', '일정 저장 중 오류가 발생했습니다.', 'error');
     }
-  };
+  }, [selectedEventDetails, newEvent, selectedGroupId, scheduleGroupMembers, invalidateCache, selectedMemberId]);
 
   // 일정 삭제 - 권한 확인 포함
   const handleDeleteEvent = async () => {
@@ -2189,19 +2222,19 @@ export default function SchedulePage() {
   };
 
   // 일정 클릭 핸들러 - 바로 액션 선택 모달 표시
-  const handleEventItemClick = (event: ScheduleEvent) => {
+  const handleEventItemClick = useCallback((event: ScheduleEvent) => {
     setSelectedEventForAction(event);
     setIsScheduleActionModalOpen(true);
     // body 스크롤 비활성화
     document.body.style.overflow = 'hidden';
-  };
+  }, []);
 
   // 뒤로가기 핸들러
-  const handleBack = () => {
+  const handleBack = useCallback(() => {
     // 뒤로가기 햅틱 피드백
     hapticFeedback.backButton();
     router.back();
-  };
+  }, [router]);
 
   // 모달 닫기 핸들러
   const closeModal = () => {
@@ -2235,8 +2268,28 @@ export default function SchedulePage() {
     document.body.style.overflow = '';
   };
 
+  // 로딩 단계 업데이트 함수
+  const updateLoadingStep = useCallback((step: 'groups' | 'schedules' | 'calendar' | 'ui', completed: boolean) => {
+    setLoadingSteps(prev => {
+      const newSteps = {
+        ...prev,
+        [step]: completed
+      };
+      
+      // 모든 로딩이 완료되었는지 확인
+      const allCompleted = Object.values(newSteps).every(stepCompleted => stepCompleted);
+      
+      // 모든 로딩이 완료되면 햅틱 피드백
+      if (allCompleted && !Object.values(prev).every(stepCompleted => stepCompleted)) {
+        hapticFeedback.dataLoadComplete();
+      }
+      
+      return newSteps;
+    });
+  }, []);
+
   // 그룹 목록 가져오기 - 실제 백엔드 API 사용
-  const fetchUserGroups = async () => {
+  const fetchUserGroups = useCallback(async () => {
     try {
       console.log('[fetchUserGroups] 그룹 목록 조회 시작');
       const data = await groupService.getCurrentUserGroups();
@@ -2274,7 +2327,7 @@ export default function SchedulePage() {
       updateLoadingStep('ui', true);
       setIsInitialLoading(false);
     }
-  };
+  }, [updateLoadingStep]);
 
   // 그룹 멤버 가져오기 - 실제 백엔드 API 사용
   const fetchGroupMembers = async (groupId: number) => {
@@ -3916,26 +3969,6 @@ export default function SchedulePage() {
   // 전체 로딩 완료 체크
   const isLoadingComplete = loadingSteps.groups && loadingSteps.schedules && loadingSteps.calendar && loadingSteps.ui;
 
-  // 로딩 단계 업데이트 함수
-  const updateLoadingStep = (step: 'groups' | 'schedules' | 'calendar' | 'ui', completed: boolean) => {
-    setLoadingSteps(prev => {
-      const newSteps = {
-        ...prev,
-        [step]: completed
-      };
-      
-      // 모든 로딩이 완료되었는지 확인
-      const allCompleted = Object.values(newSteps).every(stepCompleted => stepCompleted);
-      
-      // 모든 로딩이 완료되면 햅틱 피드백
-      if (allCompleted && !Object.values(prev).every(stepCompleted => stepCompleted)) {
-        hapticFeedback.dataLoadComplete();
-      }
-      
-      return newSteps;
-    });
-  };
-
   return (
     <>
       <style jsx global>{pageStyles}</style>
@@ -4327,10 +4360,14 @@ export default function SchedulePage() {
                                     {event.memberName && (
                                       <div className="flex items-center space-x-2">
                                         <div className="w-6 h-6 rounded-full overflow-hidden">
-                                          <img
+                                          <Image
                                             src={getSafeImageUrl(event.memberPhoto || null, event.memberGender, event.tgtSgdtIdx || 0)}
                                             alt={event.memberName}
+                                            width={24}
+                                            height={24}
                                             className="w-full h-full object-cover"
+                                            placeholder="blur"
+                                            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
                                             onError={(e) => {
                                               e.currentTarget.src = getDefaultImage(event.memberGender, event.tgtSgdtIdx || 0);
                                             }}
@@ -5884,10 +5921,14 @@ export default function SchedulePage() {
                                   <div className={`w-10 h-10 rounded-full bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden transition-all duration-300 ${
                                     member.isSelected ? 'ring-4 ring-indigo-500 ring-offset-2' : ''
                                   }`}>
-                                    <img 
+                                    <Image 
                                       src={getSafeImageUrl(member.photo, member.mt_gender, member.sgdt_idx || member.mt_idx || 0)}
                                       alt={member.name}
+                                      width={40}
+                                      height={40}
                                       className="w-full h-full object-cover"
+                                      placeholder="blur"
+                                      blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
                                       onError={(e) => {
                                         const target = e.target as HTMLImageElement;
                                         const fallbackSrc = getDefaultImage(member.mt_gender, member.sgdt_idx || member.mt_idx || 0);
