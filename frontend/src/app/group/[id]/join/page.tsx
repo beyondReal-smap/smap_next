@@ -363,7 +363,7 @@ export default function GroupJoinPage() {
                   whileTap={{ scale: 0.98 }}
                 >
                   <FaExternalLinkAlt />
-                  <span>SMAP 앱에서 열기</span>
+                  <span>SMAP 앱 설치하기</span>
                 </motion.button>
                 
                 <div className="text-center text-xs text-gray-500 px-4">
@@ -387,7 +387,7 @@ export default function GroupJoinPage() {
               ) : (
                 <>
                   <FaUsers />
-                  <span>{user ? '웹에서 그룹 가입하기' : '로그인 후 가입하기'}</span>
+                  <span>{user ? '웹에서 바로 가입하기' : '로그인 후 가입하기'}</span>
                 </>
               )}
             </motion.button>

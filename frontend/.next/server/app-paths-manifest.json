@@ -1,16 +1,8 @@
 {
   "/icon/route": "app/icon/route.js",
-  "/api/groups/current-user/route": "app/api/groups/current-user/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/members/[id]/route": "app/api/members/[id]/route.js",
+  "/apple-icon/route": "app/apple-icon/route.js",
   "/api/groups/[groupId]/route": "app/api/groups/[groupId]/route.js",
-  "/api/member-location-logs/member-activity/route": "app/api/member-location-logs/member-activity/route.js",
-  "/api/schedules/group/[groupId]/route": "app/api/schedules/group/[groupId]/route.js",
   "/api/group-members/member/[groupId]/route": "app/api/group-members/member/[groupId]/route.js",
-  "/api/groups/[groupId]/locations/route": "app/api/groups/[groupId]/locations/route.js",
-  "/api/member-location-logs/daily-counts/route": "app/api/member-location-logs/daily-counts/route.js",
-  "/api/member-location-logs/[mt_idx]/map-markers/route": "app/api/member-location-logs/[mt_idx]/map-markers/route.js",
-  "/schedule/page": "app/schedule/page.js",
   "/group/page": "app/group/page.js",
   "/group/[id]/join/page": "app/group/[id]/join/page.js"
 }

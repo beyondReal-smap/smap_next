@@ -1990,8 +1990,7 @@ function GroupPageContent() {
                 {supportsWebShare() && (
                   <motion.button 
                     onClick={handleNativeShare} 
-                    className="w-full flex items-center justify-center p-3 rounded-lg text-white shadow-sm hover:shadow-md transition-all"
-                    style={{ backgroundColor: '#F97315' }}
+                    className="w-full flex items-center justify-center p-3 rounded-lg bg-orange-200 text-orange-800 shadow-sm hover:bg-orange-300 hover:text-orange-900 transition-all"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -2014,7 +2013,7 @@ function GroupPageContent() {
                 
                 <motion.button 
                   onClick={handleCopyLink} 
-                  className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-500 text-white shadow-sm hover:shadow-md transition-shadow"
+                  className="w-full flex items-center justify-center p-3 rounded-lg bg-blue-200 text-blue-800 shadow-sm hover:bg-blue-300 hover:text-blue-900 transition-all"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
@@ -2024,8 +2023,7 @@ function GroupPageContent() {
                 
                 <motion.button 
                   onClick={handleSMSShare} 
-                  className="w-full flex items-center justify-center p-3 rounded-lg text-white shadow-sm hover:shadow-md transition-all"
-                  style={{ backgroundColor: '#22C55D' }}
+                  className="w-full flex items-center justify-center p-3 rounded-lg bg-green-200 text-green-800 shadow-sm hover:bg-green-300 hover:text-green-900 transition-all"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
