@@ -77,7 +77,7 @@ const LocationSummaryCard = dynamic(() => import('../../components/logs/Location
   ssr: false
 });
 
-const GroupSelectorDropdown = dynamic(() => import('../../components/logs/GroupSelectorDropdown'), {
+const GroupSelector = dynamic(() => import('../../components/location/GroupSelector'), {
   loading: () => (
     <div className="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 animate-pulse">
       <div className="flex items-center justify-between">
@@ -6415,15 +6415,6 @@ export default function LogsPage() {
                 showMemberList={false}
                 className="w-full h-full"
               />
-              {/* 로딩 상태 메시지 */}
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
-                <div className="flex items-center space-x-2">
-                  <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-sm font-medium text-gray-700">
-                    {isWaitingForMembers ? "멤버 데이터 로딩 중..." : "지도 초기화 중..."}
-                  </span>
-                </div>
-              </div>
             </div>
           )}
 
@@ -6731,8 +6722,13 @@ export default function LogsPage() {
             animate="open"
             exit="closed"
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]"
-            onClick={() => {
+            nClick={() => {
               console.log('[사이드바] 오버레이 클릭으로 닫기');
+              // 드롭다운이 열려있으면 사이드바를 닫지 않음
+              if (isGroupSelectorOpen) {
+                console.log('[사이드바] 드롭다운이 열려있어서 사이드바 닫기 취소');
+                return;
+              }
               setIsSidebarOpen(false);
             }}
             style={{
@@ -6796,10 +6792,15 @@ export default function LogsPage() {
                 </div>
                                      <motion.button
                        whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    console.log('[사이드바] X 버튼으로 닫기');
-                    setIsSidebarOpen(false);
-                  }}
+                       onClick={() => {
+                        console.log('[사이드바] X 버튼으로 닫기');
+                        // 드롭다운이 열려있으면 사이드바를 닫지 않음
+                        if (isGroupSelectorOpen) {
+                          console.log('[사이드바] 드롭다운이 열려있어서 사이드바 닫기 취소');
+                          return;
+                        }
+                        setIsSidebarOpen(false);
+                      }}
                   className="p-2 hover:bg-white/60 rounded-xl transition-all duration-200 backdrop-blur-sm"
                 >
                   <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6823,20 +6824,20 @@ export default function LogsPage() {
                     </div>
                   </div>
                 }>
-                  <GroupSelectorDropdown
-                    userGroups={userGroups}
-                    selectedGroupId={selectedGroupId}
-                    isGroupSelectorOpen={isGroupSelectorOpen}
-                    isLoadingGroups={isUserDataLoading}
-                    groupMemberCounts={groupMemberCounts}
-                    onToggleSelector={() => setIsGroupSelectorOpen(!isGroupSelectorOpen)}
-                    onGroupSelect={(groupId) => {
-                      if (selectedGroupId !== groupId) {
-                        handleGroupSelect(groupId);
-                      }
-                      setIsGroupSelectorOpen(false);
-                    }}
-                  />
+                 <GroupSelector
+  userGroups={userGroups}
+  selectedGroupId={selectedGroupId}
+  isGroupSelectorOpen={isGroupSelectorOpen}
+  isSidebarOpen={isSidebarOpen}
+  groupMemberCounts={groupMemberCounts}
+  onOpen={() => setIsGroupSelectorOpen(true)}
+  onClose={() => setIsGroupSelectorOpen(false)}
+  onGroupSelect={(groupId) => {
+    if (selectedGroupId !== groupId) {
+      handleGroupSelect(groupId);
+    }
+  }}
+/>
                 </Suspense>
               </div>
 

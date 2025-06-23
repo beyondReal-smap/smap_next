@@ -34,71 +34,52 @@ const GroupSelectorDropdown = memo(({
         whileHover={{ scale: 1.02, y: -1 }}
         whileTap={{ scale: 0.98 }}
         onClick={onToggleSelector}
-        className="w-full flex items-center justify-between px-4 py-3 bg-white/70 backdrop-blur-sm border rounded-xl text-sm font-medium hover:bg-white/90 hover:shadow-md transition-all duration-200"
-        style={{ 
-          borderColor: 'rgba(1, 19, 163, 0.2)',
-        }}
+        className="w-full flex items-center justify-between px-4 py-3 bg-white border rounded-xl text-sm font-medium hover:bg-gray-50 hover:shadow-md transition-all duration-200"
+        style={{ borderColor: 'rgba(1, 19, 163, 0.2)' }}
         disabled={isLoadingGroups}
       >
-        <span className="truncate text-gray-700">
-          {isLoadingGroups 
-            ? '로딩 중...' 
-            : selectedGroup?.sgt_title || '그룹 선택'
-          }
-        </span>
-        <div className="ml-2 flex-shrink-0">
-          {isLoadingGroups ? (
-            <FiLoader className="animate-spin text-blue-600" size={14} />
-          ) : (
-            <motion.div
-              animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <FiChevronDown className="text-gray-400" size={14} />
-            </motion.div>
-          )}
+        <div className="flex-1 min-w-0 text-left">
+          <div className="text-sm font-semibold text-gray-900 truncate">
+            {isLoadingGroups
+              ? '로딩 중...'
+              : selectedGroup?.sgt_title || '그룹 선택'}
+          </div>
+          <div className="text-xs text-gray-500">
+            {selectedGroupId ? `${groupMemberCounts[selectedGroupId] || 0}명의 멤버` : '그룹을 선택해주세요'}
+          </div>
         </div>
+        <motion.div
+          animate={{ rotate: isGroupSelectorOpen ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <FiChevronDown className="text-gray-400" size={18} />
+        </motion.div>
       </motion.button>
 
       <AnimatePresence>
-        {isGroupSelectorOpen && userGroups.length > 0 && (
+        {isGroupSelectorOpen && (userGroups?.length ?? 0) > 0 && (
           <motion.div
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="absolute top-full left-0 right-0 z-[9999] mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto"
+            className="absolute top-full left-0 right-0 z-[9999] mt-1 bg-white !bg-white !opacity-100 border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto"
             style={{
-              backgroundColor: '#ffffff',
-              backdropFilter: 'blur(10px)',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+              backgroundColor: '#fff',
+              opacity: 1,
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)'
             }}
           >
-            {userGroups.map((group) => (
-              <motion.button
+            {(userGroups ?? []).map((group) => (
+              <button
                 key={group.sgt_idx}
-                whileHover={{ backgroundColor: "rgba(99, 102, 241, 0.05)" }}
-                onClick={() => {
-                  if (selectedGroupId !== group.sgt_idx) {
-                    onGroupSelect(group.sgt_idx);
-                  }
-                }}
-                className={`w-full px-3 py-2 text-left text-xs focus:outline-none transition-colors ${
-                  selectedGroupId === group.sgt_idx 
-                    ? 'font-semibold bg-blue-50 text-blue-700' 
-                    : 'text-gray-900 hover:bg-blue-50'
-                }`}
+                type="button"
+                className={`w-full flex items-center justify-between px-4 py-3 bg-white border-b last:border-b-0 text-sm font-medium hover:bg-gray-50 transition-all duration-150 ${selectedGroupId === group.sgt_idx ? 'font-bold text-blue-700' : 'text-gray-900'}`}
+                onClick={() => onGroupSelect(group.sgt_idx)}
               >
-                <div className="flex items-center justify-between">
-                  <span className="truncate">{group.sgt_title}</span>
-                  {selectedGroupId === group.sgt_idx && (
-                    <span className="ml-2 text-blue-600">✓</span>
-                  )}
-                </div>
-                <div className="text-xs text-gray-500 mt-0.5">
-                  {groupMemberCounts[group.sgt_idx] || 0}명의 멤버
-                </div>
-              </motion.button>
+                <span className="truncate">{group.sgt_title}</span>
+                <span className="ml-2 text-xs text-gray-500">{groupMemberCounts[group.sgt_idx] ? `${groupMemberCounts[group.sgt_idx]}명` : ''}</span>
+              </button>
             ))}
           </motion.div>
         )}

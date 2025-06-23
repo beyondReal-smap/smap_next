@@ -4096,7 +4096,7 @@ export default function SchedulePage() {
                   <div className="p-4">
                     <AnimatePresence mode="wait">
                       {isMonthChanging ? (
-                        /* 스켈레톤 로딩 */
+                        /* 개선된 스켈레톤 로딩 */
                         <motion.div 
                           key="skeleton-loading"
                           className="space-y-4"
@@ -4111,33 +4111,53 @@ export default function SchedulePage() {
                               initial={{ opacity: 0, y: 15 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: index * 0.1, duration: 0.4 }}
-                              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-300"
+                              className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200"
                             >
                               {/* 상단: 시간 정보와 상태 배지 스켈레톤 */}
                               <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center space-x-3">
-                                  <div className="w-10 h-10 bg-gray-200 rounded-xl animate-pulse"></div>
-                                  <div>
-                                    <div className="h-6 bg-gray-200 rounded w-20 mb-1 animate-pulse"></div>
+                                  <div className="w-10 h-10 bg-gradient-to-br from-pink-100 to-pink-200 rounded-xl animate-pulse flex items-center justify-center">
+                                    <div className="w-5 h-5 bg-pink-300 rounded-sm"></div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <div className="h-5 bg-gray-200 rounded w-16 mb-1 animate-pulse"></div>
                                     <div className="h-3 bg-gray-200 rounded w-12 animate-pulse"></div>
                                   </div>
                                 </div>
                                 <div className="flex flex-col items-end space-y-1">
-                                  <div className="h-6 bg-gray-200 rounded-full w-12 animate-pulse"></div>
-                                  <div className="h-4 bg-gray-200 rounded-full w-8 animate-pulse"></div>
+                                  <div className="h-6 bg-gradient-to-r from-blue-100 to-blue-200 rounded-full w-14 animate-pulse"></div>
+                                  <div className="h-4 bg-gray-200 rounded-full w-10 animate-pulse"></div>
                                 </div>
                               </div>
 
                               {/* 제목 스켈레톤 */}
-                              <div className="mb-4">
-                                <div className="h-5 bg-gray-200 rounded w-3/4 mb-2 animate-pulse"></div>
+                              <div className="mb-4 space-y-2">
+                                <div className="h-5 bg-gray-200 rounded w-3/4 animate-pulse"></div>
                                 <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse"></div>
                               </div>
 
+                              {/* 멤버 정보 스켈레톤 */}
+                              <div className="flex items-center space-x-2 mb-4">
+                                <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+                                <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
+                                <div className="h-3 bg-gray-200 rounded w-12 animate-pulse"></div>
+                              </div>
+
                               {/* 장소 정보 스켈레톤 */}
-                              <div className="bg-gray-100 rounded-xl p-4 animate-pulse">
-                                <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
-                                <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                              <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-4 animate-pulse">
+                                <div className="flex items-start space-x-3">
+                                  <div className="w-5 h-5 bg-gray-300 rounded-full mt-0.5"></div>
+                                  <div className="flex-1 space-y-2">
+                                    <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 하단 액션 버튼 스켈레톤 */}
+                              <div className="flex justify-end space-x-2 mt-4 pt-3 border-t border-gray-100">
+                                <div className="h-8 bg-gray-200 rounded-lg w-16 animate-pulse"></div>
+                                <div className="h-8 bg-gray-200 rounded-lg w-16 animate-pulse"></div>
                               </div>
                             </motion.div>
                           ))}
@@ -4146,13 +4166,14 @@ export default function SchedulePage() {
                           <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            transition={{ delay: 0.4, duration: 0.5 }}
-                            className="text-center py-4"
+                            transition={{ delay: 0.6, duration: 0.5 }}
+                            className="text-center py-6"
                           >
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 animate-pulse">
-                              <FiCalendar className="w-4 h-4 text-blue-500" />
+                            <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse">
+                              <FiCalendar className="w-6 h-6 text-blue-500" />
                             </div>
-                            <p className="text-gray-500 text-sm">일정을 불러오는 중...</p>
+                            <p className="text-gray-500 text-sm font-medium">일정을 불러오는 중...</p>
+                            <p className="text-gray-400 text-xs mt-1">잠시만 기다려주세요</p>
                           </motion.div>
                         </motion.div>
                       ) : eventsForSelectedDay.length > 0 ? (
@@ -4393,11 +4414,22 @@ export default function SchedulePage() {
                           exit={{ opacity: 0, y: -20 }}
                           transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
                         >
-                          <div className="p-6 bg-gray-100 rounded-full w-fit mx-auto mb-4">
-                            <FiCalendar className="w-8 h-8 text-gray-400" />
+                          <div className="w-20 h-20 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                            <FiCalendar className="w-10 h-10 text-gray-400" />
                           </div>
-                          <p className="text-gray-500 text-lg font-medium">일정이 없습니다</p>
-                          <p className="text-gray-400 text-sm mt-1">새로운 일정을 추가해보세요</p>
+                          <h3 className="text-lg font-semibold text-gray-700 mb-2">일정이 없습니다</h3>
+                          <p className="text-gray-500 text-sm mb-6">새로운 일정을 추가해보세요</p>
+                          
+                          {/* 일정 추가 버튼 */}
+                          <motion.button
+                            onClick={handleOpenAddEventModal}
+                            className="inline-flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-[#0113A3] to-[#001a8a] text-white rounded-xl font-medium mobile-button shadow-lg hover:shadow-xl transition-all duration-200"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <FiPlus className="w-4 h-4" />
+                            <span>일정 추가</span>
+                          </motion.button>
                         </motion.div>
                       )}
                     </AnimatePresence>

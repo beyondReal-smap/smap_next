@@ -879,7 +879,7 @@ export default function LocationPage() {
         }, 1000);
       }
     }
-  }, [isMapReady, map, groupMembers, isFirstMemberSelectionComplete, memberMarkers]);
+  }, [isMapReady, map, groupMembers.length, isFirstMemberSelectionComplete, memberMarkers.length]);
 
   // 컴팩트 토스트 모달 상태 추가
   const [toastModal, setToastModal] = useState<{

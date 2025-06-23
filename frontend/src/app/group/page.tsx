@@ -405,6 +405,33 @@ interface GroupForm {
   description: string;
 }
 
+// 모달 애니메이션 variants
+const modalVariants = {
+  hidden: {
+    opacity: 0,
+    scale: 0.9,
+    y: 50
+  },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      duration: 0.3,
+      ease: [0.25, 0.46, 0.45, 0.94]
+    }
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.9,
+    y: 50,
+    transition: {
+      duration: 0.2,
+      ease: [0.55, 0.06, 0.68, 0.19]
+    }
+  }
+};
+
 // 메인 컴포넌트
 function GroupPageContent() {
   const router = useRouter();
@@ -1718,83 +1745,228 @@ function GroupPageContent() {
         <AnimatePresence>
           {/* 새 그룹 추가 모달 */}
           {isAddModalOpen && (
-            <Modal
-              key="add-group-modal"
-              isOpen={isAddModalOpen}
-              onClose={() => setIsAddModalOpen(false)}
-              title="새 그룹 만들기"
-              size="sm"
-              className="rounded-2xl max-w-xs"
+            <motion.div 
+              className="add-group-modal fixed inset-0 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
+              onClick={() => setIsAddModalOpen(false)}
+              style={{ zIndex: 50 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
             >
-            <div className="p-4">
-              <div className="text-center mb-4">
-                <HiUserGroup className="w-8 h-8 text-gray-700 mx-auto mb-2" />
-              </div>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: '#0113A3' }}>
-                    그룹명 <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newGroup.name}
-                    onChange={(e) => setNewGroup(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="예: 가족, 친구, 직장"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-gray-500 text-sm"
-                    style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
-                    maxLength={50}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">{newGroup.name.length}/50</p>
-                </div>
+              <motion.div 
+                className="w-full max-w-md bg-white rounded-t-3xl shadow-2xl max-h-[60vh] flex flex-col mb-12"
+                onClick={e => e.stopPropagation()}
+                onWheel={e => e.stopPropagation()}
+                variants={modalVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                {/* 모달 핸들 - 고정 영역 (드래그 가능) */}
+                <motion.div 
+                  className="w-12 h-1 bg-gray-300 rounded-full mx-auto mt-3 mb-4 flex-shrink-0 cursor-grab active:cursor-grabbing"
+                  drag="y"
+                  dragElastic={0.1}
+                  dragMomentum={false}
+                  dragConstraints={{ top: 0, bottom: 0 }}
+                  onDrag={(event, info) => {
+                    // 핸들 드래그 중 바텀시트 전체에 피드백 적용
+                    if (info.offset.y > 20) {
+                      const target = event.currentTarget as HTMLElement;
+                      if (target) {
+                        const modalElement = target.closest('.add-group-modal') as HTMLElement;
+                        if (modalElement) {
+                          modalElement.style.opacity = String(Math.max(0.5, 1 - info.offset.y / 150));
+                          modalElement.style.transform = `translateY(${Math.max(0, info.offset.y)}px)`;
+                        }
+                      }
+                    }
+                  }}
+                  onDragEnd={(event, info) => {
+                    // 핸들 드래그 종료 시 바텀시트 닫기 조건 확인
+                    const target = event.currentTarget as HTMLElement;
+                    if (target) {
+                      const modalElement = target.closest('.add-group-modal') as HTMLElement;
+                      
+                      if (info.offset.y > 50 || info.velocity.y > 200) {
+                        // 바텀시트 닫기
+                        setIsAddModalOpen(false);
+                      } else {
+                        // 원래 위치로 복귀
+                        if (modalElement) {
+                          modalElement.style.opacity = '1';
+                          modalElement.style.transform = 'translateY(0px)';
+                        }
+                      }
+                    }
+                  }}
+                  whileDrag={{ 
+                    scale: 1.2,
+                    backgroundColor: '#9CA3AF',
+                    transition: { duration: 0.1 }
+                  }}
+                />
                 
-                <div>
-                  <label className="block text-sm font-medium mb-1" style={{ color: '#0113A3' }}>
-                    그룹 설명
-                  </label>
-                  <textarea
-                    value={newGroup.description}
-                    onChange={(e) => setNewGroup(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="그룹에 대한 간단한 설명을 입력해주세요"
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:border-gray-500 resize-none text-sm"
-                    style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
-                    maxLength={100}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">{newGroup.description.length}/100</p>
+                {/* 모달 헤더 - 고정 영역 (드래그 가능) */}
+                <motion.div 
+                  className="px-6 pb-3 border-b border-gray-100 flex-shrink-0 cursor-grab active:cursor-grabbing"
+                  drag="y"
+                  dragElastic={0.1}
+                  dragMomentum={false}
+                  dragConstraints={{ top: 0, bottom: 0 }}
+                  onDrag={(event, info) => {
+                    // 헤더 드래그 중 바텀시트 전체에 피드백 적용
+                    if (info.offset.y > 20) {
+                      const target = event.currentTarget as HTMLElement;
+                      if (target) {
+                        const modalElement = target.closest('.add-group-modal') as HTMLElement;
+                        if (modalElement) {
+                          modalElement.style.opacity = String(Math.max(0.5, 1 - info.offset.y / 150));
+                          modalElement.style.transform = `translateY(${Math.max(0, info.offset.y)}px)`;
+                        }
+                      }
+                    }
+                  }}
+                  onDragEnd={(event, info) => {
+                    // 헤더 드래그 종료 시 바텀시트 닫기 조건 확인
+                    const target = event.currentTarget as HTMLElement;
+                    if (target) {
+                      const modalElement = target.closest('.add-group-modal') as HTMLElement;
+                      
+                      if (info.offset.y > 50 || info.velocity.y > 200) {
+                        // 바텀시트 닫기
+                        setIsAddModalOpen(false);
+                      } else {
+                        // 원래 위치로 복귀
+                        if (modalElement) {
+                          modalElement.style.opacity = '1';
+                          modalElement.style.transform = 'translateY(0px)';
+                        }
+                      }
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                        <FiPlus className="w-4 h-4 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">
+                          새 그룹 만들기
+                        </h3>
+                        <p className="text-xs text-gray-500">함께할 멤버들을 초대해보세요</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setIsAddModalOpen(false)}
+                      className="p-2 hover:bg-gray-100 rounded-full mobile-button transition-colors"
+                    >
+                      <FiX className="w-5 h-5 text-gray-500" />
+                    </button>
+                  </div>
+                </motion.div>
+
+                {/* 스크롤 가능한 폼 영역 */}
+                <div 
+                  className="flex-1 overflow-y-auto"
+                  onTouchStart={(e) => {
+                    // 터치 시작점 기록 (스크롤과 드래그 구분용)
+                    const touch = e.touches[0];
+                    (e.currentTarget as any).touchStartY = touch.clientY;
+                    (e.currentTarget as any).touchStartX = touch.clientX;
+                    (e.currentTarget as any).scrollTop = (e.currentTarget as HTMLElement).scrollTop;
+                  }}
+                  onTouchMove={(e) => {
+                    const touch = e.touches[0];
+                    const startY = (e.currentTarget as any).touchStartY;
+                    const startX = (e.currentTarget as any).touchStartX;
+                    const startScrollTop = (e.currentTarget as any).scrollTop;
+                    const currentScrollTop = (e.currentTarget as HTMLElement).scrollTop;
+                    
+                    if (startY && startX) {
+                      const deltaY = touch.clientY - startY;
+                      const deltaX = touch.clientX - startX;
+                      
+                      // 수직 스크롤인지 확인 (수직 이동이 수평 이동보다 큰 경우)
+                      const isVerticalScroll = Math.abs(deltaY) > Math.abs(deltaX);
+                      
+                      // 스크롤 가능한 상태인지 확인
+                      const element = e.currentTarget as HTMLElement;
+                      const canScrollUp = currentScrollTop > 0;
+                      const canScrollDown = currentScrollTop < (element.scrollHeight - element.clientHeight);
+                      
+                      // 수직 스크롤이고 스크롤 가능한 상태라면 스크롤 허용
+                      if (isVerticalScroll && (canScrollUp || canScrollDown)) {
+                        // 스크롤 영역에서의 정상적인 스크롤 - 이벤트 전파 중지
+                        e.stopPropagation();
+                      }
+                    }
+                  }}
+                >
+                  <div className="px-6 pt-4 pb-12 space-y-4">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: '#0113A3' }}>
+                          그룹명 <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={newGroup.name}
+                          onChange={(e) => setNewGroup(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="예: 가족, 친구, 직장"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:border-blue-500 text-sm transition-all duration-200"
+                          style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
+                          maxLength={50}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">{newGroup.name.length}/50</p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium mb-2" style={{ color: '#0113A3' }}>
+                          그룹 설명
+                        </label>
+                        <textarea
+                          value={newGroup.description}
+                          onChange={(e) => setNewGroup(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder="그룹에 대한 간단한 설명을 입력해주세요"
+                          rows={2}
+                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:border-blue-500 resize-none text-sm transition-all duration-200"
+                          style={{ '--tw-ring-color': '#0113A3' } as React.CSSProperties}
+                          maxLength={100}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">{newGroup.description.length}/100</p>
+                      </div>
+                    </div>
+                    
+                    {/* 그룹 만들기 버튼만 남기고 취소 버튼 제거 */}
+                    <div className="pt-2">
+                      <motion.button
+                        onClick={handleSaveGroup}
+                        disabled={newGroup.name.trim() === '' || isCreatingGroup}
+                        className="w-full py-4 text-white rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm shadow-lg relative overflow-hidden"
+                        style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                      >
+                        {isCreatingGroup ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full unified-animate-spin mr-2"></div>
+                            생성 중...
+                          </>
+                        ) : (
+                          <>
+                            <FiPlus className="w-4 h-4 mr-2" />
+                            그룹 만들기
+                          </>
+                        )}
+                      </motion.button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="flex space-x-2 mt-4">
-                <motion.button
-                  onClick={() => setIsAddModalOpen(false)}
-                  disabled={isCreatingGroup}
-                  className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium disabled:opacity-50 text-sm"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  취소
-                </motion.button>
-                <motion.button
-                  onClick={handleSaveGroup}
-                  disabled={newGroup.name.trim() === '' || isCreatingGroup}
-                  className="flex-1 py-2 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm"
-                  style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {isCreatingGroup ? (
-                    <>
-                      <div className="w-3 h-3 border-2 border-gray-300 border-t-white rounded-full unified-animate-spin mr-1"></div>
-                      생성 중...
-                    </>
-                  ) : (
-                    '그룹 만들기'
-                  )}
-                </motion.button>
-              </div>
-            </div>
-            </Modal>
+              </motion.div>
+            </motion.div>
           )}
 
           {/* 공유 모달 */}

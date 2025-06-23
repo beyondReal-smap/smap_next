@@ -13,23 +13,26 @@ interface AnimatedHeaderProps {
 // 통일된 헤더 애니메이션 설정
 const headerAnimations = {
   simple: {
-    initial: { y: -100, opacity: 0 },
+    initial: { y: -120, opacity: 0 },
     animate: { y: 0, opacity: 1 },
     transition: {
       delay: 0.1,
-      duration: 0.4,
-      ease: [0.25, 0.46, 0.45, 0.94]
+      duration: 0.6,
+      ease: [0.25, 0.46, 0.45, 0.94],
+      y: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
+      opacity: { duration: 0.4, delay: 0.2 }
     }
   },
   enhanced: {
-    initial: { y: -100, opacity: 0, scale: 0.9 },
+    initial: { y: -150, opacity: 0, scale: 0.95 },
     animate: { y: 0, opacity: 1, scale: 1 },
     transition: {
       delay: 0.2,
       duration: 0.8,
       ease: [0.25, 0.46, 0.45, 0.94],
-      opacity: { duration: 0.6 },
-      scale: { duration: 0.6 }
+      y: { duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] },
+      opacity: { duration: 0.5, delay: 0.3 },
+      scale: { duration: 0.6, delay: 0.2 }
     }
   }
 };

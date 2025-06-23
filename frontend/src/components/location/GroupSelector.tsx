@@ -37,6 +37,7 @@ interface GroupSelectorProps {
   userGroups: Group[];
   selectedGroupId: number | null;
   isGroupSelectorOpen: boolean;
+  isSidebarOpen?: boolean;
   groupMemberCounts: Record<number, number>;
   onOpen: () => void;
   onClose: () => void;
@@ -92,13 +93,9 @@ const DropdownPortal = ({
   if (!position) return null;
 
   return createPortal(
-    <motion.div
+    <div
       ref={dropdownRef}
       onMouseDown={(e) => e.stopPropagation()}
-      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -10, scale: 0.95, transition: { duration: 0.1 } }}
-      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
       className="absolute rounded-xl z-[99999] overflow-hidden bg-white shadow-2xl border border-gray-200/80"
       style={{
         top: position.top,
@@ -109,7 +106,7 @@ const DropdownPortal = ({
       }}
     >
       {children}
-    </motion.div>,
+    </div>,
     document.body
   );
 };
@@ -118,6 +115,7 @@ const GroupSelector = memo(({
   userGroups, 
   selectedGroupId, 
   isGroupSelectorOpen, 
+  isSidebarOpen,
   groupMemberCounts, 
   onOpen,
   onClose,
@@ -125,11 +123,14 @@ const GroupSelector = memo(({
 }: GroupSelectorProps) => {
   const selectedGroup = userGroups.find(g => g.sgt_idx === selectedGroupId);
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const [isMounted, setIsMounted] = useState(false);
 
+  // 사이드바가 닫힐 때 드롭다운도 함께 닫기
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    if (isSidebarOpen === false) {
+      // 사이드바가 닫히면 드롭다운도 즉시 닫기
+      onClose();
+    }
+  }, [isSidebarOpen, onClose]);
 
   return (
     <>
@@ -160,33 +161,32 @@ const GroupSelector = memo(({
         </motion.div>
       </motion.button>
 
-      <AnimatePresence>
-        {isMounted && isGroupSelectorOpen && (
-          <DropdownPortal target={buttonRef} onClose={onClose}>
-            {userGroups.map((group) => (
-              <motion.button
-                key={group.sgt_idx}
-                whileHover={{ backgroundColor: "rgba(239, 246, 255, 1)" }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onGroupSelect(group.sgt_idx);
-                  onClose();
-                }}
-                className={`w-full px-4 py-3 text-left text-sm focus:outline-none transition-colors flex items-center justify-between border-b border-gray-100 last:border-b-0 ${
-                  selectedGroupId === group.sgt_idx 
-                    ? 'font-semibold text-indigo-700' 
-                    : 'text-gray-800'
-                }`}
-              >
-                <span className="truncate">{group.sgt_title}</span>
-                {selectedGroupId === group.sgt_idx && (
-                  <span className="ml-2 text-indigo-700">✓</span>
-                )}
-              </motion.button>
-            ))}
-          </DropdownPortal>
-        )}
-      </AnimatePresence>
+      {/* 애니메이션 없이 조건부 렌더링만 사용 */}
+      {isGroupSelectorOpen && isSidebarOpen === true && (
+        <DropdownPortal target={buttonRef} onClose={onClose}>
+          {userGroups.map((group) => (
+            <motion.button
+              key={group.sgt_idx}
+              whileHover={{ backgroundColor: "rgba(239, 246, 255, 1)" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onGroupSelect(group.sgt_idx);
+                onClose();
+              }}
+              className={`w-full px-4 py-3 text-left text-sm focus:outline-none transition-colors flex items-center justify-between border-b border-gray-100 last:border-b-0 ${
+                selectedGroupId === group.sgt_idx 
+                  ? 'font-semibold text-indigo-700' 
+                  : 'text-gray-800'
+              }`}
+            >
+              <span className="truncate">{group.sgt_title}</span>
+              {selectedGroupId === group.sgt_idx && (
+                <span className="ml-2 text-indigo-700">✓</span>
+              )}
+            </motion.button>
+          ))}
+        </DropdownPortal>
+      )}
     </>
   );
 });
