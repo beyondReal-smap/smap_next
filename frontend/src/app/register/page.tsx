@@ -27,6 +27,7 @@ import {
   FiChevronRight
 } from 'react-icons/fi';
 import AnimatedHeader from '../../components/common/AnimatedHeader';
+import groupService from '@/services/groupService';
 
 // 회원가입 단계 정의
 const REGISTER_STEPS = {
@@ -263,6 +264,9 @@ export default function RegisterPage() {
     socialProvider: '',
     socialId: ''
   });
+
+  const [isJoiningGroup, setIsJoiningGroup] = useState(false);
+  const [isOpeningApp, setIsOpeningApp] = useState(false);
 
   // 소셜 로그인 데이터 초기화
   useEffect(() => {
@@ -801,6 +805,12 @@ export default function RegisterPage() {
       if (response.ok && data.success) {
         console.log('회원가입 성공:', data);
         
+        // 회원가입 성공 시 mt_idx를 localStorage에 저장
+        if (data.data && data.data.mt_idx) {
+          localStorage.setItem('newMemberMtIdx', data.data.mt_idx.toString());
+          console.log('새 회원 mt_idx 저장:', data.data.mt_idx);
+        }
+        
         // 소셜 로그인 데이터 정리
         localStorage.removeItem('socialLoginData');
         
@@ -820,6 +830,161 @@ export default function RegisterPage() {
       setIsLoading(false);
     }
   };
+
+  // 플랫폼 감지
+  const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isAndroid = () => /Android/.test(navigator.userAgent);
+  const isMobile = () => isIOS() || isAndroid();
+
+  // 앱 스토어 링크
+  const APP_STORE_URL = 'https://apps.apple.com/kr/app/smap-%EC%9C%84%EC%B9%98%EC%B6%94%EC%A0%81-%EC%9D%B4%EB%8F%99%EA%B2%BD%EB%A1%9C-%EC%9D%BC%EC%A0%95/id6480279658?platform=iphone';
+  const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.dmonster.smap&hl=ko';
+
+  // 앱 설치 여부 감지 (간접적 방법)
+  const checkAppInstalled = () => {
+    return new Promise<boolean>((resolve) => {
+      const timeout = setTimeout(() => {
+        console.log('앱이 설치되어 있지 않은 것으로 판단됩니다.');
+        resolve(false);
+      }, 2500);
+      
+      const startTime = Date.now();
+      
+      // 앱이 열리면 페이지가 숨겨지거나 blur 이벤트 발생
+      const handleVisibilityChange = () => {
+        if (document.hidden) {
+          const timeDiff = Date.now() - startTime;
+          if (timeDiff < 2000) { // 2초 이내에 숨겨지면 앱이 열린 것으로 판단
+            clearTimeout(timeout);
+            console.log('앱이 성공적으로 열렸습니다.');
+            resolve(true);
+          }
+        }
+      };
+      
+      const handleBlur = () => {
+        const timeDiff = Date.now() - startTime;
+        if (timeDiff < 2000) {
+          clearTimeout(timeout);
+          console.log('앱이 성공적으로 열렸습니다 (blur).');
+          resolve(true);
+        }
+      };
+      
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('blur', handleBlur);
+      
+      // 앱 스키마 실행 (딥링크)
+      try {
+        if (isIOS()) {
+          // iOS: 커스텀 URL 스키마
+          const deepLink = `smap://signin`;
+          console.log('iOS 딥링크 시도:', deepLink);
+          window.location.href = deepLink;
+        } else if (isAndroid()) {
+          // Android: Intent URL
+          const deepLink = `intent://signin#Intent;scheme=smap;package=com.dmonster.smap;S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_URL)};end`;
+          console.log('Android 딥링크 시도:', deepLink);
+          window.location.href = deepLink;
+        }
+      } catch (error) {
+        console.error('앱 스키마 실행 오류:', error);
+        clearTimeout(timeout);
+        resolve(false);
+      }
+      
+      // 정리 함수
+      setTimeout(() => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('blur', handleBlur);
+      }, 3000);
+    });
+  };
+
+  // 앱으로 이동 시도
+  const handleOpenApp = async () => {
+    console.log('앱 열기 시도 중...');
+    const appInstalled = await checkAppInstalled();
+    
+    if (!appInstalled) {
+      console.log('앱이 설치되어 있지 않음, 스토어로 이동');
+      // 앱이 설치되어 있지 않으면 스토어로 이동
+      if (isIOS()) {
+        window.open(APP_STORE_URL, '_blank');
+      } else if (isAndroid()) {
+        window.open(PLAY_STORE_URL, '_blank');
+      } else {
+        // 데스크탑에서는 웹 버전 사용 안내
+        alert('SMAP은 모바일 앱으로 제공됩니다. 모바일 기기에서 접속해주세요.');
+      }
+    } else {
+      console.log('앱이 성공적으로 열림');
+    }
+  };
+
+  // 자동 그룹 가입 처리
+  const handleAutoGroupJoin = async () => {
+    try {
+      const pendingGroupJoin = localStorage.getItem('pendingGroupJoin');
+      const redirectAfterRegister = localStorage.getItem('redirectAfterRegister');
+      
+      if (pendingGroupJoin && redirectAfterRegister) {
+        const groupData = JSON.parse(pendingGroupJoin);
+        const groupId = groupData.groupId;
+        
+        console.log('자동 그룹 가입 시도:', groupId);
+        
+        setIsJoiningGroup(true);
+        
+        // 새로 가입한 회원의 mt_idx를 가져오기
+        const newMemberMtIdx = localStorage.getItem('newMemberMtIdx');
+        
+        if (!newMemberMtIdx) {
+          console.error('새 회원의 mt_idx를 찾을 수 없음');
+          throw new Error('회원 정보를 찾을 수 없습니다.');
+        }
+        
+        const mt_idx = parseInt(newMemberMtIdx);
+        console.log('새 회원 mt_idx:', mt_idx);
+        
+        // 새로 가입한 회원을 위한 그룹 가입 API 호출
+        await groupService.joinNewMemberToGroup(parseInt(groupId), mt_idx);
+        
+        // 성공 시 localStorage 정리
+        localStorage.removeItem('pendingGroupJoin');
+        localStorage.removeItem('redirectAfterRegister');
+        localStorage.removeItem('newMemberMtIdx');
+        
+        console.log('자동 그룹 가입 성공');
+        
+        // 그룹 가입 성공 후 앱으로 이동 시도
+        setIsJoiningGroup(false);
+        setIsOpeningApp(true);
+        
+        if (isMobile()) {
+          await handleOpenApp();
+        } else {
+          // 데스크탑에서는 signin 페이지로 이동
+          router.push('/signin');
+        }
+        
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('자동 그룹 가입 실패:', error);
+      return false;
+    } finally {
+      setIsJoiningGroup(false);
+    }
+  };
+
+  // 완료 단계에서 자동 그룹 가입 시도
+  useEffect(() => {
+    if (currentStep === REGISTER_STEPS.COMPLETE) {
+      handleAutoGroupJoin();
+    }
+  }, [currentStep]);
 
   // 단계별 유효성 검사
   const isStepValid = () => {
@@ -1534,36 +1699,6 @@ export default function RegisterPage() {
                     </button>
                   </div>
                 </div>
-
-                {/* 푸시 알림 동의 */}
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <label className="flex items-center space-x-3 cursor-pointer">
-                    <div className="relative">
-                <input
-                  type="checkbox"
-                        checked={registerData.mt_push1}
-                        onChange={(e) => setRegisterData(prev => ({ ...prev, mt_push1: e.target.checked }))}
-                        className="sr-only"
-                      />
-                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                        registerData.mt_push1
-                          ? 'border-gray-300' 
-                          : 'border-gray-300'
-                      }`}
-                        style={registerData.mt_push1 
-                          ? {backgroundColor: '#0113A3', borderColor: '#0113A3'} 
-                          : {}}>
-                        {registerData.mt_push1 && (
-                          <FiCheck className="w-3 h-3 text-white" />
-                        )}
-              </div>
-                    </div>
-                    <div>
-                      <span className="text-sm font-medium text-gray-900">푸시 알림 수신 동의</span>
-                      <p className="text-xs text-gray-500" style={{ wordBreak: 'keep-all' }}>그룹 활동, 일정 알림 등을 받을 수 있습니다</p>
-                    </div>
-                </label>
-                </div>
               </div>
             </motion.div>
           )}
@@ -1724,39 +1859,69 @@ export default function RegisterPage() {
               >
                 <h2 className="text-3xl font-bold text-gray-900 mb-4">회원가입 완료!</h2>
                 <p className="text-gray-600 mb-8" style={{ wordBreak: 'keep-all' }}>
-                  SMAP에 오신 것을 환영합니다.<br />
-                  이제 그룹을 만들고 친구들과 함께 활동해보세요!
+                  {isJoiningGroup ? (
+                    <>
+                      그룹에 자동 가입 중입니다...<br />
+                      잠시만 기다려주세요!
+                    </>
+                  ) : isOpeningApp ? (
+                    <>
+                      앱으로 이동 중입니다...<br />
+                      {isMobile() ? '앱이 열리지 않으면 스토어로 이동합니다' : '로그인 페이지로 이동합니다'}
+                    </>
+                  ) : (
+                    <>
+                      SMAP에 오신 것을 환영합니다.<br />
+                      이제 그룹을 만들고 친구들과 함께 활동해보세요!
+                    </>
+                  )}
                 </p>
                 
-                <motion.button
-                  onClick={() => {
-                    // 사용자 입력 정보를 localStorage에 저장
-                    const userInfo = {
-                      phone: registerData.mt_id,
-                      name: registerData.mt_name,
-                      nickname: registerData.mt_nickname,
-                      email: registerData.mt_email,
-                      birth: registerData.mt_birth,
-                      gender: registerData.mt_gender,
-                      registeredAt: new Date().toISOString()
-                    };
-                    
-                    try {
-                      localStorage.setItem('recentUserInfo', JSON.stringify(userInfo));
-                      // 로그인 페이지에서 사용할 전화번호도 별도 저장
-                      localStorage.setItem('lastRegisteredPhone', registerData.mt_id);
-                    } catch (error) {
-                      console.error('사용자 정보 저장 실패:', error);
-                    }
-                    
-                    router.push('/signin');
-                  }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold text-lg"
-                >
-                  로그인하러 가기
-                </motion.button>
+                {!isJoiningGroup && !isOpeningApp && (
+                  <motion.button
+                    onClick={() => {
+                      // 사용자 입력 정보를 localStorage에 저장
+                      const userInfo = {
+                        phone: registerData.mt_id,
+                        name: registerData.mt_name,
+                        nickname: registerData.mt_nickname,
+                        email: registerData.mt_email,
+                        birth: registerData.mt_birth,
+                        gender: registerData.mt_gender,
+                        registeredAt: new Date().toISOString()
+                      };
+                      
+                      try {
+                        localStorage.setItem('recentUserInfo', JSON.stringify(userInfo));
+                        // 로그인 페이지에서 사용할 전화번호도 별도 저장
+                        localStorage.setItem('lastRegisteredPhone', registerData.mt_id);
+                      } catch (error) {
+                        console.error('사용자 정보 저장 실패:', error);
+                      }
+                      
+                      router.push('/signin');
+                    }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold text-lg"
+                  >
+                    로그인하러 가기
+                  </motion.button>
+                )}
+                
+                {isJoiningGroup && (
+                  <div className="flex items-center justify-center space-x-2 text-gray-600">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+                    <span>그룹 가입 중...</span>
+                  </div>
+                )}
+                
+                {isOpeningApp && (
+                  <div className="flex items-center justify-center space-x-2 text-gray-600">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
+                    <span>앱으로 이동 중...</span>
+                  </div>
+                )}
               </motion.div>
             </motion.div>
           )}

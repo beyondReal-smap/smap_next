@@ -335,6 +335,7 @@ class GroupService {
       throw new Error('그룹 통계를 가져오는데 실패했습니다.');
     }
   }
+
   // 그룹 가입 (초대 링크를 통한 가입)
   async joinGroup(groupId: number): Promise<{ success: boolean; message: string }> {
     try {
@@ -351,6 +352,29 @@ class GroupService {
       return response.data;
     } catch (error) {
       console.error(`Failed to join group ${groupId}:`, error);
+      throw error;
+    }
+  }
+
+  // 새로 가입한 회원의 그룹 가입 (인증 없이 호출 가능)
+  async joinNewMemberToGroup(groupId: number, mt_idx: number): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log(`[GroupService] 새 회원 그룹 가입 시작 - groupId: ${groupId}, mt_idx: ${mt_idx}`);
+      
+      const response = await apiClient.post(`/groups/${groupId}/join-new-member`, {
+        mt_idx: mt_idx,
+        sgt_idx: groupId
+      });
+      
+      console.log(`[GroupService] 새 회원 그룹 가입 응답:`, response.data);
+      
+      if (!response.data.success) {
+        throw new Error(response.data.message || '그룹 가입에 실패했습니다.');
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error(`Failed to join new member to group ${groupId}:`, error);
       throw error;
     }
   }

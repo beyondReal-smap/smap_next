@@ -24,7 +24,6 @@ export default function GroupJoinPage() {
   const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isJoining, setIsJoining] = useState(false);
 
   const groupId = params.id as string;
 
@@ -32,6 +31,10 @@ export default function GroupJoinPage() {
   const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isAndroid = () => /Android/.test(navigator.userAgent);
   const isMobile = () => isIOS() || isAndroid();
+
+  // 앱 스토어 링크
+  const APP_STORE_URL = 'https://apps.apple.com/kr/app/smap-%EC%9C%84%EC%B9%98%EC%B6%94%EC%A0%81-%EC%9D%B4%EB%8F%99%EA%B2%BD%EB%A1%9C-%EC%9D%BC%EC%A0%95/id6480279658?platform=iphone';
+  const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.dmonster.smap&hl=ko';
 
   // 앱 설치 여부 감지 (간접적 방법)
   const checkAppInstalled = () => {
@@ -67,14 +70,18 @@ export default function GroupJoinPage() {
       document.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('blur', handleBlur);
       
-      // 앱 스키마 실행
+      // 앱 스키마 실행 (딥링크)
       try {
         if (isIOS()) {
           // iOS: 커스텀 URL 스키마
-          window.location.href = `smap://group/${groupId}/join`;
+          const deepLink = `smap://group/${groupId}/join`;
+          console.log('iOS 딥링크 시도:', deepLink);
+          window.location.href = deepLink;
         } else if (isAndroid()) {
           // Android: Intent URL
-          window.location.href = `intent://group/${groupId}/join#Intent;scheme=smap;package=com.smap.app;S.browser_fallback_url=https%3A%2F%2Fplay.google.com%2Fstore%2Fapps%2Fdetails%3Fid%3Dcom.smap.app;end`;
+          const deepLink = `intent://group/${groupId}/join#Intent;scheme=smap;package=com.dmonster.smap;S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_URL)};end`;
+          console.log('Android 딥링크 시도:', deepLink);
+          window.location.href = deepLink;
         }
       } catch (error) {
         console.error('앱 스키마 실행 오류:', error);
@@ -183,7 +190,6 @@ export default function GroupJoinPage() {
         
         // 자동으로 그룹 가입 시도
         try {
-          setIsJoining(true);
           await groupService.joinGroup(parseInt(groupId));
           
           // 가입 성공 후 그룹 페이지로 이동
@@ -191,8 +197,6 @@ export default function GroupJoinPage() {
         } catch (error) {
           console.error('자동 그룹 가입 오류:', error);
           // 자동 가입 실패 시 사용자에게 수동 가입 옵션 제공
-        } finally {
-          setIsJoining(false);
         }
       }
     };
@@ -209,45 +213,35 @@ export default function GroupJoinPage() {
       timestamp: Date.now()
     }));
     
+    console.log('앱 열기 시도 중...');
     const appInstalled = await checkAppInstalled();
     
     if (!appInstalled) {
+      console.log('앱이 설치되어 있지 않음, 스토어로 이동');
       // 앱이 설치되어 있지 않으면 스토어로 이동
       if (isIOS()) {
-        // iOS App Store 링크 (실제 앱 ID로 변경 필요)
-        window.open('https://apps.apple.com/kr/app/smap/id123456789', '_blank');
+        window.open(APP_STORE_URL, '_blank');
       } else if (isAndroid()) {
-        // Google Play Store 링크 (실제 패키지명으로 변경 필요)
-        window.open('https://play.google.com/store/apps/details?id=com.smap.app', '_blank');
+        window.open(PLAY_STORE_URL, '_blank');
       } else {
         // 데스크탑에서는 웹 버전 사용 안내
         alert('SMAP은 모바일 앱으로 제공됩니다. 모바일 기기에서 접속해주세요.');
       }
+    } else {
+      console.log('앱이 성공적으로 열림');
     }
   };
 
-  // 웹에서 그룹 가입
+  // 웹에서 그룹 가입 (register 페이지로 이동)
   const handleJoinGroup = async () => {
-    if (!user) {
-      // 로그인이 필요한 경우 로그인 페이지로 이동하면서 리다이렉트 URL 저장
-      localStorage.setItem('redirectAfterLogin', `/group/${groupId}/join`);
-      router.push('/auth/login');
-      return;
-    }
-
-    try {
-      setIsJoining(true);
-      // 그룹 가입 API 호출 (실제 API에 맞게 수정 필요)
-      await groupService.joinGroup(parseInt(groupId));
-      
-      // 가입 성공 후 그룹 페이지로 이동
-      router.push('/group');
-    } catch (error) {
-      console.error('그룹 가입 오류:', error);
-      alert('그룹 가입 중 오류가 발생했습니다.');
-    } finally {
-      setIsJoining(false);
-    }
+    // 로그인 여부와 관계없이 register 페이지로 이동하면서 그룹 정보 저장
+    localStorage.setItem('redirectAfterRegister', `/group/${groupId}/join`);
+    localStorage.setItem('pendingGroupJoin', JSON.stringify({
+      groupId: groupId,
+      groupTitle: groupInfo?.sgt_title,
+      timestamp: Date.now()
+    }));
+    router.push('/register');
   };
 
   if (loading) {
@@ -363,7 +357,7 @@ export default function GroupJoinPage() {
                   whileTap={{ scale: 0.98 }}
                 >
                   <FaExternalLinkAlt />
-                  <span>SMAP 앱 설치하기</span>
+                  <span>SMAP 앱에서 열기</span>
                 </motion.button>
                 
                 <div className="text-center text-xs text-gray-500 px-4">
@@ -374,22 +368,12 @@ export default function GroupJoinPage() {
 
             <motion.button
               onClick={handleJoinGroup}
-              disabled={isJoining}
               className="w-full bg-white text-gray-800 py-4 rounded-xl font-semibold border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {isJoining ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-600"></div>
-                  <span>가입 중...</span>
-                </>
-              ) : (
-                <>
-                  <FaUsers />
-                  <span>{user ? '웹에서 바로 가입하기' : '로그인 후 가입하기'}</span>
-                </>
-              )}
+              <FaUsers />
+              <span>웹에서 바로 가입하기</span>
             </motion.button>
 
             {/* 앱 다운로드 링크 */}
@@ -399,7 +383,7 @@ export default function GroupJoinPage() {
                 <p className="text-gray-500 text-xs mb-4">앱 설치 후 로그인하면 자동으로 그룹에 가입됩니다</p>
                 <div className="flex space-x-4 justify-center">
                   <a
-                    href="https://apps.apple.com/kr/app/smap/id123456789"
+                    href={APP_STORE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
@@ -408,7 +392,7 @@ export default function GroupJoinPage() {
                     <span className="text-sm">App Store</span>
                   </a>
                   <a
-                    href="https://play.google.com/store/apps/details?id=com.smap.app"
+                    href={PLAY_STORE_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
