@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 // import { signIn, getSession } from 'next-auth/react'; // 임시 비활성화
 import authService from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDataCache } from '@/contexts/DataCacheContext';
+import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
 import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
 
@@ -98,6 +100,20 @@ export default function SignInPage() {
     };
   }
   const { login, isLoggedIn, loading, error, setError, refreshAuthState } = authContextData;
+  
+  // 🆕 DataCache 접근
+  let dataCacheContextData;
+  try {
+    dataCacheContextData = useDataCache();
+  } catch (error) {
+    console.error('[SIGNIN] useDataCache 컨텍스트 오류:', error);
+    dataCacheContextData = {
+      saveComprehensiveData: () => {},
+      saveToLocalStorage: () => {},
+      loadFromLocalStorage: () => null
+    };
+  }
+  const { saveComprehensiveData } = dataCacheContextData;
   
   // 리다이렉트 중복 실행 방지 플래그
   const isRedirectingRef = useRef(false);
@@ -345,6 +361,30 @@ export default function SignInPage() {
               sessionStorage.setItem('authToken', 'authenticated');
               
               console.log('[NATIVE DATA] 모든 저장소에 인증 상태 저장 완료');
+              
+              // 🚀 로그인 성공 시 모든 데이터 일괄 프리로딩
+              console.log('[NATIVE DATA] 🚀 로그인 성공 후 전체 데이터 프리로딩 시작');
+              try {
+                const preloadResults = await comprehensivePreloadData(result.user.mt_idx);
+                
+                if (preloadResults.success) {
+                  // DataCacheContext에 일괄 저장
+                  saveComprehensiveData({
+                    userProfile: preloadResults.userProfile,
+                    userGroups: preloadResults.userGroups,
+                    groupMembers: preloadResults.groupMembers,
+                    locationData: preloadResults.locationData,
+                    dailyLocationCounts: preloadResults.dailyCounts
+                  });
+                  
+                  console.log('[NATIVE DATA] ✅ 로그인 후 전체 데이터 프리로딩 완료');
+                } else {
+                  console.warn('[NATIVE DATA] ⚠️ 로그인 후 데이터 프리로딩 실패:', preloadResults.errors);
+                }
+              } catch (preloadError) {
+                console.error('[NATIVE DATA] ❌ 로그인 후 데이터 프리로딩 오류:', preloadError);
+                // 프리로딩 실패해도 로그인은 성공으로 처리
+              }
             }
             
             // 즉시 리다이렉션

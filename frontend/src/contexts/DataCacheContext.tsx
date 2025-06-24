@@ -111,6 +111,22 @@ interface DataCacheContextType {
   getDailyLocationCounts: (groupId: number) => any | null;
   setDailyLocationCounts: (groupId: number, counts: any) => void;
   
+  // 🆕 멀티 데이터 로딩 (새로운 기능)
+  getMultiDateLocationData: (groupId: number, dates: string[], memberId?: string) => { results: { [date: string]: any }, missingDates: string[] };
+  getMultiMemberLocationData: (groupId: number, date: string, memberIds: string[]) => { results: { [memberId: string]: any }, missingMembers: string[] };
+  analyzeCacheStatus: (groupId: number, date?: string) => any;
+  
+  // 🆕 localStorage 동기화 (새로운 기능)
+  saveToLocalStorage: (key: string, data: any) => void;
+  loadFromLocalStorage: (key: string) => any;
+  saveComprehensiveData: (data: {
+    userProfile?: any;
+    userGroups?: any[];
+    groupMembers?: { [groupId: string]: any[] };
+    locationData?: { [groupId: string]: { [date: string]: { [memberId: string]: any } } };
+    dailyLocationCounts?: { [groupId: string]: any };
+  }) => void;
+  
   // 캐시 관리
   isCacheValid: (type: string, groupId?: number, date?: string) => boolean;
   invalidateCache: (type: string, groupId?: number, date?: string) => void;
@@ -160,6 +176,41 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [cache, setCache] = useState<CacheData>(initialCache);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // 🆕 localStorage 동기화 기능을 먼저 정의 (다른 함수들에서 사용하므로)
+  const saveToLocalStorage = useCallback((key: string, data: any) => {
+    try {
+      const timestamp = Date.now();
+      const storageData = {
+        data,
+        timestamp,
+        expiresAt: timestamp + (CACHE_DURATION[key as keyof typeof CACHE_DURATION] || 10 * 60 * 1000)
+      };
+      localStorage.setItem(`smap_cache_${key}`, JSON.stringify(storageData));
+      console.log(`[DATA CACHE] 💾 localStorage 저장: ${key}`);
+    } catch (error) {
+      console.warn(`[DATA CACHE] ⚠️ localStorage 저장 실패: ${key}`, error);
+    }
+  }, []);
+
+  const loadFromLocalStorage = useCallback((key: string) => {
+    try {
+      const stored = localStorage.getItem(`smap_cache_${key}`);
+      if (!stored) return null;
+      
+      const { data, expiresAt } = JSON.parse(stored);
+      if (Date.now() > expiresAt) {
+        localStorage.removeItem(`smap_cache_${key}`);
+        return null;
+      }
+      
+      console.log(`[DATA CACHE] 📂 localStorage에서 로드: ${key}`);
+      return data;
+    } catch (error) {
+      console.warn(`[DATA CACHE] ⚠️ localStorage 로드 실패: ${key}`, error);
+      return null;
+    }
+  }, []);
 
   // 초기화는 한 번만 로그 출력
   React.useEffect(() => {
@@ -332,156 +383,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     return correctedIsValid;
   }, [cache.lastUpdated]);
 
-  // 사용자 프로필
-  const getUserProfile = useCallback(() => {
-    const isValid = isCacheValid('userProfile');
-    if (isValid && cache.userProfile) {
-      console.log('[DATA CACHE] ✅ 사용자 프로필 캐시 히트:', cache.userProfile);
-      return cache.userProfile;
-    } else {
-      console.log('[DATA CACHE] ❌ 사용자 프로필 캐시 미스');
-      return null;
-    }
-  }, [cache.userProfile, isCacheValid]);
-  
-  const setUserProfile = useCallback((profile: UserProfile) => {
-    console.log('[DATA CACHE] 💾 사용자 프로필 캐시 저장:', profile);
-    setCache(prev => ({
-      ...prev,
-      userProfile: profile,
-      lastUpdated: {
-        ...prev.lastUpdated,
-        userProfile: Date.now(),
-      },
-    }));
-  }, []);
-
-  // 사용자 그룹
-  const getUserGroups = useCallback(() => {
-    const isValid = isCacheValid('userGroups');
-    if (isValid && cache.userGroups.length > 0) {
-      console.log('[DATA CACHE] ✅ 사용자 그룹 캐시 히트:', cache.userGroups.length, '개');
-      return cache.userGroups;
-    } else {
-      console.log('[DATA CACHE] ❌ 사용자 그룹 캐시 미스');
-      return [];
-    }
-  }, [cache.userGroups, isCacheValid]);
-  
-  const setUserGroups = useCallback((groups: GroupInfo[]) => {
-    console.log('[DATA CACHE] 💾 사용자 그룹 캐시 저장:', groups.length, '개');
-    setCache(prev => ({
-      ...prev,
-      userGroups: groups,
-      lastUpdated: {
-        ...prev.lastUpdated,
-        userGroups: Date.now(),
-      },
-    }));
-  }, []);
-
-  // 그룹 멤버
-  const getGroupMembers = useCallback((groupId: number): GroupMember[] => {
-    const isValid = isCacheValid('groupMembers', groupId);
-    const members = cache.groupMembers[groupId] || [];
-    if (isValid && members.length > 0) {
-      console.log(`[DATA CACHE] ✅ 그룹 멤버 캐시 히트 (${groupId}):`, members.length, '명');
-      return members;
-    } else {
-      console.log(`[DATA CACHE] ❌ 그룹 멤버 캐시 미스 (${groupId})`);
-      return [];
-    }
-  }, [cache.groupMembers, isCacheValid]);
-  
-  const setGroupMembers = useCallback((groupId: number, members: GroupMember[]) => {
-    const timestamp = Date.now();
-    console.log(`[DATA CACHE] 💾 그룹 멤버 캐시 저장 (${groupId}):`, members.length, '명', `타임스탬프: ${timestamp}`);
-    setCache(prev => ({
-      ...prev,
-      groupMembers: {
-        ...prev.groupMembers,
-        [groupId]: members,
-      },
-      lastUpdated: {
-        ...prev.lastUpdated,
-        groupMembers: {
-          ...prev.lastUpdated.groupMembers,
-          [groupId]: timestamp,
-        },
-      },
-    }));
-  }, []);
-
-  // 스케줄 데이터
-  const getScheduleData = useCallback((groupId: number, date?: string): any[] => {
-    const isValid = isCacheValid('scheduleData', groupId);
-    if (isValid && cache.scheduleData[groupId]) {
-      if (date) {
-        const schedules = cache.scheduleData[groupId]?.[date] || [];
-        console.log(`[DATA CACHE] ✅ 스케줄 데이터 캐시 히트 (${groupId}/${date}):`, schedules.length, '개');
-        return schedules;
-      }
-      // 날짜 지정이 없으면 전체 스케줄 반환
-      const allSchedules = Object.values(cache.scheduleData[groupId] || {}).flat();
-      console.log(`[DATA CACHE] ✅ 전체 스케줄 데이터 캐시 히트 (${groupId}):`, allSchedules.length, '개');
-      return allSchedules;
-    } else {
-      console.log(`[DATA CACHE] ❌ 스케줄 데이터 캐시 미스 (${groupId}/${date || 'all'})`);
-      return [];
-    }
-  }, [cache.scheduleData, isCacheValid]);
-  
-  const setScheduleData = useCallback((groupId: number, date: string, schedules: any[]) => {
-    console.log(`[DATA CACHE] 💾 스케줄 데이터 캐시 저장 (${groupId}/${date}):`, schedules.length, '개');
-    setCache(prev => ({
-      ...prev,
-      scheduleData: {
-        ...prev.scheduleData,
-        [groupId]: {
-          ...prev.scheduleData[groupId],
-          [date]: schedules,
-        },
-      },
-      lastUpdated: {
-        ...prev.lastUpdated,
-        scheduleData: {
-          ...prev.lastUpdated.scheduleData,
-          [groupId]: Date.now(),
-        },
-      },
-    }));
-  }, []);
-
-  // 위치 데이터
-  const getLocationData = useCallback((groupId: number, date: string, memberId?: string) => {
-    const isValid = isCacheValid('locationData', groupId, date);
-    if (!isValid) {
-      console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 만료됨 (${groupId}/${date}${memberId ? `/${memberId}` : ''})`);
-      return null;
-    }
-
-    const locationData = cache.locationData[groupId]?.[date];
-    if (!locationData) {
-      console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 데이터 없음 (${groupId}/${date}${memberId ? `/${memberId}` : ''})`);
-      return null;
-    }
-
-    if (memberId) {
-      const memberData = locationData[memberId];
-      if (memberData) {
-        console.log(`[DATA CACHE] ✅ 위치 데이터 캐시 히트 (${groupId}/${date}/${memberId}):`, memberData);
-        return memberData;
-      } else {
-        console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 멤버 데이터 없음 (${groupId}/${date}/${memberId})`);
-        return null;
-      }
-    } else {
-      // memberId가 없으면 전체 날짜 데이터 반환
-      console.log(`[DATA CACHE] ✅ 위치 데이터 캐시 히트 - 전체 날짜 (${groupId}/${date}):`, locationData);
-      return locationData;
-    }
-  }, [cache.locationData, isCacheValid]);
-  
+  // 위치 데이터 - set 함수를 먼저 정의
   const setLocationData = useCallback((groupId: number, date: string, memberId: string, data: any) => {
     console.log(`[DATA CACHE] 💾 위치 데이터 캐시 저장 (${groupId}/${date}/${memberId}):`, data);
     setCache(prev => ({
@@ -515,6 +417,35 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     }));
   }, []);
 
+  const getLocationData = useCallback((groupId: number, date: string, memberId?: string) => {
+    const isValid = isCacheValid('locationData', groupId, date);
+    if (!isValid) {
+      console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 만료됨 (${groupId}/${date}${memberId ? `/${memberId}` : ''})`);
+      return null;
+    }
+
+    const locationData = cache.locationData[groupId]?.[date];
+    if (!locationData) {
+      console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 데이터 없음 (${groupId}/${date}${memberId ? `/${memberId}` : ''})`);
+      return null;
+    }
+
+    if (memberId) {
+      const memberData = locationData[memberId];
+      if (memberData) {
+        console.log(`[DATA CACHE] ✅ 위치 데이터 캐시 히트 (${groupId}/${date}/${memberId}):`, memberData);
+        return memberData;
+      } else {
+        console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 멤버 데이터 없음 (${groupId}/${date}/${memberId})`);
+        return null;
+      }
+    } else {
+      // memberId가 없으면 전체 날짜 데이터 반환
+      console.log(`[DATA CACHE] ✅ 위치 데이터 캐시 히트 - 전체 날짜 (${groupId}/${date}):`, locationData);
+      return locationData;
+    }
+  }, [cache.locationData, isCacheValid]);
+  
   // 그룹 장소
   const getGroupPlaces = useCallback((groupId: number): any[] => {
     const isValid = isCacheValid('groupPlaces', groupId);
@@ -546,33 +477,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     }));
   }, []);
 
-  // 일별 위치 카운트 (백그라운드 새로고침 포함)
-  const getDailyLocationCounts = useCallback((groupId: number) => {
-    const isValid = isCacheValid('dailyLocationCounts', groupId);
-    const isSoftExpired = !isCacheValid('dailyLocationCounts', groupId, undefined, true); // 소프트 만료 체크
-    const counts = cache.dailyLocationCounts[groupId];
-    
-    if (isValid && counts) {
-      console.log(`[DATA CACHE] ✅ 일별 위치 카운트 캐시 히트 (${groupId}):`, counts);
-      
-      // 소프트 만료된 경우 백그라운드에서 새로고침 힌트 제공
-      if (isSoftExpired) {
-        console.log(`[DATA CACHE] 💡 일별 위치 카운트 백그라운드 새로고침 권장 (${groupId})`);
-        // 백그라운드 새로고침을 위한 이벤트 발생 (선택적)
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('cache-soft-expired', {
-            detail: { type: 'dailyLocationCounts', groupId }
-          }));
-        }, 100);
-      }
-      
-      return counts;
-    } else {
-      console.log(`[DATA CACHE] ❌ 일별 위치 카운트 캐시 미스 (${groupId})`);
-      return null;
-    }
-  }, [cache.dailyLocationCounts, isCacheValid]);
-  
+  // 일별 위치 카운트 - set 함수를 먼저 정의
   const setDailyLocationCounts = useCallback((groupId: number, counts: any) => {
     console.log(`[DATA CACHE] 💾 일별 위치 카운트 캐시 저장 (${groupId}):`, counts);
     setCache(prev => ({
@@ -590,6 +495,86 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       },
     }));
   }, []);
+
+  const getDailyLocationCounts = useCallback((groupId: number) => {
+    const isValid = isCacheValid('dailyLocationCounts', groupId);
+    const counts = cache.dailyLocationCounts[groupId];
+    if (isValid && counts) {
+      console.log(`[DATA CACHE] ✅ 일별 위치 카운트 캐시 히트 (${groupId}):`, counts);
+      return counts;
+    } else {
+      console.log(`[DATA CACHE] ❌ 일별 위치 카운트 캐시 미스 (${groupId})`);
+      return null;
+    }
+  }, [cache.dailyLocationCounts, isCacheValid]);
+
+  // 🆕 멀티 날짜 위치 데이터 로딩 (새로운 기능)
+  const getMultiDateLocationData = useCallback((groupId: number, dates: string[], memberId?: string) => {
+    const results: { [date: string]: any } = {};
+    const missingDates: string[] = [];
+    
+    dates.forEach(date => {
+      const data = getLocationData(groupId, date, memberId);
+      if (data) {
+        results[date] = data;
+      } else {
+        missingDates.push(date);
+      }
+    });
+    
+    console.log(`[DATA CACHE] 📅 멀티 날짜 위치 데이터 조회 (${groupId}):`, {
+      요청날짜: dates,
+      캐시히트: Object.keys(results),
+      캐시미스: missingDates
+    });
+    
+    return { results, missingDates };
+  }, [getLocationData]);
+
+  // 🆕 멀티 멤버 위치 데이터 로딩 (새로운 기능)
+  const getMultiMemberLocationData = useCallback((groupId: number, date: string, memberIds: string[]) => {
+    const results: { [memberId: string]: any } = {};
+    const missingMembers: string[] = [];
+    
+    memberIds.forEach(memberId => {
+      const data = getLocationData(groupId, date, memberId);
+      if (data) {
+        results[memberId] = data;
+      } else {
+        missingMembers.push(memberId);
+      }
+    });
+    
+    console.log(`[DATA CACHE] 👥 멀티 멤버 위치 데이터 조회 (${groupId}/${date}):`, {
+      요청멤버: memberIds,
+      캐시히트: Object.keys(results),
+      캐시미스: missingMembers
+    });
+    
+    return { results, missingMembers };
+  }, [getLocationData]);
+
+  // 🆕 캐시 상태 분석 (새로운 기능)
+  const analyzeCacheStatus = useCallback((groupId: number, date?: string) => {
+    const analysis = {
+      groupMembers: {
+        cached: cache.groupMembers[groupId]?.length || 0,
+        valid: isCacheValid('groupMembers', groupId)
+      },
+      dailyLocationCounts: {
+        cached: !!cache.dailyLocationCounts[groupId],
+        valid: isCacheValid('dailyLocationCounts', groupId)
+      },
+      locationData: date ? {
+        cached: !!cache.locationData[groupId]?.[date],
+        valid: isCacheValid('locationData', groupId, date),
+        memberCount: Object.keys(cache.locationData[groupId]?.[date] || {}).length
+      } : null
+    };
+    
+    console.log(`[DATA CACHE] 📊 캐시 상태 분석 (${groupId}${date ? `/${date}` : ''}):`, analysis);
+    return analysis;
+  }, [cache, isCacheValid]);
 
   // 캐시 무효화
   const invalidateCache = useCallback((type: string, groupId?: number, date?: string) => {
@@ -678,6 +663,201 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }, [debugTimestamps, clearAllCache, cache]);
 
+  // 사용자 프로필 - set 함수를 먼저 정의
+  const setUserProfile = useCallback((profile: UserProfile) => {
+    console.log('[DATA CACHE] 💾 사용자 프로필 캐시 저장:', profile);
+    setCache(prev => ({
+      ...prev,
+      userProfile: profile,
+      lastUpdated: {
+        ...prev.lastUpdated,
+        userProfile: Date.now(),
+      },
+    }));
+    // localStorage에도 저장
+    saveToLocalStorage('userProfile', profile);
+  }, [saveToLocalStorage]);
+
+  const getUserProfile = useCallback(() => {
+    const isValid = isCacheValid('userProfile');
+    if (isValid && cache.userProfile) {
+      console.log('[DATA CACHE] ✅ 사용자 프로필 캐시 히트:', cache.userProfile);
+      return cache.userProfile;
+    } else {
+      // 캐시 미스 시 localStorage에서 로드 시도
+      const localData = loadFromLocalStorage('userProfile');
+      if (localData) {
+        console.log('[DATA CACHE] 📂 localStorage에서 사용자 프로필 로드:', localData);
+        setUserProfile(localData);
+        return localData;
+      }
+      console.log('[DATA CACHE] ❌ 사용자 프로필 캐시 미스');
+      return null;
+    }
+  }, [cache.userProfile, isCacheValid, loadFromLocalStorage, setUserProfile]);
+  
+  // 사용자 그룹 - set 함수를 먼저 정의
+  const setUserGroups = useCallback((groups: GroupInfo[]) => {
+    console.log('[DATA CACHE] 💾 사용자 그룹 캐시 저장:', groups.length, '개');
+    setCache(prev => ({
+      ...prev,
+      userGroups: groups,
+      lastUpdated: {
+        ...prev.lastUpdated,
+        userGroups: Date.now(),
+      },
+    }));
+    // localStorage에도 저장
+    saveToLocalStorage('userGroups', groups);
+  }, [saveToLocalStorage]);
+
+  const getUserGroups = useCallback(() => {
+    const isValid = isCacheValid('userGroups');
+    if (isValid && cache.userGroups.length > 0) {
+      console.log('[DATA CACHE] ✅ 사용자 그룹 캐시 히트:', cache.userGroups.length, '개');
+      return cache.userGroups;
+    } else {
+      // 캐시 미스 시 localStorage에서 로드 시도
+      const localData = loadFromLocalStorage('userGroups');
+      if (localData && localData.length > 0) {
+        console.log('[DATA CACHE] 📂 localStorage에서 사용자 그룹 로드:', localData.length, '개');
+        setUserGroups(localData);
+        return localData;
+      }
+      console.log('[DATA CACHE] ❌ 사용자 그룹 캐시 미스');
+      return [];
+    }
+  }, [cache.userGroups, isCacheValid, loadFromLocalStorage, setUserGroups]);
+  
+  // 그룹 멤버 - set 함수를 먼저 정의
+  const setGroupMembers = useCallback((groupId: number, members: GroupMember[]) => {
+    const timestamp = Date.now();
+    console.log(`[DATA CACHE] 💾 그룹 멤버 캐시 저장 (${groupId}):`, members.length, '명', `타임스탬프: ${timestamp}`);
+    setCache(prev => ({
+      ...prev,
+      groupMembers: {
+        ...prev.groupMembers,
+        [groupId]: members,
+      },
+      lastUpdated: {
+        ...prev.lastUpdated,
+        groupMembers: {
+          ...prev.lastUpdated.groupMembers,
+          [groupId]: timestamp,
+        },
+      },
+    }));
+    // localStorage에도 저장
+    saveToLocalStorage(`groupMembers_${groupId}`, members);
+  }, [saveToLocalStorage]);
+
+  const getGroupMembers = useCallback((groupId: number): GroupMember[] => {
+    const isValid = isCacheValid('groupMembers', groupId);
+    const members = cache.groupMembers[groupId] || [];
+    if (isValid && members.length > 0) {
+      console.log(`[DATA CACHE] ✅ 그룹 멤버 캐시 히트 (${groupId}):`, members.length, '명');
+      return members;
+    } else {
+      // 캐시 미스 시 localStorage에서 로드 시도
+      const localData = loadFromLocalStorage(`groupMembers_${groupId}`);
+      if (localData && localData.length > 0) {
+        console.log(`[DATA CACHE] 📂 localStorage에서 그룹 멤버 로드 (${groupId}):`, localData.length, '명');
+        setGroupMembers(groupId, localData);
+        return localData;
+      }
+      console.log(`[DATA CACHE] ❌ 그룹 멤버 캐시 미스 (${groupId})`);
+      return [];
+    }
+  }, [cache.groupMembers, isCacheValid, loadFromLocalStorage, setGroupMembers]);
+
+  // 스케줄 데이터
+  const getScheduleData = useCallback((groupId: number, date?: string): any[] => {
+    const isValid = isCacheValid('scheduleData', groupId);
+    if (isValid && cache.scheduleData[groupId]) {
+      if (date) {
+        const schedules = cache.scheduleData[groupId]?.[date] || [];
+        console.log(`[DATA CACHE] ✅ 스케줄 데이터 캐시 히트 (${groupId}/${date}):`, schedules.length, '개');
+        return schedules;
+      }
+      // 날짜 지정이 없으면 전체 스케줄 반환
+      const allSchedules = Object.values(cache.scheduleData[groupId] || {}).flat();
+      console.log(`[DATA CACHE] ✅ 전체 스케줄 데이터 캐시 히트 (${groupId}):`, allSchedules.length, '개');
+      return allSchedules;
+    } else {
+      console.log(`[DATA CACHE] ❌ 스케줄 데이터 캐시 미스 (${groupId}/${date || 'all'})`);
+      return [];
+    }
+  }, [cache.scheduleData, isCacheValid]);
+  
+  const setScheduleData = useCallback((groupId: number, date: string, schedules: any[]) => {
+    console.log(`[DATA CACHE] 💾 스케줄 데이터 캐시 저장 (${groupId}/${date}):`, schedules.length, '개');
+    setCache(prev => ({
+      ...prev,
+      scheduleData: {
+        ...prev.scheduleData,
+        [groupId]: {
+          ...prev.scheduleData[groupId],
+          [date]: schedules,
+        },
+      },
+      lastUpdated: {
+        ...prev.lastUpdated,
+        scheduleData: {
+          ...prev.lastUpdated.scheduleData,
+          [groupId]: Date.now(),
+        },
+      },
+    }));
+  }, []);
+
+  // 🆕 일괄 데이터 저장 (로그인 성공 시 사용) - 다른 함수들 다음에 정의
+  const saveComprehensiveData = useCallback((data: {
+    userProfile?: any;
+    userGroups?: any[];
+    groupMembers?: { [groupId: string]: any[] };
+    locationData?: { [groupId: string]: { [date: string]: { [memberId: string]: any } } };
+    dailyLocationCounts?: { [groupId: string]: any };
+  }) => {
+    console.log('[DATA CACHE] 🚀 일괄 데이터 저장 시작');
+    
+    if (data.userProfile) {
+      setUserProfile(data.userProfile);
+      saveToLocalStorage('userProfile', data.userProfile);
+    }
+    
+    if (data.userGroups) {
+      setUserGroups(data.userGroups);
+      saveToLocalStorage('userGroups', data.userGroups);
+    }
+    
+    if (data.groupMembers) {
+      Object.entries(data.groupMembers).forEach(([groupId, members]) => {
+        setGroupMembers(parseInt(groupId), members);
+        saveToLocalStorage(`groupMembers_${groupId}`, members);
+      });
+    }
+    
+    if (data.locationData) {
+      Object.entries(data.locationData).forEach(([groupId, dateData]) => {
+        Object.entries(dateData).forEach(([date, memberData]) => {
+          Object.entries(memberData).forEach(([memberId, locationData]) => {
+            setLocationData(parseInt(groupId), date, memberId, locationData);
+            saveToLocalStorage(`locationData_${groupId}_${date}_${memberId}`, locationData);
+          });
+        });
+      });
+    }
+    
+    if (data.dailyLocationCounts) {
+      Object.entries(data.dailyLocationCounts).forEach(([groupId, counts]) => {
+        setDailyLocationCounts(parseInt(groupId), counts);
+        saveToLocalStorage(`dailyLocationCounts_${groupId}`, counts);
+      });
+    }
+    
+    console.log('[DATA CACHE] ✅ 일괄 데이터 저장 완료');
+  }, [setUserProfile, setUserGroups, setGroupMembers, setLocationData, setDailyLocationCounts, saveToLocalStorage]);
+
   const value: DataCacheContextType = {
     cache,
     getUserProfile,
@@ -694,11 +874,17 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     setGroupPlaces,
     getDailyLocationCounts,
     setDailyLocationCounts,
+    getMultiDateLocationData,
+    getMultiMemberLocationData,
+    analyzeCacheStatus,
     isCacheValid,
     invalidateCache,
     clearAllCache,
     isLoading,
     setIsLoading,
+    saveToLocalStorage,
+    loadFromLocalStorage,
+    saveComprehensiveData,
   };
 
   return (

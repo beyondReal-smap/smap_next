@@ -4784,7 +4784,8 @@ export default function LogsPage() {
                 'LOGS_GROUP_MEMBERS'
               );
               
-              if (isMounted && memberData && memberData.length > 0) { 
+              if (memberData && memberData.length > 0) {
+                if (isMounted) setGroupMembers(currentMembers);
                 // 캐시에 저장 (타입 변환)
                 const cacheMembers = memberData.map((member: any) => ({
                   ...member,
@@ -4854,7 +4855,7 @@ export default function LogsPage() {
                 }
               } else {
                 console.warn('❌ No member data from API, or API call failed.');
-                setGroupMembers([]);
+                if (isMounted) setGroupMembers([]);
                 
                 console.log('[LOGS] 멤버 데이터 없음 - 초기 로딩 실패 처리');
                 setHasInitialLoadFailed(true);

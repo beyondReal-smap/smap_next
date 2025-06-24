@@ -159,7 +159,21 @@ export async function retryDataFetch<T>(
     }
   };
   
-  return retryWithBackoff(fetchFn, { ...defaultOptions, ...options });
+  console.log(`[RETRY UTILS] retryDataFetch 시작: ${dataType}`);
+  
+  try {
+    const result = await retryWithBackoff(fetchFn, { ...defaultOptions, ...options });
+    console.log(`[RETRY UTILS] retryDataFetch 성공: ${dataType}`, {
+      result,
+      resultType: typeof result,
+      isArray: Array.isArray(result),
+      length: Array.isArray(result) ? result.length : 'N/A'
+    });
+    return result;
+  } catch (error) {
+    console.error(`[RETRY UTILS] retryDataFetch 실패: ${dataType}`, error);
+    throw error;
+  }
 }
 
 /**

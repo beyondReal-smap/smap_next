@@ -315,4 +315,129 @@ class DataPreloadService {
 }
 
 export const dataPreloadService = new DataPreloadService();
-export default dataPreloadService; 
+export default dataPreloadService;
+
+// 🆕 로그인 성공 시 모든 데이터 일괄 프리로딩
+export const comprehensivePreloadData = async (userId: number) => {
+  console.log(`[COMPREHENSIVE PRELOAD] 🚀 전체 데이터 프리로딩 시작: ${userId}`);
+  
+  const startTime = Date.now();
+  const results = {
+    userProfile: null,
+    userGroups: [],
+    groupMembers: {},
+    locationData: {},
+    dailyCounts: {},
+    success: true,
+    errors: []
+  };
+
+  try {
+    // 1. 사용자 프로필 조회
+    console.log(`[COMPREHENSIVE PRELOAD] 1️⃣ 사용자 프로필 조회 시작`);
+    try {
+      const userProfile = await memberService.getUserProfile(userId);
+      results.userProfile = userProfile;
+      console.log(`[COMPREHENSIVE PRELOAD] ✅ 사용자 프로필 조회 완료: ${userProfile?.mt_name}`);
+    } catch (error) {
+      console.error(`[COMPREHENSIVE PRELOAD] ❌ 사용자 프로필 조회 실패:`, error);
+      results.errors.push({ type: 'userProfile', error });
+    }
+
+    // 2. 사용자 그룹 목록 조회
+    console.log(`[COMPREHENSIVE PRELOAD] 2️⃣ 사용자 그룹 목록 조회 시작`);
+    try {
+      const userGroups = await groupService.getUserGroups();
+      results.userGroups = userGroups;
+      console.log(`[COMPREHENSIVE PRELOAD] ✅ 사용자 그룹 조회 완료: ${userGroups.length}개 그룹`);
+    } catch (error) {
+      console.error(`[COMPREHENSIVE PRELOAD] ❌ 사용자 그룹 조회 실패:`, error);
+      results.errors.push({ type: 'userGroups', error });
+    }
+
+    // 3. 각 그룹별 멤버 및 데이터 조회
+    if (results.userGroups.length > 0) {
+      console.log(`[COMPREHENSIVE PRELOAD] 3️⃣ 그룹별 멤버 및 데이터 조회 시작`);
+      
+      for (const group of results.userGroups) {
+        const groupId = group.sgt_idx;
+        console.log(`[COMPREHENSIVE PRELOAD] 📋 그룹 처리 중: ${group.sgt_title} (${groupId})`);
+        
+        try {
+          // 3-1. 그룹 멤버 조회
+          const groupMembers = await memberService.getGroupMembers(groupId.toString());
+          results.groupMembers[groupId] = groupMembers;
+          console.log(`[COMPREHENSIVE PRELOAD] ✅ 그룹 ${groupId} 멤버 조회 완료: ${groupMembers.length}명`);
+
+          // 3-2. 최근 2주간 일별 카운트 데이터
+          const dailyCounts = await memberLocationLogService.getDailyLocationCounts(groupId, 14);
+          results.dailyCounts[groupId] = dailyCounts;
+          console.log(`[COMPREHENSIVE PRELOAD] ✅ 그룹 ${groupId} 일별 카운트 조회 완료`);
+
+          // 3-3. 각 멤버별 최근 2주간 위치 데이터
+          const recentDates = [];
+          const today = new Date();
+          for (let i = 0; i < 14; i++) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            recentDates.push(date.toISOString().split('T')[0]);
+          }
+
+          for (const member of groupMembers) {
+            const memberId = member.mt_idx;
+            console.log(`[COMPREHENSIVE PRELOAD] 👤 멤버 ${member.mt_name} (${memberId}) 위치 데이터 조회 중`);
+            
+            // 최근 2주간 위치 데이터 병렬 조회
+            const locationPromises = recentDates.map(async (date) => {
+              try {
+                const locationData = await memberLocationLogService.getLocationData(memberId, date);
+                return { date, memberId, data: locationData };
+              } catch (error) {
+                console.warn(`[COMPREHENSIVE PRELOAD] ⚠️ ${member.mt_name} ${date} 위치 데이터 조회 실패:`, error);
+                return { date, memberId, data: null, error };
+              }
+            });
+
+            const locationResults = await Promise.allSettled(locationPromises);
+            const successfulResults = locationResults
+              .filter(result => result.status === 'fulfilled' && result.value.data)
+              .map(result => (result as PromiseFulfilledResult<any>).value);
+
+            // 결과를 그룹/날짜/멤버별로 구조화
+            successfulResults.forEach(({ date, memberId, data }) => {
+              if (!results.locationData[groupId]) results.locationData[groupId] = {};
+              if (!results.locationData[groupId][date]) results.locationData[groupId][date] = {};
+              results.locationData[groupId][date][memberId] = data;
+            });
+
+            console.log(`[COMPREHENSIVE PRELOAD] ✅ 멤버 ${member.mt_name} 위치 데이터 완료: ${successfulResults.length}/14일`);
+          }
+
+        } catch (error) {
+          console.error(`[COMPREHENSIVE PRELOAD] ❌ 그룹 ${groupId} 처리 실패:`, error);
+          results.errors.push({ type: 'groupData', groupId, error });
+        }
+      }
+    }
+
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
+    console.log(`[COMPREHENSIVE PRELOAD] 🎉 전체 프리로딩 완료 (${duration}ms):`, {
+      userProfile: !!results.userProfile,
+      userGroups: results.userGroups.length,
+      groupMembers: Object.keys(results.groupMembers).length,
+      locationData: Object.keys(results.locationData).length,
+      dailyCounts: Object.keys(results.dailyCounts).length,
+      errors: results.errors.length
+    });
+
+    return results;
+
+  } catch (error) {
+    console.error(`[COMPREHENSIVE PRELOAD] ❌ 전체 프리로딩 실패:`, error);
+    results.success = false;
+    results.errors.push({ type: 'general', error });
+    return results;
+  }
+}; 

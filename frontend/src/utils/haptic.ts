@@ -710,9 +710,9 @@ const fallbackToWebVibration = (type: HapticFeedbackType, env: any) => {
         console.log(`⚠️ [HAPTIC] iOS 바이브레이션 차단됨`);
       }
     }
-  } else {
-    console.log(`⚠️ [HAPTIC] 햅틱 미지원 환경`);
-  }
+      } else {
+      console.log(`⚠️ [HAPTIC] 햅틱 미지원 환경`);
+    }
 };
 
 /**

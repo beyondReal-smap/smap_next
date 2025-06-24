@@ -6,6 +6,7 @@ import authService from '@/services/authService';
 // import { getSession } from 'next-auth/react'; // 임시 비활성화
 import { useDataCache } from '@/contexts/DataCacheContext';
 import dataPreloadService from '@/services/dataPreloadService';
+import { comprehensivePreloadData } from '@/services/dataPreloadService';
 
 // 전역 상태로 중복 실행 방지
 let globalPreloadingState = {
@@ -138,7 +139,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setDailyLocationCounts,
     clearAllCache,
     getUserProfile,
-    getUserGroups
+    getUserGroups,
+    saveComprehensiveData
   } = useDataCache();
 
   // 데이터 프리로딩 함수 (중복 실행 방지 강화)
@@ -353,41 +355,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // 로그인
   const login = async (credentials: LoginRequest): Promise<void> => {
     try {
-      dispatch({ type: 'LOGIN_START' });
+      console.log('[AUTH] 로그인 시도:', credentials.mt_id);
+      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
+
       const response = await authService.login(credentials);
-      
-      if (response.success && response.data) {
-        // authService.login()에서 이미 getUserProfile()이 호출되고 사용자 데이터가 저장됨
-        // 저장된 사용자 데이터를 가져와서 사용
-        const userProfile = authService.getUserData();
+      console.log('[AUTH] 로그인 성공:', response.member.mt_name);
+
+      // 로그인 성공 시 사용자 데이터 저장
+      dispatch({ type: 'LOGIN_SUCCESS', payload: response.member });
+
+      // 🚀 로그인 성공 시 모든 데이터 일괄 프리로딩
+      console.log('[AUTH] 🚀 로그인 성공 후 전체 데이터 프리로딩 시작');
+      try {
+        const preloadResults = await comprehensivePreloadData(response.member.mt_idx);
         
-        if (userProfile) {
-          dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
-          
-          // 🚀 로그인 성공 시 백그라운드에서 데이터 프리로딩 실행
-          preloadUserData(userProfile.mt_idx, 'login').catch(error => {
-            console.error('[AUTH] 로그인 후 프리로딩 실패:', error);
-            // 프리로딩 실패는 로그인 성공에 영향을 주지 않음
+        if (preloadResults.success) {
+          // DataCacheContext에 일괄 저장
+          saveComprehensiveData({
+            userProfile: preloadResults.userProfile,
+            userGroups: preloadResults.userGroups,
+            groupMembers: preloadResults.groupMembers,
+            locationData: preloadResults.locationData,
+            dailyLocationCounts: preloadResults.dailyCounts
           });
+          
+          console.log('[AUTH] ✅ 로그인 후 전체 데이터 프리로딩 완료');
         } else {
-          // authService에서 사용자 데이터 저장이 실패한 경우, 다시 시도
-          console.warn('[AUTH] authService에서 사용자 데이터를 찾을 수 없음, 재시도');
-          const userProfile = await authService.getUserProfile(response.data.member.mt_idx);
-          dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
-          
-          // 🚀 로그인 성공 시 백그라운드에서 데이터 프리로딩 실행
-          preloadUserData(userProfile.mt_idx, 'login-retry').catch(error => {
-            console.error('[AUTH] 로그인 후 프리로딩 실패:', error);
-            // 프리로딩 실패는 로그인 성공에 영향을 주지 않음
-          });
+          console.warn('[AUTH] ⚠️ 로그인 후 데이터 프리로딩 실패:', preloadResults.errors);
         }
-      } else {
-        throw new Error(response.message || '로그인에 실패했습니다.');
+      } catch (preloadError) {
+        console.error('[AUTH] ❌ 로그인 후 데이터 프리로딩 오류:', preloadError);
+        // 프리로딩 실패해도 로그인은 성공으로 처리
       }
+
     } catch (error: any) {
-      const errorMessage = error.message || '로그인에 실패했습니다.';
-      dispatch({ type: 'LOGIN_FAILURE', payload: errorMessage });
-      throw error;
+      console.error('[AUTH] 로그인 실패:', error);
+      const errorMessage = error.response?.data?.message || error.message || '로그인에 실패했습니다.';
+      dispatch({ type: 'SET_ERROR', payload: errorMessage });
+    } finally {
+      dispatch({ type: 'SET_LOADING', payload: false });
     }
   };
 

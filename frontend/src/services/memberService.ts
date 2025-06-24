@@ -153,8 +153,8 @@ class MemberService {
     
     try {
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 시작:', groupId);
-      // smap_group_detail_t 데이터가 포함된 완전한 멤버 정보 조회
-      const response = await apiClient.get<Member[]>(`/groups/${groupId}/members`);
+      // 올바른 엔드포인트 사용: /group-members/member/{groupId}
+      const response = await apiClient.get<Member[]>(`/group-members/member/${groupId}`);
       console.log('[MEMBER SERVICE] 그룹 멤버 조회 응답:', {
         status: response.status,
         dataLength: response.data?.length || 0,

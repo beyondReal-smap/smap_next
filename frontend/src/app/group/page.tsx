@@ -38,6 +38,7 @@ import memberService from '@/services/memberService';
 import scheduleService from '@/services/scheduleService';
 import locationService from '@/services/locationService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDataCache } from '@/contexts/DataCacheContext';
 import authService from '@/services/authService';
 import { hapticFeedback } from '@/utils/haptic';
 
@@ -286,39 +287,35 @@ const floatingButtonVariants = {
   tap: { scale: 0.9 }
 };
 
-// 그룹 목록 컨테이너 애니메이션
+// 그룹 목록 컨테이너 애니메이션 - schedule 스타일로 변경
 const groupListContainerVariants = {
   hidden: { 
     opacity: 0,
-    scale: 0.95,
-    y: 30
+    y: 20
   },
   visible: { 
     opacity: 1,
-    scale: 1,
     y: 0,
     transition: {
-      duration: 0.4,
+      duration: 0.6,
       ease: [0.25, 0.46, 0.45, 0.94],
-      staggerChildren: 0.08,
+      staggerChildren: 0.1,
       delayChildren: 0.1
     }
   }
 };
 
-// 개별 그룹 카드 애니메이션
+// 개별 그룹 카드 애니메이션 - schedule 스타일로 변경
 const groupCardVariants = {
   hidden: { 
     opacity: 0, 
-    y: 30,
-    scale: 0.9
+    y: 20
   },
   visible: { 
     opacity: 1, 
     y: 0,
-    scale: 1,
     transition: {
-      duration: 0.4,
+      duration: 0.5,
       ease: [0.25, 0.46, 0.45, 0.94]
     }
   },
@@ -436,6 +433,15 @@ const modalVariants = {
 function GroupPageContent() {
   const router = useRouter();
   const { user, isLoggedIn, loading: authLoading } = useAuth();
+  const { 
+    getUserProfile, 
+    getUserGroups, 
+    getGroupMembers, 
+    getLocationData,
+    getDailyLocationCounts,
+    isCacheValid,
+    loadFromLocalStorage
+  } = useDataCache();
   
   // 상태 관리
   const [groups, setGroups] = useState<Group[]>([]);
@@ -1215,9 +1221,90 @@ function GroupPageContent() {
     setToastModal(prev => ({ ...prev, isOpen: false }));
   };
 
-
-
-
+  // 🆕 캐시 데이터 확인 로그
+  useEffect(() => {
+    console.log('👥 [GROUP] 캐시 데이터 확인 시작');
+    
+    // 사용자 프로필 캐시 확인
+    const userProfile = getUserProfile();
+    console.log('👥 [GROUP] 사용자 프로필 캐시:', {
+      exists: !!userProfile,
+      data: userProfile ? {
+        name: userProfile.mt_name,
+        id: userProfile.mt_idx,
+        email: userProfile.mt_email
+      } : null,
+      isValid: isCacheValid('userProfile')
+    });
+    
+    // 사용자 그룹 캐시 확인
+    const userGroupsCache = getUserGroups();
+    console.log('👥 [GROUP] 사용자 그룹 캐시:', {
+      exists: !!userGroupsCache,
+      count: userGroupsCache?.length || 0,
+      groups: userGroupsCache?.map(g => ({ id: g.sgt_idx, name: g.sgt_title })) || [],
+      isValid: isCacheValid('userGroups')
+    });
+    
+    // 각 그룹의 멤버 캐시 확인
+    if (userGroupsCache && userGroupsCache.length > 0) {
+      userGroupsCache.forEach(group => {
+        const groupMembers = getGroupMembers(group.sgt_idx);
+        console.log(`👥 [GROUP] 그룹 ${group.sgt_title} 멤버 캐시:`, {
+          groupId: group.sgt_idx,
+          groupName: group.sgt_title,
+          exists: !!groupMembers,
+          count: groupMembers?.length || 0,
+          members: groupMembers?.map(m => ({ id: m.mt_idx, name: m.mt_name })) || [],
+          isValid: isCacheValid('groupMembers', group.sgt_idx)
+        });
+        
+        // 위치 데이터 캐시 확인
+        const today = new Date().toISOString().split('T')[0];
+        const locationData = getLocationData(group.sgt_idx, today);
+        console.log(`👥 [GROUP] 그룹 ${group.sgt_title} 위치 데이터 캐시:`, {
+          groupId: group.sgt_idx,
+          date: today,
+          exists: !!locationData,
+          dataCount: locationData ? Object.keys(locationData).length : 0,
+          isValid: isCacheValid('locationData', group.sgt_idx)
+        });
+        
+        // 일별 카운트 캐시 확인
+        const dailyCounts = getDailyLocationCounts(group.sgt_idx);
+        console.log(`👥 [GROUP] 그룹 ${group.sgt_title} 일별 카운트 캐시:`, {
+          groupId: group.sgt_idx,
+          exists: !!dailyCounts,
+          dataCount: dailyCounts ? Object.keys(dailyCounts).length : 0,
+          isValid: isCacheValid('dailyLocationCounts', group.sgt_idx)
+        });
+      });
+    }
+    
+    // localStorage에서 직접 확인
+    try {
+      const localStorageKeys = Object.keys(localStorage).filter(key => key.startsWith('smap_cache_'));
+      console.log('👥 [GROUP] localStorage 캐시 키들:', {
+        totalKeys: localStorageKeys.length,
+        keys: localStorageKeys.map(key => key.replace('smap_cache_', ''))
+      });
+      
+      // 각 캐시 키의 데이터 확인
+      localStorageKeys.forEach(key => {
+        const data = loadFromLocalStorage(key.replace('smap_cache_', ''));
+        console.log(`👥 [GROUP] localStorage ${key}:`, {
+          exists: !!data,
+          dataType: typeof data,
+          isArray: Array.isArray(data),
+          length: Array.isArray(data) ? data.length : 'N/A'
+        });
+      });
+    } catch (error) {
+      console.warn('👥 [GROUP] localStorage 접근 실패:', error);
+    }
+    
+    console.log('👥 [GROUP] 캐시 데이터 확인 완료');
+  }, [getUserProfile, getUserGroups, getGroupMembers, getLocationData, getDailyLocationCounts, isCacheValid, loadFromLocalStorage]);
 
   return (
     <>
@@ -1349,11 +1436,11 @@ function GroupPageContent() {
               ) : selectedGroup ? (
                 <motion.div
                   key="detail"
-                  initial={{ opacity: 0, x: 100, scale: 0.95 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: -100, scale: 0.95 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
                   transition={{ 
-                    duration: 0.5,
+                    duration: 0.6,
                     ease: [0.25, 0.46, 0.45, 0.94]
                   }}
                   className="flex flex-col flex-1 min-h-0"
@@ -1365,9 +1452,9 @@ function GroupPageContent() {
                     <motion.div 
                       className="rounded-2xl p-6 text-white shadow-lg relative"
                       style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
-                      initial={{ y: 30, opacity: 0, scale: 0.9 }}
-                      animate={{ y: 0, opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.1, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
                     >
                       {/* 그룹 액션 메뉴 버튼 */}
                       <div className="absolute top-4 right-4 z-[140]">
@@ -1456,9 +1543,9 @@ function GroupPageContent() {
                     <div className="grid grid-cols-3 gap-3">
                       <motion.div 
                         className="bg-gradient-to-r from-red-300 to-red-300 rounded-xl p-3 text-white text-center shadow-md"
-                        initial={{ y: 30, opacity: 0, scale: 0.8 }}
-                        animate={{ y: 0, opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.2, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.2, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
                       >
                         <FaUsers className="w-6 h-6 text-red-800 mx-auto mb-1" />
                         {membersLoading ? (
@@ -1477,9 +1564,9 @@ function GroupPageContent() {
                       </motion.div>
                       <motion.div 
                         className="bg-gradient-to-r from-yellow-300 to-yellow-300 rounded-xl p-3 text-white text-center shadow-md"
-                        initial={{ y: 30, opacity: 0, scale: 0.8 }}
-                        animate={{ y: 0, opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.3, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.3, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
                       >
                         <FaCalendarAlt className="w-6 h-6 text-yellow-800 mx-auto mb-1" />
                         {statsLoading ? (
@@ -1498,9 +1585,9 @@ function GroupPageContent() {
                       </motion.div>
                       <motion.div 
                         className="bg-gradient-to-r from-blue-300 to-blue-300 rounded-xl p-3 text-white text-center shadow-md"
-                        initial={{ y: 30, opacity: 0, scale: 0.8 }}
-                        animate={{ y: 0, opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.4, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                        initial={{ y: 20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.4, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
                       >
                         <FaMapMarkerAlt className="w-6 h-6 text-blue-600 mx-auto mb-1" />
                         {statsLoading ? (
@@ -1527,9 +1614,9 @@ function GroupPageContent() {
                     <motion.div 
                       className="bg-white rounded-2xl shadow-sm border overflow-hidden"
                       style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}
-                      initial={{ y: 30, opacity: 0, scale: 0.95 }}
-                      animate={{ y: 0, opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.5, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: 0.5, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
                     >
                       <div className="p-4 border-b" style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}>
                         <div className="flex items-center justify-between">
