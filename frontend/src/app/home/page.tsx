@@ -5821,7 +5821,7 @@ export default function HomePage() {
                          {groupMembers ? groupMembers.length : 0}명
                        </span>
                      </div>
-                     <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-16">
+                     <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-24">
                        {groupMembers && safeArrayCheck(groupMembers) && groupMembers.length > 0 ? (
                          <motion.div variants={sidebarContentVariants} className="space-y-2">
                            {(groupMembers && safeArrayCheck(groupMembers)) && groupMembers.map((member, index) => {

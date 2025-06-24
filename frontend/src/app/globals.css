@@ -480,3 +480,18 @@ nav[class*="navigation-fixed"] {
   border-radius: 20px 20px 0 0 !important;
   overflow: hidden !important;
 }
+
+/* 네비게이션 바 높이만큼의 공백을 위한 클래스 */
+.sidebar-bottom-spacing {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+}
+
+/* 사이드바 스크롤 영역에 네비게이션 바 높이만큼의 공백 추가 */
+.sidebar-scroll-area {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+}
+
+/* 모바일 최적화 레이아웃 */
+.container-mobile {
+  @apply w-full max-w-md mx-auto px-4;
+}

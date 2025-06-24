@@ -135,6 +135,11 @@ interface DataCacheContextType {
   // 로딩 상태
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
+
+  // 🆕 디버깅 및 상태 확인 함수들 추가
+  debugCacheStatus: () => void;
+  getCacheSummary: () => any;
+  exportCacheData: () => any;
 }
 
 // 캐시 지속 시간 설정 (더 긴 시간으로 변경)
@@ -808,7 +813,8 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
         },
       },
     }));
-  }, []);
+    saveToLocalStorage(`scheduleData_${groupId}_${date}`, schedules);
+  }, [saveToLocalStorage]);
 
   // 🆕 일괄 데이터 저장 (로그인 성공 시 사용) - 다른 함수들 다음에 정의
   const saveComprehensiveData = useCallback((data: {
@@ -858,6 +864,123 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     console.log('[DATA CACHE] ✅ 일괄 데이터 저장 완료');
   }, [setUserProfile, setUserGroups, setGroupMembers, setLocationData, setDailyLocationCounts, saveToLocalStorage]);
 
+  // 🆕 디버깅 및 상태 확인 함수들 추가
+  const debugCacheStatus = useCallback(() => {
+    console.log('🔍 [DATA CACHE DEBUG] === 캐시 상태 전체 확인 ===');
+    
+    // 메모리 캐시 상태
+    console.log('📊 메모리 캐시 상태:');
+    console.log('  - userProfile:', cache.userProfile ? '존재' : '없음', cache.userProfile);
+    console.log('  - userGroups:', cache.userGroups.length, '개', cache.userGroups);
+    console.log('  - groupMembers:', Object.keys(cache.groupMembers).length, '개 그룹', Object.keys(cache.groupMembers));
+    console.log('  - scheduleData:', Object.keys(cache.scheduleData).length, '개 그룹');
+    console.log('  - locationData:', Object.keys(cache.locationData).length, '개 그룹');
+    console.log('  - groupPlaces:', Object.keys(cache.groupPlaces).length, '개 그룹');
+    console.log('  - dailyLocationCounts:', Object.keys(cache.dailyLocationCounts).length, '개 그룹');
+    
+    // 타임스탬프 상태
+    console.log('⏰ 타임스탬프 상태:');
+    console.log('  - userProfile:', cache.lastUpdated.userProfile);
+    console.log('  - userGroups:', cache.lastUpdated.userGroups);
+    console.log('  - groupMembers:', cache.lastUpdated.groupMembers);
+    console.log('  - scheduleData:', cache.lastUpdated.scheduleData);
+    console.log('  - locationData:', cache.lastUpdated.locationData);
+    console.log('  - groupPlaces:', cache.lastUpdated.groupPlaces);
+    console.log('  - dailyLocationCounts:', cache.lastUpdated.dailyLocationCounts);
+    
+    // localStorage 상태
+    console.log('💾 localStorage 상태:');
+    try {
+      const localStorageKeys = Object.keys(localStorage).filter(key => key.startsWith('smap_cache_'));
+      console.log('  - 총 캐시 키:', localStorageKeys.length, '개');
+      localStorageKeys.forEach(key => {
+        const data = loadFromLocalStorage(key.replace('smap_cache_', ''));
+        console.log(`    - ${key}:`, data ? '존재' : '없음', data);
+      });
+    } catch (error) {
+      console.warn('  - localStorage 접근 실패:', error);
+    }
+    
+    // 캐시 유효성 검사
+    console.log('✅ 캐시 유효성 검사:');
+    console.log('  - userProfile:', isCacheValid('userProfile'));
+    console.log('  - userGroups:', isCacheValid('userGroups'));
+    
+    if (cache.userGroups.length > 0) {
+      cache.userGroups.forEach(group => {
+        console.log(`  - groupMembers(${group.sgt_idx}):`, isCacheValid('groupMembers', group.sgt_idx));
+        console.log(`  - dailyLocationCounts(${group.sgt_idx}):`, isCacheValid('dailyLocationCounts', group.sgt_idx));
+      });
+    }
+    
+    console.log('🔍 [DATA CACHE DEBUG] === 확인 완료 ===');
+  }, [cache, isCacheValid, loadFromLocalStorage]);
+
+  const getCacheSummary = useCallback(() => {
+    const summary = {
+      memory: {
+        userProfile: !!cache.userProfile,
+        userGroups: cache.userGroups.length,
+        groupMembers: Object.keys(cache.groupMembers).length,
+        scheduleData: Object.keys(cache.scheduleData).length,
+        locationData: Object.keys(cache.locationData).length,
+        groupPlaces: Object.keys(cache.groupPlaces).length,
+        dailyLocationCounts: Object.keys(cache.dailyLocationCounts).length,
+      },
+      localStorage: {
+        totalKeys: 0,
+        keys: [] as string[],
+      },
+      validity: {
+        userProfile: isCacheValid('userProfile'),
+        userGroups: isCacheValid('userGroups'),
+        groupMembers: {} as { [groupId: string]: boolean },
+        dailyLocationCounts: {} as { [groupId: string]: boolean },
+      }
+    };
+    
+    // localStorage 키 수집
+    try {
+      const localStorageKeys = Object.keys(localStorage).filter(key => key.startsWith('smap_cache_'));
+      summary.localStorage.totalKeys = localStorageKeys.length;
+      summary.localStorage.keys = localStorageKeys;
+    } catch (error) {
+      console.warn('localStorage 접근 실패:', error);
+    }
+    
+    // 그룹별 유효성 검사
+    cache.userGroups.forEach(group => {
+      summary.validity.groupMembers[group.sgt_idx] = isCacheValid('groupMembers', group.sgt_idx);
+      summary.validity.dailyLocationCounts[group.sgt_idx] = isCacheValid('dailyLocationCounts', group.sgt_idx);
+    });
+    
+    return summary;
+  }, [cache, isCacheValid]);
+
+  const exportCacheData = useCallback(() => {
+    const exportData = {
+      timestamp: new Date().toISOString(),
+      cache: cache,
+      localStorage: {} as { [key: string]: any }
+    };
+    
+    // localStorage 데이터 수집
+    try {
+      const localStorageKeys = Object.keys(localStorage).filter(key => key.startsWith('smap_cache_'));
+      localStorageKeys.forEach(key => {
+        const data = loadFromLocalStorage(key.replace('smap_cache_', ''));
+        if (data) {
+          exportData.localStorage[key] = data;
+        }
+      });
+    } catch (error) {
+      console.warn('localStorage 수집 실패:', error);
+    }
+    
+    console.log('📤 [DATA CACHE EXPORT] 캐시 데이터 내보내기:', exportData);
+    return exportData;
+  }, [cache, loadFromLocalStorage]);
+
   const value: DataCacheContextType = {
     cache,
     getUserProfile,
@@ -885,6 +1008,9 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     saveToLocalStorage,
     loadFromLocalStorage,
     saveComprehensiveData,
+    debugCacheStatus,
+    getCacheSummary,
+    exportCacheData,
   };
 
   return (

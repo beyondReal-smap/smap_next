@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">SMAP</string>
+    <string name="app_name">smap</string>
     <string name="admob_app_id">ca-app-pub-7432142706137657~4060543559</string>
     <string name="webview_url">https://nextstep.smap.site</string>
     <string name="loading_message">로딩 중...</string>

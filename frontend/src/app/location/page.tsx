@@ -5765,7 +5765,7 @@ export default function LocationPage() {
                       {groupMembers.length}명
                     </span>
                   </div>
-                  <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-16">
+                  <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-24">
                     {groupMembers.length > 0 ? (
                       <motion.div variants={sidebarContentVariants} className="space-y-2">
                         {groupMembers.map((member, index) => (
