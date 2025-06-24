@@ -1,6 +1,6 @@
 /**
  * 햅틱 피드백 유틸리티
- * iOS WebView와 웹 브라우저에서 햅틱 피드백을 제공합니다.
+ * iOS WebView와 Android WebView, 웹 브라우저에서 햅틱 피드백을 제공합니다.
  */
 
 export enum HapticFeedbackType {
@@ -274,6 +274,105 @@ const sendHapticToWebView = (type: HapticFeedbackType): boolean => {
 };
 
 /**
+ * 환경 감지 함수 (iOS, Android, 웹 브라우저 구분)
+ */
+const detectEnvironment = () => {
+  const userAgent = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+  const isAndroid = /Android/.test(userAgent);
+  const hasWebKit = !!(window as any).webkit;
+  const hasMessageHandlers = !!(window as any).webkit?.messageHandlers;
+  const hasSmapIos = !!(window as any).webkit?.messageHandlers?.smapIos;
+  const hasAndroidHaptic = !!(window as any).AndroidHaptic;
+  const supportsTouchAPI = 'ontouchstart' in window;
+  const supportsVibration = 'vibrate' in navigator;
+  
+  // 웹뷰 핸들러 체크
+  const webkit = (window as any).webkit;
+  const availableHandlers: string[] = [];
+  if (webkit?.messageHandlers) {
+    const knownHandlers = ['smapIos', 'iosHandler', 'jsToNative', 'webViewHandler', 'nativeHandler'];
+    knownHandlers.forEach(handlerName => {
+      if (webkit.messageHandlers[handlerName]) {
+        availableHandlers.push(handlerName);
+      }
+    });
+  }
+  
+  const isWebView = hasWebKit && availableHandlers.length > 0;
+  const isIOSApp = isIOS && hasSmapIos;
+  const isAndroidApp = isAndroid && hasAndroidHaptic;
+  const isIOSBrowser = isIOS && !isWebView;
+  const isAndroidBrowser = isAndroid && !isWebView;
+  const hasHandler = hasSmapIos || hasAndroidHaptic;
+  
+  return {
+    isIOS,
+    isAndroid,
+    isIOSApp,
+    isAndroidApp,
+    isIOSBrowser,
+    isAndroidBrowser,
+    isWebView,
+    hasWebKit,
+    hasMessageHandlers,
+    hasSmapIos,
+    hasAndroidHaptic,
+    hasHandler,
+    availableHandlers,
+    supportsTouchAPI,
+    supportsVibration,
+    userAgent
+  };
+};
+
+/**
+ * Android 햅틱 피드백 전송 함수
+ */
+const sendHapticToAndroid = (type: HapticFeedbackType): boolean => {
+  try {
+    const androidHaptic = (window as any).AndroidHaptic;
+    if (!androidHaptic) {
+      return false;
+    }
+
+    // Android 햅틱 타입 매핑
+    const androidType = type.toLowerCase();
+    
+    // Android 햅틱 함수 호출
+    switch (androidType) {
+      case 'light':
+        androidHaptic.lightHaptic();
+        break;
+      case 'medium':
+        androidHaptic.mediumHaptic();
+        break;
+      case 'heavy':
+        androidHaptic.heavyHaptic();
+        break;
+      case 'success':
+        androidHaptic.successHaptic();
+        break;
+      case 'warning':
+        androidHaptic.warningHaptic();
+        break;
+      case 'error':
+        androidHaptic.errorHaptic();
+        break;
+      default:
+        androidHaptic.mediumHaptic(); // 기본값
+        break;
+    }
+    
+    console.log(`🤖 [HAPTIC] Android 햅틱 전송 성공: ${type}`);
+    return true;
+  } catch (error) {
+    console.error('❌ [HAPTIC] Android 햅틱 전송 실패:', error);
+    return false;
+  }
+};
+
+/**
  * iOS 환경 감지 (강화 버전) - WebView vs Safari 정확한 구분
  */
 const detectIOSEnvironment = () => {
@@ -375,8 +474,8 @@ const detectIOSEnvironment = () => {
  * iOS 네이티브 로그 전송 함수
  */
 const sendLogToiOS = (level: 'info' | 'error' | 'warning', message: string, data?: any) => {
-  const { hasHandler } = detectIOSEnvironment();
-  if (hasHandler) {
+  const env = detectEnvironment();
+  if (env.hasSmapIos) {
     try {
       const logData = {
         type: 'jsLog',
@@ -436,7 +535,7 @@ export const triggerHapticFeedback = (
     lastCalls[hapticKey] = now;
     
     const pageInfo = getCurrentPageInfo();
-    const env = detectIOSEnvironment();
+    const env = detectEnvironment();
     
     // 로그 메시지 구성
     const logContext = {
@@ -445,7 +544,7 @@ export const triggerHapticFeedback = (
       page: pageInfo.pageName,
       fullPath: pageInfo.pathname,
       context: context || {},
-      environment: env.isIOSApp ? 'iOS App' : env.isIOSBrowser ? 'iOS Safari' : 'Web Browser'
+      environment: env.isAndroidApp ? 'Android App' : env.isIOSApp ? 'iOS App' : env.isIOSBrowser ? 'iOS Safari' : 'Web Browser'
     };
     
     // 🚨 조용한 모드 지원
@@ -454,6 +553,15 @@ export const triggerHapticFeedback = (
     // 콘솔 로그 (조용한 모드가 아닐 때만)
     if (!silentMode) {
       console.log(`🎮 [HAPTIC] ${type.toUpperCase()} | ${pageInfo.pageName} | ${description || '액션'}`);
+    }
+    
+    // 🤖 Android 앱 환경 - Android 햅틱 우선 처리
+    if (env.isAndroidApp && env.hasAndroidHaptic) {
+      console.log(`🤖 [HAPTIC] Android 앱 환경 감지 - Android 햅틱 실행: ${type}`);
+      const success = sendHapticToAndroid(type);
+      if (success) {
+        return; // Android 햅틱 성공 시 종료
+      }
     }
     
     // 핸들러 존재 여부를 다시 한번 확인 (실시간)
@@ -494,9 +602,6 @@ export const triggerHapticFeedback = (
         }
         
         if (success) {
-          // 성공 시 iOS 로그 전송
-          sendLogToiOS('info', `햅틱 피드백 실행: ${type}`, logContext);
-          
           // 추가 확인용 로그 전송
           try {
             webkit.messageHandlers.smapIos.postMessage({
@@ -567,7 +672,9 @@ export const triggerHapticFeedback = (
         '설명': description || '없음',
         '환경': logContext.environment,
         'iOS': env.isIOS,
+        'Android': env.isAndroid,
         'iOS App': env.isIOSApp,
+        'Android App': env.isAndroidApp,
         'iOS Safari': env.isIOSBrowser,
         'WebKit': env.hasWebKit,
         'Handler': env.hasHandler,
@@ -603,9 +710,9 @@ const fallbackToWebVibration = (type: HapticFeedbackType, env: any) => {
         console.log(`⚠️ [HAPTIC] iOS 바이브레이션 차단됨`);
       }
     }
-      } else {
-      console.log(`⚠️ [HAPTIC] 햅틱 미지원 환경`);
-    }
+  } else {
+    console.log(`⚠️ [HAPTIC] 햅틱 미지원 환경`);
+  }
 };
 
 /**
@@ -644,7 +751,7 @@ if (typeof window !== 'undefined') {
     console.log(`🎉 [iOS-NATIVE] 햅틱 실행 확인 수신: ${hapticType}`);
     
     // 확인 메시지가 수신되면 추가 로깅
-    const env = detectIOSEnvironment();
+    const env = detectEnvironment();
     console.table({
       '햅틱 타입': hapticType,
       '확인 시각': new Date().toLocaleTimeString(),
@@ -746,7 +853,7 @@ if (typeof window !== 'undefined') {
     // 🚨 환경 감지 로그 제거 (디버깅 시에만 출력)
     const debugMode = (window as any).__HAPTIC_DEBUG_MODE__ === true;
     if (debugMode) {
-      const env = detectIOSEnvironment();
+      const env = detectEnvironment();
       console.log(`🔍 [HAPTIC-ENV] 환경 감지:`, {
         isIOS: env.isIOS,
         isIOSApp: env.isIOSApp, 

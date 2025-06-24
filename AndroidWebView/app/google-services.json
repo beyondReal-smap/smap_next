@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "283271180972",
+    "project_id": "com-dmonster-smap",
+    "storage_bucket": "com-dmonster-smap.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:283271180972:android:dc4d5f68b40b256a03e509",
+        "android_client_info": {
+          "package_name": "com.dmonster.smap"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5uPTx2pY1iUrxwPonpsqF0XVvwHKkww4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

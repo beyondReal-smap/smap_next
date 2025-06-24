@@ -1,14 +1,4 @@
 {
-  "/icon/route": "app/icon/route.js",
-  "/apple-icon/route": "app/apple-icon/route.js",
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/groups/current-user/route": "app/api/groups/current-user/route.js",
-  "/api/groups/[groupId]/join/route": "app/api/groups/[groupId]/join/route.js",
-  "/api/members/[id]/route": "app/api/members/[id]/route.js",
-  "/api/push-logs/[...slug]/route": "app/api/push-logs/[...slug]/route.js",
-  "/api/groups/[groupId]/members/route": "app/api/groups/[groupId]/members/route.js",
-  "/register/page": "app/register/page.js",
-  "/signin/page": "app/signin/page.js",
-  "/group/page": "app/group/page.js",
   "/home/page": "app/home/page.js"
 }
