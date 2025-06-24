@@ -5723,8 +5723,8 @@ export default function LogsPage() {
     } else if (stayTimesData && stayTimesData.length > 0) {
       // 위치 데이터가 없지만 체류지점이 있으면 첫 번째 체류지점으로 중심 설정
       const firstStayPoint = stayTimesData[0];
-      const stayLat = firstStayPoint.latitude || firstStayPoint.start_lat || 0;
-      const stayLng = firstStayPoint.longitude || firstStayPoint.start_long || 0;
+      const stayLat = firstStayPoint.latitude || firstStayPoint.start_lat;
+      const stayLng = firstStayPoint.longitude || firstStayPoint.start_long;
       
       if (stayLat && stayLng) {
         mapCenter = new window.naver.maps.LatLng(Number(stayLat), Number(stayLng));
@@ -7090,45 +7090,134 @@ export default function LogsPage() {
                                   </span>
                                 </div>
                                 
-                                {/* 14일 네모 캘린더 - 7x2 그리드로 개선 */}
-                                <div className="grid grid-cols-7 gap-1.5 mb-1">
-                                  {Array.from({ length: 14 }, (_, i) => {
-                                    // 0~6: 13~7일전(윗줄), 7~13: 6~0일전(아랫줄)
-                                    const row = i < 7 ? 0 : 1;
-                                    const col = i % 7;
-                                    const dayIndex = i;
-                                    const arr = memberLogDistribution[member.id] || Array(14).fill(false);
-                                    const hasLog = arr[dayIndex];
-                                    // 0~6: 13~7일전, 7~13: 6~0일전
-                                    const offset = row === 0 ? 13 - col : 6 - col;
-                                    const date = new Date();
-                                    date.setDate(date.getDate() - offset);
-                                    const dateString = format(date, 'yyyy-MM-dd');
-                                    const isSelected = dateString === selectedDate && member.isSelected;
-                                    const isToday = offset === 0;
-                                    return (
-                                      <div
-                                        key={`calendar-${i}`}
-                                        className={`w-4 h-4 rounded transition-all duration-200 flex items-center justify-center text-[10px] font-bold select-none
-                                          ${isSelected
-                                            ? 'bg-gradient-to-br from-pink-500 to-rose-500 border border-pink-600 ring-2 ring-pink-300 shadow-md text-white'
-                                            : hasLog
-                                              ? 'bg-indigo-400/80 border border-indigo-500/30 cursor-pointer hover:bg-indigo-500/90 hover:scale-110 text-white' 
-                                              : 'bg-gray-50 border border-gray-200/50 text-gray-300'}
-                                          ${isToday ? 'ring-2 ring-indigo-400' : ''}
-                                        `}
-                                        title={`${format(date, 'MM.dd(E)', { locale: ko })} - ${hasLog ? '활동 있음' : '활동 없음'}${isToday ? ' (오늘)' : ''}${isSelected ? ' (선택됨)' : hasLog ? ' (클릭하여 이동)' : ''}`}
-                                        onClick={hasLog ? (e) => handleCalendarSquareClick(member, dateString, e) : undefined}
-                                        style={{marginBottom: row === 0 ? '2px' : 0}}
-                                      >
-                                        {isToday ? '●' : ''}
-                                      </div>
-                                    );
-                                  })}
+                                {/* 지난주 (오늘 기준 13일전~7일전) */}
+                                <div className="mb-2">
+                                  <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                                    <span>지난주</span>
+                                    <span className="text-xs text-gray-300">7일전</span>
+                                  </div>
+                                  <div className="grid grid-cols-7 gap-1.5">
+                                    {Array.from({ length: 7 }, (_, index) => {
+                                      const dayIndex = 13 - index; // 13일전부터 7일전까지 (정순 배열: 13, 12, 11, 10, 9, 8, 7)
+                                      const arrayIndex = 13 - dayIndex; // memberLogDistribution 배열의 실제 인덱스 (0, 1, 2, 3, 4, 5, 6)
+                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[arrayIndex];
+                                      const date = new Date();
+                                      date.setDate(date.getDate() - dayIndex);
+                                      const isToday = dayIndex === 0;
+                                      
+                                      const dateString = format(date, 'yyyy-MM-dd');
+                                      const isSelected = dateString === selectedDate && member.isSelected;
+                                      
+                                      // 디버깅용 로그 (첫 번째 항목만)
+                                      if (index === 0 && member.id === groupMembers.find(m => m.isSelected)?.id) {
+                                        console.log(`[네모 캘린더] 지난주 비교:`, {
+                                          dateString,
+                                          selectedDate,
+                                          isSelected,
+                                          dayIndex,
+                                          hasLog
+                                        });
+                                      }
+                                      
+                                      return (
+                                        <div
+                                          key={`week1-${index}`}
+                                          className={`w-3.5 h-3.5 transition-all duration-200 ${
+                                            isSelected
+                                              ? 'bg-gradient-to-br from-pink-500 to-rose-500 border border-pink-600 ring-2 ring-pink-300 shadow-md'
+                                              : hasLog 
+                                                ? 'bg-indigo-400/80 border border-indigo-500/30 cursor-pointer hover:bg-indigo-500/90 hover:scale-110' 
+                                                : 'bg-gray-50 border border-gray-200/50'
+                                          } ${isToday && !isSelected ? 'ring-1 ring-indigo-300' : ''}`}
+                                          title={`${format(date, 'MM.dd(E)', { locale: ko })} - ${hasLog ? '활동 있음' : '활동 없음'}${isToday ? ' (오늘)' : ''}${isSelected ? ' (선택됨)' : hasLog ? ' (클릭하여 이동)' : ''}`}
+                                          onClick={hasLog ? (e) => {
+                                            const dateString = format(date, 'yyyy-MM-dd');
+                                            console.log(`[활동 캘린더] 지난주 ${format(date, 'MM.dd(E)', { locale: ko })} 클릭 - 멤버: ${member.name}, 날짜: ${dateString}`);
+                                            handleCalendarSquareClick(member, dateString, e);
+                                          } : undefined}
+                                        />
+                                      );
+                                    })}
+                                  </div>
                                 </div>
-                                <div className="flex justify-between px-0.5 mt-0.5">
-                                  <span className="text-[10px] text-gray-400">1주전</span>
-                                  <span className="text-[10px] text-indigo-600 font-semibold">오늘</span>
+                                
+                                {/* 이번주 (오늘 기준 6일전~오늘) */}
+                                <div className="mb-2">
+                                  <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                                    <span>이번주</span>
+                                    <span className="text-xs text-indigo-600 font-medium">오늘까지</span>
+                                  </div>
+                                  <div className="grid grid-cols-7 gap-1.5">
+                                    {Array.from({ length: 7 }, (_, index) => {
+                                      const dayIndex = 6 - index; // 6일전부터 오늘까지 (정순: 6, 5, 4, 3, 2, 1, 0)
+                                      const arrayIndex = 13 - dayIndex; // memberLogDistribution 배열의 실제 인덱스 (7, 8, 9, 10, 11, 12, 13)
+                                      const hasLog = (memberLogDistribution[member.id] || Array(14).fill(false))[arrayIndex];
+                                      const date = new Date();
+                                      date.setDate(date.getDate() - dayIndex);
+                                      const isToday = dayIndex === 0;
+                                      
+                                      const dateString = format(date, 'yyyy-MM-dd');
+                                      const isSelected = dateString === selectedDate && member.isSelected;
+                                      
+                                      // 디버깅용 로그 (첫 번째 항목만)
+                                      if (index === 0 && member.id === groupMembers.find(m => m.isSelected)?.id) {
+                                        console.log(`[네모 캘린더] 이번주 비교:`, {
+                                          dateString,
+                                          selectedDate,
+                                          isSelected,
+                                          dayIndex,
+                                          hasLog,
+                                          isToday
+                                        });
+                                      }
+                                      
+                                      return (
+                                        <div
+                                          key={`week2-${index}`}
+                                          className={`w-3.5 h-3.5 transition-all duration-200 ${
+                                            isSelected
+                                              ? 'bg-gradient-to-br from-pink-500 to-rose-500 border border-pink-600 ring-2 ring-pink-300 shadow-md'
+                                              : isToday 
+                                                ? hasLog 
+                                                  ? 'bg-gradient-to-br from-indigo-500 to-purple-500 border border-indigo-600/50 ring-2 ring-indigo-200 shadow-sm' 
+                                                  : 'bg-gradient-to-br from-gray-200 to-gray-300 border border-gray-300 ring-2 ring-indigo-200'
+                                                : hasLog 
+                                                  ? 'bg-indigo-500/90 border border-indigo-600/40 cursor-pointer hover:bg-indigo-600 hover:scale-110' 
+                                                  : 'bg-gray-50 border border-gray-200/50'
+                                          }`}
+                                          title={`${format(date, 'MM.dd(E)', { locale: ko })} - ${hasLog ? '활동 있음' : '활동 없음'}${isToday ? ' (오늘)' : ''}${isSelected ? ' (선택됨)' : (hasLog || isToday) ? ' (클릭하여 이동)' : ''}`}
+                                          onClick={(hasLog || isToday) ? (e) => {
+                                            const dateString = format(date, 'yyyy-MM-dd');
+                                            console.log(`[활동 캘린더] 이번주 ${format(date, 'MM.dd(E)', { locale: ko })} 클릭 - 멤버: ${member.name}, 날짜: ${dateString}${isToday ? ' (오늘)' : ''}`);
+                                            handleCalendarSquareClick(member, dateString, e);
+                                          } : undefined}
+                                        />
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                                
+                                {/* 요일 레이블 */}
+                                <div className="grid grid-cols-7 gap-1.5">
+                                  {(() => {
+                                    const today = new Date();
+                                    const todayDay = today.getDay(); // 0(일) ~ 6(토)
+                                    const days = ['일', '월', '화', '수', '목', '금', '토'];
+                                    
+                                    return Array.from({ length: 7 }, (_, index) => {
+                                      // 오늘 기준으로 요일 배열 생성
+                                      const dayIndex = (todayDay - 6 + index + 7) % 7;
+                                      const isToday = index === 6; // 마지막이 오늘
+                                      
+                                      return (
+                                        <div key={index} className="w-3.5 flex justify-center">
+                                          <span className={`text-xs ${isToday ? 'text-indigo-600 font-semibold' : 'text-gray-400'}`} style={{ fontSize: '9px' }}>
+                                            {days[dayIndex]}
+                                          </span>
+                                        </div>
+                                      );
+                                    });
+                                  })()}
                                 </div>
                               </div>
                             </div>
