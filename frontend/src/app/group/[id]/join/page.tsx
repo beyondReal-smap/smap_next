@@ -8,6 +8,7 @@ import { HiSparkles } from 'react-icons/hi2';
 import Image from 'next/image';
 import groupService from '@/services/groupService';
 import { useAuth } from '@/contexts/AuthContext';
+import IOSCompatibleSpinner from '@/../../components/IOSCompatibleSpinner';
 
 interface GroupInfo {
   sgt_idx: number;
@@ -35,6 +36,18 @@ export default function GroupJoinPage() {
   // 앱 스토어 링크
   const APP_STORE_URL = 'https://apps.apple.com/kr/app/smap-%EC%9C%84%EC%B9%98%EC%B6%94%EC%A0%81-%EC%9D%B4%EB%8F%99%EA%B2%BD%EB%A1%9C-%EC%9D%BC%EC%A0%95/id6480279658?platform=iphone';
   const PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=com.dmonster.smap&hl=ko';
+
+  // 앱 스토어 링크 (그룹 ID 포함)
+  const getAppStoreUrl = () => {
+    const groupParams = `group_id=${groupId}&group_title=${encodeURIComponent(groupInfo?.sgt_title || '')}&source=group_invite`;
+    
+    if (isIOS()) {
+      return `${APP_STORE_URL}&${groupParams}`;
+    } else if (isAndroid()) {
+      return `${PLAY_STORE_URL}&referrer=${encodeURIComponent(`group_invite_${groupId}`)}&utm_source=group_invite&utm_medium=web&utm_campaign=group_${groupId}`;
+    }
+    return APP_STORE_URL;
+  };
 
   // 앱 설치 여부 감지 (간접적 방법)
   const checkAppInstalled = () => {
@@ -73,13 +86,14 @@ export default function GroupJoinPage() {
       // 앱 스키마 실행 (딥링크)
       try {
         if (isIOS()) {
-          // iOS: 커스텀 URL 스키마
-          const deepLink = `smap://group/${groupId}/join`;
+          // iOS: 커스텀 URL 스키마 (더 상세한 정보 포함)
+          const deepLink = `smap://group/${groupId}/join?title=${encodeURIComponent(groupInfo?.sgt_title || '')}&content=${encodeURIComponent(groupInfo?.sgt_content || '')}&memo=${encodeURIComponent(groupInfo?.sgt_memo || '')}&memberCount=${groupInfo?.memberCount || 0}`;
           console.log('iOS 딥링크 시도:', deepLink);
           window.location.href = deepLink;
         } else if (isAndroid()) {
-          // Android: Intent URL
-          const deepLink = `intent://group/${groupId}/join#Intent;scheme=smap;package=com.dmonster.smap;S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_URL)};end`;
+          // Android: Intent URL (더 상세한 정보 포함)
+          const fallbackUrl = getAppStoreUrl(); // 그룹 정보가 포함된 앱스토어 URL 사용
+          const deepLink = `intent://group/${groupId}/join?title=${encodeURIComponent(groupInfo?.sgt_title || '')}&content=${encodeURIComponent(groupInfo?.sgt_content || '')}&memo=${encodeURIComponent(groupInfo?.sgt_memo || '')}&memberCount=${groupInfo?.memberCount || 0}#Intent;scheme=smap;package=com.dmonster.smap;S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`;
           console.log('Android 딥링크 시도:', deepLink);
           window.location.href = deepLink;
         }
@@ -206,29 +220,77 @@ export default function GroupJoinPage() {
 
   // 앱으로 이동 시도
   const handleOpenApp = async () => {
-    // 앱 설치 후 자동 그룹 가입을 위해 그룹 정보 저장
-    localStorage.setItem('pendingGroupJoin', JSON.stringify({
-      groupId: groupId,
+    // 앱 설치 후 자동 그룹 가입을 위해 그룹 정보 저장 (더 상세한 정보)
+    const groupJoinData = {
+      groupId: parseInt(groupId),
       groupTitle: groupInfo?.sgt_title,
-      timestamp: Date.now()
+      groupContent: groupInfo?.sgt_content,
+      groupMemo: groupInfo?.sgt_memo,
+      memberCount: groupInfo?.memberCount,
+      timestamp: Date.now(),
+      source: 'group_invite_link',
+      deepLink: `smap://group/${groupId}/join?title=${encodeURIComponent(groupInfo?.sgt_title || '')}&content=${encodeURIComponent(groupInfo?.sgt_content || '')}&memo=${encodeURIComponent(groupInfo?.sgt_memo || '')}&memberCount=${groupInfo?.memberCount || 0}`
+    };
+    
+    localStorage.setItem('pendingGroupJoin', JSON.stringify(groupJoinData));
+    
+    // 앱 설치 여부 확인을 위한 추가 정보도 저장
+    localStorage.setItem('appInstallRedirect', JSON.stringify({
+      groupId: parseInt(groupId),
+      timestamp: Date.now(),
+      returnUrl: window.location.href,
+      appStoreUrl: getAppStoreUrl()
     }));
     
-    console.log('앱 열기 시도 중...');
-    const appInstalled = await checkAppInstalled();
+    // URL 파라미터로도 그룹 정보 저장 (앱에서 URL 스키마로 접근할 때)
+    const urlParams = new URLSearchParams(window.location.search);
+    urlParams.set('pending_group_id', groupId);
+    urlParams.set('pending_group_title', groupInfo?.sgt_title || '');
+    urlParams.set('pending_group_timestamp', Date.now().toString());
     
-    if (!appInstalled) {
-      console.log('앱이 설치되어 있지 않음, 스토어로 이동');
-      // 앱이 설치되어 있지 않으면 스토어로 이동
-      if (isIOS()) {
-        window.open(APP_STORE_URL, '_blank');
-      } else if (isAndroid()) {
-        window.open(PLAY_STORE_URL, '_blank');
+    // 현재 URL에 파라미터 추가 (브라우저 히스토리에 저장)
+    const newUrl = `${window.location.pathname}?${urlParams.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+    
+    console.log('앱 열기 시도 중...', groupJoinData);
+    
+    try {
+      const appInstalled = await checkAppInstalled();
+      
+      if (!appInstalled) {
+        console.log('앱이 설치되어 있지 않음, 스토어로 이동');
+        
+        // 스토어로 이동하기 전에 사용자에게 안내
+        const shouldProceed = confirm(
+          'SMAP 앱이 설치되어 있지 않습니다.\n\n' +
+          '1. 앱스토어에서 SMAP을 설치해주세요\n' +
+          '2. 설치 후 앱을 열고 회원가입/로그인을 해주세요\n' +
+          '3. 자동으로 초대받은 그룹에 가입됩니다\n\n' +
+          '앱스토어로 이동하시겠습니까?'
+        );
+        
+        if (shouldProceed) {
+          if (isIOS()) {
+            window.open(getAppStoreUrl(), '_blank');
+          } else if (isAndroid()) {
+            window.open(getAppStoreUrl(), '_blank');
+          } else {
+            alert('SMAP은 모바일 앱으로 제공됩니다. 모바일 기기에서 접속해주세요.');
+          }
+        }
       } else {
-        // 데스크탑에서는 웹 버전 사용 안내
-        alert('SMAP은 모바일 앱으로 제공됩니다. 모바일 기기에서 접속해주세요.');
+        console.log('앱이 성공적으로 열림');
+        // 앱이 열렸으므로 성공 메시지 표시
+        alert('SMAP 앱이 열렸습니다!\n\n앱에서 회원가입/로그인 후 자동으로 그룹에 가입됩니다.');
       }
-    } else {
-      console.log('앱이 성공적으로 열림');
+    } catch (error) {
+      console.error('앱 열기 중 오류:', error);
+      // 오류 발생 시 스토어로 이동
+      if (isIOS()) {
+        window.open(getAppStoreUrl(), '_blank');
+      } else if (isAndroid()) {
+        window.open(getAppStoreUrl(), '_blank');
+      }
     }
   };
 
@@ -244,32 +306,170 @@ export default function GroupJoinPage() {
     router.push('/register');
   };
 
+  // 앱 설치 후 자동 그룹 가입 처리 (페이지 로드 시 체크)
+  useEffect(() => {
+    const checkPendingGroupJoin = () => {
+      try {
+        const pendingGroupJoin = localStorage.getItem('pendingGroupJoin');
+        const appInstallRedirect = localStorage.getItem('appInstallRedirect');
+        
+        // URL 파라미터에서도 그룹 정보 확인
+        const urlParams = new URLSearchParams(window.location.search);
+        const pendingGroupId = urlParams.get('pending_group_id');
+        const pendingGroupTitle = urlParams.get('pending_group_title');
+        const pendingGroupTimestamp = urlParams.get('pending_group_timestamp');
+        
+        let groupData = null;
+        
+        // 1. localStorage에서 그룹 정보 확인
+        if (pendingGroupJoin) {
+          groupData = JSON.parse(pendingGroupJoin);
+          console.log('[자동 그룹 가입] localStorage에서 그룹 정보 발견:', groupData);
+        }
+        // 2. URL 파라미터에서 그룹 정보 확인 (localStorage보다 우선)
+        else if (pendingGroupId && pendingGroupTitle && pendingGroupTimestamp) {
+          groupData = {
+            groupId: parseInt(pendingGroupId),
+            groupTitle: pendingGroupTitle,
+            timestamp: parseInt(pendingGroupTimestamp),
+            source: 'url_parameter'
+          };
+          console.log('[자동 그룹 가입] URL 파라미터에서 그룹 정보 발견:', groupData);
+          
+          // URL 파라미터 정보를 localStorage에도 저장
+          localStorage.setItem('pendingGroupJoin', JSON.stringify(groupData));
+        }
+        
+        if (groupData) {
+          // 24시간 이내의 데이터인지 확인
+          const isRecent = (Date.now() - groupData.timestamp) < (24 * 60 * 60 * 1000);
+          
+          if (isRecent && user) {
+            console.log('[자동 그룹 가입] 사용자 로그인 확인, 그룹 가입 시도');
+            
+            // 자동 그룹 가입 시도
+            groupService.joinGroup(groupData.groupId)
+              .then(() => {
+                console.log('[자동 그룹 가입] 성공');
+                localStorage.removeItem('pendingGroupJoin');
+                localStorage.removeItem('appInstallRedirect');
+                
+                // URL 파라미터도 정리
+                const cleanUrl = window.location.pathname;
+                window.history.replaceState({}, '', cleanUrl);
+                
+                // 성공 메시지 표시
+                alert(`🎉 "${groupData.groupTitle}" 그룹에 성공적으로 가입되었습니다!`);
+                
+                // 그룹 페이지로 이동
+                router.push('/group');
+              })
+              .catch((error) => {
+                console.error('[자동 그룹 가입] 실패:', error);
+                
+                // 실패 시 사용자에게 수동 가입 안내
+                const shouldRetry = confirm(
+                  `자동 그룹 가입에 실패했습니다.\n\n` +
+                  `그룹: ${groupData.groupTitle}\n` +
+                  `오류: ${error.message || '알 수 없는 오류'}\n\n` +
+                  `수동으로 다시 시도하시겠습니까?`
+                );
+                
+                if (shouldRetry) {
+                  // 현재 페이지에서 그룹 가입 시도
+                  router.push(`/group/${groupData.groupId}/join`);
+                }
+              });
+          } else if (!isRecent) {
+            console.log('[자동 그룹 가입] 24시간이 지난 데이터, 삭제');
+            localStorage.removeItem('pendingGroupJoin');
+            localStorage.removeItem('appInstallRedirect');
+            
+            // URL 파라미터도 정리
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, '', cleanUrl);
+          }
+        }
+      } catch (error) {
+        console.error('[자동 그룹 가입] 처리 중 오류:', error);
+        localStorage.removeItem('pendingGroupJoin');
+        localStorage.removeItem('appInstallRedirect');
+        
+        // URL 파라미터도 정리
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+      }
+    };
+
+    // 페이지 로드 시 체크
+    checkPendingGroupJoin();
+    
+    // 사용자 로그인 상태 변경 시에도 체크
+    if (user) {
+      checkPendingGroupJoin();
+    }
+  }, [user, router]);
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">그룹 정보를 불러오는 중...</p>
+      <>
+        {/* 네비게이션 바 강제 숨김 CSS */}
+        <style jsx global>{`
+          #bottom-navigation-bar {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+          }
+          
+          /* 하단 네비게이션이 있던 공간 확보 */
+          body {
+            padding-bottom: 0 !important;
+          }
+        `}</style>
+        
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+          <IOSCompatibleSpinner 
+            message="그룹 정보를 불러오는 중..."
+            size="lg"
+          />
         </div>
-      </div>
+      </>
     );
   }
 
   if (error || !groupInfo) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-        <div className="text-center p-8">
-          <div className="text-6xl mb-4">😕</div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">그룹을 찾을 수 없습니다</h1>
-          <p className="text-gray-600 mb-6">{error || '유효하지 않은 초대 링크입니다.'}</p>
-          <button
-            onClick={() => router.push('/')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            홈으로 돌아가기
-          </button>
+      <>
+        {/* 네비게이션 바 강제 숨김 CSS */}
+        <style jsx global>{`
+          #bottom-navigation-bar {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+          }
+          
+          /* 하단 네비게이션이 있던 공간 확보 */
+          body {
+            padding-bottom: 0 !important;
+          }
+        `}</style>
+        
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+          <div className="text-center p-8">
+            <div className="text-6xl mb-4">😕</div>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">그룹을 찾을 수 없습니다</h1>
+            <p className="text-gray-600 mb-6">{error || '유효하지 않은 초대 링크입니다.'}</p>
+            <button
+              onClick={() => router.push('/')}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              홈으로 돌아가기
+            </button>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -361,20 +561,13 @@ export default function GroupJoinPage() {
                 </motion.button>
                 
                 <div className="text-center text-xs text-gray-500 px-4">
-                  <p>💡 앱이 없다면 설치 후 로그인하면 자동으로 그룹에 가입됩니다</p>
+                  <p>📱 <strong>앱 설치 후 자동 가입</strong></p>
+                  <p>1. 앱스토어에서 SMAP 설치</p>
+                  <p>2. 앱에서 회원가입/로그인</p>
+                  <p>3. 자동으로 이 그룹에 가입됩니다!</p>
                 </div>
               </>
             )}
-
-            <motion.button
-              onClick={handleJoinGroup}
-              className="w-full bg-white text-gray-800 py-4 rounded-xl font-semibold border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <FaUsers />
-              <span>웹에서 바로 가입하기</span>
-            </motion.button>
 
             {/* 앱 다운로드 링크 */}
             {!isMobile() && (
@@ -383,7 +576,7 @@ export default function GroupJoinPage() {
                 <p className="text-gray-500 text-xs mb-4">앱 설치 후 로그인하면 자동으로 그룹에 가입됩니다</p>
                 <div className="flex space-x-4 justify-center">
                   <a
-                    href={APP_STORE_URL}
+                    href={getAppStoreUrl()}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center space-x-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
@@ -392,7 +585,7 @@ export default function GroupJoinPage() {
                     <span className="text-sm">App Store</span>
                   </a>
                   <a
-                    href={PLAY_STORE_URL}
+                    href={getAppStoreUrl()}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"

@@ -164,6 +164,7 @@ export default function ClientLayout({
   const shouldHideNavBar = React.useMemo(() => {
     const hideNavBarPages = ['/signin', '/register', '/notice', '/setting'];
     return hideNavBarPages.some(page => pathname.startsWith(page)) || 
+           pathname === '/' || // 루트 페이지만 네비게이션 숨김
            pathname.includes('/join') || // 그룹 초대 페이지도 네비게이션 숨김
            pathname.match(/\/group\/\d+\/join/); // 정규식으로 그룹 초대 페이지 확실히 매칭
   }, [pathname]);

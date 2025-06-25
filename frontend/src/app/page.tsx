@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import Image from 'next/image';
 
 export default function RootPage() {
   const router = useRouter();
@@ -47,20 +48,27 @@ export default function RootPage() {
 
   // 로딩 화면 표시
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-green-50 to-white">
+    <div 
+      className="min-h-screen flex items-center justify-center"
+      style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
+    >
       <div className="text-center">
-        <div className="relative w-24 h-24 mx-auto mb-6">
-          <div className="absolute inset-0 bg-green-500 rounded-full opacity-20 animate-pulse"></div>
-          <div className="absolute inset-2 bg-white rounded-full flex items-center justify-center">
-            <h1 className="text-4xl text-green-600 font-bold">S</h1>
-          </div>
+        <div className="relative w-32 h-32 mx-auto mb-6">
+          <Image 
+            src="/images/smap_logo.webp"
+            alt="SMAP Logo"
+            width={128}
+            height={128}
+            className="w-full h-full object-contain"
+            priority
+          />
         </div>
         
         <h2 className="text-2xl font-bold text-gray-900 mb-4">SMAP</h2>
         
         <div className="flex items-center justify-center space-x-2">
           <div 
-            className="rounded-full h-6 w-6 border-4 border-gray-200 border-t-green-500"
+            className="rounded-full h-6 w-6 border-4 border-gray-200 border-t-blue-500"
             style={{
               WebkitAnimation: 'spin 1s linear infinite',
               animation: 'spin 1s linear infinite',

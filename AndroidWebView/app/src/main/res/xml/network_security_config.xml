@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">nextstep.smap.site</domain>
+        <domain includeSubdomains="true">smap.site</domain>
+        <domain includeSubdomains="true">vercel-dns-017.com</domain>
+    </domain-config>
+    
+    <!-- 개발 환경용 설정 -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system"/>
+            <certificates src="user"/>
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config> 

@@ -113,7 +113,7 @@ const SearchSection = memo<{
         onChange={onSearchChange}
         onFocus={onFocus}
         onBlur={onBlur}
-        className="w-full pl-12 pr-4 py-4 bg-white border rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
+        className="w-full pl-4 pr-4 py-4 bg-white border rounded-2xl focus:outline-none focus:ring-2 focus:border-gray-500 placeholder-gray-400 text-base shadow-sm"
         style={{ 
           borderColor: 'rgba(1, 19, 163, 0.2)',
           '--tw-ring-color': '#0113A3'
