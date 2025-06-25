@@ -6,16 +6,19 @@ plugins {
 
 android {
     namespace = "com.dmonster.smap"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.dmonster.smap"
         minSdk = 24
-        targetSdk = 34
-        versionCode = 2
-        versionName = "1.0.0"
+        targetSdk = 35
+        versionCode = 19
+        versionName = "1.0.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // 기기 지원 범위 명시
+        resConfigs("ko", "en")
     }
 
     buildTypes {
@@ -56,7 +59,7 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.11.0")
+    implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.webkit:webkit:1.8.0")
     
@@ -78,6 +81,15 @@ dependencies {
     
     // AdMob
     implementation("com.google.android.gms:play-services-ads:22.6.0")
+    
+    // OkHttp for network requests
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    
+    // Gson for JSON parsing
+    implementation("com.google.code.gson:gson:2.10.1")
+    
+    // JSON
+    implementation("org.json:json:20231013")
     
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

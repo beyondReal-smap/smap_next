@@ -557,8 +557,12 @@ class MemberLocationLogService {
         rawResponse: result
       });
       
-      if (result.result === 'Y' && Array.isArray(result.data)) {
+      // 개선된 검증 로직: result 필드가 없어도 데이터가 있으면 사용
+      if (Array.isArray(result.data) && result.data.length > 0) {
         console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용:', result.data.length, '개');
+        return result.data;
+      } else if (result.result === 'Y' && Array.isArray(result.data)) {
+        console.log('[MemberLocationLogService] ✅ 실제 백엔드 데이터 사용 (result=Y):', result.data.length, '개');
         return result.data;
       } else {
         console.warn('[MemberLocationLogService] ⚠️ 백엔드에서 유효하지 않은 데이터 반환, mock 데이터 사용');

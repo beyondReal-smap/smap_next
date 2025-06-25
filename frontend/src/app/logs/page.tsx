@@ -4551,7 +4551,7 @@ export default function LogsPage() {
     // 비동기 초기화 실행
     initializeFirstMember();
     
-  }, [isMapInitializedLogs, groupMembers.length, selectedDate, firstMemberSelected, groupMembers]);
+  }, [isMapInitializedLogs, groupMembers.length, selectedDate, firstMemberSelected, groupMembers, selectedGroupId, isUserDataLoading, userGroups.length]);
 
   // 백업 useEffect 제거됨 - 위의 통합 로직에서 처리
 
