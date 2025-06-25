@@ -68,14 +68,7 @@ export default function RootPage() {
         
         <div className="flex items-center justify-center space-x-2">
           <div 
-            className="rounded-full h-6 w-6 border-4 border-gray-200 border-t-blue-500"
-            style={{
-              WebkitAnimation: 'spin 1s linear infinite',
-              animation: 'spin 1s linear infinite',
-              WebkitTransformOrigin: 'center',
-              transformOrigin: 'center',
-              willChange: 'transform'
-            }}
+            className="animate-spin rounded-full h-6 w-6 border-4 border-gray-200 border-t-blue-500"
           ></div>
           <p className="text-gray-600">
             {loading ? '로딩 중...' : '페이지 이동 중...'}
