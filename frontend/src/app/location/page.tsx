@@ -44,7 +44,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
 import { hapticFeedback } from '@/utils/haptic';
 import { retryDataFetch, retryMapApiLoad, retryMapInitialization } from '@/utils/retryUtils';
-import useDataCache from '@/hooks/useDataCache';
+// import useDataCache from '@/hooks/useDataCache'; // 현재 사용하지 않는 hook
 
 // Dynamic Imports for better code splitting
 const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
@@ -844,9 +844,21 @@ export default function LocationPage() {
 
   // 컴포넌트 상단에 추가
   const [isFirstInfoWindowShown, setIsFirstInfoWindowShown] = useState(false);
+  
+  // 이미지 캐싱을 위한 ref 추가
+  const imageCache = useRef<Map<string, string>>(new Map());
+  const infoWindowCreationInProgress = useRef(false);
+  
+  // 무한 루프 방지를 위한 플래그
+  const isUpdatingMarkers = useRef(false);
 
+  // 최초 InfoWindow 생성을 한 번만 수행하도록 최적화
   useEffect(() => {
-    if (isFirstInfoWindowShown || infoWindow) return;
+    // 중복 실행 방지
+    if (isFirstInfoWindowShown || infoWindow || infoWindowCreationInProgress.current) {
+      return;
+    }
+    
     if (
       isMapReady &&
       map &&
@@ -858,10 +870,18 @@ export default function LocationPage() {
     ) {
       const selectedMember = groupMembers.find(m => m.isSelected);
       if (selectedMember) {
+        infoWindowCreationInProgress.current = true;
+        
         setTimeout(() => {
-          if (infoWindow || isFirstInfoWindowShown) return;
+          // 다시 한 번 중복 체크
+          if (infoWindow || isFirstInfoWindowShown) {
+            infoWindowCreationInProgress.current = false;
+            return;
+          }
+          
           const lat = parseCoordinate(selectedMember.mlt_lat) || parseCoordinate(selectedMember.location?.lat);
           const lng = parseCoordinate(selectedMember.mlt_long) || parseCoordinate(selectedMember.location?.lng);
+          
           if (lat && lng) {
             const memberMarker = memberMarkers.find(marker => marker.getTitle?.() === selectedMember.name);
             if (memberMarker) {
@@ -877,6 +897,8 @@ export default function LocationPage() {
             }
             setIsFirstInfoWindowShown(true);
           }
+          
+          infoWindowCreationInProgress.current = false;
         }, 1000);
       }
     }
@@ -2944,10 +2966,24 @@ export default function LocationPage() {
   };
 
   // 안전한 이미지 URL 가져오기 헬퍼 함수
-  const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
-    // 그룹멤버 리스트와 동일한 로직: 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
-    return photoUrl ?? getDefaultImage(gender, index);
-  };
+  // 이미지 캐싱이 포함된 최적화된 이미지 URL 함수
+  const getSafeImageUrl = useCallback((photoUrl: string | null, gender: number | null | undefined, index: number): string => {
+    // 캐시 키 생성
+    const cacheKey = `${photoUrl || 'null'}_${gender || 'null'}_${index}`;
+    
+    // 캐시에서 먼저 확인
+    if (imageCache.current.has(cacheKey)) {
+      return imageCache.current.get(cacheKey)!;
+    }
+    
+    // 실제 이미지 URL 계산
+    const imageUrl = photoUrl ?? getDefaultImage(gender, index);
+    
+    // 캐시에 저장
+    imageCache.current.set(cacheKey, imageUrl);
+    
+    return imageUrl;
+  }, []);
 
   // 네이버 맵 역지오코딩 API를 사용한 좌표 -> 주소 변환
   const getAddressFromCoordinates = async (lat: number, lng: number): Promise<string> => {
@@ -3060,17 +3096,27 @@ export default function LocationPage() {
     }
   };
 
-    // 멤버 정보창 생성 함수
-    const createMemberInfoWindow = (member: GroupMember, marker: NaverMarker) => {
+    // 멤버 정보창 생성 함수 - 중복 생성 방지 강화
+    const createMemberInfoWindow = useCallback((member: GroupMember, marker: NaverMarker) => {
       if (!map || !window.naver) return;
-        // 이미 같은 멤버의 InfoWindow가 열려있으면 중복 실행 방지
-        if (infoWindow) {
-          const currentContent = infoWindow.getContent?.();
-          if (currentContent && currentContent.includes(`member-address-${member.id}`)) {
-            return;
-          }
-          infoWindow.close();
+      
+      // 이미 InfoWindow 생성 중이면 중복 실행 방지
+      if (infoWindowCreationInProgress.current) {
+        console.log('[createMemberInfoWindow] InfoWindow 생성 중이므로 중복 실행 방지');
+        return;
+      }
+      
+      // 이미 같은 멤버의 InfoWindow가 열려있으면 중복 실행 방지
+      if (infoWindow) {
+        const currentContent = infoWindow.getContent?.();
+        if (currentContent && currentContent.includes(`member-address-${member.id}`)) {
+          console.log('[createMemberInfoWindow] 동일 멤버 InfoWindow가 이미 존재하므로 중복 실행 방지');
+          return;
         }
+        infoWindow.close();
+      }
+      
+      infoWindowCreationInProgress.current = true;
   
       // 좌표 파싱
       const lat = parseCoordinate(member.mlt_lat) || parseCoordinate(member.location?.lat);
@@ -3188,7 +3234,10 @@ export default function LocationPage() {
           }
         });
       }
-    };
+      
+      // InfoWindow 생성 완료
+      infoWindowCreationInProgress.current = false;
+    }, [map]);
 
   // 지도에 그룹멤버 마커 표시 (깜빡임 방지 최적화)
   // 사용하지 않는 함수 - updateAllMarkers로 통합됨 (중복 이벤트 방지)
@@ -3203,7 +3252,7 @@ export default function LocationPage() {
     return; // 함수 실행 중단
   };
 
-  // 통합 마커 업데이트 함수 - 멤버 마커와 선택된 멤버의 장소 마커만 동시 생성
+  // 통합 마커 업데이트 함수 - 멤버 마커와 선택된 멤버의 장소 마커만 동시 생성 (최적화됨)
   const updateAllMarkers = (members: GroupMember[], locations: LocationData[] | null) => {
     if (!map || !window.naver || !isMapReady) {
       console.log('[updateAllMarkers] 지도가 준비되지 않음');
@@ -3281,10 +3330,11 @@ export default function LocationPage() {
     
     console.log('[updateAllMarkers] 기존 마커 제거 완료 - 강화된 로직 적용');
 
-    // 새 멤버 마커들 생성
+    // 새 멤버 마커들 생성 (중복 방지 강화)
     const newMemberMarkers: NaverMarker[] = [];
     
     if (members.length > 0) {
+      console.log('[updateAllMarkers] 멤버 마커 생성 시작 - 총', members.length, '명');
       members.forEach((member, index) => {
         const lat = parseCoordinate(member.mlt_lat) || parseCoordinate(member.location?.lat);
         const lng = parseCoordinate(member.mlt_long) || parseCoordinate(member.location?.lng);
@@ -3321,10 +3371,15 @@ export default function LocationPage() {
             zIndex: member.isSelected ? 200 : 150
           });
 
-          // 멤버 마커 클릭 이벤트 - handleMemberSelect 호출하여 사이드바와 동일한 동작
-          // 멤버 마커 클릭 이벤트 - 정보창 열기 및 handleMemberSelect 호출
+          // 멤버 마커 클릭 이벤트 - 최적화된 중복 방지 로직
           window.naver.maps.Event.addListener(marker, 'click', () => {
             console.log('[멤버 마커 클릭] 멤버 선택 및 정보창 열기 시작:', member.name);
+            
+            // InfoWindow 생성 중이면 클릭 무시
+            if (infoWindowCreationInProgress.current) {
+              console.log('[멤버 마커 클릭] InfoWindow 생성 중이므로 클릭 무시');
+              return;
+            }
             
             // 멤버 위치로 지도 중심 이동
             const lat = parseCoordinate(member.mlt_lat) || parseCoordinate(member.location?.lat);
@@ -3339,7 +3394,7 @@ export default function LocationPage() {
               console.log('[멤버 마커 클릭] 지도 중심 이동 완료:', member.name, { lat, lng });
             }
             
-            // 정보창 생성
+            // 정보창 생성 (중복 방지 로직 포함)
             createMemberInfoWindow(member, marker);
 
             // 사이드바 업데이트 및 지도 이동 (기존 로직)
@@ -3511,7 +3566,12 @@ export default function LocationPage() {
       });
     }
 
-    // 상태 업데이트 (배치 처리로 리렌더링 최소화)
+    // 상태 업데이트 (배치 처리로 리렌더링 최소화) - 플래그 확인 후 업데이트
+    if (!isUpdatingMarkers.current) {
+      console.log('[updateAllMarkers] ⚠️ 마커 업데이트 플래그가 설정되지 않음 - 업데이트 건너뜀');
+      return;
+    }
+    
     setMemberMarkers(newMemberMarkers);
     setMarkers(newLocationMarkers);
     
@@ -3535,8 +3595,14 @@ export default function LocationPage() {
     console.log('[updateAllMarkers] 멤버 마커 생성 완료 - InfoWindow 표시하지 않음');
   };
 
-  // 멤버 마커와 선택된 멤버의 장소 마커를 동시 업데이트
+  // 멤버 마커와 선택된 멤버의 장소 마커를 동시 업데이트 (무한 루프 방지)
   useEffect(() => {
+    // 무한 루프 방지
+    if (isUpdatingMarkers.current) {
+      console.log('[useEffect 통합 마커] 마커 업데이트 중이므로 건너뜀');
+      return;
+    }
+    
     console.log('[useEffect 통합 마커] 조건 체크:', {
       hasMap: !!map,
       isMapReady,
@@ -3561,10 +3627,22 @@ export default function LocationPage() {
         장소데이터: selectedMemberSavedLocations
       });
       
+      // 플래그 설정
+      isUpdatingMarkers.current = true;
+      
       // 멤버 마커는 항상 생성, 장소 마커는 선택된 멤버가 있을 때만 생성
       updateAllMarkers(groupMembers, selectedMemberSavedLocations);
+      
+      // 비동기적으로 플래그 해제 (상태 업데이트 완료 후)
+      setTimeout(() => {
+        isUpdatingMarkers.current = false;
+      }, 100);
+      
     } else if (map && isMapReady) {
       console.log('[useEffect 통합 마커] 기존 마커들 제거');
+      
+      isUpdatingMarkers.current = true;
+      
       // 조건에 맞지 않으면 기존 마커들 제거
       memberMarkers.forEach(marker => {
         if (marker && marker.setMap) {
@@ -3578,6 +3656,11 @@ export default function LocationPage() {
         infoWindow.close();
         setInfoWindow(null);
       }
+      
+      setTimeout(() => {
+        isUpdatingMarkers.current = false;
+      }, 100);
+      
     } else {
       console.log('[useEffect 통합 마커] 조건 미충족:', {
         hasMap: !!map,
