@@ -957,78 +957,91 @@ export default function LocationPage() {
     };
   }, [infoWindow, isFirstInfoWindowShown]);
 
-  // (컴포넌트 함수 내부, return문 위, useEffect들 사이에 위치해야 함)
+  // 초기 InfoWindow 생성 (단순 플래그 기반으로 중복 방지)
   useEffect(() => {
     console.log('[InfoWindow useEffect] 조건 체크', {
       isMapReady,
       map,
       groupMembersLength: groupMembers.length,
       isFirstMemberSelectionComplete,
-      memberMarkersLength: memberMarkers.length
+      memberMarkersLength: memberMarkers.length,
+      infoWindowExists: !!infoWindow,
+      isFirstInfoWindowShown
     });
-  
-    // InfoWindow가 이미 생성되어 있으면 중복 실행 방지
-    if (infoWindow) {
-      console.log('[InfoWindow useEffect] InfoWindow가 이미 존재하므로 중복 실행 방지');
-      return;
-    }
   
     // 이미 최초 InfoWindow를 띄웠으면 return
     if (isFirstInfoWindowShown) {
       console.log('[InfoWindow useEffect] 이미 최초 InfoWindow를 띄웠으므로 중복 실행 방지');
       return;
     }
-  
+
     if (
       isMapReady &&
       map &&
       window.naver?.maps &&
       groupMembers.length > 0 &&
-      isFirstMemberSelectionComplete &&
-      memberMarkers.length > 0 &&
-      memberMarkers.length === groupMembers.length
+      isFirstMemberSelectionComplete
+      // memberMarkers.length > 0 조건 제거 - 마커와 독립적으로 InfoWindow 생성
     ) {
       const selectedMember = groupMembers.find(m => m.isSelected);
       if (selectedMember) {
+        console.log('[InfoWindow useEffect] InfoWindow 생성 조건 만족 - 선택된 멤버:', selectedMember.name);
+        
         setTimeout(() => {
-          // InfoWindow가 이미 생성되었는지 다시 한번 확인
-          if (infoWindow || isFirstInfoWindowShown) {
-            console.log('[InfoWindow useEffect] setTimeout 내부에서 InfoWindow가 이미 존재하므로 중복 실행 방지');
-            return;
-          }
-  
-          const lat = parseCoordinate(selectedMember.mlt_lat) || parseCoordinate(selectedMember.location?.lat);
-          const lng = parseCoordinate(selectedMember.mlt_long) || parseCoordinate(selectedMember.location?.lng);
-  
+          try {
+            // setTimeout 내부에서 다시 한 번 체크 (필요 시)
+            if (isFirstInfoWindowShown) {
+              console.log('[InfoWindow useEffect] setTimeout 내부에서 이미 생성됨으로 확인되어 중복 방지');
+              return;
+            }
+            
+            console.log('[InfoWindow useEffect] setTimeout 실행 - InfoWindow 생성 시도');
+            
+            const lat = parseCoordinate(selectedMember.mlt_lat) || parseCoordinate(selectedMember.location?.lat);
+            const lng = parseCoordinate(selectedMember.mlt_long) || parseCoordinate(selectedMember.location?.lng);
+            
+            console.log('[InfoWindow useEffect] 좌표 확인:', { lat, lng, member: selectedMember.name });
+
           if (lat && lng) {
-            const memberMarker = memberMarkers.find(marker => {
-              const markerTitle = marker.getTitle?.();
-              console.log('[InfoWindow useEffect] 마커 타이틀:', markerTitle, '멤버 이름:', selectedMember.name);
-              return markerTitle === selectedMember.name;
-            });
-  
+            // 기존 멤버 마커 찾기
+            let memberMarker = null;
+            if (memberMarkers.length > 0) {
+              memberMarker = memberMarkers.find(marker => {
+                const markerTitle = marker.getTitle?.();
+                console.log('[InfoWindow useEffect] 마커 타이틀:', markerTitle, '멤버 이름:', selectedMember.name);
+                return markerTitle === selectedMember.name;
+              });
+            }
+
             if (memberMarker) {
-              createMemberInfoWindow(selectedMember, memberMarker);
-              console.log('[첫 번째 멤버 InfoWindow] 표시 완료:', selectedMember.name);
+              console.log('[첫 번째 멤버 InfoWindow] 기존 마커 사용:', selectedMember.name);
+              createMemberInfoWindow(selectedMember, memberMarker, true); // forceCreate: true로 강제 생성
+              setIsFirstInfoWindowShown(true); // 성공 후에만 플래그 설정
             } else {
-              // 임시 마커 생성
+              // 임시 마커 생성 (마커가 없거나 찾을 수 없을 때)
+              console.log('[첫 번째 멤버 InfoWindow] 임시 마커 생성:', selectedMember.name);
               const position = new window.naver.maps.LatLng(lat, lng);
               const tempMarker = new window.naver.maps.Marker({
                 position: position,
                 map: map,
                 visible: false
               });
-              createMemberInfoWindow(selectedMember, tempMarker);
-              console.log('[첫 번째 멤버 InfoWindow] 임시 마커로 표시 완료:', selectedMember.name);
+              createMemberInfoWindow(selectedMember, tempMarker, true); // forceCreate: true로 강제 생성
+              setIsFirstInfoWindowShown(true); // 성공 후에만 플래그 설정
             }
-            setIsFirstInfoWindowShown(true); // 최초 1회만 실행!
+            console.log('[첫 번째 멤버 InfoWindow] 표시 완료:', selectedMember.name);
+          } else {
+            console.warn('[InfoWindow useEffect] 유효하지 않은 좌표:', { lat, lng, member: selectedMember.name });
           }
-        }, 1000);
+          } catch (error) {
+            console.error('[InfoWindow useEffect] InfoWindow 생성 중 오류:', error);
+          }
+        }, 300); // 0.3초 후 실행 (시간 단축)
       }
     }
-  }, [isMapReady, map, groupMembers, isFirstMemberSelectionComplete, memberMarkers]);
+  }, [isMapReady, map, groupMembers, isFirstMemberSelectionComplete, memberMarkers]); // 단순화된 의존성
 
-  // InfoWindow에서 삭제 버튼 클릭 시 호출되는 전역 함수
+  // InfoWindow에서 삭제 버튼 클릭 시 호출되는 전역 함수 (최적화: infoWindow 의존성 제거)
   useEffect(() => {
     (window as any).handleLocationDeleteFromInfoWindow = (locationId: string) => {
       console.log('[InfoWindow 삭제] 장소 삭제 요청:', locationId);
@@ -1049,9 +1062,10 @@ export default function LocationPage() {
       }
       
       if (targetLocation) {
-        // InfoWindow 닫기
-        if (infoWindow) {
-          infoWindow.close();
+        // InfoWindow 닫기 (현재 infoWindow 상태를 동적으로 확인)
+        const currentInfoWindow = infoWindow;
+        if (currentInfoWindow) {
+          currentInfoWindow.close();
           setInfoWindow(null);
         }
         
@@ -1063,22 +1077,37 @@ export default function LocationPage() {
       }
     };
 
-    // InfoWindow 닫기 전역 함수
+    // InfoWindow 닫기 전역 함수 (개선됨)
     (window as any).closeInfoWindow = () => {
       console.log('[InfoWindow 닫기] 닫기 요청');
-      console.log('[InfoWindow 닫기] 현재 infoWindow 상태:', !!infoWindow);
-      if (infoWindow) {
-        try {
-          console.log('[InfoWindow 닫기] close() 메서드 호출 시작');
-          infoWindow.close();
+      const currentInfoWindow = infoWindow;
+      console.log('[InfoWindow 닫기] 현재 infoWindow 상태:', !!currentInfoWindow);
+      
+      try {
+        // 1차: React 상태의 InfoWindow 처리
+        if (currentInfoWindow) {
+          console.log('[InfoWindow 닫기] React 상태 InfoWindow close() 호출');
+          currentInfoWindow.close();
           setInfoWindow(null);
-          console.log('[InfoWindow 닫기] 성공');
-        } catch (error) {
-          console.error('[InfoWindow 닫기] 실패:', error);
-          setInfoWindow(null);
+          console.log('[InfoWindow 닫기] React 상태 처리 성공');
         }
-      } else {
-        console.warn('[InfoWindow 닫기] infoWindow가 null이므로 닫을 수 없음');
+        
+        // 2차: DOM에서 직접 InfoWindow 찾아서 숨김 처리 (React 상태와 독립적)
+        const infoWindows = document.querySelectorAll('.location-info-window-container, .member-info-window-container');
+        if (infoWindows.length > 0) {
+          infoWindows.forEach((element, index) => {
+            const htmlElement = element as HTMLElement;
+            htmlElement.style.display = 'none';
+            htmlElement.style.opacity = '0';
+            htmlElement.style.visibility = 'hidden';
+            console.log(`[InfoWindow 닫기] DOM InfoWindow ${index + 1} 숨김 처리 완료`);
+          });
+        }
+        
+        console.log('[InfoWindow 닫기] 전체 처리 완료');
+      } catch (error) {
+        console.error('[InfoWindow 닫기] 처리 중 오류:', error);
+        setInfoWindow(null); // 에러 발생 시에도 상태 정리
       }
     };
 
@@ -1094,7 +1123,7 @@ export default function LocationPage() {
       delete (window as any).handleLocationDeleteFromInfoWindow;
       delete (window as any).closeInfoWindow;
     };
-  }, [selectedMemberSavedLocations, otherMembersSavedLocations, infoWindow]);
+  }, [selectedMemberSavedLocations, otherMembersSavedLocations]); // infoWindow 의존성 제거!
 
   // 사이드바 업데이트 확인용 useEffect (디버깅)
   useEffect(() => {
@@ -2985,12 +3014,12 @@ export default function LocationPage() {
     return imageUrl;
   }, []);
 
-  // 네이버 맵 역지오코딩 API를 사용한 좌표 -> 주소 변환
+  // 네이버 맵 역지오코딩 API를 사용한 좌표 -> 주소 변환 (타임아웃 최적화)
   const getAddressFromCoordinates = async (lat: number, lng: number): Promise<string> => {
       try {
-        // 네이버 맵 Service가 로드될 때까지 대기 (최대 5초)
+        // 네이버 맵 Service가 로드될 때까지 대기 (최대 2초로 단축)
         let retryCount = 0;
-        const maxRetries = 50; // 5초 (100ms * 50)
+        const maxRetries = 20; // 2초 (100ms * 20)
         
         while (!window.naver?.maps?.Service && retryCount < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -2998,7 +3027,7 @@ export default function LocationPage() {
         }
         
         if (!window.naver?.maps?.Service) {
-          console.warn('[getAddressFromCoordinates] 네이버 맵 Service 로드 타임아웃');
+          console.warn('[getAddressFromCoordinates] 네이버 맵 Service 로드 타임아웃 (2초)');
         return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
         }
 
@@ -3096,24 +3125,33 @@ export default function LocationPage() {
     }
   };
 
-    // 멤버 정보창 생성 함수 - 중복 생성 방지 강화
-    const createMemberInfoWindow = useCallback((member: GroupMember, marker: NaverMarker) => {
+    // 멤버 정보창 생성 함수 - 중복 생성 방지 완화 (초기 생성 허용)
+    const createMemberInfoWindow = useCallback((member: GroupMember, marker: NaverMarker, forceCreate: boolean = false) => {
       if (!map || !window.naver) return;
       
-      // 이미 InfoWindow 생성 중이면 중복 실행 방지
-      if (infoWindowCreationInProgress.current) {
-        console.log('[createMemberInfoWindow] InfoWindow 생성 중이므로 중복 실행 방지');
-        return;
-      }
-      
-      // 이미 같은 멤버의 InfoWindow가 열려있으면 중복 실행 방지
-      if (infoWindow) {
-        const currentContent = infoWindow.getContent?.();
-        if (currentContent && currentContent.includes(`member-address-${member.id}`)) {
-          console.log('[createMemberInfoWindow] 동일 멤버 InfoWindow가 이미 존재하므로 중복 실행 방지');
+      // forceCreate가 true가 아닐 때만 기존 체크 수행 (초기 생성 시 건너뛰기)
+      if (!forceCreate) {
+        // 이미 InfoWindow 생성 중이면 중복 실행 방지
+        if (infoWindowCreationInProgress.current) {
+          console.log('[createMemberInfoWindow] InfoWindow 생성 중이므로 중복 실행 방지');
           return;
         }
-        infoWindow.close();
+        
+        // 이미 같은 멤버의 InfoWindow가 열려있으면 중복 실행 방지
+        if (infoWindow) {
+          const currentContent = infoWindow.getContent?.();
+          if (currentContent && currentContent.includes(`member-address-${member.id}`)) {
+            console.log('[createMemberInfoWindow] 동일 멤버 InfoWindow가 이미 존재하므로 중복 실행 방지');
+            return;
+          }
+          infoWindow.close();
+        }
+      } else {
+        console.log('[createMemberInfoWindow] 강제 생성 모드 - 중복 체크 건너뜀');
+        // 기존 InfoWindow만 닫기
+        if (infoWindow) {
+          infoWindow.close();
+        }
       }
       
       infoWindowCreationInProgress.current = true;
@@ -3156,7 +3194,30 @@ export default function LocationPage() {
           position: relative;
         ">
           <!-- 닫기 버튼 -->
-          <button class="close-button" onclick="this.parentElement.parentElement.style.display='none'; event.stopPropagation();" style="
+          <button class="close-button" onclick="
+            console.log('[멤버 InfoWindow] 닫기 버튼 클릭됨');
+            event.stopPropagation();
+            
+            // 1차: 직접 DOM 조작으로 강제 숨김
+            try {
+              this.parentElement.parentElement.style.display='none';
+              this.parentElement.parentElement.style.opacity='0';
+              this.parentElement.parentElement.style.visibility='hidden';
+              console.log('[멤버 InfoWindow] DOM 조작으로 숨김 성공');
+            } catch(e) {
+              console.error('[멤버 InfoWindow] DOM 조작 실패:', e);
+            }
+            
+            // 2차: 전역 함수로 상태 정리
+            try {
+              if (window.closeInfoWindow) {
+                console.log('[멤버 InfoWindow] 전역 함수 호출');
+                window.closeInfoWindow();
+              }
+            } catch(e) {
+              console.error('[멤버 InfoWindow] 전역 함수 호출 실패:', e);
+            }
+          " style="
             position: absolute;
             top: 8px;
             right: 8px;
@@ -3218,7 +3279,7 @@ export default function LocationPage() {
       newInfoWindow.open(map, marker);
       setInfoWindow(newInfoWindow);
       
-      // 주소 변환 및 업데이트 (비동기 처리)
+      // 주소 변환 및 업데이트 (비동기 처리) - 플래그 해제 보장
       if (lat && lng) {
         getAddressFromCoordinates(lat, lng).then(address => {
         const addressElement = document.getElementById(`member-address-${member.id}`);
@@ -3232,11 +3293,15 @@ export default function LocationPage() {
           if (addressElement) {
             addressElement.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
           }
+        }).finally(() => {
+          // 주소 변환 성공/실패와 관계없이 플래그 해제
+          console.log('[createMemberInfoWindow] 주소 변환 완료 - 플래그 해제');
         });
       }
       
-      // InfoWindow 생성 완료
+      // InfoWindow 생성 완료 (즉시 플래그 해제 - 주소 변환은 비동기로 별도 처리)
       infoWindowCreationInProgress.current = false;
+      console.log('[createMemberInfoWindow] InfoWindow 생성 완료 - 플래그 해제');
     }, [map]);
 
   // 지도에 그룹멤버 마커 표시 (깜빡임 방지 최적화)
@@ -3597,11 +3662,8 @@ export default function LocationPage() {
 
   // 멤버 마커와 선택된 멤버의 장소 마커를 동시 업데이트 (무한 루프 방지)
   useEffect(() => {
-    // 무한 루프 방지
-    if (isUpdatingMarkers.current) {
-      console.log('[useEffect 통합 마커] 마커 업데이트 중이므로 건너뜀');
-      return;
-    }
+    // 무한 루프 방지 로직 간소화
+    console.log('[useEffect 통합 마커] 실행 시작');
     
     console.log('[useEffect 통합 마커] 조건 체크:', {
       hasMap: !!map,
@@ -3627,21 +3689,11 @@ export default function LocationPage() {
         장소데이터: selectedMemberSavedLocations
       });
       
-      // 플래그 설정
-      isUpdatingMarkers.current = true;
-      
       // 멤버 마커는 항상 생성, 장소 마커는 선택된 멤버가 있을 때만 생성
       updateAllMarkers(groupMembers, selectedMemberSavedLocations);
       
-      // 비동기적으로 플래그 해제 (상태 업데이트 완료 후)
-      setTimeout(() => {
-        isUpdatingMarkers.current = false;
-      }, 100);
-      
     } else if (map && isMapReady) {
       console.log('[useEffect 통합 마커] 기존 마커들 제거');
-      
-      isUpdatingMarkers.current = true;
       
       // 조건에 맞지 않으면 기존 마커들 제거
       memberMarkers.forEach(marker => {
@@ -3656,10 +3708,6 @@ export default function LocationPage() {
         infoWindow.close();
         setInfoWindow(null);
       }
-      
-      setTimeout(() => {
-        isUpdatingMarkers.current = false;
-      }, 100);
       
     } else {
       console.log('[useEffect 통합 마커] 조건 미충족:', {
@@ -3980,6 +4028,37 @@ export default function LocationPage() {
           
           <!-- 닫기 버튼 -->
           <button class="info-button close-button location-close-btn" 
+                  onclick="
+                    console.log('[장소 InfoWindow] 닫기 버튼 클릭됨');
+                    event.stopPropagation();
+                    
+                    // 1차: 직접 DOM 조작으로 강제 숨김 (가장 확실한 방법)
+                    try {
+                      let element = this.parentElement;
+                      while (element && !element.className.includes('location-info-window-container')) {
+                        element = element.parentElement;
+                      }
+                      if (element) {
+                        element.style.display = 'none';
+                        element.style.opacity = '0';
+                        element.style.visibility = 'hidden';
+                        console.log('[장소 InfoWindow] DOM 조작으로 숨김 성공');
+                      }
+                    } catch(e) {
+                      console.error('[장소 InfoWindow] DOM 조작 실패:', e);
+                      this.closest('div').style.display = 'none';
+                    }
+                    
+                    // 2차: 전역 함수로 상태 정리
+                    try {
+                      if (window.closeInfoWindow) {
+                        console.log('[장소 InfoWindow] 전역 함수 호출');
+                        window.closeInfoWindow();
+                      }
+                    } catch(e) {
+                      console.error('[장소 InfoWindow] 전역 함수 호출 실패:', e);
+                    }
+                  "
                   data-action="close" 
                   style="z-index: 999999 !important; pointer-events: auto !important;"
                   title="닫기">
@@ -4008,103 +4087,10 @@ export default function LocationPage() {
       setInfoWindow(null);
     });
 
-    // 대안적 접근법: InfoWindow 자체에 클릭 이벤트 리스너 추가
+    // 간단한 DOM ready 이벤트만 유지 (닫기 버튼은 inline onclick으로 처리)
     window.naver.maps.Event.addListener(newInfoWindow, 'domready', () => {
-      console.log('[InfoWindow] DOM 준비 완료 - 클릭 이벤트 추가');
-      try {
-        // 네이버 지도 InfoWindow의 DOM 요소 직접 접근
-        const iwContent = newInfoWindow.getContentElement ? newInfoWindow.getContentElement() : null;
-        if (iwContent) {
-          console.log('[InfoWindow] InfoWindow 컨텐트 요소 발견');
-          
-          // 이벤트 위임을 사용하여 닫기 버튼 클릭 감지
-          iwContent.addEventListener('click', (e: Event) => {
-            const target = e.target as HTMLElement;
-            console.log('[InfoWindow] 컨텐트 클릭:', target.className, target.getAttribute('data-action'));
-            
-            if (target.matches('.location-close-btn') || 
-                target.closest('.location-close-btn') ||
-                target.getAttribute('data-action') === 'close') {
-              console.log('[InfoWindow] 닫기 버튼 클릭 감지 - InfoWindow 닫기');
-              e.stopPropagation();
-              e.preventDefault();
-              
-              newInfoWindow.close();
-              setInfoWindow(null);
-            }
-          });
-          
-          console.log('[InfoWindow] 이벤트 위임 추가 완료');
-        }
-      } catch (domReadyError) {
-        console.warn('[InfoWindow] DOM ready 이벤트 처리 실패:', domReadyError);
-      }
+      console.log('[InfoWindow] 장소 InfoWindow DOM 준비 완료');
     });
-
-    // InfoWindow 열린 후 DOM 요소에 직접 닫기 이벤트 연결 (개선된 접근법)
-    setTimeout(() => {
-      try {
-        // 더 구체적인 선택자로 장소 InfoWindow의 닫기 버튼만 선택
-        const locationCloseButtons = document.querySelectorAll('.location-close-btn[data-action="close"]');
-        console.log('[DOM 이벤트] 찾은 장소 닫기 버튼 수:', locationCloseButtons.length);
-        
-        locationCloseButtons.forEach((button, index) => {
-          // 기존 이벤트 리스너가 없는 경우에만 추가
-          if (!button.hasAttribute('data-close-attached')) {
-            // 여러 이벤트 타입으로 확실하게 잡기
-            ['click', 'mousedown', 'touchstart'].forEach(eventType => {
-              button.addEventListener(eventType, (e) => {
-                console.log(`[DOM 이벤트] 장소 InfoWindow 닫기 버튼 ${eventType} 이벤트 감지`);
-                e.stopPropagation();
-                e.preventDefault();
-                
-                // 1차: 전역 함수 시도
-                if ((window as any).closeInfoWindow) {
-                  console.log('[DOM 이벤트] 전역 함수로 닫기 시도');
-                  (window as any).closeInfoWindow();
-                } 
-                // 2차: 직접 InfoWindow API 사용
-                else if (newInfoWindow) {
-                  console.log('[DOM 이벤트] 직접 InfoWindow API로 닫기');
-                  newInfoWindow.close();
-                  setInfoWindow(null);
-                }
-                // 3차: DOM 조작으로 강제 숨김
-                else {
-                  console.log('[DOM 이벤트] DOM 조작으로 강제 숨김');
-                  try {
-                    // 네이버 지도 InfoWindow 구조에 맞게 부모 요소들 탐색
-                    let targetElement = button.closest('.location-info-window-container');
-                    if (!targetElement) {
-                      targetElement = button.parentElement;
-                    }
-                    
-                                         // 여러 레벨 위로 올라가면서 InfoWindow 컨테이너 찾기
-                     let current = targetElement;
-                     for (let i = 0; i < 5 && current; i++) {
-                       if (current instanceof HTMLElement) {
-                         current.style.display = 'none';
-                         current.style.visibility = 'hidden';
-                         current.style.opacity = '0';
-                       }
-                       current = current.parentElement;
-                     }
-                    console.log('[DOM 이벤트] InfoWindow 강제 숨김 완료');
-                  } catch (hideError) {
-                    console.error('[DOM 이벤트] InfoWindow 강제 숨김 실패:', hideError);
-                  }
-                }
-              }, { capture: true }); // 캡처링 단계에서 이벤트 잡기
-            });
-            
-            button.setAttribute('data-close-attached', 'true');
-            console.log(`[DOM 이벤트] 장소 닫기 버튼 ${index + 1} 이벤트 리스너 추가됨`);
-          }
-        });
-      } catch (domError) {
-        console.warn('[DOM 이벤트] 장소 닫기 버튼 이벤트 추가 실패:', domError);
-      }
-    }, 200); // 시간을 더 늘려서 DOM이 완전히 렌더링되도록
     
     return newInfoWindow;
   };
@@ -4657,15 +4643,34 @@ export default function LocationPage() {
       return;
     }
 
-    // InfoWindow 닫기 함수 등록
+    // InfoWindow 닫기 함수 등록 (개선됨)
     (window as any).closeInfoWindow = () => {
       console.log('[window.closeInfoWindow] InfoWindow 닫기 함수 호출됨');
-      if (infoWindow) {
-        infoWindow.close();
+      
+      try {
+        // 1차: React 상태의 InfoWindow 처리
+        if (infoWindow) {
+          infoWindow.close();
+          setInfoWindow(null);
+          console.log('[window.closeInfoWindow] React 상태 InfoWindow 닫기 완료');
+        }
+        
+        // 2차: DOM에서 직접 InfoWindow 찾아서 숨김 처리
+        const infoWindows = document.querySelectorAll('.location-info-window-container, .member-info-window-container');
+        if (infoWindows.length > 0) {
+          infoWindows.forEach((element, index) => {
+            const htmlElement = element as HTMLElement;
+            htmlElement.style.display = 'none';
+            htmlElement.style.opacity = '0';
+            htmlElement.style.visibility = 'hidden';
+            console.log(`[window.closeInfoWindow] DOM InfoWindow ${index + 1} 숨김 처리 완료`);
+          });
+        }
+        
+        console.log('[window.closeInfoWindow] 전체 처리 완료');
+      } catch (error) {
+        console.error('[window.closeInfoWindow] 처리 중 오류:', error);
         setInfoWindow(null);
-        console.log('[window.closeInfoWindow] InfoWindow 닫기 완료');
-      } else {
-        console.log('[window.closeInfoWindow] 닫을 InfoWindow가 없음');
       }
     };
 
@@ -5892,3 +5897,4 @@ export default function LocationPage() {
     </>
   );
 } 
+
