@@ -112,15 +112,25 @@ const MemberCalendar = memo(({
       </div>
 
       {/* 캘린더 그리드 */}
-      <div className="grid grid-cols-7 gap-1">
+      <div>
         {/* 요일 헤더 */}
-        {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
-          <div key={day} className="text-center text-xs font-medium text-gray-500 py-1">
-            {day}
-          </div>
-        ))}
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+            <div 
+              key={`${day}-${index}`} 
+              className={`text-center text-xs font-bold py-1 rounded-md ${
+                index === 0 ? 'text-red-500 bg-red-50' : 
+                index === 6 ? 'text-blue-500 bg-blue-50' : 
+                'text-gray-600 bg-gray-50'
+              }`}
+            >
+              {day}
+            </div>
+          ))}
+        </div>
         
         {/* 날짜 셀 */}
+        <div className="grid grid-cols-7 gap-1">
         {monthDays.map((date) => {
           const dateString = format(date, 'yyyy-MM-dd');
           const count = getDailyCount(date);
@@ -155,6 +165,7 @@ const MemberCalendar = memo(({
             </motion.button>
           );
         })}
+        </div>
       </div>
     </div>
   );

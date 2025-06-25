@@ -2449,36 +2449,25 @@ export default function LogsPage() {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // 1단계: 멤버가 다른 경우 먼저 멤버 변경
-      if (!member.isSelected) {
-        console.log(`[네모 캘린더] 1단계: 멤버 변경 ${groupMembers.find(m => m.isSelected)?.name} → ${member.name}`);
-        
-        // 멤버 상태만 먼저 업데이트 (데이터 로딩 없이)
-        const updatedMembers = groupMembers.map(m => ({
-          ...m,
-          isSelected: m.id === member.id
-        }));
-        setGroupMembers(updatedMembers);
-        
-        // 멤버 변경 완료 대기
-        await new Promise(resolve => setTimeout(resolve, 100));
-        console.log(`[네모 캘린더] 멤버 변경 완료: ${member.name}`);
-      }
-      
-      // 2단계: 날짜가 다른 경우 날짜 변경 및 데이터 로딩
-      if (selectedDate !== dateString) {
-        console.log(`[네모 캘린더] 2단계: 날짜 변경 및 데이터 로딩 ${selectedDate} → ${dateString}`);
+      // 1단계: 멤버가 다른 경우 또는 날짜가 다른 경우 통합 처리
+      if (!member.isSelected || selectedDate !== dateString) {
+        if (!member.isSelected) {
+          console.log(`[네모 캘린더] 멤버 변경: ${groupMembers.find(m => m.isSelected)?.name} → ${member.name}`);
+        }
+        if (selectedDate !== dateString) {
+          console.log(`[네모 캘린더] 날짜 변경: ${selectedDate} → ${dateString}`);
+        }
         
         // 지도 초기화
         clearMapMarkersAndPaths(false, true);
         setLocationSummary(DEFAULT_LOCATION_SUMMARY);
         
-        // 통합 함수로 날짜+멤버 데이터 로딩
+        // 통합 함수로 날짜+멤버 데이터 로딩 (명시적으로 멤버 ID 전달)
         await loadDateMemberData(dateString, member.id, 'date');
         
-        console.log(`[네모 캘린더] 날짜 변경 및 데이터 로딩 완료: ${dateString}`);
+        console.log(`[네모 캘린더] 처리 완료: ${member.name}, ${dateString}`);
       } else {
-        console.log(`[네모 캘린더] 같은 날짜 - 데이터 로딩 생략`);
+        console.log(`[네모 캘린더] 같은 멤버, 같은 날짜 - 처리 생략`);
       }
       
       // 사이드바 자동 닫기
@@ -4167,54 +4156,43 @@ export default function LogsPage() {
         return;
       }
       
-      // 3단계: 멤버 목록 업데이트 및 선택할 멤버 결정
+      // 3단계: 선택할 멤버 결정 (기존 멤버 정보 유지)
       const currentSelectedMember = groupMembers.find((m: GroupMember) => m.isSelected);
       let selectedMemberId = targetMemberId;
       
-      // targetMemberId가 없으면 우선순위에 따라 선택
-      if (!selectedMemberId) {
-        if (triggerSource === 'date' && currentSelectedMember) {
-          // 날짜 변경 시: 현재 선택된 멤버가 해당 날짜에 활동했으면 유지
-          const memberStillActive = memberActivityResponse.member_activities.find(
-            m => m.member_id.toString() === currentSelectedMember.id
-          );
-          selectedMemberId = memberStillActive ? currentSelectedMember.id : memberActivityResponse.member_activities[0].member_id.toString();
-        } else {
-          // 멤버 변경 시 또는 기본: 첫 번째 활동 멤버 선택
-          selectedMemberId = memberActivityResponse.member_activities[0].member_id.toString();
-        }
+      // targetMemberId가 명시적으로 전달된 경우 해당 멤버 선택
+      if (selectedMemberId) {
+        console.log('[loadDateMemberData] 명시적으로 지정된 멤버 ID 사용:', selectedMemberId);
+      } else if (currentSelectedMember) {
+        // 현재 선택된 멤버가 있으면 유지 (활동 여부와 관계없이)
+        selectedMemberId = currentSelectedMember.id;
+        console.log('[loadDateMemberData] 현재 선택된 멤버 유지:', selectedMemberId, currentSelectedMember.name);
+      } else {
+        // 선택된 멤버가 없으면 첫 번째 활동 멤버 선택
+        selectedMemberId = memberActivityResponse.member_activities[0].member_id.toString();
+        console.log('[loadDateMemberData] 첫 번째 활동 멤버 선택:', selectedMemberId);
       }
       
-      console.log('[loadDateMemberData] 선택될 멤버 ID:', selectedMemberId);
+      console.log('[loadDateMemberData] 최종 선택될 멤버 ID:', selectedMemberId);
       
-      // 4단계: 그룹 멤버 상태 업데이트
-      const updatedMembers = memberActivityResponse.member_activities.map((memberActivity: any, index: number) => {
-        const existingMember = groupMembers.find((m: GroupMember) => m.id === memberActivity.member_id.toString());
-        
-        return {
-          id: memberActivity.member_id.toString(),
-          name: memberActivity.member_name || `멤버 ${index + 1}`,
-          photo: memberActivity.member_photo,
-          isSelected: memberActivity.member_id.toString() === selectedMemberId,
-          location: { 
-            lat: existingMember?.location.lat || 37.5665, 
-            lng: existingMember?.location.lng || 126.9780 
-          },
-          mt_gender: typeof memberActivity.member_gender === 'number' ? memberActivity.member_gender : null,
-          original_index: index,
-          mt_weather_sky: existingMember?.mt_weather_sky,
-          mt_weather_tmx: existingMember?.mt_weather_tmx,
-          mt_weather_tmn: existingMember?.mt_weather_tmn,
-          mt_weather_date: existingMember?.mt_weather_date,
-          mlt_lat: existingMember?.mlt_lat,
-          mlt_long: existingMember?.mlt_long,
-          mlt_speed: existingMember?.mlt_speed,
-          mlt_battery: existingMember?.mlt_battery,
-          mlt_gps_time: existingMember?.mlt_gps_time,
-          sgdt_owner_chk: existingMember?.sgdt_owner_chk,
-          sgdt_leader_chk: existingMember?.sgdt_leader_chk,
-          sgdt_idx: existingMember?.sgdt_idx
-        };
+      // 4단계: 기존 그룹 멤버 정보를 유지하면서 선택 상태만 업데이트
+      const updatedMembers = groupMembers.map((member: GroupMember) => ({
+        ...member,
+        isSelected: member.id === selectedMemberId
+      }));
+      
+      // 해당 날짜에 활동한 멤버 정보로 업데이트 (필요시)
+      memberActivityResponse.member_activities.forEach((memberActivity: any) => {
+        const memberIndex = updatedMembers.findIndex(m => m.id === memberActivity.member_id.toString());
+        if (memberIndex !== -1) {
+          // 기존 멤버 정보는 유지하고 활동 관련 정보만 업데이트
+          updatedMembers[memberIndex] = {
+            ...updatedMembers[memberIndex],
+            name: memberActivity.member_name || updatedMembers[memberIndex].name,
+            photo: memberActivity.member_photo || updatedMembers[memberIndex].photo,
+            mt_gender: typeof memberActivity.member_gender === 'number' ? memberActivity.member_gender : updatedMembers[memberIndex].mt_gender
+          };
+        }
       });
       
       // 상태 업데이트
@@ -4223,19 +4201,52 @@ export default function LogsPage() {
       // 5단계: 선택된 멤버의 위치 데이터 로딩
       const selectedMember = updatedMembers.find(m => m.isSelected);
       if (selectedMember) {
-        console.log('[loadDateMemberData] 선택된 멤버의 위치 데이터 로딩:', selectedMember.name, targetDate);
+        // 선택된 멤버가 해당 날짜에 활동했는지 확인
+        const memberIsActive = memberActivityResponse.member_activities.find(
+          m => m.member_id.toString() === selectedMember.id
+        );
         
-        // 로딩 상태 활성화
-        setIsLocationDataLoading(true);
-        setIsMapLoading(true);
-        
-        // 지도 초기화
-        clearMapMarkersAndPaths(false, true, true);
-        
-        // 위치 데이터 로딩
-        await loadLocationDataWithMapPreset(parseInt(selectedMember.id), targetDate, selectedMember, false);
-        
-        console.log('[loadDateMemberData] 위치 데이터 로딩 완료');
+        if (memberIsActive) {
+          console.log('[loadDateMemberData] 선택된 멤버의 위치 데이터 로딩:', selectedMember.name, targetDate);
+          
+          // 로딩 상태 활성화
+          setIsLocationDataLoading(true);
+          setIsMapLoading(true);
+          
+          // 지도 초기화
+          clearMapMarkersAndPaths(false, true, true);
+          
+          // 위치 데이터 로딩
+          await loadLocationDataWithMapPreset(parseInt(selectedMember.id), targetDate, selectedMember, false);
+          
+          console.log('[loadDateMemberData] 위치 데이터 로딩 완료');
+        } else {
+          console.log('[loadDateMemberData] 선택된 멤버가 해당 날짜에 활동하지 않음:', selectedMember.name, targetDate);
+          
+          // 활동하지 않은 멤버의 경우 기본 위치로 지도 이동 및 멤버 마커만 표시
+          setIsLocationDataLoading(false);
+          setIsMapLoading(false);
+          
+          // 지도 초기화 (경로 및 활동 마커 제거)
+          clearMapMarkersAndPaths(false, true, true);
+          setLocationSummary(DEFAULT_LOCATION_SUMMARY);
+          
+          // 멤버의 기본 위치로 지도 중심 이동
+          if (map.current) {
+            const memberLat = selectedMember.mlt_lat || selectedMember.location.lat || 37.5665;
+            const memberLng = selectedMember.mlt_long || selectedMember.location.lng || 126.9780;
+            const adjustedPosition = new window.naver.maps.LatLng(memberLat, memberLng);
+            
+            map.current.setCenter(adjustedPosition);
+            map.current.setZoom(16);
+            
+            // 멤버 마커만 표시
+            setTimeout(() => {
+              updateMemberMarkers(updatedMembers, false);
+              console.log('[loadDateMemberData] 활동하지 않은 멤버 - 기본 위치로 지도 설정 완료');
+            }, 100);
+          }
+        }
       }
       
       console.log('[loadDateMemberData] ===== 통합 데이터 로딩 완료 =====');
@@ -7088,6 +7099,32 @@ export default function LogsPage() {
                                       return `${activeDays}/14일`;
                                     })()}
                                   </span>
+                                </div>
+                                
+                                {/* 요일 헤더 - 실제 날짜에 따른 동적 요일 */}
+                                <div className="grid grid-cols-7 gap-1.5 mb-1">
+                                  {Array.from({ length: 7 }, (_, index) => {
+                                    // 윗줄(13~7일전)의 실제 요일 계산
+                                    const offset = 13 - index;
+                                    const date = new Date();
+                                    date.setDate(date.getDate() - offset);
+                                    const dayOfWeek = date.getDay(); // 0=일, 1=월, 2=화, 3=수, 4=목, 5=금, 6=토
+                                    const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+                                    const dayLabel = dayLabels[dayOfWeek];
+                                    
+                                    return (
+                                      <div 
+                                        key={`day-header-${index}`}
+                                        className={`h-3 rounded text-[9px] font-bold flex items-center justify-center
+                                          ${dayOfWeek === 0 ? 'text-red-500 bg-red-50' : 
+                                            dayOfWeek === 6 ? 'text-blue-500 bg-blue-50' : 
+                                            'text-gray-500 bg-gray-50'}
+                                        `}
+                                      >
+                                        {dayLabel}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                                 
                                 {/* 14일 네모 캘린더 - 7x2 그리드로 개선 */}
