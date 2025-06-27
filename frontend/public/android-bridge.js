@@ -261,4 +261,28 @@
     
     console.log('✅ Android Google Sign-In 콜백 함수 등록 완료');
     
+    // 플랫폼 감지 함수
+    function isIOS() {
+        return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    }
+
+    // Android 환경이면 iOS 콜백을 덮어쓰기
+    if (isAndroid()) {
+        window.onNativeGoogleLoginSuccess = function(idToken, userInfo) {
+            console.log('📱 Android - 기존 iOS 콜백 덮어쓰기됨');
+            // 아무것도 하지 않음
+        };
+        window.handleNativeGoogleLoginSuccess = function(idToken, userInfo) {
+            console.log('📱 Android - 기존 iOS 콜백 덮어쓰기됨');
+            // 아무것도 하지 않음
+        };
+    }
+
+    // iOS 환경이면 Android 콜백을 덮어쓰기(필요시)
+    if (isIOS()) {
+        window.googleSignInSuccess = function() {
+            // 아무것도 하지 않음
+        };
+    }
+    
 })(); 
