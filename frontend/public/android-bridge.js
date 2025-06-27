@@ -136,8 +136,13 @@
             const userInfo = typeof userInfoJson === 'string' ? JSON.parse(userInfoJson) : userInfoJson;
             console.log('📱 Android Google Sign-In 사용자 정보:', userInfo);
             
-            // 백엔드 API 직접 호출
-            console.log('📱 Android Google Sign-In 백엔드 API 호출 시작');
+            // 🚨 기존 iOS 콜백을 완전히 우회하고 직접 백엔드 API 호출
+            console.log('📱 Android Google Sign-In 백엔드 API 직접 호출 시작');
+            
+            // 성공 햅틱 피드백
+            if (window.SmapApp && window.SmapApp.haptic) {
+                window.SmapApp.haptic.success();
+            }
             
             fetch('/api/google-auth', {
                 method: 'POST',
@@ -150,9 +155,12 @@
                     source: 'android_native'
                 }),
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('📱 Android Google Sign-In 백엔드 응답 상태:', response.status);
+                return response.json();
+            })
             .then(data => {
-                console.log('📱 Android Google Sign-In 백엔드 응답:', data);
+                console.log('📱 Android Google Sign-In 백엔드 응답 데이터:', data);
                 
                 if (data.success) {
                     console.log('📱 Android Google Sign-In 성공:', data.user);
@@ -162,14 +170,9 @@
                         window.SmapApp.haptic.success();
                     }
                     
-                    // 기존 iOS 콜백과 동일한 방식으로 처리
-                    if (window.onNativeGoogleLoginSuccess) {
-                        window.onNativeGoogleLoginSuccess(data);
-                    } else {
-                        // 백업 처리 - 홈으로 이동
-                        console.log('📱 Android Google Sign-In 직접 처리 - 홈으로 이동');
-                        window.location.href = '/home';
-                    }
+                    // 🚨 직접 홈 페이지로 이동 (기존 콜백 우회)
+                    console.log('📱 Android Google Sign-In 직접 처리 - 홈으로 이동');
+                    window.location.href = '/home';
                 } else {
                     throw new Error(data.error || '로그인에 실패했습니다.');
                 }
@@ -182,15 +185,27 @@
                     window.SmapApp.haptic.error();
                 }
                 
-                if (window.onNativeGoogleLoginError) {
-                    window.onNativeGoogleLoginError(error.message || '백엔드 인증에 실패했습니다.');
+                // 에러 표시
+                if (window.showError) {
+                    window.showError(error.message || '백엔드 인증에 실패했습니다.');
+                } else {
+                    alert(error.message || '백엔드 인증에 실패했습니다.');
                 }
             });
             
         } catch (error) {
             console.error('📱 Android Google Sign-In 사용자 정보 파싱 오류:', error);
-            if (window.onNativeGoogleLoginError) {
-                window.onNativeGoogleLoginError('사용자 정보를 처리하는 중 오류가 발생했습니다.');
+            
+            // 에러 햅틱 피드백
+            if (window.SmapApp && window.SmapApp.haptic) {
+                window.SmapApp.haptic.error();
+            }
+            
+            // 에러 표시
+            if (window.showError) {
+                window.showError('사용자 정보를 처리하는 중 오류가 발생했습니다.');
+            } else {
+                alert('사용자 정보를 처리하는 중 오류가 발생했습니다.');
             }
         }
     };
