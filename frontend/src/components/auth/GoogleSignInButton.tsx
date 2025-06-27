@@ -22,6 +22,7 @@ export default function GoogleSignInButton({
     isLoading, 
     error, 
     isIOS, 
+    isAndroid,
     signIn, 
     signOut, 
     clearError 
@@ -51,8 +52,8 @@ export default function GoogleSignInButton({
     signOut();
   };
 
-  // iOS가 아닌 경우 표시하지 않음
-  if (!isIOS) {
+  // iOS/Android가 아닌 경우 표시하지 않음
+  if (!isIOS && !isAndroid) {
     return null;
   }
 

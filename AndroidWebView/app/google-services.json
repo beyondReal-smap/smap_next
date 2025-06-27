@@ -2,7 +2,7 @@
   "project_info": {
     "project_number": "283271180972",
     "project_id": "com-dmonster-smap",
-    "storage_bucket": "com-dmonster-smap.appspot.com"
+    "storage_bucket": "com-dmonster-smap.firebasestorage.app"
   },
   "client": [
     {
@@ -12,7 +12,20 @@
           "package_name": "com.dmonster.smap"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "283271180972-lamjiad6ljpa02fk30k6nh6arqq4rc4o.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dmonster.smap",
+            "certificate_hash": "8d9a1073f8d46c38dd45fd394ef53f8b527d0d17"
+          }
+        },
+        {
+          "client_id": "283271180972-38reu7hqcogn8b465nu2dh89f5a03ac5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC5uPTx2pY1iUrxwPonpsqF0XVvwHKkww4"
@@ -20,7 +33,20 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "283271180972-38reu7hqcogn8b465nu2dh89f5a03ac5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.dmonster.smap",
+                "app_store_id": "6480279658"
+              }
+            }
+          ]
         }
       }
     }

@@ -2427,11 +2427,84 @@ export default function SignInPage() {
     console.log('🚀 [GOOGLE LOGIN] 핸들러 시작됨');
     setIsLoading(true);
     
-    // 🔥 페이지 로드 완료 후 핸들러 준비 상태 확인
+    // 🔥 Android 환경 체크 및 Android 브리지 사용 (개선된 버전)
+    const isAndroidWebView = /Android/.test(navigator.userAgent);
+    const hasAndroidGoogleSignIn = !!(window as any).AndroidGoogleSignIn;
+    const hasAndroidBridge = !!(window as any).androidBridge?.googleSignIn;
+    const hasAndroidHandlers = !!(window as any).__SMAP_ANDROID_HANDLERS_READY__;
+    const androidHandlersList = (window as any).__SMAP_ANDROID_HANDLERS_LIST__ || [];
+    
+    console.log('🔍 [GOOGLE LOGIN] Android 환경 체크 (개선된 버전):', {
+      isAndroidWebView,
+      hasAndroidGoogleSignIn,
+      hasAndroidBridge,
+      hasAndroidHandlers,
+      androidHandlersList,
+      userAgent: navigator.userAgent.substring(0, 50)
+    });
+    
+    // Android 환경에서 Android 브리지 사용 (개선된 버전)
+    if (isAndroidWebView && (hasAndroidGoogleSignIn || hasAndroidBridge || hasAndroidHandlers)) {
+      console.log('🤖 [GOOGLE LOGIN] Android 환경에서 Android 브리지 사용');
+      
+      try {
+        // 🔥 Android 브리지 우선 시도
+        if (hasAndroidBridge) {
+          console.log('📱 [GOOGLE LOGIN] Android Bridge를 통한 Google Sign-In 호출');
+          (window as any).androidBridge.googleSignIn.signIn();
+        } 
+        // 🔥 Android 핸들러 직접 호출
+        else if (hasAndroidGoogleSignIn) {
+          console.log('📱 [GOOGLE LOGIN] Android Google Sign-In 직접 호출');
+          (window as any).AndroidGoogleSignIn.signIn();
+        }
+        // 🔥 WebKit 시뮬레이션을 통한 호출
+        else if ((window as any).webkit?.messageHandlers?.smapIos) {
+          console.log('📱 [GOOGLE LOGIN] Android WebKit 시뮬레이션을 통한 Google Sign-In 호출');
+          (window as any).webkit.messageHandlers.smapIos.postMessage({
+            type: 'googleSignIn',
+            param: '',
+            timestamp: Date.now(),
+            source: 'android-webkit-sim'
+          });
+        }
+        // 🔥 Android 핸들러 목록에서 찾기
+        else if (androidHandlersList.includes('AndroidGoogleSignIn')) {
+          console.log('📱 [GOOGLE LOGIN] Android 핸들러 목록에서 Google Sign-In 호출');
+          if ((window as any).AndroidGoogleSignIn) {
+            (window as any).AndroidGoogleSignIn.signIn();
+          }
+        }
+        
+        console.log('✅ [GOOGLE LOGIN] Android 네이티브 호출 성공, 콜백 대기 중...');
+        return;
+      } catch (error) {
+        console.error('❌ [GOOGLE LOGIN] Android 네이티브 호출 실패:', error);
+        setIsLoading(false);
+        showError('Android Google 로그인을 시작할 수 없습니다.');
+        return;
+      }
+    }
+    
+    // 🔥 Android 핸들러 모니터링 및 재시도 로직
+    if (isAndroidWebView && !hasAndroidHandlers && retryCount < 3) {
+      console.log(`⏳ [ANDROID HANDLER] Android 핸들러 준비 대기 중... (${retryCount + 1}/3) 1초 후 재시도`);
+      clearTimeout(timeoutId);
+      setIsLoading(false);
+      
+      setTimeout(() => {
+        handleGoogleLogin(retryCount + 1);
+      }, 1000);
+      return;
+    }
+    
+    // 기존 iOS 로직은 그대로 유지...
+
+    // 🔥 페이지 로드 완료 후 핸들러 준비 상태 확인 (Android 호환성 개선)
     if (typeof window !== 'undefined') {
-      const isHandlersReady = (window as any).__SMAP_HANDLERS_READY__;
-      const handlersList = (window as any).__SMAP_HANDLERS_LIST__;
-      const isGoogleLoginReady = (window as any).__SMAP_GOOGLE_LOGIN_READY__;
+      const isHandlersReady = (window as any).__SMAP_HANDLERS_READY__ || (window as any).__SMAP_ANDROID_HANDLERS_READY__;
+      const handlersList = (window as any).__SMAP_HANDLERS_LIST__ || (window as any).__SMAP_ANDROID_HANDLERS_LIST__ || [];
+      const isGoogleLoginReady = (window as any).__SMAP_GOOGLE_LOGIN_READY__ || (window as any).__SMAP_ANDROID_GOOGLE_SIGNIN_READY__;
       
       if (isHandlersReady && handlersList?.length > 0) {
         console.log('✅ [HANDLER-FORCE] 페이지 로드 완료 후 핸들러 발견됨:', handlersList);
@@ -2457,1542 +2530,6 @@ export default function SignInPage() {
     // 환경 체크
     console.log('🔍 [GOOGLE LOGIN] 환경 체크 시작');
     
-    const isIOSWebView = !!(window as any).webkit?.messageHandlers;
-    const isIOSSimulator = navigator.userAgent.includes('iPhone') && navigator.userAgent.includes('OS');
-      const hasWebKit = !!(window as any).webkit;
-      const hasMessageHandlers = !!(window as any).webkit?.messageHandlers;
-      const hasSmapIos = !!(window as any).webkit?.messageHandlers?.smapIos;
-      const hasIosBridge = !!(window as any).iosBridge;
-    const hasGoogleSDK = typeof (window as any).google !== 'undefined';
-    
-    console.log('🔍 [GOOGLE LOGIN] 환경 정보:', {
-      hasWebkit: hasWebKit,
-      hasMessageHandlers: hasMessageHandlers,
-      hasSmapIos: hasSmapIos,
-      hasIosBridge: hasIosBridge,
-      hasGoogleSDK: hasGoogleSDK,
-      userAgent: navigator.userAgent.substring(0, 100)
-    });
-    
-    // 강화된 환경 체크
-      console.log('[GOOGLE LOGIN] 환경 체크 (강화):', {
-        isIOSWebView,
-        isIOSSimulator,
-        hasWebKit,
-        hasMessageHandlers,
-        hasSmapIos,
-        hasIosBridge,
-      domain: window.location.hostname,
-        currentURL: window.location.href
-      });
-      
-    try {
-      // 🚨 강제 웹 SDK 모드이거나 nextstep.smap.site에서 MessageHandler가 없는 경우 웹 SDK 강제 사용
-      const isNexStepDomain = window.location.hostname === 'nextstep.smap.site';
-      const hasNoMessageHandlers = !hasMessageHandlers || !hasSmapIos;
-      const isForceWebMode = !!(window as any).__FORCE_WEB_SDK_MODE__;
-      
-      // 🚨 네이티브 강제 모드일 때는 무조건 네이티브 시도 (단, 핸들러 준비된 경우 예외)
-      const isForceNativeMode = !!(window as any).__FORCE_NATIVE_GOOGLE_LOGIN__;
-      const isHandlersReady = !!(window as any).__SMAP_HANDLERS_READY__;
-      
-      if (isForceNativeMode && !isHandlersReady) {
-        console.log('🔥 [GOOGLE LOGIN] 네이티브 강제 모드 - MessageHandler 없어도 네이티브 시도');
-        // MessageHandler가 없어도 네이티브 로그인 강제 시도
-      } else if (isHandlersReady && hasMessageHandlers) {
-        console.log('✅ [GOOGLE LOGIN] 핸들러 준비 완료 - 정상 네이티브 로그인 진행');
-        // 핸들러가 준비되었으므로 정상 네이티브 로그인 진행
-      } else if (isForceWebMode || (isNexStepDomain && hasNoMessageHandlers)) {
-        const reason = isForceWebMode ? '강제 웹 SDK 모드' : 'MessageHandler 없음';
-        console.log(`🌐 [GOOGLE LOGIN] ${reason} - 웹 SDK 강제 사용`);
-        
-        // 웹 Google SDK 강제 사용
-        setTimeout(() => {
-          handleGoogleSDKLogin();
-        }, 100);
-        return;
-      }
-      
-      // 기존 iOS WebView 로직
-      if (isIOSWebView || isIOSSimulator || true) {
-        console.log('[GOOGLE LOGIN] iOS WebView에서 네이티브 Google Sign-In 사용');
-        
-        // 상세 환경 분석
-        console.log('[GOOGLE LOGIN] 🔍 상세 환경 분석:', {
-          '현재URL': window.location.href,
-          '기기타입': isIOSSimulator ? '시뮬레이터' : '실제기기',
-          'WebKit유무': hasWebKit,
-          'MessageHandler유무': hasMessageHandlers,
-          'SmapIos핸들러': hasSmapIos,
-          'IosBridge유무': hasIosBridge,
-          'SDK유무': hasGoogleSDK
-        });
-        
-        // 🚨 네이티브 강제 모드이거나 핸들러 준비 완료 또는 ios-bridge를 통한 네이티브 Google Sign-In 시도
-        const isForceNativeMode = !!(window as any).__FORCE_NATIVE_GOOGLE_LOGIN__;
-        const isHandlersReady = !!(window as any).__SMAP_HANDLERS_READY__;
-        
-        if (isForceNativeMode || isHandlersReady || (hasIosBridge && (window as any).iosBridge.googleSignIn?.signIn)) {
-          let modeDescription = '';
-          if (isHandlersReady) {
-            modeDescription = '핸들러 준비 완료';
-          } else if (isForceNativeMode) {
-            modeDescription = '강제 네이티브 모드';
-          } else {
-            modeDescription = 'ios-bridge.js googleSignIn 메서드';
-          }
-          console.log(`🌉 [GOOGLE LOGIN] ${modeDescription} 사용`);
-          
-          try {
-            console.log('📱 [GOOGLE LOGIN] 네이티브 호출 실행 중...');
-            
-            if (isHandlersReady) {
-              console.log('✅ [GOOGLE LOGIN] 핸들러 준비 완료 - 정상 MessageHandler 사용');
-              
-              // 핸들러가 준비되었으므로 정상적인 MessageHandler 사용
-              const webkit = (window as any).webkit;
-              const availableHandlers = (window as any).__SMAP_HANDLERS_LIST__ || [];
-              
-              // 🔍 상세 디버깅 정보
-              console.log('🔍 [HANDLER-DEBUG] 전역 플래그 상태:', {
-                __SMAP_HANDLERS_READY__: (window as any).__SMAP_HANDLERS_READY__,
-                __SMAP_HANDLERS_LIST__: (window as any).__SMAP_HANDLERS_LIST__,
-                __SMAP_GOOGLE_LOGIN_READY__: (window as any).__SMAP_GOOGLE_LOGIN_READY__
-              });
-              
-              // 🔍 실제 MessageHandler 상태 직접 확인 (Object.keys 대신 직접 체크)
-              const actualHandlers = [];
-              const candidateHandlers = ['smapIos', 'iosHandler', 'messageHandler', 'hapticHandler'];
-              
-              if (webkit?.messageHandlers) {
-                for (const handlerName of candidateHandlers) {
-                  if (webkit.messageHandlers[handlerName]) {
-                    actualHandlers.push(handlerName);
-                  }
-                }
-              }
-              
-              console.log('🔍 [HANDLER-DEBUG] 실제 MessageHandler 상태:', {
-                webkit존재: !!webkit,
-                messageHandlers존재: !!webkit?.messageHandlers,
-                Object_keys_결과: webkit?.messageHandlers ? Object.keys(webkit.messageHandlers) : [],
-                직접체크_결과: actualHandlers,
-                전역핸들러목록: availableHandlers
-              });
-              
-              // 🔍 각 핸들러별 개별 테스트
-              if (webkit?.messageHandlers) {
-                console.log('🔍 [HANDLER-DEBUG] 각 핸들러별 존재 확인:', {
-                  smapIos: !!webkit.messageHandlers.smapIos,
-                  iosHandler: !!webkit.messageHandlers.iosHandler,
-                  messageHandler: !!webkit.messageHandlers.messageHandler,
-                  hapticHandler: !!webkit.messageHandlers.hapticHandler
-                });
-              }
-              
-              console.log('🎯 [GOOGLE LOGIN] 사용 가능한 핸들러:', availableHandlers);
-              
-              // 🚨 전역 핸들러 목록이 비어있다면 실제 핸들러 목록 사용
-              const finalHandlers = availableHandlers.length > 0 ? availableHandlers : actualHandlers;
-              
-              // 우선순위: smapIos > iosHandler > messageHandler > hapticHandler
-              const priorityOrder = ['smapIos', 'iosHandler', 'messageHandler', 'hapticHandler'];
-              let usedHandler = null;
-              
-              console.log('🔍 [HANDLER-DEBUG] 핸들러 선택 진행:', {
-                finalHandlers: finalHandlers,
-                priorityOrder: priorityOrder
-              });
-              
-              for (const handlerName of priorityOrder) {
-                const isInFinalList = finalHandlers.includes(handlerName);
-                const existsInWebkit = !!webkit?.messageHandlers?.[handlerName];
-                
-                console.log(`🔍 [HANDLER-DEBUG] ${handlerName} 체크:`, {
-                  목록에있음: isInFinalList,
-                  webkit에있음: existsInWebkit
-                });
-                
-                if (isInFinalList && existsInWebkit) {
-                  console.log(`✅ [GOOGLE LOGIN] ${handlerName} 핸들러 사용`);
-                  webkit.messageHandlers[handlerName].postMessage({
-                    type: 'googleSignIn',
-                    action: 'googleSignIn',
-                    timestamp: Date.now()
-                  });
-                  usedHandler = handlerName;
-                  break;
-                }
-              }
-              
-              if (!usedHandler) {
-                console.error('❌ [GOOGLE LOGIN] 우선순위 핸들러에서 사용 가능한 핸들러 없음');
-                console.error('🔍 [HANDLER-DEBUG] 최종 상태:', {
-                  finalHandlers: finalHandlers,
-                  webkit: !!webkit,
-                  messageHandlers: !!webkit?.messageHandlers,
-                  모든MessageHandler: webkit?.messageHandlers ? Object.keys(webkit.messageHandlers) : []
-                });
-                
-                // 🚨 마지막 시도: MessageHandler가 존재한다면 강제로 smapIos 사용
-                if (webkit?.messageHandlers?.smapIos) {
-                  console.log('🚨 [GOOGLE LOGIN] 강제 시도: smapIos 핸들러 직접 사용');
-                  const message = {
-                    type: 'googleSignIn',
-                    action: 'googleSignIn',
-                    timestamp: Date.now(),
-                    forceAttempt: true
-                  };
-                  console.log('📤 [GOOGLE LOGIN] 전송할 메시지:', message);
-                  webkit.messageHandlers.smapIos.postMessage(message);
-                  usedHandler = 'smapIos (강제)';
-                  console.log('✅ [GOOGLE LOGIN] 강제 메시지 전송 완료');
-                } else {
-                  throw new Error('MessageHandler를 찾을 수 없습니다.');
-                }
-              }
-              
-            } else if (isForceNativeMode) {
-              console.log('🔥 [GOOGLE LOGIN] 강제 네이티브 모드 - 모든 방법 시도');
-              
-              // 🚨 1. 직접 MessageHandler 시도 (강제 모드)
-              const webkit = (window as any).webkit;
-              if (webkit?.messageHandlers?.smapIos) {
-                console.log('🎯 [GOOGLE LOGIN] MessageHandler 발견 - 직접 호출');
-                webkit.messageHandlers.smapIos.postMessage({
-                  action: 'googleSignIn',
-                  type: 'googleLogin',
-                  forceMode: true
-                });
-              } else {
-                console.log('🚨 [GOOGLE LOGIN] MessageHandler 없음 - 네이티브 함수 직접 호출 시도');
-                
-                // 🚨 2. 네이티브 함수 직접 호출 시도
-                const nativeFunctions = [
-                  'googleSignIn',
-                  'nativeGoogleLogin', 
-                  'iosGoogleSignIn',
-                  'startGoogleLogin',
-                  'googleLogin'
-                ];
-                
-                let callSuccess = false;
-                for (const funcName of nativeFunctions) {
-                  if (typeof (window as any)[funcName] === 'function') {
-                    console.log(`🎯 [GOOGLE LOGIN] ${funcName}() 함수 발견 - 호출 시도`);
-                    try {
-                      (window as any)[funcName]();
-                      callSuccess = true;
-                      break;
-                    } catch (e) {
-                      console.warn(`⚠️ [GOOGLE LOGIN] ${funcName}() 호출 실패:`, e);
-                    }
-                  }
-                }
-                
-                if (!callSuccess) {
-                  console.log('🚨 [GOOGLE LOGIN] 직접 네이티브 함수 호출 실패 - iOS 브리지 강제 생성 시도');
-                  
-                                     // 🚨 3. iOS 브리지 강제 생성 시도
-                   const windowWebkit = (window as any).webkit;
-                   if (!windowWebkit) {
-                     (window as any).webkit = {};
-                   }
-                   if (!(window as any).webkit.messageHandlers) {
-                     (window as any).webkit.messageHandlers = {};
-                   }
-                   if (!(window as any).webkit.messageHandlers.smapIos) {
-                     (window as any).webkit.messageHandlers.smapIos = {
-                       postMessage: function(message: any) {
-                         console.log('🚨 [FAKE WEBKIT] 가짜 webkit으로 메시지 전송:', message);
-                         // iOS 앱이 직접 감지하길 기대
-                         if (typeof (window as any).handleNativeGoogleLogin === 'function') {
-                           (window as any).handleNativeGoogleLogin(message);
-                         }
-                       }
-                     };
-                   }
-                   
-                   (window as any).webkit.messageHandlers.smapIos.postMessage({
-                     action: 'googleSignIn',
-                     type: 'googleLogin',
-                     forceMode: true,
-                     fake: true
-                   });
-                }
-              }
-              
-            } else {
-              // 기존 ios-bridge 로직
-              (window as any).iosBridge.googleSignIn.signIn();
-            }
-            
-            console.log('✅ [GOOGLE LOGIN] 네이티브 호출 전송 완료, 콜백 대기 중...');
-              
-              // iOS 로그 전송 - 네이티브 호출 성공
-              sendLogToiOS('info', '✅ Google Sign-In 네이티브 호출 성공', {
-                timestamp: new Date().toISOString(),
-                waitingFor: 'native callback',
-              step: 'native_call_success',
-              forceMode: isForceNativeMode
-              });
-              
-              return;
-            } catch (error) {
-              console.error('❌ [GOOGLE LOGIN] 네이티브 호출 중 오류:', error);
-              
-              // iOS 로그 전송 - 네이티브 호출 오류
-              sendLogToiOS('error', '❌ Google Sign-In 네이티브 호출 오류', {
-                timestamp: new Date().toISOString(),
-                error: error?.toString(),
-              step: 'native_call_error',
-              forceMode: isForceNativeMode
-            });
-            
-            // 강제 네이티브 모드면 웹 SDK 사용 안함
-            if (isForceNativeMode) {
-              console.log('🚨 [GOOGLE LOGIN] 강제 네이티브 모드 - 웹 SDK 사용 금지');
-              setIsLoading(false);
-              showError('네이티브 구글 로그인을 사용할 수 없습니다. iOS 앱을 다시 빌드해주세요.');
-              return;
-            }
-            
-            // 오류 발생 시 웹 SDK로 fallback (일반 모드만)
-            }
-          }
-
-          // ios-bridge.js가 아직 로드되지 않았다면 잠시 대기
-          console.log('[GOOGLE LOGIN] ios-bridge.js 로드 대기 중...');
-          
-          // iOS 로그 전송 - ios-bridge 로드 대기
-          sendLogToiOS('info', '⏳ ios-bridge.js 로드 대기 중', {
-            timestamp: new Date().toISOString(),
-            maxWaitTime: '3000ms'
-          });
-          
-          const bridgeLoaded = await waitForIosBridge();
-        if (bridgeLoaded && (window as any).iosBridge.googleSignIn?.signIn) {
-          console.log('[GOOGLE LOGIN] ios-bridge.js 로드 완료, 네이티브 호출 재시도');
-          
-          try {
-            (window as any).iosBridge.googleSignIn.signIn();
-            console.log('✅ [GOOGLE LOGIN] 지연 네이티브 호출 성공');
-            
-            // iOS 로그 전송 - 지연 네이티브 호출 성공
-            sendLogToiOS('info', '✅ Google Sign-In 지연 네이티브 호출 성공', {
-              timestamp: new Date().toISOString(),
-              delay: '3000ms',
-              step: 'delayed_native_call_success'
-            });
-            
-            return;
-          } catch (error) {
-            console.error('❌ [GOOGLE LOGIN] 지연 네이티브 호출 실패:', error);
-            
-            // iOS 로그 전송 - 지연 네이티브 호출 실패
-            sendLogToiOS('error', '❌ Google Sign-In 지연 네이티브 호출 실패', {
-              timestamp: new Date().toISOString(),
-              error: error?.toString(),
-              step: 'delayed_native_call_error'
-            });
-            
-            // 최종적으로 웹 SDK로 fallback
-            }
-          } else {
-          console.log('[GOOGLE LOGIN] ios-bridge.js 로드 실패, 웹 SDK로 fallback');
-            
-          // iOS 로그 전송 - ios-bridge 로드 실패
-          sendLogToiOS('warning', '⚠️ ios-bridge.js 로드 실패, 웹 SDK로 fallback', {
-              timestamp: new Date().toISOString(),
-            hasBridge: !!(window as any).iosBridge,
-            hasGoogleSignIn: !!(window as any).iosBridge?.googleSignIn,
-            step: 'bridge_load_failed'
-          });
-        }
-      }
-        
-        // iOS 로그 전송 - 모든 환경 허용 (경고 레벨로 변경)
-        sendLogToiOS('warning', '🌐 모든 환경에서 Google SDK 로그인 허용 (시뮬레이터 포함)', {
-          timestamp: new Date().toISOString(),
-          environment: 'universal_including_simulator',
-          userAgent: navigator.userAgent.substring(0, 50), // UserAgent 길이 제한
-          restriction: 'COMPLETELY_REMOVED',
-          simulator_allowed: true,
-          isIOSSimulator,
-          isIOSWebView
-        });
-      
-      // Google SDK를 사용한 로그인 처리 (모든 환경 허용)
-      setTimeout(() => {
-        handleGoogleSDKLogin();
-      }, 100);
-      return;
-          } catch (error) {
-        console.error('Google 로그인 실패:', error);
-        
-        // iOS 로그 전송 - Google 로그인 catch 블록
-        sendLogToiOS('error', '❌ Google 로그인 catch 블록', {
-          timestamp: new Date().toISOString(),
-          error: error instanceof Error ? {
-            message: error.message,
-            stack: error.stack,
-            name: error.name
-          } : String(error)
-        });
-        
-        // 에러 메시지 개선
-        let errorMessage = 'Google 로그인에 실패했습니다.';
-        if (error instanceof Error) {
-          if (error.message.includes('network')) {
-            errorMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
-          } else {
-            errorMessage = `구글 로그인 오류: ${error.message}`;
-          }
-        }
-        
-        // iOS 로그 전송 - 에러 메시지 변환
-        sendLogToiOS('info', '🔄 Google 로그인 에러 메시지 변환', {
-          timestamp: new Date().toISOString(),
-          originalError: error instanceof Error ? error.message : String(error),
-          convertedError: errorMessage
-        });
-        
-        // 에러 모달 강제 표시
-        setTimeout(() => {
-          showError(errorMessage);
-        }, 100);
-      } finally {
-        setIsLoading(false);
-        
-        // 타임아웃 정리 (finally에서도 정리)
-        clearTimeout(timeoutId);
-        
-        // iOS 로그 전송 - Google 로그인 프로세스 완료
-        sendLogToiOS('info', '🏁 Google 로그인 프로세스 완료', {
-          timestamp: new Date().toISOString(),
-          finalState: {
-            isLoading: false
-          }
-        });
-      }
-  };
-
-  // 🚨 카카오 로그인 강제 종료 함수
-  const forceCloseKakaoLogin = () => {
-    console.log('🚨 [KAKAO] 강제 종료 시작');
-    
-    try {
-      // 1. 카카오 팝업 강제 종료
-      if (window.Kakao && window.Kakao.Auth) {
-        try {
-          window.Kakao.Auth.cleanup();
-        } catch (e) {
-          console.log('카카오 Auth cleanup 실패:', e);
-        }
-      }
-      
-      // 2. 모든 팝업 윈도우 강제 종료
-      if (window.opener) {
-        try {
-          window.close();
-        } catch (e) {
-          console.log('팝업 윈도우 닫기 실패:', e);
-        }
-      }
-      
-      // 3. 로딩 상태 해제
-      setIsLoading(false);
-      setApiError('');
-      
-      // 4. 강제 홈페이지 이동
-      router.replace('/home');
-      
-    } catch (error) {
-      console.error('강제 종료 중 오류:', error);
-      // 최후의 수단: 페이지 새로고침
-      window.location.href = '/home';
-    }
-  };
-
-  // 🚨 에러 복구 함수
-  const recoverFromKakaoError = () => {
-    console.log('🔄 [KAKAO] 에러 복구 시작');
-    
-    setIsLoading(false);
-    setApiError('');
-    
-    // 홈페이지로 안전하게 이동
-    router.replace('/home');
-  };
-
-  // 전역 카카오 에러 복구 함수 등록
-  useEffect(() => {
-    (window as any).forceCloseKakaoLogin = forceCloseKakaoLogin;
-    (window as any).recoverFromKakaoError = recoverFromKakaoError;
-    
-    return () => {
-      delete (window as any).forceCloseKakaoLogin;
-      delete (window as any).recoverFromKakaoError;
-    };
-  }, []);
-
-  // Kakao 로그인 핸들러
-  const handleKakaoLogin = async () => {
-    // 🚨 에러 복구 타이머 설정 (30초 후 자동 복구)
-    const errorRecoveryTimer = setTimeout(() => {
-      console.log('🚨 [KAKAO] 30초 타임아웃 - 자동 복구 실행');
-      recoverFromKakaoError();
-    }, 30000);
-
-    try {
-      // 🚨 새로운 iOS 로깅 시스템 사용
-      iosLogger.logKakaoLogin('로그인 시도 시작', {
-        hasKakaoSDK: !!window.Kakao,
-        isKakaoInitialized: window.Kakao ? window.Kakao.isInitialized() : false,
-        kakaoVersion: window.Kakao ? window.Kakao.VERSION : 'unknown',
-        url: window.location.href,
-        environment: 'signin_page'
-      });
-      
-      // 레거시 iOS 로그 전송 (호환성 유지)
-      sendLogToiOS('info', '💬 카카오 로그인 시도 시작', {
-        timestamp: new Date().toISOString(),
-        hasKakaoSDK: !!window.Kakao,
-        isKakaoInitialized: window.Kakao ? window.Kakao.isInitialized() : false
-      });
-    
-      // 카카오 SDK가 로드되었는지 확인 및 자동 초기화
-      if (!window.Kakao) {
-        clearTimeout(errorRecoveryTimer);
-        sendLogToiOS('error', '❌ 카카오 SDK 객체 없음', {
-          timestamp: new Date().toISOString(),
-          hasKakao: !!window.Kakao,
-          hasKakaoGlobal: !!(window as any).Kakao
-        });
-        
-        showError('카카오 SDK가 로드되지 않았습니다. 페이지를 새로고침해주세요.');
-        return;
-      }
-    
-      // 카카오 SDK가 초기화되지 않은 경우 자동 초기화 시도
-      if (!window.Kakao.isInitialized()) {
-        console.log('⚠️ [KAKAO LOGIN] SDK가 초기화되지 않음, 자동 초기화 시도');
-        
-        const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || '56b34b5e5e538073805559cabc81e1d8';
-        const kakaoAdminKey = process.env.KAKAO_ADMIN_KEY || 'ee1f8631e4c4c488612a526ab6e1facb';
-        try {
-          window.Kakao.init(kakaoAppKey);
-          console.log('✅ [KAKAO LOGIN] 자동 초기화 성공:', kakaoAppKey.substring(0, 8) + '***');
-          console.log('🔧 [KAKAO LOGIN] Admin 키 설정됨:', kakaoAdminKey.substring(0, 8) + '***');
-          
-          sendLogToiOS('info', '✅ 카카오 SDK 자동 초기화 성공', {
-            timestamp: new Date().toISOString(),
-            appKey: kakaoAppKey.substring(0, 8) + '***',
-            isNowInitialized: window.Kakao.isInitialized()
-          });
-        } catch (error) {
-          clearTimeout(errorRecoveryTimer);
-          console.error('❌ [KAKAO LOGIN] 자동 초기화 실패:', error);
-          
-          sendLogToiOS('error', '❌ 카카오 SDK 자동 초기화 실패', {
-            timestamp: new Date().toISOString(),
-            error: String(error),
-            appKey: kakaoAppKey.substring(0, 8) + '***'
-          });
-          
-          showError('카카오 SDK 초기화에 실패했습니다. 잠시 후 다시 시도해주세요.');
-          return;
-        }
-      }
-
-      setIsLoading(true);
-      
-      // iOS 로그 전송 - 카카오 로그인 팝업 시작
-      sendLogToiOS('info', '🚀 카카오 로그인 팝업 시작', {
-        timestamp: new Date().toISOString(),
-        kakaoSDKVersion: window.Kakao ? window.Kakao.VERSION : 'unknown'
-      });
-      
-      // 카카오 로그인 팝업 띄우기
-      window.Kakao.Auth.login({
-        success: async (authObj: any) => {
-          clearTimeout(errorRecoveryTimer);
-          try {
-            console.log('카카오 로그인 성공:', authObj);
-            
-            // iOS 로그 전송 - 카카오 로그인 성공
-            sendLogToiOS('info', '✅ 카카오 로그인 성공 (토큰 획득)', {
-              timestamp: new Date().toISOString(),
-              hasAccessToken: !!authObj.access_token,
-              tokenType: authObj.token_type || 'unknown',
-              expiresIn: authObj.expires_in || 'unknown'
-            });
-            
-            // iOS 로그 전송 - 백엔드 API 호출 시작
-            sendLogToiOS('info', '🔄 백엔드 카카오 인증 API 호출 시작', {
-              timestamp: new Date().toISOString(),
-              apiEndpoint: '/api/kakao-auth',
-              method: 'POST'
-            });
-            
-            // 백엔드 API로 액세스 토큰 전송
-            const response = await fetch('/api/kakao-auth', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              access_token: authObj.access_token,
-            }),
-          });
-
-                          const data = await response.json();
-              
-              // iOS 로그 전송 - 백엔드 API 응답
-              sendLogToiOS('info', '📡 백엔드 카카오 인증 API 응답', {
-                timestamp: new Date().toISOString(),
-                success: data.success,
-                hasUser: !!data.user,
-                hasError: !!data.error,
-                responseStatus: response.status
-              });
-
-              if (data.success) {
-                console.log('[KAKAO LOGIN] 카카오 로그인 성공:', {
-                  isNewUser: data.isNewUser,
-                  hasUser: !!data.user,
-                  hasSocialData: !!data.socialLoginData
-                });
-                
-                // 🚨 Kakao 로그인 성공 상세 로깅
-                iosLogger.logKakaoLogin('로그인 성공', {
-                  hasUser: !!data.user,
-                  hasToken: !!data.token,
-                  isNewUser: data.isNewUser || false,
-                  userEmail: data.user?.mt_email ? data.user.mt_email.substring(0, 3) + '***@' + data.user.mt_email.split('@')[1] : 'unknown',
-                  userNickname: data.user?.mt_nickname || 'unknown',
-                  userId: data.user?.mt_idx || 'unknown',
-                  provider: 'kakao'
-                });
-                
-                // 카카오 로그인 성공 햅틱 피드백
-                triggerHapticFeedback(HapticFeedbackType.SUCCESS, '카카오 로그인 성공', { 
-                  component: 'signin', 
-                  action: 'kakao-login', 
-                  userEmail: data.user?.mt_email?.substring(0, 3) + '***' 
-                });
-                console.log('🎮 [SIGNIN] 카카오 로그인 성공 햅틱 피드백 실행');
-                
-                // 리다이렉트 플래그 설정
-                isRedirectingRef.current = true;
-                blockAllEffectsRef.current = true;
-                
-                // 🔥 신규회원/기존회원에 따른 분기 처리
-                if (data.isNewUser) {
-                  console.log('[KAKAO LOGIN] 신규회원 - 회원가입 페이지로 이동');
-                  
-                  // 레거시 iOS 로그 전송
-                  sendLogToiOS('info', '📝 카카오 신규회원, 회원가입 페이지로 이동', {
-                    timestamp: new Date().toISOString(),
-                    hasEmail: !!data.socialLoginData?.email,
-                    hasNickname: !!data.socialLoginData?.nickname
-                  });
-                  
-                  // 소셜 로그인 데이터를 sessionStorage에 저장
-                  if (data.socialLoginData) {
-                    sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
-                    console.log('[KAKAO LOGIN] 소셜 로그인 데이터 저장 완료');
-                  }
-                  
-                  // 회원가입 페이지로 이동
-                  router.replace('/register?social=kakao');
-                  return;
-                  
-                } else {
-                  console.log('[KAKAO LOGIN] 기존회원 - 홈으로 이동');
-                  
-                  // 레거시 iOS 로그 전송 (호환성 유지)
-                  sendLogToiOS('info', '💾 카카오 사용자 정보 저장', {
-                    timestamp: new Date().toISOString(),
-                    hasUserData: !!data.user,
-                    userEmail: data.user?.mt_email ? data.user.mt_email.substring(0, 3) + '***' : 'unknown'
-                  });
-                  
-                  // authService에 사용자 정보 설정 (AuthContext 우회, JWT 토큰은 이미 쿠키에 저장됨)
-                  if (data.user) {
-                    authService.setUserData(data.user);
-                    // 토큰은 쿠키에 저장되므로 별도 설정 불필요
-                  }
-                  
-                  console.log('[KAKAO LOGIN] 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
-                  
-                  // iOS 로그 전송 - AuthContext 동기화 시작
-                  sendLogToiOS('info', '🔄 AuthContext 상태 동기화 시작', {
-                    timestamp: new Date().toISOString(),
-                    authServiceData: {
-                      hasUserData: !!authService.getUserData(),
-                      hasToken: !!authService.getToken()
-                    }
-                  });
-                  
-                  // AuthContext 상태를 수동으로 동기화
-                  await refreshAuthState();
-                  console.log('[KAKAO LOGIN] AuthContext 상태 동기화 완료');
-                  
-                  // iOS 로그 전송 - AuthContext 동기화 완료
-                  sendLogToiOS('info', '✅ AuthContext 상태 동기화 완료', {
-                    timestamp: new Date().toISOString(),
-                    authState: {
-                      isLoggedIn: isLoggedIn,
-                      hasUser: !!authService.getUserData()
-                    }
-                  });
-                  
-                  // iOS 로그 전송 - 리다이렉트 시작
-                  sendLogToiOS('info', '🚀 Home 페이지로 리다이렉트 시작', {
-                    timestamp: new Date().toISOString(),
-                    redirectMethod: 'router.replace',
-                    targetPage: '/home'
-                  });
-                  
-                  // router.replace 사용 (페이지 새로고침 없이 이동)
-                  router.replace('/home');
-                  return;
-                }
-            } else {
-              throw new Error(data.error || '로그인에 실패했습니다.');
-            }
-                      } catch (error: any) {
-              console.error('카카오 로그인 처리 오류:', error);
-              
-              // iOS 로그 전송 - 카카오 로그인 처리 오류
-              sendLogToiOS('error', '❌ 카카오 로그인 처리 오류', {
-                timestamp: new Date().toISOString(),
-                error: error instanceof Error ? {
-                  message: error.message,
-                  stack: error.stack,
-                  name: error.name
-                } : String(error),
-                isWithdrawnUser: error.response?.status === 403 && error.response?.data?.isWithdrawnUser
-              });
-              
-              // 탈퇴한 사용자 오류 처리
-              if (error.response?.status === 403 && error.response?.data?.isWithdrawnUser) {
-                // iOS 로그 전송 - 탈퇴한 사용자
-                sendLogToiOS('warning', '⚠️ 탈퇴한 카카오 사용자 로그인 시도', {
-                  timestamp: new Date().toISOString(),
-                  responseStatus: error.response.status
-                });
-                
-                showError('탈퇴한 계정입니다. 새로운 계정으로 가입해주세요.');
-              } else {
-                showError(error.message || '로그인 처리 중 오류가 발생했습니다.');
-              }
-            } finally {
-              // 🔄 로딩 상태 해제 및 리다이렉트 플래그 초기화
-              setIsLoading(false);
-              isRedirectingRef.current = false;
-              blockAllEffectsRef.current = false;
-              
-              // iOS 로그 전송 - 카카오 로그인 success 콜백 완료
-              sendLogToiOS('info', '🏁 카카오 로그인 success 콜백 완료', {
-                timestamp: new Date().toISOString(),
-                isLoading: false,
-                isRedirecting: false
-              });
-            }
-        },
-                          fail: (error: any) => {
-          clearTimeout(errorRecoveryTimer);
-          console.error('카카오 로그인 실패:', error);
-          
-          // iOS 로그 전송 - 카카오 로그인 실패
-          sendLogToiOS('error', '❌ 카카오 로그인 실패 (fail 콜백)', {
-            timestamp: new Date().toISOString(),
-            error: error ? String(error) : 'unknown error',
-            errorCode: error?.error_code || 'unknown',
-            errorDescription: error?.error_description || 'unknown'
-          });
-          
-          // 🔄 로딩 상태 해제 및 리다이렉트 플래그 초기화
-          setIsLoading(false);
-          isRedirectingRef.current = false;
-          blockAllEffectsRef.current = false;
-          
-          // KOE006 에러 특별 처리
-          if (error?.error_code === 'KOE006' || String(error).includes('KOE006')) {
-            showError('카카오 앱 설정 오류입니다. 잠시 후 자동으로 홈페이지로 이동합니다.');
-            
-            // 5초 후 자동으로 홈페이지로 이동
-            setTimeout(() => {
-              console.log('🚨 [KAKAO] KOE006 에러 - 자동 홈페이지 이동');
-              recoverFromKakaoError();
-            }, 5000);
-          } else {
-            showError('카카오 로그인에 실패했습니다. 다시 시도해주세요.');
-          }
-          
-          console.log('🔄 [KAKAO LOGIN] 실패 후 signin 화면으로 복귀');
-        },
-        });
-      } catch (error: any) {
-        clearTimeout(errorRecoveryTimer);
-        console.error('카카오 로그인 오류:', error);
-        
-        // iOS 로그 전송 - 카카오 로그인 catch 블록
-        sendLogToiOS('error', '❌ 카카오 로그인 catch 블록', {
-          timestamp: new Date().toISOString(),
-          error: error instanceof Error ? {
-            message: error.message,
-            stack: error.stack,
-            name: error.name
-          } : String(error)
-        });
-        
-        // 🔄 로딩 상태 해제 및 리다이렉트 플래그 초기화
-        setIsLoading(false);
-        isRedirectingRef.current = false;
-        blockAllEffectsRef.current = false;
-        
-        showError('카카오 로그인 중 오류가 발생했습니다. 잠시 후 자동으로 홈페이지로 이동합니다.');
-        
-        // 3초 후 자동 복구
-        setTimeout(() => {
-          console.log('🚨 [KAKAO] catch 블록 - 자동 홈페이지 이동');
-          recoverFromKakaoError();
-        }, 3000);
-        
-        console.log('🔄 [KAKAO LOGIN] 오류 후 signin 화면으로 복귀');
-      } finally {
-        // iOS 로그 전송 - 카카오 로그인 프로세스 완료
-        sendLogToiOS('info', '🏁 카카오 로그인 프로세스 완료', {
-          timestamp: new Date().toISOString(),
-          finalState: {
-            isLoading: false,
-            isRedirecting: false
-          }
-        });
-      }
-    };
-
-  // 로딩 스피너 컴포넌트 (통일된 디자인)
-  const LoadingSpinner = ({ message, fullScreen = true }: { message: string; fullScreen?: boolean }) => {
-    if (fullScreen) {
-      return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
-            <UnifiedLoadingSpinner size="md" message={message} />
-          </div>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="flex items-center justify-center">
-        <UnifiedLoadingSpinner size="sm" message={message} inline color="white" />
-      </div>
-    );
-  };
-
-  // Kakao SDK 로드
-  useEffect(() => {
-    const loadKakaoSDK = () => {
-      const script = document.createElement('script');
-      script.src = 'https://developers.kakao.com/sdk/js/kakao.js';
-      script.async = true;
-      script.onload = () => {
-        // 카카오 SDK 초기화
-        if (window.Kakao && !window.Kakao.isInitialized()) {
-          // 🔥 환경 변수가 없을 때 Info.plist에서 가져온 카카오 앱 키 사용
-          const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || '56b34b5e5e538073805559cabc81e1d8';
-          const kakaoAdminKey = process.env.KAKAO_ADMIN_KEY || 'ee1f8631e4c4c488612a526ab6e1facb';
-          if (kakaoAppKey) {
-            window.Kakao.init(kakaoAppKey);
-            console.log('✅ 카카오 SDK 초기화 완료:', kakaoAppKey.substring(0, 8) + '***');
-          } else {
-            console.error('❌ 카카오 앱 키가 설정되지 않았습니다.');
-          }
-        }
-      };
-      document.head.appendChild(script);
-    };
-
-    loadKakaoSDK();
-  }, []);
-
-  // 컴포넌트 언마운트 시 모든 이벤트 리스너 정리
-  useEffect(() => {
-    return () => {
-      // 모든 네비게이션 차단 이벤트 리스너 제거
-      if (navigationListenersRef.current.beforeunload) {
-        window.removeEventListener('beforeunload', navigationListenersRef.current.beforeunload);
-      }
-      if (navigationListenersRef.current.popstate) {
-        window.removeEventListener('popstate', navigationListenersRef.current.popstate);
-      }
-      if (navigationListenersRef.current.unload) {
-        window.removeEventListener('unload', navigationListenersRef.current.unload);
-      }
-      if (navigationListenersRef.current.pagehide) {
-        window.removeEventListener('pagehide', navigationListenersRef.current.pagehide);
-      }
-      if (navigationListenersRef.current.visibilitychange) {
-        document.removeEventListener('visibilitychange', navigationListenersRef.current.visibilitychange);
-      }
-      if (navigationListenersRef.current.keydown) {
-        window.removeEventListener('keydown', navigationListenersRef.current.keydown);
-      }
-      
-      // 브라우저 저장소에서 에러 모달 상태 제거
-      sessionStorage.removeItem('__SIGNIN_ERROR_MODAL_ACTIVE__');
-      sessionStorage.removeItem('__SIGNIN_ERROR_MESSAGE__');
-      sessionStorage.removeItem('__SIGNIN_PREVENT_REMOUNT__');
-      sessionStorage.removeItem('__SIGNIN_BLOCK_ALL_EFFECTS__');
-      
-      // 전역 플래그 정리
-      delete (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__;
-      delete (window as any).__SIGNIN_ERROR_MESSAGE__;
-      
-      // 스크롤 복구
-      document.body.style.overflow = '';
-      document.documentElement.style.overflow = '';
-      
-      console.log('[SIGNIN] 컴포넌트 언마운트 - 모든 이벤트 리스너 및 브라우저 저장소 정리 완료');
-    };
-  }, []);
-
-  // 인증 상태 확인 중일 때 로딩 화면 표시
-  // if (isCheckingAuth) {
-  //   return (
-  //     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center">
-  //       <div className="text-center">
-  //         <div 
-  //           className="rounded-full h-16 w-16 border-4 border-gray-200 border-t-indigo-600 mx-auto mb-6"
-  //           style={{
-  //             WebkitAnimation: 'spin 1s linear infinite',
-  //             animation: 'spin 1s linear infinite',
-  //             WebkitTransformOrigin: 'center',
-  //             transformOrigin: 'center',
-  //             willChange: 'transform'
-  //           }}
-  //         ></div>
-  //         <h2 className="text-xl font-semibold text-gray-800 mb-2">인증 상태 확인 중</h2>
-  //         <p className="text-gray-600">잠시만 기다려주세요...</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
-
-  // 🔍 카카오 SDK 상태 확인 함수
-  const checkKakaoSDKStatus = () => {
-    const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_APP_KEY || '56b34b5e5e538073805559cabc81e1d8';
-    const kakaoAdminKey = process.env.KAKAO_ADMIN_KEY || 'ee1f8631e4c4c488612a526ab6e1facb';
-    
-    const status = {
-      hasWindow: typeof window !== 'undefined',
-      hasKakaoGlobal: !!(window as any).Kakao,
-      hasKakaoObject: !!window.Kakao,
-      isInitialized: window.Kakao ? window.Kakao.isInitialized() : false,
-      version: window.Kakao ? window.Kakao.VERSION : 'unknown',
-      availableMethods: window.Kakao ? Object.keys(window.Kakao) : [],
-      appKey: kakaoAppKey.substring(0, 8) + '***',
-      adminKey: kakaoAdminKey.substring(0, 8) + '***',
-      timestamp: new Date().toISOString()
-    };
-    
-    console.log('🔍 [KAKAO SDK] 상태 확인:', status);
-    sendLogToiOS('info', '[KAKAO SDK] 상태 확인', status);
-    
-    return status;
-  };
-
-  // 🔬 상세 햅틱 디버깅 함수들 추가
-  const runDetailedHapticDebug = () => {
-    console.log('🔬 [HAPTIC DEBUG] ===== 상세 햅틱 디버깅 시작 =====');
-    sendLogToiOS('info', '[HAPTIC DEBUG] 상세 햅틱 디버깅 시작', { timestamp: Date.now() });
-    
-    // 1. 환경 정보 수집
-    const envInfo = {
-      userAgent: navigator.userAgent,
-      platform: navigator.platform,
-      isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent),
-      hasWebKit: !!(window as any).webkit,
-      hasMessageHandlers: !!(window as any).webkit?.messageHandlers,
-      availableHandlers: (window as any).webkit?.messageHandlers ? 
-        Object.keys((window as any).webkit.messageHandlers) : [],
-      hasSmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
-      hasNativeFunctions: {
-        SMAP_FORCE_HAPTIC: typeof (window as any).SMAP_FORCE_HAPTIC === 'function',
-        SMAP_CHECK_HANDLERS: typeof (window as any).SMAP_CHECK_HANDLERS === 'function'
-      }
-    };
-    
-    console.log('🔬 [HAPTIC DEBUG] 환경 정보:', envInfo);
-    sendLogToiOS('info', '[HAPTIC DEBUG] 환경 정보', envInfo);
-    
-    // 2. 각 햅틱 타입별 테스트
-    const hapticTypes = ['success', 'warning', 'error', 'light', 'medium', 'heavy'];
-    
-    hapticTypes.forEach((type, index) => {
-      setTimeout(() => {
-        console.log(`🔬 [HAPTIC DEBUG] ${type.toUpperCase()} 햅틱 테스트 시작`);
-        sendLogToiOS('info', `[HAPTIC DEBUG] ${type.toUpperCase()} 햅틱 테스트`, { 
-          type, 
-          testIndex: index + 1,
-          totalTests: hapticTypes.length 
-        });
-        
-        // 3가지 방법으로 동시 시도
-        testAllHapticMethods(type as HapticFeedbackType);
-        
-      }, index * 2000); // 2초 간격
-    });
-  };
-  
-  const testAllHapticMethods = (type: HapticFeedbackType) => {
-    const webkit = (window as any).webkit;
-    const results = {
-      nativeFunction: false,
-      directMessage: false,
-      utilFunction: false,
-      errors: [] as string[]
-    };
-    
-    // 방법 1: 네이티브 강제 함수
-    try {
-      if (typeof (window as any).SMAP_FORCE_HAPTIC === 'function') {
-        console.log(`🔬 [METHOD 1] 네이티브 강제 함수 시도: ${type}`);
-        const result = (window as any).SMAP_FORCE_HAPTIC(type);
-        results.nativeFunction = !!result;
-        sendLogToiOS('info', `[METHOD 1] 네이티브 강제 함수 결과`, { type, result });
-      }
-         } catch (error) {
-       const errorMsg = `네이티브 함수 에러: ${error}`;
-       results.errors.push(errorMsg);
-       console.error(`🔬 [METHOD 1] ${errorMsg}`);
-       sendLogToiOS('error', `[METHOD 1] ${errorMsg}`, { type, error: String(error) });
-     }
-    
-    // 방법 2: 직접 메시지 전송
-    try {
-      if (webkit?.messageHandlers?.smapIos) {
-        console.log(`🔬 [METHOD 2] 직접 메시지 전송: ${type}`);
-        webkit.messageHandlers.smapIos.postMessage({
-          type: 'haptic',
-          param: type,
-          debug: true,
-          timestamp: Date.now()
-        });
-        results.directMessage = true;
-        sendLogToiOS('info', `[METHOD 2] 직접 메시지 전송 완료`, { type });
-      }
-         } catch (error) {
-       const errorMsg = `직접 메시지 에러: ${error}`;
-       results.errors.push(errorMsg);
-       console.error(`🔬 [METHOD 2] ${errorMsg}`);
-       sendLogToiOS('error', `[METHOD 2] ${errorMsg}`, { type, error: String(error) });
-     }
-    
-    // 방법 3: triggerHapticFeedback 유틸
-    try {
-      console.log(`🔬 [METHOD 3] triggerHapticFeedback 유틸: ${type}`);
-      triggerHapticFeedback(type, `상세 디버그 테스트 - ${type}`, { 
-        component: 'signin-debug', 
-        action: 'detailed-test',
-        debugMode: true
-      });
-      results.utilFunction = true;
-      sendLogToiOS('info', `[METHOD 3] triggerHapticFeedback 완료`, { type });
-         } catch (error) {
-       const errorMsg = `유틸 함수 에러: ${error}`;
-       results.errors.push(errorMsg);
-       console.error(`🔬 [METHOD 3] ${errorMsg}`);
-       sendLogToiOS('error', `[METHOD 3] ${errorMsg}`, { type, error: String(error) });
-     }
-    
-    // 결과 종합
-    const summary = {
-      type,
-      successful: results.nativeFunction || results.directMessage || results.utilFunction,
-      methods: results,
-      timestamp: Date.now()
-    };
-    
-    console.log(`🔬 [HAPTIC DEBUG] ${type} 테스트 결과:`, summary);
-    sendLogToiOS('info', `[HAPTIC DEBUG] ${type} 테스트 결과`, summary);
-  };
-  
-  // 🎯 실시간 핸들러 상태 모니터링
-  const startHandlerMonitoring = () => {
-    console.log('🎯 [HANDLER MONITOR] 실시간 모니터링 시작');
-    sendLogToiOS('info', '[HANDLER MONITOR] 실시간 모니터링 시작');
-    
-    const monitor = () => {
-      const webkit = (window as any).webkit;
-      const status = {
-        timestamp: new Date().toISOString(),
-        webkit: !!webkit,
-        messageHandlers: !!webkit?.messageHandlers,
-        smapIos: !!webkit?.messageHandlers?.smapIos,
-        availableHandlers: webkit?.messageHandlers ? 
-          Object.keys(webkit.messageHandlers) : [],
-        nativeFunctions: {
-          SMAP_FORCE_HAPTIC: typeof (window as any).SMAP_FORCE_HAPTIC,
-          SMAP_CHECK_HANDLERS: typeof (window as any).SMAP_CHECK_HANDLERS
-        },
-        // 추가 디버깅 정보
-        userAgent: navigator.userAgent.substring(0, 50),
-        webkitDetails: webkit ? {
-          hasUserContentController: !!webkit.messageHandlers,
-          messageHandlersKeys: webkit?.messageHandlers ? Object.keys(webkit.messageHandlers) : 'null',
-          webkitType: typeof webkit
-        } : null
-      };
-      
-      console.log('🎯 [HANDLER MONITOR] 현재 상태:', status);
-      sendLogToiOS('info', '[HANDLER MONITOR] 핸들러 상태', status);
-      
-      // WebKit이 있지만 messageHandlers가 없는 경우 경고
-      if (webkit && !webkit.messageHandlers) {
-        console.warn('⚠️ [WEBKIT WARNING] WebKit 존재하지만 messageHandlers 없음!');
-        console.warn('⚠️ [iOS 조치 필요] webView.configuration.userContentController.add(self, name: "smapIos")');
-        sendLogToiOS('warning', '[WEBKIT WARNING] messageHandlers 없음', {
-          suggestion: 'iOS에서 webView.configuration.userContentController.add(self, name: "smapIos") 추가 필요'
-        });
-      }
-      
-      // 네이티브 체크 함수가 있으면 호출
-      if (typeof (window as any).SMAP_CHECK_HANDLERS === 'function') {
-        try {
-          const nativeCheck = (window as any).SMAP_CHECK_HANDLERS();
-          console.log('🎯 [NATIVE CHECK] 네이티브 핸들러 체크:', nativeCheck);
-          sendLogToiOS('info', '[NATIVE CHECK] 네이티브 핸들러 체크', nativeCheck);
-                 } catch (e) {
-           console.error('🎯 [NATIVE CHECK] 에러:', e);
-           sendLogToiOS('error', '[NATIVE CHECK] 체크 실패', { error: String(e) });
-         }
-      }
-      
-      return status;
-    };
-    
-    // 즉시 실행
-    monitor();
-    
-    // 5초마다 모니터링
-    const interval = setInterval(monitor, 5000);
-    
-    // 30초 후 자동 종료
-    setTimeout(() => {
-      clearInterval(interval);
-      console.log('🎯 [HANDLER MONITOR] 모니터링 종료');
-      sendLogToiOS('info', '[HANDLER MONITOR] 모니터링 종료');
-    }, 30000);
-    
-    return interval;
-  };
-  
-  // 🧪 빠른 테스트 함수들 (전역으로 등록)
-  const registerTestFunctions = () => {
-    // 햅틱 테스트 함수
-    (window as any).TEST_HAPTIC = (type = 'success') => {
-      console.log(`🧪 [TEST] 햅틱 테스트: ${type}`);
-      
-      // 여러 방법으로 시도
-      const methods = [
-        () => (window as any).iosBridge?.haptic?.[type]?.(),
-        () => (window as any).webkit?.messageHandlers?.smapIos?.postMessage({
-          type: 'haptic', param: type, source: 'TEST_HAPTIC'
-        }),
-        () => (window as any).SMAP_HAPTIC_TEST?.(type)
-      ];
-      
-      methods.forEach((method, i) => {
-        try {
-          console.log(`🧪 방법 ${i + 1} 시도`);
-          method();
-        } catch (e) {
-          console.error(`❌ 방법 ${i + 1} 실패:`, e);
-        }
-      });
-    };
-    
-    // 구글 로그인 테스트 함수
-    (window as any).TEST_GOOGLE = () => {
-      console.log('🧪 [TEST] Google 로그인 테스트');
-      
-      const methods = [
-        () => (window as any).iosBridge?.googleSignIn?.signIn?.(),
-        () => (window as any).webkit?.messageHandlers?.smapIos?.postMessage({
-          type: 'googleSignIn', param: '', source: 'TEST_GOOGLE'
-        }),
-        () => (window as any).SMAP_GOOGLE_TEST?.()
-      ];
-      
-      methods.forEach((method, i) => {
-        try {
-          console.log(`🧪 Google 방법 ${i + 1} 시도`);
-          method();
-        } catch (e) {
-          console.error(`❌ Google 방법 ${i + 1} 실패:`, e);
-        }
-      });
-    };
-
-    // 🔥 네이티브 카카오 로그인 성공 핸들러
-    (window as any).handleNativeKakaoLoginSuccess = async (token: string, userInfo: any) => {
-      console.log('📱 [NATIVE-KAKAO] 로그인 성공 핸들러 호출:', {
-        hasToken: !!token,
-        hasUserInfo: !!userInfo,
-        userInfo
-      });
-
-      try {
-        setIsLoading(true);
-        
-        // iOS 로그 전송
-        sendLogToiOS('info', '📱 네이티브 카카오 로그인 성공 처리 시작', {
-          hasToken: !!token,
-          hasUserInfo: !!userInfo,
-          tokenLength: token ? token.length : 0
-        });
-
-        // 백엔드 API 호출
-        const response = await fetch('/api/kakao-auth', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            access_token: token,
-            nativeUserInfo: userInfo
-          }),
-        });
-
-        const data = await response.json();
-        
-        if (data.success) {
-          console.log('📱 [NATIVE-KAKAO] 백엔드 인증 성공:', {
-            isNewUser: data.isNewUser,
-            hasUser: !!data.user,
-            hasSocialData: !!data.socialLoginData
-          });
-          
-          // 성공 햅틱 피드백
-          triggerHapticFeedback(HapticFeedbackType.SUCCESS, '네이티브 카카오 로그인 성공', { 
-            component: 'signin', 
-            action: 'native-kakao-login' 
-          });
-          
-          // 리다이렉트 플래그 설정
-          isRedirectingRef.current = true;
-          blockAllEffectsRef.current = true;
-          
-          // 🔥 신규회원/기존회원에 따른 분기 처리
-          if (data.isNewUser) {
-            console.log('📱 [NATIVE-KAKAO] 신규회원 - 회원가입 페이지로 이동');
-            
-            // iOS 로그 전송
-            sendLogToiOS('info', '📱 네이티브 카카오 신규회원, 회원가입 페이지로 이동', {
-              hasEmail: !!data.socialLoginData?.email,
-              hasNickname: !!data.socialLoginData?.nickname
-            });
-            
-            // 소셜 로그인 데이터를 sessionStorage에 저장
-            if (data.socialLoginData) {
-              sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
-              console.log('📱 [NATIVE-KAKAO] 소셜 로그인 데이터 저장 완료');
-            }
-            
-            // 회원가입 페이지로 이동
-            router.replace('/register?social=kakao');
-            
-          } else {
-            console.log('📱 [NATIVE-KAKAO] 기존회원 - 홈으로 이동');
-            
-            // authService에 사용자 정보 설정
-            if (data.user) {
-              authService.setUserData(data.user);
-            }
-            
-            // AuthContext 상태 동기화
-            await refreshAuthState();
-            
-            // iOS 로그 전송
-            sendLogToiOS('info', '📱 네이티브 카카오 기존회원 로그인 완료, 홈으로 이동', {
-              userEmail: data.user?.mt_email?.substring(0, 3) + '***'
-            });
-            
-            // 홈으로 리다이렉트
-            router.replace('/home');
-          }
-          
-        } else {
-          throw new Error(data.error || '로그인에 실패했습니다.');
-        }
-        
-      } catch (error: any) {
-        console.error('📱 [NATIVE-KAKAO] 로그인 처리 오류:', error);
-        
-        // iOS 로그 전송
-        sendLogToiOS('error', '📱 네이티브 카카오 로그인 처리 오류', {
-          error: error.message
-        });
-        
-        // 에러 모달 표시
-        showError(error.message || '로그인 처리 중 오류가 발생했습니다.');
-        
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    // 🔥 네이티브 카카오 로그인 실패 핸들러
-    (window as any).handleNativeKakaoLoginError = (error: any) => {
-      console.error('📱 [NATIVE-KAKAO] 로그인 실패 핸들러 호출:', error);
-      
-      // iOS 로그 전송
-      sendLogToiOS('error', '📱 네이티브 카카오 로그인 실패', {
-        error: typeof error === 'string' ? error : error.message
-      });
-      
-      // 에러 모달 표시
-      const errorMessage = typeof error === 'string' ? error : (error.message || '카카오 로그인에 실패했습니다.');
-      showError(errorMessage);
-      
-      setIsLoading(false);
-    };
-
-    // 🔥 네이티브 구글 로그인 성공 핸들러
-    (window as any).handleNativeGoogleLoginSuccess = async (token: string, userInfo: any) => {
-      console.log('📱 [NATIVE-GOOGLE] 로그인 성공 핸들러 호출:', {
-        hasToken: !!token,
-        hasUserInfo: !!userInfo
-      });
-
-      try {
-        setIsLoading(true);
-        
-        // iOS 로그 전송
-        sendLogToiOS('info', '📱 네이티브 구글 로그인 성공 처리 시작', {
-          hasToken: !!token,
-          hasUserInfo: !!userInfo
-        });
-
-        // 구글 로그인 성공 처리 (기존 로직과 동일)
-        // 여기서는 간단히 홈으로 리다이렉트
-        router.replace('/home');
-        
-      } catch (error: any) {
-        console.error('📱 [NATIVE-GOOGLE] 로그인 처리 오류:', error);
-        showError(error.message || '구글 로그인 처리 중 오류가 발생했습니다.');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    // 🔥 네이티브 구글 로그인 실패 핸들러
-    (window as any).handleNativeGoogleLoginError = (error: any) => {
-      console.error('📱 [NATIVE-GOOGLE] 로그인 실패 핸들러 호출:', error);
-      
-      const errorMessage = typeof error === 'string' ? error : (error.message || '구글 로그인에 실패했습니다.');
-      showError(errorMessage);
-      
-      setIsLoading(false);
-    };
-    
-    // 환경 정보 출력 함수
-    (window as any).TEST_ENV = () => {
-      const env = {
-        webkit: !!(window as any).webkit,
-        messageHandlers: !!(window as any).webkit?.messageHandlers,
-        smapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
-        iosBridge: !!(window as any).iosBridge,
-        userAgent: navigator.userAgent.substring(0, 100),
-        url: window.location.href
-      };
-      console.log('🔍 [TEST] 환경 정보:', env);
-      return env;
-    };
-    
-    console.log('🧪 [TEST] 테스트 함수 등록 완료:');
-    console.log('  TEST_HAPTIC("success") - 햅틱 테스트');
-    console.log('  TEST_GOOGLE() - 구글 로그인 테스트');
-    console.log('  TEST_ENV() - 환경 정보');
-    console.log('  handleNativeKakaoLoginSuccess() - 네이티브 카카오 성공 핸들러');
-    console.log('  handleNativeKakaoLoginError() - 네이티브 카카오 실패 핸들러');
-    console.log('  handleNativeGoogleLoginSuccess() - 네이티브 구글 성공 핸들러');
-    console.log('  handleNativeGoogleLoginError() - 네이티브 구글 실패 핸들러');
-  };
-
-  // 🔧 WebKit 핸들러 강제 등록 시도
-  const forceRegisterHandlers = () => {
-    console.log('🔧 [FORCE REGISTER] WebKit 핸들러 강제 등록 시도');
-    sendLogToiOS('info', '[FORCE REGISTER] WebKit 핸들러 강제 등록 시도');
-    
-    const webkit = (window as any).webkit;
-    if (!webkit) {
-      console.error('🔧 [FORCE REGISTER] WebKit 없음');
-      return false;
-    }
-    
-    try {
-      // messageHandlers가 없으면 강제로 생성 시도
-      if (!webkit.messageHandlers) {
-        console.log('🔧 [FORCE REGISTER] messageHandlers 없음, 강제 생성 시도');
-        webkit.messageHandlers = {};
-        sendLogToiOS('info', '[FORCE REGISTER] messageHandlers 객체 생성');
-      }
-      
-      // smapIos 핸들러가 없으면 가짜 핸들러 등록
-      if (!webkit.messageHandlers.smapIos) {
-        console.log('🔧 [FORCE REGISTER] smapIos 핸들러 없음, 가짜 핸들러 등록');
-        webkit.messageHandlers.smapIos = {
-          postMessage: function(message: any) {
-            console.log('🔧 [FAKE HANDLER] 가짜 핸들러 메시지 수신:', message);
-            sendLogToiOS('info', '[FAKE HANDLER] 메시지 수신', message);
-            
-            // window 이벤트로 네이티브에 알림
-            window.dispatchEvent(new CustomEvent('smap-haptic-message', { 
-              detail: message 
-            }));
-          }
-        };
-        sendLogToiOS('info', '[FORCE REGISTER] 가짜 smapIos 핸들러 등록 완료');
-        
-        // 등록 후 즉시 테스트
-        webkit.messageHandlers.smapIos.postMessage({
-          type: 'haptic',
-          param: 'success',
-          source: 'force-register-test'
-        });
-        
-        return true;
-      }
-      
-      console.log('🔧 [FORCE REGISTER] smapIos 핸들러 이미 존재');
-      return true;
-      
-    } catch (error) {
-      console.error('🔧 [FORCE REGISTER] 강제 등록 실패:', error);
-      sendLogToiOS('error', '[FORCE REGISTER] 강제 등록 실패', { error: String(error) });
-      return false;
-    }
-  };
-
-  // 🚨 긴급 햅틱 테스트 (모든 가능한 방법 동시 시도)
-  const emergencyHapticTest = () => {
-    console.log('🚨 [EMERGENCY HAPTIC] 긴급 햅틱 테스트 시작');
-    sendLogToiOS('warning', '[EMERGENCY HAPTIC] 긴급 햅틱 테스트 시작');
-    
-    const webkit = (window as any).webkit;
-    const allResults = [];
-    
-    // 1. 모든 가능한 핸들러에 메시지 전송
-    if (webkit?.messageHandlers) {
-      const handlerNames = ['smapIos', 'iosHandler', 'jsToNative', 'webViewHandler', 'nativeHandler'];
-      
-      handlerNames.forEach(handlerName => {
-        if (webkit.messageHandlers[handlerName]) {
-          try {
-            webkit.messageHandlers[handlerName].postMessage({
-              type: 'haptic',
-              param: 'heavy',
-              emergency: true,
-              source: 'emergency-test'
-            });
-            console.log(`🚨 [EMERGENCY] ${handlerName} 메시지 전송 성공`);
-            sendLogToiOS('info', `[EMERGENCY] ${handlerName} 성공`);
-            allResults.push(`${handlerName}: 성공`);
-          } catch (e) {
-            console.error(`🚨 [EMERGENCY] ${handlerName} 실패:`, e);
-            sendLogToiOS('error', `[EMERGENCY] ${handlerName} 실패`, { error: String(e) });
-            allResults.push(`${handlerName}: 실패`);
-          }
-        }
-      });
-    }
-    
-    // 2. window 이벤트 발생
-    try {
-      window.dispatchEvent(new CustomEvent('smap-emergency-haptic', { 
-        detail: { type: 'heavy', source: 'emergency-test' } 
-      }));
-      console.log('🚨 [EMERGENCY] window 이벤트 발생');
-      sendLogToiOS('info', '[EMERGENCY] window 이벤트 발생');
-      allResults.push('window 이벤트: 성공');
-    } catch (e) {
-      console.error('🚨 [EMERGENCY] window 이벤트 실패:', e);
-      allResults.push('window 이벤트: 실패');
-    }
-    
-    // 3. 글로벌 함수 시도
-    const globalFunctions = ['SMAP_FORCE_HAPTIC', 'iosHaptic', 'triggerHaptic', 'nativeHaptic'];
-    globalFunctions.forEach(funcName => {
-      try {
-        if (typeof (window as any)[funcName] === 'function') {
-          (window as any)[funcName]('heavy');
-          console.log(`🚨 [EMERGENCY] ${funcName} 함수 호출 성공`);
-          sendLogToiOS('info', `[EMERGENCY] ${funcName} 함수 성공`);
-          allResults.push(`${funcName}: 성공`);
-        }
-      } catch (e) {
-        console.error(`🚨 [EMERGENCY] ${funcName} 함수 실패:`, e);
-        allResults.push(`${funcName}: 실패`);
-      }
-    });
-    
-    // 결과 요약
-    console.log('🚨 [EMERGENCY] 테스트 결과:', allResults);
-    sendLogToiOS('info', '[EMERGENCY] 테스트 완료', { results: allResults });
-  };
-  
-  // 🔍 강제 핸들러 확인 함수
-  const forceCheckHandlers = () => {
-    console.log('🔍 [FORCE CHECK] 상세 핸들러 확인 시작');
-    
-    const webkit = (window as any).webkit;
-    
-    // 1. WebKit 객체 확인
-    console.log('🔍 [FORCE CHECK] WebKit 객체:', webkit);
-    console.log('🔍 [FORCE CHECK] WebKit 타입:', typeof webkit);
-    
-    if (!webkit) {
-      console.error('❌ [FORCE CHECK] WebKit 객체 없음');
-      return;
-    }
-    
-    // 2. messageHandlers 확인
-    console.log('🔍 [FORCE CHECK] messageHandlers:', webkit.messageHandlers);
-    console.log('🔍 [FORCE CHECK] messageHandlers 타입:', typeof webkit.messageHandlers);
-    
-    if (!webkit.messageHandlers) {
-      console.error('❌ [FORCE CHECK] messageHandlers 객체 없음');
-      return;
-    }
-    
-    // 3. 핸들러 목록 확인
-    const handlers = Object.keys(webkit.messageHandlers);
-    console.log('🔍 [FORCE CHECK] 등록된 핸들러들:', handlers);
-    console.log('🔍 [FORCE CHECK] 총 핸들러 수:', handlers.length);
-    
-    // 4. 각 핸들러 개별 테스트
-    handlers.forEach((handlerName: string) => {
-      console.log(`🔍 [FORCE CHECK] ${handlerName} 핸들러 테스트 중...`);
-      
-      try {
-        const handler = webkit.messageHandlers[handlerName];
-        console.log(`🔍 [FORCE CHECK] ${handlerName} 객체:`, handler);
-        
-        if (handler && typeof handler.postMessage === 'function') {
-          handler.postMessage({
-            type: 'forceHandlerTest',
-            handler: handlerName,
-            timestamp: Date.now(),
-            message: 'Web에서 강제 핸들러 테스트'
-          });
-          console.log(`✅ [FORCE CHECK] ${handlerName} 테스트 메시지 전송 성공`);
-        } else {
           console.error(`❌ [FORCE CHECK] ${handlerName} postMessage 함수 없음`);
         }
       } catch (error) {
@@ -4161,6 +2698,86 @@ export default function SignInPage() {
       };
     }
   }, []);
+
+  // 🔍 강제 핸들러 확인 함수
+  const forceCheckHandlers = () => {
+    console.log('🔍 [FORCE CHECK] 상세 핸들러 확인 시작');
+    
+    // WebKit 객체 확인
+    const webkit = (window as any).webkit;
+    console.log('🔍 [FORCE CHECK] WebKit 객체:', webkit);
+    console.log('🔍 [FORCE CHECK] WebKit 타입:', typeof webkit);
+    
+    // messageHandlers 확인
+    const messageHandlers = webkit?.messageHandlers;
+    console.log('🔍 [FORCE CHECK] messageHandlers:', messageHandlers);
+    console.log('🔍 [FORCE CHECK] messageHandlers 타입:', typeof messageHandlers);
+    
+    if (!messageHandlers) {
+      console.log('❌ [FORCE CHECK] messageHandlers 객체 없음');
+      return;
+    }
+    
+    // 각 핸들러 테스트
+    const handlerNames = ['smapIos', 'iosHandler', 'hapticHandler', 'messageHandler'];
+    
+    handlerNames.forEach(handlerName => {
+      try {
+        const handler = messageHandlers[handlerName];
+        if (handler && typeof handler.postMessage === 'function') {
+          console.log(`✅ [FORCE CHECK] ${handlerName} 핸들러 정상`);
+        } else {
+          console.error(`❌ [FORCE CHECK] ${handlerName} postMessage 함수 없음`);
+        }
+      } catch (error) {
+        console.error(`❌ [FORCE CHECK] ${handlerName} 테스트 실패:`, error);
+      }
+    });
+    
+    console.log('🔍 [FORCE CHECK] 상세 핸들러 확인 완료');
+  };
+
+  // 🔍 카카오 SDK 상태 확인 함수
+  const checkKakaoSDKStatus = () => {
+    console.log('🔍 [KAKAO SDK] 카카오 SDK 상태 확인');
+    
+    const kakao = (window as any).Kakao;
+    if (kakao) {
+      console.log('✅ [KAKAO SDK] Kakao 객체 발견');
+      console.log('🔍 [KAKAO SDK] Kakao.isInitialized():', kakao.isInitialized());
+      return true;
+    } else {
+      console.log('❌ [KAKAO SDK] Kakao 객체 없음');
+      return false;
+    }
+  };
+
+  // 🔍 테스트 함수들 등록
+  const registerTestFunctions = () => {
+    console.log('🔍 [TEST FUNCTIONS] 테스트 함수들 등록');
+    
+    // 전역 테스트 함수들
+    (window as any).__SMAP_TEST_HAPTIC__ = testHapticFeedback;
+    (window as any).__SMAP_TEST_HANDLER_HAPTIC__ = testHapticWithHandler;
+    (window as any).__SMAP_ENABLE_SIMULATOR__ = enableSimulatorMode;
+    
+    console.log('✅ [TEST FUNCTIONS] 테스트 함수들 등록 완료');
+  };
+
+  // 🔍 카카오 에러 복구 함수
+  const recoverFromKakaoError = () => {
+    console.log('🔍 [KAKAO RECOVER] 카카오 에러 복구 시도');
+    
+    try {
+      // 카카오 SDK 재초기화
+      if ((window as any).Kakao) {
+        (window as any).Kakao.init(process.env.NEXT_PUBLIC_KAKAO_APP_KEY);
+        console.log('✅ [KAKAO RECOVER] 카카오 SDK 재초기화 완료');
+      }
+    } catch (error) {
+      console.error('❌ [KAKAO RECOVER] 카카오 에러 복구 실패:', error);
+    }
+  };
 
   return (
     <motion.div 

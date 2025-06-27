@@ -24,14 +24,18 @@ export function useGoogleSignIn() {
   });
 
   const [isIOS, setIsIOS] = useState(false);
+  const [isAndroid, setIsAndroid] = useState(false);
 
   useEffect(() => {
     // iOS 환경인지 확인
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroidDevice = /Android/.test(navigator.userAgent);
+    
     setIsIOS(isIOSDevice);
+    setIsAndroid(isAndroidDevice);
 
-    if (isIOSDevice) {
-      // iOS에서 Google Sign-In 콜백 함수들을 전역으로 등록
+    if (isIOSDevice || isAndroidDevice) {
+      // iOS/Android에서 Google Sign-In 콜백 함수들을 전역으로 등록
       (window as any).googleSignInSuccess = (idToken: string, userInfoJson: string) => {
         try {
           const userInfo = JSON.parse(userInfoJson) as GoogleUser;
@@ -101,7 +105,7 @@ export function useGoogleSignIn() {
 
     // 컴포넌트 언마운트 시 전역 함수 정리
     return () => {
-      if (isIOSDevice) {
+      if (isIOSDevice || isAndroidDevice) {
         delete (window as any).googleSignInSuccess;
         delete (window as any).googleSignInError;
         delete (window as any).googleSignOutSuccess;
@@ -112,14 +116,19 @@ export function useGoogleSignIn() {
 
   // Google 로그인 시작
   const signIn = useCallback(() => {
-    if (!isIOS) {
-      console.warn('Google Sign-In은 iOS에서만 지원됩니다.');
+    if (!isIOS && !isAndroid) {
+      console.warn('Google Sign-In은 iOS/Android에서만 지원됩니다.');
       return;
     }
 
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-    if ((window as any).iosBridge?.googleSignIn?.signIn) {
+    // Android 브리지 사용
+    if (isAndroid && (window as any).androidBridge?.googleSignIn?.signIn) {
+      (window as any).androidBridge.googleSignIn.signIn();
+    }
+    // iOS 브리지 사용
+    else if (isIOS && (window as any).iosBridge?.googleSignIn?.signIn) {
       (window as any).iosBridge.googleSignIn.signIn();
     } else {
       setState(prev => ({
@@ -128,30 +137,34 @@ export function useGoogleSignIn() {
         error: 'Google Sign-In을 사용할 수 없습니다.'
       }));
     }
-  }, [isIOS]);
+  }, [isIOS, isAndroid]);
 
   // Google 로그아웃
   const signOut = useCallback(() => {
-    if (!isIOS) {
-      console.warn('Google Sign-In은 iOS에서만 지원됩니다.');
+    if (!isIOS && !isAndroid) {
+      console.warn('Google Sign-In은 iOS/Android에서만 지원됩니다.');
       return;
     }
 
-    if ((window as any).iosBridge?.googleSignIn?.signOut) {
+    if (isAndroid && (window as any).androidBridge?.googleSignIn?.signOut) {
+      (window as any).androidBridge.googleSignIn.signOut();
+    } else if (isIOS && (window as any).iosBridge?.googleSignIn?.signOut) {
       (window as any).iosBridge.googleSignIn.signOut();
     }
-  }, [isIOS]);
+  }, [isIOS, isAndroid]);
 
   // 현재 로그인 상태 확인
   const checkSignInStatus = useCallback(() => {
-    if (!isIOS) {
+    if (!isIOS && !isAndroid) {
       return;
     }
 
-    if ((window as any).iosBridge?.googleSignIn?.checkStatus) {
+    if (isAndroid && (window as any).androidBridge?.googleSignIn?.checkStatus) {
+      (window as any).androidBridge.googleSignIn.checkStatus();
+    } else if (isIOS && (window as any).iosBridge?.googleSignIn?.checkStatus) {
       (window as any).iosBridge.googleSignIn.checkStatus();
     }
-  }, [isIOS]);
+  }, [isIOS, isAndroid]);
 
   // 에러 상태 초기화
   const clearError = useCallback(() => {
@@ -161,6 +174,7 @@ export function useGoogleSignIn() {
   return {
     ...state,
     isIOS,
+    isAndroid,
     signIn,
     signOut,
     checkSignInStatus,
