@@ -129,7 +129,8 @@
     window.googleSignInSuccess = function(idToken, userInfoJson) {
         console.log('📱 Android Google Sign-In 성공 콜백 수신:', {
             hasIdToken: !!idToken,
-            hasUserInfo: !!userInfoJson
+            hasUserInfo: !!userInfoJson,
+            idTokenLength: idToken ? idToken.length : 0
         });
         
         try {
@@ -144,16 +145,31 @@
                 window.SmapApp.haptic.success();
             }
             
+            // 🚨 기존 iOS 콜백 호출 방지
+            console.log('📱 Android Google Sign-In - 기존 iOS 콜백 호출 방지');
+            
+            // 요청 본문 구성
+            const requestBody = {
+                idToken: idToken,  // ✅ 올바른 파라미터 이름으로 전송
+                userInfo: userInfo,
+                source: 'android_native'
+            };
+            
+            console.log('📱 Android Google Sign-In 요청 본문:', {
+                hasIdToken: !!requestBody.idToken,
+                idTokenLength: requestBody.idToken ? requestBody.idToken.length : 0,
+                idTokenPrefix: requestBody.idToken ? requestBody.idToken.substring(0, 50) + '...' : 'N/A',
+                hasUserInfo: !!requestBody.userInfo,
+                userInfoKeys: requestBody.userInfo ? Object.keys(requestBody.userInfo) : [],
+                source: requestBody.source
+            });
+            
             fetch('/api/google-auth', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    idToken: idToken,  // ✅ 올바른 파라미터 이름으로 전송
-                    userInfo: userInfo,
-                    source: 'android_native'
-                }),
+                body: JSON.stringify(requestBody),
             })
             .then(response => {
                 console.log('📱 Android Google Sign-In 백엔드 응답 상태:', response.status);
