@@ -1,27 +1,17 @@
 // frontend/src/app/signin/page.tsx
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import Image from 'next/image'; // Image 컴포넌트 임포트
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-// import { signIn, getSession } from 'next-auth/react'; // 임시 비활성화
+import { FiPhone, FiLock, FiMail, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
+import { useRouter, useSearchParams } from 'next/navigation';
 import authService from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
-import { comprehensivePreloadData } from '@/services/dataPreloadService';
+import AlertModal from '@/components/ui/AlertModal';
 import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
-import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
-
-// 아이콘 임포트 (react-icons 사용 예시)
-import { FcGoogle } from 'react-icons/fc';
-import { RiKakaoTalkFill } from 'react-icons/ri';
-import { FiX, FiAlertTriangle, FiPhone, FiLock, FiEye, FiEyeOff, FiMail, FiUser } from 'react-icons/fi';
-import { AlertModal } from '@/components/ui';
-import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
-import iosLogger, { LogCategory } from '@/utils/iosLogger';
-import '@/utils/fetchLogger'; // Fetch API 자동 로깅 활성화
+import LoadingSpinner from '../components/common/LoadingSpinner';
+import { comprehensivePreloadData } from '@/services/dataPreloadService';
 
 // 카카오 SDK 타입 정의
 declare global {
@@ -29,6 +19,50 @@ declare global {
     Kakao: any;
   }
 }
+
+// 햅틱 피드백 타입 정의
+enum HapticFeedbackType {
+  LIGHT = 'light',
+  MEDIUM = 'medium',
+  HEAVY = 'heavy',
+  SUCCESS = 'success',
+  WARNING = 'warning',
+  ERROR = 'error'
+}
+
+// 햅틱 피드백 함수
+const triggerHapticFeedback = (type: HapticFeedbackType) => {
+  if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
+    const patterns = {
+      [HapticFeedbackType.LIGHT]: [10],
+      [HapticFeedbackType.MEDIUM]: [20],
+      [HapticFeedbackType.HEAVY]: [30],
+      [HapticFeedbackType.SUCCESS]: [50, 100, 50],
+      [HapticFeedbackType.WARNING]: [100, 50, 100],
+      [HapticFeedbackType.ERROR]: [200, 100, 200]
+    };
+    window.navigator.vibrate(patterns[type]);
+  }
+};
+
+// iOS 로거 함수
+const iosLogger = {
+  info: (message: string, data?: any) => {
+    console.log(`[iOS LOG] ${message}`, data);
+  },
+  error: (message: string, error?: any) => {
+    console.error(`[iOS LOG] ${message}`, error);
+  },
+  warn: (message: string, data?: any) => {
+    console.warn(`[iOS LOG] ${message}`, data);
+  }
+};
+
+// 카카오 로그인 함수
+const handleKakaoLogin = async () => {
+  console.log('카카오 로그인 시도');
+  // 카카오 로그인 로직 구현
+};
 
 export default function SignInPage() {
   // 🚨 페이지 로드 디버깅
@@ -2530,14 +2564,43 @@ export default function SignInPage() {
     // 환경 체크
     console.log('🔍 [GOOGLE LOGIN] 환경 체크 시작');
     
-          console.error(`❌ [FORCE CHECK] ${handlerName} postMessage 함수 없음`);
-        }
-      } catch (error) {
-        console.error(`❌ [FORCE CHECK] ${handlerName} 테스트 실패:`, error);
+    // 🔍 강제 핸들러 확인 함수
+    const forceCheckHandlers = () => {
+      console.log('🔍 [FORCE CHECK] 상세 핸들러 확인 시작');
+      
+      // WebKit 객체 확인
+      const webkit = (window as any).webkit;
+      console.log('🔍 [FORCE CHECK] WebKit 객체:', webkit);
+      console.log('🔍 [FORCE CHECK] WebKit 타입:', typeof webkit);
+      
+      // messageHandlers 확인
+      const messageHandlers = webkit?.messageHandlers;
+      console.log('🔍 [FORCE CHECK] messageHandlers:', messageHandlers);
+      console.log('🔍 [FORCE CHECK] messageHandlers 타입:', typeof messageHandlers);
+      
+      if (!messageHandlers) {
+        console.log('❌ [FORCE CHECK] messageHandlers 객체 없음');
+        return;
       }
-    });
-    
-    console.log('🔍 [FORCE CHECK] 상세 핸들러 확인 완료');
+      
+      // 각 핸들러 테스트
+      const handlerNames = ['smapIos', 'iosHandler', 'hapticHandler', 'messageHandler'];
+      
+      handlerNames.forEach(handlerName => {
+        try {
+          const handler = messageHandlers[handlerName];
+          if (handler && typeof handler.postMessage === 'function') {
+            console.log(`✅ [FORCE CHECK] ${handlerName} 핸들러 정상`);
+          } else {
+            console.error(`❌ [FORCE CHECK] ${handlerName} postMessage 함수 없음`);
+          }
+        } catch (error) {
+          console.error(`❌ [FORCE CHECK] ${handlerName} 테스트 실패:`, error);
+        }
+      });
+      
+      console.log('🔍 [FORCE CHECK] 상세 핸들러 확인 완료');
+    };
   };
   
   // 🚨 웹에서 직접 MessageHandler 생성 시도
