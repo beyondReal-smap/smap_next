@@ -786,9 +786,9 @@ export default function LogsPage() {
   const { user, isLoggedIn, loading: authLoading } = useAuth();
   // UserContext 사용
   const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData } = useUser();
-  // DataCacheContext 사용
-  const { 
-    getGroupMembers: getCachedGroupMembers, 
+    // DataCacheContext 사용 - LOGS 페이지에서는 캐시 비활성화
+  const {
+    getGroupMembers: getCachedGroupMembers,
     setGroupMembers: setCachedGroupMembers,
     getLocationData: getCachedLocationData,
     setLocationData: setCachedLocationData,
@@ -797,6 +797,9 @@ export default function LogsPage() {
     isCacheValid,
     invalidateCache
   } = useDataCache();
+
+  // LOGS 페이지 전용 캐시 비활성화 설정
+  const DISABLE_CACHE = true;
   
   // home/page.tsx와 동일한 상태들 추가
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
@@ -1696,9 +1699,9 @@ export default function LogsPage() {
     }
   }, [dailyCountsData, groupMembers, calculateMemberLogDistribution]);
 
-  // 그룹 멤버가 로딩된 후 캐시에서 일별 카운트 데이터 확인
+  // 그룹 멤버가 로딩된 후 캐시에서 일별 카운트 데이터 확인 - LOGS 페이지에서는 캐시 비활성화
   useEffect(() => {
-    if (groupMembers.length > 0 && selectedGroupId && !dailyCountsData) {
+    if (groupMembers.length > 0 && selectedGroupId && !dailyCountsData && !DISABLE_CACHE) {
       const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
       const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
       
@@ -1713,8 +1716,8 @@ export default function LogsPage() {
   // 사이드바 날짜 선택 부분 초기 스크롤 설정 및 캐시 데이터 확인
   useEffect(() => {
     if (isSidebarOpen) {
-      // 사이드바가 열릴 때 캐시에서 일별 카운트 데이터 확인
-      if (selectedGroupId && !dailyCountsData) {
+      // 사이드바가 열릴 때 캐시에서 일별 카운트 데이터 확인 - LOGS 페이지에서는 캐시 비활성화
+      if (selectedGroupId && !dailyCountsData && !DISABLE_CACHE) {
         const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
         const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
         
@@ -2768,10 +2771,10 @@ export default function LogsPage() {
         });
       }
       
-      const cachedLocationData = getCachedLocationData(selectedGroupId, adjustedDate, mtIdx.toString());
-      const isCacheValid_Location = isCacheValid('locationData', selectedGroupId, adjustedDate);
+      const cachedLocationData = !DISABLE_CACHE ? getCachedLocationData(selectedGroupId, adjustedDate, mtIdx.toString()) : null;
+      const isCacheValid_Location = !DISABLE_CACHE ? isCacheValid('locationData', selectedGroupId, adjustedDate) : false;
       
-      if (cachedLocationData && isCacheValid_Location) {
+      if (cachedLocationData && isCacheValid_Location && !DISABLE_CACHE) {
         console.log(`[loadLocationData] 캐시에서 위치 데이터 사용 (멤버 ${mtIdx}):`, date);
         console.log('[loadLocationData] 📋 캐시 데이터 구조 분석:', {
           캐시전체구조: Object.keys(cachedLocationData),
@@ -3195,8 +3198,12 @@ export default function LogsPage() {
           locationLogSummary: validatedData.locationLogSummary,
           members: groupMembers
         };
-        setCachedLocationData(selectedGroupId, apiDate, mtIdx.toString(), locationDataForCache);
-        console.log(`[loadLocationData] 데이터를 캐시에 저장 (멤버 ${mtIdx}):`, date);
+        if (!DISABLE_CACHE) {
+          setCachedLocationData(selectedGroupId, apiDate, mtIdx.toString(), locationDataForCache);
+          console.log(`[loadLocationData] 데이터를 캐시에 저장 (멤버 ${mtIdx}):`, date);
+        } else {
+          console.log(`[loadLocationData] 📋 LOGS 페이지 - 캐시 저장 건너뛰기 (멤버 ${mtIdx}):`, date);
+        }
       }
       
       // UI 상태 업데이트
@@ -4039,8 +4046,12 @@ export default function LogsPage() {
       const response = await memberLocationLogService.getDailyLocationCounts(groupId, days);
       setDailyCountsData(response);
       
-      // 캐시에 저장
-      setCachedDailyLocationCounts(groupId, response);
+      // 캐시에 저장 - LOGS 페이지에서는 캐시 비활성화
+      if (!DISABLE_CACHE) {
+        setCachedDailyLocationCounts(groupId, response);
+      } else {
+        console.log('[loadDailyLocationCounts] 📋 LOGS 페이지 - 캐시 저장 건너뛰기');
+      }
       
       console.log('[LOGS] 일별 위치 기록 카운트 조회 완료:', response);
     } catch (error) {
@@ -4747,11 +4758,11 @@ export default function LogsPage() {
         let currentMembers: GroupMember[] = groupMembers.length > 0 ? [...groupMembers] : [];
 
         if (!dataFetchedRef.current.members) {
-          // 캐시에서 먼저 확인
-          const cachedMembers = getCachedGroupMembers(selectedGroupId);
-          const isCacheValid_Members = isCacheValid('groupMembers', selectedGroupId);
-          
-          if (cachedMembers && cachedMembers.length > 0 && isCacheValid_Members) {
+                // 캐시에서 먼저 확인 - LOGS 페이지에서는 캐시 비활성화
+      const cachedMembers = !DISABLE_CACHE ? getCachedGroupMembers(selectedGroupId) : null;
+      const isCacheValid_Members = !DISABLE_CACHE ? isCacheValid('groupMembers', selectedGroupId) : false;
+      
+      if (cachedMembers && cachedMembers.length > 0 && isCacheValid_Members && !DISABLE_CACHE) {
             console.log('[LOGS] 캐시에서 그룹 멤버 데이터 사용:', cachedMembers.length, '명');
             
             // 캐시된 데이터를 UI 형식으로 변환
@@ -4807,7 +4818,11 @@ export default function LogsPage() {
                   sgdt_owner_chk: member.sgdt_owner_chk || '',
                   sgdt_leader_chk: member.sgdt_leader_chk || ''
                 }));
-                setCachedGroupMembers(selectedGroupId, cacheMembers);
+                if (!DISABLE_CACHE) {
+                  setCachedGroupMembers(selectedGroupId, cacheMembers);
+                } else {
+                  console.log('[LOGS] 📋 LOGS 페이지 - 그룹 멤버 캐시 저장 건너뛰기');
+                }
                 
                 currentMembers = memberData.map((member: any, index: number) => {
                   // 위치 데이터 우선순위: mlt_lat/mlt_long (최신 GPS) > mt_lat/mt_long (기본 위치)
@@ -4891,14 +4906,18 @@ export default function LogsPage() {
             
             // 지연 로딩 최적화: 초기 진입 시 필수가 아닌 API들은 나중에 호출
             if (isMounted) {
-              // 캐시에서 일별 카운트 데이터 즉시 복원 (사이드바 표시용)
-              const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
-              const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
-              
-              if (cachedCounts && isCountsCacheValid) {
-                console.log('[LOGS] 캐시에서 일별 카운트 데이터 즉시 복원');
-                setDailyCountsData(cachedCounts);
-                dataFetchedRef.current.dailyCounts = true;
+              // 캐시에서 일별 카운트 데이터 즉시 복원 (사이드바 표시용) - LOGS 페이지에서는 캐시 비활성화
+              if (!DISABLE_CACHE) {
+                const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
+                const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
+                
+                if (cachedCounts && isCountsCacheValid) {
+                  console.log('[LOGS] 캐시에서 일별 카운트 데이터 즉시 복원');
+                  setDailyCountsData(cachedCounts);
+                  dataFetchedRef.current.dailyCounts = true;
+                }
+              } else {
+                console.log('[LOGS] 📋 LOGS 페이지 - 일별 카운트 캐시 조회 건너뛰기');
               }
 
               // 🚨 iOS 시뮬레이터 최적화: 즉시 로딩으로 변경 (지연 시간 제거)
