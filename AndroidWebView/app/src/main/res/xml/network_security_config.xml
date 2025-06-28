@@ -4,13 +4,26 @@
         <domain includeSubdomains="true">nextstep.smap.site</domain>
         <domain includeSubdomains="true">smap.site</domain>
         <domain includeSubdomains="true">vercel-dns-017.com</domain>
+        <domain includeSubdomains="true">vercel.app</domain>
+        <domain includeSubdomains="true">vercel.com</domain>
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">smap-team.vercel.app</domain>
+        <domain includeSubdomains="true">smap-next.vercel.app</domain>
     </domain-config>
     
     <!-- 개발 환경용 설정 -->
-    <debug-overrides>
+    <debug-overrides cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system"/>
             <certificates src="user"/>
         </trust-anchors>
     </debug-overrides>
+    
+    <!-- 기본 설정 -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system"/>
+        </trust-anchors>
+    </base-config>
 </network-security-config> 

@@ -13,6 +13,7 @@ import AlertModal from '@/components/ui/AlertModal';
 import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
+import { RiKakaoTalkFill } from 'react-icons/ri';
 
 // 카카오 SDK 타입 정의
 declare global {
