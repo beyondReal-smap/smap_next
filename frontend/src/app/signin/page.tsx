@@ -2445,7 +2445,7 @@ export default function SignInPage() {
             (window as any).AndroidGoogleSignIn.signIn();
             console.log('✅ [GOOGLE LOGIN] Android 네이티브 호출 성공, 콜백 대기 중...');
             
-            // Android 환경에서 3초 후 웹 SDK 폴백
+            // Android 환경에서 1초 후 웹 SDK 폴백 (시간 단축)
             setTimeout(() => {
               console.log('🔍 [ANDROID FALLBACK] Android Google Sign-In 응답 확인 중...');
               
@@ -2454,7 +2454,7 @@ export default function SignInPage() {
                 console.log('⚠️ [ANDROID FALLBACK] Android 네이티브 응답 없음, 웹 SDK로 폴백');
                 handleGoogleSDKLogin();
               }
-            }, 3000);
+            }, 1000); // 3초에서 1초로 단축
             
             return;
           } catch (error) {
@@ -2471,7 +2471,7 @@ export default function SignInPage() {
             (window as any).androidBridge.googleSignIn.signIn();
             console.log('✅ [GOOGLE LOGIN] Android Bridge 호출 성공, 콜백 대기 중...');
             
-            // Android 환경에서 3초 후 웹 SDK 폴백
+            // Android 환경에서 1초 후 웹 SDK 폴백 (시간 단축)
             setTimeout(() => {
               console.log('🔍 [ANDROID FALLBACK] Android Bridge 응답 확인 중...');
               
@@ -2480,7 +2480,7 @@ export default function SignInPage() {
                 console.log('⚠️ [ANDROID FALLBACK] Android Bridge 응답 없음, 웹 SDK로 폴백');
                 handleGoogleSDKLogin();
               }
-            }, 3000);
+            }, 1000); // 3초에서 1초로 단축
             
             return;
           } catch (error) {
