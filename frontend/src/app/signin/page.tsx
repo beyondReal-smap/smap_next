@@ -1288,10 +1288,11 @@ export default function SignInPage() {
   useEffect(() => {
     // iOS 환경인지 확인
     const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
-    console.log('[GOOGLE LOGIN] 콜백 함수 등록 - iOS WebView 환경:', isIOSWebView);
+    const isAndroidWebView = /Android/.test(navigator.userAgent);
+    console.log('[GOOGLE LOGIN] 콜백 함수 등록 - 환경:', { isIOSWebView, isAndroidWebView });
     
-    if (isIOSWebView) {
-      // Google Sign-In 성공 콜백
+    if (isIOSWebView || isAndroidWebView) {
+      // Google Sign-In 성공 콜백 (iOS + Android 공통)
       (window as any).googleSignInSuccess = async (idToken: string, userInfoJson: any) => {
         try {
           // 타임아웃 클리어
@@ -1300,61 +1301,65 @@ export default function SignInPage() {
             (window as any).__GOOGLE_LOGIN_TIMEOUT__ = null;
           }
           
-          console.log('[GOOGLE LOGIN] ✅ iOS 네이티브 Google Sign-In 성공');
-          console.log('[GOOGLE LOGIN] 기기타입:', /Simulator/.test(navigator.userAgent) ? '시뮬레이터' : '실제기기');
+          console.log('[GOOGLE LOGIN] ✅ 네이티브 Google Sign-In 성공 콜백 수신');
+          console.log('[GOOGLE LOGIN] 기기타입:', isAndroidWebView ? 'Android' : (isIOSWebView ? 'iOS' : 'Unknown'));
           console.log('[GOOGLE LOGIN] 매개변수 타입 확인:', {
             idTokenType: typeof idToken,
             idTokenLength: idToken?.length || 0,
             userInfoType: typeof userInfoJson,
             userInfoValue: userInfoJson
           });
+          
+          // 진행 중 플래그 해제
+          delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
+          
           setIsLoading(true);
           
-                      // 사용자 정보 처리 (다양한 형태 지원)
-            let userInfo;
-            try {
-              if (typeof userInfoJson === 'string') {
-                console.log('[GOOGLE LOGIN] JSON 문자열 파싱 시도:', userInfoJson);
-                userInfo = JSON.parse(userInfoJson);
-              } else if (typeof userInfoJson === 'object' && userInfoJson !== null) {
-                console.log('[GOOGLE LOGIN] 객체 형태의 사용자 정보 수신:', userInfoJson);
-                userInfo = userInfoJson;
-              } else if (userInfoJson === null || userInfoJson === undefined) {
-                console.log('[GOOGLE LOGIN] 사용자 정보가 null/undefined, ID 토큰에서 추출 시도');
-                // ID 토큰에서 사용자 정보 추출 시도
-                try {
-                  const tokenParts = idToken.split('.');
-                  if (tokenParts.length === 3) {
-                    const payload = JSON.parse(atob(tokenParts[1]));
-                    userInfo = {
-                      email: payload.email,
-                      name: payload.name,
-                      givenName: payload.given_name,
-                      familyName: payload.family_name,
-                      picture: payload.picture,
-                      sub: payload.sub
-                    };
-                    console.log('[GOOGLE LOGIN] ID 토큰에서 추출한 사용자 정보:', userInfo);
-                  } else {
-                    throw new Error('Invalid token format');
-                  }
-                } catch (tokenError) {
-                  console.error('[GOOGLE LOGIN] ID 토큰 파싱 실패:', tokenError);
-                  throw new Error('사용자 정보를 가져올 수 없습니다.');
+          // 사용자 정보 처리 (다양한 형태 지원)
+          let userInfo;
+          try {
+            if (typeof userInfoJson === 'string') {
+              console.log('[GOOGLE LOGIN] JSON 문자열 파싱 시도:', userInfoJson);
+              userInfo = JSON.parse(userInfoJson);
+            } else if (typeof userInfoJson === 'object' && userInfoJson !== null) {
+              console.log('[GOOGLE LOGIN] 객체 형태의 사용자 정보 수신:', userInfoJson);
+              userInfo = userInfoJson;
+            } else if (userInfoJson === null || userInfoJson === undefined) {
+              console.log('[GOOGLE LOGIN] 사용자 정보가 null/undefined, ID 토큰에서 추출 시도');
+              // ID 토큰에서 사용자 정보 추출 시도
+              try {
+                const tokenParts = idToken.split('.');
+                if (tokenParts.length === 3) {
+                  const payload = JSON.parse(atob(tokenParts[1]));
+                  userInfo = {
+                    email: payload.email,
+                    name: payload.name,
+                    givenName: payload.given_name,
+                    familyName: payload.family_name,
+                    picture: payload.picture,
+                    sub: payload.sub
+                  };
+                  console.log('[GOOGLE LOGIN] ID 토큰에서 추출한 사용자 정보:', userInfo);
+                } else {
+                  throw new Error('Invalid token format');
                 }
-              } else {
-                console.log('[GOOGLE LOGIN] 예상치 못한 userInfoJson 타입:', typeof userInfoJson, userInfoJson);
-                throw new Error('지원되지 않는 사용자 정보 형태입니다.');
+              } catch (tokenError) {
+                console.error('[GOOGLE LOGIN] ID 토큰 파싱 실패:', tokenError);
+                throw new Error('사용자 정보를 가져올 수 없습니다.');
               }
-              
-              console.log('[GOOGLE LOGIN] 처리된 사용자 정보:', userInfo);
-            } catch (parseError) {
-              console.error('[GOOGLE LOGIN] 사용자 정보 처리 오류:', parseError);
-              console.log('[GOOGLE LOGIN] 원본 데이터 타입:', typeof userInfoJson);
-              console.log('[GOOGLE LOGIN] 원본 데이터:', userInfoJson);
-              throw new Error('사용자 정보 파싱에 실패했습니다.');
+            } else {
+              console.log('[GOOGLE LOGIN] 예상치 못한 userInfoJson 타입:', typeof userInfoJson, userInfoJson);
+              throw new Error('지원되지 않는 사용자 정보 형태입니다.');
             }
-          
+            
+            console.log('[GOOGLE LOGIN] 처리된 사용자 정보:', userInfo);
+          } catch (parseError) {
+            console.error('[GOOGLE LOGIN] 사용자 정보 처리 오류:', parseError);
+            console.log('[GOOGLE LOGIN] 원본 데이터 타입:', typeof userInfoJson);
+            console.log('[GOOGLE LOGIN] 원본 데이터:', userInfoJson);
+            throw new Error('사용자 정보 파싱에 실패했습니다.');
+          }
+        
           // 사용자 정보 필드명 정규화 (iOS에서 오는 필드명을 표준화)
           const normalizedUserInfo = {
             email: userInfo.email || userInfo.Email,
@@ -1372,7 +1377,7 @@ export default function SignInPage() {
           sendLogToiOS('info', 'Google Auth API 호출 시작', {
             idTokenLength: idToken.length,
             userInfo: normalizedUserInfo,
-            deviceType: /Simulator/.test(navigator.userAgent) ? 'simulator' : 'real_device',
+            deviceType: isAndroidWebView ? 'android' : (isIOSWebView ? 'ios' : 'unknown'),
             timestamp: new Date().toISOString()
           });
           
@@ -1383,7 +1388,8 @@ export default function SignInPage() {
             },
             body: JSON.stringify({
               idToken: idToken,
-              userInfo: normalizedUserInfo
+              userInfo: normalizedUserInfo,
+              source: isAndroidWebView ? 'android_native' : 'ios_native'
             }),
           });
 
@@ -1443,7 +1449,7 @@ export default function SignInPage() {
               userEmail: data.user?.mt_email || data.user?.email || normalizedUserInfo.email || 'unknown',
               userNickname: data.user?.mt_nickname || data.user?.nickname || normalizedUserInfo.name || 'unknown',
               userId: data.user?.mt_idx || data.user?.id || 'unknown',
-              provider: 'google_native',
+              provider: isAndroidWebView ? 'google_android' : 'google_ios',
               requestedEmail: normalizedUserInfo.email,
               emailMatch: (data.user?.mt_email || data.user?.email) === normalizedUserInfo.email
             });
