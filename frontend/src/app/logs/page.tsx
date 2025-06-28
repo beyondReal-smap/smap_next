@@ -3505,7 +3505,15 @@ export default function LogsPage() {
 
   // 마커 데이터로부터 이동거리, 이동시간, 걸음수 계산 (걸음수는 마지막 마커의 mt_health_work 사용)
   const calculateLocationStats = (locationData: any[]): { distance: string; time: string; steps: string } => {
+    console.log('[calculateLocationStats] 입력 데이터 확인:', {
+      hasData: !!locationData,
+      dataLength: locationData?.length || 0,
+      firstItem: locationData?.[0],
+      lastItem: locationData?.[locationData?.length - 1]
+    });
+    
     if (!locationData || locationData.length === 0) {
+      console.log('[calculateLocationStats] 데이터 없음 - 기본값 반환');
       return { distance: '0 km', time: '0분', steps: '0 걸음' };
     }
 
@@ -3518,6 +3526,16 @@ export default function LogsPage() {
 
     let totalDistance = 0;
     let movingTimeSeconds = 0;
+    let validSegments = 0;
+    
+    console.log('[calculateLocationStats] 거리/시간 계산 시작:', {
+      totalMarkers: sortedData.length,
+      firstMarker: {
+        timestamp: sortedData[0].timestamp || sortedData[0].mlt_gps_time,
+        lat: sortedData[0].latitude || sortedData[0].mlt_lat,
+        lng: sortedData[0].longitude || sortedData[0].mlt_long
+      }
+    });
     
     // 이동거리와 실제 이동시간 계산 (체류시간 제외)
     for (let i = 1; i < sortedData.length; i++) {
@@ -3535,6 +3553,7 @@ export default function LogsPage() {
         // 오차 데이터 필터링 (1km 이상 점프는 제외)
         if (distance < 1000) {
           totalDistance += distance;
+          validSegments++;
           
           // 이동시간 계산 - 실제로 움직인 구간만 계산
           const prevTime = new Date(prev.timestamp || prev.mlt_gps_time || '').getTime();
@@ -3574,21 +3593,41 @@ export default function LogsPage() {
       }
     }
 
-    // 걸음수는 마지막 마커의 mt_health_work 데이터 사용
+    // 걸음수는 가장 큰 값을 가진 마커의 걸음수 데이터 사용 (다양한 필드명 시도)
     let actualSteps = 0;
     
     if (sortedData.length > 0) {
-      const latestData = sortedData[sortedData.length - 1];
-      const latestHealthWork = latestData.mt_health_work || latestData.health_work || 0;
+      console.log('[calculateLocationStats] 걸음수 데이터 탐색 시작 - 마커 개수:', sortedData.length);
       
-      if (latestHealthWork > 0) {
-        actualSteps = latestHealthWork;
-        console.log('[calculateLocationStats] 마지막 마커의 걸음수 데이터 사용:', {
-          latestDataTime: latestData.timestamp || latestData.mlt_gps_time,
-          latestHealthWork: latestHealthWork
+      // 가능한 걸음수 필드명들
+      const stepFields = ['mt_health_work', 'health_work', 'steps', 'mt_steps', 'step_count', 'daily_steps'];
+      
+      // 모든 마커에서 가장 큰 걸음수 값 찾기
+      for (const data of sortedData) {
+        for (const field of stepFields) {
+          const value = data[field];
+          if (value && typeof value === 'number' && value > actualSteps) {
+            actualSteps = value;
+            console.log('[calculateLocationStats] 더 큰 걸음수 발견:', {
+              field: field,
+              value: value,
+              timestamp: data.timestamp || data.mlt_gps_time
+            });
+          }
+        }
+      }
+      
+      if (actualSteps > 0) {
+        console.log('[calculateLocationStats] 최종 걸음수 데이터 사용:', {
+          finalSteps: actualSteps,
+          totalMarkers: sortedData.length
         });
       } else {
-        console.log('[calculateLocationStats] 마지막 마커에 mt_health_work 데이터가 없어서 0으로 설정');
+        console.log('[calculateLocationStats] 모든 마커에서 걸음수 데이터를 찾을 수 없음');
+        
+        // 디버깅을 위해 첫 번째와 마지막 마커의 모든 필드 출력
+        console.log('[calculateLocationStats] 디버깅 - 첫 번째 마커 데이터:', sortedData[0]);
+        console.log('[calculateLocationStats] 디버깅 - 마지막 마커 데이터:', sortedData[sortedData.length - 1]);
       }
     }
 
@@ -3604,8 +3643,19 @@ export default function LogsPage() {
       timeFormatted: timeFormatted,
       actualSteps: actualSteps,
       dataPoints: sortedData.length,
-      note: '마커 데이터 기반 이동거리/시간 계산, 마지막 마커의 mt_health_work 걸음수 사용'
+      validSegments: validSegments,
+      note: '마커 데이터 기반 이동거리/시간 계산, 모든 마커에서 최대 걸음수 사용'
     });
+    
+    // 데이터가 전부 0인 경우 추가 진단
+    if (totalDistance === 0 && movingTimeSeconds === 0 && actualSteps === 0) {
+      console.warn('[calculateLocationStats] ⚠️ 모든 값이 0 - 추가 진단 필요');
+      console.log('[calculateLocationStats] 상세 진단:', {
+        hasValidCoordinates: sortedData.some(d => (d.latitude || d.mlt_lat) && (d.longitude || d.mlt_long)),
+        hasValidTimestamps: sortedData.some(d => d.timestamp || d.mlt_gps_time),
+        sampleMarkers: sortedData.slice(0, 3)
+      });
+    }
 
     return {
       distance: `${distanceKm} km`,
@@ -6428,12 +6478,8 @@ export default function LogsPage() {
         >
           <AnimatedHeader 
               variant="simple"
-              className="fixed top-0 left-0 right-0 z-[9999] glass-effect header-fixed"
-              style={{ 
-                paddingTop: 'env(safe-area-inset-top)',
-                position: 'fixed',
-                zIndex: 9999
-              }}
+              className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+              style={{ paddingTop: 'env(safe-area-inset-top)' }}
             >
             {/* 헤더 내용 */}
             {showHeader && (
@@ -6467,7 +6513,7 @@ export default function LogsPage() {
           animate="animate"
           className="full-map-container hardware-accelerated" 
           style={{ 
-            paddingTop: '0px', // 지도 영역을 화면 전체로 확장
+            paddingTop: 'calc(env(safe-area-inset-top) + 80px)', // 다른 페이지와 동일한 헤더 높이 적용
             position: 'relative', // 로딩 오버레이를 위한 relative 포지션
             zIndex: 1 // 헤더보다 낮은 z-index
           }}
