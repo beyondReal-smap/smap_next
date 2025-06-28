@@ -354,6 +354,7 @@ div[style*="zIndex: 99999"] {
   -webkit-overflow-scrolling: touch !important;
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
+  padding-top: calc(3.5rem + max(16px, env(safe-area-inset-top)) + 1rem) !important;
 }
 
 .schedule-page-content::-webkit-scrollbar {
@@ -494,4 +495,21 @@ nav[class*="navigation-fixed"] {
 /* 모바일 최적화 레이아웃 */
 .container-mobile {
   @apply w-full max-w-md mx-auto px-4;
+}
+
+/* Android WebView에서 safe-area-inset-top이 지원되지 않는 경우 */
+@supports not (padding-top: env(safe-area-inset-top)) {
+  .schedule-page-content {
+    padding-top: 5rem !important; /* 80px 고정값 */
+  }
+}
+
+/* 🚨 logs 페이지 헤더 패딩 동기화 */
+.logs-page-content {
+  padding-top: calc(3.5rem + max(16px, env(safe-area-inset-top)) + 1rem) !important;
+}
+@supports not (padding-top: env(safe-area-inset-top)) {
+  .logs-page-content {
+    padding-top: 5rem !important;
+  }
 }

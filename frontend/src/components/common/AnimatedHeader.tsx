@@ -51,7 +51,9 @@ const defaultHeaderStyle: React.CSSProperties = {
   willChange: 'transform',
   WebkitPerspective: 1000,
   WebkitBackfaceVisibility: 'hidden',
-  paddingTop: 'max(16px, env(safe-area-inset-top))'
+  paddingTop: 'max(16px, env(safe-area-inset-top))',
+  minHeight: 'calc(3.5rem + max(16px, env(safe-area-inset-top)))',
+  zIndex: 50
 };
 
 const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
