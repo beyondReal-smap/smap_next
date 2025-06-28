@@ -289,103 +289,51 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // 캐시 유효성 검사 (하드 만료와 소프트 만료 구분)
   const isCacheValid = useCallback((type: string, groupId?: number, date?: string, checkSoft = false): boolean => {
+    // 🚨 캐시 완전 비활성화 - 항상 false 반환
+    console.log(`[DATA CACHE] 🚨 캐시 비활성화 - ${type} 항상 false 반환`);
+    return false;
+    
+    // 기존 로직은 주석 처리
+    /*
     const now = Date.now();
-    let duration = CACHE_DURATION[type as keyof typeof CACHE_DURATION] || 10 * 60 * 1000;
-    
-    // 🕒 위치 데이터의 경우 날짜별 차등 캐시 시간 적용
-    if (type === 'locationData' && date) {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD 형식
-      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      
-      if (date === today) {
-        duration = 3 * 60 * 1000; // 오늘: 3분 (자주 업데이트)
-      } else if (date === yesterday) {
-        duration = 15 * 60 * 1000; // 어제: 15분
-      } else {
-        duration = 24 * 60 * 60 * 1000; // 과거 날짜: 24시간 (거의 변경되지 않음)
-      }
-    }
-    
-    const actualDuration = checkSoft ? duration * SOFT_EXPIRY_RATIO : duration; // 소프트 체크 시 80% 시점
-    
-    let isValid = false;
     let lastUpdate = 0;
-    
+    let cacheDuration = CACHE_DURATION[type as keyof typeof CACHE_DURATION] || 10 * 60 * 1000;
+
     switch (type) {
       case 'userProfile':
         lastUpdate = cache.lastUpdated.userProfile;
-        isValid = now - lastUpdate < actualDuration;
         break;
       case 'userGroups':
         lastUpdate = cache.lastUpdated.userGroups;
-        isValid = now - lastUpdate < actualDuration;
         break;
       case 'groupMembers':
         if (!groupId) return false;
         lastUpdate = cache.lastUpdated.groupMembers[groupId] || 0;
-        isValid = now - lastUpdate < actualDuration;
         break;
       case 'scheduleData':
         if (!groupId) return false;
         lastUpdate = cache.lastUpdated.scheduleData[groupId] || 0;
-        isValid = now - lastUpdate < actualDuration;
         break;
       case 'locationData':
         if (!groupId || !date) return false;
-        // memberId가 없으면 해당 그룹/날짜의 모든 멤버 데이터가 유효한지 확인
-        const memberUpdates = cache.lastUpdated.locationData[groupId]?.[date];
-        if (!memberUpdates) return false;
-        const allMemberUpdates = Object.values(memberUpdates);
-        lastUpdate = allMemberUpdates.length > 0 ? Math.max(...allMemberUpdates) : 0;
-        isValid = now - lastUpdate < actualDuration;
+        const memberId = 'all'; // 모든 멤버 데이터를 하나로 관리
+        lastUpdate = cache.lastUpdated.locationData[groupId]?.[date]?.[memberId] || 0;
         break;
       case 'groupPlaces':
         if (!groupId) return false;
         lastUpdate = cache.lastUpdated.groupPlaces[groupId] || 0;
-        isValid = now - lastUpdate < actualDuration;
         break;
       case 'dailyLocationCounts':
         if (!groupId) return false;
         lastUpdate = cache.lastUpdated.dailyLocationCounts[groupId] || 0;
-        isValid = now - lastUpdate < actualDuration;
         break;
       default:
         return false;
     }
-    
-    // 타임스탬프 검증 및 수정
-    let correctedLastUpdate = lastUpdate;
-    let timestampCorrected = false;
-    
-    // lastUpdate가 초 단위로 저장된 경우 (10자리 숫자) 밀리초로 변환
-    if (lastUpdate > 0 && lastUpdate < 9999999999) { // 10자리 미만이면 초 단위
-      correctedLastUpdate = lastUpdate * 1000;
-      timestampCorrected = true;
-      console.warn(`[DATA CACHE] ⚠️ 타임스탬프 형식 오류 감지 및 수정: ${lastUpdate} → ${correctedLastUpdate}`);
-    }
-    
-    // 수정된 타임스탬프로 유효성 재계산
-    const correctedElapsedMs = now - correctedLastUpdate;
-    const correctedIsValid = correctedElapsedMs < actualDuration;
-    
-    const elapsedSeconds = Math.round(correctedElapsedMs / 1000);
-    const maxSeconds = Math.round(actualDuration / 1000);
-    const status = correctedIsValid ? '유효' : '만료';
-    const softCheck = checkSoft ? ' (소프트)' : '';
-    const correctionNote = timestampCorrected ? ' (타임스탬프 수정됨)' : '';
-    
-    console.log(`[DATA CACHE] 캐시 유효성 검사: ${type}${groupId ? `(${groupId})` : ''}${date ? `[${date}]` : ''}${softCheck} - ${status} (${elapsedSeconds}초/${maxSeconds}초)${correctionNote}`);
-    
-    // 타임스탬프가 수정되었고 캐시가 만료된 경우 캐시 무효화
-    if (timestampCorrected && !correctedIsValid) {
-      console.log(`[DATA CACHE] 🔄 잘못된 타임스탬프로 인한 캐시 무효화: ${type}${groupId ? `(${groupId})` : ''}`);
-      // 해당 캐시 항목의 타임스탬프를 0으로 리셋하여 다음에 새로 로드하도록 함
-      setTimeout(() => {
-        invalidateCache(type, groupId, date);
-      }, 0);
-    }
-    
-    return correctedIsValid;
+
+    const expiryTime = checkSoft ? lastUpdate + (cacheDuration * SOFT_EXPIRY_RATIO) : lastUpdate + cacheDuration;
+    return now < expiryTime;
+    */
   }, [cache.lastUpdated]);
 
   // 위치 데이터 - set 함수를 먼저 정의

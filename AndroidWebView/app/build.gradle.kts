@@ -21,6 +21,15 @@ android {
         resConfigs("ko", "en")
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("my-release-key.jks")
+            storePassword = "Smap2023##"
+            keyAlias = "my-key-alias"
+            keyPassword = "Smap2023##"
+        }
+    }
+
     buildTypes {
         val baseUrl: String = project.properties["baseUrl"] as String
         val baseUrlDebug: String = project.properties["baseUrlDebug"] as String
@@ -33,6 +42,7 @@ android {
 
         getByName("release") {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             buildConfigField("String", "BASE_URL", baseUrl)
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
