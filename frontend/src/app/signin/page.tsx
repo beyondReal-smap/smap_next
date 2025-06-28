@@ -525,7 +525,7 @@ export default function SignInPage() {
     keydown?: (e: KeyboardEvent) => void;
   }>({});
 
-  // iOS WebView 환경 감지 - 모든 제한 제거, 시뮬레이터 완전 허용
+  // iOS WebView 환경 감지 - 안드로이드 기기 제외
   const isIOSWebView = React.useMemo(() => {
     if (typeof window === 'undefined') return false;
     
@@ -540,24 +540,32 @@ export default function SignInPage() {
                       navigator.userAgent.includes('iPhone Simulator') ||
                       navigator.userAgent.includes('iPad Simulator');
     
-    // 🚨 제한 완전 제거 - 아래 조건 중 하나라도 만족하면 iOS 앱으로 인정 (시뮬레이터 포함)
+    // 🚨 안드로이드 기기면 무조건 iOS가 아님
+    if (isAndroid) {
+      console.log('[SIGNIN] 🤖 안드로이드 기기 감지 - iOS 환경이 아님');
+      return false;
+    }
+    
+    // iOS 환경 감지 조건들
     const conditions = {
       condition1: isIOS && hasWebKit && hasMessageHandlers, // 표준 WebKit
       condition2: isIOS && hasIosBridge, // ios-bridge.js가 로드된 iOS
       condition3: isLocalhost && isIOS, // localhost의 iOS
-      condition4: isSimulator, // iOS 시뮬레이터 (완전 허용)
+      condition4: isSimulator, // iOS 시뮬레이터
       condition5: (window as any).__FORCE_IOS_MODE__ === true, // 강제 iOS 모드
-      condition6: isIOS, // 단순히 iOS면 모두 허용
-      condition7: isLocalhost, // localhost면 모두 허용
-      condition8: true // 🚨 무조건 허용 모드 (테스트용)
+      condition6: isIOS && hasWebKit, // iOS + WebKit
     };
     
     const result = Object.values(conditions).some(Boolean);
     
-    console.log('[SIGNIN] 🚨 제한 완전 해제된 환경 감지 (시뮬레이터 허용):', {
+    console.log('[SIGNIN] 🍎 iOS 환경 감지:', {
       userAgent: userAgent.substring(0, 50) + '...',
       hostname: window.location.hostname,
+      isIOS,
+      isAndroid,
       isSimulator,
+      hasWebKit,
+      hasMessageHandlers,
       conditions,
       finalResult: result
     });
@@ -565,7 +573,7 @@ export default function SignInPage() {
     return result;
   }, []);
 
-  // Android WebView 환경 감지
+  // Android WebView 환경 감지 - 개선된 버전
   const isAndroidWebView = React.useMemo(() => {
     if (typeof window === 'undefined') return false;
     
@@ -574,6 +582,8 @@ export default function SignInPage() {
     const hasAndroidBridge = !!(window as any).androidBridge;
     const hasAndroidGoogleSignIn = !!(window as any).AndroidGoogleSignIn;
     const hasAndroidHandlers = !!(window as any).__SMAP_ANDROID_HANDLERS_READY__;
+    const hasWebKit = !!(window as any).webkit;
+    const hasMessageHandlers = !!(window as any).webkit?.messageHandlers;
     
     // Android 기기이면 무조건 Android 환경으로 인정
     const result = isAndroid;
@@ -584,6 +594,8 @@ export default function SignInPage() {
       hasAndroidBridge,
       hasAndroidGoogleSignIn,
       hasAndroidHandlers,
+      hasWebKit,
+      hasMessageHandlers,
       finalResult: result
     });
     
@@ -2347,6 +2359,17 @@ export default function SignInPage() {
     (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = true;
     
     try {
+      // 환경 감지 상태 출력
+      console.log('🔍 [GOOGLE LOGIN] 환경 감지 상태:', {
+        userAgent: navigator.userAgent.substring(0, 100),
+        isIOSWebView,
+        isAndroidWebView,
+        isWebEnvironment,
+        hasWebKit: !!(window as any).webkit,
+        hasAndroidBridge: !!(window as any).androidBridge,
+        platform: 'web'
+      });
+      
       console.log('🚀 [GOOGLE LOGIN] 시작', { 
         platform: 'web',
         isIOSWebView,
@@ -2407,27 +2430,14 @@ export default function SignInPage() {
       if (isAndroidWebView) {
         console.log('🤖 [GOOGLE LOGIN] Android 환경에서 Google 로그인 시도');
         
-        if ((window as any).AndroidGoogleSignIn?.signIn) {
-          console.log('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 인터페이스 발견');
-          
-          try {
-            const result = await (window as any).AndroidGoogleSignIn.signIn();
-            console.log('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 성공', { result });
-            
-            if (result && result.idToken) {
-              await handleGoogleCallback(result);
-            } else {
-              throw new Error('Android 네이티브 로그인 결과가 유효하지 않습니다');
-            }
-          } catch (error) {
-            console.error('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 실패', { error });
-            throw error;
-          }
-        } else {
-          console.warn('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 인터페이스가 없습니다. 웹 SDK로 폴백합니다');
-          
-          // Android에서 네이티브 인터페이스가 없으면 웹 SDK 사용
+        // 안드로이드에서는 웹 SDK 사용 (네이티브 인터페이스가 불안정할 수 있음)
+        console.log('🤖 [GOOGLE LOGIN] Android에서 웹 SDK Google 로그인 사용');
+        
+        try {
           await handleGoogleSDKLogin();
+        } catch (error) {
+          console.error('🤖 [GOOGLE LOGIN] Android 웹 SDK Google 로그인 실패', { error });
+          throw error;
         }
         
         return; // Android 처리가 완료되면 함수 종료
