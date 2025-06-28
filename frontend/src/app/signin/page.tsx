@@ -506,6 +506,7 @@ export default function SignInPage() {
     
     const userAgent = navigator.userAgent;
     const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+    const isAndroid = /Android/.test(userAgent);
     const hasWebKit = !!(window as any).webkit;
     const hasMessageHandlers = !!(window as any).webkit?.messageHandlers;
     const hasIosBridge = typeof (window as any).SMAP_FORCE_HAPTIC === 'function';
@@ -549,7 +550,8 @@ export default function SignInPage() {
     const hasAndroidGoogleSignIn = !!(window as any).AndroidGoogleSignIn;
     const hasAndroidHandlers = !!(window as any).__SMAP_ANDROID_HANDLERS_READY__;
     
-    const result = isAndroid && (hasAndroidBridge || hasAndroidGoogleSignIn || hasAndroidHandlers);
+    // Android 기기이면 무조건 Android 환경으로 인정
+    const result = isAndroid;
     
     console.log('[SIGNIN] 🤖 Android 환경 감지:', {
       userAgent: userAgent.substring(0, 50) + '...',
@@ -837,6 +839,14 @@ export default function SignInPage() {
   const handleGoogleSDKLogin = async (retryCount: number = 0) => {
     console.log('[GOOGLE SDK] 웹 Google SDK를 통한 로그인 시작', retryCount > 0 ? `(재시도 ${retryCount})` : '');
     
+    // 중복 호출 방지
+    if ((window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__) {
+      console.log('[GOOGLE SDK] 이미 로그인 진행 중, 중복 호출 무시');
+      return;
+    }
+    
+    (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = true;
+    
     try {
       // Google Identity Services 초기화 (이미 로드되어 있다고 가정)
       if ((window as any).google?.accounts?.id) {
@@ -951,6 +961,7 @@ export default function SignInPage() {
               showError('Google 로그인 처리 중 오류가 발생했습니다.');
             } finally {
               setIsLoading(false);
+              (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = false;
             }
           },
           error_callback: (error: any) => {
@@ -969,40 +980,37 @@ export default function SignInPage() {
             
             showError(errorMessage);
             setIsLoading(false);
+            (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = false;
           }
         });
         
-        // 로그인 팝업 띄우기
-        google.accounts.id.prompt((notification: any) => {
-          console.log('[GOOGLE SDK] Prompt notification:', notification);
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            // 팝업이 표시되지 않은 경우 버튼 클릭 방식 사용
-            google.accounts.id.renderButton(
-              document.createElement('div'), // 임시 div
-              {
-                theme: 'outline',
-                size: 'large',
-                type: 'standard',
-                text: 'signin_with',
-                shape: 'rectangular',
-                logo_alignment: 'left'
-              }
-            );
-            
-            // 직접 로그인 함수 호출
-            setTimeout(() => {
-              try {
-                google.accounts.id.prompt();
-              } catch (e) {
-                console.error('[GOOGLE SDK] 두 번째 prompt 실패:', e);
-                showError('Google 로그인 팝업을 열 수 없습니다.');
-                setIsLoading(false);
-              }
-            }, 100);
-          }
-        });
+        // 로그인 팝업 띄우기 (중복 호출 방지)
+        try {
+          google.accounts.id.prompt((notification: any) => {
+            console.log('[GOOGLE SDK] Prompt notification:', notification);
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+              // 팝업이 표시되지 않은 경우 버튼 클릭 방식 사용
+              google.accounts.id.renderButton(
+                document.createElement('div'), // 임시 div
+                {
+                  theme: 'outline',
+                  size: 'large',
+                  type: 'standard',
+                  text: 'signin_with',
+                  shape: 'rectangular',
+                  logo_alignment: 'left'
+                }
+              );
+            }
+          });
+        } catch (error) {
+          console.error('[GOOGLE SDK] Prompt 호출 실패:', error);
+          showError('Google 로그인 팝업을 열 수 없습니다.');
+          setIsLoading(false);
+          (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = false;
+        }
         
-              } else {
+      } else {
         console.error('[GOOGLE SDK] window.google.accounts.id가 없음:', {
           hasWindow: typeof window !== 'undefined',
           hasGoogle: !!(window as any).google,
@@ -1030,21 +1038,7 @@ export default function SignInPage() {
       
     } catch (error: any) {
       console.error('[GOOGLE SDK] 초기화 실패:', error);
-      
-      // 에러 타입별 세부 메시지 (시뮬레이터 허용)
-      let errorMessage = 'Google 로그인 SDK 초기화에 실패했습니다.';
-      if (error.message.includes('로드 타임아웃')) {
-        errorMessage = 'Google 로그인 서비스 연결에 시간이 너무 오래 걸립니다.\n\n해결 방법:\n1. 네트워크 연결 확인\n2. VPN 연결 해제 후 재시도\n3. WiFi 연결 상태 확인';
-      } else if (error.message.includes('스크립트 로드 실패')) {
-        errorMessage = 'Google 로그인 서비스에 연결할 수 없습니다.\n\n해결 방법:\n1. 인터넷 연결 확인\n2. 방화벽 설정 확인\n3. 브라우저 캐시 삭제 후 재시도';
-      } else if (error.message.includes('사용할 수 없습니다')) {
-        errorMessage = 'Google 로그인 SDK를 사용할 수 없습니다.\n\n상세 오류:\n' + (error.message || '알 수 없는 오류') + '\n\n해결 방법:\n1. 페이지 새로고침 후 재시도\n2. 브라우저 업데이트\n3. 전화번호 로그인 사용';
-      } else {
-        errorMessage = 'Google 로그인 처리 중 오류가 발생했습니다.\n\n상세 오류:\n' + (error.message || error.toString()) + '\n\n해결 방법:\n1. 페이지 새로고침\n2. 브라우저 설정 확인\n3. 전화번호 로그인 사용';
-      }
-      
-      showError(errorMessage);
-      setIsLoading(false);
+      (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = false;
     }
   };
 
