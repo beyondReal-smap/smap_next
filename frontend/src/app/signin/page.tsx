@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiPhone, FiLock, FiMail, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
+import { FiPhone, FiLock, FiMail, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 import { FcGoogle } from 'react-icons/fc';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -58,6 +58,9 @@ const iosLogger = {
   },
   warn: (message: string, data?: any) => {
     console.warn(`[iOS LOG] ${message}`, data);
+  },
+  logGoogleLogin: (message: string, data?: any) => {
+    console.log(`[iOS LOG] [GOOGLE LOGIN] ${message}`, data);
   }
 };
 
@@ -241,11 +244,7 @@ export default function SignInPage() {
           });
           
           // 구글 로그인 성공 햅틱 피드백
-          triggerHapticFeedback(HapticFeedbackType.SUCCESS, '구글 로그인 성공', { 
-            component: 'signin', 
-            action: 'native-google-login', 
-            userEmail: data.user?.mt_email?.substring(0, 3) + '***' 
-          });
+          triggerHapticFeedback(HapticFeedbackType.SUCCESS);
           
           // 리다이렉트 플래그 설정
           isRedirectingRef.current = true;
@@ -648,10 +647,7 @@ export default function SignInPage() {
       }
       
       // triggerHapticFeedback도 테스트
-      triggerHapticFeedback(HapticFeedbackType.SUCCESS, '핸들러 발견 테스트', { 
-        component: 'signin', 
-        action: 'handler-detected-test' 
-      });
+      triggerHapticFeedback(HapticFeedbackType.SUCCESS);
       
     } catch (error) {
       console.error('🧪 [HAPTIC TEST] 햅틱 테스트 실패:', error);
@@ -687,10 +683,7 @@ export default function SignInPage() {
       
       // 3. triggerHapticFeedback 유틸 시도
       console.log('🧪 [HAPTIC TEST] triggerHapticFeedback 유틸 시도');
-      triggerHapticFeedback(HapticFeedbackType.SUCCESS, '수동 햅틱 테스트', { 
-        component: 'signin', 
-        action: 'manual-test' 
-      });
+      triggerHapticFeedback(HapticFeedbackType.SUCCESS);
       
     } catch (error) {
       console.error('🧪 [HAPTIC TEST] 햅틱 테스트 실패:', error);
@@ -897,7 +890,7 @@ export default function SignInPage() {
                 }
                 
                 // 성공 햅틱 피드백
-                triggerHapticFeedback(HapticFeedbackType.SUCCESS, 'Google SDK 로그인 성공', { component: 'signin', action: 'google-sdk-login', userEmail: data.user?.mt_email });
+                triggerHapticFeedback(HapticFeedbackType.SUCCESS);
                 console.log('🎮 [SIGNIN] Google 로그인 성공 햅틱 피드백 실행');
                 
                 // 추가 지연 후 홈으로 이동
@@ -1502,11 +1495,7 @@ export default function SignInPage() {
               }
               
               // 5. Google 로그인 성공 햅틱 피드백
-              triggerHapticFeedback(HapticFeedbackType.SUCCESS, 'Google 로그인 성공', { 
-                component: 'signin', 
-                action: 'google-login', 
-                userEmail: data.user?.mt_email?.substring(0, 3) + '***' 
-              });
+              triggerHapticFeedback(HapticFeedbackType.SUCCESS);
               console.log('🎮 [SIGNIN] Google 로그인 성공 햅틱 피드백 실행');
               
               // 6. 리다이렉트 플래그 설정
@@ -1567,11 +1556,7 @@ export default function SignInPage() {
         }
         
         // Google 로그인 에러 햅틱 피드백
-        triggerHapticFeedback(HapticFeedbackType.ERROR, 'Google 로그인 콜백 에러', { 
-          component: 'signin', 
-          action: 'google-login-callback-error', 
-          error: errorMessage 
-        });
+        triggerHapticFeedback(HapticFeedbackType.ERROR);
         
         // 에러 모달 강제 표시 - setTimeout으로 확실히 실행
         console.log('[GOOGLE LOGIN] 에러 모달 강제 표시:', userFriendlyMessage);
@@ -1796,11 +1781,7 @@ export default function SignInPage() {
       });
       
       // 로그인 성공 햅틱 피드백
-      triggerHapticFeedback(HapticFeedbackType.SUCCESS, '전화번호 로그인 성공', { 
-        component: 'signin', 
-        action: 'phone-login', 
-        phone: phoneNumber.replace(/-/g, '').substring(0, 7) + '****' 
-      });
+      triggerHapticFeedback(HapticFeedbackType.SUCCESS);
       console.log('🎮 [SIGNIN] 전화번호 로그인 성공 햅틱 피드백 실행');
       
       // 리다이렉트 플래그 설정
@@ -1869,11 +1850,7 @@ export default function SignInPage() {
       });
       
       // 로그인 실패 햅틱 피드백
-      triggerHapticFeedback(HapticFeedbackType.ERROR, '전화번호 로그인 실패', { 
-        component: 'signin', 
-        action: 'phone-login-error', 
-        error: err.message 
-      });
+      triggerHapticFeedback(HapticFeedbackType.ERROR);
       console.log('🎮 [SIGNIN] 전화번호 로그인 실패 햅틱 피드백 실행');
       
       try {
@@ -3058,10 +3035,7 @@ export default function SignInPage() {
                   });
                   
                   // 햅틱 피드백 (버튼 클릭 시)
-                  triggerHapticFeedback(HapticFeedbackType.LIGHT, 'Google 로그인 버튼 클릭', { 
-                    component: 'signin', 
-                    action: 'google-login-button-click' 
-                  });
+                  triggerHapticFeedback(HapticFeedbackType.LIGHT);
                   
                   // 실제 핸들러 호출
                   handleGoogleLogin();
@@ -3103,10 +3077,7 @@ export default function SignInPage() {
                 });
                 
                 // 햅틱 피드백 (버튼 클릭 시)
-                triggerHapticFeedback(HapticFeedbackType.LIGHT, 'Kakao 로그인 버튼 클릭', { 
-                  component: 'signin', 
-                  action: 'kakao-login-button-click' 
-                });
+                triggerHapticFeedback(HapticFeedbackType.LIGHT);
                 
                 // 실제 핸들러 호출
                 handleKakaoLogin();
@@ -3239,7 +3210,7 @@ export default function SignInPage() {
       {isLoading && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
-            <IOSCompatibleSpinner size="md" message="처리 중..." />
+            <LoadingSpinner message="처리 중..." fullScreen={false} />
           </div>
         </div>
       )}
