@@ -51,7 +51,7 @@ const defaultHeaderStyle: React.CSSProperties = {
   willChange: 'transform',
   WebkitPerspective: 1000,
   WebkitBackfaceVisibility: 'hidden',
-  paddingTop: '0',
+  paddingTop: 'max(env(safe-area-inset-top), 20px)',
   minHeight: 'auto',
   height: 'auto',
   zIndex: 50
