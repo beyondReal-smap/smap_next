@@ -2630,7 +2630,8 @@ export default function SignInPage() {
     }
   };
 
-  // 🔥 iOS 환경에서 네이티브 Google Sign-In 시도
+  // 🔥 iOS 환경에서 네이티브 Google Sign-In 시도 (자동 실행 비활성화)
+  /*
   if (isIOSWebView && !isAndroidWebView) {
     console.log('🍎 [GOOGLE LOGIN] iOS 환경에서 네이티브 Google Sign-In 시도');
     
@@ -2669,6 +2670,7 @@ export default function SignInPage() {
       return;
     }
   }
+  */
 
   return (
     <motion.div 
