@@ -356,6 +356,9 @@ export default function SignInPage() {
     const handleNativeGoogleLoginData = async (data: any) => {
       console.log('🔄 [NATIVE DATA] 네이티브 구글 로그인 데이터 처리 시작', data);
       
+      // 진행 중 플래그 해제 (로그인 완료)
+      delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
+      
       try {
         if (!data.idToken) {
           throw new Error('ID 토큰이 없습니다');
@@ -447,6 +450,28 @@ export default function SignInPage() {
         
         // 데이터 사용 후 삭제
         delete (window as any).__NATIVE_GOOGLE_LOGIN_DATA__;
+      }
+      
+      // iOS 네이티브 콜백 데이터도 확인
+      if ((window as any).__IOS_GOOGLE_LOGIN_CALLBACK__) {
+        const callbackData = (window as any).__IOS_GOOGLE_LOGIN_CALLBACK__;
+        console.log('🎉 [NATIVE DATA] iOS 콜백 데이터 발견!', callbackData);
+        
+        // 진행 중 플래그 해제
+        delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
+        
+        if (callbackData.success && callbackData.data) {
+          // 성공한 경우
+          handleNativeGoogleLoginData(callbackData.data);
+        } else if (callbackData.error) {
+          // 실패한 경우
+          console.log('ℹ️ [NATIVE DATA] iOS 로그인 취소 또는 실패:', callbackData.error);
+          setError('로그인이 취소되었습니다. 다시 시도해주세요.');
+          setIsLoading(false);
+        }
+        
+        // 콜백 데이터 삭제
+        delete (window as any).__IOS_GOOGLE_LOGIN_CALLBACK__;
       }
     };
     
@@ -2304,17 +2329,30 @@ export default function SignInPage() {
 
   // Google 로그인 핸들러 (플랫폼별 분리된 버전)
   const handleGoogleLogin = async () => {
-    if (isLoading) return;
+    if (isLoading) {
+      console.log('🚫 [GOOGLE LOGIN] 이미 로딩 중입니다.');
+      return;
+    }
+    
+    // 중복 실행 방지를 위한 플래그 체크
+    if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
+      console.log('🚫 [GOOGLE LOGIN] 이미 진행 중인 로그인이 있습니다.');
+      return;
+    }
     
     setIsLoading(true);
     setError(null);
+    
+    // 진행 중 플래그 설정
+    (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = true;
     
     try {
       console.log('🚀 [GOOGLE LOGIN] 시작', { 
         platform: 'web',
         isIOSWebView,
         isAndroidWebView,
-        isWebEnvironment
+        isWebEnvironment,
+        timestamp: Date.now()
       });
       triggerHapticFeedback(HapticFeedbackType.LIGHT);
       
@@ -2322,21 +2360,38 @@ export default function SignInPage() {
       if (isIOSWebView) {
         console.log('🍎 [GOOGLE LOGIN] iOS 환경에서 Google 로그인 시도');
         
-        if ((window as any).iosBridge?.googleSignIn?.signIn) {
-          console.log('🍎 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 인터페이스 발견');
+        // iOS 네이티브 Google 로그인 시도
+        if ((window as any).webkit?.messageHandlers?.smapIos) {
+          console.log('📱 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 인터페이스 발견');
           
           try {
-            const result = await (window as any).iosBridge.googleSignIn.signIn();
-            console.log('🍎 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 성공', { result });
+            // iOS 네이티브 로그인 호출
+            (window as any).webkit.messageHandlers.smapIos.postMessage({
+              type: 'googleSignIn',
+              param: '',
+              timestamp: Date.now(),
+              source: 'ios_native'
+            });
             
-            if (result && result.idToken) {
-              await handleGoogleCallback(result);
-            } else {
-              throw new Error('iOS 네이티브 로그인 결과가 유효하지 않습니다');
-            }
+            console.log('✅ [GOOGLE LOGIN] iOS 네이티브 호출 성공, 콜백 대기 중...');
+            
+            // iOS 환경에서 3초 후 웹 SDK 폴백 (시간 증가)
+            setTimeout(() => {
+              console.log('🔍 [IOS FALLBACK] iOS Google Sign-In 응답 확인 중...');
+              
+              // 진행 중 플래그가 여전히 설정되어 있으면 웹 SDK로 폴백
+              if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
+                console.log('⚠️ [IOS FALLBACK] iOS 네이티브 응답 없음, 웹 SDK로 폴백');
+                handleGoogleSDKLogin();
+              }
+            }, 3000);
+            
+            return;
           } catch (error) {
-            console.error('🍎 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 실패', { error });
-            throw error;
+            console.error('❌ [GOOGLE LOGIN] iOS 네이티브 호출 실패:', error);
+            console.log('🔄 [IOS FALLBACK] iOS 실패로 웹 SDK로 폴백');
+            await handleGoogleSDKLogin();
+            return;
           }
         } else {
           console.warn('🍎 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 인터페이스가 없습니다. 웹 SDK로 폴백합니다');
@@ -2384,10 +2439,21 @@ export default function SignInPage() {
       
     } catch (error) {
       console.error('❌ [GOOGLE LOGIN] Google 로그인 실패', { error });
-      setError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
+      
+      // 취소된 로그인인지 확인
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('canceled') || errorMessage.includes('cancelled')) {
+        console.log('ℹ️ [GOOGLE LOGIN] 사용자가 로그인을 취소했습니다.');
+        setError('로그인이 취소되었습니다. 다시 시도해주세요.');
+      } else {
+        setError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
+      }
+      
       triggerHapticFeedback(HapticFeedbackType.ERROR);
     } finally {
       setIsLoading(false);
+      // 진행 중 플래그 해제
+      delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
     }
   };
 
