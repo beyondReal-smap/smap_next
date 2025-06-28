@@ -1523,11 +1523,7 @@ export default function SignInPage() {
           console.error('[GOOGLE LOGIN] 네이티브 Google 로그인 처리 오류:', error);
           
           // Google 로그인 실패 햅틱 피드백
-          triggerHapticFeedback(HapticFeedbackType.ERROR, 'Google 로그인 실패', { 
-            component: 'signin', 
-            action: 'google-login-error', 
-            error: error.message 
-          });
+          triggerHapticFeedback(HapticFeedbackType.ERROR);
           
           showError(error.message || 'Google 로그인 처리 중 오류가 발생했습니다.');
         } finally {
@@ -2433,11 +2429,19 @@ export default function SignInPage() {
 
   // Google 로그인 핸들러
   const handleGoogleLogin = async (retryCount: number = 0) => {
-    // 타임아웃 설정 (10초 후 자동으로 로딩 해제)
+    // 타임아웃 설정 (3초 후 자동으로 폴백)
     const timeoutId = setTimeout(() => {
-      console.warn('⏰ [GOOGLE LOGIN] 타임아웃 발생 (10초)');
-      setIsLoading(false);
-    }, 10000);
+      console.warn('⏰ [GOOGLE LOGIN] 타임아웃 발생 (3초), 웹 SDK로 폴백');
+      
+      // Android 환경에서 타임아웃 시 웹 SDK로 폴백
+      if (/Android/.test(navigator.userAgent)) {
+        console.log('🔄 [ANDROID TIMEOUT] Android 타임아웃으로 웹 SDK 폴백');
+        handleGoogleSDKLogin();
+      } else {
+        setIsLoading(false);
+      }
+    }, 3000); // 3초로 단축
+    
     console.log('🚀 [GOOGLE LOGIN] 핸들러 시작됨');
     setIsLoading(true);
     
@@ -2454,7 +2458,12 @@ export default function SignInPage() {
       hasAndroidBridge,
       hasAndroidHandlers,
       androidHandlersList,
-      userAgent: navigator.userAgent.substring(0, 50)
+      userAgent: navigator.userAgent.substring(0, 50),
+      // 추가 상세 정보
+      androidGoogleSignInType: typeof (window as any).AndroidGoogleSignIn,
+      androidBridgeType: typeof (window as any).androidBridge,
+      webkitType: typeof (window as any).webkit,
+      messageHandlersType: typeof (window as any).webkit?.messageHandlers
     });
     
     // Android 환경에서 Android 브리지 사용 (개선된 버전)
@@ -2491,11 +2500,60 @@ export default function SignInPage() {
         }
         
         console.log('✅ [GOOGLE LOGIN] Android 네이티브 호출 성공, 콜백 대기 중...');
+        
+        // 🔥 Android 환경에서 3초 후 인터페이스 확인 및 웹 SDK 폴백
+        setTimeout(() => {
+          console.log('🔍 [ANDROID FALLBACK] Android Google Sign-In 인터페이스 확인 중...');
+          
+          // Android Google Sign-In 인터페이스가 실제로 존재하는지 확인
+          const hasRealAndroidInterface = !!(window as any).AndroidGoogleSignIn?.signIn || 
+                                        !!(window as any).androidBridge?.googleSignIn?.signIn;
+          
+          if (!hasRealAndroidInterface) {
+            console.log('⚠️ [ANDROID FALLBACK] Android Google Sign-In 인터페이스가 없음, 웹 SDK로 폴백');
+            
+            // 사용자에게 안내 메시지 표시
+            console.log('📱 [ANDROID INFO] Android 앱에서 Google Sign-In 인터페이스가 설정되지 않았습니다.');
+            console.log('📱 [ANDROID INFO] 웹 SDK를 통한 Google 로그인으로 전환합니다.');
+            console.log('📱 [ANDROID INFO] Android 앱 개발자에게 다음 사항을 확인해주세요:');
+            console.log('📱 [ANDROID INFO] 1. Google Sign-In 라이브러리 추가');
+            console.log('📱 [ANDROID INFO] 2. WebView에 JavaScript 인터페이스 등록');
+            console.log('📱 [ANDROID INFO] 3. window.AndroidGoogleSignIn 객체 설정');
+            
+            // iOS 로그 전송 - Android 폴백 정보
+            sendLogToiOS('info', '📱 Android Google Sign-In 폴백', {
+              timestamp: new Date().toISOString(),
+              reason: 'android_interface_not_found',
+              fallbackTo: 'web_sdk',
+              androidHandlers: androidHandlersList,
+              hasAndroidBridge: hasAndroidBridge,
+              hasAndroidGoogleSignIn: hasAndroidGoogleSignIn
+            });
+            
+            // 웹 SDK 로그인으로 폴백
+            handleGoogleSDKLogin();
+          } else {
+            console.log('✅ [ANDROID FALLBACK] Android Google Sign-In 인터페이스 확인됨');
+          }
+        }, 1000); // 1초로 단축
+        
         return;
       } catch (error) {
         console.error('❌ [GOOGLE LOGIN] Android 네이티브 호출 실패:', error);
-        setIsLoading(false);
-        showError('Android Google 로그인을 시작할 수 없습니다.');
+        console.log('🔄 [ANDROID FALLBACK] Android 실패로 웹 SDK로 폴백');
+        
+        // iOS 로그 전송 - Android 실패 정보
+        sendLogToiOS('error', '❌ Android Google Sign-In 실패', {
+          timestamp: new Date().toISOString(),
+          error: String(error),
+          fallbackTo: 'web_sdk',
+          androidHandlers: androidHandlersList,
+          hasAndroidBridge: hasAndroidBridge,
+          hasAndroidGoogleSignIn: hasAndroidGoogleSignIn
+        });
+        
+        // Android 실패 시 웹 SDK로 폴백
+        handleGoogleSDKLogin();
         return;
       }
     }
