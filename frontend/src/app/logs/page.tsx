@@ -1699,16 +1699,31 @@ export default function LogsPage() {
     }
   }, [dailyCountsData, groupMembers, calculateMemberLogDistribution]);
 
-  // 그룹 멤버가 로딩된 후 캐시에서 일별 카운트 데이터 확인 - LOGS 페이지에서는 캐시 비활성화
+  // 그룹 멤버가 로딩된 후 일별 카운트 데이터 확인 - LOGS 페이지에서는 캐시 비활성화로 항상 API 호출
   useEffect(() => {
-    if (groupMembers.length > 0 && selectedGroupId && !dailyCountsData && !DISABLE_CACHE) {
-      const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
-      const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
-      
-      if (cachedCounts && isCountsCacheValid) {
-        console.log('[LOGS] 그룹 멤버 로딩 후 캐시에서 일별 카운트 데이터 복원');
-        setDailyCountsData(cachedCounts);
-        dataFetchedRef.current.dailyCounts = true;
+    if (groupMembers.length > 0 && selectedGroupId) {
+      if (DISABLE_CACHE) {
+        // 캐시 비활성화 시 항상 API에서 최신 데이터 로딩
+        if (!dailyCountsData) {
+          console.log('[LOGS] 그룹 멤버 로딩 후 API에서 일별 카운트 데이터 로딩 (캐시 비활성화)');
+          loadDailyLocationCounts(selectedGroupId, 14).then(() => {
+            console.log('[LOGS] 그룹 멤버 로딩 후 일별 카운트 데이터 로딩 완료');
+          }).catch(error => {
+            console.error('[LOGS] 그룹 멤버 로딩 후 일별 카운트 데이터 로딩 실패:', error);
+          });
+        }
+      } else {
+        // 캐시 활성화 시 기존 로직
+        if (!dailyCountsData) {
+          const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
+          const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
+          
+          if (cachedCounts && isCountsCacheValid) {
+            console.log('[LOGS] 그룹 멤버 로딩 후 캐시에서 일별 카운트 데이터 복원');
+            setDailyCountsData(cachedCounts);
+            dataFetchedRef.current.dailyCounts = true;
+          }
+        }
       }
     }
   }, [groupMembers.length, selectedGroupId, dailyCountsData, getCachedDailyLocationCounts, isCacheValid]);
@@ -1716,15 +1731,30 @@ export default function LogsPage() {
   // 사이드바 날짜 선택 부분 초기 스크롤 설정 및 캐시 데이터 확인
   useEffect(() => {
     if (isSidebarOpen) {
-      // 사이드바가 열릴 때 캐시에서 일별 카운트 데이터 확인 - LOGS 페이지에서는 캐시 비활성화
-      if (selectedGroupId && !dailyCountsData && !DISABLE_CACHE) {
-        const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
-        const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
-        
-        if (cachedCounts && isCountsCacheValid) {
-          console.log('[LOGS] 사이드바 열기 시 캐시에서 일별 카운트 데이터 복원');
-          setDailyCountsData(cachedCounts);
-          dataFetchedRef.current.dailyCounts = true;
+      // 사이드바가 열릴 때 일별 카운트 데이터 확인 - LOGS 페이지에서는 캐시 비활성화로 항상 API 호출
+      if (selectedGroupId) {
+        if (DISABLE_CACHE) {
+          // 캐시 비활성화 시 항상 API에서 최신 데이터 로딩
+          if (!dailyCountsData) {
+            console.log('[LOGS] 사이드바 열기 시 API에서 일별 카운트 데이터 로딩 (캐시 비활성화)');
+            loadDailyLocationCounts(selectedGroupId, 14).then(() => {
+              console.log('[LOGS] 사이드바 일별 카운트 데이터 로딩 완료');
+            }).catch(error => {
+              console.error('[LOGS] 사이드바 일별 카운트 데이터 로딩 실패:', error);
+            });
+          }
+        } else {
+          // 캐시 활성화 시 기존 로직
+          if (!dailyCountsData) {
+            const cachedCounts = getCachedDailyLocationCounts(selectedGroupId);
+            const isCountsCacheValid = isCacheValid('dailyLocationCounts', selectedGroupId);
+            
+            if (cachedCounts && isCountsCacheValid) {
+              console.log('[LOGS] 사이드바 열기 시 캐시에서 일별 카운트 데이터 복원');
+              setDailyCountsData(cachedCounts);
+              dataFetchedRef.current.dailyCounts = true;
+            }
+          }
         }
       }
       
@@ -4925,9 +4955,9 @@ export default function LogsPage() {
                 console.log('🚀 [LOGS] iOS 시뮬레이터 최적화 - 사이드바 캘린더 데이터 즉시 로딩');
                 const immediatePromises = [];
                 
-                // 1. 최근 14일간 일별 카운트 조회 (사이드바 캘린더용) - 캐시 미스 시에만 API 호출
-                if (!dailyCountsData || !dataFetchedRef.current.dailyCounts) {
-                  console.log('🚀 [LOGS] 캐시 미스 - API에서 일별 카운트 데이터 조회 (즉시 로딩)');
+                // 1. 최근 14일간 일별 카운트 조회 (사이드바 캘린더용) - LOGS 페이지에서는 캐시 비활성화로 항상 로딩
+                if (DISABLE_CACHE || !dailyCountsData || !dataFetchedRef.current.dailyCounts) {
+                  console.log('🚀 [LOGS] API에서 일별 카운트 데이터 조회 (캐시 비활성화 또는 데이터 없음)');
                   immediatePromises.push(loadDailyLocationCounts(selectedGroupId, 14));
                   dataFetchedRef.current.dailyCounts = true;
                 } else {
