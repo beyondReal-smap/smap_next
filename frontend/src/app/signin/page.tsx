@@ -891,8 +891,8 @@ export default function SignInPage() {
         
         console.log('[GOOGLE SDK] Google Identity Services 초기화');
         
-        // 동적 Client ID 설정 (환경변수에서 직접 가져오기)
-        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+        // 🔥 Client ID 설정 (하드코딩으로 문제 해결)
+        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-lamjiad6ljpa02fk30k6nh6arqq4rc4o.apps.googleusercontent.com';
         
         console.log('[GOOGLE SDK] Client ID 확인:', {
           hasPublicEnv: !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
@@ -900,8 +900,15 @@ export default function SignInPage() {
           usingClientId: clientId.substring(0, 12) + '...',
           clientIdLength: clientId.length,
           currentDomain: window.location.hostname,
-          isProduction: window.location.hostname.includes('.smap.site')
+          isProduction: window.location.hostname.includes('.smap.site'),
+          isHardcoded: !process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
         });
+        
+        // Client ID 유효성 검사
+        if (!clientId || clientId.length < 10) {
+          console.error('[GOOGLE SDK] Client ID가 유효하지 않습니다:', clientId);
+          throw new Error('Google OAuth Client ID가 설정되지 않았습니다.');
+        }
         
         // 프로덕션 환경에서 추가 도메인 검증
         if (window.location.hostname.includes('.smap.site')) {
@@ -2436,13 +2443,43 @@ export default function SignInPage() {
       if (isAndroidWebView) {
         console.log('🤖 [GOOGLE LOGIN] Android 환경에서 Google 로그인 시도');
         
-        // Android 네이티브 Google 로그인 시도
-        if ((window as any).AndroidGoogleSignIn?.signIn) {
+        // 🔥 Android 인터페이스 대기 및 감지 함수
+        const waitForAndroidInterface = async (maxWait = 3000) => {
+          const startTime = Date.now();
+          
+          while (Date.now() - startTime < maxWait) {
+            // 여러 방법으로 Android 인터페이스 확인
+            const interfaces = [
+              (window as any).AndroidGoogleSignIn,
+              (window as any).androidGoogleSignIn,
+              (window as any).androidBridge?.googleSignIn,
+              (window as any).__SMAP_ANDROID_GOOGLE_SIGNIN__
+            ];
+            
+            for (const iface of interfaces) {
+              if (iface && typeof iface.signIn === 'function') {
+                console.log('✅ [ANDROID INTERFACE] Android Google Sign-In 인터페이스 발견:', iface);
+                return iface;
+              }
+            }
+            
+            console.log('⏳ [ANDROID INTERFACE] Android 인터페이스 대기 중...', Date.now() - startTime);
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          
+          console.error('❌ [ANDROID INTERFACE] Android 인터페이스 대기 시간 초과');
+          return null;
+        };
+        
+        // Android 인터페이스 대기
+        const androidInterface = await waitForAndroidInterface();
+        
+        if (androidInterface) {
           console.log('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 인터페이스 발견');
           
           try {
             // Android 네이티브 로그인 호출
-            (window as any).AndroidGoogleSignIn.signIn();
+            androidInterface.signIn();
             console.log('✅ [GOOGLE LOGIN] Android 네이티브 호출 성공, 콜백 대기 중...');
             
             // Android 환경에서 1초 후 웹 SDK 폴백 (시간 단축)
@@ -2463,34 +2500,17 @@ export default function SignInPage() {
             await handleGoogleSDKLogin();
             return;
           }
-        } else if ((window as any).androidBridge?.googleSignIn?.signIn) {
-          console.log('🤖 [GOOGLE LOGIN] Android Bridge를 통한 Google 로그인 시도');
-          
-          try {
-            // Android Bridge를 통한 로그인 호출
-            (window as any).androidBridge.googleSignIn.signIn();
-            console.log('✅ [GOOGLE LOGIN] Android Bridge 호출 성공, 콜백 대기 중...');
-            
-            // Android 환경에서 1초 후 웹 SDK 폴백 (시간 단축)
-            setTimeout(() => {
-              console.log('🔍 [ANDROID FALLBACK] Android Bridge 응답 확인 중...');
-              
-              // 진행 중 플래그가 여전히 설정되어 있으면 웹 SDK로 폴백
-              if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
-                console.log('⚠️ [ANDROID FALLBACK] Android Bridge 응답 없음, 웹 SDK로 폴백');
-                handleGoogleSDKLogin();
-              }
-            }, 1000); // 3초에서 1초로 단축
-            
-            return;
-          } catch (error) {
-            console.error('❌ [GOOGLE LOGIN] Android Bridge 호출 실패:', error);
-            console.log('🔄 [ANDROID FALLBACK] Android Bridge 실패로 웹 SDK로 폴백');
-            await handleGoogleSDKLogin();
-            return;
-          }
         } else {
           console.warn('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 인터페이스가 없습니다. 웹 SDK로 폴백합니다');
+          console.log('🔍 [ANDROID DEBUG] 사용 가능한 객체들:', {
+            AndroidGoogleSignIn: !!(window as any).AndroidGoogleSignIn,
+            androidGoogleSignIn: !!(window as any).androidGoogleSignIn,
+            androidBridge: !!(window as any).androidBridge,
+            androidBridgeGoogleSignIn: !!((window as any).androidBridge && (window as any).androidBridge.googleSignIn),
+            __SMAP_ANDROID_GOOGLE_SIGNIN__: !!(window as any).__SMAP_ANDROID_GOOGLE_SIGNIN__,
+            __ANDROID_GOOGLE_SIGNIN_INJECTED__: !!(window as any).__ANDROID_GOOGLE_SIGNIN_INJECTED__,
+            __ANDROID_GOOGLE_SIGNIN_READY__: !!(window as any).__ANDROID_GOOGLE_SIGNIN_READY__
+          });
           
           // Android에서 네이티브 인터페이스가 없으면 웹 SDK 사용
           await handleGoogleSDKLogin();
