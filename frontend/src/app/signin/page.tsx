@@ -539,6 +539,51 @@ export default function SignInPage() {
     return result;
   }, []);
 
+  // Android WebView 환경 감지
+  const isAndroidWebView = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    
+    const userAgent = navigator.userAgent;
+    const isAndroid = /Android/.test(userAgent);
+    const hasAndroidBridge = !!(window as any).androidBridge;
+    const hasAndroidGoogleSignIn = !!(window as any).AndroidGoogleSignIn;
+    const hasAndroidHandlers = !!(window as any).__SMAP_ANDROID_HANDLERS_READY__;
+    
+    const result = isAndroid && (hasAndroidBridge || hasAndroidGoogleSignIn || hasAndroidHandlers);
+    
+    console.log('[SIGNIN] 🤖 Android 환경 감지:', {
+      userAgent: userAgent.substring(0, 50) + '...',
+      isAndroid,
+      hasAndroidBridge,
+      hasAndroidGoogleSignIn,
+      hasAndroidHandlers,
+      finalResult: result
+    });
+    
+    return result;
+  }, []);
+
+  // 웹 환경 감지
+  const isWebEnvironment = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    
+    const userAgent = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+    const isAndroid = /Android/.test(userAgent);
+    
+    // iOS나 Android가 아니면 웹 환경으로 간주
+    const result = !isIOS && !isAndroid;
+    
+    console.log('[SIGNIN] 🌐 웹 환경 감지:', {
+      userAgent: userAgent.substring(0, 50) + '...',
+      isIOS,
+      isAndroid,
+      finalResult: result
+    });
+    
+    return result;
+  }, []);
+
   // 안전한 이벤트 등록 함수
   const safeAddEventListener = (target: any, event: string, handler: any, options?: any) => {
     try {
@@ -2427,221 +2472,95 @@ export default function SignInPage() {
     return false;
   };
 
-  // Google 로그인 핸들러
-  const handleGoogleLogin = async (retryCount: number = 0) => {
-    // 타임아웃 설정 (3초 후 자동으로 폴백)
-    const timeoutId = setTimeout(() => {
-      console.warn('⏰ [GOOGLE LOGIN] 타임아웃 발생 (3초), 웹 SDK로 폴백');
-      
-      // Android 환경에서 타임아웃 시 웹 SDK로 폴백
-      if (/Android/.test(navigator.userAgent)) {
-        console.log('🔄 [ANDROID TIMEOUT] Android 타임아웃으로 웹 SDK 폴백');
-        handleGoogleSDKLogin();
-      } else {
-        setIsLoading(false);
-      }
-    }, 3000); // 3초로 단축
+  // Google 로그인 핸들러 (플랫폼별 분리된 버전)
+  const handleGoogleLogin = async () => {
+    if (isLoading) return;
     
-    console.log('🚀 [GOOGLE LOGIN] 핸들러 시작됨');
     setIsLoading(true);
+    setError(null);
     
-    // 🔥 Android 환경 체크 및 Android 브리지 사용 (개선된 버전)
-    const isAndroidWebView = /Android/.test(navigator.userAgent);
-    const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
-    const hasAndroidGoogleSignIn = !!(window as any).AndroidGoogleSignIn;
-    const hasAndroidBridge = !!(window as any).androidBridge?.googleSignIn;
-    const hasAndroidHandlers = !!(window as any).__SMAP_ANDROID_HANDLERS_READY__;
-    const androidHandlersList = (window as any).__SMAP_ANDROID_HANDLERS_LIST__ || [];
-    
-    console.log('🔍 [GOOGLE LOGIN] Android 환경 체크 (개선된 버전):', {
-      isAndroidWebView,
-      hasAndroidGoogleSignIn,
-      hasAndroidBridge,
-      hasAndroidHandlers,
-      androidHandlersList,
-      userAgent: navigator.userAgent.substring(0, 50),
-      // 추가 상세 정보
-      androidGoogleSignInType: typeof (window as any).AndroidGoogleSignIn,
-      androidBridgeType: typeof (window as any).androidBridge,
-      webkitType: typeof (window as any).webkit,
-      messageHandlersType: typeof (window as any).webkit?.messageHandlers
-    });
-    
-    // Android 환경에서 Android 브리지 사용 (개선된 버전)
-    if (isAndroidWebView && (hasAndroidGoogleSignIn || hasAndroidBridge || hasAndroidHandlers)) {
-      console.log('🤖 [GOOGLE LOGIN] Android 환경에서 Android 브리지 사용');
-      
-      try {
-        // 🔥 Android 브리지 우선 시도
-        if (hasAndroidBridge) {
-          console.log('📱 [GOOGLE LOGIN] Android Bridge를 통한 Google Sign-In 호출');
-          (window as any).androidBridge.googleSignIn.signIn();
-        } 
-        // 🔥 Android 핸들러 직접 호출
-        else if (hasAndroidGoogleSignIn) {
-          console.log('📱 [GOOGLE LOGIN] Android Google Sign-In 직접 호출');
-          (window as any).AndroidGoogleSignIn.signIn();
-        }
-        // 🔥 WebKit 시뮬레이션을 통한 호출
-        else if ((window as any).webkit?.messageHandlers?.smapIos) {
-          console.log('📱 [GOOGLE LOGIN] Android WebKit 시뮬레이션을 통한 Google Sign-In 호출');
-          (window as any).webkit.messageHandlers.smapIos.postMessage({
-            type: 'googleSignIn',
-            param: '',
-            timestamp: Date.now(),
-            source: 'android-webkit-sim'
-          });
-        }
-        // 🔥 Android 핸들러 목록에서 찾기
-        else if (androidHandlersList.includes('AndroidGoogleSignIn')) {
-          console.log('📱 [GOOGLE LOGIN] Android 핸들러 목록에서 Google Sign-In 호출');
-          if ((window as any).AndroidGoogleSignIn) {
-            (window as any).AndroidGoogleSignIn.signIn();
-          }
-        }
-        
-        console.log('✅ [GOOGLE LOGIN] Android 네이티브 호출 성공, 콜백 대기 중...');
-        
-        // 🔥 Android 환경에서 3초 후 인터페이스 확인 및 웹 SDK 폴백
-        setTimeout(() => {
-          console.log('🔍 [ANDROID FALLBACK] Android Google Sign-In 인터페이스 확인 중...');
-          
-          // Android Google Sign-In 인터페이스가 실제로 존재하는지 확인
-          const hasRealAndroidInterface = !!(window as any).AndroidGoogleSignIn?.signIn || 
-                                        !!(window as any).androidBridge?.googleSignIn?.signIn;
-          
-          if (!hasRealAndroidInterface) {
-            console.log('⚠️ [ANDROID FALLBACK] Android Google Sign-In 인터페이스가 없음, 웹 SDK로 폴백');
-            
-            // 사용자에게 안내 메시지 표시
-            console.log('📱 [ANDROID INFO] Android 앱에서 Google Sign-In 인터페이스가 설정되지 않았습니다.');
-            console.log('📱 [ANDROID INFO] 웹 SDK를 통한 Google 로그인으로 전환합니다.');
-            console.log('📱 [ANDROID INFO] Android 앱 개발자에게 다음 사항을 확인해주세요:');
-            console.log('📱 [ANDROID INFO] 1. Google Sign-In 라이브러리 추가');
-            console.log('📱 [ANDROID INFO] 2. WebView에 JavaScript 인터페이스 등록');
-            console.log('📱 [ANDROID INFO] 3. window.AndroidGoogleSignIn 객체 설정');
-            
-            // iOS 로그 전송 - Android 폴백 정보
-            sendLogToiOS('info', '📱 Android Google Sign-In 폴백', {
-              timestamp: new Date().toISOString(),
-              reason: 'android_interface_not_found',
-              fallbackTo: 'web_sdk',
-              androidHandlers: androidHandlersList,
-              hasAndroidBridge: hasAndroidBridge,
-              hasAndroidGoogleSignIn: hasAndroidGoogleSignIn
-            });
-            
-            // 웹 SDK 로그인으로 폴백
-            handleGoogleSDKLogin();
-          } else {
-            console.log('✅ [ANDROID FALLBACK] Android Google Sign-In 인터페이스 확인됨');
-          }
-        }, 1000); // 1초로 단축
-        
-        return;
-      } catch (error) {
-        console.error('❌ [GOOGLE LOGIN] Android 네이티브 호출 실패:', error);
-        console.log('🔄 [ANDROID FALLBACK] Android 실패로 웹 SDK로 폴백');
-        
-        // iOS 로그 전송 - Android 실패 정보
-        sendLogToiOS('error', '❌ Android Google Sign-In 실패', {
-          timestamp: new Date().toISOString(),
-          error: String(error),
-          fallbackTo: 'web_sdk',
-          androidHandlers: androidHandlersList,
-          hasAndroidBridge: hasAndroidBridge,
-          hasAndroidGoogleSignIn: hasAndroidGoogleSignIn
-        });
-        
-        // Android 실패 시 웹 SDK로 폴백
-        handleGoogleSDKLogin();
-        return;
-      }
-    }
-    
-    // 🔥 Android 핸들러 모니터링 및 재시도 로직
-    if (isAndroidWebView && !hasAndroidHandlers && retryCount < 3) {
-      console.log(`⏳ [ANDROID HANDLER] Android 핸들러 준비 대기 중... (${retryCount + 1}/3) 1초 후 재시도`);
-      clearTimeout(timeoutId);
-      setIsLoading(false);
-      
-      setTimeout(() => {
-        handleGoogleLogin(retryCount + 1);
-      }, 1000);
-      return;
-    }
-    
-    // 기존 iOS 로직은 그대로 유지...
-
-    // 🔥 페이지 로드 완료 후 핸들러 준비 상태 확인 (Android 호환성 개선)
-    if (typeof window !== 'undefined') {
-      const isHandlersReady = (window as any).__SMAP_HANDLERS_READY__ || (window as any).__SMAP_ANDROID_HANDLERS_READY__;
-      const handlersList = (window as any).__SMAP_HANDLERS_LIST__ || (window as any).__SMAP_ANDROID_HANDLERS_LIST__ || [];
-      const isGoogleLoginReady = (window as any).__SMAP_GOOGLE_LOGIN_READY__ || (window as any).__SMAP_ANDROID_GOOGLE_SIGNIN_READY__;
-      
-      if (isHandlersReady && handlersList?.length > 0) {
-        console.log('✅ [HANDLER-FORCE] 페이지 로드 완료 후 핸들러 발견됨:', handlersList);
-        console.log('🔥 [HANDLER-FORCE] 구글 로그인 준비 상태:', isGoogleLoginReady);
-        
-        // 핸들러가 준비되었으므로 강제 네이티브 모드 해제하고 정상 로직 사용
-        console.log('🔄 [HANDLER-FORCE] 핸들러 준비 완료 - 정상 네이티브 로그인 진행');
-      } else if (retryCount === 0) {
-        // 첫 번째 시도에서 핸들러가 준비되지 않았다면 잠시 대기 후 재시도
-        console.log('⏳ [HANDLER-FORCE] 핸들러 준비 대기 중... 1초 후 재시도');
-        clearTimeout(timeoutId);
-        setIsLoading(false);
-        
-        setTimeout(() => {
-          handleGoogleLogin(1); // 재시도 카운트 1로 호출
-        }, 1000);
-        return;
-      } else {
-        console.warn('⚠️ [HANDLER-FORCE] 재시도 후에도 핸들러 준비되지 않음');
-      }
-    }
-    
-    // 환경 체크
-    console.log('🔍 [GOOGLE LOGIN] 환경 체크 시작');
-    
-    // 🔍 강제 핸들러 확인 함수
-    const forceCheckHandlers = () => {
-      console.log('🔍 [FORCE CHECK] 상세 핸들러 확인 시작');
-      
-      // WebKit 객체 확인
-      const webkit = (window as any).webkit;
-      console.log('🔍 [FORCE CHECK] WebKit 객체:', webkit);
-      console.log('🔍 [FORCE CHECK] WebKit 타입:', typeof webkit);
-      
-      // messageHandlers 확인
-      const messageHandlers = webkit?.messageHandlers;
-      console.log('🔍 [FORCE CHECK] messageHandlers:', messageHandlers);
-      console.log('🔍 [FORCE CHECK] messageHandlers 타입:', typeof messageHandlers);
-      
-      if (!messageHandlers) {
-        console.log('❌ [FORCE CHECK] messageHandlers 객체 없음');
-        return;
-      }
-      
-      // 각 핸들러 테스트
-      const handlerNames = ['smapIos', 'iosHandler', 'hapticHandler', 'messageHandler'];
-      
-      handlerNames.forEach(handlerName => {
-        try {
-          const handler = messageHandlers[handlerName];
-          if (handler && typeof handler.postMessage === 'function') {
-            console.log(`✅ [FORCE CHECK] ${handlerName} 핸들러 정상`);
-          } else {
-            console.error(`❌ [FORCE CHECK] ${handlerName} postMessage 함수 없음`);
-          }
-        } catch (error) {
-          console.error(`❌ [FORCE CHECK] ${handlerName} 테스트 실패:`, error);
-        }
+    try {
+      console.log('🚀 [GOOGLE LOGIN] 시작', { 
+        platform: 'web',
+        isIOSWebView,
+        isAndroidWebView,
+        isWebEnvironment
       });
+      triggerHapticFeedback(HapticFeedbackType.LIGHT);
       
-      console.log('🔍 [FORCE CHECK] 상세 핸들러 확인 완료');
-    };
+      // iOS 환경 체크 및 처리
+      if (isIOSWebView) {
+        console.log('🍎 [GOOGLE LOGIN] iOS 환경에서 Google 로그인 시도');
+        
+        if ((window as any).iosBridge?.googleSignIn?.signIn) {
+          console.log('🍎 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 인터페이스 발견');
+          
+          try {
+            const result = await (window as any).iosBridge.googleSignIn.signIn();
+            console.log('🍎 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 성공', { result });
+            
+            if (result && result.idToken) {
+              await handleGoogleCallback(result);
+            } else {
+              throw new Error('iOS 네이티브 로그인 결과가 유효하지 않습니다');
+            }
+          } catch (error) {
+            console.error('🍎 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 실패', { error });
+            throw error;
+          }
+        } else {
+          console.warn('🍎 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 인터페이스가 없습니다. 웹 SDK로 폴백합니다');
+          
+          // iOS에서 네이티브 인터페이스가 없으면 웹 SDK 사용
+          await handleGoogleSDKLogin();
+        }
+        
+        return; // iOS 처리가 완료되면 함수 종료
+      }
+      
+      // Android 환경 체크 및 처리
+      if (isAndroidWebView) {
+        console.log('🤖 [GOOGLE LOGIN] Android 환경에서 Google 로그인 시도');
+        
+        if ((window as any).AndroidGoogleSignIn?.signIn) {
+          console.log('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 인터페이스 발견');
+          
+          try {
+            const result = await (window as any).AndroidGoogleSignIn.signIn();
+            console.log('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 성공', { result });
+            
+            if (result && result.idToken) {
+              await handleGoogleCallback(result);
+            } else {
+              throw new Error('Android 네이티브 로그인 결과가 유효하지 않습니다');
+            }
+          } catch (error) {
+            console.error('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 실패', { error });
+            throw error;
+          }
+        } else {
+          console.warn('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 인터페이스가 없습니다. 웹 SDK로 폴백합니다');
+          
+          // Android에서 네이티브 인터페이스가 없으면 웹 SDK 사용
+          await handleGoogleSDKLogin();
+        }
+        
+        return; // Android 처리가 완료되면 함수 종료
+      }
+      
+      // 웹 환경 또는 기타 환경에서 웹 SDK 사용
+      console.log('🌐 [GOOGLE LOGIN] 웹 환경에서 Google 로그인 시도');
+      await handleGoogleSDKLogin();
+      
+    } catch (error) {
+      console.error('❌ [GOOGLE LOGIN] Google 로그인 실패', { error });
+      setError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
+      triggerHapticFeedback(HapticFeedbackType.ERROR);
+    } finally {
+      setIsLoading(false);
+    }
   };
-  
+
   // 🚨 웹에서 직접 MessageHandler 생성 시도
   const forceCreateMessageHandlers = () => {
     console.log('🚨 [FORCE CREATE] 웹에서 MessageHandler 강제 생성 시도');
