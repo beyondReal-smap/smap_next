@@ -449,6 +449,10 @@ const pageStyles = `
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
   position: fixed !important;
   z-index: 9999 !important;
+  min-height: unset !important;
+  height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
 .full-map-container {
@@ -6734,7 +6738,7 @@ export default function LogsPage() {
             animate="open"
             exit="closed"
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]"
-            nClick={() => {
+            onClick={() => {
               console.log('[사이드바] 오버레이 클릭으로 닫기');
               // 드롭다운이 열려있으면 사이드바를 닫지 않음
               if (isGroupSelectorOpen) {
