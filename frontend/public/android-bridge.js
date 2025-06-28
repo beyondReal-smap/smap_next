@@ -22,9 +22,21 @@
     // Android Google Sign-In 브리지 객체 생성
     window.androidBridge = {
         googleSignIn: {
+            // 중복 호출 방지 플래그
+            _isSigningIn: false,
+            
             // Google 로그인 시작
             signIn: function() {
                 console.log('📱 Android Google Sign-In 시작');
+                
+                // 중복 호출 방지
+                if (this._isSigningIn) {
+                    console.log('📱 Android Google Sign-In 이미 진행 중, 중복 호출 무시');
+                    return false;
+                }
+                
+                this._isSigningIn = true;
+                console.log('📱 Android Google Sign-In 진행 중 플래그 설정');
                 
                 // 🔥 여러 방법으로 Android Google Sign-In 인터페이스 확인
                 const interfaces = [
@@ -46,9 +58,19 @@
                     try {
                         foundInterface.signIn();
                         console.log('✅ Android Google Sign-In 네이티브 호출 성공');
+                        
+                        // 10초 후 플래그 자동 해제 (타임아웃)
+                        setTimeout(() => {
+                            if (this._isSigningIn) {
+                                console.log('📱 Android Google Sign-In 타임아웃, 플래그 해제');
+                                this._isSigningIn = false;
+                            }
+                        }, 10000);
+                        
                         return true;
                     } catch (error) {
                         console.error('❌ Android Google Sign-In 네이티브 호출 실패:', error);
+                        this._isSigningIn = false;
                         return false;
                     }
                 } else {
@@ -58,6 +80,7 @@
                         androidGoogleSignIn: !!window.androidGoogleSignIn,
                         __SMAP_ANDROID_GOOGLE_SIGNIN__: !!window.__SMAP_ANDROID_GOOGLE_SIGNIN__
                     });
+                    this._isSigningIn = false;
                     return false;
                 }
             },
@@ -126,6 +149,12 @@
                     console.warn('⚠️ Android Google Sign-In 인터페이스를 찾을 수 없습니다.');
                     return false;
                 }
+            },
+            
+            // 진행 중 플래그 해제 (콜백에서 호출)
+            _clearSigningInFlag: function() {
+                console.log('📱 Android Google Sign-In 진행 중 플래그 해제');
+                this._isSigningIn = false;
             }
         },
         
@@ -181,6 +210,11 @@
             hasUserInfo: !!userInfoJson,
             idTokenLength: idToken ? idToken.length : 0
         });
+        
+        // 진행 중 플래그 해제
+        if (window.androidBridge?.googleSignIn?._clearSigningInFlag) {
+            window.androidBridge.googleSignIn._clearSigningInFlag();
+        }
         
         try {
             const userInfo = typeof userInfoJson === 'string' ? JSON.parse(userInfoJson) : userInfoJson;
@@ -277,6 +311,11 @@
     
     window.googleSignInError = function(errorMessage) {
         console.error('📱 Android Google Sign-In 실패 콜백 수신:', errorMessage);
+        
+        // 진행 중 플래그 해제
+        if (window.androidBridge?.googleSignIn?._clearSigningInFlag) {
+            window.androidBridge.googleSignIn._clearSigningInFlag();
+        }
         
         if (window.onNativeGoogleLoginError) {
             window.onNativeGoogleLoginError(errorMessage);
