@@ -6,17 +6,67 @@
     
     // Android 환경 감지
     const isAndroid = /Android/.test(navigator.userAgent);
-    const hasAndroidGoogleSignIn = !!(window.AndroidGoogleSignIn);
     
     console.log('🔍 Android 환경 감지:', {
         isAndroid: isAndroid,
-        hasAndroidGoogleSignIn: hasAndroidGoogleSignIn,
         userAgent: navigator.userAgent.substring(0, 100)
     });
     
     if (!isAndroid) {
         console.log('📱 Android 환경이 아니므로 Android Bridge를 비활성화합니다.');
         return;
+    }
+    
+    // 🔥 Android Google Sign-In 인터페이스 찾기 함수
+    function findAndroidGoogleSignInInterface() {
+        const interfaces = [
+            window.AndroidGoogleSignIn,
+            window.androidGoogleSignIn,
+            window.__SMAP_ANDROID_GOOGLE_SIGNIN__,
+            window.androidBridge?.googleSignIn
+        ];
+        
+        for (const iface of interfaces) {
+            if (iface && typeof iface.signIn === 'function') {
+                console.log('✅ Android Google Sign-In 인터페이스 발견:', iface);
+                return iface;
+            }
+        }
+        
+        console.warn('⚠️ Android Google Sign-In 인터페이스를 찾을 수 없습니다.');
+        console.log('🔍 사용 가능한 인터페이스들:', {
+            AndroidGoogleSignIn: !!window.AndroidGoogleSignIn,
+            androidGoogleSignIn: !!window.androidGoogleSignIn,
+            __SMAP_ANDROID_GOOGLE_SIGNIN__: !!window.__SMAP_ANDROID_GOOGLE_SIGNIN__,
+            androidBridge: !!window.androidBridge,
+            androidBridgeGoogleSignIn: !!(window.androidBridge && window.androidBridge.googleSignIn)
+        });
+        
+        return null;
+    }
+    
+    // 🔥 Android Google Sign-In 인터페이스 대기 함수
+    function waitForAndroidGoogleSignInInterface(maxWait = 3000) {
+        return new Promise((resolve) => {
+            const startTime = Date.now();
+            
+            function checkInterface() {
+                const iface = findAndroidGoogleSignInInterface();
+                if (iface) {
+                    resolve(iface);
+                    return;
+                }
+                
+                if (Date.now() - startTime < maxWait) {
+                    setTimeout(checkInterface, 100);
+                } else {
+                    console.error('❌ Android Google Sign-In 인터페이스 대기 시간 초과');
+                    resolve(null);
+                }
+            }
+            
+            checkInterface();
+        });
     }
     
     // Android Google Sign-In 브리지 객체 생성
@@ -26,7 +76,7 @@
             _isSigningIn: false,
             
             // Google 로그인 시작
-            signIn: function() {
+            signIn: async function() {
                 console.log('📱 Android Google Sign-In 시작');
                 
                 // 중복 호출 방지
@@ -38,20 +88,12 @@
                 this._isSigningIn = true;
                 console.log('📱 Android Google Sign-In 진행 중 플래그 설정');
                 
-                // 🔥 여러 방법으로 Android Google Sign-In 인터페이스 확인
-                const interfaces = [
-                    window.AndroidGoogleSignIn,
-                    window.androidGoogleSignIn,
-                    window.__SMAP_ANDROID_GOOGLE_SIGNIN__
-                ];
+                // 🔥 인터페이스 찾기 (대기 포함)
+                let foundInterface = findAndroidGoogleSignInInterface();
                 
-                let foundInterface = null;
-                for (const iface of interfaces) {
-                    if (iface && typeof iface.signIn === 'function') {
-                        foundInterface = iface;
-                        console.log('✅ Android Google Sign-In 인터페이스 발견:', iface);
-                        break;
-                    }
+                if (!foundInterface) {
+                    console.log('⏳ Android Google Sign-In 인터페이스 대기 중...');
+                    foundInterface = await waitForAndroidGoogleSignInInterface();
                 }
                 
                 if (foundInterface) {
@@ -74,12 +116,7 @@
                         return false;
                     }
                 } else {
-                    console.warn('⚠️ Android Google Sign-In 인터페이스를 찾을 수 없습니다.');
-                    console.log('🔍 사용 가능한 인터페이스들:', {
-                        AndroidGoogleSignIn: !!window.AndroidGoogleSignIn,
-                        androidGoogleSignIn: !!window.androidGoogleSignIn,
-                        __SMAP_ANDROID_GOOGLE_SIGNIN__: !!window.__SMAP_ANDROID_GOOGLE_SIGNIN__
-                    });
+                    console.error('❌ Android Google Sign-In 인터페이스를 찾을 수 없습니다.');
                     this._isSigningIn = false;
                     return false;
                 }
@@ -89,19 +126,7 @@
             signOut: function() {
                 console.log('📱 Android Google Sign-Out 시작');
                 
-                const interfaces = [
-                    window.AndroidGoogleSignIn,
-                    window.androidGoogleSignIn,
-                    window.__SMAP_ANDROID_GOOGLE_SIGNIN__
-                ];
-                
-                let foundInterface = null;
-                for (const iface of interfaces) {
-                    if (iface && typeof iface.signOut === 'function') {
-                        foundInterface = iface;
-                        break;
-                    }
-                }
+                const foundInterface = findAndroidGoogleSignInInterface();
                 
                 if (foundInterface) {
                     try {
@@ -122,19 +147,7 @@
             checkStatus: function() {
                 console.log('📱 Android Google Sign-In 상태 확인');
                 
-                const interfaces = [
-                    window.AndroidGoogleSignIn,
-                    window.androidGoogleSignIn,
-                    window.__SMAP_ANDROID_GOOGLE_SIGNIN__
-                ];
-                
-                let foundInterface = null;
-                for (const iface of interfaces) {
-                    if (iface && typeof iface.checkStatus === 'function') {
-                        foundInterface = iface;
-                        break;
-                    }
-                }
+                const foundInterface = findAndroidGoogleSignInInterface();
                 
                 if (foundInterface) {
                     try {
@@ -193,15 +206,41 @@
         }
     };
     
+    // 🔥 인터페이스 준비 상태 확인
+    const hasAndroidGoogleSignIn = !!findAndroidGoogleSignInInterface();
+    
     // 전역 플래그 설정
     window.__SMAP_ANDROID_BRIDGE_READY__ = true;
     window.__SMAP_ANDROID_GOOGLE_SIGNIN_READY__ = hasAndroidGoogleSignIn;
     
     console.log('✅ Android Bridge 초기화 완료:', {
-        hasGoogleSignIn: hasAndroidGoogleSignIn,
-        bridgeReady: window.__SMAP_ANDROID_BRIDGE_READY__,
-        googleSignInReady: window.__SMAP_ANDROID_GOOGLE_SIGNIN_READY__
+        hasAndroidGoogleSignIn: hasAndroidGoogleSignIn,
+        androidBridge: !!window.androidBridge,
+        __SMAP_ANDROID_BRIDGE_READY__: window.__SMAP_ANDROID_BRIDGE_READY__,
+        __SMAP_ANDROID_GOOGLE_SIGNIN_READY__: window.__SMAP_ANDROID_GOOGLE_SIGNIN_READY__
     });
+    
+    // 🔥 인터페이스가 나중에 로드될 경우를 대비한 모니터링
+    if (!hasAndroidGoogleSignIn) {
+        console.log('⏳ Android Google Sign-In 인터페이스 모니터링 시작...');
+        
+        let checkCount = 0;
+        const maxChecks = 30; // 3초 (100ms * 30)
+        
+        const checkInterval = setInterval(() => {
+            checkCount++;
+            const iface = findAndroidGoogleSignInInterface();
+            
+            if (iface) {
+                console.log('✅ Android Google Sign-In 인터페이스 발견! (모니터링)', checkCount);
+                window.__SMAP_ANDROID_GOOGLE_SIGNIN_READY__ = true;
+                clearInterval(checkInterval);
+            } else if (checkCount >= maxChecks) {
+                console.error('❌ Android Google Sign-In 인터페이스 모니터링 시간 초과');
+                clearInterval(checkInterval);
+            }
+        }, 100);
+    }
     
     // Android Google Sign-In 콜백 함수들을 전역으로 등록
     window.googleSignInSuccess = function(idToken, userInfoJson) {
