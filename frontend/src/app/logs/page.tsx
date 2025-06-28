@@ -6476,11 +6476,11 @@ export default function LogsPage() {
             position: 'fixed'
           }}
         >
-          <AnimatedHeader 
-              variant="simple"
-              className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
-              style={{ paddingTop: 'env(safe-area-inset-top)' }}
-            >
+          <AnimatedHeader
+            variant="simple"
+            className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+            style={{ paddingTop: 'max(env(safe-area-inset-top), 20px)' }}
+          >
             {/* 헤더 내용 */}
             {showHeader && (
               <motion.div 
