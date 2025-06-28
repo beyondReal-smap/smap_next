@@ -1940,12 +1940,6 @@ export default function SignInPage() {
       delete (window as any).__SIGNIN_RESTORE_HISTORY__;
     }
     
-    // location 메서드 복원
-    if ((window as any).__SIGNIN_RESTORE_LOCATION__) {
-      (window as any).__SIGNIN_RESTORE_LOCATION__();
-      delete (window as any).__SIGNIN_RESTORE_LOCATION__;
-    }
-    
     // fetch 복원
     if ((window as any).__SIGNIN_RESTORE_FETCH__) {
       (window as any).__SIGNIN_RESTORE_FETCH__();
@@ -2097,7 +2091,7 @@ export default function SignInPage() {
         preventRemountRef: preventRemountRef.current
       });
       
-      // 🚫 브라우저 네비게이션 차단 (최강 버전)
+      // 🚫 브라우저 네비게이션 차단 (안전한 버전)
       console.log('[SIGNIN] 브라우저 네비게이션 차단 설정 중...');
       
       // beforeunload 이벤트 (새로고침, 창 닫기 차단) - 안전한 버전
@@ -2117,285 +2111,146 @@ export default function SignInPage() {
         }
       };
       
-      // popstate 이벤트 (뒤로가기 차단)
-      navigationListenersRef.current.popstate = (e: PopStateEvent) => {
-        console.log('[SIGNIN] 🚫 popstate 이벤트 차단!');
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        // 즉시 현재 상태로 되돌리기
-        setTimeout(() => {
-          window.history.pushState(null, '', window.location.href);
-        }, 0);
-        return false;
-      };
+      safeAddEventListener(window, 'beforeunload', navigationListenersRef.current.beforeunload, { capture: true, passive: false });
       
-      // unload 이벤트도 추가 (더 강력한 차단)
+      // unload 이벤트 차단
       navigationListenersRef.current.unload = (e: Event) => {
         console.log('[SIGNIN] 🚫 unload 이벤트 차단!');
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        return false;
+        try {
+          if (e.preventDefault) e.preventDefault();
+          if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        } catch (error) {
+          console.warn('[SIGNIN] unload 처리 중 오류:', error);
+        }
       };
       
-      // pagehide 이벤트 추가 (페이지 숨김 차단)
+      safeAddEventListener(window, 'unload', navigationListenersRef.current.unload, { capture: true, passive: false });
+      
+      // pagehide 이벤트 차단
       navigationListenersRef.current.pagehide = (e: PageTransitionEvent) => {
         console.log('[SIGNIN] 🚫 pagehide 이벤트 차단!');
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        return false;
-      };
-      
-      // visibilitychange 이벤트 추가 (탭 전환 감지)
-      navigationListenersRef.current.visibilitychange = (e: Event) => {
-        if (document.visibilityState === 'hidden') {
-          console.log('[SIGNIN] 🚫 visibilitychange 이벤트 감지 - 페이지 숨김 시도 차단!');
-          e.preventDefault();
-          e.stopImmediatePropagation();
-        }
-      };
-      
-      // 모든 이벤트 리스너를 안전하게 추가
-      const eventOptions = { capture: true, passive: false };
-      safeAddEventListener(window, 'beforeunload', navigationListenersRef.current.beforeunload, eventOptions);
-      safeAddEventListener(window, 'popstate', navigationListenersRef.current.popstate, eventOptions);
-      safeAddEventListener(window, 'unload', navigationListenersRef.current.unload, eventOptions);
-      safeAddEventListener(window, 'pagehide', navigationListenersRef.current.pagehide, eventOptions);
-      safeAddEventListener(document, 'visibilitychange', navigationListenersRef.current.visibilitychange, eventOptions);
-      
-      // 키보드 단축키 차단 (F5, Ctrl+R, Ctrl+F5 등)
-      navigationListenersRef.current.keydown = (e: KeyboardEvent) => {
-        // F5 (새로고침)
-        if (e.key === 'F5') {
-          console.log('[SIGNIN] 🚫 F5 키 차단!');
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          return false;
-        }
-        // Ctrl+R (새로고침)
-        if (e.ctrlKey && e.key === 'r') {
-          console.log('[SIGNIN] 🚫 Ctrl+R 키 차단!');
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          return false;
-        }
-        // Ctrl+F5 (강제 새로고침)
-        if (e.ctrlKey && e.key === 'F5') {
-          console.log('[SIGNIN] 🚫 Ctrl+F5 키 차단!');
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          return false;
-        }
-        // Ctrl+Shift+R (강제 새로고침)
-        if (e.ctrlKey && e.shiftKey && e.key === 'R') {
-          console.log('[SIGNIN] 🚫 Ctrl+Shift+R 키 차단!');
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          return false;
-        }
-      };
-      
-      safeAddEventListener(window, 'keydown', navigationListenersRef.current.keydown, eventOptions);
-      
-      // 현재 히스토리 상태 고정 (더 많이 실행)
-      for (let i = 0; i < 10; i++) {
-        window.history.pushState(null, '', window.location.href);
-      }
-      
-      // 주기적으로 히스토리 상태 재고정 (1초마다)
-      const historyInterval = setInterval(() => {
-        if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-          window.history.pushState(null, '', window.location.href);
-        } else {
-          clearInterval(historyInterval);
-        }
-      }, 1000);
-      
-      // Next.js Router 차단 (강제)
-      if (typeof window !== 'undefined') {
-        // Next.js의 router.push, router.replace 등을 임시로 무력화
-        const originalPush = window.history.pushState;
-        const originalReplace = window.history.replaceState;
-        
-        window.history.pushState = function(...args) {
-          if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-            console.log('[SIGNIN] 🚫 history.pushState 차단!');
-            return;
-          }
-          return originalPush.apply(this, args);
-        };
-        
-        window.history.replaceState = function(...args) {
-          if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-            console.log('[SIGNIN] 🚫 history.replaceState 차단!');
-            return;
-          }
-          return originalReplace.apply(this, args);
-        };
-        
-        // window.location 변경도 차단 (더 강력한 방법)
         try {
-          // 기존 메서드들을 백업 (이미 재정의되어 있을 수 있음)
-          const originalLocationAssign = window.location.assign.bind(window.location);
-          const originalLocationReplace = window.location.replace.bind(window.location);
-          const originalLocationReload = window.location.reload.bind(window.location);
-          
-          // 강제로 재정의 (configurable: true로 설정)
-          try {
-            Object.defineProperty(window.location, 'assign', {
-              value: function(url: string | URL) {
-                if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-                  console.log('[SIGNIN] 🚫 location.assign 차단!');
-                  return;
-                }
-                return originalLocationAssign(url);
-              },
-              writable: true,
-              configurable: true
-            });
-          } catch (e) {
-            // 이미 정의되어 있다면 직접 덮어쓰기 시도
-            try {
-              (window.location as any).assign = function(url: string | URL) {
-                if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-                  console.log('[SIGNIN] 🚫 location.assign 차단!');
-                  return;
-                }
-                return originalLocationAssign(url);
-              };
-            } catch (e2) {
-              console.warn('[SIGNIN] location.assign 차단 실패:', e2);
-            }
-          }
-          
-          try {
-            Object.defineProperty(window.location, 'replace', {
-              value: function(url: string | URL) {
-                if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-                  console.log('[SIGNIN] 🚫 location.replace 차단!');
-                  return;
-                }
-                return originalLocationReplace(url);
-              },
-              writable: true,
-              configurable: true
-            });
-          } catch (e) {
-            try {
-              (window.location as any).replace = function(url: string | URL) {
-                if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-                  console.log('[SIGNIN] 🚫 location.replace 차단!');
-                  return;
-                }
-                return originalLocationReplace(url);
-              };
-            } catch (e2) {
-              console.warn('[SIGNIN] location.replace 차단 실패:', e2);
-            }
-          }
-          
-          try {
-            Object.defineProperty(window.location, 'reload', {
-              value: function() {
-                if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-                  console.log('[SIGNIN] 🚫 location.reload 차단!');
-                  return;
-                }
-                return originalLocationReload();
-              },
-              writable: true,
-              configurable: true
-            });
-          } catch (e) {
-            try {
-              (window.location as any).reload = function() {
-                if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-                  console.log('[SIGNIN] 🚫 location.reload 차단!');
-                  return;
-                }
-                return originalLocationReload();
-              };
-            } catch (e2) {
-              console.warn('[SIGNIN] location.reload 차단 실패:', e2);
-            }
-          }
-          
-          // window.location.href 직접 할당도 차단
-          let originalHref = window.location.href;
-          try {
-            Object.defineProperty(window.location, 'href', {
-              get: function() {
-                return originalHref;
-              },
-              set: function(url: string) {
-                if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-                  console.log('[SIGNIN] 🚫 location.href 변경 차단!');
-                  return;
-                }
-                originalHref = url;
-                window.location.assign(url);
-              },
-              configurable: true
-            });
-          } catch (e) {
-            console.warn('[SIGNIN] location.href 차단 실패:', e);
-          }
-          
-          // 복원 함수
-          (window as any).__SIGNIN_RESTORE_LOCATION__ = () => {
-            try {
-              Object.defineProperty(window.location, 'assign', {
-                value: originalLocationAssign,
-                writable: true,
-                configurable: true
-              });
-              Object.defineProperty(window.location, 'replace', {
-                value: originalLocationReplace,
-                writable: true,
-                configurable: true
-              });
-              Object.defineProperty(window.location, 'reload', {
-                value: originalLocationReload,
-                writable: true,
-                configurable: true
-              });
-            } catch (e) {
-              console.warn('[SIGNIN] location 메서드 복원 실패:', e);
-            }
-          };
-        } catch (e) {
-          console.warn('[SIGNIN] location 메서드 차단 실패 (무시):', e);
+          if (e.preventDefault) e.preventDefault();
+          if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        } catch (error) {
+          console.warn('[SIGNIN] pagehide 처리 중 오류:', error);
         }
-        
-        // 복원 함수 저장
-        (window as any).__SIGNIN_RESTORE_HISTORY__ = () => {
-          window.history.pushState = originalPush;
-          window.history.replaceState = originalReplace;
-          // location 메서드는 별도 복원 함수에서 처리
-          if ((window as any).__SIGNIN_RESTORE_LOCATION__) {
-            (window as any).__SIGNIN_RESTORE_LOCATION__();
+      };
+      
+      safeAddEventListener(window, 'pagehide', navigationListenersRef.current.pagehide, { capture: true, passive: false });
+      
+      // visibilitychange 이벤트 차단
+      navigationListenersRef.current.visibilitychange = (e: Event) => {
+        console.log('[SIGNIN] 🚫 visibilitychange 이벤트 차단!');
+        try {
+          if (e.preventDefault) e.preventDefault();
+          if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        } catch (error) {
+          console.warn('[SIGNIN] visibilitychange 처리 중 오류:', error);
+        }
+      };
+      
+      safeAddEventListener(document, 'visibilitychange', navigationListenersRef.current.visibilitychange, { capture: true, passive: false });
+      
+      // popstate 이벤트 차단 (뒤로가기, 앞으로가기 차단)
+      navigationListenersRef.current.popstate = (e: PopStateEvent) => {
+        console.log('[SIGNIN] 🚫 popstate 이벤트 차단!');
+        try {
+          if (e.preventDefault) e.preventDefault();
+          if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+          // 현재 URL로 다시 pushState
+          window.history.pushState(null, '', window.location.href);
+        } catch (error) {
+          console.warn('[SIGNIN] popstate 처리 중 오류:', error);
+        }
+      };
+      
+      safeAddEventListener(window, 'popstate', navigationListenersRef.current.popstate, { capture: true, passive: false });
+      
+      // 키보드 이벤트 차단 (F5, Ctrl+R 등)
+      navigationListenersRef.current.keydown = (e: KeyboardEvent) => {
+        if (e.key === 'F5' || (e.ctrlKey && e.key === 'r') || (e.ctrlKey && e.key === 'F5') || (e.ctrlKey && e.shiftKey && e.key === 'R')) {
+          console.log('[SIGNIN] 🚫 키보드 이벤트 차단:', e.key);
+          try {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+          } catch (error) {
+            console.warn('[SIGNIN] 키보드 이벤트 처리 중 오류:', error);
           }
-        };
-      }
+          return false;
+        }
+      };
       
-      console.log('[SIGNIN] 브라우저 네비게이션 차단 완료 (최강 버전)');
+      safeAddEventListener(window, 'keydown', navigationListenersRef.current.keydown, { capture: true, passive: false });
       
-      // React 컴포넌트 재마운트 방지 - DOM을 직접 조작하여 강제로 고정
-      const preventReactRemount = () => {
-        // 현재 페이지의 모든 스크립트 태그를 찾아서 새로고침 방지
-        const scripts = document.querySelectorAll('script[src*="/_next/"]');
-        scripts.forEach(script => {
-          script.addEventListener('error', (e) => {
-            if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-              console.log('[SIGNIN] 🚫 스크립트 로드 오류 차단!');
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          });
+      // 🚫 히스토리 API 차단 (안전한 방법)
+      const originalPush = window.history.pushState;
+      const originalReplace = window.history.replaceState;
+      
+      window.history.pushState = function(...args) {
+        if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+          console.log('[SIGNIN] 🚫 history.pushState 차단!');
+          return;
+        }
+        return originalPush.apply(this, args);
+      };
+      
+      window.history.replaceState = function(...args) {
+        if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+          console.log('[SIGNIN] 🚫 history.replaceState 차단!');
+          return;
+        }
+        return originalReplace.apply(this, args);
+      };
+      
+      // 복원 함수 저장
+      (window as any).__SIGNIN_RESTORE_HISTORY__ = () => {
+        window.history.pushState = originalPush;
+        window.history.replaceState = originalReplace;
+      };
+      
+      // 🚫 fetch 요청 차단 (페이지 데이터 로드 방지)
+      const originalFetch = window.fetch;
+      window.fetch = function(...args) {
+        if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+          const url = args[0]?.toString() || '';
+          if (url.includes('/_next/') || url.includes('/api/')) {
+            console.log('[SIGNIN] 🚫 fetch 요청 차단:', url);
+            return Promise.reject(new Error('페이지 고정 모드에서 요청 차단'));
+          }
+        }
+        return originalFetch.apply(this, args);
+      };
+      
+      // 복원 함수
+      (window as any).__SIGNIN_RESTORE_FETCH__ = () => {
+        window.fetch = originalFetch;
+      };
+      
+    } catch (e) {
+      console.warn('[SIGNIN] 브라우저 네비게이션 차단 설정 중 오류 (무시):', e);
+    }
+    
+    console.log('[SIGNIN] 브라우저 네비게이션 차단 완료 (안전한 버전)');
+    
+    // React 컴포넌트 재마운트 방지 - DOM을 직접 조작하여 강제로 고정
+    const preventReactRemount = () => {
+      // 현재 페이지의 모든 스크립트 태그를 찾아서 새로고침 방지
+      const scripts = document.querySelectorAll('script[src*="/_next/"]');
+      scripts.forEach(script => {
+        script.addEventListener('error', (e) => {
+          if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+            console.log('[SIGNIN] 🚫 스크립트 로드 오류 차단!');
+            e.preventDefault();
+            e.stopPropagation();
+          }
         });
-        
-        // Next.js의 페이지 전환을 완전히 차단
-        if ((window as any).__NEXT_DATA__) {
-          let originalNextData = (window as any).__NEXT_DATA__;
+      });
+      
+      // Next.js의 페이지 전환을 완전히 차단
+      if ((window as any).__NEXT_DATA__) {
+        let originalNextData = (window as any).__NEXT_DATA__;
+        try {
           Object.defineProperty(window, '__NEXT_DATA__', {
             get: function() {
               if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
@@ -2413,45 +2268,26 @@ export default function SignInPage() {
             },
             configurable: true
           });
+        } catch (e) {
+          console.warn('[SIGNIN] __NEXT_DATA__ 차단 실패 (무시):', e);
         }
-        
-        // 모든 fetch 요청도 차단 (페이지 데이터 로드 방지)
-        const originalFetch = window.fetch;
-        window.fetch = function(...args) {
-          if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-            const url = args[0]?.toString() || '';
-            if (url.includes('/_next/') || url.includes('/api/')) {
-              console.log('[SIGNIN] 🚫 fetch 요청 차단:', url);
-              return Promise.reject(new Error('페이지 고정 모드에서 요청 차단'));
-            }
-          }
-          return originalFetch.apply(this, args);
-        };
-        
-        // 복원 함수
-        (window as any).__SIGNIN_RESTORE_FETCH__ = () => {
-          window.fetch = originalFetch;
-        };
-      };
-      
-      preventReactRemount();
-      
-      // 🚨 즉시 DOM 직접 에러 모달 생성 (React와 무관)
-      // DOM 직접 모달 생성 비활성화 - React AlertModal만 사용
-      console.log('[SIGNIN] ⚡ DOM 직접 모달 생성 스킵 - React AlertModal만 사용');
-      
-      // React 상태도 즉시 설정
-      console.log('[SIGNIN] ⚡ 즉시 React 상태 설정...');
-      setIsLoading(false);
-      setErrorModalMessage(message);
-      setShowErrorModal(true);
-      
-      // React 모달만 사용하므로 DOM 직접 모달 관련 코드 제거
-      
-      console.log('[SIGNIN] ✅ showError 함수 완료');
-    } catch (error) {
-      console.error('[SIGNIN] ❌ showError 함수 내부 오류:', error);
-    }
+      }
+    };
+    
+    preventReactRemount();
+    
+    // 🚨 즉시 DOM 직접 에러 모달 생성 (React와 무관)
+    // DOM 직접 모달 생성 비활성화 - React AlertModal만 사용
+    console.log('[SIGNIN] ⚡ DOM 직접 모달 생성 스킵 - React AlertModal만 사용');
+    
+    // React 상태도 즉시 설정
+    console.log('[SIGNIN] ⚡ 즉시 React 상태 설정...');
+    setIsLoading(false);
+    setErrorModalMessage(message);
+    setShowErrorModal(true);
+    
+    // React 모달만 사용하므로 DOM 직접 모달 관련 코드 제거
+    console.log('[SIGNIN] ✅ showError 함수 완료');
   };
 
   // iOS bridge 로드 대기 함수
