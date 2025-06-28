@@ -2444,7 +2444,7 @@ export default function SignInPage() {
         console.log('🤖 [GOOGLE LOGIN] Android 환경에서 Google 로그인 시도');
         
         // 🔥 Android 인터페이스 대기 및 감지 함수
-        const waitForAndroidInterface = async (maxWait = 3000) => {
+        const waitForAndroidInterface = async (maxWait = 5000) => { // 5초로 증가
           const startTime = Date.now();
           
           while (Date.now() - startTime < maxWait) {
@@ -2461,6 +2461,21 @@ export default function SignInPage() {
                 console.log('✅ [ANDROID INTERFACE] Android Google Sign-In 인터페이스 발견:', iface);
                 return iface;
               }
+            }
+            
+            // 상세 디버깅 (1초마다)
+            if ((Date.now() - startTime) % 1000 < 100) {
+              console.log('🔍 [ANDROID INTERFACE] 상세 디버깅:', {
+                AndroidGoogleSignIn: !!(window as any).AndroidGoogleSignIn,
+                androidGoogleSignIn: !!(window as any).androidGoogleSignIn,
+                androidBridge: !!(window as any).androidBridge,
+                androidBridgeGoogleSignIn: !!((window as any).androidBridge && (window as any).androidBridge.googleSignIn),
+                __SMAP_ANDROID_GOOGLE_SIGNIN__: !!(window as any).__SMAP_ANDROID_GOOGLE_SIGNIN__,
+                __ANDROID_GOOGLE_SIGNIN_INJECTED__: !!(window as any).__ANDROID_GOOGLE_SIGNIN_INJECTED__,
+                __ANDROID_GOOGLE_SIGNIN_READY__: !!(window as any).__ANDROID_GOOGLE_SIGNIN_READY__,
+                __SMAP_ANDROID_HANDLERS_READY__: !!(window as any).__SMAP_ANDROID_HANDLERS_READY__,
+                __ANDROID_HANDLER_MONITOR_INJECTED__: !!(window as any).__ANDROID_HANDLER_MONITOR_INJECTED__
+              });
             }
             
             console.log('⏳ [ANDROID INTERFACE] Android 인터페이스 대기 중...', Date.now() - startTime);
