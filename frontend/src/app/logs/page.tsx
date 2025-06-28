@@ -6400,7 +6400,7 @@ export default function LogsPage() {
               variant="simple"
               className="fixed top-0 left-0 right-0 z-[9999] glass-effect header-fixed"
               style={{ 
-                paddingTop: 'max(env(safe-area-inset-top), 20px)',
+                paddingTop: 'env(safe-area-inset-top)',
                 position: 'fixed',
                 zIndex: 9999
               }}
