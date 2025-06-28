@@ -1,20 +1,27 @@
 // frontend/src/app/signin/page.tsx
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FiPhone, FiLock, FiMail, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
-import { FcGoogle } from 'react-icons/fc';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image'; // Image 컴포넌트 임포트
+import { motion, AnimatePresence } from 'framer-motion';
+// import { signIn, getSession } from 'next-auth/react'; // 임시 비활성화
 import authService from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
-import AlertModal from '@/components/ui/AlertModal';
-import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
-import LoadingSpinner from '../components/common/LoadingSpinner';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
+import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
+import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
+
+// 아이콘 임포트 (react-icons 사용 예시)
+import { FcGoogle } from 'react-icons/fc';
 import { RiKakaoTalkFill } from 'react-icons/ri';
+import { FiX, FiAlertTriangle, FiPhone, FiLock, FiEye, FiEyeOff, FiMail, FiUser } from 'react-icons/fi';
+import { AlertModal } from '@/components/ui';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import iosLogger, { LogCategory } from '@/utils/iosLogger';
+import '@/utils/fetchLogger'; // Fetch API 자동 로깅 활성화
 
 // 카카오 SDK 타입 정의
 declare global {
@@ -22,53 +29,6 @@ declare global {
     Kakao: any;
   }
 }
-
-// 햅틱 피드백 타입 정의
-enum HapticFeedbackType {
-  LIGHT = 'light',
-  MEDIUM = 'medium',
-  HEAVY = 'heavy',
-  SUCCESS = 'success',
-  WARNING = 'warning',
-  ERROR = 'error'
-}
-
-// 햅틱 피드백 함수
-const triggerHapticFeedback = (type: HapticFeedbackType) => {
-  if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
-    const patterns = {
-      [HapticFeedbackType.LIGHT]: [10],
-      [HapticFeedbackType.MEDIUM]: [20],
-      [HapticFeedbackType.HEAVY]: [30],
-      [HapticFeedbackType.SUCCESS]: [50, 100, 50],
-      [HapticFeedbackType.WARNING]: [100, 50, 100],
-      [HapticFeedbackType.ERROR]: [200, 100, 200]
-    };
-    window.navigator.vibrate(patterns[type]);
-  }
-};
-
-// iOS 로거 함수
-const iosLogger = {
-  info: (message: string, data?: any) => {
-    console.log(`[iOS LOG] ${message}`, data);
-  },
-  error: (message: string, error?: any) => {
-    console.error(`[iOS LOG] ${message}`, error);
-  },
-  warn: (message: string, data?: any) => {
-    console.warn(`[iOS LOG] ${message}`, data);
-  },
-  logGoogleLogin: (message: string, data?: any) => {
-    console.log(`[iOS LOG] [GOOGLE LOGIN] ${message}`, data);
-  }
-};
-
-// 카카오 로그인 함수
-const handleKakaoLogin = async () => {
-  console.log('카카오 로그인 시도');
-  // 카카오 로그인 로직 구현
-};
 
 export default function SignInPage() {
   // 🚨 페이지 로드 디버깅
@@ -244,7 +204,11 @@ export default function SignInPage() {
           });
           
           // 구글 로그인 성공 햅틱 피드백
-          triggerHapticFeedback(HapticFeedbackType.SUCCESS);
+          triggerHapticFeedback(HapticFeedbackType.SUCCESS, '구글 로그인 성공', { 
+            component: 'signin', 
+            action: 'native-google-login', 
+            userEmail: data.user?.mt_email?.substring(0, 3) + '***' 
+          });
           
           // 리다이렉트 플래그 설정
           isRedirectingRef.current = true;
@@ -647,7 +611,10 @@ export default function SignInPage() {
       }
       
       // triggerHapticFeedback도 테스트
-      triggerHapticFeedback(HapticFeedbackType.SUCCESS);
+      triggerHapticFeedback(HapticFeedbackType.SUCCESS, '핸들러 발견 테스트', { 
+        component: 'signin', 
+        action: 'handler-detected-test' 
+      });
       
     } catch (error) {
       console.error('🧪 [HAPTIC TEST] 햅틱 테스트 실패:', error);
@@ -683,7 +650,10 @@ export default function SignInPage() {
       
       // 3. triggerHapticFeedback 유틸 시도
       console.log('🧪 [HAPTIC TEST] triggerHapticFeedback 유틸 시도');
-      triggerHapticFeedback(HapticFeedbackType.SUCCESS);
+      triggerHapticFeedback(HapticFeedbackType.SUCCESS, '수동 햅틱 테스트', { 
+        component: 'signin', 
+        action: 'manual-test' 
+      });
       
     } catch (error) {
       console.error('🧪 [HAPTIC TEST] 햅틱 테스트 실패:', error);
@@ -890,7 +860,7 @@ export default function SignInPage() {
                 }
                 
                 // 성공 햅틱 피드백
-                triggerHapticFeedback(HapticFeedbackType.SUCCESS);
+                triggerHapticFeedback(HapticFeedbackType.SUCCESS, 'Google SDK 로그인 성공', { component: 'signin', action: 'google-sdk-login', userEmail: data.user?.mt_email });
                 console.log('🎮 [SIGNIN] Google 로그인 성공 햅틱 피드백 실행');
                 
                 // 추가 지연 후 홈으로 이동
@@ -1495,7 +1465,11 @@ export default function SignInPage() {
               }
               
               // 5. Google 로그인 성공 햅틱 피드백
-              triggerHapticFeedback(HapticFeedbackType.SUCCESS);
+              triggerHapticFeedback(HapticFeedbackType.SUCCESS, 'Google 로그인 성공', { 
+                component: 'signin', 
+                action: 'google-login', 
+                userEmail: data.user?.mt_email?.substring(0, 3) + '***' 
+              });
               console.log('🎮 [SIGNIN] Google 로그인 성공 햅틱 피드백 실행');
               
               // 6. 리다이렉트 플래그 설정
@@ -1523,7 +1497,11 @@ export default function SignInPage() {
           console.error('[GOOGLE LOGIN] 네이티브 Google 로그인 처리 오류:', error);
           
           // Google 로그인 실패 햅틱 피드백
-          triggerHapticFeedback(HapticFeedbackType.ERROR);
+          triggerHapticFeedback(HapticFeedbackType.ERROR, 'Google 로그인 실패', { 
+            component: 'signin', 
+            action: 'google-login-error', 
+            error: error.message 
+          });
           
           showError(error.message || 'Google 로그인 처리 중 오류가 발생했습니다.');
         } finally {
@@ -1552,7 +1530,11 @@ export default function SignInPage() {
         }
         
         // Google 로그인 에러 햅틱 피드백
-        triggerHapticFeedback(HapticFeedbackType.ERROR);
+        triggerHapticFeedback(HapticFeedbackType.ERROR, 'Google 로그인 콜백 에러', { 
+          component: 'signin', 
+          action: 'google-login-callback-error', 
+          error: errorMessage 
+        });
         
         // 에러 모달 강제 표시 - setTimeout으로 확실히 실행
         console.log('[GOOGLE LOGIN] 에러 모달 강제 표시:', userFriendlyMessage);
@@ -1777,7 +1759,11 @@ export default function SignInPage() {
       });
       
       // 로그인 성공 햅틱 피드백
-      triggerHapticFeedback(HapticFeedbackType.SUCCESS);
+      triggerHapticFeedback(HapticFeedbackType.SUCCESS, '전화번호 로그인 성공', { 
+        component: 'signin', 
+        action: 'phone-login', 
+        phone: phoneNumber.replace(/-/g, '').substring(0, 7) + '****' 
+      });
       console.log('🎮 [SIGNIN] 전화번호 로그인 성공 햅틱 피드백 실행');
       
       // 리다이렉트 플래그 설정
@@ -1846,7 +1832,11 @@ export default function SignInPage() {
       });
       
       // 로그인 실패 햅틱 피드백
-      triggerHapticFeedback(HapticFeedbackType.ERROR);
+      triggerHapticFeedback(HapticFeedbackType.ERROR, '전화번호 로그인 실패', { 
+        component: 'signin', 
+        action: 'phone-login-error', 
+        error: err.message 
+      });
       console.log('🎮 [SIGNIN] 전화번호 로그인 실패 햅틱 피드백 실행');
       
       try {
@@ -2429,25 +2419,16 @@ export default function SignInPage() {
 
   // Google 로그인 핸들러
   const handleGoogleLogin = async (retryCount: number = 0) => {
-    // 타임아웃 설정 (3초 후 자동으로 폴백)
+    // 타임아웃 설정 (10초 후 자동으로 로딩 해제)
     const timeoutId = setTimeout(() => {
-      console.warn('⏰ [GOOGLE LOGIN] 타임아웃 발생 (3초), 웹 SDK로 폴백');
-      
-      // Android 환경에서 타임아웃 시 웹 SDK로 폴백
-      if (/Android/.test(navigator.userAgent)) {
-        console.log('🔄 [ANDROID TIMEOUT] Android 타임아웃으로 웹 SDK 폴백');
-        handleGoogleSDKLogin();
-      } else {
-        setIsLoading(false);
-      }
-    }, 3000); // 3초로 단축
-    
+      console.warn('⏰ [GOOGLE LOGIN] 타임아웃 발생 (10초)');
+      setIsLoading(false);
+    }, 10000);
     console.log('🚀 [GOOGLE LOGIN] 핸들러 시작됨');
     setIsLoading(true);
     
     // 🔥 Android 환경 체크 및 Android 브리지 사용 (개선된 버전)
     const isAndroidWebView = /Android/.test(navigator.userAgent);
-    const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
     const hasAndroidGoogleSignIn = !!(window as any).AndroidGoogleSignIn;
     const hasAndroidBridge = !!(window as any).androidBridge?.googleSignIn;
     const hasAndroidHandlers = !!(window as any).__SMAP_ANDROID_HANDLERS_READY__;
@@ -2459,12 +2440,7 @@ export default function SignInPage() {
       hasAndroidBridge,
       hasAndroidHandlers,
       androidHandlersList,
-      userAgent: navigator.userAgent.substring(0, 50),
-      // 추가 상세 정보
-      androidGoogleSignInType: typeof (window as any).AndroidGoogleSignIn,
-      androidBridgeType: typeof (window as any).androidBridge,
-      webkitType: typeof (window as any).webkit,
-      messageHandlersType: typeof (window as any).webkit?.messageHandlers
+      userAgent: navigator.userAgent.substring(0, 50)
     });
     
     // Android 환경에서 Android 브리지 사용 (개선된 버전)
@@ -2501,60 +2477,11 @@ export default function SignInPage() {
         }
         
         console.log('✅ [GOOGLE LOGIN] Android 네이티브 호출 성공, 콜백 대기 중...');
-        
-        // 🔥 Android 환경에서 3초 후 인터페이스 확인 및 웹 SDK 폴백
-        setTimeout(() => {
-          console.log('🔍 [ANDROID FALLBACK] Android Google Sign-In 인터페이스 확인 중...');
-          
-          // Android Google Sign-In 인터페이스가 실제로 존재하는지 확인
-          const hasRealAndroidInterface = !!(window as any).AndroidGoogleSignIn?.signIn || 
-                                        !!(window as any).androidBridge?.googleSignIn?.signIn;
-          
-          if (!hasRealAndroidInterface) {
-            console.log('⚠️ [ANDROID FALLBACK] Android Google Sign-In 인터페이스가 없음, 웹 SDK로 폴백');
-            
-            // 사용자에게 안내 메시지 표시
-            console.log('📱 [ANDROID INFO] Android 앱에서 Google Sign-In 인터페이스가 설정되지 않았습니다.');
-            console.log('📱 [ANDROID INFO] 웹 SDK를 통한 Google 로그인으로 전환합니다.');
-            console.log('📱 [ANDROID INFO] Android 앱 개발자에게 다음 사항을 확인해주세요:');
-            console.log('📱 [ANDROID INFO] 1. Google Sign-In 라이브러리 추가');
-            console.log('📱 [ANDROID INFO] 2. WebView에 JavaScript 인터페이스 등록');
-            console.log('📱 [ANDROID INFO] 3. window.AndroidGoogleSignIn 객체 설정');
-            
-            // iOS 로그 전송 - Android 폴백 정보
-            sendLogToiOS('info', '📱 Android Google Sign-In 폴백', {
-              timestamp: new Date().toISOString(),
-              reason: 'android_interface_not_found',
-              fallbackTo: 'web_sdk',
-              androidHandlers: androidHandlersList,
-              hasAndroidBridge: hasAndroidBridge,
-              hasAndroidGoogleSignIn: hasAndroidGoogleSignIn
-            });
-            
-            // 웹 SDK 로그인으로 폴백
-            handleGoogleSDKLogin();
-          } else {
-            console.log('✅ [ANDROID FALLBACK] Android Google Sign-In 인터페이스 확인됨');
-          }
-        }, 1000); // 1초로 단축
-        
         return;
       } catch (error) {
         console.error('❌ [GOOGLE LOGIN] Android 네이티브 호출 실패:', error);
-        console.log('🔄 [ANDROID FALLBACK] Android 실패로 웹 SDK로 폴백');
-        
-        // iOS 로그 전송 - Android 실패 정보
-        sendLogToiOS('error', '❌ Android Google Sign-In 실패', {
-          timestamp: new Date().toISOString(),
-          error: String(error),
-          fallbackTo: 'web_sdk',
-          androidHandlers: androidHandlersList,
-          hasAndroidBridge: hasAndroidBridge,
-          hasAndroidGoogleSignIn: hasAndroidGoogleSignIn
-        });
-        
-        // Android 실패 시 웹 SDK로 폴백
-        handleGoogleSDKLogin();
+        setIsLoading(false);
+        showError('Android Google 로그인을 시작할 수 없습니다.');
         return;
       }
     }
@@ -2603,43 +2530,14 @@ export default function SignInPage() {
     // 환경 체크
     console.log('🔍 [GOOGLE LOGIN] 환경 체크 시작');
     
-    // 🔍 강제 핸들러 확인 함수
-    const forceCheckHandlers = () => {
-      console.log('🔍 [FORCE CHECK] 상세 핸들러 확인 시작');
-      
-      // WebKit 객체 확인
-      const webkit = (window as any).webkit;
-      console.log('🔍 [FORCE CHECK] WebKit 객체:', webkit);
-      console.log('🔍 [FORCE CHECK] WebKit 타입:', typeof webkit);
-      
-      // messageHandlers 확인
-      const messageHandlers = webkit?.messageHandlers;
-      console.log('🔍 [FORCE CHECK] messageHandlers:', messageHandlers);
-      console.log('🔍 [FORCE CHECK] messageHandlers 타입:', typeof messageHandlers);
-      
-      if (!messageHandlers) {
-        console.log('❌ [FORCE CHECK] messageHandlers 객체 없음');
-        return;
-      }
-      
-      // 각 핸들러 테스트
-      const handlerNames = ['smapIos', 'iosHandler', 'hapticHandler', 'messageHandler'];
-      
-      handlerNames.forEach(handlerName => {
-        try {
-          const handler = messageHandlers[handlerName];
-          if (handler && typeof handler.postMessage === 'function') {
-            console.log(`✅ [FORCE CHECK] ${handlerName} 핸들러 정상`);
-          } else {
-            console.error(`❌ [FORCE CHECK] ${handlerName} postMessage 함수 없음`);
-          }
-        } catch (error) {
-          console.error(`❌ [FORCE CHECK] ${handlerName} 테스트 실패:`, error);
+          console.error(`❌ [FORCE CHECK] ${handlerName} postMessage 함수 없음`);
         }
-      });
-      
-      console.log('🔍 [FORCE CHECK] 상세 핸들러 확인 완료');
-    };
+      } catch (error) {
+        console.error(`❌ [FORCE CHECK] ${handlerName} 테스트 실패:`, error);
+      }
+    });
+    
+    console.log('🔍 [FORCE CHECK] 상세 핸들러 확인 완료');
   };
   
   // 🚨 웹에서 직접 MessageHandler 생성 시도
@@ -2881,46 +2779,6 @@ export default function SignInPage() {
     }
   };
 
-  // 🔥 iOS 환경에서 네이티브 Google Sign-In 시도
-  if (isIOSWebView && !isAndroidWebView) {
-    console.log('🍎 [GOOGLE LOGIN] iOS 환경에서 네이티브 Google Sign-In 시도');
-    
-    try {
-      // iOS 네이티브 Google Sign-In 호출
-      if ((window as any).webkit?.messageHandlers?.smapIos) {
-        console.log('📱 [GOOGLE LOGIN] iOS 네이티브 Google Sign-In 호출');
-        (window as any).webkit.messageHandlers.smapIos.postMessage({
-          type: 'googleSignIn',
-          param: '',
-          timestamp: Date.now(),
-          source: 'ios_native'
-        });
-        
-        console.log('✅ [GOOGLE LOGIN] iOS 네이티브 호출 성공, 콜백 대기 중...');
-        
-        // iOS 환경에서 2초 후 웹 SDK 폴백
-        setTimeout(() => {
-          console.log('🔍 [IOS FALLBACK] iOS Google Sign-In 응답 확인 중...');
-          
-          // iOS에서 응답이 없으면 웹 SDK로 폴백
-          console.log('⚠️ [IOS FALLBACK] iOS 네이티브 응답 없음, 웹 SDK로 폴백');
-          handleGoogleSDKLogin();
-        }, 2000);
-        
-        return;
-      } else {
-        console.log('⚠️ [IOS FALLBACK] iOS smapIos 핸들러 없음, 웹 SDK로 폴백');
-        handleGoogleSDKLogin();
-        return;
-      }
-    } catch (error) {
-      console.error('❌ [GOOGLE LOGIN] iOS 네이티브 호출 실패:', error);
-      console.log('🔄 [IOS FALLBACK] iOS 실패로 웹 SDK로 폴백');
-      handleGoogleSDKLogin();
-      return;
-    }
-  }
-
   return (
     <motion.div 
       className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8"
@@ -3134,7 +2992,10 @@ export default function SignInPage() {
                   });
                   
                   // 햅틱 피드백 (버튼 클릭 시)
-                  triggerHapticFeedback(HapticFeedbackType.LIGHT);
+                  triggerHapticFeedback(HapticFeedbackType.LIGHT, 'Google 로그인 버튼 클릭', { 
+                    component: 'signin', 
+                    action: 'google-login-button-click' 
+                  });
                   
                   // 실제 핸들러 호출
                   handleGoogleLogin();
@@ -3176,7 +3037,10 @@ export default function SignInPage() {
                 });
                 
                 // 햅틱 피드백 (버튼 클릭 시)
-                triggerHapticFeedback(HapticFeedbackType.LIGHT);
+                triggerHapticFeedback(HapticFeedbackType.LIGHT, 'Kakao 로그인 버튼 클릭', { 
+                  component: 'signin', 
+                  action: 'kakao-login-button-click' 
+                });
                 
                 // 실제 핸들러 호출
                 handleKakaoLogin();
@@ -3309,7 +3173,7 @@ export default function SignInPage() {
       {isLoading && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
-            <LoadingSpinner message="처리 중..." fullScreen={false} />
+            <IOSCompatibleSpinner size="md" message="처리 중..." />
           </div>
         </div>
       )}
