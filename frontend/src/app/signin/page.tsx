@@ -2474,7 +2474,8 @@ export default function SignInPage() {
                 __ANDROID_GOOGLE_SIGNIN_INJECTED__: !!(window as any).__ANDROID_GOOGLE_SIGNIN_INJECTED__,
                 __ANDROID_GOOGLE_SIGNIN_READY__: !!(window as any).__ANDROID_GOOGLE_SIGNIN_READY__,
                 __SMAP_ANDROID_HANDLERS_READY__: !!(window as any).__SMAP_ANDROID_HANDLERS_READY__,
-                __ANDROID_HANDLER_MONITOR_INJECTED__: !!(window as any).__ANDROID_HANDLER_MONITOR_INJECTED__
+                __ANDROID_HANDLER_MONITOR_INJECTED__: !!(window as any).__ANDROID_HANDLER_MONITOR_INJECTED__,
+                elapsedTime: Date.now() - startTime
               });
             }
             
