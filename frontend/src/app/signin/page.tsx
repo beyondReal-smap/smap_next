@@ -2430,64 +2430,14 @@ export default function SignInPage() {
       if (isAndroidWebView) {
         console.log('🤖 [GOOGLE LOGIN] Android 환경에서 Google 로그인 시도');
         
-        // Android 네이티브 Google 로그인 시도
-        if ((window as any).AndroidGoogleSignIn?.signIn) {
-          console.log('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 인터페이스 발견');
-          
-          try {
-            // Android 네이티브 로그인 호출
-            (window as any).AndroidGoogleSignIn.signIn();
-            console.log('✅ [GOOGLE LOGIN] Android 네이티브 호출 성공, 콜백 대기 중...');
-            
-            // Android 환경에서 3초 후 웹 SDK 폴백
-            setTimeout(() => {
-              console.log('🔍 [ANDROID FALLBACK] Android Google Sign-In 응답 확인 중...');
-              
-              // 진행 중 플래그가 여전히 설정되어 있으면 웹 SDK로 폴백
-              if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
-                console.log('⚠️ [ANDROID FALLBACK] Android 네이티브 응답 없음, 웹 SDK로 폴백');
-                handleGoogleSDKLogin();
-              }
-            }, 3000);
-            
-            return;
-          } catch (error) {
-            console.error('❌ [GOOGLE LOGIN] Android 네이티브 호출 실패:', error);
-            console.log('🔄 [ANDROID FALLBACK] Android 실패로 웹 SDK로 폴백');
-            await handleGoogleSDKLogin();
-            return;
-          }
-        } else if ((window as any).androidBridge?.googleSignIn?.signIn) {
-          console.log('🤖 [GOOGLE LOGIN] Android Bridge를 통한 Google 로그인 시도');
-          
-          try {
-            // Android Bridge를 통한 로그인 호출
-            (window as any).androidBridge.googleSignIn.signIn();
-            console.log('✅ [GOOGLE LOGIN] Android Bridge 호출 성공, 콜백 대기 중...');
-            
-            // Android 환경에서 3초 후 웹 SDK 폴백
-            setTimeout(() => {
-              console.log('🔍 [ANDROID FALLBACK] Android Bridge 응답 확인 중...');
-              
-              // 진행 중 플래그가 여전히 설정되어 있으면 웹 SDK로 폴백
-              if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
-                console.log('⚠️ [ANDROID FALLBACK] Android Bridge 응답 없음, 웹 SDK로 폴백');
-                handleGoogleSDKLogin();
-              }
-            }, 3000);
-            
-            return;
-          } catch (error) {
-            console.error('❌ [GOOGLE LOGIN] Android Bridge 호출 실패:', error);
-            console.log('🔄 [ANDROID FALLBACK] Android Bridge 실패로 웹 SDK로 폴백');
-            await handleGoogleSDKLogin();
-            return;
-          }
-        } else {
-          console.warn('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 인터페이스가 없습니다. 웹 SDK로 폴백합니다');
-          
-          // Android에서 네이티브 인터페이스가 없으면 웹 SDK 사용
+        // Android에서는 웹 SDK 사용 (OAuth 설정 문제로 인해 네이티브가 불안정함)
+        console.log('🤖 [GOOGLE LOGIN] Android에서 웹 SDK Google 로그인 사용');
+        
+        try {
           await handleGoogleSDKLogin();
+        } catch (error) {
+          console.error('🤖 [GOOGLE LOGIN] Android 웹 SDK Google 로그인 실패', { error });
+          throw error;
         }
         
         return; // Android 처리가 완료되면 함수 종료
