@@ -6513,7 +6513,7 @@ export default function LogsPage() {
           animate="animate"
           className="full-map-container hardware-accelerated" 
           style={{ 
-            paddingTop: 'calc(env(safe-area-inset-top) + 80px)', // 다른 페이지와 동일한 헤더 높이 적용
+            paddingTop: 'calc(env(safe-area-inset-top) + 56px)', // 다른 페이지와 동일한 헤더 높이 적용
             position: 'relative', // 로딩 오버레이를 위한 relative 포지션
             zIndex: 1 // 헤더보다 낮은 z-index
           }}
