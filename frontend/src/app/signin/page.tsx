@@ -88,8 +88,10 @@ const handleKakaoLogin = async () => {
   await kakaoLoginHandler();
 };
 
-// 🚨 iOS 네이티브 카카오 로그인 콜백 등록 (전역 함수)
-if (typeof window !== 'undefined') {
+// 🚨 iOS 네이티브 카카오 로그인 콜백 초기화 함수
+const initializeKakaoCallbacks = () => {
+  if (typeof window === 'undefined') return;
+  
   // 즉시 등록
   (window as any).onNativeKakaoLoginSuccess = async (userInfo: any) => {
     console.log('🎯 [NATIVE CALLBACK] iOS 앱에서 카카오 로그인 성공 콜백 수신:', userInfo);
@@ -165,9 +167,6 @@ if (typeof window !== 'undefined') {
   };
   
   console.log('✅ [NATIVE CALLBACK] 네이티브 카카오 로그인 콜백 함수 등록 완료');
-  
-  // 🚨 iOS로 콜백 등록 상태 전송은 useEffect에서 실행하도록 이동
-  console.log('📝 [NATIVE CALLBACK] iOS로 콜백 상태 전송은 컴포넌트 로드 후 실행됩니다.');
   
   // 🚨 iOS로 카카오 콜백 등록 상태 알림 (페이지 로드 완료 후)
   const sendKakaoCallbackStatus = () => {
@@ -284,7 +283,7 @@ if (typeof window !== 'undefined') {
   
   // 추가 안전장치: 3초 후에도 확인 및 전송
   setTimeout(ensureKakaoCallbackAndNotifyiOS, 3000);
-}
+};
 
 export default function SignInPage() {
   // 🚨 페이지 로드 디버깅
@@ -293,6 +292,11 @@ export default function SignInPage() {
     location: typeof window !== 'undefined' ? window.location.href : 'unknown',
     timestamp: new Date().toISOString()
   });
+
+  // 🚨 카카오 콜백 초기화
+  useEffect(() => {
+    initializeKakaoCallbacks();
+  }, []);
 
   // 🚨 페이지 로드 즉시 브라우저 저장소에서 에러 모달 상태 확인 및 복원
   const [showErrorModal, setShowErrorModal] = useState(() => {

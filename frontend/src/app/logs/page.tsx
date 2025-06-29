@@ -6728,7 +6728,7 @@ export default function LogsPage() {
           animate="animate"
           className="full-map-container hardware-accelerated" 
           style={{ 
-            paddingTop: '0px', // 다른 페이지와 동일한 헤더 높이 적용
+            paddingTop: '56px', // 헤더 높이만큼 패딩 추가 (14 * 4 = 56px)
             position: 'relative', // 로딩 오버레이를 위한 relative 포지션
             zIndex: 1 // 헤더보다 낮은 z-index
           }}
@@ -6748,7 +6748,7 @@ export default function LogsPage() {
           
           {/* 커스텀 줌 컨트롤 */}
           {map.current && (
-            <div className="absolute top-[180px] right-[10px] z-[200] z-zoom-control flex flex-col">
+            <div className="absolute top-[70px] right-[10px] z-[200] z-zoom-control flex flex-col">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -6786,7 +6786,7 @@ export default function LogsPage() {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                className="absolute top-20 left-0 right-0 z-[100] z-floating-card flex justify-center px-4"
+                className="absolute top-4 left-0 right-0 z-[100] z-floating-card flex justify-center px-4"
               >
                 <motion.div
                    whileHover={{ 

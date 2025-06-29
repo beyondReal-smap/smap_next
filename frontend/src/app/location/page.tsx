@@ -4755,7 +4755,7 @@ export default function LocationPage() {
         <div 
           className="full-map-container" 
           style={{ 
-            paddingTop: '0px', 
+            paddingTop: '56px', 
             position: 'relative'
           }}
         >
@@ -4884,7 +4884,7 @@ export default function LocationPage() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -30, scale: 0.96 }}
               transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className="location-info-panel fixed top-20 left-4 right-4 z-30 rounded-2xl p-3 shadow-2xl"
+              className="location-info-panel fixed top-16 left-4 right-4 z-30 rounded-2xl p-3 shadow-2xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
               <div className="flex justify-between items-center mb-2">
