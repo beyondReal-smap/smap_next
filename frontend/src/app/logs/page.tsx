@@ -6466,42 +6466,22 @@ export default function LogsPage() {
         style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
       >
         {/* 통일된 헤더 애니메이션 */}
-        <motion.div
-          variants={headerVariants}
-          initial="initial"
-          animate="animate"
-          className="fixed top-0 left-0 right-0 logs-header-container z-header"
-          style={{ 
-            zIndex: 10000,
-            position: 'fixed'
-          }}
+        <AnimatedHeader 
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
-          <AnimatedHeader
-            variant="simple"
-            className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
-            style={{ paddingTop: 'max(env(safe-area-inset-top), 20px)' }}
-          >
-            {/* 헤더 내용 */}
-            {showHeader && (
-              <motion.div 
-                initial={{ opacity: 1 }}
-                animate={{ opacity: showHeader ? 1 : 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-                className="flex items-center justify-between h-14 px-4"
-              >
+          <div className="flex items-center justify-between h-14 px-4">
+            <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-3">
-                  <div>
-                    <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
-                    <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
-                  </div>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
+                  <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
                 </div>
               </div>
-              </motion.div>
-            )}
-          </AnimatedHeader>
-        </motion.div>
+            </div>
+          </div>
+        </AnimatedHeader>
 
         {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
         
