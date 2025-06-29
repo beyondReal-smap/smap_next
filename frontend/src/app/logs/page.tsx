@@ -6468,7 +6468,7 @@ export default function LogsPage() {
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+          className="fixed top-0 left-0 right-0 z-9999 glass-effect header-fixed"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
           <div className="flex items-center justify-between h-14 px-4">
@@ -6513,7 +6513,7 @@ export default function LogsPage() {
           
           {/* 커스텀 줌 컨트롤 */}
           {map.current && (
-            <div className="absolute top-[150px] right-[10px] z-[200] z-zoom-control flex flex-col">
+            <div className="absolute top-[180px] right-[10px] z-[200] z-zoom-control flex flex-col">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -6551,7 +6551,7 @@ export default function LogsPage() {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                className="absolute top-20 left-0 right-0 z-[100] z-floating-card flex justify-center px-4"
+                className="absolute top-24 left-0 right-0 z-[100] z-floating-card flex justify-center px-4"
               >
                 <motion.div
                    whileHover={{ 
