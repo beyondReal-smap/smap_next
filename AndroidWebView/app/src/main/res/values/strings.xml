@@ -1,7 +1,6 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Smap</string>
-    <string name="admob_app_id">ca-app-pub-3940256099942544~3347511713</string>
-    <string name="error_message">네트워크 연결을 확인해주세요.</string>
+    <string name="app_name">Smap Next</string>
+    <string name="admob_app_id">ca-app-pub-7432142706137657~8450079233</string>
+    <string name="error_message">오류가 발생했습니다. 잠시 후 다시 시도해 주세요.</string>
     <string name="retry_button">다시 시도</string>
-</resources> 
+</resources>

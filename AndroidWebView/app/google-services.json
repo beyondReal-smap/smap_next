@@ -14,7 +14,7 @@
       },
       "oauth_client": [
         {
-          "client_id": "283271180972-lamjiad6ljpa02fk30k6nh6arqq4rc4o.apps.googleusercontent.com",
+          "client_id": "283271180972-a359g0bq74eins70r59ke1i8dovbi74r.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.dmonster.smap",
@@ -22,7 +22,15 @@
           }
         },
         {
-          "client_id": "283271180972-38reu7hqcogn8b465nu2dh89f5a03ac5.apps.googleusercontent.com",
+          "client_id": "283271180972-me2quu5c84e8cnd60ks4bg9uknuffa0b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dmonster.smap",
+            "certificate_hash": "868e5c2acd123e542cf7eac8ed60437480fecf40"
+          }
+        },
+        {
+          "client_id": "283271180972-u5d7854oeo60bafosht4dv0plvpb9cbe.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -35,7 +43,7 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "283271180972-38reu7hqcogn8b465nu2dh89f5a03ac5.apps.googleusercontent.com",
+              "client_id": "283271180972-u5d7854oeo60bafosht4dv0plvpb9cbe.apps.googleusercontent.com",
               "client_type": 3
             },
             {

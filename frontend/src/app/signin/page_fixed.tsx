@@ -652,7 +652,7 @@ export default function SignInPageFixed() {
       {isLoading && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
-            <UnifiedLoadingSpinner size="md" message="처리 중..." />
+            <IOSCompatibleSpinner size="md" message="처리 중..." />
           </div>
         </div>
       )}

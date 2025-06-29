@@ -15,6 +15,7 @@ import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner'
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import { RiKakaoTalkFill } from 'react-icons/ri';
+import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
 
 // 카카오 SDK 타입 정의
 declare global {
@@ -3229,7 +3230,7 @@ export default function SignInPage() {
       {isLoading && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
-            <LoadingSpinner message="처리 중..." fullScreen={false} />
+            <IOSCompatibleSpinner size="md" message="처리 중..." />
           </div>
         </div>
       )}
