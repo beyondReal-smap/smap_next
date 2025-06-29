@@ -166,25 +166,44 @@ if (typeof window !== 'undefined') {
   
   console.log('✅ [NATIVE CALLBACK] 네이티브 카카오 로그인 콜백 함수 등록 완료');
   
-  // 🚨 iOS로 콜백 등록 상태 알림
-  if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.smapIos) {
-    try {
-      window.webkit.messageHandlers.smapIos.postMessage({
-        type: 'kakaoCallbackReady',
-        status: 'registered',
-        timestamp: Date.now(),
-        hasSuccessCallback: typeof (window as any).onNativeKakaoLoginSuccess === 'function',
-        hasErrorCallback: typeof (window as any).onNativeKakaoLoginError === 'function'
-      });
-      console.log('📱 [KAKAO CALLBACK] iOS로 콜백 등록 상태 전송 완료');
-    } catch (error) {
-      console.error('❌ [KAKAO CALLBACK] iOS로 상태 전송 실패:', error);
-    }
-  }
+  // 🚨 iOS로 콜백 등록 상태 전송은 useEffect에서 실행하도록 이동
+  console.log('📝 [NATIVE CALLBACK] iOS로 콜백 상태 전송은 컴포넌트 로드 후 실행됩니다.');
   
-  // 🚨 추가: 페이지 로드 완료 후 콜백 등록 상태 확인 및 강제 등록
-  const ensureKakaoCallback = () => {
-    console.log('🔍 [KAKAO CALLBACK CHECK] 콜백 등록 상태 확인');
+  // 🚨 iOS로 카카오 콜백 등록 상태 알림 (페이지 로드 완료 후)
+  const sendKakaoCallbackStatus = () => {
+    console.log('📱 [KAKAO CALLBACK] iOS로 콜백 등록 상태 전송 시도');
+    
+    if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.smapIos) {
+      try {
+        const hasSuccessCallback = typeof (window as any).onNativeKakaoLoginSuccess === 'function';
+        const hasErrorCallback = typeof (window as any).onNativeKakaoLoginError === 'function';
+        
+        window.webkit.messageHandlers.smapIos.postMessage({
+          type: 'kakaoCallbackReady',
+          status: 'registered',
+          timestamp: Date.now(),
+          hasSuccessCallback: hasSuccessCallback,
+          hasErrorCallback: hasErrorCallback
+        });
+        
+        console.log('📱 [KAKAO CALLBACK] iOS로 콜백 등록 상태 전송 완료', {
+          hasSuccessCallback,
+          hasErrorCallback
+        });
+      } catch (error) {
+        console.error('❌ [KAKAO CALLBACK] iOS로 상태 전송 실패:', error);
+      }
+    } else {
+      console.warn('⚠️ [KAKAO CALLBACK] iOS MessageHandler 없음, 콜백 상태 전송 실패');
+      console.log('   - window.webkit:', !!window.webkit);
+      console.log('   - messageHandlers:', !!window.webkit?.messageHandlers);
+      console.log('   - smapIos:', !!window.webkit?.messageHandlers?.smapIos);
+    }
+  };
+  
+  // 🚨 페이지 로드 완료 후 콜백 등록 상태 확인 및 전송
+  const ensureKakaoCallbackAndNotifyiOS = () => {
+    console.log('🔍 [KAKAO CALLBACK CHECK] 콜백 등록 상태 확인 및 iOS 알림');
     console.log('  - onNativeKakaoLoginSuccess:', typeof (window as any).onNativeKakaoLoginSuccess);
     console.log('  - onNativeKakaoLoginError:', typeof (window as any).onNativeKakaoLoginError);
     
@@ -252,17 +271,19 @@ if (typeof window !== 'undefined') {
     } else {
       console.log('✅ [KAKAO CALLBACK CHECK] 콜백 정상 등록됨');
     }
+    
+    // iOS로 상태 전송
+    sendKakaoCallbackStatus();
   };
   
-  // 페이지 로드 완료 후 확인
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', ensureKakaoCallback);
-  } else {
-    ensureKakaoCallback();
-  }
+  // 즉시 확인 및 전송
+  ensureKakaoCallbackAndNotifyiOS();
   
-  // 추가 안전장치: 1초 후에도 확인
-  setTimeout(ensureKakaoCallback, 1000);
+  // 추가 안전장치: 1초 후에도 확인 및 전송
+  setTimeout(ensureKakaoCallbackAndNotifyiOS, 1000);
+  
+  // 추가 안전장치: 3초 후에도 확인 및 전송
+  setTimeout(ensureKakaoCallbackAndNotifyiOS, 3000);
 }
 
 export default function SignInPage() {
