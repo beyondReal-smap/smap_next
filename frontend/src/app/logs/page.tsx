@@ -6468,7 +6468,7 @@ export default function LogsPage() {
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="simple"
-          className="fixed top-0 left-0 right-0 z-9999 glass-effect header-fixed"
+          className="fixed top-0 left-0 right-0 z-99 glass-effect header-fixed"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
           <div className="flex items-center justify-between h-14 px-4">

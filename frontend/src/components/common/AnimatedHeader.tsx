@@ -37,6 +37,9 @@ const headerAnimations = {
   }
 };
 
+// 안드로이드 환경 감지
+const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent);
+
 // 기본 헤더 스타일
 const defaultHeaderStyle: React.CSSProperties = {
   position: 'fixed',
@@ -54,7 +57,21 @@ const defaultHeaderStyle: React.CSSProperties = {
   paddingTop: 'env(safe-area-inset-top)',
   minHeight: 'auto',
   height: 'auto',
-  zIndex: 50
+  zIndex: 50,
+  // 안드로이드 최적화
+  ...(isAndroid && {
+    transform: 'translate3d(0, 0, 0)',
+    WebkitTransform: 'translate3d(0, 0, 0)',
+    backfaceVisibility: 'hidden',
+    WebkitBackfaceVisibility: 'hidden',
+    perspective: 1000,
+    WebkitPerspective: 1000,
+    willChange: 'transform, opacity',
+    // 안드로이드에서 애니메이션 성능 향상
+    WebkitOverflowScrolling: 'touch',
+    overscrollBehavior: 'none',
+    touchAction: 'manipulation'
+  })
 };
 
 const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
@@ -75,27 +92,39 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
     ...(duration !== undefined && { duration })
   };
 
+  // 안드로이드에서 애니메이션 지연 시간 조정
+  const androidAdjustedTransition = isAndroid ? {
+    ...customTransition,
+    delay: (customTransition.delay || 0) + 0.1, // 안드로이드에서 약간 더 지연
+    duration: (customTransition.duration || 0.4) * 1.2 // 안드로이드에서 약간 더 긴 지속시간
+  } : customTransition;
+
   // 한 번 애니메이션이 실행된 후에는 더 이상 초기 애니메이션을 실행하지 않음
   React.useEffect(() => {
     if (!hasAnimated) {
       const timer = setTimeout(() => {
         setHasAnimated(true);
-      }, (customTransition.delay || 0) * 1000 + (customTransition.duration || 0.4) * 1000);
+      }, (androidAdjustedTransition.delay || 0) * 1000 + (androidAdjustedTransition.duration || 0.4) * 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [hasAnimated, customTransition.delay, customTransition.duration]);
+  }, [hasAnimated, androidAdjustedTransition.delay, androidAdjustedTransition.duration]);
 
   return (
     <motion.header
       initial={hasAnimated ? animation.animate : animation.initial}
       animate={animation.animate}
-      transition={hasAnimated ? { duration: 0 } : customTransition}
-      className={className}
+      transition={hasAnimated ? { duration: 0 } : androidAdjustedTransition}
+      className={`${className} ${isAndroid ? 'android-optimized' : ''}`}
       style={{
         ...defaultHeaderStyle,
         ...style
       }}
+      // 안드로이드에서 애니메이션 우선순위 설정
+      {...(isAndroid && {
+        layout: false,
+        layoutId: undefined
+      })}
     >
       {children}
     </motion.header>
