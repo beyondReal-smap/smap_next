@@ -90,6 +90,7 @@ const handleKakaoLogin = async () => {
 
 // 🚨 iOS 네이티브 카카오 로그인 콜백 등록 (전역 함수)
 if (typeof window !== 'undefined') {
+  // 즉시 등록
   (window as any).onNativeKakaoLoginSuccess = async (userInfo: any) => {
     console.log('🎯 [NATIVE CALLBACK] iOS 앱에서 카카오 로그인 성공 콜백 수신:', userInfo);
     
@@ -164,6 +165,104 @@ if (typeof window !== 'undefined') {
   };
   
   console.log('✅ [NATIVE CALLBACK] 네이티브 카카오 로그인 콜백 함수 등록 완료');
+  
+  // 🚨 iOS로 콜백 등록 상태 알림
+  if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.smapIos) {
+    try {
+      window.webkit.messageHandlers.smapIos.postMessage({
+        type: 'kakaoCallbackReady',
+        status: 'registered',
+        timestamp: Date.now(),
+        hasSuccessCallback: typeof (window as any).onNativeKakaoLoginSuccess === 'function',
+        hasErrorCallback: typeof (window as any).onNativeKakaoLoginError === 'function'
+      });
+      console.log('📱 [KAKAO CALLBACK] iOS로 콜백 등록 상태 전송 완료');
+    } catch (error) {
+      console.error('❌ [KAKAO CALLBACK] iOS로 상태 전송 실패:', error);
+    }
+  }
+  
+  // 🚨 추가: 페이지 로드 완료 후 콜백 등록 상태 확인 및 강제 등록
+  const ensureKakaoCallback = () => {
+    console.log('🔍 [KAKAO CALLBACK CHECK] 콜백 등록 상태 확인');
+    console.log('  - onNativeKakaoLoginSuccess:', typeof (window as any).onNativeKakaoLoginSuccess);
+    console.log('  - onNativeKakaoLoginError:', typeof (window as any).onNativeKakaoLoginError);
+    
+    // 콜백이 없으면 다시 등록
+    if (typeof (window as any).onNativeKakaoLoginSuccess !== 'function') {
+      console.log('🔄 [KAKAO CALLBACK CHECK] 콜백 재등록 필요 - 다시 등록');
+      
+      (window as any).onNativeKakaoLoginSuccess = async (userInfo: any) => {
+        console.log('🎯 [NATIVE CALLBACK - RE-REGISTERED] iOS 앱에서 카카오 로그인 성공 콜백 수신:', userInfo);
+        
+        try {
+          console.log('🔄 [NATIVE CALLBACK - RE-REGISTERED] 백엔드 카카오 인증 API 호출 시작');
+          
+          const response = await fetch('/api/kakao-auth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              access_token: userInfo.accessToken,
+              userInfo: userInfo.userInfo,
+              source: 'native'
+            }),
+          });
+
+          const data = await response.json();
+          
+          console.log('📡 [NATIVE CALLBACK - RE-REGISTERED] 백엔드 카카오 인증 API 응답:', data);
+
+          if (data.success) {
+            console.log('[NATIVE CALLBACK - RE-REGISTERED] 카카오 로그인 성공:', {
+              isNewUser: data.isNewUser,
+              hasUser: !!data.user
+            });
+            
+            // 햅틱 피드백
+            if (typeof triggerHapticFeedback === 'function') {
+              triggerHapticFeedback(HapticFeedbackType.SUCCESS);
+            }
+            
+            // 신규회원/기존회원에 따른 분기 처리
+            if (data.isNewUser) {
+              console.log('[NATIVE CALLBACK - RE-REGISTERED] 신규회원 - 회원가입 페이지로 이동');
+              
+              if (data.socialLoginData) {
+                sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
+              }
+              
+              window.location.href = '/register?social=kakao';
+            } else {
+              console.log('[NATIVE CALLBACK - RE-REGISTERED] 기존회원 - 홈으로 이동');
+              window.location.href = '/home';
+            }
+          } else {
+            console.error('[NATIVE CALLBACK - RE-REGISTERED] 서버 인증 실패:', data.error);
+            alert(data.error || '서버 인증에 실패했습니다.');
+          }
+        } catch (error) {
+          console.error('❌ [NATIVE CALLBACK - RE-REGISTERED] 백엔드 API 호출 실패:', error);
+          alert('네트워크 오류가 발생했습니다.');
+        }
+      };
+      
+      console.log('✅ [KAKAO CALLBACK CHECK] 콜백 재등록 완료');
+    } else {
+      console.log('✅ [KAKAO CALLBACK CHECK] 콜백 정상 등록됨');
+    }
+  };
+  
+  // 페이지 로드 완료 후 확인
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureKakaoCallback);
+  } else {
+    ensureKakaoCallback();
+  }
+  
+  // 추가 안전장치: 1초 후에도 확인
+  setTimeout(ensureKakaoCallback, 1000);
 }
 
 export default function SignInPage() {
@@ -357,7 +456,7 @@ export default function SignInPage() {
             }
             
             // 회원가입 페이지로 이동
-            router.replace('/register?social=google');
+            window.location.href = '/register?social=google';
             return;
             
           } else {
