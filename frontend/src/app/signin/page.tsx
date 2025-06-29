@@ -90,199 +90,141 @@ const handleKakaoLogin = async () => {
 
 // 🚨 iOS 네이티브 카카오 로그인 콜백 초기화 함수
 const initializeKakaoCallbacks = () => {
-  if (typeof window === 'undefined') return;
+  // 안전하게 window 객체 확인
+  if (typeof window === 'undefined') {
+    console.log('[INIT KAKAO] 서버사이드에서 실행됨, 스킵');
+    return;
+  }
   
-  // 즉시 등록
-  (window as any).onNativeKakaoLoginSuccess = async (userInfo: any) => {
-    console.log('🎯 [NATIVE CALLBACK] iOS 앱에서 카카오 로그인 성공 콜백 수신:', userInfo);
-    
-    try {
-      console.log('🔄 [NATIVE CALLBACK] 백엔드 카카오 인증 API 호출 시작');
+  console.log('[INIT KAKAO] 클라이언트사이드에서 카카오 콜백 초기화 시작');
+  
+  try {
+    // 즉시 등록
+    (window as any).onNativeKakaoLoginSuccess = async (userInfo: any) => {
+      console.log('🎯 [NATIVE CALLBACK] iOS 앱에서 카카오 로그인 성공 콜백 수신:', userInfo);
       
-      // 백엔드 API로 액세스 토큰 전송
-      const response = await fetch('/api/kakao-auth', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          access_token: userInfo.accessToken,
-          userInfo: userInfo.userInfo,
-          source: 'native'
-        }),
-      });
-
-      const data = await response.json();
-      
-      console.log('📡 [NATIVE CALLBACK] 백엔드 카카오 인증 API 응답:', {
-        success: data.success,
-        hasUser: !!data.user,
-        hasError: !!data.error,
-        responseStatus: response.status
-      });
-
-      if (data.success) {
-        console.log('[NATIVE CALLBACK] 카카오 로그인 성공:', {
-          isNewUser: data.isNewUser,
-          hasUser: !!data.user,
-          hasSocialData: !!data.socialLoginData
+      try {
+        console.log('🔄 [NATIVE CALLBACK] 백엔드 카카오 인증 API 호출 시작');
+        
+        // 백엔드 API로 액세스 토큰 전송
+        const response = await fetch('/api/kakao-auth', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            access_token: userInfo.accessToken,
+            userInfo: userInfo.userInfo,
+            source: 'native'
+          }),
         });
+
+        const data = await response.json();
         
-        // 카카오 로그인 성공 햅틱 피드백
-        triggerHapticFeedback(HapticFeedbackType.SUCCESS);
-        
-        // 신규회원/기존회원에 따른 분기 처리
-        if (data.isNewUser) {
-          console.log('[NATIVE CALLBACK] 신규회원 - 회원가입 페이지로 이동');
+        console.log('📡 [NATIVE CALLBACK] 백엔드 카카오 인증 API 응답:', {
+          success: data.success,
+          hasUser: !!data.user,
+          hasError: !!data.error,
+          responseStatus: response.status,
+          isNewUser: data.isNewUser
+        });
+
+        if (data.success) {
+          console.log('[NATIVE CALLBACK] 카카오 로그인 성공:', {
+            isNewUser: data.isNewUser,
+            hasUser: !!data.user,
+            hasSocialData: !!data.socialLoginData
+          });
           
-          // 소셜 로그인 데이터를 sessionStorage에 저장
-          if (data.socialLoginData) {
-            sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
-            console.log('[NATIVE CALLBACK] 소셜 로그인 데이터 저장 완료');
+          // 카카오 로그인 성공 햅틱 피드백
+          if (typeof triggerHapticFeedback === 'function') {
+            triggerHapticFeedback(HapticFeedbackType.SUCCESS);
           }
           
-          // 회원가입 페이지로 이동
-          window.location.href = '/register?social=kakao';
-          return;
-          
+          // 신규회원/기존회원에 따른 분기 처리
+          if (data.isNewUser) {
+            console.log('[NATIVE CALLBACK] 신규회원 감지 - 회원가입 페이지로 이동 준비');
+            
+            // 소셜 로그인 데이터를 sessionStorage에 저장
+            if (data.socialLoginData) {
+              try {
+                sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
+                console.log('[NATIVE CALLBACK] 소셜 로그인 데이터 저장 완료');
+              } catch (storageError) {
+                console.error('[NATIVE CALLBACK] sessionStorage 저장 실패:', storageError);
+              }
+            }
+            
+            // 회원가입 페이지로 이동
+            console.log('[NATIVE CALLBACK] 신규회원 리다이렉트 실행');
+            setTimeout(() => {
+              window.location.replace('/register?social=kakao');
+            }, 100);
+            
+          } else {
+            console.log('[NATIVE CALLBACK] 기존회원 감지 - 홈으로 이동 준비');
+            
+            // 홈으로 리다이렉트
+            console.log('[NATIVE CALLBACK] 기존회원 리다이렉트 실행');
+            setTimeout(() => {
+              window.location.replace('/home');
+            }, 100);
+          }
         } else {
-          console.log('[NATIVE CALLBACK] 기존회원 - 홈으로 이동');
+          console.error('[NATIVE CALLBACK] 서버 인증 실패:', data.error);
+          alert(data.error || '서버 인증에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('❌ [NATIVE CALLBACK] 백엔드 API 호출 실패:', error);
+        alert('네트워크 오류가 발생했습니다.');
+      }
+    };
+    
+    (window as any).onNativeKakaoLoginError = (error: any) => {
+      console.error('❌ [NATIVE CALLBACK] iOS 앱에서 카카오 로그인 실패 콜백 수신:', error);
+      alert(error?.message || '네이티브 카카오 로그인에 실패했습니다.');
+    };
+    
+    console.log('✅ [NATIVE CALLBACK] 네이티브 카카오 로그인 콜백 함수 등록 완료');
+    
+    // 🚨 iOS로 카카오 콜백 등록 상태 알림
+    const sendKakaoCallbackStatus = () => {
+      console.log('📱 [KAKAO CALLBACK] iOS로 콜백 등록 상태 전송 시도');
+      
+      if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.smapIos) {
+        try {
+          const hasSuccessCallback = typeof (window as any).onNativeKakaoLoginSuccess === 'function';
+          const hasErrorCallback = typeof (window as any).onNativeKakaoLoginError === 'function';
           
-          // 홈으로 리다이렉트
-          window.location.href = '/home';
+          window.webkit.messageHandlers.smapIos.postMessage({
+            type: 'kakaoCallbackReady',
+            status: 'registered',
+            timestamp: Date.now(),
+            hasSuccessCallback: hasSuccessCallback,
+            hasErrorCallback: hasErrorCallback
+          });
+          
+          console.log('📱 [KAKAO CALLBACK] iOS로 콜백 등록 상태 전송 완료', {
+            hasSuccessCallback,
+            hasErrorCallback
+          });
+        } catch (error) {
+          console.error('❌ [KAKAO CALLBACK] iOS로 상태 전송 실패:', error);
         }
       } else {
-        console.error('[NATIVE CALLBACK] 서버 인증 실패:', data.error);
-        alert(data.error || '서버 인증에 실패했습니다.');
+        console.warn('⚠️ [KAKAO CALLBACK] iOS MessageHandler 없음, 콜백 상태 전송 실패');
       }
-    } catch (error) {
-      console.error('❌ [NATIVE CALLBACK] 백엔드 API 호출 실패:', error);
-      alert('네트워크 오류가 발생했습니다.');
-    }
-  };
-  
-  (window as any).onNativeKakaoLoginError = (error: any) => {
-    console.error('❌ [NATIVE CALLBACK] iOS 앱에서 카카오 로그인 실패 콜백 수신:', error);
-    alert(error?.message || '네이티브 카카오 로그인에 실패했습니다.');
-  };
-  
-  console.log('✅ [NATIVE CALLBACK] 네이티브 카카오 로그인 콜백 함수 등록 완료');
-  
-  // 🚨 iOS로 카카오 콜백 등록 상태 알림 (페이지 로드 완료 후)
-  const sendKakaoCallbackStatus = () => {
-    console.log('📱 [KAKAO CALLBACK] iOS로 콜백 등록 상태 전송 시도');
+    };
     
-    if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.smapIos) {
-      try {
-        const hasSuccessCallback = typeof (window as any).onNativeKakaoLoginSuccess === 'function';
-        const hasErrorCallback = typeof (window as any).onNativeKakaoLoginError === 'function';
-        
-        window.webkit.messageHandlers.smapIos.postMessage({
-          type: 'kakaoCallbackReady',
-          status: 'registered',
-          timestamp: Date.now(),
-          hasSuccessCallback: hasSuccessCallback,
-          hasErrorCallback: hasErrorCallback
-        });
-        
-        console.log('📱 [KAKAO CALLBACK] iOS로 콜백 등록 상태 전송 완료', {
-          hasSuccessCallback,
-          hasErrorCallback
-        });
-      } catch (error) {
-        console.error('❌ [KAKAO CALLBACK] iOS로 상태 전송 실패:', error);
-      }
-    } else {
-      console.warn('⚠️ [KAKAO CALLBACK] iOS MessageHandler 없음, 콜백 상태 전송 실패');
-      console.log('   - window.webkit:', !!window.webkit);
-      console.log('   - messageHandlers:', !!window.webkit?.messageHandlers);
-      console.log('   - smapIos:', !!window.webkit?.messageHandlers?.smapIos);
-    }
-  };
-  
-  // 🚨 페이지 로드 완료 후 콜백 등록 상태 확인 및 전송
-  const ensureKakaoCallbackAndNotifyiOS = () => {
-    console.log('🔍 [KAKAO CALLBACK CHECK] 콜백 등록 상태 확인 및 iOS 알림');
-    console.log('  - onNativeKakaoLoginSuccess:', typeof (window as any).onNativeKakaoLoginSuccess);
-    console.log('  - onNativeKakaoLoginError:', typeof (window as any).onNativeKakaoLoginError);
-    
-    // 콜백이 없으면 다시 등록
-    if (typeof (window as any).onNativeKakaoLoginSuccess !== 'function') {
-      console.log('🔄 [KAKAO CALLBACK CHECK] 콜백 재등록 필요 - 다시 등록');
-      
-      (window as any).onNativeKakaoLoginSuccess = async (userInfo: any) => {
-        console.log('🎯 [NATIVE CALLBACK - RE-REGISTERED] iOS 앱에서 카카오 로그인 성공 콜백 수신:', userInfo);
-        
-        try {
-          console.log('🔄 [NATIVE CALLBACK - RE-REGISTERED] 백엔드 카카오 인증 API 호출 시작');
-          
-          const response = await fetch('/api/kakao-auth', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              access_token: userInfo.accessToken,
-              userInfo: userInfo.userInfo,
-              source: 'native'
-            }),
-          });
-
-          const data = await response.json();
-          
-          console.log('📡 [NATIVE CALLBACK - RE-REGISTERED] 백엔드 카카오 인증 API 응답:', data);
-
-          if (data.success) {
-            console.log('[NATIVE CALLBACK - RE-REGISTERED] 카카오 로그인 성공:', {
-              isNewUser: data.isNewUser,
-              hasUser: !!data.user
-            });
-            
-            // 햅틱 피드백
-            if (typeof triggerHapticFeedback === 'function') {
-              triggerHapticFeedback(HapticFeedbackType.SUCCESS);
-            }
-            
-            // 신규회원/기존회원에 따른 분기 처리
-            if (data.isNewUser) {
-              console.log('[NATIVE CALLBACK - RE-REGISTERED] 신규회원 - 회원가입 페이지로 이동');
-              
-              if (data.socialLoginData) {
-                sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
-              }
-              
-              window.location.href = '/register?social=kakao';
-            } else {
-              console.log('[NATIVE CALLBACK - RE-REGISTERED] 기존회원 - 홈으로 이동');
-              window.location.href = '/home';
-            }
-          } else {
-            console.error('[NATIVE CALLBACK - RE-REGISTERED] 서버 인증 실패:', data.error);
-            alert(data.error || '서버 인증에 실패했습니다.');
-          }
-        } catch (error) {
-          console.error('❌ [NATIVE CALLBACK - RE-REGISTERED] 백엔드 API 호출 실패:', error);
-          alert('네트워크 오류가 발생했습니다.');
-        }
-      };
-      
-      console.log('✅ [KAKAO CALLBACK CHECK] 콜백 재등록 완료');
-    } else {
-      console.log('✅ [KAKAO CALLBACK CHECK] 콜백 정상 등록됨');
-    }
-    
-    // iOS로 상태 전송
+    // 즉시 상태 전송
     sendKakaoCallbackStatus();
-  };
-  
-  // 즉시 확인 및 전송
-  ensureKakaoCallbackAndNotifyiOS();
-  
-  // 추가 안전장치: 1초 후에도 확인 및 전송
-  setTimeout(ensureKakaoCallbackAndNotifyiOS, 1000);
-  
-  // 추가 안전장치: 3초 후에도 확인 및 전송
-  setTimeout(ensureKakaoCallbackAndNotifyiOS, 3000);
+    
+    // 추가 안전장치: 1초 후에도 상태 전송
+    setTimeout(sendKakaoCallbackStatus, 1000);
+    
+  } catch (initError) {
+    console.error('❌ [INIT KAKAO] 카카오 콜백 초기화 실패:', initError);
+  }
 };
 
 export default function SignInPage() {
