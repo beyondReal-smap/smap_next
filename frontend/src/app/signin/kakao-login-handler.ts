@@ -23,9 +23,14 @@ export const handleKakaoLogin = async () => {
     console.log(`🔍 [KAKAO LOGIN DEBUG] MessageHandlers 발견: ${handlersCount}개, smapIos: ${hasSmapIos ? '있음' : '없음'}`);
     
     // iOS WebView에서 확인하기 위한 alert
+    console.log(`🔍 [KAKAO LOGIN DEBUG] MessageHandlers 발견: ${handlersCount}개, smapIos: ${hasSmapIos ? '있음' : '없음'}`);
+    console.log(`🔍 [KAKAO LOGIN DEBUG] 핸들러 목록:`, Object.keys(window.webkit.messageHandlers));
+    
+    // 임시 alert (테스트용)
     alert(`카카오 로그인 디버그:\nHandlers: ${handlersCount}개\nsmapIos: ${hasSmapIos ? '있음' : '없음'}\n핸들러목록: ${Object.keys(window.webkit.messageHandlers).join(', ')}`);
   } else {
     console.log('🔍 [KAKAO LOGIN DEBUG] WebKit MessageHandlers 없음 - 웹 브라우저 환경');
+    // 임시 alert (테스트용)
     alert('카카오 로그인: 웹 브라우저 환경 감지');
   }
   
@@ -47,6 +52,20 @@ export const handleKakaoLogin = async () => {
       
       // 메시지 전송 확인 alert
       alert('카카오 로그인 메시지를 iOS로 전송했습니다!');
+      
+      // 🚨 테스트: 햅틱 피드백도 함께 전송해보기
+      try {
+        console.log('🧪 [TEST] 햅틱 피드백 테스트 전송');
+        window.webkit.messageHandlers.smapIos.postMessage({
+          type: 'haptic',
+          param: 'success',
+          timestamp: Date.now(),
+          source: 'kakao-login-test'
+        });
+        console.log('✅ [TEST] 햅틱 피드백 테스트 전송 완료');
+      } catch (error) {
+        console.error('❌ [TEST] 햅틱 피드백 테스트 실패:', error);
+      }
       
       // 네이티브 카카오 로그인 성공 콜백 등록
       (window as any).onNativeKakaoLoginSuccess = async (userInfo: any) => {
