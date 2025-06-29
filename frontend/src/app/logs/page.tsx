@@ -953,6 +953,19 @@ export default function LogsPage() {
   const maxRetries = 3;
   const dateScrollContainerRef = useRef<HTMLDivElement>(null); // 날짜 스크롤 컨테이너 Ref 추가
 
+  // 데이터 검증 및 재세팅 관련 상태 추가
+  const [dataValidationState, setDataValidationState] = useState<{
+    isValidating: boolean;
+    lastValidationTime: number | null;
+    validationErrors: string[];
+    retryCount: number;
+  }>({
+    isValidating: false,
+    lastValidationTime: null,
+    validationErrors: [],
+    retryCount: 0
+  });
+
   // 메모이제이션된 계산 값들
   const selectedMember = useMemo(() => {
     return groupMembers.find(member => member.isSelected) || null;
@@ -1231,8 +1244,6 @@ export default function LogsPage() {
       setIsLocationDataLoading(false);
     }
   };
-
-
 
   // 초기 로딩 완료 체크
   useEffect(() => {
@@ -4134,6 +4145,13 @@ export default function LogsPage() {
       }
       
       console.log('[LOGS] 일별 위치 기록 카운트 조회 완료:', response);
+      
+      // 데이터 검증 수행 (초기 로딩이 아닌 경우에만)
+      if (!isInitialLoading && dataValidationState.lastValidationTime) {
+        setTimeout(() => {
+          validateAndResyncData(groupId);
+        }, 2000);
+      }
     } catch (error) {
       console.error('[LOGS] 일별 위치 기록 카운트 조회 실패:', error);
       handleDataError(error, 'loadDailyLocationCounts');
@@ -4142,6 +4160,196 @@ export default function LogsPage() {
       setIsDailyCountsLoading(false);
       // 일별 위치 카운트 로딩 완료 햅틱 피드백
       hapticFeedback.dataLoadComplete();
+    }
+  };
+
+  // 데이터 검증 및 재세팅 함수들
+  const validateAndResyncData = async (groupId: number, forceResync: boolean = false) => {
+    if (dataValidationState.isValidating && !forceResync) {
+      console.log('[validateAndResyncData] 이미 검증 중이므로 건너뜀');
+      return;
+    }
+
+    setDataValidationState(prev => ({ ...prev, isValidating: true }));
+    console.log('[validateAndResyncData] 데이터 검증 및 재세팅 시작:', { groupId, forceResync });
+
+    try {
+      // 1. 일별 카운트 데이터 검증
+      const dailyCountsValidation = await validateDailyCountsData(groupId);
+      
+      // 2. 멤버별 활동 데이터 검증
+      const memberActivityValidation = await validateMemberActivityData(groupId);
+      
+      // 3. 그룹 멤버 데이터 검증
+      const groupMembersValidation = await validateGroupMembersData(groupId);
+
+      const allValidations = [dailyCountsValidation, memberActivityValidation, groupMembersValidation];
+      const hasErrors = allValidations.some(v => !v.isValid);
+      const errors = allValidations.flatMap(v => v.errors);
+
+      if (hasErrors) {
+        console.warn('[validateAndResyncData] 데이터 불일치 발견:', errors);
+        
+        // 재시도 횟수 확인
+        if (dataValidationState.retryCount < 3) {
+          console.log('[validateAndResyncData] 데이터 재세팅 시도:', dataValidationState.retryCount + 1);
+          await resyncAllData(groupId);
+          
+          setDataValidationState(prev => ({
+            ...prev,
+            retryCount: prev.retryCount + 1,
+            validationErrors: errors
+          }));
+        } else {
+          console.error('[validateAndResyncData] 최대 재시도 횟수 초과');
+          setDataValidationState(prev => ({
+            ...prev,
+            validationErrors: errors
+          }));
+        }
+      } else {
+        console.log('[validateAndResyncData] 모든 데이터 검증 통과');
+        setDataValidationState(prev => ({
+          ...prev,
+          retryCount: 0,
+          validationErrors: []
+        }));
+      }
+    } catch (error) {
+      console.error('[validateAndResyncData] 검증 중 오류 발생:', error);
+      setDataValidationState(prev => ({
+        ...prev,
+        validationErrors: [...prev.validationErrors, `검증 오류: ${error}`]
+      }));
+    } finally {
+      setDataValidationState(prev => ({
+        ...prev,
+        isValidating: false,
+        lastValidationTime: Date.now()
+      }));
+    }
+  };
+
+  // 일별 카운트 데이터 검증
+  const validateDailyCountsData = async (groupId: number) => {
+    try {
+      const currentData = dailyCountsData;
+      const freshData = await memberLocationLogService.getDailyLocationCounts(groupId, 14);
+      
+      if (!currentData || !freshData) {
+        return { isValid: false, errors: ['일별 카운트 데이터가 없습니다.'] };
+      }
+
+      const errors: string[] = [];
+      
+      // 총 카운트 비교
+      if (currentData.total_daily_counts.length !== freshData.total_daily_counts.length) {
+        errors.push(`일별 카운트 개수 불일치: ${currentData.total_daily_counts.length} vs ${freshData.total_daily_counts.length}`);
+      }
+      
+      // 각 날짜별 카운트 비교
+      currentData.total_daily_counts.forEach((currentDay, index) => {
+        const freshDay = freshData.total_daily_counts[index];
+        if (freshDay && currentDay.count !== freshDay.count) {
+          errors.push(`${currentDay.date} 카운트 불일치: ${currentDay.count} vs ${freshDay.count}`);
+        }
+      });
+
+      return { isValid: errors.length === 0, errors };
+    } catch (error) {
+      return { isValid: false, errors: [`일별 카운트 검증 오류: ${error}`] };
+    }
+  };
+
+  // 멤버별 활동 데이터 검증
+  const validateMemberActivityData = async (groupId: number) => {
+    try {
+      const currentData = memberActivityData;
+      const freshData = await memberLocationLogService.getMemberActivityByDate(groupId, selectedDate);
+      
+      if (!currentData || !freshData) {
+        return { isValid: false, errors: ['멤버 활동 데이터가 없습니다.'] };
+      }
+
+      const errors: string[] = [];
+      
+      // 멤버 활동 개수 비교
+      if (currentData.member_activities.length !== freshData.member_activities.length) {
+        errors.push(`멤버 활동 개수 불일치: ${currentData.member_activities.length} vs ${freshData.member_activities.length}`);
+      }
+      
+      // 각 멤버별 로그 수 비교
+      currentData.member_activities.forEach(currentMember => {
+        const freshMember = freshData.member_activities.find(m => m.member_id === currentMember.member_id);
+        if (freshMember && currentMember.log_count !== freshMember.log_count) {
+          errors.push(`${currentMember.member_name} 로그 수 불일치: ${currentMember.log_count} vs ${freshMember.log_count}`);
+        }
+      });
+
+      return { isValid: errors.length === 0, errors };
+    } catch (error) {
+      return { isValid: false, errors: [`멤버 활동 검증 오류: ${error}`] };
+    }
+  };
+
+  // 그룹 멤버 데이터 검증
+  const validateGroupMembersData = async (groupId: number) => {
+    try {
+      const currentMembers = groupMembers;
+      const freshMemberCount = await getGroupMemberCount(groupId);
+      
+      if (currentMembers.length !== freshMemberCount) {
+        return { 
+          isValid: false, 
+          errors: [`그룹 멤버 수 불일치: ${currentMembers.length} vs ${freshMemberCount}`] 
+        };
+      }
+
+      return { isValid: true, errors: [] };
+    } catch (error) {
+      return { isValid: false, errors: [`그룹 멤버 검증 오류: ${error}`] };
+    }
+  };
+
+  // 모든 데이터 재세팅
+  const resyncAllData = async (groupId: number) => {
+    console.log('[resyncAllData] 모든 데이터 재세팅 시작:', groupId);
+    
+    try {
+      // 캐시 무효화
+      // if (!DISABLE_CACHE) {
+      //   invalidateCache();
+      // }
+      
+      // 1. 그룹 멤버 재로딩
+      const freshMembers = await groupService.getGroupMembers(groupId);
+      // GroupMember 타입에 맞게 변환
+      const convertedMembers: GroupMember[] = freshMembers.map((member, index) => ({
+        id: member.mt_idx.toString(),
+        name: member.mt_name,
+        photo: member.mt_file1 || null,
+        isSelected: false,
+        location: { lat: 0, lng: 0 },
+        mt_gender: member.mt_gender,
+        original_index: index,
+        sgdt_owner_chk: member.sgdt_owner_chk,
+        sgdt_leader_chk: member.sgdt_leader_chk,
+        sgdt_idx: member.sgdt_idx
+      }));
+      setGroupMembers(convertedMembers);
+      
+      // 2. 일별 카운트 재로딩
+      const freshDailyCounts = await memberLocationLogService.getDailyLocationCounts(groupId, 14);
+      setDailyCountsData(freshDailyCounts);
+      
+      // 3. 멤버 활동 재로딩
+      const freshMemberActivity = await memberLocationLogService.getMemberActivityByDate(groupId, selectedDate);
+      setMemberActivityData(freshMemberActivity);
+      
+      console.log('[resyncAllData] 모든 데이터 재세팅 완료');
+    } catch (error) {
+      console.error('[resyncAllData] 데이터 재세팅 실패:', error);
+      throw error;
     }
   };
 
@@ -4179,6 +4387,34 @@ export default function LogsPage() {
       setRetryCount(0);
     }
   }, [groupMembers, dailyCountsData, memberActivityData]);
+
+  // 데이터 검증 자동 수행 (초기 로딩 완료 후)
+  useEffect(() => {
+    if (!selectedGroupId || isInitialLoading || dataValidationState.isValidating) {
+      return;
+    }
+
+    // 초기 로딩이 완료된 후 30초 후부터 검증 시작
+    const validationTimer = setTimeout(() => {
+      if (!isInitialLoading && selectedGroupId) {
+        console.log('[데이터 검증] 자동 검증 시작:', selectedGroupId);
+        validateAndResyncData(selectedGroupId);
+      }
+    }, 30000);
+
+    // 주기적 검증 (5분마다)
+    const periodicValidationTimer = setInterval(() => {
+      if (!isInitialLoading && selectedGroupId && !dataValidationState.isValidating) {
+        console.log('[데이터 검증] 주기적 검증 시작:', selectedGroupId);
+        validateAndResyncData(selectedGroupId);
+      }
+    }, 300000); // 5분
+
+    return () => {
+      clearTimeout(validationTimer);
+      clearInterval(periodicValidationTimer);
+    };
+  }, [selectedGroupId, isInitialLoading, dataValidationState.isValidating]);
 
   // 로딩 상태 안전장치 - 30초 후 강제 종료
   useEffect(() => {
@@ -4376,7 +4612,6 @@ export default function LogsPage() {
     // 마커 데이터가 있을 때만 지도 업데이트 수행 (빈 배열일 때는 건너뜀)
     if (isMapInitializedLogs && mapMarkersData.length > 0) {
       console.log('[LOGS] 지도에 마커 업데이트 실행:', mapMarkersData.length, '개');
-      // updateLocationLogMarkers(mapMarkersData); // loadLocationData에서 호출하므로 주석 처리
       
       // 첫 번째 마커(시작지점)를 기준으로 지도 중심 조정
       if (map.current && mapMarkersData.length > 0) {
@@ -6423,9 +6658,9 @@ export default function LogsPage() {
     // 시작위치로 지도 중심 재설정 (마커 생성 후 확실히 적용)
     if (locationMarkersData.length > 0 && mapCenter) {
       setTimeout(() => {
-        if (mapInstance && mapCenter) {
-          mapInstance.setCenter(mapCenter);
-          mapInstance.setZoom(16);
+        if (map.current && mapCenter) {
+          map.current.setCenter(mapCenter);
+          map.current.setZoom(16);
           console.log('[renderLocationDataOnMap] 시작위치로 지도 중심 재설정 완료');
         }
       }, 100);
@@ -6433,8 +6668,8 @@ export default function LogsPage() {
 
     // 9. 지도 새로고침 (마커 렌더링 완료 후 한 번만)
     setTimeout(() => {
-      if (mapInstance) { 
-        mapInstance.refresh(true); 
+      if (map.current) { 
+        map.current.refresh(true); 
         console.log('[renderLocationDataOnMap] 최종 지도 새로고침 완료');
       }
     }, 200);
@@ -6551,7 +6786,7 @@ export default function LogsPage() {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                className="absolute top-24 left-0 right-0 z-[100] z-floating-card flex justify-center px-4"
+                className="absolute top-20 left-0 right-0 z-[100] z-floating-card flex justify-center px-4"
               >
                 <motion.div
                    whileHover={{ 
@@ -6584,7 +6819,7 @@ export default function LogsPage() {
                              className="w-full h-full object-cover member-image"
                              priority={true}
                              placeholder="blur"
-                             blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
+                             blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
                              onError={(e) => {
                                const img = e.target as HTMLImageElement;
                                const member = groupMembers.find(m => m.isSelected);
@@ -7127,7 +7362,7 @@ export default function LogsPage() {
                                   className="w-full h-full object-cover member-image"
                                   placeholder="blur"
                                   priority={member.isSelected}
-                                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
+                                  blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
                                   onError={(e) => {
                                     const img = e.target as HTMLImageElement;
                                     const fallbackUrl = getDefaultImage(member.mt_gender, member.original_index);
@@ -7293,77 +7528,6 @@ export default function LogsPage() {
       
       {/* <DebugPanel />
       <LogParser /> */}
-      
-      <style jsx global>{`
-        /* 헤더 최상위 z-index 보장 */
-        .logs-header-container {
-          z-index: 10000 !important;
-          position: fixed !important;
-          top: 0 !important;
-          left: 0 !important;
-          right: 0 !important;
-        }
-        
-        /* 지도 컨테이너 z-index 설정 */
-        .logs-map-container {
-          z-index: 1 !important;
-          position: relative !important;
-        }
-        
-        /* 하드웨어 가속 최적화 */
-        .hardware-accelerated {
-          transform: translateZ(0);
-          will-change: transform, opacity;
-          backface-visibility: hidden;
-          perspective: 1000px;
-        }
-        
-        /* 터치 최적화 */
-        .touch-optimized {
-          -webkit-touch-callout: none;
-          -webkit-user-select: none;
-          -khtml-user-select: none;
-          -moz-user-select: none;
-          -ms-user-select: none;
-          user-select: none;
-          touch-action: manipulation;
-        }
-        
-        /* 멤버 이미지 로딩 최적화 */
-        .member-image {
-          image-rendering: -webkit-optimize-contrast;
-          image-rendering: crisp-edges;
-          transition: opacity 0.3s ease;
-        }
-        
-        /* 접근성 - 모션 감소 선호 사용자 대응 */
-        @media (prefers-reduced-motion: reduce) {
-          * {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-          }
-        }
-        
-        /* 스크롤바 숨기기 */
-        .hide-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        
-        /* 계층적 z-index 구조 */
-        .z-header { z-index: 10000; }
-        .z-sidebar { z-index: 600; }
-        .z-sidebar-overlay { z-index: 500; }
-        .z-floating-button { z-index: 400; }
-        .z-zoom-control { z-index: 200; }
-        .z-floating-card { z-index: 100; }
-        .z-map { z-index: 1; }
-      `}</style>
     </>
   );
-    }
+};
