@@ -12,6 +12,8 @@
         <domain includeSubdomains="true">smap-next.vercel.app</domain>
         <domain includeSubdomains="true">map.naver.com</domain>
         <domain includeSubdomains="true">map.naver.net</domain>
+        <domain includeSubdomains="true">216.198.79.65</domain>
+        <domain includeSubdomains="true">64.29.17.65</domain>
     </domain-config>
     
     <!-- 개발 환경용 설정 -->

@@ -16,9 +16,9 @@ android {
         versionName = "1.0.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
+        resourceConfigurations += setOf("ko", "en")
+
         // 기기 지원 범위 명시
-        resConfigs("ko", "en")
     }
 
     signingConfigs {
