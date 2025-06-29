@@ -455,6 +455,44 @@ const pageStyles = `
   margin: 0 !important;
 }
 
+/* 안드로이드 환경 최적화 */
+@media screen and (-webkit-device-pixel-ratio: 1),
+       screen and (-webkit-device-pixel-ratio: 1.5),
+       screen and (-webkit-device-pixel-ratio: 2),
+       screen and (-webkit-device-pixel-ratio: 3) {
+  /* 안드로이드 기기 감지 시 헤더 최적화 */
+  .header-fixed {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    padding-top: max(16px, env(safe-area-inset-top)) !important;
+    min-height: 64px !important;
+    height: auto !important;
+    z-index: 50 !important;
+    will-change: transform !important;
+    -webkit-transform: translateZ(0) !important;
+    transform: translateZ(0) !important;
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+  }
+  
+  /* 안드로이드에서 지도 컨테이너 상단 마진 증가 */
+  .full-map-container {
+    padding-top: max(72px, calc(env(safe-area-inset-top) + 72px)) !important;
+  }
+}
+
+/* 안드로이드 Chrome WebView 최적화 */
+@supports (-webkit-appearance: none) {
+  .header-fixed {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    touch-action: manipulation !important;
+  }
+}
+
 .full-map-container {
   position: fixed;
   top: 0;
@@ -6703,10 +6741,15 @@ export default function LogsPage() {
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="simple"
-          className="fixed top-0 left-0 right-0 z-99 glass-effect header-fixed"
-          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+          style={{ 
+            paddingTop: 'env(safe-area-inset-top)',
+            // 안드로이드에서 추가 상단 여백 보장
+            minHeight: '64px',
+            height: 'auto'
+          }}
         >
-          <div className="flex items-center justify-between h-14 px-4">
+          <div className="flex items-center justify-between h-14 px-4" style={{ minHeight: '56px' }}>
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-3">
                 <div>
@@ -6728,7 +6771,7 @@ export default function LogsPage() {
           animate="animate"
           className="full-map-container hardware-accelerated" 
           style={{ 
-            paddingTop: '56px', // 헤더 높이만큼 패딩 추가 (14 * 4 = 56px)
+            paddingTop: 'max(56px, calc(env(safe-area-inset-top) + 56px))', // 헤더 높이 + safe area 고려
             position: 'relative', // 로딩 오버레이를 위한 relative 포지션
             zIndex: 1 // 헤더보다 낮은 z-index
           }}
@@ -6748,7 +6791,7 @@ export default function LogsPage() {
           
           {/* 커스텀 줌 컨트롤 */}
           {map.current && (
-            <div className="absolute top-[70px] right-[10px] z-[200] z-zoom-control flex flex-col">
+            <div className="absolute top-[70px] right-[10px] z-30 z-zoom-control flex flex-col">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -6786,7 +6829,7 @@ export default function LogsPage() {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                className="absolute top-4 left-0 right-0 z-[100] z-floating-card flex justify-center px-4"
+                className="absolute top-4 left-0 right-0 z-40 z-floating-card flex justify-center px-4"
               >
                 <motion.div
                    whileHover={{ 
@@ -6992,7 +7035,7 @@ export default function LogsPage() {
         whileHover="hover"
         whileTap="tap"
         onClick={toggleSidebar}
-        className="fixed bottom-20 right-4 z-[400] z-floating-button w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white touch-optimized"
+        className="fixed bottom-20 right-4 z-40 z-floating-button w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white touch-optimized"
         style={{
           background: '#0113A3',
           boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)'
@@ -7047,7 +7090,7 @@ export default function LogsPage() {
             initial="closed"
             animate="open"
             exit="closed"
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
             onClick={() => {
               console.log('[사이드바] 오버레이 클릭으로 닫기');
               // 드롭다운이 열려있으면 사이드바를 닫지 않음
@@ -7077,7 +7120,7 @@ export default function LogsPage() {
             initial="closed"
             animate="open"
             exit="closed"
-            className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[9999] flex flex-col"
+            className="fixed left-0 top-0 w-80 shadow-2xl border-r z-50 flex flex-col"
             style={{ 
               background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
               borderColor: 'rgba(1, 19, 163, 0.1)',
