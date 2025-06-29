@@ -16,6 +16,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import { RiKakaoTalkFill } from 'react-icons/ri';
 import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
+import { handleKakaoLogin as kakaoLoginHandler } from './kakao-login-handler';
 
 // 카카오 SDK 타입 정의
 declare global {
@@ -67,8 +68,24 @@ const iosLogger = {
 
 // 카카오 로그인 함수
 const handleKakaoLogin = async () => {
-  console.log('카카오 로그인 시도');
-  // 카카오 로그인 로직 구현
+  console.log('💬 [KAKAO LOGIN] 카카오 로그인 버튼 클릭됨');
+  
+  // 햅틱 피드백 (버튼 클릭 시)
+  triggerHapticFeedback(HapticFeedbackType.LIGHT);
+  
+  // 🚨 디버깅: 현재 환경 상태 확인
+  console.log('🔍 [KAKAO LOGIN DEBUG] 현재 환경 상태:', {
+    hasWindow: typeof window !== 'undefined',
+    hasWebkit: typeof window !== 'undefined' && !!window.webkit,
+    hasMessageHandlers: typeof window !== 'undefined' && !!window.webkit?.messageHandlers,
+    hasSmapIos: typeof window !== 'undefined' && !!window.webkit?.messageHandlers?.smapIos,
+    availableHandlers: typeof window !== 'undefined' && window.webkit?.messageHandlers ? 
+      Object.keys(window.webkit.messageHandlers) : [],
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown'
+  });
+  
+  // 실제 카카오 로그인 핸들러 호출
+  await kakaoLoginHandler();
 };
 
 export default function SignInPage() {

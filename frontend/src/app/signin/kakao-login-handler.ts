@@ -2,17 +2,51 @@
 export const handleKakaoLogin = async () => {
   console.log('💬 [KAKAO LOGIN] 카카오 로그인 시도');
   
+  // 🚨 강력한 디버깅: 현재 환경 상태 확인
+  const debugInfo = {
+    hasWindow: typeof window !== 'undefined',
+    hasWebkit: typeof window !== 'undefined' && !!window.webkit,
+    hasMessageHandlers: typeof window !== 'undefined' && !!window.webkit?.messageHandlers,
+    hasSmapIos: typeof window !== 'undefined' && !!window.webkit?.messageHandlers?.smapIos,
+    availableHandlers: typeof window !== 'undefined' && window.webkit?.messageHandlers ? 
+      Object.keys(window.webkit.messageHandlers) : [],
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+    timestamp: new Date().toISOString()
+  };
+  
+  console.log('🔍 [KAKAO LOGIN DEBUG] 현재 환경 상태:', debugInfo);
+  
+  // 🚨 디버깅을 위한 alert (iOS WebView에서 확인 가능)
+  if (typeof window !== 'undefined' && window.webkit?.messageHandlers) {
+    const handlersCount = Object.keys(window.webkit.messageHandlers).length;
+    const hasSmapIos = !!window.webkit.messageHandlers.smapIos;
+    console.log(`🔍 [KAKAO LOGIN DEBUG] MessageHandlers 발견: ${handlersCount}개, smapIos: ${hasSmapIos ? '있음' : '없음'}`);
+    
+    // iOS WebView에서 확인하기 위한 alert
+    alert(`카카오 로그인 디버그:\nHandlers: ${handlersCount}개\nsmapIos: ${hasSmapIos ? '있음' : '없음'}\n핸들러목록: ${Object.keys(window.webkit.messageHandlers).join(', ')}`);
+  } else {
+    console.log('🔍 [KAKAO LOGIN DEBUG] WebKit MessageHandlers 없음 - 웹 브라우저 환경');
+    alert('카카오 로그인: 웹 브라우저 환경 감지');
+  }
+  
   // iOS 네이티브 환경 확인
   if (typeof window !== 'undefined' && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smapIos) {
     console.log('💬 [KAKAO LOGIN] iOS 네이티브 환경 감지, 네이티브 카카오 로그인 호출');
     
     try {
       // iOS 네이티브 카카오 로그인 호출
-      window.webkit.messageHandlers.smapIos.postMessage({
-        type: 'kakaoLogin'
-      });
+      const message = {
+        type: 'kakaoLogin',
+        timestamp: Date.now(),
+        source: 'kakao-login-handler'
+      };
       
-      console.log('💬 [KAKAO LOGIN] iOS 네이티브 카카오 로그인 요청 전송 완료');
+      console.log('📤 [KAKAO LOGIN] iOS로 메시지 전송 시도:', message);
+      window.webkit.messageHandlers.smapIos.postMessage(message);
+      console.log('✅ [KAKAO LOGIN] iOS 네이티브 카카오 로그인 요청 전송 완료');
+      
+      // 메시지 전송 확인 alert
+      alert('카카오 로그인 메시지를 iOS로 전송했습니다!');
       
       // 네이티브 카카오 로그인 성공 콜백 등록
       (window as any).onNativeKakaoLoginSuccess = async (userInfo: any) => {
