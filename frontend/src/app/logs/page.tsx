@@ -19,12 +19,12 @@ import { hapticFeedback } from '@/utils/haptic';
 import memberService from '@/services/memberService';
 
 // Dynamic Imports for better code splitting
-const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
-  loading: () => (
-    <div className="h-14 bg-gradient-to-r from-[#667eea] to-[#764ba2] animate-pulse" />
-  ),
-  ssr: false
-});
+// const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
+//   loading: () => (
+//     <div className="h-14 bg-gradient-to-r from-[#667eea] to-[#764ba2] animate-pulse" />
+//   ),
+//   ssr: false
+// });
 
 const DebugPanel = dynamic(() => import('../components/layout/DebugPanel'), {
   loading: () => (
@@ -6466,7 +6466,7 @@ export default function LogsPage() {
         style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
       >
         {/* 통일된 헤더 애니메이션 */}
-        <AnimatedHeader 
+        {/* <AnimatedHeader 
           variant="simple"
           className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
@@ -6481,7 +6481,7 @@ export default function LogsPage() {
               </div>
             </div>
           </div>
-        </AnimatedHeader>
+        </AnimatedHeader> */}
 
         {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
         
