@@ -26,12 +26,12 @@ export const handleKakaoLogin = async () => {
     console.log(`🔍 [KAKAO LOGIN DEBUG] MessageHandlers 발견: ${handlersCount}개, smapIos: ${hasSmapIos ? '있음' : '없음'}`);
     console.log(`🔍 [KAKAO LOGIN DEBUG] 핸들러 목록:`, Object.keys(window.webkit.messageHandlers));
     
-    // 임시 alert (테스트용)
-    alert(`카카오 로그인 디버그:\nHandlers: ${handlersCount}개\nsmapIos: ${hasSmapIos ? '있음' : '없음'}\n핸들러목록: ${Object.keys(window.webkit.messageHandlers).join(', ')}`);
+    // 임시 alert 제거 (로그만 사용)
+    // alert(`카카오 로그인 디버그:\nHandlers: ${handlersCount}개\nsmapIos: ${hasSmapIos ? '있음' : '없음'}\n핸들러목록: ${Object.keys(window.webkit.messageHandlers).join(', ')}`);
   } else {
     console.log('🔍 [KAKAO LOGIN DEBUG] WebKit MessageHandlers 없음 - 웹 브라우저 환경');
-    // 임시 alert (테스트용)
-    alert('카카오 로그인: 웹 브라우저 환경 감지');
+    // 임시 alert 제거 (로그만 사용)
+    // alert('카카오 로그인: 웹 브라우저 환경 감지');
   }
   
   // iOS 네이티브 환경 확인
@@ -50,8 +50,8 @@ export const handleKakaoLogin = async () => {
       window.webkit.messageHandlers.smapIos.postMessage(message);
       console.log('✅ [KAKAO LOGIN] iOS 네이티브 카카오 로그인 요청 전송 완료');
       
-      // 메시지 전송 확인 alert
-      alert('카카오 로그인 메시지를 iOS로 전송했습니다!');
+      // 메시지 전송 확인 로그 (alert 제거)
+      console.log('✅ [KAKAO LOGIN] 카카오 로그인 메시지를 iOS로 전송 완료!');
       
       // 🚨 테스트: 햅틱 피드백도 함께 전송해보기
       try {
