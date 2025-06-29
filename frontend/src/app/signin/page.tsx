@@ -88,6 +88,84 @@ const handleKakaoLogin = async () => {
   await kakaoLoginHandler();
 };
 
+// 🚨 iOS 네이티브 카카오 로그인 콜백 등록 (전역 함수)
+if (typeof window !== 'undefined') {
+  (window as any).onNativeKakaoLoginSuccess = async (userInfo: any) => {
+    console.log('🎯 [NATIVE CALLBACK] iOS 앱에서 카카오 로그인 성공 콜백 수신:', userInfo);
+    
+    try {
+      console.log('🔄 [NATIVE CALLBACK] 백엔드 카카오 인증 API 호출 시작');
+      
+      // 백엔드 API로 액세스 토큰 전송
+      const response = await fetch('/api/kakao-auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          access_token: userInfo.accessToken,
+          userInfo: userInfo.userInfo,
+          source: 'native'
+        }),
+      });
+
+      const data = await response.json();
+      
+      console.log('📡 [NATIVE CALLBACK] 백엔드 카카오 인증 API 응답:', {
+        success: data.success,
+        hasUser: !!data.user,
+        hasError: !!data.error,
+        responseStatus: response.status
+      });
+
+      if (data.success) {
+        console.log('[NATIVE CALLBACK] 카카오 로그인 성공:', {
+          isNewUser: data.isNewUser,
+          hasUser: !!data.user,
+          hasSocialData: !!data.socialLoginData
+        });
+        
+        // 카카오 로그인 성공 햅틱 피드백
+        triggerHapticFeedback(HapticFeedbackType.SUCCESS);
+        
+        // 신규회원/기존회원에 따른 분기 처리
+        if (data.isNewUser) {
+          console.log('[NATIVE CALLBACK] 신규회원 - 회원가입 페이지로 이동');
+          
+          // 소셜 로그인 데이터를 sessionStorage에 저장
+          if (data.socialLoginData) {
+            sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
+            console.log('[NATIVE CALLBACK] 소셜 로그인 데이터 저장 완료');
+          }
+          
+          // 회원가입 페이지로 이동
+          window.location.href = '/register?social=kakao';
+          return;
+          
+        } else {
+          console.log('[NATIVE CALLBACK] 기존회원 - 홈으로 이동');
+          
+          // 홈으로 리다이렉트
+          window.location.href = '/home';
+        }
+      } else {
+        console.error('[NATIVE CALLBACK] 서버 인증 실패:', data.error);
+        alert(data.error || '서버 인증에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('❌ [NATIVE CALLBACK] 백엔드 API 호출 실패:', error);
+      alert('네트워크 오류가 발생했습니다.');
+    }
+  };
+  
+  (window as any).onNativeKakaoLoginError = (error: any) => {
+    console.error('❌ [NATIVE CALLBACK] iOS 앱에서 카카오 로그인 실패 콜백 수신:', error);
+    alert(error?.message || '네이티브 카카오 로그인에 실패했습니다.');
+  };
+  
+  console.log('✅ [NATIVE CALLBACK] 네이티브 카카오 로그인 콜백 함수 등록 완료');
+}
+
 export default function SignInPage() {
   // 🚨 페이지 로드 디버깅
   console.log('[SIGNIN PAGE] 컴포넌트 로딩 시작', {

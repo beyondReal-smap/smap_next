@@ -1117,6 +1117,9 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
     private func handleSmapIOSMessage(_ message: WKScriptMessage) {
         guard let body = message.body as? [String: Any] else { return }
         
+        print("📨 [MessageHandler] 메시지 수신: smapIos")
+        print("📦 [MessageHandler] 메시지 내용: \(body)")
+        
         let type = body["type"] as? String ?? ""
         let param = body["param"]
         
@@ -1127,6 +1130,9 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
             handleJavaScriptLog(param: param)
         case "googleSignIn":
             handleGoogleSignIn()
+        case "kakaoLogin":
+            print("🚨🚨🚨 [KAKAO LOGIN] 카카오 로그인 요청 수신!")
+            handleKakaoLogin()
         default:
             print("⚠️ [SMAP-iOS] 알 수 없는 타입: \(type)")
         }
@@ -1331,6 +1337,42 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
     private func handleGoogleSignIn() {
         print("🔐 [Auth] Google Sign-In 요청")
         // Google Sign-In 처리 로직
+    }
+    
+    private func handleKakaoLogin() {
+        print("🔥🔥🔥 [KAKAO LOGIN] 카카오 로그인 함수 시작!")
+        
+        // Heavy 햅틱 테스트 실행
+        let generator = UIImpactFeedbackGenerator(style: .heavy)
+        generator.prepare()
+        generator.impactOccurred()
+        print("🎮 [KAKAO LOGIN] Heavy 햅틱 실행 완료")
+        
+        DispatchQueue.main.async {
+            print("🚀 [KAKAO LOGIN] 카카오 로그인 처리 시작")
+            
+            // 웹으로 카카오 로그인 결과 전송
+            let resultScript = """
+                if (window.kakaoLoginCallback) {
+                    console.log('🔥 [iOS-NATIVE] 카카오 로그인 콜백 실행 중...');
+                    window.kakaoLoginCallback({
+                        success: true,
+                        message: 'iOS에서 카카오 로그인 처리 완료',
+                        source: 'ios-native'
+                    });
+                } else {
+                    console.log('⚠️ [iOS-NATIVE] kakaoLoginCallback 함수를 찾을 수 없습니다');
+                }
+            """
+            
+            self.webView?.evaluateJavaScript(resultScript) { result, error in
+                if let error = error {
+                    print("❌ [KAKAO LOGIN] 웹 콜백 실행 실패: \(error)")
+                } else {
+                    print("✅ [KAKAO LOGIN] 웹 콜백 실행 완료")
+                }
+            }
+        }
     }
 }
 
