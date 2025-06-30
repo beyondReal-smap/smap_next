@@ -6798,7 +6798,7 @@ export default function LogsPage() {
             <div 
               className="absolute right-[10px] z-30 z-zoom-control flex flex-col"
               style={{
-                top: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '140px' : '170px'
+                top: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '140px' : '190px'
               }}
             >
               <motion.button
@@ -6840,7 +6840,7 @@ export default function LogsPage() {
                 exit="exit"
                 className="absolute left-0 right-0 z-40 z-floating-card flex justify-center px-4"
                 style={{
-                  top: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '70px' : '100px'
+                  top: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '70px' : '120px'
                 }}
               >
                 <motion.div

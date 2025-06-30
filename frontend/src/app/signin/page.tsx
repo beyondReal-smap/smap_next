@@ -16,7 +16,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import { RiKakaoTalkFill } from 'react-icons/ri';
 import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
-import { handleKakaoLogin as kakaoLoginHandler } from './kakao-login-handler';
+
 
 // 카카오 SDK 타입 정의
 declare global {
@@ -78,21 +78,39 @@ const SignInPage = () => {
     timestamp: new Date().toISOString()
   });
 
-  // 🚨 카카오 콜백 초기화
+  // 🚨 페이지 초기화 및 에러 모달 상태 복원
   useEffect(() => {
     // 안전하게 window 객체 확인
     if (typeof window === 'undefined') {
-      console.log('[INIT KAKAO] 서버사이드에서 실행됨, 스킵');
+      console.log('[INIT] 서버사이드에서 실행됨, 스킵');
       return;
     }
     
-    console.log('[INIT KAKAO] 클라이언트사이드에서 카카오 콜백 초기화 시작');
+    console.log('[INIT] 클라이언트사이드 초기화 시작');
     
-    // 간단한 콜백 함수로 수정
+    // 에러 모달 상태 복원
+    try {
+      const savedErrorFlag = sessionStorage.getItem('__SIGNIN_ERROR_MODAL_ACTIVE__') === 'true';
+      if (savedErrorFlag) {
+        console.log('[SIGNIN] 🔄 페이지 로드 시 브라우저 저장소에서 에러 모달 상태 복원');
+        
+        const savedErrorMessage = sessionStorage.getItem('__SIGNIN_ERROR_MESSAGE__') || '';
+        (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+        (window as any).__SIGNIN_ERROR_MESSAGE__ = savedErrorMessage;
+        
+        setShowErrorModal(true);
+        if (savedErrorMessage) {
+          setErrorModalMessage(savedErrorMessage);
+        }
+      }
+    } catch (error) {
+      console.warn('[SIGNIN] sessionStorage 접근 실패:', error);
+    }
+    
+    // 카카오 콜백 함수 등록
     (window as any).onNativeKakaoLoginSuccess = (userInfo: any) => {
       console.log('🎯 [NATIVE CALLBACK] iOS 카카오 로그인 성공:', userInfo);
       
-      // sessionStorage에 카카오 로그인 정보 저장
       if (userInfo && userInfo.accessToken) {
         try {
           const kakaoLoginData = {
@@ -105,7 +123,6 @@ const SignInPage = () => {
           sessionStorage.setItem('pendingKakaoLogin', JSON.stringify(kakaoLoginData));
           console.log('[NATIVE CALLBACK] 카카오 로그인 정보 sessionStorage에 저장 완료');
           
-          // 홈으로 리다이렉트
           console.log('[NATIVE CALLBACK] 홈으로 이동');
           window.location.href = '/home';
         } catch (error) {
@@ -123,19 +140,24 @@ const SignInPage = () => {
       alert('카카오 로그인에 실패했습니다.');
     };
     
-    console.log('✅ [NATIVE CALLBACK] 카카오 콜백 함수 등록 완료');
+    console.log('✅ [INIT] 초기화 완료');
   }, []);
 
   // 카카오 로그인 함수
   const handleKakaoLogin = async () => {
     console.log('💬 [KAKAO LOGIN] 카카오 로그인 버튼 클릭됨');
     
-    // 햅틱 피드백 (버튼 클릭 시)
-    triggerHapticFeedback(HapticFeedbackType.LIGHT);
-    
-    // 간단한 네이티브 메시지 전송
-    if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.smapIos) {
-      try {
+    try {
+      // 햅틱 피드백 (버튼 클릭 시)
+      triggerHapticFeedback(HapticFeedbackType.LIGHT);
+      
+      // iOS 네이티브 환경 체크
+      const isIOSNative = typeof window !== 'undefined' && 
+                          window.webkit && 
+                          window.webkit.messageHandlers && 
+                          window.webkit.messageHandlers.smapIos;
+      
+      if (isIOSNative) {
         console.log('💬 [KAKAO LOGIN] iOS 네이티브 환경 감지, 네이티브 카카오 로그인 호출');
         
         const message = {
@@ -144,53 +166,22 @@ const SignInPage = () => {
         };
         
         console.log('📤 [KAKAO LOGIN] iOS로 메시지 전송:', message);
-        window.webkit.messageHandlers.smapIos.postMessage(message);
+        (window as any).webkit.messageHandlers.smapIos.postMessage(message);
         console.log('✅ [KAKAO LOGIN] iOS 네이티브 카카오 로그인 요청 전송 완료');
-      } catch (error) {
-        console.error('❌ [KAKAO LOGIN] 메시지 전송 실패:', error);
+      } else {
+        console.log('💬 [KAKAO LOGIN] 웹 환경 감지');
+        alert('카카오 로그인은 앱에서만 지원됩니다.');
       }
-    } else {
-      console.log('💬 [KAKAO LOGIN] 웹 환경 감지');
-      alert('카카오 로그인은 앱에서만 지원됩니다.');
+    } catch (error) {
+      console.error('❌ [KAKAO LOGIN] 메시지 전송 실패:', error);
+      alert('카카오 로그인 중 오류가 발생했습니다.');
     }
   };
 
   // 🚨 페이지 로드 즉시 브라우저 저장소에서 에러 모달 상태 확인 및 복원
-  const [showErrorModal, setShowErrorModal] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedErrorFlag = sessionStorage.getItem('__SIGNIN_ERROR_MODAL_ACTIVE__') === 'true';
-        if (savedErrorFlag) {
-          console.log('[SIGNIN] 🔄 페이지 로드 시 브라우저 저장소에서 에러 모달 상태 복원');
-          
-          // 전역 플래그도 즉시 복원
-          const savedErrorMessage = sessionStorage.getItem('__SIGNIN_ERROR_MESSAGE__') || '';
-          (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
-          (window as any).__SIGNIN_ERROR_MESSAGE__ = savedErrorMessage;
-          
-          return true;
-        }
-      } catch (error) {
-        console.warn('[SIGNIN] sessionStorage 접근 실패:', error);
-      }
-    }
-    return false;
-  });
+  const [showErrorModal, setShowErrorModal] = useState(false);
   
-  const [errorModalMessage, setErrorModalMessage] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const savedErrorMessage = sessionStorage.getItem('__SIGNIN_ERROR_MESSAGE__') || '';
-        if (savedErrorMessage) {
-          console.log('[SIGNIN] 🔄 페이지 로드 시 에러 메시지 복원:', savedErrorMessage);
-          return savedErrorMessage;
-        }
-      } catch (error) {
-        console.warn('[SIGNIN] sessionStorage 접근 실패:', error);
-      }
-    }
-    return '';
-  });
+  const [errorModalMessage, setErrorModalMessage] = useState('');
 
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
