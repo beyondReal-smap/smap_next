@@ -83,7 +83,7 @@ const SignInPage = () => {
     // 안전하게 window 객체 확인
     if (typeof window === 'undefined') {
       console.log('[INIT] 서버사이드에서 실행됨, 스킵');
-      return;
+      return undefined;
     }
     
     console.log('[INIT] 클라이언트사이드 초기화 시작');
@@ -330,7 +330,7 @@ const SignInPage = () => {
             
             // 회원가입 페이지로 이동
             window.location.href = '/register?social=google';
-            return;
+            return undefined;
             
           } else {
             console.log('[NATIVE CALLBACK] 기존회원 - 홈으로 이동');
@@ -869,7 +869,7 @@ const SignInPage = () => {
     
     // 프로덕션에서는 에러와 경고만 전송
     if (isProduction && level === 'info') {
-      return;
+      return undefined;
     }
     
     const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
@@ -947,7 +947,7 @@ const SignInPage = () => {
     // 중복 호출 방지
     if ((window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__) {
       console.log('[GOOGLE SDK] 이미 로그인 진행 중, 중복 호출 무시');
-      return;
+      return undefined;
     }
     
     (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = true;
@@ -1186,7 +1186,7 @@ const SignInPage = () => {
           setIsLoading(false);
         }, 100);
         
-        return;
+        return undefined;
       }
     }
     
@@ -1206,7 +1206,7 @@ const SignInPage = () => {
           setIsLoading(false);
         }, 100);
       }
-      return;
+      return undefined;
     }
     
     if (componentMountedRef.current && !preventRemountRef.current) {
@@ -1217,7 +1217,7 @@ const SignInPage = () => {
       // 강제로 현재 페이지 상태 유지
       window.history.replaceState(null, '', window.location.href);
       
-      return;
+      return undefined;
     }
     
     if (!componentMountedRef.current) {
@@ -1231,20 +1231,20 @@ const SignInPage = () => {
     // 전역 에러 모달 플래그 확인 - 최우선 차단
     if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
       console.log('[SIGNIN] 🚫 전역 에러 모달 플래그로 인한 메인 useEffect 차단');
-      return;
+      return undefined;
     }
     
     // 모든 useEffect 차단 플래그가 설정되어 있으면 아무것도 하지 않음
     if (blockAllEffectsRef.current || preventRemountRef.current) {
       console.log('[SIGNIN] 🚫 모든 useEffect 차단됨 (재마운트 방지 포함)');
-      return;
+      return undefined;
     }
     
     // 에러 모달이 표시 중이면 아무것도 하지 않음 (최우선 조건)
     if (showErrorModal) {
       console.log('[SIGNIN] ⛔ 에러 모달 표시 중, useEffect 완전 중단');
       blockAllEffectsRef.current = true; // 차단 플래그 설정
-      return;
+      return undefined;
     }
     
     console.log('[SIGNIN] 🔄 메인 useEffect 실행:', { isLoggedIn, loading, showErrorModal, isCheckingAuth });
@@ -1252,7 +1252,7 @@ const SignInPage = () => {
     // 로딩 중이면 대기
     if (loading) {
       console.log('[SIGNIN] AuthContext 로딩 중, 대기...');
-      return;
+      return undefined;
     }
 
     // URL에서 탈퇴 완료 플래그 확인
@@ -1270,7 +1270,7 @@ const SignInPage = () => {
       if (isCheckingAuth) {
         setIsCheckingAuth(false);
       }
-      return;
+      return undefined;
     }
 
     // 로그인된 사용자는 홈으로 리다이렉트 (한 번만 실행)
@@ -1282,7 +1282,7 @@ const SignInPage = () => {
       blockAllEffectsRef.current = true;
       
       router.replace('/home');
-      return;
+      return undefined;
     }
 
     // 로그인되지 않은 상태에서만 페이지 표시 (상태 변경 최소화)
@@ -1749,13 +1749,13 @@ const SignInPage = () => {
     // 전역 에러 모달 플래그 확인 - 최우선 차단
     if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
       console.log('[SIGNIN] 🚫 전역 에러 모달 플래그로 인한 useEffect 차단');
-      return;
+      return undefined;
     }
     
     // 모든 useEffect 차단 플래그가 설정되어 있으면 아무것도 하지 않음
     if (blockAllEffectsRef.current) {
       console.log('[SIGNIN] 🚫 에러 감지 useEffect 차단됨');
-      return;
+      return undefined;
     }
     
     console.log('[SIGNIN] 🚨 에러 감지 useEffect 실행:', { 
@@ -1874,7 +1874,7 @@ const SignInPage = () => {
       
       setFormErrors(currentFormErrors);
       setIsLoading(false);
-      return;
+      return undefined;
     }
 
     try {
@@ -2308,7 +2308,7 @@ const SignInPage = () => {
       window.history.pushState = function(...args) {
         if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
           console.log('[SIGNIN] 🚫 history.pushState 차단!');
-          return;
+          return undefined;
         }
         return originalPush.apply(this, args);
       };
@@ -2316,7 +2316,7 @@ const SignInPage = () => {
       window.history.replaceState = function(...args) {
         if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
           console.log('[SIGNIN] 🚫 history.replaceState 차단!');
-          return;
+          return undefined;
         }
         return originalReplace.apply(this, args);
       };
@@ -2380,7 +2380,7 @@ const SignInPage = () => {
             set: function(value) {
               if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
                 console.log('[SIGNIN] 🚫 __NEXT_DATA__ 변경 차단!');
-                return;
+                return undefined;
               }
               originalNextData = value;
             },
@@ -2424,13 +2424,13 @@ const SignInPage = () => {
   const handleGoogleLogin = async () => {
     if (isLoading) {
       console.log('🚫 [GOOGLE LOGIN] 이미 로딩 중입니다.');
-      return;
+      return undefined;
     }
     
     // 중복 실행 방지를 위한 플래그 체크
     if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
       console.log('🚫 [GOOGLE LOGIN] 이미 진행 중인 로그인이 있습니다.');
-      return;
+      return undefined;
     }
     
     setIsLoading(true);
@@ -2490,12 +2490,12 @@ const SignInPage = () => {
               }
             }, 3000);
             
-            return;
+            return undefined;
           } catch (error) {
             console.error('❌ [GOOGLE LOGIN] iOS 네이티브 호출 실패:', error);
             console.log('🔄 [IOS FALLBACK] iOS 실패로 웹 SDK로 폴백');
             await handleGoogleSDKLogin();
-            return;
+            return undefined;
           }
         } else {
           console.warn('🍎 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 인터페이스가 없습니다. 웹 SDK로 폴백합니다');
@@ -2504,7 +2504,7 @@ const SignInPage = () => {
           await handleGoogleSDKLogin();
         }
         
-        return; // iOS 처리가 완료되면 함수 종료
+        return undefined; // iOS 처리가 완료되면 함수 종료
       }
       
       // Android 환경 체크 및 처리
@@ -2578,12 +2578,12 @@ const SignInPage = () => {
               }
             }, 1000); // 3초에서 1초로 단축
             
-            return;
+            return undefined;
           } catch (error) {
             console.error('❌ [GOOGLE LOGIN] Android 네이티브 호출 실패:', error);
             console.log('🔄 [ANDROID FALLBACK] Android 실패로 웹 SDK로 폴백');
             await handleGoogleSDKLogin();
-            return;
+            return undefined;
           }
         } else {
           console.warn('🤖 [GOOGLE LOGIN] Android 네이티브 Google 로그인 인터페이스가 없습니다. 웹 SDK로 폴백합니다');
@@ -2601,7 +2601,7 @@ const SignInPage = () => {
           await handleGoogleSDKLogin();
         }
         
-        return; // Android 처리가 완료되면 함수 종료
+        return undefined; // Android 처리가 완료되면 함수 종료
       }
       
       // 웹 환경 또는 기타 환경에서 웹 SDK 사용
@@ -2803,7 +2803,7 @@ const SignInPage = () => {
     
     if (!messageHandlers) {
       console.log('❌ [FORCE CHECK] messageHandlers 객체 없음');
-      return;
+      return undefined;
     }
     
     // 각 핸들러 테스트
@@ -2894,17 +2894,17 @@ const SignInPage = () => {
           handleGoogleSDKLogin();
         }, 2000);
         
-        return;
+        return undefined;
       } else {
         console.log('⚠️ [IOS FALLBACK] iOS smapIos 핸들러 없음, 웹 SDK로 폴백');
         handleGoogleSDKLogin();
-        return;
+        return undefined;
       }
     } catch (error) {
       console.error('❌ [GOOGLE LOGIN] iOS 네이티브 호출 실패:', error);
       console.log('🔄 [IOS FALLBACK] iOS 실패로 웹 SDK로 폴백');
       handleGoogleSDKLogin();
-      return;
+      return undefined;
     }
   }
   */
