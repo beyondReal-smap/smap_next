@@ -6795,7 +6795,12 @@ export default function LogsPage() {
           
           {/* 커스텀 줌 컨트롤 */}
           {map.current && (
-            <div className="absolute top-[140px] right-[10px] z-30 z-zoom-control flex flex-col">
+            <div 
+              className="absolute right-[10px] z-30 z-zoom-control flex flex-col"
+              style={{
+                top: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '140px' : '170px'
+              }}
+            >
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -6833,7 +6838,10 @@ export default function LogsPage() {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                className="absolute top-[70px] left-0 right-0 z-40 z-floating-card flex justify-center px-4"
+                className="absolute left-0 right-0 z-40 z-floating-card flex justify-center px-4"
+                style={{
+                  top: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '70px' : '100px'
+                }}
               >
                 <motion.div
                    whileHover={{ 
