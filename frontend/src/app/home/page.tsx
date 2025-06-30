@@ -1723,6 +1723,67 @@ export default function HomePage() {
   
     // 로그인 상태 확인 및 사용자 정보 초기화 (Google 로그인 동기화 개선)
   useEffect(() => {
+    // 🚨 카카오 로그인 처리
+    const processPendingKakaoLogin = async () => {
+      try {
+        const pendingLoginData = sessionStorage.getItem('pendingKakaoLogin');
+        if (pendingLoginData) {
+          console.log('[HOME] 대기 중인 카카오 로그인 데이터 발견');
+          
+          const loginData = JSON.parse(pendingLoginData);
+          
+          // sessionStorage에서 제거
+          sessionStorage.removeItem('pendingKakaoLogin');
+          
+          // 백엔드 API 호출
+          const response = await fetch('/api/kakao-auth', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              access_token: loginData.accessToken,
+              userInfo: loginData.userInfo,
+              source: 'native'
+            }),
+          });
+
+          const data = await response.json();
+          
+          console.log('[HOME] 카카오 인증 API 응답:', {
+            success: data.success,
+            isNewUser: data.isNewUser
+          });
+
+          if (data.success) {
+            if (data.isNewUser) {
+              console.log('[HOME] 신규회원 - 회원가입 페이지로 리다이렉트');
+              
+              // 소셜 로그인 데이터 저장
+              if (data.socialLoginData) {
+                sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
+              }
+              
+              window.location.href = '/register?social=kakao';
+              return; // 함수 종료
+            } else {
+              console.log('[HOME] 기존회원 - 로그인 완료');
+              // 페이지를 새로고침하여 로그인 상태 반영
+              console.log('[HOME] 카카오 로그인 후 페이지 새로고침');
+              window.location.reload();
+            }
+          } else {
+            console.error('[HOME] 카카오 인증 실패:', data.error);
+            alert(data.error || '카카오 로그인에 실패했습니다.');
+            window.location.href = '/signin';
+            return; // 함수 종료
+          }
+        }
+      } catch (error) {
+        console.error('[HOME] 카카오 로그인 처리 실패:', error);
+      }
+    };
+
     const initializeUserAuth = async () => {
       // 인증 로딩 중이면 대기
       if (authLoading) {
@@ -1885,7 +1946,13 @@ export default function HomePage() {
         }
     };
 
-    initializeUserAuth();
+    // 먼저 카카오 로그인 처리, 그 다음 일반 인증 처리
+    const runAuthSequence = async () => {
+      await processPendingKakaoLogin();
+      await initializeUserAuth();
+    };
+
+    runAuthSequence();
   }, [authLoading, isLoggedIn, user, router]);
 
   // 🗺️ 지도 API 로딩 및 초기화 - 컴포넌트 마운트 시 시작

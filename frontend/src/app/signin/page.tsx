@@ -66,27 +66,7 @@ const iosLogger = {
   }
 };
 
-// 카카오 로그인 함수
-const handleKakaoLogin = async () => {
-  console.log('💬 [KAKAO LOGIN] 카카오 로그인 버튼 클릭됨');
-  
-  // 햅틱 피드백 (버튼 클릭 시)
-  triggerHapticFeedback(HapticFeedbackType.LIGHT);
-  
-  // 🚨 디버깅: 현재 환경 상태 확인
-  console.log('🔍 [KAKAO LOGIN DEBUG] 현재 환경 상태:', {
-    hasWindow: typeof window !== 'undefined',
-    hasWebkit: typeof window !== 'undefined' && !!window.webkit,
-    hasMessageHandlers: typeof window !== 'undefined' && !!window.webkit?.messageHandlers,
-    hasSmapIos: typeof window !== 'undefined' && !!window.webkit?.messageHandlers?.smapIos,
-    availableHandlers: typeof window !== 'undefined' && window.webkit?.messageHandlers ? 
-      Object.keys(window.webkit.messageHandlers) : [],
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown'
-  });
-  
-  // 실제 카카오 로그인 핸들러 호출
-  await kakaoLoginHandler();
-};
+
 
 
 
@@ -108,95 +88,72 @@ const SignInPage = () => {
     
     console.log('[INIT KAKAO] 클라이언트사이드에서 카카오 콜백 초기화 시작');
     
-    try {
-      // 즉시 등록
-      (window as any).onNativeKakaoLoginSuccess = async (userInfo: any) => {
-        console.log('🎯 [NATIVE CALLBACK] iOS 앱에서 카카오 로그인 성공 콜백 수신:', userInfo);
-        
+    // 간단한 콜백 함수로 수정
+    (window as any).onNativeKakaoLoginSuccess = (userInfo: any) => {
+      console.log('🎯 [NATIVE CALLBACK] iOS 카카오 로그인 성공:', userInfo);
+      
+      // sessionStorage에 카카오 로그인 정보 저장
+      if (userInfo && userInfo.accessToken) {
         try {
-          console.log('🔄 [NATIVE CALLBACK] 백엔드 카카오 인증 API 호출 시작');
+          const kakaoLoginData = {
+            accessToken: userInfo.accessToken,
+            userInfo: userInfo,
+            timestamp: Date.now(),
+            source: 'native'
+          };
           
-          // 백엔드 API로 액세스 토큰 전송
-          const response = await fetch('/api/kakao-auth', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              access_token: userInfo.accessToken,
-              userInfo: userInfo.userInfo,
-              source: 'native'
-            }),
-          });
-
-          const data = await response.json();
+          sessionStorage.setItem('pendingKakaoLogin', JSON.stringify(kakaoLoginData));
+          console.log('[NATIVE CALLBACK] 카카오 로그인 정보 sessionStorage에 저장 완료');
           
-          console.log('📡 [NATIVE CALLBACK] 백엔드 카카오 인증 API 응답:', {
-            success: data.success,
-            hasUser: !!data.user,
-            hasError: !!data.error,
-            responseStatus: response.status,
-            isNewUser: data.isNewUser
-          });
-
-          if (data.success) {
-            console.log('[NATIVE CALLBACK] 카카오 로그인 성공:', {
-              isNewUser: data.isNewUser,
-              hasUser: !!data.user,
-              hasSocialData: !!data.socialLoginData
-            });
-            
-            // 카카오 로그인 성공 햅틱 피드백
-            if (typeof triggerHapticFeedback === 'function') {
-              triggerHapticFeedback(HapticFeedbackType.SUCCESS);
-            }
-            
-            // 신규회원/기존회원에 따른 분기 처리
-            if (data.isNewUser) {
-              console.log('[NATIVE CALLBACK] 신규회원 감지 - 회원가입 페이지로 이동 준비');
-              
-              // 소셜 로그인 데이터를 sessionStorage에 저장
-              if (data.socialLoginData) {
-                try {
-                  sessionStorage.setItem('socialLoginData', JSON.stringify(data.socialLoginData));
-                  console.log('[NATIVE CALLBACK] 소셜 로그인 데이터 저장 완료');
-                } catch (storageError) {
-                  console.error('[NATIVE CALLBACK] sessionStorage 저장 실패:', storageError);
-                }
-              }
-              
-              // 회원가입 페이지로 이동
-              console.log('[NATIVE CALLBACK] 신규회원 리다이렉트 실행');
-              window.location.replace('/register?social=kakao');
-              
-            } else {
-              console.log('[NATIVE CALLBACK] 기존회원 감지 - 홈으로 이동 준비');
-              
-              // 홈으로 리다이렉트
-              console.log('[NATIVE CALLBACK] 기존회원 리다이렉트 실행');
-              window.location.replace('/home');
-            }
-          } else {
-            console.error('[NATIVE CALLBACK] 서버 인증 실패:', data.error);
-            alert(data.error || '서버 인증에 실패했습니다.');
-          }
+          // 홈으로 리다이렉트
+          console.log('[NATIVE CALLBACK] 홈으로 이동');
+          window.location.href = '/home';
         } catch (error) {
-          console.error('❌ [NATIVE CALLBACK] 백엔드 API 호출 실패:', error);
-          alert('네트워크 오류가 발생했습니다.');
+          console.error('[NATIVE CALLBACK] sessionStorage 저장 실패:', error);
+          alert('로그인 정보 저장에 실패했습니다.');
         }
-      };
-      
-      (window as any).onNativeKakaoLoginError = (error: any) => {
-        console.error('❌ [NATIVE CALLBACK] iOS 앱에서 카카오 로그인 실패 콜백 수신:', error);
-        alert(error?.message || '네이티브 카카오 로그인에 실패했습니다.');
-      };
-      
-      console.log('✅ [NATIVE CALLBACK] 네이티브 카카오 로그인 콜백 함수 등록 완료');
-      
-    } catch (initError) {
-      console.error('❌ [INIT KAKAO] 카카오 콜백 초기화 실패:', initError);
-    }
+      } else {
+        console.error('[NATIVE CALLBACK] 유효하지 않은 사용자 정보');
+        alert('로그인 정보가 유효하지 않습니다.');
+      }
+    };
+    
+    (window as any).onNativeKakaoLoginError = (error: any) => {
+      console.error('❌ [NATIVE CALLBACK] iOS 카카오 로그인 실패:', error);
+      alert('카카오 로그인에 실패했습니다.');
+    };
+    
+    console.log('✅ [NATIVE CALLBACK] 카카오 콜백 함수 등록 완료');
   }, []);
+
+  // 카카오 로그인 함수
+  const handleKakaoLogin = async () => {
+    console.log('💬 [KAKAO LOGIN] 카카오 로그인 버튼 클릭됨');
+    
+    // 햅틱 피드백 (버튼 클릭 시)
+    triggerHapticFeedback(HapticFeedbackType.LIGHT);
+    
+    // 간단한 네이티브 메시지 전송
+    if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.smapIos) {
+      try {
+        console.log('💬 [KAKAO LOGIN] iOS 네이티브 환경 감지, 네이티브 카카오 로그인 호출');
+        
+        const message = {
+          type: 'kakaoLogin',
+          timestamp: Date.now(),
+        };
+        
+        console.log('📤 [KAKAO LOGIN] iOS로 메시지 전송:', message);
+        window.webkit.messageHandlers.smapIos.postMessage(message);
+        console.log('✅ [KAKAO LOGIN] iOS 네이티브 카카오 로그인 요청 전송 완료');
+      } catch (error) {
+        console.error('❌ [KAKAO LOGIN] 메시지 전송 실패:', error);
+      }
+    } else {
+      console.log('💬 [KAKAO LOGIN] 웹 환경 감지');
+      alert('카카오 로그인은 앱에서만 지원됩니다.');
+    }
+  };
 
   // 🚨 페이지 로드 즉시 브라우저 저장소에서 에러 모달 상태 확인 및 복원
   const [showErrorModal, setShowErrorModal] = useState(() => {
