@@ -6791,7 +6791,7 @@ export default function LogsPage() {
           
           {/* 커스텀 줌 컨트롤 */}
           {map.current && (
-            <div className="absolute top-[70px] right-[10px] z-30 z-zoom-control flex flex-col">
+            <div className="absolute top-[140px] right-[10px] z-30 z-zoom-control flex flex-col">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -6829,7 +6829,7 @@ export default function LogsPage() {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                className="absolute top-4 left-0 right-0 z-40 z-floating-card flex justify-center px-4"
+                className="absolute top-[70px] left-0 right-0 z-40 z-floating-card flex justify-center px-4"
               >
                 <motion.div
                    whileHover={{ 
