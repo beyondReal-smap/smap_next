@@ -31,9 +31,11 @@
         <domain includeSubdomains="true">map.naver.com</domain>
         <domain includeSubdomains="true">map.naver.net</domain>
         
-        <!-- IP 주소 백업 -->
+        <!-- 🔥 IP 주소 직접 접근 (DNS 문제 우회) -->
         <domain includeSubdomains="true">216.198.79.65</domain>
         <domain includeSubdomains="true">64.29.17.65</domain>
+        <domain includeSubdomains="true">76.76.19.0</domain>
+        <domain includeSubdomains="true">76.76.19.1</domain>
     </domain-config>
     
     <!-- 개발 환경용 설정 -->

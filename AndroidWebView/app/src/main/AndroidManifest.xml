@@ -55,6 +55,7 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <application
+        android:name=".SmapApplication"
         android:allowBackup="false"
         android:fullBackupContent="false"
         tools:replace="android:allowBackup"

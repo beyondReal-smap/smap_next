@@ -163,6 +163,25 @@ lsof -i :3000
 5. **Wipe Data**:
    - 에뮬레이터의 Cold Boot 또는 Wipe Data 실행
 
+### Google Play Services 타임아웃 문제 해결:
+
+1. **에뮬레이터에서 Google Play Services 업데이트**:
+   - Play Store 앱에서 Google Play Services 검색 후 업데이트
+
+2. **Google Play Services 재시작**:
+   ```bash
+   adb shell am force-stop com.google.android.gms
+   adb shell am force-stop com.google.android.gsf
+   ```
+
+3. **에뮬레이터 DNS 설정**:
+   - 에뮬레이터 설정 > 네트워크 > DNS 서버를 8.8.8.8로 변경
+
+4. **에뮬레이터 성능 개선**:
+   - RAM: 4GB 이상 할당
+   - VM heap: 512MB 이상
+   - Hardware acceleration 활성화
+
 ## 📱 에뮬레이터별 주의사항
 
 ### Android Studio 기본 에뮬레이터
@@ -177,12 +196,61 @@ lsof -i :3000
 - 네트워크 설정이 다를 수 있음
 - 실제 네트워크 어댑터를 사용하는 경우 있음
 
+## 🛠️ DNS 문제 자동 해결 스크립트
+
+에뮬레이터에서 DNS 문제가 발생할 때 자동으로 해결하는 스크립트를 제공합니다:
+
+```bash
+# 스크립트 실행
+./AndroidWebView/fix-emulator-dns.sh
+```
+
+**스크립트가 수행하는 작업들:**
+1. Google Play Services 재시작
+2. DNS 캐시 초기화  
+3. 네트워크 상태 확인
+4. 도메인 해석 테스트
+5. IP 주소 직접 연결 테스트
+6. WebView 캐시 초기화
+7. 앱 자동 재시작 옵션
+
+## 🔧 수동 DNS 문제 해결
+
+### 1. Google Play Services 재시작
+```bash
+adb shell am force-stop com.google.android.gms
+adb shell am force-stop com.google.android.gsf
+```
+
+### 2. DNS 캐시 초기화
+```bash
+adb shell "ndc resolver flushdefaultif"
+```
+
+### 3. 앱 데이터 초기화
+```bash
+adb shell pm clear com.dmonster.smap
+```
+
+### 4. 에뮬레이터 DNS 서버 변경
+- 에뮬레이터 설정 → 네트워크 → DNS 서버를 `8.8.8.8`로 변경
+
 ## 💡 개발 팁
 
 1. **개발 중에는 에뮬레이터에서 캐시 비활성화**
 2. **로그를 통해 현재 시도 중인 URL 확인**
 3. **네트워크 상태와 연결 오류 모니터링**
-4. **fallback URL 순서 최적화**
+4. **fallback URL 순서 최적화 (IP 주소 우선)**
 5. **개발 서버와 운영 서버 간 자동 전환**
+6. **DNS 문제 발생 시 자동 해결 스크립트 사용**
+
+### 로그 모니터링
+```bash
+# 앱 관련 로그만 필터링
+adb logcat -s SmapApplication:* SMAP_WebView:* DevServer:* GoogleSignIn:*
+
+# 네트워크 오류만 확인
+adb logcat | grep -E "(DNS|ERR_NAME_NOT_RESOLVED|net::)"
+```
 
 이러한 설정을 통해 에뮬레이터에서도 안정적인 서버 연결을 보장할 수 있습니다. 

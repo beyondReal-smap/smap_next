@@ -6742,14 +6742,9 @@ export default function LogsPage() {
         <AnimatedHeader 
           variant="simple"
           className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
-          style={{ 
-            paddingTop: 'env(safe-area-inset-top)',
-            // 안드로이드에서 추가 상단 여백 보장
-            minHeight: '64px',
-            height: 'auto'
-          }}
+          style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
-          <div className="flex items-center justify-between h-14 px-4" style={{ minHeight: '56px' }}>
+          <div className="flex items-center justify-between h-14 px-4">
             <div className="flex items-center space-x-3">
               <div className="flex items-center space-x-3">
                 <div>
@@ -6771,7 +6766,7 @@ export default function LogsPage() {
           animate="animate"
           className="full-map-container hardware-accelerated" 
           style={{ 
-            paddingTop: 'max(56px, calc(env(safe-area-inset-top) + 56px))', // 헤더 높이 + safe area 고려
+            paddingTop: '56px', 
             position: 'relative', // 로딩 오버레이를 위한 relative 포지션
             zIndex: 1 // 헤더보다 낮은 z-index
           }}
@@ -6791,7 +6786,7 @@ export default function LogsPage() {
           
           {/* 커스텀 줌 컨트롤 */}
           {map.current && (
-            <div className="absolute top-[140px] right-[10px] z-30 z-zoom-control flex flex-col">
+            <div className="absolute top-[70px] right-[10px] z-30 z-zoom-control flex flex-col">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -6829,7 +6824,7 @@ export default function LogsPage() {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                className="absolute top-[70px] left-0 right-0 z-40 z-floating-card flex justify-center px-4"
+                className="absolute top-[16px] left-0 right-0 z-40 z-floating-card flex justify-center px-4"
               >
                 <motion.div
                    whileHover={{ 
