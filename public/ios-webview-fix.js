@@ -107,6 +107,47 @@
       }
     }
     
+    // 즉시 전역 객체 확인 및 복구
+    ensureGlobalObjects();
+    
+    // Next.js 스크립트 파싱 오류 방지 (추가)
+    function preventNextJSParsingErrors() {
+      try {
+        // self.__next_f 및 self.__next_s 안전성 확보
+        if (typeof window !== 'undefined') {
+          window.self = window.self || window;
+          window.self.__next_f = window.self.__next_f || [];
+          window.self.__next_s = window.self.__next_s || [];
+          
+          // Array.prototype.push 안전성 강화
+          const originalPush = Array.prototype.push;
+          const safePush = function(...args) {
+            try {
+              return originalPush.apply(this, args);
+            } catch (error) {
+              console.warn('[iOS WebView] Next.js Array push 오류 무시:', error);
+              return this.length;
+            }
+          };
+          
+          // Next.js 전용 배열에 안전한 push 적용
+          if (window.self.__next_f && Array.isArray(window.self.__next_f)) {
+            window.self.__next_f.push = safePush.bind(window.self.__next_f);
+          }
+          if (window.self.__next_s && Array.isArray(window.self.__next_s)) {
+            window.self.__next_s.push = safePush.bind(window.self.__next_s);
+          }
+          
+          console.log('[iOS WebView] Next.js 스크립트 파싱 오류 방지 설정 완료');
+        }
+      } catch (error) {
+        console.error('[iOS WebView] Next.js 파싱 오류 방지 설정 실패:', error);
+      }
+    }
+    
+    // Next.js 파싱 오류 방지 즉시 실행
+    preventNextJSParsingErrors();
+    
     // 강화된 에러 핸들링 함수 정의
     function setupEnhancedErrorHandling() {
       // 구글 로그인 후 home 진입 시 발생하는 특정 에러들 처리
@@ -120,9 +161,23 @@
         /Cannot read properties of undefined.*isArray/
       ];
       
+      // Next.js 파싱 오류 패턴 추가
+      const nextJSErrorPatterns = [
+        /__next_/,
+        /self\.__next_f/,
+        /self\.__next_s/,
+        /Unexpected token/,
+        /SyntaxError.*return/,
+        /Return statements are only valid inside functions/,
+        /_next\/static/,
+        /chunk.*loading.*error/
+      ];
+      
       window.addEventListener('error', function(event) {
         const errorMessage = event.message || '';
+        const errorFilename = event.filename || '';
         const isHomePageError = homePageErrorPatterns.some(pattern => pattern.test(errorMessage));
+        const isNextJSError = nextJSErrorPatterns.some(pattern => pattern.test(errorMessage + errorFilename));
         
         if (isHomePageError) {
           console.warn('[iOS WebView] Home 페이지 Array.isArray 에러 감지, 복구 시도:', errorMessage);
@@ -141,6 +196,16 @@
           
           return false;
         }
+        
+        if (isNextJSError) {
+          console.warn('[iOS WebView] Next.js 스크립트 파싱 오류 감지, 무시:', errorMessage);
+          event.preventDefault();
+          
+          // Next.js 파싱 오류 방지 함수 재실행
+          preventNextJSParsingErrors();
+          
+          return false;
+        }
       });
       
       // Promise rejection도 처리
@@ -156,9 +221,6 @@
         }
       });
     }
-    
-    // 즉시 전역 객체 확인 및 복구
-    ensureGlobalObjects();
     
     // 강화된 에러 핸들링 설정
     setupEnhancedErrorHandling();

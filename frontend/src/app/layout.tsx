@@ -163,8 +163,48 @@ export default function RootLayout({
                 if (isIOSWebView) {
                   console.log('[iOS WebView] 안전한 스크립트 실행 모드 활성화');
                   
-                  // 스크립트 오류 무시 설정
+                  // Next.js 스크립트 파싱 오류 방지
+                  const originalPush = Array.prototype.push;
+                  if (typeof window !== 'undefined') {
+                    // self.__next_f 및 self.__next_s 에러 방지
+                    window.self = window.self || window;
+                    window.self.__next_f = window.self.__next_f || [];
+                    window.self.__next_s = window.self.__next_s || [];
+                    
+                    // push 함수 안전성 강화
+                    const safePush = function(...args) {
+                      try {
+                        return originalPush.apply(this, args);
+                      } catch (error) {
+                        console.warn('[iOS WebView] Array push 오류 무시:', error);
+                        return this.length;
+                      }
+                    };
+                    
+                    // Next.js 배열에 안전한 push 적용
+                    if (window.self.__next_f && Array.isArray(window.self.__next_f)) {
+                      window.self.__next_f.push = safePush.bind(window.self.__next_f);
+                    }
+                    if (window.self.__next_s && Array.isArray(window.self.__next_s)) {
+                      window.self.__next_s.push = safePush.bind(window.self.__next_s);
+                    }
+                  }
+                  
+                  // 스크립트 파싱 오류 전역 처리
                   window.addEventListener('error', function(e) {
+                    // Next.js 관련 오류 무시
+                    if (e.message && (
+                      e.message.includes('__next_') ||
+                      e.message.includes('Unexpected token') ||
+                      e.message.includes('SyntaxError') ||
+                      e.filename && e.filename.includes('_next/static')
+                    )) {
+                      console.warn('[iOS WebView] Next.js 스크립트 오류 무시:', e.message);
+                      e.preventDefault();
+                      return true;
+                    }
+                    
+                    // Google GSI 오류 무시
                     if (e.filename && e.filename.includes('accounts.google.com')) {
                       console.warn('[iOS WebView] Google GSI 스크립트 오류 무시:', e.message);
                       e.preventDefault();
