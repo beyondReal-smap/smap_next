@@ -3227,7 +3227,7 @@ const SignInPage = () => {
           displayMessage
         });
         
-                          return (
+        return (
           <AnimatePresence>
             {shouldShowModal && (
               <>
