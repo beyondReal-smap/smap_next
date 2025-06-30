@@ -157,18 +157,14 @@ const initializeKakaoCallbacks = () => {
             
             // 회원가입 페이지로 이동
             console.log('[NATIVE CALLBACK] 신규회원 리다이렉트 실행');
-            setTimeout(() => {
-              window.location.replace('/register?social=kakao');
-            }, 100);
+            window.location.replace('/register?social=kakao');
             
           } else {
             console.log('[NATIVE CALLBACK] 기존회원 감지 - 홈으로 이동 준비');
             
             // 홈으로 리다이렉트
             console.log('[NATIVE CALLBACK] 기존회원 리다이렉트 실행');
-            setTimeout(() => {
-              window.location.replace('/home');
-            }, 100);
+            window.location.replace('/home');
           }
         } else {
           console.error('[NATIVE CALLBACK] 서버 인증 실패:', data.error);
@@ -186,41 +182,6 @@ const initializeKakaoCallbacks = () => {
     };
     
     console.log('✅ [NATIVE CALLBACK] 네이티브 카카오 로그인 콜백 함수 등록 완료');
-    
-    // 🚨 iOS로 카카오 콜백 등록 상태 알림
-    const sendKakaoCallbackStatus = () => {
-      console.log('📱 [KAKAO CALLBACK] iOS로 콜백 등록 상태 전송 시도');
-      
-      if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.smapIos) {
-        try {
-          const hasSuccessCallback = typeof (window as any).onNativeKakaoLoginSuccess === 'function';
-          const hasErrorCallback = typeof (window as any).onNativeKakaoLoginError === 'function';
-          
-          window.webkit.messageHandlers.smapIos.postMessage({
-            type: 'kakaoCallbackReady',
-            status: 'registered',
-            timestamp: Date.now(),
-            hasSuccessCallback: hasSuccessCallback,
-            hasErrorCallback: hasErrorCallback
-          });
-          
-          console.log('📱 [KAKAO CALLBACK] iOS로 콜백 등록 상태 전송 완료', {
-            hasSuccessCallback,
-            hasErrorCallback
-          });
-        } catch (error) {
-          console.error('❌ [KAKAO CALLBACK] iOS로 상태 전송 실패:', error);
-        }
-      } else {
-        console.warn('⚠️ [KAKAO CALLBACK] iOS MessageHandler 없음, 콜백 상태 전송 실패');
-      }
-    };
-    
-    // 즉시 상태 전송
-    sendKakaoCallbackStatus();
-    
-    // 추가 안전장치: 1초 후에도 상태 전송
-    setTimeout(sendKakaoCallbackStatus, 1000);
     
   } catch (initError) {
     console.error('❌ [INIT KAKAO] 카카오 콜백 초기화 실패:', initError);

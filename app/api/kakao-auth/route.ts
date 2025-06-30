@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     if (!kakaoUserResponse.ok) {
       console.log('[KAKAO API] 카카오 사용자 정보 요청 실패:', kakaoUserResponse.status, kakaoUserResponse.statusText);
       const errorText = await kakaoUserResponse.text();
-      console.log('[KAKAO API] 카카오 오러 응답:', errorText);
+      console.log('[KAKAO API] 카카오 오류 응답:', errorText);
       return NextResponse.json(
         { error: '카카오 사용자 정보를 가져올 수 없습니다.' },
         { status: 400 }
@@ -45,44 +45,46 @@ export async function POST(request: NextRequest) {
     const nickname = kakaoUser.properties?.nickname || '';
     const profileImage = kakaoUser.properties?.profile_image || null;
 
-    console.log('[KAKAO API] 데이터베이스에서 기존 사용자 확인 시작 - 카카오 ID:', kakaoId);
+    console.log('[KAKAO API] 추출된 정보:', { kakaoId, email, nickname, profileImage });
 
-    // 데이터베이스에서 기존 사용자 확인 (카카오 ID로 먼저 확인, 없으면 이메일로 확인)
+    if (!email) {
+      console.log('[KAKAO API] 이메일 정보가 없음');
+      return NextResponse.json(
+        { error: '카카오 계정에서 이메일 정보를 가져올 수 없습니다. 카카오 계정 설정에서 이메일을 확인해주세요.' },
+        { status: 400 }
+      );
+    }
+
+    console.log('[KAKAO API] 데이터베이스에서 기존 사용자 확인 시작 - 이메일:', email);
+
+    // 데이터베이스에서 기존 사용자 확인 (이메일 기반)
     let existingUser = null;
     let isNewUser = false;
 
     try {
-      // 1. 카카오 ID로 기존 사용자 확인
-      const [kakaoRows] = await pool.execute(
-        'SELECT * FROM member_t WHERE mt_kakao_id = ? AND mt_status = "Y"',
-        [kakaoId]
+      // 1. 이메일로 기존 사용자 확인 (구글 로그인과 동일한 방식)
+      const [emailRows] = await pool.execute(
+        'SELECT * FROM member_t WHERE mt_email = ? AND mt_status = "Y"',
+        [email]
       );
 
-      if (Array.isArray(kakaoRows) && kakaoRows.length > 0) {
-        existingUser = kakaoRows[0];
-        console.log('[KAKAO API] 카카오 ID로 기존 사용자 발견:', existingUser.mt_idx);
-      } else if (email) {
-        // 2. 이메일로 기존 사용자 확인 (카카오 ID가 없는 경우)
-        const [emailRows] = await pool.execute(
-          'SELECT * FROM member_t WHERE mt_email = ? AND mt_status = "Y"',
-          [email]
-        );
-
-        if (Array.isArray(emailRows) && emailRows.length > 0) {
-          existingUser = emailRows[0];
-          console.log('[KAKAO API] 이메일로 기존 사용자 발견, 카카오 ID 업데이트:', existingUser.mt_idx);
-          
-          // 기존 사용자에게 카카오 ID 추가
+      if (Array.isArray(emailRows) && emailRows.length > 0) {
+        existingUser = emailRows[0];
+        console.log('[KAKAO API] 이메일로 기존 사용자 발견:', existingUser.mt_idx);
+        
+        // 기존 사용자에게 카카오 ID 추가/업데이트 (아직 연결되지 않은 경우)
+        if (!existingUser.mt_kakao_id) {
+          console.log('[KAKAO API] 기존 사용자에게 카카오 ID 연결');
           await pool.execute(
             'UPDATE member_t SET mt_kakao_id = ?, mt_udate = NOW() WHERE mt_idx = ?',
             [kakaoId, existingUser.mt_idx]
           );
           existingUser.mt_kakao_id = kakaoId;
         }
-      }
-
-      if (!existingUser) {
-        console.log('[KAKAO API] 신규 사용자 - 임시 사용자 정보 생성');
+        
+        isNewUser = false;
+      } else {
+        console.log('[KAKAO API] 신규 사용자 감지 - 이메일:', email);
         isNewUser = true;
         
         // 신규 사용자용 임시 사용자 정보 생성
@@ -96,9 +98,6 @@ export async function POST(request: NextRequest) {
           provider: 'kakao',
           isNewUser: true
         };
-      } else {
-        console.log('[KAKAO API] 기존 사용자 로그인 성공');
-        isNewUser = false;
       }
 
     } catch (dbError) {
@@ -123,7 +122,14 @@ export async function POST(request: NextRequest) {
     // JWT 토큰 생성 (신규 사용자는 임시 토큰)
     const tokenPayload = isNewUser 
       ? { kakaoId, email, nickname, isNewUser: true, provider: 'kakao' }
-      : { userId: user.mt_idx, email: user.mt_email, nickname: user.mt_nickname, isNewUser: false };
+      : { 
+          userId: user.mt_idx, 
+          mt_idx: user.mt_idx,
+          email: user.mt_email, 
+          nickname: user.mt_nickname, 
+          isNewUser: false,
+          provider: 'kakao'
+        };
 
     const token = jwt.sign(
       tokenPayload,
@@ -162,7 +168,7 @@ export async function POST(request: NextRequest) {
     return response;
 
   } catch (error) {
-    console.error('카카오 로그인 오류:', error);
+    console.error('[KAKAO API] 카카오 로그인 오류:', error);
     return NextResponse.json(
       { error: '로그인 처리 중 오류가 발생했습니다.' },
       { status: 500 }

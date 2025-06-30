@@ -47,9 +47,17 @@ export async function POST(request: NextRequest) {
 
     console.log('[KAKAO API] 추출된 정보:', { kakaoId, email, nickname, profileImage });
 
+    if (!email) {
+      console.log('[KAKAO API] 이메일 정보가 없음');
+      return NextResponse.json(
+        { error: '카카오 계정에서 이메일 정보를 가져올 수 없습니다. 카카오 계정 설정에서 이메일을 확인해주세요.' },
+        { status: 400 }
+      );
+    }
+
     // 백엔드 API 시도 (실패해도 계속 진행)
     let backendData = null;
-    let isNewUser = true;
+    let isNewUser = true; // 기본값은 신규 사용자
     
     try {
       console.log('[KAKAO API] 백엔드 연결 시도...');
@@ -137,7 +145,14 @@ export async function POST(request: NextRequest) {
         },
         token,
         isNewUser,
-        message: isNewUser ? '카카오 계정으로 회원가입되었습니다.' : '카카오 로그인 성공'
+        socialLoginData: isNewUser ? {
+          provider: 'kakao',
+          kakao_id: kakaoId,
+          email: email,
+          nickname: nickname,
+          profile_image: profileImage
+        } : null,
+        message: isNewUser ? '카카오 계정으로 회원가입이 필요합니다.' : '카카오 로그인 성공'
       });
 
       response.cookies.set('auth-token', token, {
@@ -151,8 +166,11 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    // 백엔드 연결 실패 시 임시 모드
-    console.log('[KAKAO API] 임시 모드로 로그인 처리');
+    // 백엔드 연결 실패 시 임시 모드 - 이메일 기반으로 신규/기존 판별
+    console.log('[KAKAO API] 임시 모드로 로그인 처리 - 이메일 기반 판별');
+    
+    // 임시 모드에서는 항상 신규 사용자로 처리 (백엔드 없이는 DB 확인 불가)
+    isNewUser = true;
     
     const tempUser = {
       id: kakaoId,
@@ -173,7 +191,8 @@ export async function POST(request: NextRequest) {
         email: tempUser.email, 
         nickname: tempUser.nickname,
         kakaoId: kakaoId,
-        provider: 'kakao'
+        provider: 'kakao',
+        isNewUser: isNewUser
       },
       process.env.NEXTAUTH_SECRET || 'default-secret',
       { expiresIn: '7d' }
@@ -187,7 +206,14 @@ export async function POST(request: NextRequest) {
       user: tempUser,
       token,
       isNewUser: isNewUser,
-      message: '카카오 로그인 성공 (임시 모드)'
+      socialLoginData: isNewUser ? {
+        provider: 'kakao',
+        kakao_id: kakaoId,
+        email: email,
+        nickname: nickname,
+        profile_image: profileImage
+      } : null,
+      message: isNewUser ? '카카오 계정으로 회원가입이 필요합니다.' : '카카오 로그인 성공 (임시 모드)'
     });
 
     // 쿠키에 토큰 저장
@@ -199,7 +225,7 @@ export async function POST(request: NextRequest) {
       path: '/',
     });
 
-    console.log('[KAKAO API] 임시 모드 로그인 성공, 응답 반환');
+    console.log('[KAKAO API] 임시 모드 로그인 성공, 응답 반환 - isNewUser:', isNewUser);
     return response;
 
   } catch (error) {
