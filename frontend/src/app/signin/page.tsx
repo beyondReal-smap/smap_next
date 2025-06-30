@@ -90,7 +90,7 @@ const handleKakaoLogin = async () => {
 
 
 
-export default function SignInPage() {
+const SignInPage = () => {
   // 🚨 페이지 로드 디버깅
   console.log('[SIGNIN PAGE] 컴포넌트 로딩 시작', {
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
@@ -3355,4 +3355,6 @@ export default function SignInPage() {
       )}
     </motion.div>
   );
-}
+};
+
+export default SignInPage;
