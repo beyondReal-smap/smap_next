@@ -174,19 +174,20 @@ class MemberService {
         console.warn('[MEMBER SERVICE] ⚠️ 백엔드에서 빈 배열 반환, mock 데이터 사용');
         return mockData;
       }
-    } catch (error) {
-      console.error('[MEMBER SERVICE] ❌ 백엔드 API 호출 실패, mock 데이터 반환:', error);
+    } catch (error: any) {
+      console.error('[MEMBER SERVICE] ❌ 백엔드 API 호출 실패:', error);
       
-      // 네트워크 오류나 서버 오류인 경우 상세 로그
-      if (error instanceof Error) {
-        console.error('[MEMBER SERVICE] 오류 상세:', {
-          message: error.message,
-          name: error.name,
-          stack: error.stack
-        });
+      // 404 에러나 기타 HTTP 에러인 경우 에러를 throw
+      if (error?.response?.status === 404) {
+        console.error('[MEMBER SERVICE] 404 에러: 그룹을 찾을 수 없습니다.');
+        throw new Error('그룹 멤버 데이터를 찾을 수 없습니다.');
+      } else if (error?.response?.status) {
+        console.error('[MEMBER SERVICE] HTTP 에러:', error.response.status);
+        throw new Error('서버에서 데이터를 가져오는 중 오류가 발생했습니다.');
+      } else {
+        console.error('[MEMBER SERVICE] 네트워크 에러 또는 기타 오류');
+        throw new Error('네트워크 연결을 확인해주세요.');
       }
-      
-      return mockData;
     }
   }
 

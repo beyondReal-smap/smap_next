@@ -1199,7 +1199,12 @@ export default function LogsPage() {
     else if (error?.response?.status >= 400 && error?.response?.status < 500) {
       if (error.response.status === 404) {
         errorType = 'data';
-        errorMessage = '요청한 데이터를 찾을 수 없습니다. 다른 날짜나 멤버를 선택해보세요.';
+        // 컨텍스트에 따라 다른 메시지 표시
+        if (context.includes('멤버 조회') || context.includes('그룹')) {
+          errorMessage = '그룹 정보를 찾을 수 없습니다. 다른 그룹을 선택해보세요.';
+        } else {
+          errorMessage = '요청한 데이터를 찾을 수 없습니다. 다른 날짜나 멤버를 선택해보세요.';
+        }
         retryable = false;
       } else {
         errorType = 'data';
@@ -5462,6 +5467,10 @@ export default function LogsPage() {
       return memberData ? memberData.length : 0;
     } catch (error) {
       console.error(`그룹 ${groupId} 멤버 수 조회 실패:`, error);
+      
+      // 사용자에게 에러 상황을 알림
+      handleDataError(error, `그룹 ${groupId} 멤버 조회`);
+      
       return 0;
     }
   };
@@ -6786,7 +6795,7 @@ export default function LogsPage() {
           
           {/* 커스텀 줌 컨트롤 */}
           {map.current && (
-            <div className="absolute top-[70px] right-[10px] z-30 z-zoom-control flex flex-col">
+            <div className="absolute top-[140px] right-[10px] z-30 z-zoom-control flex flex-col">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -6824,7 +6833,7 @@ export default function LogsPage() {
                 initial="initial"
                 animate="animate"
                 exit="exit"
-                className="absolute top-[16px] left-0 right-0 z-40 z-floating-card flex justify-center px-4"
+                className="absolute top-[70px] left-0 right-0 z-40 z-floating-card flex justify-center px-4"
               >
                 <motion.div
                    whileHover={{ 
