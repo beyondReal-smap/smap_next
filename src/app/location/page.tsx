@@ -256,7 +256,7 @@ const pageVariants = {
     y: 0,
     transition: {
       duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
+      
     }
   },
   out: { 
@@ -264,7 +264,7 @@ const pageVariants = {
     y: -20,
     transition: {
       duration: 0.2,
-      ease: [0.22, 1, 0.36, 1]
+      
     }
   }
 };
@@ -275,7 +275,7 @@ const sidebarVariants = {
     x: '-100%',
     transition: {
       type: 'tween',
-      ease: [0.22, 1, 0.36, 1],
+      ,
       duration: 0.6
     }
   },
@@ -283,7 +283,7 @@ const sidebarVariants = {
     x: 0,
     transition: {
       type: 'tween',
-      ease: [0.22, 1, 0.36, 1],
+      ,
       duration: 0.6
     }
   }
@@ -294,14 +294,14 @@ const sidebarOverlayVariants = {
     opacity: 0,
     transition: {
       duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      
     }
   },
   open: {
     opacity: 1,
     transition: {
       duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      
     }
   }
 };
@@ -311,14 +311,14 @@ const sidebarContentVariants = {
     opacity: 0,
     transition: {
       duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      
     }
   },
   open: {
     opacity: 1,
     transition: {
       duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      
     }
   }
 };
@@ -481,7 +481,7 @@ const modalVariants = {
     y: 30,
     transition: {
       duration: 0.2,
-      ease: [0.22, 1, 0.36, 1]
+      
     }
   }
 };
@@ -4763,7 +4763,7 @@ export default function LocationPage() {
               initial={{ opacity: 0, y: -30, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -30, scale: 0.96 }}
-              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.3,  }}
               className="location-info-panel fixed top-20 left-4 right-4 z-30 rounded-2xl p-3 shadow-2xl"
             onMouseDown={(e) => e.stopPropagation()}
           >

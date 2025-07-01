@@ -558,7 +558,6 @@ const pageVariants = {
     y: 0,
     transition: {
       duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
     }
   },
   out: { 
@@ -566,7 +565,6 @@ const pageVariants = {
     y: -20,
     transition: {
       duration: 0.2,
-      ease: [0.22, 1, 0.36, 1]
     }
   }
 };
@@ -5364,7 +5362,7 @@ export default function HomePage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.6 }}
           className="min-h-screen relative overflow-hidden"
           style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
           data-react-mount="true"
