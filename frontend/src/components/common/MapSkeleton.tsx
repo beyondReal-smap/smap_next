@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
+import IOSCompatibleSpinner from './IOSCompatibleSpinner';
 import styles from './MapSkeleton.module.css';
 
 interface MapSkeletonProps {

@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/use-toast';
 import notificationService from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import LoadingSpinner from '@/app/components/common/LoadingSpinner';
-import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
+import IOSCompatibleSpinner from '../../components/common/IOSCompatibleSpinner';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import AnimatedHeader from '../../components/common/AnimatedHeader';
 

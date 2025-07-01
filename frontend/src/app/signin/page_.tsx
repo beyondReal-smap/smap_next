@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import authService from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
-import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
+import IOSCompatibleSpinner from '../../components/common/IOSCompatibleSpinner';
 import { hapticFeedback } from '@/utils/haptic';
 
 // 아이콘 임포트

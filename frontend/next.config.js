@@ -130,8 +130,7 @@ const nextConfig = {
   // 출력 설정 - iOS WebView 호환성
   output: 'standalone',
   
-  // SWC 컴파일러 설정 (Terser 대신 SWC 사용)
-  swcMinify: true, // Terser 문제 해결을 위해 SWC minify 사용
+  // SWC는 Next.js 15에서 기본으로 활성화됨
   
   // 추가 최적화 설정
   compiler: {

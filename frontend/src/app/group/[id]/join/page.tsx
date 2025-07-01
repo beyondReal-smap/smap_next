@@ -8,7 +8,7 @@ import { HiSparkles } from 'react-icons/hi2';
 import Image from 'next/image';
 import groupService from '@/services/groupService';
 import { useAuth } from '@/contexts/AuthContext';
-import IOSCompatibleSpinner from '@/../../components/IOSCompatibleSpinner';
+import IOSCompatibleSpinner from '../../../components/common/IOSCompatibleSpinner';
 
 interface GroupInfo {
   sgt_idx: number;

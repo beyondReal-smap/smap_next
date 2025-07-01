@@ -15,7 +15,7 @@ import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner'
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import { RiKakaoTalkFill } from 'react-icons/ri';
-import IOSCompatibleSpinner from '../../../../components/IOSCompatibleSpinner';
+import IOSCompatibleSpinner from '../../components/common/IOSCompatibleSpinner';
 
 
 // 카카오 SDK 타입 정의
