@@ -45,33 +45,13 @@ const nextConfig = {
       };
     }
     
-    // React 모듈 해결 문제 수정 (SWC 호환)
+    // React 18 모듈 해결 설정
     config.resolve.alias = {
       ...config.resolve.alias,
       // React 중복 방지
       'react': require.resolve('react'),
       'react-dom': require.resolve('react-dom'),
-      // JSX Runtime 명시적 해결
-      'react/jsx-runtime': require.resolve('react/jsx-runtime'),
-      'react/jsx-dev-runtime': require.resolve('react/jsx-dev-runtime'),
     };
-    
-    // Node modules fallback 설정
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      net: false,
-      tls: false,
-    };
-    
-    // 모듈 해결 확장자 순서 명시
-    config.resolve.extensions = ['.tsx', '.ts', '.jsx', '.js', '.json'];
-    
-    // 모듈 검색 경로 명시
-    config.resolve.modules = ['node_modules', 'src'];
-    
-    // React JSX를 위한 추가 설정
-    config.resolve.symlinks = false;
     
     // iOS WebView 호환성을 위한 최적화
     if (!isServer) {
