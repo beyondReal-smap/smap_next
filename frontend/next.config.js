@@ -3,11 +3,17 @@ const nextConfig = {
   // React 최적화 - Strict Mode 비활성화 (컴포넌트 이중 마운트 방지)
   reactStrictMode: false,
   
-  // 실험적 기능들 (최소한만)
+  // 실험적 기능들 (안정성 우선)
   experimental: {
     memoryBasedWorkersCount: true,
-    // iOS WebView 호환성을 위해 최신 실험적 기능 비활성화
-    forceSwcTransforms: false,
+    // React 19 호환성을 위한 설정
+    turbo: {
+      rules: {
+        '*.js': {
+          loaders: ['babel-loader'],
+        },
+      },
+    },
   },
   
   // 개발 모드 설정
@@ -47,15 +53,15 @@ const nextConfig = {
       };
     }
     
-    // Terser plugin 모듈 경로 문제 해결
-    if (!dev && !isServer) {
-      // Terser 관련 최적화 문제 해결을 위해 기본 minimizer 사용
-      config.optimization = {
-        ...config.optimization,
-        minimize: true,
-        // minimizer 설정을 Next.js 기본값으로 유지
-      };
-    }
+    // React JSX Runtime 모듈 해결 문제 수정
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      // React 중복 방지 및 경로 명시
+      'react': require.resolve('react'),
+      'react-dom': require.resolve('react-dom'),
+      'react/jsx-runtime': require.resolve('react/jsx-runtime'),
+      'react/jsx-dev-runtime': require.resolve('react/jsx-dev-runtime'),
+    };
     
     // iOS WebView 호환성을 위한 최적화
     if (!isServer) {
@@ -74,14 +80,6 @@ const nextConfig = {
           },
         };
       }
-      
-      // iOS WebView에서 문제가 될 수 있는 모듈 처리
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        // React 중복 방지
-        'react': require.resolve('react'),
-        'react-dom': require.resolve('react-dom'),
-      };
     }
     
     return config;
