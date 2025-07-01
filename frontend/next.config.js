@@ -6,12 +6,13 @@ const nextConfig = {
   // 실험적 기능들 (안정성 우선)
   experimental: {
     memoryBasedWorkersCount: true,
-    // React 19 호환성을 위한 설정
-    turbo: {
-      rules: {
-        '*.js': {
-          loaders: ['babel-loader'],
-        },
+  },
+  
+  // Turbopack 설정 (Next.js 15에서 안정화됨)
+  turbopack: {
+    rules: {
+      '*.js': {
+        loaders: ['babel-loader'],
       },
     },
   },
