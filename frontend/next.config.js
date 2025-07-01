@@ -213,8 +213,10 @@ const nextConfig = {
   
 
   
-  // SWC 컴파일러 최적화 설정
+  // SWC 컴파일러 최적화 설정 (JSX Runtime 포함)
   compiler: {
+    // React JSX Runtime 설정
+    emotion: false,
     // 개발 도구 제거 (프로덕션)
     removeConsole: process.env.NODE_ENV === 'production' ? {
       exclude: ['error', 'warn'],
@@ -224,6 +226,8 @@ const nextConfig = {
     // Styled components 지원
     styledComponents: false,
   },
+  
+
   
   async redirects() {
     return [
