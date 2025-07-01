@@ -11,7 +11,6 @@ import authService from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import AlertModal from '@/components/ui/AlertModal';
-import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import { RiKakaoTalkFill } from 'react-icons/ri';
