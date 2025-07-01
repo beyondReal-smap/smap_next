@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  context: { params: Promise<{ groupId: string }> }
 ) {
   try {
+    const params = await context.params;
     console.log(`[GROUP JOIN NEW MEMBER API] 새 회원 그룹 가입 요청 시작 - groupId: ${params.groupId}`);
     
     const body = await request.json();

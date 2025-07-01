@@ -3,9 +3,10 @@ import { requireAuth, getCurrentUserId } from '@/lib/auth';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { groupId: string } }
+  context: { params: Promise<{ groupId: string }> }
 ) {
   try {
+    const params = await context.params;
     console.log(`[GROUP JOIN API] 그룹 가입 요청 시작 - groupId: ${params.groupId}`);
     
     // 인증 확인
