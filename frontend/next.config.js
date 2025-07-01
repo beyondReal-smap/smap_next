@@ -5,7 +5,8 @@ const nextConfig = {
   
   // 실험적 기능들 (최소한만)
   experimental: {
-    memoryBasedWorkersCount: true,
+    optimizeCss: true,
+    scrollRestoration: true,
   },
   
   // 개발 모드 설정
@@ -13,6 +14,10 @@ const nextConfig = {
     onDemandEntries: {
       maxInactiveAge: 25 * 1000,
       pagesBufferLength: 2,
+    },
+    devIndicators: {
+      buildActivity: true,
+      buildActivityPosition: 'bottom-right',
     },
   }),
   
@@ -30,7 +35,15 @@ const nextConfig = {
         hostname: '**',
       }
     ],
-    unoptimized: false,
+    unoptimized: true,
+    domains: [
+      'localhost',
+      'nextstep.smap.site', 
+      'app2.smap.site',
+      'app.smap.site',
+      'smap.site',
+      '118.67.130.71'
+    ],
   },
   
   // iOS WebView 호환성을 위한 webpack 설정
@@ -45,13 +58,51 @@ const nextConfig = {
       };
     }
     
-    // React 18 모듈 해결 설정
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      // React 중복 방지
-      'react': require.resolve('react'),
-      'react-dom': require.resolve('react-dom'),
-    };
+    // React JSX Runtime 모듈 해결 설정 (강화)
+    try {
+      const reactPath = require.resolve('react');
+      const reactDomPath = require.resolve('react-dom');
+      const reactJsxRuntimePath = require.resolve('react/jsx-runtime');
+      const reactJsxDevRuntimePath = require.resolve('react/jsx-dev-runtime');
+      
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'react$': reactPath,
+        'react-dom$': reactDomPath,
+        'react/jsx-runtime$': reactJsxRuntimePath,
+        'react/jsx-dev-runtime$': reactJsxDevRuntimePath,
+      };
+      
+      console.log('React module paths resolved:', {
+        react: reactPath,
+        'jsx-runtime': reactJsxRuntimePath,
+        'jsx-dev-runtime': reactJsxDevRuntimePath
+      });
+    } catch (error) {
+      console.error('Error resolving React modules:', error);
+    }
+    
+    // 모듈 해결 우선순위 및 fallback 설정
+    config.resolve.modules = [
+      'node_modules',
+      ...(config.resolve.modules || [])
+    ];
+    
+    config.resolve.mainFields = ['browser', 'module', 'main'];
+    
+    // React JSX runtime을 externals에서 제외
+    if (!isServer && config.externals) {
+      const originalExternals = config.externals;
+      config.externals = (context, request, callback) => {
+        if (request === 'react/jsx-runtime' || request === 'react/jsx-dev-runtime') {
+          return callback();
+        }
+        if (typeof originalExternals === 'function') {
+          return originalExternals(context, request, callback);
+        }
+        return callback();
+      };
+    }
     
     // iOS WebView 호환성을 위한 최적화
     if (!isServer) {
@@ -72,6 +123,14 @@ const nextConfig = {
       }
     }
     
+    if (!isServer) {
+      config.externals = {
+        ...config.externals,
+        'naver-maps': 'naver',
+        'google-maps': 'google',
+      };
+    }
+    
     return config;
   },
   
@@ -82,18 +141,52 @@ const nextConfig = {
         source: '/(.*)',
         headers: [
           {
+            key: 'Access-Control-Allow-Origin',
+            value: '*'
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'GET, POST, PUT, DELETE, OPTIONS'
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Authorization, X-Requested-With'
+          },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com *.googleapis.com *.gstatic.com *.google.com",
+              "connect-src 'self' *.map.naver.com *.googleapis.com *.google.com wss: ws: data: blob:",
+              "img-src 'self' data: blob: *.map.naver.com *.googleapis.com *.gstatic.com *.google.com",
+              "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com",
+              "font-src 'self' *.gstatic.com *.googleapis.com",
+              "frame-src 'self' *.google.com",
+              "worker-src 'self' blob:",
+              "object-src 'none'",
+              "base-uri 'self'"
+            ].join('; ')
+          },
+          {
             key: 'X-Frame-Options',
-            value: 'DENY',
+            value: 'SAMEORIGIN'
           },
           {
             key: 'X-Content-Type-Options',
-            value: 'nosniff',
+            value: 'nosniff'
           },
-          // iOS WebView 캐싱 최적화
           {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin'
           },
+          {
+            key: 'Cross-Origin-Embedder-Policy',
+            value: 'unsafe-none'
+          },
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups'
+          }
         ],
       },
     ];
@@ -107,19 +200,18 @@ const nextConfig = {
   
   // ESLint 빌드 시 무시
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   
   // TypeScript 빌드 시 무시
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   
   // 출력 설정 - iOS WebView 호환성
   output: 'standalone',
   
-  // SWC 컴파일러 설정 (next/font 지원을 위해 필요)
-  swcMinify: true,
+
   
   // SWC 컴파일러 최적화 설정
   compiler: {
@@ -132,6 +224,25 @@ const nextConfig = {
     // Styled components 지원
     styledComponents: false,
   },
+  
+  async redirects() {
+    return [
+      {
+        source: '/(.*)',
+        has: [
+          {
+            type: 'header',
+            key: 'x-forwarded-proto',
+            value: 'http',
+          },
+        ],
+        destination: 'https://nextstep.smap.site/:path*',
+        permanent: true,
+      },
+    ];
+  },
+  
+  trailingSlash: false,
 };
 
 module.exports = nextConfig; 

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "npm ci && npm run build",
   "installCommand": "npm install",
   "outputDirectory": ".next",
   "framework": "nextjs",
@@ -8,6 +8,9 @@
   "functions": {
     "app/**": {
       "maxDuration": 60
+    },
+    "src/app/api/**/*.js": {  
+      "runtime": "nodejs18.x"
     }
   },
   "build": {
@@ -16,7 +19,8 @@
       "NEXT_TELEMETRY_DISABLED": "1",
       "SKIP_ENV_VALIDATION": "1",
       "REACT_VERSION": "18.3.1",
-      "NODE_ENV": "production"
+      "NODE_ENV": "production",
+      "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
     }
   },
   "headers": [
