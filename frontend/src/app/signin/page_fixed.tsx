@@ -11,6 +11,7 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 import AlertModal from '@/components/ui/AlertModal';
 import UnifiedLoadingSpinner from '../../../../components/UnifiedLoadingSpinner';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
 
 // 카카오 SDK 타입 정의

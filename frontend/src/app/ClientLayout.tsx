@@ -16,7 +16,7 @@ import { useMapPreloader } from '@/hooks/useMapPreloader';
 // 인증이 필요하지 않은 페이지들 (루트 페이지는 자체적으로 리다이렉트 처리)
 const PUBLIC_ROUTES = ['/signin', '/register', '/login', '/social-login', '/'];
 
-import IOSCompatibleSpinner from '../components/common/IOSCompatibleSpinner';
+import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
 
 // 인증 가드 컴포넌트
 function AuthGuard({ children }: { children: React.ReactNode }) {
