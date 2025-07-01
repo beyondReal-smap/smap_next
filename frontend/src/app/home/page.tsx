@@ -95,7 +95,7 @@ import {
   checkNetworkStatus,
   type EnvironmentConfig 
 } from '../../utils/domainDetection';
-import MapDebugger from '@/../../components/MapDebugger';
+
 import memberService from '@/services/memberService';
 import scheduleService from '../../services/scheduleService';
 import groupService from '@/services/groupService';
@@ -5162,16 +5162,12 @@ export default function HomePage() {
     closed: {
       x: '-100%',
       transition: {
-        type: 'tween',
-        ease: [0.22, 1, 0.36, 1],
         duration: 0.6
       }
     },
     open: {
       x: 0,
       transition: {
-        type: 'tween',
-        ease: [0.22, 1, 0.36, 1],
         duration: 0.6
       }
     }
@@ -5181,15 +5177,13 @@ export default function HomePage() {
     closed: {
       opacity: 0,
       transition: {
-        duration: 0.6,
-        ease: [0.22, 1, 0.36, 1]
+        duration: 0.6
       }
     },
     open: {
       opacity: 1,
       transition: {
-        duration: 0.6,
-        ease: [0.22, 1, 0.36, 1]
+        duration: 0.6
       }
     }
   };
@@ -5198,15 +5192,13 @@ export default function HomePage() {
     closed: {
       opacity: 0,
       transition: {
-        duration: 0.6,
-        ease: [0.22, 1, 0.36, 1]
+        duration: 0.6
       }
     },
     open: {
       opacity: 1,
       transition: {
-        duration: 0.6,
-        ease: [0.22, 1, 0.36, 1]
+        duration: 0.6
       }
     }
   };

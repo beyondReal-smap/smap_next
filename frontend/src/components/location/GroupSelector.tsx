@@ -42,6 +42,7 @@ interface GroupSelectorProps {
   onOpen: () => void;
   onClose: () => void;
   onGroupSelect: (groupId: number) => void;
+  onToggleSelector?: () => void;
 }
 
 const DropdownPortal = ({
@@ -119,7 +120,8 @@ const GroupSelector = memo(({
   groupMemberCounts, 
   onOpen,
   onClose,
-  onGroupSelect 
+  onGroupSelect,
+  onToggleSelector
 }: GroupSelectorProps) => {
   const selectedGroup = userGroups.find(g => g.sgt_idx === selectedGroupId);
   const buttonRef = useRef<HTMLButtonElement>(null);

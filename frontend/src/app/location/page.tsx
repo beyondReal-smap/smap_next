@@ -311,16 +311,14 @@ const pageVariants = {
     opacity: 1, 
     y: 0,
     transition: {
-      duration: 0.3,
-      ease: [0.22, 1, 0.36, 1]
+      duration: 0.3
     }
   },
   out: { 
     opacity: 0, 
     y: -20,
     transition: {
-      duration: 0.2,
-      ease: [0.22, 1, 0.36, 1]
+      duration: 0.2
     }
   }
 };
@@ -330,16 +328,14 @@ const sidebarVariants = {
   closed: {
     x: '-100%',
     transition: {
-      type: 'tween',
-      ease: [0.22, 1, 0.36, 1],
+      type: 'tween' as const,
       duration: 0.6
     }
   },
   open: {
     x: 0,
     transition: {
-      type: 'tween',
-      ease: [0.22, 1, 0.36, 1],
+      type: 'tween' as const,
       duration: 0.6
     }
   }
@@ -349,15 +345,13 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      duration: 0.6
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      duration: 0.6
     }
   }
 };
@@ -366,15 +360,13 @@ const sidebarContentVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      duration: 0.6
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.6,
-      ease: [0.22, 1, 0.36, 1]
+      duration: 0.6
     }
   }
 };

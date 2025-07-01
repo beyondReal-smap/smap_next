@@ -35,12 +35,12 @@ import { HiSparkles, HiCalendarDays, HiArrowPath, HiBell, HiUserGroup } from 're
 import { FaTrash, FaCrown } from 'react-icons/fa';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
-import memberService from '@/services/memberService';
-import groupService, { Group } from '@/services/groupService';
-import scheduleService, { Schedule, UserPermission } from '@/services/scheduleService';
-import pushNotificationService, { ScheduleNotificationContext, GroupMemberInfo } from '@/services/pushNotificationService';
-import { useDataCache } from '@/contexts/DataCacheContext';
-import { hapticFeedback } from '@/utils/haptic';
+import memberService from '../../services/memberService';
+import groupService, { Group } from '../../services/groupService';
+import scheduleService, { Schedule, UserPermission } from '../../services/scheduleService';
+import pushNotificationService, { ScheduleNotificationContext, GroupMemberInfo } from '../../services/pushNotificationService';
+import { useDataCache } from '../../contexts/DataCacheContext';
+import { hapticFeedback } from '../../utils/haptic';
 
 // Dynamic Imports for better code splitting
 const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {

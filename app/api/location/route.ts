@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { pool } from '@/lib/db';
-import { verifyJWT } from '@/lib/auth';
+import { pool } from '../../../lib/db';
+import { verifyJWT } from '../../../lib/auth';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 export async function POST(req: NextRequest) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyJWT } from '@/lib/auth';
+import { verifyJWT } from '../../../../lib/auth';
 
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;

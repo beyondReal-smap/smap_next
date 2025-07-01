@@ -80,8 +80,7 @@ export default function BottomNavBar() {
                      rotate: [0, 5, -5, 0]
                    } : {}}
                    transition={{
-                     duration: 0.6,
-                     ease: "easeInOut"
+                     duration: 0.6
                    }}
                    style={{ 
                      color: isActive ? '#0113A3' : '#6b7280'
@@ -101,8 +100,7 @@ export default function BottomNavBar() {
                        }}
                        transition={{
                          duration: 3,
-                         repeat: Infinity,
-                         ease: "easeInOut"
+                         repeat: Infinity
                        }}
                      />
                    )}
@@ -213,8 +211,7 @@ export default function BottomNavBar() {
                     scale: [1, 1.1, 1]
                   } : {}}
                   transition={{
-                    duration: 0.3,
-                    ease: "easeInOut"
+                    duration: 0.3
                   }}
                 >
                   {name}

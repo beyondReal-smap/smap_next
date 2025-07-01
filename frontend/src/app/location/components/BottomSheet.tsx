@@ -79,7 +79,7 @@ export default function BottomSheet({
       ref={bottomSheetRef}
       initial={{ y: "100%" }}
       animate={{ y: bottomSheetState === 'collapsed' ? "calc(100% - 120px)" : "58%" }}
-      transition={{ duration: 0.5, ease: "easeInOut" }}
+              transition={{ duration: 0.5 }}
       className="bottom-sheet hide-scrollbar"
       onTouchStart={(e) => {
         // 터치 시작 로직

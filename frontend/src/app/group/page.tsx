@@ -237,16 +237,14 @@ const pageVariants = {
     opacity: 1, 
     y: 0,
     transition: {
-      duration: 0.6,
-      ease: "easeOut"
+      duration: 0.6
     }
   },
   out: { 
     opacity: 0, 
     y: -20,
     transition: {
-      duration: 0.4,
-      ease: "easeIn"
+      duration: 0.4
     }
   }
 };
@@ -259,8 +257,7 @@ const cardVariants = {
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.5,
-      ease: "easeOut"
+      duration: 0.5
     }
   }
 };
@@ -272,9 +269,7 @@ const floatingButtonVariants = {
     rotate: 0,
     transition: {
       delay: 0.5,
-      type: "spring",
-      stiffness: 260,
-      damping: 20
+      duration: 0.6
     }
   },
   hover: { 
@@ -295,7 +290,6 @@ const groupListContainerVariants = {
     y: 0,
     transition: {
       duration: 0.6,
-      ease: "easeOut",
       staggerChildren: 0.1,
       delayChildren: 0.1
     }
@@ -312,16 +306,14 @@ const groupCardVariants = {
     opacity: 1, 
     y: 0,
     transition: {
-      duration: 0.5,
-      ease: "easeOut"
+      duration: 0.5
     }
   },
   hover: {
     scale: 1.02,
     y: -4,
     transition: {
-      duration: 0.2,
-      ease: "easeOut"
+      duration: 0.2
     }
   },
   tap: {
@@ -411,8 +403,7 @@ const modalVariants = {
     scale: 1,
     y: 0,
     transition: {
-      duration: 0.3,
-      ease: [0.25, 0.46, 0.45, 0.94]
+      duration: 0.3
     }
   },
   exit: {
@@ -420,8 +411,7 @@ const modalVariants = {
     scale: 0.9,
     y: 50,
     transition: {
-      duration: 0.2,
-      ease: [0.55, 0.06, 0.68, 0.19]
+      duration: 0.2
     }
   }
 };
@@ -1324,7 +1314,7 @@ function GroupPageContent() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    transition={{ duration: 0.3 }}
                     className="flex items-center space-x-3"
                   >
                     <div className="flex items-center space-x-3">
@@ -1340,7 +1330,7 @@ function GroupPageContent() {
                      initial={{ opacity: 0, x: -20 }}
                      animate={{ opacity: 1, x: 0 }}
                      exit={{ opacity: 0, x: 20 }}
-                     transition={{ delay: 0.4, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+                     transition={{ delay: 0.4, duration: 0.5 }}
                      className="flex items-center space-x-3"
                    >
                      <motion.button 
@@ -1385,8 +1375,7 @@ function GroupPageContent() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ 
-                    duration: 0.6,
-                    ease: [0.25, 0.46, 0.45, 0.94]
+                    duration: 0.6
                   }}
                 >
                   {/* 검색 섹션 */}
@@ -1440,8 +1429,7 @@ function GroupPageContent() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   transition={{ 
-                    duration: 0.6,
-                    ease: [0.25, 0.46, 0.45, 0.94]
+                    duration: 0.6
                   }}
                   className="flex flex-col flex-1 min-h-0"
                 >
@@ -1454,7 +1442,7 @@ function GroupPageContent() {
                       style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
                       initial={{ y: 20, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: 0.1, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+                      transition={{ delay: 0.1, duration: 0.5 }}
                     >
                       {/* 그룹 액션 메뉴 버튼 */}
                       <div className="absolute top-4 right-4 z-[140]">
@@ -1545,7 +1533,7 @@ function GroupPageContent() {
                         className="bg-gradient-to-r from-red-300 to-red-300 rounded-xl p-3 text-white text-center shadow-md"
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: 0.2, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+                        transition={{ delay: 0.2, duration: 0.5 }}
                       >
                         <FaUsers className="w-6 h-6 text-red-800 mx-auto mb-1" />
                         {membersLoading ? (
@@ -1566,7 +1554,7 @@ function GroupPageContent() {
                         className="bg-gradient-to-r from-yellow-300 to-yellow-300 rounded-xl p-3 text-white text-center shadow-md"
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: 0.3, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+                        transition={{ delay: 0.3, duration: 0.5 }}
                       >
                         <FaCalendarAlt className="w-6 h-6 text-yellow-800 mx-auto mb-1" />
                         {statsLoading ? (
@@ -1587,7 +1575,7 @@ function GroupPageContent() {
                         className="bg-gradient-to-r from-blue-300 to-blue-300 rounded-xl p-3 text-white text-center shadow-md"
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: 0.4, duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+                        transition={{ delay: 0.4, duration: 0.6 }}
                       >
                         <FaMapMarkerAlt className="w-6 h-6 text-blue-600 mx-auto mb-1" />
                         {statsLoading ? (
@@ -1616,7 +1604,7 @@ function GroupPageContent() {
                       style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}
                       initial={{ y: 20, opacity: 0 }}
                       animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: 0.5, duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+                                              transition={{ delay: 0.5, duration: 0.5 }}
                     >
                       <div className="p-4 border-b" style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}>
                         <div className="flex items-center justify-between">
@@ -2362,7 +2350,7 @@ function GroupPageContent() {
               initial={{ opacity: 0, y: 50, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 50, scale: 0.9 }}
-              transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+                              transition={{ duration: 0.3 }}
             >
               <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden w-full">
                 <div className="p-4">
@@ -2412,7 +2400,7 @@ function GroupPageContent() {
                       }`}
                       initial={{ width: '100%' }}
                       animate={{ width: `${100 - (toastModal.progress || 0)}%` }}
-                      transition={{ duration: 0.1, ease: 'linear' }}
+                      transition={{ duration: 0.1 }}
                     />
                   </div>
                 )}
