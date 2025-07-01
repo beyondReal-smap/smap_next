@@ -156,12 +156,12 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com *.googleapis.com *.gstatic.com *.google.com",
-              "connect-src 'self' *.map.naver.com *.googleapis.com *.google.com wss: ws: data: blob:",
-              "img-src 'self' data: blob: *.map.naver.com *.googleapis.com *.gstatic.com *.google.com",
-              "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com",
-              "font-src 'self' *.gstatic.com *.googleapis.com",
-              "frame-src 'self' *.google.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net",
+              "connect-src 'self' *.map.naver.com *.googleapis.com *.google.com *.navercorp.com *.naver.net wss: ws: data: blob:",
+              "img-src 'self' data: blob: *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net",
+              "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com *.navercorp.com *.naver.net",
+              "font-src 'self' *.gstatic.com *.googleapis.com *.navercorp.com *.naver.net",
+              "frame-src 'self' *.google.com *.navercorp.com *.naver.net",
               "worker-src 'self' blob:",
               "object-src 'none'",
               "base-uri 'self'"
