@@ -74,10 +74,18 @@
     "eslint": "^8",
     "eslint-config-next": "15.3.2"
   },
-  "resolutions": {
+  "overrides": {
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "@types/react": "^19.1.6",
-    "@types/react-dom": "^19.1.6"
+    "@types/react-dom": "^19.1.6",
+    "next-auth": {
+      "react": "^19.1.0",
+      "react-dom": "^19.1.0"
+    }
+  },
+  "peerDependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   }
 }
