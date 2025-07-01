@@ -60,9 +60,32 @@ const nextConfig = {
       // React 중복 방지 및 경로 명시
       'react': require.resolve('react'),
       'react-dom': require.resolve('react-dom'),
+    };
+    
+    // React JSX Runtime을 명시적으로 fallback 설정
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
       'react/jsx-runtime': require.resolve('react/jsx-runtime'),
       'react/jsx-dev-runtime': require.resolve('react/jsx-dev-runtime'),
     };
+    
+    // 모듈 해결 옵션 강화
+    config.resolve.modules = [
+      'node_modules',
+      require.resolve('react').split('/node_modules/')[0] + '/node_modules'
+    ];
+    
+    // React 관련 확장자 우선순위
+    config.resolve.extensions = ['.jsx', '.js', '.tsx', '.ts', '.json'];
+    
+    // externals 설정으로 React 모듈 강제 해결
+    if (!isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        'react/jsx-runtime': 'commonjs react/jsx-runtime',
+        'react/jsx-dev-runtime': 'commonjs react/jsx-dev-runtime'
+      });
+    }
     
     // iOS WebView 호환성을 위한 최적화
     if (!isServer) {
