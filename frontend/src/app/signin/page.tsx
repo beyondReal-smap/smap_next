@@ -188,10 +188,7 @@ const SignInPage = () => {
               // 3. 포괄적 데이터 캐싱
               try {
                 await saveComprehensiveData({
-                  user: data.user,
-                  token: data.token,
-                  source: 'kakao-native',
-                  timestamp: Date.now()
+                  userProfile: data.user
                 });
                 console.log('[NATIVE CALLBACK] 포괄적 데이터 캐싱 완료');
               } catch (cacheError) {
