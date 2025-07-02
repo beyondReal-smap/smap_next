@@ -3,7 +3,6 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
 import { hapticFeedback } from '../../../utils/haptic';
 
 export default function BottomNavBar() {
@@ -34,7 +33,7 @@ export default function BottomNavBar() {
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-[9999] rounded-t-2xl !important"
+      className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-[9999] rounded-t-2xl"
       id="bottom-navigation-bar"
       style={{
         position: 'fixed',
@@ -45,14 +44,15 @@ export default function BottomNavBar() {
         backgroundColor: 'white',
         borderTop: '1px solid #e5e7eb',
         boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
-        transform: 'none',
-        WebkitTransform: 'none',
-        backfaceVisibility: 'visible',
-        WebkitBackfaceVisibility: 'visible',
+        transform: 'translate3d(0, 0, 0)', // GPU 가속 활성화로 고정성 강화
+        WebkitTransform: 'translate3d(0, 0, 0)',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
         borderTopLeftRadius: '16px',
         borderTopRightRadius: '16px',
         borderRadius: '16px 16px 0 0',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        willChange: 'auto' // willChange 제거로 성능 최적화
       }}
     >
       <nav className="flex justify-around items-center py-3">
@@ -66,89 +66,24 @@ export default function BottomNavBar() {
               onClick={() => handleNavClick({ name, path, icon })}
               className="flex flex-col items-center space-y-1 transition-colors duration-200 flex-1"
             >
-                             <motion.div 
-                 className="relative flex flex-col items-center space-y-1"
-                 whileTap={{ scale: 0.9 }}
-                 whileHover={{ scale: 1.05 }}
-                 transition={{ type: "spring", stiffness: 400, damping: 17 }}
-               >
-                 {/* 아이콘 컨테이너 */}
-                 <motion.div 
-                   className="w-5 h-5 flex items-center justify-center relative"
-                   animate={isActive ? {
-                     scale: [1, 1.2, 1],
-                     rotate: [0, 5, -5, 0]
-                   } : {}}
-                   transition={{
-                     duration: 0.6
-                   }}
-                   style={{ 
-                     color: isActive ? '#0113A3' : '#6b7280'
-                   }}
-                 >
-                   {/* 선택된 아이템에 반짝이는 효과 */}
-                   {isActive && (
-                     <motion.div
-                       className="absolute inset-0 rounded-full"
-                       style={{ 
-                         background: 'radial-gradient(circle, rgba(1, 19, 163, 0.2) 0%, transparent 70%)',
-                         filter: 'blur(2px)'
-                       }}
-                       animate={{
-                         scale: [0.8, 1.2, 0.8],
-                         rotate: [0, 180, 360]
-                       }}
-                       transition={{
-                         duration: 3,
-                         repeat: Infinity
-                       }}
-                     />
-                   )}
-                   
-                   {/* 선택된 아이템에 작은 별 효과 */}
-                   {isActive && (
-                     <>
-                       <motion.div
-                         className="absolute -top-1 -right-1 w-1 h-1 rounded-full"
-                         style={{ backgroundColor: '#0113A3' }}
-                         animate={{
-                           scale: [0, 1, 0],
-                           opacity: [0, 1, 0]
-                         }}
-                         transition={{
-                           duration: 2.5,
-                           repeat: Infinity,
-                           delay: 0
-                         }}
-                       />
-                       <motion.div
-                         className="absolute -top-1 -left-1 w-0.5 h-0.5 rounded-full"
-                         style={{ backgroundColor: '#0113A3' }}
-                         animate={{
-                           scale: [0, 1, 0],
-                           opacity: [0, 1, 0]
-                         }}
-                         transition={{
-                           duration: 2.5,
-                           repeat: Infinity,
-                           delay: 0.8
-                         }}
-                       />
-                       <motion.div
-                         className="absolute -bottom-1 -right-1 w-0.5 h-0.5 rounded-full"
-                         style={{ backgroundColor: '#0113A3' }}
-                         animate={{
-                           scale: [0, 1, 0],
-                           opacity: [0, 1, 0]
-                         }}
-                         transition={{
-                           duration: 2.5,
-                           repeat: Infinity,
-                           delay: 1.6
-                         }}
-                       />
-                     </>
-                   )}
+              <div className="relative flex flex-col items-center space-y-1">
+                {/* 아이콘 컨테이너 - 애니메이션 제거 */}
+                <div 
+                  className="w-5 h-5 flex items-center justify-center relative"
+                  style={{ 
+                    color: isActive ? '#0113A3' : '#6b7280',
+                    transform: 'none' // transform 고정
+                  }}
+                >
+                  {/* 선택된 아이템 배경 표시 - 애니메이션 제거 */}
+                  {isActive && (
+                    <div
+                      className="absolute inset-0 rounded-full"
+                      style={{ 
+                        background: 'radial-gradient(circle, rgba(1, 19, 163, 0.1) 0%, transparent 70%)'
+                      }}
+                    />
+                  )}
                   
                   {icon === 'home' && (
                     <svg 
@@ -199,26 +134,19 @@ export default function BottomNavBar() {
                       <path d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279 9.768 9.768 0 0 0-6.963-6.963Z" />
                     </svg>
                   )}
-                </motion.div>
+                </div>
                 
-                {/* 텍스트 라벨 */}
-                <motion.span 
+                {/* 텍스트 라벨 - 애니메이션 제거 */}
+                <span 
                   className="text-xs font-medium relative z-10"
                   style={{ 
-                    color: isActive ? '#0113A3' : '#6b7280'
-                  }}
-                  animate={isActive ? {
-                    scale: [1, 1.1, 1]
-                  } : {}}
-                  transition={{
-                    duration: 0.3
+                    color: isActive ? '#0113A3' : '#6b7280',
+                    transform: 'none' // transform 고정
                   }}
                 >
                   {name}
-                </motion.span>
-                
-                
-              </motion.div>
+                </span>
+              </div>
             </Link>
           );
         })}

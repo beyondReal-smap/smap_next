@@ -319,22 +319,59 @@ div[style*="zIndex: 99999"] {
   user-select: none !important;
 }
 
-/* 네비게이션 바 강제 고정 */
+/* 모든 브라우저에서 네비게이션 바 강제 고정 - 강화 버전 */
+nav[id="bottom-navigation-bar"],
+div[id="bottom-navigation-bar"],
+.fixed.bottom-0,
 #bottom-navigation-bar {
   position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
+  bottom: 0px !important;
+  left: 0px !important;
+  right: 0px !important;
   z-index: 9999 !important;
+  transform: translate3d(0, 0, 0) !important;
+  -webkit-transform: translate3d(0, 0, 0) !important;
+  -moz-transform: translate3d(0, 0, 0) !important;
+  -ms-transform: translate3d(0, 0, 0) !important;
+  -o-transform: translate3d(0, 0, 0) !important;
+  will-change: auto !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
+  contain: layout style paint !important;
+}
+
+/* 네비게이션 바 내부 요소들도 고정 */
+#bottom-navigation-bar * {
   transform: none !important;
   -webkit-transform: none !important;
-  backface-visibility: visible !important;
-  -webkit-backface-visibility: visible !important;
   will-change: auto !important;
-  border-top-left-radius: 16px !important;
-  border-top-right-radius: 16px !important;
-  border-radius: 16px 16px 0 0 !important;
-  overflow: hidden !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
+}
+
+/* Framer Motion 애니메이션 강제 비활성화 */
+#bottom-navigation-bar [data-framer-component],
+#bottom-navigation-bar .motion-div {
+  transform: none !important;
+  -webkit-transform: none !important;
+  animation: none !important;
+  transition: color 0.2s ease !important; /* 색상 변경만 허용 */
+}
+
+/* 네비게이션 바 호버 및 액티브 상태 최적화 */
+#bottom-navigation-bar a:hover,
+#bottom-navigation-bar a:active,
+#bottom-navigation-bar a:focus {
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+/* GPU 레이어 생성으로 성능 최적화 */
+#bottom-navigation-bar {
+  -webkit-perspective: 1000px !important;
+  perspective: 1000px !important;
+  -webkit-transform-style: preserve-3d !important;
+  transform-style: preserve-3d !important;
 }
 
 /* schedule 페이지 전용 스타일 */
@@ -370,22 +407,6 @@ body:has(.schedule-page-container) #bottom-navigation-bar {
   z-index: 10000 !important;
   transform: translateZ(0) !important;
   -webkit-transform: translateZ(0) !important;
-}
-
-/* 모든 브라우저에서 네비게이션 바 강제 고정 */
-nav[id="bottom-navigation-bar"],
-div[id="bottom-navigation-bar"],
-.fixed.bottom-0 {
-  position: fixed !important;
-  bottom: 0px !important;
-  left: 0px !important;
-  right: 0px !important;
-  z-index: 9999 !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-  -moz-transform: none !important;
-  -ms-transform: none !important;
-  -o-transform: none !important;
 }
 
 /* 스크롤 컨테이너가 네비게이션 바에 영향을 주지 않도록 */

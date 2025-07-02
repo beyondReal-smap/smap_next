@@ -451,26 +451,28 @@ const pageStyles = `
        screen and (-webkit-device-pixel-ratio: 1.5),
        screen and (-webkit-device-pixel-ratio: 2),
        screen and (-webkit-device-pixel-ratio: 3) {
-  /* 안드로이드 기기 감지 시 헤더 최적화 */
-  .header-fixed {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    padding-top: env(safe-area-inset-top) !important;
-    min-height: 64px !important;
-    height: auto !important;
-    z-index: 50 !important;
-    will-change: transform !important;
-    -webkit-transform: translateZ(0) !important;
-    transform: translateZ(0) !important;
-    -webkit-backface-visibility: hidden !important;
-    backface-visibility: hidden !important;
-  }
-  
-  /* 안드로이드에서 지도 컨테이너 상단 마진 증가 */
-  .full-map-container {
-    padding-top: max(72px, calc(env(safe-area-inset-top) + 72px)) !important;
+  /* 안드로이드 기기만 감지 (iOS 제외) */
+  @supports not (-webkit-appearance: none) {
+    .header-fixed {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      padding-top: env(safe-area-inset-top) !important;
+      min-height: 64px !important;
+      height: auto !important;
+      z-index: 50 !important;
+      will-change: transform !important;
+      -webkit-transform: translateZ(0) !important;
+      transform: translateZ(0) !important;
+      -webkit-backface-visibility: hidden !important;
+      backface-visibility: hidden !important;
+    }
+    
+    /* 안드로이드에서만 지도 컨테이너 상단 마진 증가 */
+    .full-map-container {
+      padding-top: max(72px, calc(env(safe-area-inset-top) + 72px)) !important;
+    }
   }
 }
 
@@ -6766,7 +6768,7 @@ export default function LogsPage() {
           animate="animate"
           className="full-map-container hardware-accelerated" 
           style={{ 
-            paddingTop: '56px', 
+            paddingTop: '0px', 
             position: 'relative', // 로딩 오버레이를 위한 relative 포지션
             zIndex: 1 // 헤더보다 낮은 z-index
           }}
@@ -6789,7 +6791,7 @@ export default function LogsPage() {
             <div 
               className="absolute right-[10px] z-30 z-zoom-control flex flex-col"
               style={{
-                top: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '140px' : '190px'
+                top: '70px'
               }}
             >
               <motion.button
@@ -6831,7 +6833,7 @@ export default function LogsPage() {
                 exit="exit"
                 className="absolute left-0 right-0 z-40 z-floating-card flex justify-center px-4"
                 style={{
-                  top: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '70px' : '120px'
+                  top: '70px'
                 }}
               >
                 <motion.div
