@@ -61,6 +61,8 @@ body {
   -webkit-overflow-scrolling: touch;
   /* iOS 터치 이벤트 최적화 */
   touch-action: manipulation;
+  /* 🔥 하단 네비게이션을 위한 body 패딩 */
+  padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
 }
 
 /* iOS 웹뷰에서 고정 요소 최적화 */
@@ -319,16 +321,13 @@ div[style*="zIndex: 99999"] {
   user-select: none !important;
 }
 
-/* 모든 브라우저에서 네비게이션 바 강제 고정 - 강화 버전 */
-nav[id="bottom-navigation-bar"],
-div[id="bottom-navigation-bar"],
-.fixed.bottom-0,
+/* 🔥 하단 네비게이션 바 강력한 고정 스타일 */
 #bottom-navigation-bar {
   position: fixed !important;
   bottom: 0px !important;
   left: 0px !important;
   right: 0px !important;
-  z-index: 9999 !important;
+  z-index: 10000 !important;
   transform: translate3d(0, 0, 0) !important;
   -webkit-transform: translate3d(0, 0, 0) !important;
   -moz-transform: translate3d(0, 0, 0) !important;
@@ -338,6 +337,50 @@ div[id="bottom-navigation-bar"],
   backface-visibility: hidden !important;
   -webkit-backface-visibility: hidden !important;
   contain: layout style paint !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  background-color: white !important;
+  border-top: 1px solid #e5e7eb !important;
+  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  overflow: hidden !important;
+  min-height: 64px !important;
+  height: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* z-index 계층 정리 */
+/* 1000-1999: 일반적인 드롭다운, 툴팁 */
+/* 2000-2999: 사이드바, 메뉴 */  
+/* 3000-3999: 모달 배경 */
+/* 4000-4999: 모달 콘텐츠 */
+/* 5000-5999: 토스트, 알림 */
+/* 10000+: 하단 네비게이션 (최상위) */
+
+/* 모달들이 하단 네비게이션 아래 오도록 조정 */
+.modal-backdrop,
+.fixed.inset-0 {
+  z-index: 3000 !important;
+}
+
+.modal-content,
+.modal-dialog {
+  z-index: 4000 !important;
+}
+
+/* 토스트 알림은 모달보다 위에 */
+.toast,
+.notification {
+  z-index: 5000 !important;
+}
+
+/* 하단 네비게이션은 모든 것보다 위에 */
+#bottom-navigation-bar {
+  z-index: 10000 !important;
 }
 
 /* 네비게이션 바 내부 요소들도 고정 */
@@ -372,6 +415,31 @@ div[id="bottom-navigation-bar"],
   perspective: 1000px !important;
   -webkit-transform-style: preserve-3d !important;
   transform-style: preserve-3d !important;
+}
+
+/* 모든 페이지에서 하단 네비게이션 강제 표시 */
+body #bottom-navigation-bar {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* iOS Safari 및 WebView 호환성 */
+@supports (-webkit-touch-callout: none) {
+  #bottom-navigation-bar {
+    position: fixed !important;
+    bottom: 0 !important;
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Android WebView 호환성 */
+@supports not (-webkit-touch-callout: none) {
+  #bottom-navigation-bar {
+    position: fixed !important;
+    bottom: 0 !important;
+    padding-bottom: 8px !important;
+  }
 }
 
 /* schedule 페이지 전용 스타일 */
@@ -533,4 +601,33 @@ nav[class*="navigation-fixed"] {
   .logs-page-content {
     padding-top: 5rem !important;
   }
+}
+
+/* 하단 네비게이션이 없는 페이지에서는 패딩 제거 */
+body:has(.hide-bottom-nav) {
+  padding-bottom: 0 !important;
+}
+
+/* 메인 콘텐츠 영역에도 네비게이션을 위한 여백 추가 */
+main {
+  margin-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+}
+
+/* 하단 네비게이션이 없는 페이지에서는 메인 마진 제거 */
+body:has(.hide-bottom-nav) main {
+  margin-bottom: 0 !important;
+}
+
+/* 스크롤 컨테이너에도 네비게이션을 위한 패딩 추가 */
+.scroll-container,
+.overflow-y-auto,
+.h-screen {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+}
+
+/* 하단 네비게이션이 없는 페이지에서는 스크롤 컨테이너 패딩 제거 */
+body:has(.hide-bottom-nav) .scroll-container,
+body:has(.hide-bottom-nav) .overflow-y-auto,
+body:has(.hide-bottom-nav) .h-screen {
+  padding-bottom: 0 !important;
 }

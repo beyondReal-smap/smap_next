@@ -160,14 +160,31 @@ export default function ClientLayout({
     unregisterServiceWorker();
   }, []);
 
-  // 네비게이션 바를 숨길 페이지들 - useMemo로 최적화
+  // 네비게이션 바를 숨길 페이지들 - 최소한으로 제한
   const shouldHideNavBar = React.useMemo(() => {
-    const hideNavBarPages = ['/signin', '/register', '/notice', '/setting'];
+    // 오직 로그인/회원가입 관련 페이지에서만 숨김
+    const hideNavBarPages = ['/signin', '/register', '/login', '/social-login'];
     return hideNavBarPages.some(page => pathname.startsWith(page)) || 
-           pathname === '/' || // 루트 페이지만 네비게이션 숨김
-           pathname.includes('/join') || // 그룹 초대 페이지도 네비게이션 숨김
-           pathname.match(/\/group\/\d+\/join/); // 정규식으로 그룹 초대 페이지 확실히 매칭
+           pathname === '/'; // 루트 페이지에서만 추가로 숨김
   }, [pathname]);
+
+  // body에 클래스 추가/제거
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (shouldHideNavBar) {
+        document.body.classList.add('hide-bottom-nav');
+      } else {
+        document.body.classList.remove('hide-bottom-nav');
+      }
+    }
+    
+    // 컴포넌트 언마운트 시 클래스 제거
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.body.classList.remove('hide-bottom-nav');
+      }
+    };
+  }, [shouldHideNavBar]);
   
   // 디버깅용 로그 - 개발 환경에서만 출력
   React.useEffect(() => {

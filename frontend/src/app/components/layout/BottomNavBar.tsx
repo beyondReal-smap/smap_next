@@ -33,18 +33,18 @@ export default function BottomNavBar() {
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-[9999] rounded-t-2xl"
+      className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-[10000] rounded-t-2xl"
       id="bottom-navigation-bar"
       style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 9999,
+        position: 'fixed !important' as any,
+        bottom: '0px !important',
+        left: '0px !important',
+        right: '0px !important',
+        zIndex: 10000,
         backgroundColor: 'white',
         borderTop: '1px solid #e5e7eb',
         boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
-        transform: 'translate3d(0, 0, 0)', // GPU 가속 활성화로 고정성 강화
+        transform: 'translate3d(0, 0, 0)',
         WebkitTransform: 'translate3d(0, 0, 0)',
         backfaceVisibility: 'hidden',
         WebkitBackfaceVisibility: 'hidden',
@@ -52,10 +52,13 @@ export default function BottomNavBar() {
         borderTopRightRadius: '16px',
         borderRadius: '16px 16px 0 0',
         overflow: 'hidden',
-        willChange: 'auto' // willChange 제거로 성능 최적화
+        willChange: 'auto',
+        paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
+        height: 'auto',
+        minHeight: '64px'
       }}
     >
-      <nav className="flex justify-around items-center py-3">
+      <nav className="flex justify-around items-center py-3 px-2">
         {navItems.map(({ name, path, icon }) => {
           const isActive = pathname === path;
           
@@ -64,18 +67,18 @@ export default function BottomNavBar() {
               key={path}
               href={path}
               onClick={() => handleNavClick({ name, path, icon })}
-              className="flex flex-col items-center space-y-1 transition-colors duration-200 flex-1"
+              className="flex flex-col items-center space-y-1 transition-colors duration-200 flex-1 min-w-0"
             >
               <div className="relative flex flex-col items-center space-y-1">
-                {/* 아이콘 컨테이너 - 애니메이션 제거 */}
+                {/* 아이콘 컨테이너 */}
                 <div 
                   className="w-5 h-5 flex items-center justify-center relative"
                   style={{ 
                     color: isActive ? '#0113A3' : '#6b7280',
-                    transform: 'none' // transform 고정
+                    transform: 'none'
                   }}
                 >
-                  {/* 선택된 아이템 배경 표시 - 애니메이션 제거 */}
+                  {/* 선택된 아이템 배경 표시 */}
                   {isActive && (
                     <div
                       className="absolute inset-0 rounded-full"
@@ -85,6 +88,7 @@ export default function BottomNavBar() {
                     />
                   )}
                   
+                  {/* 홈 아이콘 */}
                   {icon === 'home' && (
                     <svg 
                       className="w-5 h-5 relative z-10" 
@@ -95,15 +99,20 @@ export default function BottomNavBar() {
                       <path d="m12 5.432 8.159 8.159c.03.03.06.058.091.086v6.198c0 1.035-.84 1.875-1.875 1.875H15a.75.75 0 0 1-.75-.75v-4.5a.75.75 0 0 0-.75-.75h-3a.75.75 0 0 0-.75.75V21a.75.75 0 0 1-.75.75H5.625a1.875 1.875 0 0 1-1.875-1.875v-6.198a2.29 2.29 0 0 0 .091-.086L12 5.432Z" />
                     </svg>
                   )}
+                  
+                  {/* 사용자 그룹 아이콘 */}
                   {icon === 'users' && (
                     <svg 
                       className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
-                      <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
+                      <path fillRule="evenodd" d="M8.25 6.75a3.75 3.75 0 1 1 7.5 0 3.75 3.75 0 0 1-7.5 0ZM15.75 9.75a3 3 0 1 1 6 0 3 3 0 0 1-6 0ZM2.25 9.75a3 3 0 1 1 6 0 3 3 0 0 1-6 0ZM6.31 15.117A6.745 6.745 0 0 1 12 12a6.745 6.745 0 0 1 6.709 7.498.75.75 0 0 1-.372.568A12.696 12.696 0 0 1 12 21.75c-2.305 0-4.47-.612-6.337-1.684a.75.75 0 0 1-.372-.568 6.787 6.787 0 0 1 1.019-4.38Z" clipRule="evenodd" />
+                      <path d="M5.082 14.254a8.287 8.287 0 0 0-1.308 5.135 9.687 9.687 0 0 1-1.764-.44l-.115-.04a.563.563 0 0 1-.373-.487l-.01-.121a3.75 3.75 0 0 1 3.57-4.047ZM20.226 19.389a8.287 8.287 0 0 0-1.308-5.135 3.75 3.75 0 0 1 3.57 4.047l-.01.121a.563.563 0 0 1-.373.486l-.115.041c-.07.027-.22.07-.544.14-.42.094-.85.174-1.27.24.15-.171.2-.26.05-.94Z" />
                     </svg>
                   )}
+                  
+                  {/* 달력 아이콘 */}
                   {icon === 'calendar' && (
                     <svg 
                       className="w-5 h-5 relative z-10" 
@@ -111,19 +120,22 @@ export default function BottomNavBar() {
                       fill="currentColor"
                     >
                       <path d="M12.75 12.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM7.5 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM8.25 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM9.75 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM10.5 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM12.75 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM14.25 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM15 17.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM16.5 15.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM15 12.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM16.5 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" />
-                      <path fillRule="evenodd" d="M6.75 2.25A.75.75 0 0 1 7.5 3v1.5h9V3A.75.75 0 0 1 18 3v1.5h.75a3 3 0 0 1 3 3v11.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3H6V3a.75.75 0 0 1 .75-.75Zm13.5 9a1.5 1.5 0 0 0-1.5-1.5H5.25a1.5 1.5 0 0 0-1.5 1.5v7.5a1.5 1.5 0 0 0 1.5 1.5h13.5a1.5 1.5 0 0 0 1.5-1.5v-7.5Z" clipRule="evenodd" />
+                      <path fillRule="evenodd" d="M6.75 2.25A.75.75 0 0 1 7.5 3v1.5h9V3A.75.75 0 0 1 18 3v1.5h.75a3 3 0 0 1 3 3v11.25a3 3 0 0 1-3 3H5.25a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3H6V3a.75.75 0 0 1 .75-.75ZM5.25 6A1.5 1.5 0 0 0 3.75 7.5v11.25A1.5 1.5 0 0 0 5.25 20.25h13.5A1.5 1.5 0 0 0 20.25 18.75V7.5A1.5 1.5 0 0 0 18.75 6H5.25Z" clipRule="evenodd" />
                     </svg>
                   )}
+                  
+                  {/* 지도 핀 아이콘 */}
                   {icon === 'map-pin' && (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5 relative z-10"
+                    <svg 
+                      className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
                       <path fillRule="evenodd" d="m11.54 22.351.07.04.028.016a.76.76 0 0 0 .723 0l.028-.015.071-.041a16.975 16.975 0 0 0 1.144-.742 19.58 19.58 0 0 0 2.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 0 0-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 0 0 2.682 2.282 16.975 16.975 0 0 0 1.145.742ZM12 13.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clipRule="evenodd" />
                     </svg>
                   )}
+                  
+                  {/* 문서 아이콘 */}
                   {icon === 'document' && (
                     <svg 
                       className="w-5 h-5 relative z-10" 
@@ -136,12 +148,12 @@ export default function BottomNavBar() {
                   )}
                 </div>
                 
-                {/* 텍스트 라벨 - 애니메이션 제거 */}
+                {/* 텍스트 라벨 */}
                 <span 
-                  className="text-xs font-medium relative z-10"
+                  className="text-xs font-medium relative z-10 text-center"
                   style={{ 
                     color: isActive ? '#0113A3' : '#6b7280',
-                    transform: 'none' // transform 고정
+                    transform: 'none'
                   }}
                 >
                   {name}
