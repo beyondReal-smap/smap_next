@@ -228,7 +228,7 @@ const pageVariants = {
   out: { 
     opacity: 0,
     y: -20,
-    transition: {
+    transition: { 
       duration: 0.2,
     }
   }
