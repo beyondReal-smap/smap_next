@@ -7,8 +7,6 @@ import { useRouter } from 'next/navigation'
 declare global {
   interface Window {
     google: any;
-    iosBridge?: any;
-    webkit?: any;
   }
 }
 
@@ -61,10 +59,7 @@ export default function SimpleSignInPage() {
 
       // Google 로그인 실행
       window.google.accounts.id.initialize({
-        client_id: (() => {
-          const { API_KEYS } = require('@/config');
-          return API_KEYS.GOOGLE_CLIENT_ID;
-        })(),
+        client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '',
         callback: handleGoogleCallback
       })
 
@@ -125,7 +120,10 @@ export default function SimpleSignInPage() {
       
       if (data.success && data.user) {
         console.log('Google 로그인 성공:', data.user)
-        await login(data.user, data.token)
+        await login({
+          mt_id: data.user.mt_id || data.user.mt_email || '',
+          mt_pwd: '' // Google 로그인의 경우 비밀번호는 필요 없음
+        })
         router.push('/home')
       } else {
         throw new Error(data.error || 'Google 로그인 실패')

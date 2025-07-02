@@ -33,6 +33,11 @@ interface IOSBridge {
   }
   requestNotificationPermission: () => void
   sendNotification: (title: string, body: string) => void
+  googleSignIn?: {
+    signIn: () => void
+    signOut: () => void
+    checkStatus: () => void
+  }
 }
 
 declare global {

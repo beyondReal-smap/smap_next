@@ -259,9 +259,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // 1. NextAuth 세션 먼저 확인 (최신 상태) - 임시 비활성화
         console.log('[AUTH CONTEXT] NextAuth 세션 확인 (비활성화됨)');
         // const session = await getSession();
-        const session = null;
+        // const session = null;
         
-        if (false && session?.backendData?.member) { // 임시 비활성화
+        // NextAuth 세션 처리 (임시 비활성화)
+        /*
+        if (session?.backendData?.member) {
           console.log('[AUTH CONTEXT] NextAuth 세션에서 사용자 데이터 발견:', session.backendData.member.mt_name, 'ID:', session.backendData.member.mt_idx);
           
           // 탈퇴한 사용자인지 확인 (mt_level이 1이면 탈퇴한 사용자)
@@ -316,6 +318,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           return;
         }
+        */
 
         // 2. NextAuth 세션이 없으면 authService에서 로그인 상태 확인
         const isLoggedInFromService = authService.isLoggedIn();
@@ -360,33 +363,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       dispatch({ type: 'SET_ERROR', payload: null });
 
       const response = await authService.login(credentials);
-      console.log('[AUTH] 로그인 성공:', response.member.mt_name);
+      console.log('[AUTH] 로그인 성공:', response.data?.member?.mt_name);
 
       // 로그인 성공 시 사용자 데이터 저장
-      dispatch({ type: 'LOGIN_SUCCESS', payload: response.member });
+      if (response.data?.member) {
+        dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.member });
 
-      // 🚀 로그인 성공 시 모든 데이터 일괄 프리로딩
-      console.log('[AUTH] 🚀 로그인 성공 후 전체 데이터 프리로딩 시작');
-      try {
-        const preloadResults = await comprehensivePreloadData(response.member.mt_idx);
-        
-        if (preloadResults.success) {
-          // DataCacheContext에 일괄 저장
-          saveComprehensiveData({
-            userProfile: preloadResults.userProfile,
-            userGroups: preloadResults.userGroups,
-            groupMembers: preloadResults.groupMembers,
-            locationData: preloadResults.locationData,
-            dailyLocationCounts: preloadResults.dailyCounts
-          });
+        // 🚀 로그인 성공 시 모든 데이터 일괄 프리로딩
+        console.log('[AUTH] 🚀 로그인 성공 후 전체 데이터 프리로딩 시작');
+        try {
+          const preloadResults = await comprehensivePreloadData(response.data.member.mt_idx);
           
-          console.log('[AUTH] ✅ 로그인 후 전체 데이터 프리로딩 완료');
-        } else {
-          console.warn('[AUTH] ⚠️ 로그인 후 데이터 프리로딩 실패:', preloadResults.errors);
+          if (preloadResults.success) {
+            // DataCacheContext에 일괄 저장
+            saveComprehensiveData({
+              userProfile: preloadResults.userProfile,
+              userGroups: preloadResults.userGroups,
+              groupMembers: preloadResults.groupMembers,
+              locationData: preloadResults.locationData,
+              dailyLocationCounts: preloadResults.dailyCounts
+            });
+            
+            console.log('[AUTH] ✅ 로그인 후 전체 데이터 프리로딩 완료');
+          } else {
+            console.warn('[AUTH] ⚠️ 로그인 후 데이터 프리로딩 실패:', preloadResults.errors);
+          }
+        } catch (preloadError) {
+          console.error('[AUTH] ❌ 로그인 후 데이터 프리로딩 오류:', preloadError);
+          // 프리로딩 실패해도 로그인은 성공으로 처리
         }
-      } catch (preloadError) {
-        console.error('[AUTH] ❌ 로그인 후 데이터 프리로딩 오류:', preloadError);
-        // 프리로딩 실패해도 로그인은 성공으로 처리
       }
 
     } catch (error: any) {
@@ -524,7 +529,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   enhancedUserData = {
                     ...enhancedUserData,
                     groups: groups,
-                    group_count: parseInt(groupCount || '0'),
                     ownedGroups: groups.filter(g => g.myRole?.isOwner || g.is_owner),
                     joinedGroups: groups.filter(g => !(g.myRole?.isOwner || g.is_owner))
                   };

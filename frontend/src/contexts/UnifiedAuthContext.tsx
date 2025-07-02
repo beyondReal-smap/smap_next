@@ -898,9 +898,11 @@ export const UnifiedAuthProvider: React.FC<UnifiedAuthProviderProps> = ({ childr
       // 캐시 업데이트
       setUserGroups(groups.map(g => ({
         sgt_idx: g.sgt_idx,
-        sgt_title: g.sgt_title,
-        sgt_intro: g.sgt_content || '',
+        sgt_title: g.sgt_title || '',
+        sgt_intro: (g as any).sgt_content || (g as any).sgt_intro || '',
         member_count: (g as any).member_count || 1,
+        sgdt_owner_chk: (g as any).sgdt_owner_chk || 'N',
+        sgdt_leader_chk: (g as any).sgdt_leader_chk || 'N',
       })));
       
       dispatch({ type: 'UPDATE_CACHE_STATS', payload: { userGroups: true } });

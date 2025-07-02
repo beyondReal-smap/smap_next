@@ -35,7 +35,7 @@ interface CustomToast {
   type: 'success' | 'error' | 'info';
 }
 
-import { API_KEYS } from '../../config';
+// import { API_KEYS } from '../../config';
 import ReactDOM from 'react-dom';
 import memberService from '@/services/memberService';
 import locationService, { OtherMemberLocationRaw } from '@/services/locationService';
@@ -43,7 +43,7 @@ import groupService, { Group } from '@/services/groupService';
 import { useAuth } from '@/contexts/AuthContext';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
 import { hapticFeedback } from '@/utils/haptic';
-import { retryDataFetch, retryMapApiLoad, retryMapInitialization } from '@/utils/retryUtils';
+// import { retryDataFetch, retryMapApiLoad, retryMapInitialization } from '@/utils/retryUtils';
 // import useDataCache from '@/hooks/useDataCache'; // 현재 사용하지 않는 hook
 
 // Dynamic Imports for better code splitting
@@ -1337,7 +1337,7 @@ export default function LocationPage() {
       // 카카오 지도 API를 사용한 주소 검색 로직
       const response = await axios.get(`https://dapi.kakao.com/v2/local/search/keyword.json`, {
         headers: {
-          Authorization: `KakaoAK ${API_KEYS.KAKAO_REST_API_KEY}`
+          Authorization: `KakaoAK ${process.env.NEXT_PUBLIC_KAKAO_REST_API_KEY}`
         },
         params: {
           query: locationSearchQuery,
@@ -1815,10 +1815,7 @@ export default function LocationPage() {
 
     try {
       console.log('[fetchGroupMembersData] 시작, 그룹ID:', selectedGroupId);
-      const membersData = await retryDataFetch(
-        () => memberService.getGroupMembers(selectedGroupId.toString()),
-        'LOCATION_GROUP_MEMBERS'
-      );
+          const membersData = await memberService.getGroupMembers(selectedGroupId.toString());
       console.log('[fetchGroupMembersData] 멤버 데이터 조회 완료:', membersData);
 
       if (membersData && membersData.length > 0) {
@@ -1887,10 +1884,7 @@ export default function LocationPage() {
           (async () => {
             try {
               setIsLoadingOtherLocations(true);
-              const memberLocationsRaw = await retryDataFetch(
-                () => locationService.getOtherMembersLocations(firstMember.id),
-                'FIRST_MEMBER_LOCATIONS'
-              );
+                  const memberLocationsRaw = await locationService.getOtherMembersLocations(firstMember.id);
               console.log("[fetchGroupMembersData] 첫 번째 멤버 장소 조회 완료:", memberLocationsRaw.length, '개');
               
               // LocationData 형식으로 변환
@@ -2481,7 +2475,7 @@ export default function LocationPage() {
       }
       
       // 동적 Client ID 가져오기 (도메인별 자동 선택) - Home 페이지와 동일
-      const dynamicClientId = API_KEYS.NAVER_MAPS_CLIENT_ID;
+      const dynamicClientId = process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '';
       console.log(`🗺️ [LOCATION] 네이버 지도 Client ID 사용: ${dynamicClientId}`);
       
       // 프로덕션 환경에서는 서브모듈 최소화 (로딩 속도 최적화)

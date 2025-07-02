@@ -99,7 +99,7 @@ const Modal: React.FC<ModalProps> = ({
         scale: 1, 
         y: 0,
         transition: {
-          type: "spring",
+          type: "spring" as const,
           stiffness: 300,
           damping: 25,
           duration: 0.3
@@ -118,7 +118,7 @@ const Modal: React.FC<ModalProps> = ({
         opacity: 1, 
         y: 0,
         transition: {
-          type: "spring",
+          type: "spring" as const,
           stiffness: 300,
           damping: 30,
           duration: 0.3
@@ -136,7 +136,7 @@ const Modal: React.FC<ModalProps> = ({
         opacity: 1, 
         y: 0,
         transition: {
-          type: "spring",
+          type: "spring" as const,
           stiffness: 300,
           damping: 30,
           duration: 0.3

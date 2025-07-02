@@ -261,7 +261,6 @@ const mapContainerVariants = {
     scale: 1,
     transition: {
       duration: 0.6,
-      ease: [0.25, 0.46, 0.45, 0.94],
       delay: 0.3
     }
   }
@@ -280,7 +279,6 @@ const floatingCardVariants = {
     scale: 1,
     transition: {
       duration: 0.5,
-      ease: [0.25, 0.46, 0.45, 0.94],
       delay: 0.6
     }
   },
@@ -299,16 +297,14 @@ const sidebarVariants = {
   closed: {
     x: '-100%',
     transition: {
-      type: 'tween',
-      ease: [0.25, 0.46, 0.45, 0.94],
+      type: 'tween' as const,
       duration: 0.4
     }
   },
   open: {
     x: 0,
     transition: {
-      type: 'tween',
-      ease: [0.25, 0.46, 0.45, 0.94],
+      type: 'tween' as const,
       duration: 0.4
     }
   }
@@ -318,15 +314,13 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.3,
-      ease: [0.25, 0.46, 0.45, 0.94]
+      duration: 0.3
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.3,
-      ease: [0.25, 0.46, 0.45, 0.94]
+      duration: 0.3
     }
   }
 };
@@ -362,7 +356,6 @@ const memberItemVariants = {
     scale: 1,
     transition: {
       duration: 0.3,
-      ease: [0.25, 0.46, 0.45, 0.94],
       delay: index * 0.05
     }
   })
@@ -378,7 +371,7 @@ const floatingButtonVariants = {
     scale: 1, 
     opacity: 1,
     transition: {
-      type: "spring",
+      type: "spring" as const,
       stiffness: 260,
       damping: 20,
       delay: 1.0
@@ -387,8 +380,7 @@ const floatingButtonVariants = {
   hover: { 
     scale: 1.1,
     transition: { 
-      duration: 0.2,
-      ease: "easeOut"
+      duration: 0.2
     }
   },
   tap: { 

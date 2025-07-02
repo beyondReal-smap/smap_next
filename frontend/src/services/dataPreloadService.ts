@@ -322,7 +322,15 @@ export const comprehensivePreloadData = async (userId: number) => {
   console.log(`[COMPREHENSIVE PRELOAD] 🚀 전체 데이터 프리로딩 시작: ${userId}`);
   
   const startTime = Date.now();
-  const results = {
+  const results: {
+    userProfile: any;
+    userGroups: any[];
+    groupMembers: { [key: string]: any[] };
+    locationData: { [key: string]: any };
+    dailyCounts: { [key: string]: any };
+    success: boolean;
+    errors: any[];
+  } = {
     userProfile: null,
     userGroups: [],
     groupMembers: {},
@@ -336,7 +344,7 @@ export const comprehensivePreloadData = async (userId: number) => {
     // 1. 사용자 프로필 조회
     console.log(`[COMPREHENSIVE PRELOAD] 1️⃣ 사용자 프로필 조회 시작`);
     try {
-      const userProfile = await memberService.getUserProfile(userId);
+      const userProfile = await memberService.getMemberById(userId);
       results.userProfile = userProfile;
       console.log(`[COMPREHENSIVE PRELOAD] ✅ 사용자 프로필 조회 완료: ${userProfile?.mt_name}`);
     } catch (error) {
@@ -347,7 +355,7 @@ export const comprehensivePreloadData = async (userId: number) => {
     // 2. 사용자 그룹 목록 조회
     console.log(`[COMPREHENSIVE PRELOAD] 2️⃣ 사용자 그룹 목록 조회 시작`);
     try {
-      const userGroups = await groupService.getUserGroups();
+      const userGroups = await groupService.getCurrentUserGroups();
       results.userGroups = userGroups;
       console.log(`[COMPREHENSIVE PRELOAD] ✅ 사용자 그룹 조회 완료: ${userGroups.length}개 그룹`);
     } catch (error) {
@@ -390,7 +398,7 @@ export const comprehensivePreloadData = async (userId: number) => {
             // 최근 2주간 위치 데이터 병렬 조회
             const locationPromises = recentDates.map(async (date) => {
               try {
-                const locationData = await memberLocationLogService.getLocationData(memberId, date);
+                const locationData = await memberLocationLogService.getDailyLocationLogs(memberId, date);
                 return { date, memberId, data: locationData };
               } catch (error) {
                 console.warn(`[COMPREHENSIVE PRELOAD] ⚠️ ${member.mt_name} ${date} 위치 데이터 조회 실패:`, error);

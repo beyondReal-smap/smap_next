@@ -210,16 +210,14 @@ const pageVariants = {
     opacity: 1, 
     y: 0,
     transition: {
-      duration: 0.6,
-      ease: [0.25, 0.46, 0.45, 0.94]
+      duration: 0.6
     }
   },
   out: { 
     opacity: 0, 
     y: -20,
     transition: {
-      duration: 0.4,
-      ease: [0.55, 0.06, 0.68, 0.19]
+      duration: 0.4
     }
   }
 };
@@ -235,8 +233,7 @@ const modalVariants = {
     scale: 1,
     y: 0,
     transition: {
-      duration: 0.3,
-      ease: [0.25, 0.46, 0.45, 0.94]
+      duration: 0.3
     }
   },
   exit: {
@@ -244,8 +241,7 @@ const modalVariants = {
     scale: 0.9,
     y: 50,
     transition: {
-      duration: 0.2,
-      ease: [0.55, 0.06, 0.68, 0.19]
+      duration: 0.2
     }
   }
 };
@@ -257,8 +253,7 @@ const cardVariants = {
     y: 0,
     transition: {
       delay: i * 0.1,
-      duration: 0.5,
-      ease: [0.25, 0.46, 0.45, 0.94]
+      duration: 0.5
     }
   })
 };
@@ -4069,7 +4064,7 @@ export default function SchedulePage() {
                     style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+                    transition={{ delay: 0.1, duration: 0.4 }}
                   >
                     <div className="flex items-center justify-between">
                       <div>
@@ -4187,8 +4182,7 @@ export default function SchedulePage() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -20 }}
                           transition={{ 
-                            duration: 0.3, 
-                            ease: [0.25, 0.46, 0.45, 0.94]
+                            duration: 0.3
                           }}
                         >
                           {eventsForSelectedDay.map((event, index) => {
@@ -4248,14 +4242,13 @@ export default function SchedulePage() {
                                   scale: 1,
                                   transition: {
                                     duration: 0.3,
-                                    delay: index * 0.05,
-                                    ease: [0.25, 0.46, 0.45, 0.94]
+                                    delay: index * 0.05
                                   }
                                 }}
                                 whileHover={{ 
                                   scale: 1.02,
                                   y: -4,
-                                  transition: { duration: 0.2, ease: "easeOut" }
+                                  transition: { duration: 0.2 }
                                 }}
                                 whileTap={{ scale: 0.98 }}
                               >
