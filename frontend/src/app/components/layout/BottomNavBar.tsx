@@ -33,11 +33,11 @@ export default function BottomNavBar() {
 
   return (
     <div 
-      className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-xl z-[10000] rounded-t-2xl"
+      className="fixed left-0 right-0 bg-white border-t shadow-xl z-[10000] rounded-t-2xl"
       id="bottom-navigation-bar"
       style={{
         position: 'fixed !important' as any,
-        bottom: '0px !important',
+        bottom: 'max(0px, env(safe-area-inset-bottom))' as any,
         left: '0px !important',
         right: '0px !important',
         zIndex: 10000,
@@ -51,14 +51,15 @@ export default function BottomNavBar() {
         borderTopLeftRadius: '16px',
         borderTopRightRadius: '16px',
         borderRadius: '16px 16px 0 0',
-        overflow: 'hidden',
+        overflow: 'visible',
         willChange: 'auto',
-        paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
+        paddingTop: '12px',
+        paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom) + 12px))',
         height: 'auto',
-        minHeight: '64px'
+        minHeight: 'calc(64px + env(safe-area-inset-bottom))'
       }}
     >
-      <nav className="flex justify-around items-center py-3 px-2">
+      <nav className="flex justify-around items-center px-2">
         {navItems.map(({ name, path, icon }) => {
           const isActive = pathname === path;
           
@@ -67,12 +68,12 @@ export default function BottomNavBar() {
               key={path}
               href={path}
               onClick={() => handleNavClick({ name, path, icon })}
-              className="flex flex-col items-center space-y-1 transition-colors duration-200 flex-1 min-w-0"
+              className="flex flex-col items-center space-y-1 transition-colors duration-200 flex-1 min-w-0 py-2"
             >
               <div className="relative flex flex-col items-center space-y-1">
                 {/* 아이콘 컨테이너 */}
                 <div 
-                  className="w-5 h-5 flex items-center justify-center relative"
+                  className="w-6 h-6 flex items-center justify-center relative"
                   style={{ 
                     color: isActive ? '#0113A3' : '#6b7280',
                     transform: 'none'
@@ -91,7 +92,7 @@ export default function BottomNavBar() {
                   {/* 홈 아이콘 */}
                   {icon === 'home' && (
                     <svg 
-                      className="w-5 h-5 relative z-10" 
+                      className="w-6 h-6 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -103,7 +104,7 @@ export default function BottomNavBar() {
                   {/* 사용자 그룹 아이콘 */}
                   {icon === 'users' && (
                     <svg 
-                      className="w-5 h-5 relative z-10" 
+                      className="w-6 h-6 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -115,7 +116,7 @@ export default function BottomNavBar() {
                   {/* 달력 아이콘 */}
                   {icon === 'calendar' && (
                     <svg 
-                      className="w-5 h-5 relative z-10" 
+                      className="w-6 h-6 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -127,7 +128,7 @@ export default function BottomNavBar() {
                   {/* 지도 핀 아이콘 */}
                   {icon === 'map-pin' && (
                     <svg 
-                      className="w-5 h-5 relative z-10" 
+                      className="w-6 h-6 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -138,7 +139,7 @@ export default function BottomNavBar() {
                   {/* 문서 아이콘 */}
                   {icon === 'document' && (
                     <svg 
-                      className="w-5 h-5 relative z-10" 
+                      className="w-6 h-6 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >

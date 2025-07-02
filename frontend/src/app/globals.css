@@ -62,7 +62,7 @@ body {
   /* iOS 터치 이벤트 최적화 */
   touch-action: manipulation;
   /* 🔥 하단 네비게이션을 위한 body 패딩 */
-  padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
 }
 
 /* iOS 웹뷰에서 고정 요소 최적화 */
@@ -324,7 +324,7 @@ div[style*="zIndex: 99999"] {
 /* 🔥 하단 네비게이션 바 강력한 고정 스타일 */
 #bottom-navigation-bar {
   position: fixed !important;
-  bottom: 0px !important;
+  bottom: max(0px, env(safe-area-inset-bottom)) !important;
   left: 0px !important;
   right: 0px !important;
   z-index: 10000 !important;
@@ -346,11 +346,13 @@ div[style*="zIndex: 99999"] {
   box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
   border-top-left-radius: 16px !important;
   border-top-right-radius: 16px !important;
-  overflow: hidden !important;
-  min-height: 64px !important;
+  overflow: visible !important;
+  min-height: calc(76px + env(safe-area-inset-bottom)) !important;
   height: auto !important;
   width: 100% !important;
   max-width: 100% !important;
+  padding-top: 12px !important;
+  padding-bottom: max(12px, calc(env(safe-area-inset-bottom) + 12px)) !important;
 }
 
 /* z-index 계층 정리 */
@@ -428,8 +430,8 @@ body #bottom-navigation-bar {
 @supports (-webkit-touch-callout: none) {
   #bottom-navigation-bar {
     position: fixed !important;
-    bottom: 0 !important;
-    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    bottom: env(safe-area-inset-bottom) !important;
+    padding-bottom: max(16px, calc(env(safe-area-inset-bottom) + 16px)) !important;
   }
 }
 
@@ -438,7 +440,36 @@ body #bottom-navigation-bar {
   #bottom-navigation-bar {
     position: fixed !important;
     bottom: 0 !important;
+    padding-bottom: 16px !important;
+  }
+}
+
+/* WebView 환경에서 추가 여백 확보 */
+@media screen and (max-height: 700px) {
+  #bottom-navigation-bar {
+    bottom: 8px !important;
+    margin: 0 8px !important;
+    border-radius: 20px !important;
+    box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.1) !important;
+  }
+}
+
+/* 매우 작은 화면에서 네비게이션 최적화 */
+@media screen and (max-height: 600px) {
+  #bottom-navigation-bar {
+    bottom: 4px !important;
+    padding-top: 8px !important;
     padding-bottom: 8px !important;
+    min-height: 60px !important;
+  }
+  
+  #bottom-navigation-bar .w-6 {
+    width: 20px !important;
+    height: 20px !important;
+  }
+  
+  #bottom-navigation-bar .text-xs {
+    font-size: 10px !important;
   }
 }
 
@@ -454,27 +485,17 @@ body #bottom-navigation-bar {
   position: relative !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
-  height: calc(100vh - 64px) !important; /* 네비게이션 바 높이 제외 */
-  max-height: calc(100vh - 64px) !important;
+  height: calc(100vh - 76px - env(safe-area-inset-bottom)) !important;
+  max-height: calc(100vh - 76px - env(safe-area-inset-bottom)) !important;
   -webkit-overflow-scrolling: touch !important;
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
   padding-top: calc(3.5rem + max(16px, env(safe-area-inset-top)) + 1rem) !important;
+  padding-bottom: 1rem !important;
 }
 
 .schedule-page-content::-webkit-scrollbar {
   display: none !important;
-}
-
-/* schedule 페이지에서 네비게이션 바 더 강력한 고정 */
-body:has(.schedule-page-container) #bottom-navigation-bar {
-  position: fixed !important;
-  bottom: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 10000 !important;
-  transform: translateZ(0) !important;
-  -webkit-transform: translateZ(0) !important;
 }
 
 /* 스크롤 컨테이너가 네비게이션 바에 영향을 주지 않도록 */
@@ -596,10 +617,17 @@ nav[class*="navigation-fixed"] {
 /* 🚨 logs 페이지 헤더 패딩 동기화 */
 .logs-page-content {
   padding-top: calc(3.5rem + max(16px, env(safe-area-inset-top)) + 1rem) !important;
+  padding-bottom: 1rem !important;
 }
 @supports not (padding-top: env(safe-area-inset-top)) {
   .logs-page-content {
     padding-top: 5rem !important;
+    padding-bottom: 1rem !important;
+  }
+  
+  .schedule-page-content {
+    padding-top: 5rem !important;
+    padding-bottom: 1rem !important;
   }
 }
 
@@ -610,7 +638,7 @@ body:has(.hide-bottom-nav) {
 
 /* 메인 콘텐츠 영역에도 네비게이션을 위한 여백 추가 */
 main {
-  margin-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+  margin-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
 }
 
 /* 하단 네비게이션이 없는 페이지에서는 메인 마진 제거 */
@@ -622,7 +650,7 @@ body:has(.hide-bottom-nav) main {
 .scroll-container,
 .overflow-y-auto,
 .h-screen {
-  padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
 }
 
 /* 하단 네비게이션이 없는 페이지에서는 스크롤 컨테이너 패딩 제거 */
