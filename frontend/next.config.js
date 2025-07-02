@@ -229,22 +229,23 @@ const nextConfig = {
   
 
   
-  async redirects() {
-    return [
-      {
-        source: '/(.*)',
-        has: [
-          {
-            type: 'header',
-            key: 'x-forwarded-proto',
-            value: 'http',
-          },
-        ],
-        destination: 'https://nextstep.smap.site/:path*',
-        permanent: true,
-      },
-    ];
-  },
+  // 리다이렉트 설정 제거 - 로컬 개발 환경에서 문제 발생 방지
+  // async redirects() {
+  //   return [
+  //     {
+  //       source: '/(.*)',
+  //       has: [
+  //         {
+  //           type: 'header',
+  //           key: 'x-forwarded-proto',
+  //           value: 'http',
+  //         },
+  //       ],
+  //       destination: 'https://nextstep.smap.site/:path*',
+  //       permanent: true,
+  //     },
+  //   ];
+  // },
   
   trailingSlash: false,
 };
