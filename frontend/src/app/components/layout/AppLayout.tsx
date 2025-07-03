@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BottomNavBar } from './index';
 import { FaUsers } from 'react-icons/fa';
 
 interface AppLayoutProps {
@@ -307,8 +306,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
       </main>
 
-      {/* 하단 네비게이션 바 (조건부 렌더링 제거) */}
-      <BottomNavBar />
+      {/* 하단 네비게이션 바는 ClientLayout에서 관리하므로 여기서는 제거 */}
     </div>
   );
 } 

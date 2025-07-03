@@ -1,12 +1,117 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { hapticFeedback } from '../../../utils/haptic';
 
 export default function BottomNavBar() {
   const pathname = usePathname();
+  
+  // 네비게이션 바 위치 강제 설정
+  useEffect(() => {
+    let isSettingPosition = false; // 무한 루프 방지 플래그
+    
+    // 🔥 강제 위치 설정 (조건부 실행으로 무한루프 방지)
+    const forceBottomNavPosition = () => {
+      if (isSettingPosition) return; // 이미 설정 중이면 무시
+      
+      const bottomNav = document.getElementById('bottom-navigation-bar');
+      if (bottomNav) {
+        const currentBottom = bottomNav.style.bottom;
+        const currentPosition = bottomNav.style.position;
+        
+        // 현재 페이지에 따라 다른 bottom 값 적용
+        const currentPath = window.location.pathname;
+        let targetBottom = '40px'; // 기본값
+        
+        // 모든 페이지에서 40px 위로 설정
+        if (['/home', '/group', '/schedule', '/logs', '/location'].includes(currentPath)) {
+          targetBottom = '40px'; // 모든 페이지는 40px 위로
+        }
+        
+        // 이미 올바른 값이면 실행하지 않음 (무한루프 방지)
+        if (currentPosition === 'fixed' && currentBottom === targetBottom) {
+          return;
+        }
+        
+        // 1. 인라인 스타일 강제 설정
+        bottomNav.style.setProperty('position', 'fixed', 'important');
+        bottomNav.style.setProperty('bottom', targetBottom, 'important');
+        bottomNav.style.setProperty('top', 'auto', 'important');
+        bottomNav.style.setProperty('left', '0px', 'important');
+        bottomNav.style.setProperty('right', '0px', 'important');
+        bottomNav.style.setProperty('width', '100%', 'important');
+        bottomNav.style.setProperty('z-index', '999999', 'important');
+        bottomNav.style.setProperty('transform', 'none', 'important');
+        bottomNav.style.setProperty('-webkit-transform', 'none', 'important');
+        bottomNav.style.setProperty('animation', 'none', 'important');
+        bottomNav.style.setProperty('transition', 'none', 'important');
+        
+        // 2. 클래스 강제 추가
+        bottomNav.classList.add('forced-bottom-nav', 'position-fixed-bottom');
+        bottomNav.setAttribute('data-forced-position', 'bottom-fixed');
+        bottomNav.setAttribute('data-bottom', targetBottom.replace('px', ''));
+        
+        console.log(`[BottomNavBar] 네비게이션 바 위치 조정 완료 (${targetBottom}) - 페이지: ${currentPath}`);
+      }
+    };
+
+    // DOM 변경 감시 (더 제한적으로)
+    const observer = new MutationObserver((mutations) => {
+      let needsForce = false;
+      
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.target instanceof HTMLElement) {
+          const target = mutation.target;
+                      if (target.id === 'bottom-navigation-bar') {
+              const style = target.style;
+              const currentPath = window.location.pathname;
+              const expectedBottom = ['/home', '/group', '/schedule', '/logs', '/location'].includes(currentPath) ? '40px' : '40px';
+              
+              if (style.bottom !== expectedBottom || style.position !== 'fixed') {
+                needsForce = true;
+              }
+            }
+        }
+      });
+      
+      if (needsForce) {
+        forceBottomNavPosition();
+      }
+    });
+
+    // 즉시 실행
+    forceBottomNavPosition();
+    
+    // 일반 주기적 체크만 (빠른 체크 제거)
+    const normalInterval = setInterval(forceBottomNavPosition, 10000); // 10초마다로 변경
+
+    // DOM 감시 시작 (제한적으로)
+    const targetElement = document.getElementById('bottom-navigation-bar');
+    if (targetElement) {
+      observer.observe(targetElement, {
+        attributes: true,
+        attributeFilter: ['style'],
+        subtree: false
+      });
+    }
+
+    // 페이지 로드 완료 후 한 번만 실행
+    if (document.readyState === 'complete') {
+      setTimeout(forceBottomNavPosition, 500);
+    } else {
+      window.addEventListener('load', () => {
+        setTimeout(forceBottomNavPosition, 500);
+      });
+    }
+
+    // cleanup
+    return () => {
+      clearInterval(normalInterval);
+      observer.disconnect();
+    };
+  }, []);
   
   // 네비게이션 메뉴 아이템
   const navItems = [
@@ -33,14 +138,14 @@ export default function BottomNavBar() {
 
   return (
     <div 
-      className="fixed left-0 right-0 bg-white border-t shadow-xl z-[10000] rounded-t-2xl"
+      className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl"
       id="bottom-navigation-bar"
       style={{
         position: 'fixed !important' as any,
-        bottom: 'max(0px, env(safe-area-inset-bottom))' as any,
+        bottom: '40px !important',
         left: '0px !important',
         right: '0px !important',
-        zIndex: 10000,
+        zIndex: 999,
         backgroundColor: 'white',
         borderTop: '1px solid #e5e7eb',
         boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
@@ -54,9 +159,9 @@ export default function BottomNavBar() {
         overflow: 'visible',
         willChange: 'auto',
         paddingTop: '12px',
-        paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom) + 12px))',
+        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
         height: 'auto',
-        minHeight: 'calc(64px + env(safe-area-inset-bottom))'
+        minHeight: '76px'
       }}
     >
       <nav className="flex justify-around items-center px-2">

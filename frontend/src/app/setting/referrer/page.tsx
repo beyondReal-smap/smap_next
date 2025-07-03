@@ -541,7 +541,7 @@ export default function ReferrerPage() {
         </motion.div>
 
         {/* 탭 컨텐츠 */}
-        <div className="px-4 pb-20">
+        <div className="px-4 pb-24">
           <AnimatePresence mode="wait">
             {activeTab === 'invite' && (
               <motion.div

@@ -41,6 +41,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import authService from '@/services/authService';
 import { hapticFeedback } from '@/utils/haptic';
+import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
 
 // Dynamic imports for performance optimization
 const Modal = dynamicImport(() => import('@/components/ui/Modal'), {
@@ -56,8 +57,8 @@ export const dynamic = 'force-dynamic';
 const floatingButtonStyles = `
 .floating-button {
   position: fixed;
-  bottom: 80px;
-  right: 20px;
+  bottom: 20px;
+  right: 16px;
   z-index: 40;
   background: #0113A3;
   box-shadow: 0 8px 25px rgba(1, 19, 163, 0.3);
@@ -99,7 +100,7 @@ const SearchSection = memo<{
   onFocus: () => void;
   onBlur: () => void;
 }>(({ searchQuery, onSearchChange, onFocus, onBlur }) => (
-  <div className="px-4 pb-4">
+  <div className="px-4 pb-4 mt-5">
     <motion.div 
       className="relative"
       whileFocus={{ scale: 1.02 }}
@@ -263,17 +264,22 @@ const cardVariants = {
 };
 
 const floatingButtonVariants = {
-  initial: { scale: 0, rotate: -180 },
+  initial: { y: 100, opacity: 0, scale: 0.8 },
   animate: { 
-    scale: 1, 
-    rotate: 0,
+    y: -80, 
+    opacity: 1, 
+    scale: 1,
     transition: {
-      delay: 0.5,
-      duration: 0.6
+      delay: 0.2,
+      type: "spring" as const,
+      stiffness: 120,
+      damping: 25,
+      duration: 1.0
     }
   },
   hover: { 
     scale: 1.1,
+    y: -2,
     transition: { duration: 0.2 }
   },
   tap: { scale: 0.9 }
@@ -1366,7 +1372,12 @@ function GroupPageContent() {
           </AnimatedHeader>
 
         {/* 메인 컨텐츠 */}
-          <div className="pb-safe pt-16 h-screen flex flex-col" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 80px)' }}>
+          <div className="pb-safe-nav pt-16 flex flex-col" style={{ 
+            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)',
+            height: 'calc(100vh - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px))',
+            maxHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px))',
+            overflow: 'hidden'
+          }}>
             <AnimatePresence mode="wait">
               {currentView === 'list' ? (
                 <motion.div
@@ -1436,7 +1447,7 @@ function GroupPageContent() {
                   {/* 고정 영역: 그룹 헤더 카드 + 통계 카드들 */}
                   <div className="flex-shrink-0">
                     {/* 그룹 헤더 카드 */}
-                    <div className="mx-4 mb-4">
+                    <div className="mx-4 mb-4 mt-5">
                     <motion.div 
                       className="rounded-2xl p-6 text-white shadow-lg relative"
                       style={{ background: 'linear-gradient(to right, #0113A3, #001a8a)' }}
@@ -1596,9 +1607,9 @@ function GroupPageContent() {
                   </div>
                   </div>
 
-                  {/* 스크롤 영역: 그룹 멤버 섹션 */}
-                  <div className="flex-1 min-h-0 overflow-y-auto">
-                    <div className="px-4 pb-20">
+                                      {/* 스크롤 영역: 그룹 멤버 섹션 */}
+                    <div className="flex-auto min-h-0 overflow-y-auto">
+                     <div className="px-4 pb-2" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
                     <motion.div 
                       className="bg-white rounded-2xl shadow-sm border overflow-hidden"
                       style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}
@@ -1804,13 +1815,27 @@ function GroupPageContent() {
         {/* 플로팅 추가 버튼 - 전체 페이지 기준 */}
         {currentView === 'list' && (
           <motion.button
+            initial={{ y: 100, opacity: 0, scale: 0.8 }}
+            animate={{ 
+              y: -80, 
+              opacity: 1, 
+              scale: 1,
+              transition: {
+                delay: 0.2,
+                type: "spring",
+                stiffness: 120,
+                damping: 25,
+                duration: 1.0
+              }
+            }}
+            whileHover={{ 
+              scale: 1.1,
+              y: -2,
+              transition: { duration: 0.2 }
+            }}
+            whileTap={{ scale: 0.9 }}
             onClick={() => setIsAddModalOpen(true)}
             className="floating-button w-14 h-14 rounded-full flex items-center justify-center text-white"
-            variants={floatingButtonVariants}
-            initial="initial"
-            animate="animate"
-            whileHover="hover"
-            whileTap="tap"
           >
             <FiPlus className="w-6 h-6 stroke-2" />
           </motion.button>
@@ -2416,14 +2441,7 @@ function GroupPageContent() {
 // Suspense로 감싸는 기본 export 함수
 export default function GroupPageWithSuspense() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}>
-        <div className="text-center px-6">
-          <HiUserGroup className="w-16 h-16 mx-auto mb-4 animate-pulse" style={{ color: '#0113A3' }} />
-          <p className="font-medium" style={{ color: '#0113A3' }}>로딩 중...</p>
-        </div>
-      </div>
-    }> 
+    <Suspense fallback={<IOSCompatibleSpinner message="로딩 중..." fullScreen />}> 
       <GroupPageContent />
     </Suspense>
   );

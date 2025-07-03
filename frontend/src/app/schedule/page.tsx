@@ -3996,7 +3996,7 @@ export default function SchedulePage() {
             animate="in"
             exit="out"
             variants={pageVariants}
-            className="schedule-page-content px-4 space-y-6 pb-20"
+            className="schedule-page-content px-4 space-y-6 pb-24"
           >
             {/* 캘린더 섹션 */}
             <motion.div

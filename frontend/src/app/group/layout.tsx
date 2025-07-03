@@ -1,7 +1,7 @@
 'use client';
 
-import { AppLayout } from '../components/layout';
 import { Suspense } from 'react';
+import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
 
 export default function GroupLayout({
   children,
@@ -9,6 +9,8 @@ export default function GroupLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AppLayout>{children}</AppLayout>
+    <Suspense fallback={<IOSCompatibleSpinner message="로딩 중..." fullScreen />}>
+      {children}
+    </Suspense>
   );
 } 

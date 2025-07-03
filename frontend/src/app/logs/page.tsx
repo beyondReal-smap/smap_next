@@ -6844,7 +6844,7 @@ export default function LogsPage() {
                    }}
                    whileTap={{ scale: 0.98 }}
                    onClick={() => setIsSidebarOpen(true)}
-                   className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-lg border border-white/30 cursor-pointer max-w-full"
+                   className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 pt-3 shadow-lg border border-white/30 cursor-pointer max-w-full"
                    style={{
                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(249, 250, 251, 0.95) 100%)',
                      boxShadow: '0 8px 25px rgba(1, 19, 163, 0.15), 0 0 0 1px rgba(1, 19, 163, 0.05)',

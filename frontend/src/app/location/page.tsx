@@ -57,9 +57,8 @@ const mobileStyles = `
   box-sizing: border-box;
 }
 
-html, body, #__next, main {
+html, body {
   width: 100%;
-  height: 100%;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
@@ -69,6 +68,8 @@ html, body, #__next, main {
   background-color: #ffffff !important;
   background-image: none !important;
 }
+
+
 
 body {
   background: #ffffff !important;
@@ -87,6 +88,7 @@ body {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  z-index: 1;
 }
 
 .hide-scrollbar {
@@ -245,7 +247,7 @@ div[class*="nmap_control_zoom"] {
   .floating-button {
     width: 56px;
     height: 56px;
-    bottom: 100px;
+    bottom: 96px;
     right: 20px;
   }
 }
@@ -657,6 +659,8 @@ export default function LocationPage() {
       console.log('[성능] Location 페이지 로드 시작 (최적화 버전)');
     }
   }, []);
+
+
   
   // 상태 관리
   const [isExiting, setIsExiting] = useState(false);
@@ -4585,7 +4589,7 @@ export default function LocationPage() {
           isExiting ? "out" : "in"
         }
         variants={pageVariants}
-        className="min-h-screen relative overflow-hidden"
+        className="w-full"
         style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
       >
         {/* 통일된 헤더 애니메이션 */}
@@ -5020,10 +5024,11 @@ export default function LocationPage() {
           }}
           whileTap={{ scale: 0.9 }}
           onClick={toggleSidebar}
-          className="fixed bottom-20 right-4 z-[9998] w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
+          className="fixed right-4 z-[9998] w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
           style={{
             background: '#0113A3',
-            boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)'
+            boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
+            bottom: 'calc(76px + 20px)' // 네비게이션 바(76px) + 여유공간(20px)
           }}
         >
           {isSidebarOpen ? (
@@ -5094,7 +5099,7 @@ export default function LocationPage() {
               style={{ 
                 background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                 borderColor: 'rgba(1, 19, 163, 0.1)',
-                height: '100vh',
+                height: 'calc(100vh - 76px)', // 네비게이션 바(76px) 높이만큼 여유 공간
                 // 모바일 사파리 최적화
                 transform: 'translateZ(0)',
                 willChange: 'transform',
@@ -5644,11 +5649,11 @@ export default function LocationPage() {
               animate="open"
               exit="closed"
               className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[9999] flex flex-col"
-              style={{ 
-                background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
-                borderColor: 'rgba(1, 19, 163, 0.1)',
-                height: '100vh' // 네비게이션 바 높이만큼 여유 공간
-              }}
+                                   style={{ 
+                       background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
+                       borderColor: 'rgba(1, 19, 163, 0.1)',
+                       height: 'calc(100vh - 76px)' // 네비게이션 바 높이만큼 여유 공간
+                     }}
             >
               <motion.div
                 variants={sidebarContentVariants}
@@ -5786,7 +5791,7 @@ export default function LocationPage() {
                       {groupMembers.length}명
                     </span>
                   </div>
-                  <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-16">
+                  <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-4">
                     {groupMembers.length > 0 ? (
                       <motion.div variants={sidebarContentVariants} className="space-y-2">
                         {groupMembers.map((member, index) => (

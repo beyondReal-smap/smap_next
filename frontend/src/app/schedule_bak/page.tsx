@@ -1563,7 +1563,7 @@ export default function SchedulePage() {
   return (
     <>
       <style jsx global>{pageStyles}</style>
-      <div className="bg-indigo-50 min-h-screen pb-20">
+      <div className="bg-indigo-50 min-h-screen pb-24">
         {/* 개선된 헤더 */}
         <motion.header 
           initial={{ y: -100, opacity: 0 }}

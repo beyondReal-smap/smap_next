@@ -1303,7 +1303,7 @@
         });
       }
       
-      // 네비게이션 요소 강제 고정
+      // 네비게이션 요소 강제 고정 (location 페이지 제외)
       function fixNavigations() {
         const navSelectors = [
           'nav', 
@@ -1316,6 +1316,11 @@
         navSelectors.forEach(selector => {
           const elements = document.querySelectorAll(selector);
           elements.forEach(nav => {
+            // location 페이지에서는 네비게이션 바 위치 조정하지 않음
+            if (window.location.pathname === '/location') {
+              return;
+            }
+            
             // 하단 네비게이션으로 보이는 요소들만
             const rect = nav.getBoundingClientRect();
             const isBottomNav = rect.bottom >= window.innerHeight - 100 || 

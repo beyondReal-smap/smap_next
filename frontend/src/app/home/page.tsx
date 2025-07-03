@@ -5134,6 +5134,13 @@ export default function HomePage() {
     // 사이드바 외부 클릭 시 닫기 (강화된 햅틱 피드백)
     useEffect(() => {
       const handleSidebarClickOutside = (event: MouseEvent) => {
+        // 플로팅 버튼 클릭 시 사이드바 닫지 않음
+        const target = event.target as HTMLElement;
+        const floatingButton = document.querySelector('[data-floating-button]') as HTMLElement;
+        if (floatingButton && floatingButton.contains(target)) {
+          return;
+        }
+        
         if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
           setIsSidebarOpen(false);
           
@@ -5591,7 +5598,7 @@ export default function HomePage() {
          <motion.button
            initial={{ y: 100, opacity: 0, scale: 0.8 }}
            animate={{ 
-             y: 0, 
+             y: -80, 
              opacity: 1, 
              scale: 1,
              transition: {
@@ -5608,11 +5615,19 @@ export default function HomePage() {
              transition: { duration: 0.2 }
            }}
            whileTap={{ scale: 0.9 }}
-           onClick={toggleSidebar}
-           className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
+           onClick={(e) => {
+             e.stopPropagation(); // 이벤트 전파 방지
+             console.log('플로팅 버튼 클릭됨, 현재 사이드바 상태:', isSidebarOpen);
+             toggleSidebar();
+           }}
+           className="fixed bottom-36 right-4 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
+           data-floating-button="true"
            style={{
              background: '#0113A3',
-             boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)'
+             boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
+             zIndex: 999999, // 사이드바보다 훨씬 높은 z-index
+             position: 'fixed',
+             pointerEvents: 'auto' // 항상 클릭 가능하도록 설정
            }}
          >
            {isSidebarOpen ? (
@@ -5668,8 +5683,16 @@ export default function HomePage() {
                  initial="closed"
                  animate="open"
                  exit="closed"
-                 className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999]"
-                 onClick={() => setIsSidebarOpen(false)}
+                 className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99995]"
+                 onClick={(e) => {
+                   // 플로팅 버튼 영역 클릭 시 사이드바 닫지 않음
+                   const target = e.target as HTMLElement;
+                   const floatingButton = document.querySelector('[data-floating-button]') as HTMLElement;
+                   if (floatingButton && floatingButton.contains(target)) {
+                     return;
+                   }
+                   setIsSidebarOpen(false);
+                 }}
                  style={{
                    // 모바일 사파리 최적화
                    transform: 'translateZ(0)',
@@ -5686,11 +5709,12 @@ export default function HomePage() {
                    initial="closed"
                    animate="open"
                    exit="closed"
-                   className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[9999] flex flex-col"
+                   className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[99997] flex flex-col"
+                   onClick={(e) => e.stopPropagation()}
                    style={{ 
                      background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                      borderColor: 'rgba(1, 19, 163, 0.1)',
-                     height: '100vh',
+                     height: 'calc(100vh - 40px)',
                      // 모바일 사파리 최적화
                      transform: 'translateZ(0)',
                      willChange: 'transform',
@@ -5706,13 +5730,19 @@ export default function HomePage() {
                      animate="open"
                      exit="closed"
                      className="p-6 h-full flex flex-col relative z-10"
+                     onClick={(e) => e.stopPropagation()}
                      style={{
                        paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)',
                        paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)'
                      }}
                    >
+
+
                    {/* 개선된 헤더 */}
-                   <div className="flex items-center justify-between mb-6">
+                   <div 
+                     className="flex items-center justify-between mb-6"
+                     onClick={(e) => e.stopPropagation()}
+                   >
                      <div className="flex items-center space-x-3">
                        <motion.div 
                          className="p-2 rounded-xl shadow-lg"
@@ -5729,16 +5759,6 @@ export default function HomePage() {
                          <p className="text-sm text-gray-600">멤버를 선택해보세요</p>
                        </div>
                      </div>
-                     <motion.button
-                       whileHover={{ scale: 1.05, rotate: 90 }}
-                       whileTap={{ scale: 0.95 }}
-                       onClick={() => setIsSidebarOpen(false)}
-                       className="p-2 hover:bg-white/60 rounded-xl transition-all duration-200 backdrop-blur-sm"
-                     >
-                       <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                       </svg>
-                     </motion.button>
                    </div>
 
                    {/* 그룹 목록 섹션 */}

@@ -521,7 +521,7 @@ export default function CouponPage() {
         </motion.div>
 
         {/* 쿠폰 목록 */}
-        <div className="px-4 pb-20">
+        <div className="px-4 pb-24">
           <AnimatePresence mode="wait">
             {filteredCoupons.length > 0 ? (
               <motion.div
@@ -697,7 +697,7 @@ export default function CouponPage() {
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 50 }}
-              className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50"
+              className="fixed bottom-40 left-1/2 transform -translate-x-1/2 z-50"
             >
               <div className="bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg flex items-center space-x-2">
                 <FiCopy className="w-4 h-4" />
