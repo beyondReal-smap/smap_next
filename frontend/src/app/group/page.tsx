@@ -57,14 +57,59 @@ export const dynamic = 'force-dynamic';
 const floatingButtonStyles = `
 .floating-button {
   position: fixed;
-  bottom: 20px;
+  bottom: 100px;
   right: 16px;
   z-index: 40;
   background: #0113A3;
   box-shadow: 0 8px 25px rgba(1, 19, 163, 0.3);
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   touch-action: manipulation;
   user-select: none;
+  animation: floatIn 0.8s ease-out 0.2s both;
+}
+
+@keyframes floatIn {
+  from {
+    transform: translateY(100px) scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.group-content {
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.group-content:nth-child(1) { animation-delay: 0.1s; }
+.group-content:nth-child(2) { animation-delay: 0.2s; }
+.group-content:nth-child(3) { animation-delay: 0.3s; }
+
+.group-card {
+  opacity: 0;
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.group-card:nth-child(1) { animation-delay: 0.4s; }
+.group-card:nth-child(2) { animation-delay: 0.5s; }
+.group-card:nth-child(3) { animation-delay: 0.6s; }
+.group-card:nth-child(4) { animation-delay: 0.7s; }
+.group-card:nth-child(5) { animation-delay: 0.8s; }
+
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+  }
+}
+
+/* 로딩 중일 때는 애니메이션 비활성화 */
+.loading .group-content,
+.loading .group-card {
+  opacity: 1;
+  animation: none;
 }
 
 .floating-button:hover {
@@ -171,16 +216,11 @@ const GroupCard = memo<{
   memberCount: number;
   onSelect: (group: ExtendedGroup) => void;
 }>(({ group, index, memberCount, onSelect }) => (
-  <motion.div
+  <div
     key={group.sgt_idx}
     onClick={() => onSelect(group)}
-    className="rounded-xl p-4 cursor-pointer"
+    className="rounded-xl p-4 cursor-pointer group-card"
     style={{ background: 'linear-gradient(to right, rgba(240, 249, 255, 0.8), rgba(219, 234, 254, 0.8))' }}
-    variants={groupCardVariants}
-    initial="hidden"
-    animate="visible"
-    whileHover="hover"
-    whileTap="tap"
   >
     <div className="flex items-center justify-between">
       <div className="flex items-center flex-1 mr-3">
@@ -218,7 +258,7 @@ const GroupCard = memo<{
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
       </svg>
     </div>
-  </motion.div>
+  </div>
 ));
 
 // SSL 인증서 오류가 있는 URL인지 확인하는 함수
@@ -253,10 +293,9 @@ const pageVariants = {
 
 
 const cardVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    y: 0,
     transition: {
       duration: 0.5
     }
@@ -288,12 +327,10 @@ const floatingButtonVariants = {
 // 그룹 목록 컨테이너 애니메이션 - schedule 스타일로 변경
 const groupListContainerVariants = {
   hidden: { 
-    opacity: 0,
-    y: 20
+    opacity: 0
   },
   visible: { 
     opacity: 1,
-    y: 0,
     transition: {
       duration: 0.6,
       staggerChildren: 0.1,
@@ -305,19 +342,16 @@ const groupListContainerVariants = {
 // 개별 그룹 카드 애니메이션 - schedule 스타일로 변경
 const groupCardVariants = {
   hidden: { 
-    opacity: 0, 
-    y: 20
+    opacity: 0
   },
   visible: { 
     opacity: 1, 
-    y: 0,
     transition: {
       duration: 0.5
     }
   },
   hover: {
     scale: 1.02,
-    y: -4,
     transition: {
       duration: 0.2
     }
@@ -401,13 +435,11 @@ interface GroupForm {
 const modalVariants = {
   hidden: {
     opacity: 0,
-    scale: 0.9,
-    y: 50
+    scale: 0.9
   },
   visible: {
     opacity: 1,
     scale: 1,
-    y: 0,
     transition: {
       duration: 0.3
     }
@@ -415,7 +447,6 @@ const modalVariants = {
   exit: {
     opacity: 0,
     scale: 0.9,
-    y: 50,
     transition: {
       duration: 0.2
     }
@@ -1382,40 +1413,63 @@ function GroupPageContent() {
               {currentView === 'list' ? (
                 <motion.div
                   key="list"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   transition={{ 
-                    duration: 0.6
+                    duration: 0.3
                   }}
+                  className={loading ? 'loading' : ''}
                 >
                   {/* 검색 섹션 */}
+                  <div className="group-content">
                   <SearchSection
                     searchQuery={searchQuery}
                     onSearchChange={handleSearchChange}
                     onFocus={() => setIsSearchFocused(true)}
                     onBlur={() => setIsSearchFocused(false)}
                   />
+                  </div>
 
                   {/* 통계 카드 */}
+                  <div className="group-content">
                   <StatsCards
                     groupsCount={groups.length}
                     totalMembers={Object.values(groupMemberCounts).reduce((a, b) => a + b, 0)}
                   />
+                  </div>
 
                   {/* 그룹 목록 */}
-                  <div className="px-4 space-y-3">
-                      <motion.div 
-                        className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
-                        variants={groupListContainerVariants}
-                        initial="hidden"
-                        animate="visible"
-                      >
+                  <div className="px-4 space-y-3 group-content">
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="px-4 py-3 border-b border-gray-100">
                           <h3 className="text-lg font-bold text-gray-900">내 그룹 목록</h3>
                         </div>
-                        <div className="p-4 space-y-3">
-                          {(filteredGroups && Array.isArray(filteredGroups)) && filteredGroups.map((group, index) => {
+                        <div className="p-4 space-y-3 min-h-[300px]">
+                          {loading ? (
+                            <div className="space-y-3">
+                              {/* 스켈레톤 그룹 카드들 */}
+                              {[1, 2, 3, 4].map((index) => (
+                                <div key={index} className="animate-pulse">
+                                  <div className="rounded-xl p-4 bg-gray-100">
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center flex-1 mr-3">
+                                        <div className="p-2 bg-gray-200 rounded-xl mr-4">
+                                          <div className="w-12 h-12 bg-gray-300 rounded-lg"></div>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="h-5 bg-gray-300 rounded mb-2 w-3/4"></div>
+                                          <div className="h-4 bg-gray-300 rounded mb-2 w-full"></div>
+                                          <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+                                        </div>
+                                      </div>
+                                      <div className="w-5 h-5 bg-gray-300 rounded"></div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (filteredGroups && Array.isArray(filteredGroups)) && filteredGroups.map((group, index) => {
                             const memberCount = groupMemberCounts[group.sgt_idx] || 0;
                             
                             return (
@@ -1429,18 +1483,18 @@ function GroupPageContent() {
                             );
                           })}
                         </div>
-                      </motion.div>
+                      </div>
                   </div>
 
                 </motion.div>
               ) : selectedGroup ? (
                 <motion.div
                   key="detail"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   transition={{ 
-                    duration: 0.6
+                    duration: 0.3
                   }}
                   className="flex flex-col flex-1 min-h-0"
                 >
@@ -1815,9 +1869,8 @@ function GroupPageContent() {
         {/* 플로팅 추가 버튼 - 전체 페이지 기준 */}
         {currentView === 'list' && (
           <motion.button
-            initial={{ y: 100, opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.8 }}
             animate={{ 
-              y: -80, 
               opacity: 1, 
               scale: 1,
               transition: {
@@ -1825,12 +1878,11 @@ function GroupPageContent() {
                 type: "spring",
                 stiffness: 120,
                 damping: 25,
-                duration: 1.0
+                duration: 0.6
               }
             }}
             whileHover={{ 
               scale: 1.1,
-              y: -2,
               transition: { duration: 0.2 }
             }}
             whileTap={{ scale: 0.9 }}

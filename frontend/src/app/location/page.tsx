@@ -1828,17 +1828,65 @@ export default function LocationPage() {
         isSelected: member.id === memberId
     }));
     
-    // InfoWindow 보존을 위해 setGroupMembers 호출을 지연
-    // 이렇게 하면 InfoWindow가 생성된 후 마커 업데이트가 진행됨
-    if (fromMarkerClick) {
-      // 마커 클릭인 경우 즉시 업데이트 (이미 InfoWindow가 생성됨)
-      setGroupMembers(updatedMembers);
-    } else {
-      // 사이드바 선택인 경우 InfoWindow 생성 후 업데이트
-      setTimeout(() => {
-        setGroupMembers(updatedMembers);
-      }, 400); // InfoWindow 생성보다 약간 늦게
-    }
+    // 먼저 선택 상태 업데이트
+    setGroupMembers(updatedMembers);
+    console.log('[handleMemberSelect] 선택 상태 업데이트 완료:', memberId);
+    
+    // 선택된 멤버의 장소 데이터 로드
+    const loadSelectedMemberLocations = async () => {
+      try {
+        console.log('[handleMemberSelect] 선택된 멤버 장소 데이터 로드 시작:', newlySelectedMember.name);
+        
+        const memberLocationsRaw = await locationService.getOtherMembersLocations(memberId);
+        console.log('[handleMemberSelect] 멤버 장소 데이터 로드 완료:', {
+          멤버ID: memberId,
+          원본데이터수: memberLocationsRaw.length
+        });
+        
+        // LocationData 형식으로 변환
+        const convertedLocations = memberLocationsRaw.map(loc => ({
+          id: loc.slt_idx ? loc.slt_idx.toString() : Date.now().toString(),
+          name: loc.name || loc.slt_title || '제목 없음',
+          address: loc.address || loc.slt_add || '주소 정보 없음',
+          coordinates: [
+            parseFloat(String(loc.slt_long || '0')) || 0,
+            parseFloat(String(loc.slt_lat || '0')) || 0
+          ] as [number, number],
+          category: loc.category || '기타',
+          memo: loc.memo || '',
+          favorite: loc.favorite || false,
+          notifications: loc.notifications !== undefined ? loc.notifications : ((loc as any).slt_enter_alarm === 'Y' || (loc as any).slt_enter_alarm === undefined)
+        }));
+        
+        // 상태 업데이트
+        setSelectedMemberSavedLocations(convertedLocations);
+        setOtherMembersSavedLocations(memberLocationsRaw);
+        setActiveView('selectedMemberPlaces');
+        
+        // 멤버 데이터에 장소 정보 추가
+        setGroupMembers(prevMembers => 
+          prevMembers.map(member => {
+            if (member.id === memberId) {
+              return { 
+                ...member, 
+                savedLocations: convertedLocations, 
+                savedLocationCount: convertedLocations.length 
+              };
+            }
+            return member;
+          })
+        );
+        
+        console.log('[handleMemberSelect] 멤버 장소 데이터 업데이트 완료:', convertedLocations.length, '개');
+      } catch (error) {
+        console.error('[handleMemberSelect] 장소 데이터 로드 실패:', error);
+        setSelectedMemberSavedLocations([]);
+        setOtherMembersSavedLocations([]);
+      }
+    };
+    
+    // 장소 데이터 로드 실행
+    await loadSelectedMemberLocations();
   
     if (map && window.naver?.maps) {
       // 장소 선택 중이거나 마커 클릭인 경우 지도 이동 방지 (마커 클릭에서 이미 이동했음)
@@ -1900,13 +1948,9 @@ export default function LocationPage() {
           
           console.log('[handleMemberSelect] 지도 중심 이동 완료');
         
-        // 사이드바 닫기 (멤버 선택 시 사용자 경험 개선) - 마커 클릭이 아닌 경우에만
-        if (!fromMarkerClick) {
-          setTimeout(() => {
-            setIsSidebarOpen(false);
-            console.log('[handleMemberSelect] 사이드바 닫기 완료');
-          }, 300); // 마커 업데이트 완료 후 InfoWindow 생성
-        }
+        // 사이드바는 유지하여 사용자가 장소 리스트를 볼 수 있도록 함
+        // 멤버 선택 시 사이드바 자동 닫기 비활성화
+        console.log('[handleMemberSelect] 사이드바 유지 - 장소 리스트 표시를 위해');
         
         // 기존 InfoWindow 처리 (마커 클릭인 경우 제외)
         if (infoWindow && !fromMarkerClick) {

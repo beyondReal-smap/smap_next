@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
     const backendUrl = `${BACKEND_URL}/api/v1/logs/daily-counts?group_id=${groupId}&days=${days}`;
     console.log('[API] 백엔드 URL:', backendUrl);
 
+    // Node.js 환경 변수로 SSL 검증 비활성화
+    const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    
     const response = await fetch(backendUrl, {
       method: 'GET',
       headers: {
@@ -28,6 +32,13 @@ export async function GET(request: NextRequest) {
         'Accept': 'application/json',
       },
     });
+    
+    // 환경 변수 복원
+    if (originalTlsReject !== undefined) {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
+    } else {
+      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+    }
 
     if (!response.ok) {
       const errorText = await response.text();

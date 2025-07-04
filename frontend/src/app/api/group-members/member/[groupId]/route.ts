@@ -1,13 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// node-fetch를 대안으로 사용
-let nodeFetch: any = null;
-try {
-  nodeFetch = require('node-fetch');
-} catch (e) {
-  console.log('[Group Members API] node-fetch 패키지를 찾을 수 없음');
-}
-
 async function fetchWithFallback(url: string): Promise<any> {
   const fetchOptions: RequestInit = {
     method: 'GET',
@@ -22,33 +14,8 @@ async function fetchWithFallback(url: string): Promise<any> {
   const originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   
-  let response: any;
-
   try {
-    try {
-      // 기본 fetch 시도
-      response = await fetch(url, fetchOptions);
-    } catch (fetchError) {
-      if (nodeFetch) {
-        // node-fetch 시도
-        response = await nodeFetch(url, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'User-Agent': 'Next.js API Proxy (node-fetch)',
-          },
-          agent: function(_parsedURL: any) {
-            const https = require('https');
-            return new https.Agent({
-              rejectUnauthorized: false
-            });
-          }
-        });
-      } else {
-        throw fetchError;
-      }
-    }
+    const response = await fetch(url, fetchOptions);
 
     if (!response.ok) {
       const errorText = await response.text();

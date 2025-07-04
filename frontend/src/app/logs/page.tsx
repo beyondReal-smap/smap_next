@@ -3836,7 +3836,7 @@ export default function LogsPage() {
         // 유효하지 않은 clientX 값 체크
         if (isNaN(clientX) || !isFinite(clientX)) return;
         
-        const percentage = Math.max(0, Math.min(90, ((clientX - rect.left) / rect.width) * 100));
+        const percentage = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
         
         // 유효하지 않은 percentage 값 체크
         if (isNaN(percentage) || !isFinite(percentage)) return;
@@ -4076,9 +4076,8 @@ export default function LogsPage() {
     if (!map.current || sortedLocationData.length === 0) return;
 
     const totalMarkers = sortedLocationData.length;
-    // 슬라이더 90% 지점에서 100% 데이터를 보여주도록 조정
-    const adjustedPercentage = Math.min(percentage / 0.9, 100);
-    const currentIndex = Math.floor((adjustedPercentage / 100) * totalMarkers);
+    // 슬라이더 값을 직접 사용 (0% = 시작점, 100% = 종료점)
+    const currentIndex = Math.floor((percentage / 100) * totalMarkers);
     const targetIndex = Math.min(currentIndex, totalMarkers - 1);
 
     if (targetIndex >= 0 && sortedLocationData[targetIndex]) {
@@ -6791,7 +6790,7 @@ export default function LogsPage() {
             <div 
               className="absolute right-[10px] z-30 z-zoom-control flex flex-col"
               style={{
-                top: '70px'
+                top: '150px'
               }}
             >
               <motion.button
@@ -6852,9 +6851,9 @@ export default function LogsPage() {
                  >
                   <div className="flex items-center justify-between space-x-4">
                     {/* 왼쪽: 멤버 정보 */}
-                    <div className="flex items-center space-x-3 flex-shrink-0">
+                    <div className="flex items-center space-x-4 flex-shrink-0">
                       {/* 선택된 멤버 아바타 */}
-                      <div className="relative">
+                      <div className="relative flex items-center">
                         <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-white shadow-sm">
                           <Image 
                              src={(() => {
@@ -6940,19 +6939,8 @@ export default function LogsPage() {
           {/* 플로팅 경로따라가기 컨트롤 - 왼쪽 중단 (네비게이션 바 위) */}
           <AnimatePresence>
             {groupMembers.some(m => m.isSelected) && selectedDate && sortedLocationData.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20, scale: 0.9 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                transition={{ 
-                  type: "spring", 
-                  stiffness: 300, 
-                  damping: 25,
-                  duration: 0.6,
-                  delay: 0.4
-                }}
-                className="absolute bottom-20 left-4 z-50"
-              >
+              <div className="logs-control-buttons">
+              
                 <motion.div
                   whileHover={{ scale: 1.02, y: -2 }}
                   className="bg-white/95 backdrop-blur-sm rounded-2xl p-3 shadow-lg border border-white/30 min-w-[220px]"
@@ -6980,40 +6968,63 @@ export default function LogsPage() {
                       onMouseDown={handleSliderStart}
                       onTouchStart={handleSliderStart}
                     >
-                      {/* 슬라이더 트랙 */}
-                      <div className="absolute w-full h-3 bg-gray-200 rounded-full top-1/2 transform -translate-y-1/2"></div>
-                                             {/* 진행 표시 바 */}
-                       <div 
-                         className={`absolute h-3 bg-blue-500 rounded-full pointer-events-none ${
-                           isSliderDragging ? '' : 'transition-all duration-150 ease-out'
-                         }`}
-                         style={{ 
-                           width: `${sliderValue}%`,
-                           left: '1px',
-                           top: 'calc(50% + 6px)',
-                           /* GPU 가속 최적화 */
-                           transform: 'translateZ(0) translateY(-50%)',
-                           willChange: isSliderDragging ? 'width' : 'auto',
-                           backfaceVisibility: 'hidden',
-                           WebkitBackfaceVisibility: 'hidden'
-                         }} 
-                       ></div>
-                       {/* 슬라이더 핸들 */}
-                       <div 
-                         className={`absolute w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg cursor-grab active:cursor-grabbing z-10 ${
-                           isSliderDragging ? 'scale-110' : 'transition-all duration-150 ease-out hover:scale-105'
-                         }`}
-                         style={{ 
-                           left: `calc(${sliderValue}% + 8px)`,
-                           top: 'calc(50% + 6px)',
-                           pointerEvents: 'auto',
-                           /* GPU 가속 최적화 */
-                           transform: 'translateZ(0) translate(-50%, -50%)',
-                           willChange: isSliderDragging ? 'transform' : 'auto',
-                           backfaceVisibility: 'hidden',
-                           WebkitBackfaceVisibility: 'hidden'
-                         }}
-                       ></div>
+                      {/* 트랙(전체 배경) */}
+                      <div
+  className="absolute h-3 rounded-full"
+  style={{
+    left: '12px',
+    right: '12px',
+    width: 'calc(100% - 24px)',
+    background: '#e5e7eb', // 트랙 (연한 회색)
+    top: 'calc(50% - 5px)',
+    zIndex: 0,
+  }}
+></div>
+                      {/* 예정 경로 (미진행 구간) */}
+                      <div
+  className="absolute h-3 rounded-full"
+  style={{
+    left: '12px',
+    width: 'calc(100% - 24px)',
+    background: '#cbd5e1', // 예정경로 (더 진한 회색)
+    top: 'calc(50% - 5px)',
+    zIndex: 1,
+  }}
+></div>
+{/* 진행바 (진행 구간) */}
+<div
+  className={`absolute h-3 bg-blue-500 rounded-full pointer-events-none ${
+    isSliderDragging ? '' : 'transition-all duration-150 ease-out'
+  }`}
+  style={{
+    left: '12px',
+    width: `calc(${sliderValue} * (100% - 24px) / 100)`,
+    top: 'calc(50% - 5px)',
+    zIndex: 2,
+    willChange: isSliderDragging ? 'width' : 'auto',
+    backfaceVisibility: 'hidden',
+    WebkitBackfaceVisibility: 'hidden'
+  }}
+></div>
+                      {/* 핸들 */}
+                      <div
+  className={`absolute bg-blue-500 border-2 border-white shadow-lg cursor-grab active:cursor-grabbing z-10 ${
+    isSliderDragging ? 'scale-110' : 'transition-all duration-150 ease-out hover:scale-105'
+  }`}
+  style={{
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    left: `calc(12px + ${sliderValue} * (100% - 24px) / 100)`, // ← +12px 더하지 마세요!
+    top: 'calc(50% - 5px)',
+    pointerEvents: 'auto',
+    transform: 'translate(-50%, -50%)',
+    zIndex: 3,
+    willChange: isSliderDragging ? 'transform' : 'auto',
+    backfaceVisibility: 'hidden',
+    WebkitBackfaceVisibility: 'hidden'
+  }}
+></div>
                     </div>
                     {/* 슬라이더 레이블 */}
                     <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -7023,7 +7034,7 @@ export default function LogsPage() {
                     </div>
                   </div>
                 </motion.div>
-              </motion.div>
+              </div>
             )}
           </AnimatePresence>
 
@@ -7040,10 +7051,13 @@ export default function LogsPage() {
         whileHover="hover"
         whileTap="tap"
         onClick={toggleSidebar}
-        className="fixed bottom-20 right-4 z-40 z-floating-button w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white touch-optimized"
+        className="fixed bottom-40 right-4 z-40 z-floating-button w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white touch-optimized"                                 
         style={{
           background: '#0113A3',
-          boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)'
+          boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
+          bottom: '120px !important',
+          right: '16px !important',
+          zIndex: 40
         }}
       >
         {isSidebarOpen ? (

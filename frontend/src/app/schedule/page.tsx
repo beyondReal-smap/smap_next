@@ -173,7 +173,7 @@ html, body {
 /* Floating button styles from group/page.tsx */
 .floating-button {
   position: fixed;
-  bottom: 80px;
+  bottom: 180px;
   right: 20px;
   z-index: 40;
   background: #0113A3;
@@ -188,11 +188,23 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: floatIn 0.8s ease-out forwards;
 }
 
 .floating-button:hover {
   transform: scale(1.1);
   box-shadow: 0 12px 35px rgba(1, 19, 163, 0.4);
+}
+
+@keyframes floatIn {
+  from {
+    transform: translateY(100px) scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
 }
 `;
 
@@ -3996,7 +4008,7 @@ export default function SchedulePage() {
             animate="in"
             exit="out"
             variants={pageVariants}
-            className="schedule-page-content px-4 space-y-6 pb-24"
+            className="schedule-page-content px-4 space-y-5 pb-16"
           >
             {/* 캘린더 섹션 */}
             <motion.div
@@ -5653,20 +5665,18 @@ export default function SchedulePage() {
           style={{
             boxShadow: '0 10px 25px rgba(79, 70, 229, 0.3), 0 4px 10px rgba(0, 0, 0, 0.1)',
           }}
-          initial={{ scale: 0, rotate: -180 }}
+          initial={{ opacity: 0 }}
           animate={{ 
-            scale: 1, 
-            rotate: 0,
+            opacity: 1,
             transition: {
-              delay: 0.5,
-              type: "spring",
-              stiffness: 260,
-              damping: 20
+              delay: 0.2,
+              duration: 0.3
             }
           }}
-          exit={{ scale: 0, opacity: 0 }}
+          exit={{ opacity: 0 }}
           whileHover={{ 
             scale: 1.1,
+            y: -2,
             transition: { duration: 0.2 }
           }}
           whileTap={{ 
