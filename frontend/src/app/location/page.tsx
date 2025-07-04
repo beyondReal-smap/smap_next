@@ -1754,7 +1754,7 @@ export default function LocationPage() {
   };
 
   // 멤버 선택 핸들러
-  const handleMemberSelect = async (memberId: string, openLocationPanel = false, membersArray?: GroupMember[], fromMarkerClick = false, clickedMarker?: any) => { 
+  const handleMemberSelect = async (memberId: string, openLocationPanel = false, membersArray?: GroupMember[], fromMarkerClick = false, clickedMarker?: any, onlyShowInfoWindow = false) => { 
     console.log('[handleMemberSelect] 멤버 선택:', memberId, '패널 열기:', openLocationPanel, '마커 클릭:', fromMarkerClick);
     
     // 즉시 햅틱 피드백 (사용자 응답성 개선)
@@ -1972,8 +1972,8 @@ export default function LocationPage() {
           console.log('[handleMemberSelect] 마커 클릭으로 인한 호출 - InfoWindow 닫지 않음');
         }
         
-        // 멤버 InfoWindow 생성 및 표시 (마커 클릭이 아닌 경우에만 - 마커 클릭은 이미 InfoWindow 생성함)
-        if (!fromMarkerClick) {
+        // 멤버 InfoWindow 생성 및 표시 (마커 클릭인 경우에도 생성)
+        if (true) {
           // 마커 업데이트가 완료된 후 InfoWindow 생성하도록 약간의 지연 추가
           setTimeout(() => {
           // 클릭된 마커가 전달되면 사용하고, 아니면 배열에서 찾기
@@ -3351,8 +3351,8 @@ export default function LocationPage() {
           window.naver.maps.Event.addListener(marker, 'click', () => {
             console.log('[멤버 마커 클릭] 멤버 선택 시작:', member.name);
             
-            // handleMemberSelect 함수 호출 (사이드바와 동일한 로직 사용)
-            handleMemberSelect(member.id, false, members, true, marker);
+            // handleMemberSelect 함수 호출 (마커 클릭 시 인포윈도우도 생성)
+            handleMemberSelect(member.id, false, members, true, marker, false);
             
             console.log('[멤버 마커 클릭] handleMemberSelect 호출 완료:', member.name);
           });
@@ -5068,7 +5068,7 @@ export default function LocationPage() {
           }}
           whileTap={{ scale: 0.9 }}
           onClick={toggleSidebar}
-          className="fixed right-4 z-[9998] w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
+          className="fixed right-4 z-[99999] w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
           style={{
             background: '#0113A3',
             boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
@@ -5124,7 +5124,7 @@ export default function LocationPage() {
               initial="closed"
               animate="open"
               exit="closed"
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]"
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9997]"
               onClick={() => setIsSidebarOpen(false)}
             />
           )}
@@ -5674,7 +5674,7 @@ export default function LocationPage() {
               initial="closed"
               animate="open"
               exit="closed"
-              className="fixed inset-0 bg-black bg-opacity-50 z-[9998]"
+              className="fixed inset-0 bg-black bg-opacity-50 z-[9997]"
               onClick={() => setIsSidebarOpen(false)}
               style={{
                 // 모바일 사파리 최적화
