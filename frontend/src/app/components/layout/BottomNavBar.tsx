@@ -54,17 +54,14 @@ export default function BottomNavBar() {
       
       const bottomNav = document.getElementById('bottom-navigation-bar');
       if (bottomNav) {
+        const currentPath = window.location.pathname;
+        
+
+        
+        // 다른 페이지들
         const currentBottom = bottomNav.style.bottom;
         const currentPosition = bottomNav.style.position;
-        
-        // 현재 페이지에 따라 다른 bottom 값 적용
-        const currentPath = window.location.pathname;
-        let targetBottom = '40px'; // 기본값
-        
-        // 모든 페이지에서 0px로 설정 (화면 하단에 딱 붙임)
-        if (['/home', '/group', '/schedule', '/logs', '/location'].includes(currentPath)) {
-          targetBottom = '0px'; // 모든 페이지는 화면 하단에 딱 붙임
-        }
+        let targetBottom = '0px'; // 모든 페이지는 화면 하단에 딱 붙임
         
         // 이미 올바른 값이면 실행하지 않음 (무한루프 방지)
         if (currentPosition === 'fixed' && currentBottom === targetBottom) {
@@ -72,7 +69,6 @@ export default function BottomNavBar() {
         }
         
         // 1. 인라인 스타일 강제 설정
-        // 가장 강력한 방법으로 위치 강제 설정
         bottomNav.setAttribute('style', `
           position: fixed !important;
           bottom: ${targetBottom} !important;
@@ -105,10 +101,7 @@ export default function BottomNavBar() {
         bottomNav.setAttribute('data-forced-position', 'bottom-fixed');
         bottomNav.setAttribute('data-bottom', targetBottom.replace('px', ''));
         
-        // 로그를 줄여서 무한반복 방지 (10% 확률로만 출력)
-        if (Math.random() < 0.1) {
-          console.log(`[BottomNavBar] 위치 조정 완료: ${targetBottom}`);
-        }
+        // 로그 출력 제거 (무한반복 방지)
       }
     };
 
@@ -147,11 +140,12 @@ export default function BottomNavBar() {
         const isCorrectlyPositioned = 
           computedStyle.position === 'fixed' && 
           computedStyle.bottom === '0px' && 
-          computedStyle.zIndex === '999999';
+          computedStyle.zIndex === '999999' &&
+          computedStyle.display === 'block' &&
+          computedStyle.visibility === 'visible';
         
-        // 위치가 잘못된 경우에만 수정
+        // 위치가 잘못된 경우에만 수정 (로그 출력 없이)
         if (!isCorrectlyPositioned) {
-          console.log('[BottomNavBar] 위치 수정 필요, 강제 보정 실행');
           forceBottomNavPosition();
         }
       }

@@ -110,6 +110,7 @@ import DebugPanel from '../components/layout/DebugPanel';
 import LogParser from '../components/layout/LogParser';
 import AnimatedHeader from '../../components/common/AnimatedHeader';
 import GroupSelector from '@/components/location/GroupSelector';
+import BottomNavBar from '../components/layout/BottomNavBar';
 
 declare global {
   interface Window {
@@ -1050,69 +1051,11 @@ export default function HomePage() {
     }
   }, []);
 
-  // 홈 페이지임을 명시하기 위한 body 속성 설정
+  // 홈 페이지임을 명시하기 위한 body 속성 설정 (다른 페이지와 동일한 구조)
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.body.setAttribute('data-page', '/home');
       document.documentElement.setAttribute('data-page', '/home');
-      // 네비게이션 바가 표시되도록 클래스 제거
-      document.body.classList.remove('hide-bottom-nav');
-      
-      // 네비게이션 바 위치 한 번만 강제 설정 (무한반복 방지)
-      const forceNavBarPosition = () => {
-        const navBar = document.getElementById('bottom-navigation-bar');
-        if (navBar) {
-          // 이미 올바르게 설정되어 있는지 확인
-          const computedStyle = window.getComputedStyle(navBar);
-          const isCorrectlyPositioned = 
-            computedStyle.position === 'fixed' && 
-            computedStyle.bottom === '0px' && 
-            computedStyle.zIndex === '999999';
-          
-          if (!isCorrectlyPositioned) {
-            console.log('🏠 [HOME] 네비게이션 바 위치 수정 필요:', {
-              position: computedStyle.position,
-              bottom: computedStyle.bottom,
-              zIndex: computedStyle.zIndex
-            });
-            
-            // 한 번만 강제로 위치 설정
-            navBar.style.cssText = `
-              position: fixed !important;
-              bottom: 0px !important;
-              left: 0px !important;
-              right: 0px !important;
-              top: auto !important;
-              width: 100% !important;
-              height: auto !important;
-              min-height: 70px !important;
-              z-index: 999999 !important;
-              transform: none !important;
-              -webkit-transform: none !important;
-              display: block !important;
-              visibility: visible !important;
-              opacity: 1 !important;
-              background-color: white !important;
-              border-top: 1px solid #e5e7eb !important;
-              box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-              border-top-left-radius: 16px !important;
-              border-top-right-radius: 16px !important;
-              padding-top: 12px !important;
-              padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
-              margin: 0px !important;
-            `;
-            
-            navBar.classList.add('forced-fixed-bottom');
-            console.log('🏠 [HOME] 네비게이션 바 위치 수정 완료');
-          } else {
-            console.log('🏠 [HOME] 네비게이션 바 위치 정상 확인됨');
-          }
-        }
-      };
-      
-      // 초기 설정만 실행 (무한반복 방지)
-      setTimeout(forceNavBarPosition, 1000);
-      
       console.log('🏠 [HOME] 홈 페이지 body 속성 설정 완료');
     }
     
@@ -5701,13 +5644,15 @@ export default function HomePage() {
              console.log('플로팅 버튼 클릭됨, 현재 사이드바 상태:', isSidebarOpen);
              toggleSidebar();
            }}
-           className="fixed bottom-36 right-4 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
+                      className="fixed w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
            data-floating-button="true"
            style={{
              background: '#0113A3',
              boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
              zIndex: 999999, // 사이드바보다 훨씬 높은 z-index
              position: 'fixed',
+             bottom: '80px !important', // 10px 아래로 이동 (기존 106px에서 96px로)
+             right: '16px',
              pointerEvents: 'auto' // 항상 클릭 가능하도록 설정
            }}
          >
@@ -6108,6 +6053,9 @@ export default function HomePage() {
            )}
          </AnimatePresence>
               </motion.div>
+              
+              {/* 하단 네비게이션 바 */}
+              <BottomNavBar />
       </>
     );
   } catch (renderError) {

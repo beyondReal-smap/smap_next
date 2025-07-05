@@ -3044,6 +3044,21 @@ export default function LocationPage() {
     return photoUrl ?? getDefaultImage(gender, index);
   };
 
+  // 시간을 월/일 hh:mm 형식으로 변환하는 함수
+  const formatTimeToMMDDHHMM = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${month}/${day} ${hours}:${minutes}`;
+    } catch (error) {
+      console.error('시간 포맷 변환 오류:', error);
+      return '시간 정보 없음';
+    }
+  };
+
   // 네이버 맵 역지오코딩 API를 사용한 좌표 -> 주소 변환
   const getAddressFromCoordinates = async (lat: number, lng: number): Promise<string> => {
     try {
@@ -4004,7 +4019,7 @@ export default function LocationPage() {
             <div style="margin-bottom: 4px;">
               <div style="display: flex; align-items: center; font-size: 11px; color: #9ca3af;">
                 <span style="flex-shrink: 0;">🕐 </span>
-                <span style="margin-left: 2px;">마지막 업데이트: ${new Date(member.mlt_gps_time).toLocaleString('ko-KR')}</span>
+                <span style="margin-left: 2px;">마지막 업데이트: ${formatTimeToMMDDHHMM(member.mlt_gps_time)}</span>
               </div>
             </div>
           ` : ''}
