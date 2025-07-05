@@ -1527,25 +1527,48 @@ export default function LocationPage() {
       return;
     }
     
+    console.log('[handleGroupSelect] 새로운 그룹 선택 - 데이터 초기화 및 새 그룹 로딩 시작');
+    
     // 그룹 변경 시 즉시 지도 초기화 (멤버 마커도 제거)
     if (map && memberMarkers.length > 0) {
       console.log('[handleGroupSelect] 기존 멤버 마커 즉시 제거 시작:', memberMarkers.length, '개');
-      memberMarkers.forEach(marker => {
-        if (marker && typeof marker.setMap === 'function') {
-          marker.setMap(null);
+      memberMarkers.forEach((marker, index) => {
+        try {
+          if (marker && typeof marker.setMap === 'function' && marker.getMap()) {
+            marker.setMap(null);
+            console.log('[handleGroupSelect] 멤버 마커 제거 성공:', index);
+          }
+        } catch (error) {
+          console.warn('[handleGroupSelect] 멤버 마커 제거 실패:', index, error);
         }
       });
       console.log('[handleGroupSelect] 기존 멤버 마커 지도에서 제거 완료');
     }
     setMemberMarkers([]); // 상태 배열도 확실히 비움
     
-    // 장소 마커도 제거
-    markers.forEach(marker => marker.setMap(null));
+    // 장소 마커도 안전하게 제거
+    if (markers.length > 0) {
+      markers.forEach((marker, index) => {
+        try {
+          if (marker && typeof marker.setMap === 'function' && marker.getMap()) {
+            marker.setMap(null);
+            console.log('[handleGroupSelect] 장소 마커 제거 성공:', index);
+          }
+        } catch (error) {
+          console.warn('[handleGroupSelect] 장소 마커 제거 실패:', index, error);
+        }
+      });
+    }
     setMarkers([]);
     
-    // InfoWindow 닫기
-    if (infoWindow) {
-      infoWindow.close();
+    // InfoWindow 안전하게 닫기
+    try {
+      if (infoWindow && typeof infoWindow.close === 'function') {
+        infoWindow.close();
+        setInfoWindow(null);
+      }
+    } catch (error) {
+      console.warn('[handleGroupSelect] InfoWindow 닫기 실패:', error);
       setInfoWindow(null);
     }
     
@@ -1556,6 +1579,7 @@ export default function LocationPage() {
       console.log('[handleGroupSelect] 이전 그룹 캐시 무효화:', selectedGroupId);
     }
     
+    // 먼저 그룹 ID 변경
     setSelectedGroupId(groupId);
     setIsGroupSelectorOpen(false);
     
@@ -1582,15 +1606,14 @@ export default function LocationPage() {
     
     // 그룹 변경 시 즉시 새 그룹 데이터 로딩 (useEffect 의존성 때문에 지연될 수 있어서 직접 호출)
     setTimeout(() => {
-      if (!isFetchingGroupMembers) {
-        console.log('[handleGroupSelect] 새 그룹 데이터 즉시 로딩 시작');
-        fetchGroupMembersData();
-      }
+      console.log('[handleGroupSelect] 새 그룹 데이터 즉시 로딩 시작 - 그룹ID:', groupId);
+      fetchGroupMembersData(groupId);
     }, 100); // 상태 업데이트 완료 후 호출
   }, [selectedGroupId, map, memberMarkers, markers, infoWindow, isFetchingGroupMembers]);
 
-  const fetchGroupMembersData = async () => {
-    if (!selectedGroupId) {
+  const fetchGroupMembersData = async (groupId?: number) => {
+    const targetGroupId = groupId || selectedGroupId;
+    if (!targetGroupId) {
       console.error('[fetchGroupMembersData] 선택된 그룹이 없습니다.');
       return;
     }
@@ -1599,9 +1622,9 @@ export default function LocationPage() {
     setIsFirstMemberSelectionComplete(false);
 
     try {
-      console.log('[fetchGroupMembersData] 시작, 그룹ID:', selectedGroupId);
+      console.log('[fetchGroupMembersData] 시작, 그룹ID:', targetGroupId);
       const membersData = await retryDataFetch(
-        () => memberService.getGroupMembers(selectedGroupId.toString()),
+        () => memberService.getGroupMembers(targetGroupId.toString()),
         'LOCATION_GROUP_MEMBERS'
       );
       console.log('[fetchGroupMembersData] 멤버 데이터 조회 완료:', membersData);
@@ -3635,8 +3658,9 @@ export default function LocationPage() {
       
       // 첫번째 멤버 선택 완료 후 InfoWindow 자동 생성
       const selectedMember = groupMembers.find(m => m.isSelected);
-      if (selectedMember && isFirstMemberSelectionComplete && !infoWindow) {
+      if (selectedMember && isFirstMemberSelectionComplete && !infoWindow && !isLocationSelectingRef.current) {
         // 마커 업데이트 완료 후 InfoWindow 생성
+        // 단, 장소 선택 중이면 멤버 InfoWindow 생성을 방지
         setTimeout(() => {
           const memberIndex = groupMembers.findIndex(m => m.id === selectedMember.id);
           if (memberIndex >= 0 && memberMarkers.length > memberIndex && memberMarkers[memberIndex]) {
@@ -3650,6 +3674,8 @@ export default function LocationPage() {
             });
           }
         }, 300); // 마커 생성 완료를 위한 지연
+      } else if (selectedMember && isFirstMemberSelectionComplete && isLocationSelectingRef.current) {
+        console.log('[useEffect 통합 마커] 장소 선택 중 - 멤버 InfoWindow 생성 방지');
       }
     } else if (map && isMapReady) {
       console.log('[useEffect 통합 마커] 기존 마커들 제거');
@@ -4462,6 +4488,9 @@ export default function LocationPage() {
     // 장소 선택 중임을 표시하여 다른 로직의 지도 이동 방지
     isLocationSelectingRef.current = true;
     
+    // 장소 선택 시 멤버 InfoWindow 자동 생성을 방지하기 위한 플래그 설정
+    const preventMemberInfoWindow = true;
+    
     // 지도에서 해당 장소로 이동 (사이드바 닫기 전에 먼저 실행)
     if (map && location.coordinates) {
       const [lng, lat] = location.coordinates;
@@ -4614,23 +4643,54 @@ export default function LocationPage() {
         
         // 3. InfoWindow 생성 및 표시 (지도 위치에 표시)
         setTimeout(() => {
-        const newInfoWindow = createLocationInfoWindow(location.name, location.address, location);
+          console.log('[handleLocationSelect] InfoWindow 생성 시작:', location.name);
+          
+          // 기존 InfoWindow 닫기
+          if (infoWindow) {
+            console.log('[handleLocationSelect] 기존 InfoWindow 닫기');
+            infoWindow.close();
+            setInfoWindow(null);
+          }
+          
+          const newInfoWindow = createLocationInfoWindow(location.name, location.address, location);
           
           // 해당 장소의 마커 찾기
           const locationIndex = selectedMemberSavedLocations ? selectedMemberSavedLocations.findIndex(loc => loc.id === location.id) : -1;
           const selectedMarker = locationIndex >= 0 ? markers[locationIndex] : null;
+          
+          console.log('[handleLocationSelect] 마커 찾기 결과:', {
+            locationIndex,
+            hasSelectedMarker: !!selectedMarker,
+            totalMarkers: markers.length,
+            selectedMemberSavedLocationsCount: selectedMemberSavedLocations?.length || 0
+          });
           
           if (selectedMarker) {
             // 마커에 InfoWindow 연결
             newInfoWindow.open(map, selectedMarker);
             console.log('[handleLocationSelect] InfoWindow를 마커에 연결:', location.name);
           } else {
-            // 마커가 없으면 좌표에 직접 표시
-        newInfoWindow.open(map, targetPosition);
-            console.log('[handleLocationSelect] InfoWindow를 좌표에 직접 표시:', location.name);
+            // 마커가 없으면 임시 마커를 생성하여 InfoWindow 표시
+            console.log('[handleLocationSelect] 마커가 없어 임시 마커 생성');
+            const tempInfoMarker = new window.naver.maps.Marker({
+              position: targetPosition,
+              map: map,
+              visible: false // 보이지 않는 마커
+            });
+            
+            newInfoWindow.open(map, tempInfoMarker);
+            console.log('[handleLocationSelect] InfoWindow를 임시 마커에 연결:', location.name);
+            
+            // 임시 마커는 InfoWindow가 닫힐 때 같이 제거되도록 설정
+            setTimeout(() => {
+              if (tempInfoMarker) {
+                tempInfoMarker.setMap(null);
+              }
+            }, 100);
           }
           
-        setInfoWindow(newInfoWindow);
+          setInfoWindow(newInfoWindow);
+          console.log('[handleLocationSelect] InfoWindow 설정 완료');
         }, 300); // 마커 업데이트 완료 후 InfoWindow 표시
         
         // 4. 상태 업데이트는 마지막에 (마커 업데이트 완료 후)
@@ -4655,10 +4715,11 @@ export default function LocationPage() {
             }, 200 * (i + 1)); // 200ms, 400ms, 600ms, 800ms, 1000ms 간격으로 체크
           }
           
-          // 장소 선택 완료, 플래그 해제
+          // 장소 선택 완료, 플래그 해제 (더 긴 지연으로 멤버 InfoWindow 생성 방지)
           setTimeout(() => {
             isLocationSelectingRef.current = false;
-          }, 1200);
+            console.log('[handleLocationSelect] 장소 선택 완료 - 플래그 해제');
+          }, 2000); // 2초 후 플래그 해제하여 멤버 InfoWindow 생성 방지
         };
         
         keepLocationCentered();
@@ -4702,21 +4763,25 @@ export default function LocationPage() {
         const isGroupDropdownContainer = target.closest('[data-group-dropdown-container]');
         const isGroupDropdownButton = target.closest('[data-group-selector]');
         const isGroupDropdownMenu = target.closest('[data-group-dropdown-menu]');
+        const isGroupDropdownOption = target.closest('[data-group-option]');
+        const isGroupSelector = target.closest('.group-selector');
         
         // 그룹 드롭다운 관련 요소가 아닌 외부 클릭인 경우에만 닫기
-        if (!isGroupDropdownContainer && !isGroupDropdownButton && !isGroupDropdownMenu) {
+        if (!isGroupDropdownContainer && !isGroupDropdownButton && !isGroupDropdownMenu && !isGroupDropdownOption && !isGroupSelector) {
           console.log('[handleClickOutside] 그룹 드롭다운 외부 클릭 감지 - 드롭다운 닫기');
           setIsGroupSelectorOpen(false);
+        } else {
+          console.log('[handleClickOutside] 그룹 드롭다운 내부 클릭 감지 - 드롭다운 유지');
         }
       }
     };
 
     if (isGroupSelectorOpen) {
-      // 약간의 지연을 주어 클릭 이벤트가 완전히 처리된 후 리스너 추가
+      // 더 긴 지연을 주어 그룹 선택 클릭이 완전히 처리된 후 리스너 추가
       const timer = setTimeout(() => {
         document.addEventListener('mousedown', handleClickOutside);
         document.addEventListener('touchstart', handleClickOutside);
-      }, 10);
+      }, 100);
       
       return () => {
         clearTimeout(timer);
@@ -5304,11 +5369,12 @@ export default function LocationPage() {
           }}
           whileTap={{ scale: 0.9 }}
           onClick={toggleSidebar}
-          className="fixed right-4 z-[999999] w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
+          className="fixed right-4 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
           style={{
             background: '#0113A3',
             boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
-                          bottom: 'calc(48px + 40px)' // 네비게이션 바(48px) + 여유공간(50px) - 30px 위로 올림
+            bottom: 'calc(48px + 40px)', // 네비게이션 바(48px) + 여유공간(50px) - 30px 위로 올림
+            zIndex: 99999999 // 매우 높은 z-index로 설정하여 모든 오버레이 위에 표시
           }}
         >
           {isSidebarOpen ? (
@@ -5439,11 +5505,22 @@ export default function LocationPage() {
                     isGroupSelectorOpen={isGroupSelectorOpen}
                     isSidebarOpen={isSidebarOpen}
                     groupMemberCounts={groupMemberCounts}
-                    onOpen={() => setIsGroupSelectorOpen(true)}
-                    onClose={() => setIsGroupSelectorOpen(false)}
+                    onOpen={() => {
+                      console.log('[GroupSelector] onOpen 호출됨');
+                      setIsGroupSelectorOpen(true);
+                    }}
+                    onClose={() => {
+                      console.log('[GroupSelector] onClose 호출됨');
+                      setIsGroupSelectorOpen(false);
+                    }}
                     onGroupSelect={(groupId) => {
+                      console.log('[GroupSelector onGroupSelect] 그룹 선택 시도:', groupId, '현재 선택된 그룹:', selectedGroupId);
                       if (selectedGroupId !== groupId) {
+                        console.log('[GroupSelector onGroupSelect] 다른 그룹 선택 - handleGroupSelect 호출');
                         handleGroupSelect(groupId);
+                      } else {
+                        console.log('[GroupSelector onGroupSelect] 같은 그룹 선택 - 드롭다운만 닫기');
+                        setIsGroupSelectorOpen(false);
                       }
                     }}
                   />
@@ -5915,11 +5992,22 @@ export default function LocationPage() {
                     isGroupSelectorOpen={isGroupSelectorOpen}
                     isSidebarOpen={isSidebarOpen}
                     groupMemberCounts={groupMemberCounts}
-                    onOpen={() => setIsGroupSelectorOpen(true)}
-                    onClose={() => setIsGroupSelectorOpen(false)}
+                    onOpen={() => {
+                      console.log('[GroupSelector] onOpen 호출됨');
+                      setIsGroupSelectorOpen(true);
+                    }}
+                    onClose={() => {
+                      console.log('[GroupSelector] onClose 호출됨');
+                      setIsGroupSelectorOpen(false);
+                    }}
                     onGroupSelect={(groupId) => {
+                      console.log('[GroupSelector onGroupSelect] 그룹 선택 시도:', groupId, '현재 선택된 그룹:', selectedGroupId);
                       if (selectedGroupId !== groupId) {
+                        console.log('[GroupSelector onGroupSelect] 다른 그룹 선택 - handleGroupSelect 호출');
                         handleGroupSelect(groupId);
+                      } else {
+                        console.log('[GroupSelector onGroupSelect] 같은 그룹 선택 - 드롭다운만 닫기');
+                        setIsGroupSelectorOpen(false);
                       }
                     }}
                   />

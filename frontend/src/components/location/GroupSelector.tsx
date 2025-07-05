@@ -96,7 +96,13 @@ const DropdownPortal = ({
   return createPortal(
     <div
       ref={dropdownRef}
-      onMouseDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+      }}
       className="absolute rounded-xl z-[99999] overflow-hidden bg-white shadow-2xl border border-gray-200/80"
       style={{
         top: position.top,
@@ -105,6 +111,7 @@ const DropdownPortal = ({
         maxHeight: '40vh',
         overflowY: 'auto'
       }}
+      data-group-dropdown-menu="true"
     >
       {children}
     </div>,
@@ -142,10 +149,12 @@ const GroupSelector = memo(({
         whileTap={{ scale: 0.98 }}
         onClick={(e) => {
           e.stopPropagation();
+          console.log('[GroupSelector] 버튼 클릭됨, 현재 상태:', isGroupSelectorOpen);
           isGroupSelectorOpen ? onClose() : onOpen();
         }}
         className="group-selector w-full px-4 py-3 rounded-xl flex items-center justify-between text-left focus:outline-none transition-all duration-300 bg-white/50 border"
         style={{ borderColor: 'rgba(1, 19, 163, 0.2)' }}
+        data-group-selector="true"
       >
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-gray-900 truncate">
@@ -164,22 +173,33 @@ const GroupSelector = memo(({
       </motion.button>
 
       {/* 애니메이션 없이 조건부 렌더링만 사용 */}
-      {isGroupSelectorOpen && isSidebarOpen === true && (
+      {isGroupSelectorOpen && (
         <DropdownPortal target={buttonRef} onClose={onClose}>
           {userGroups.map((group) => (
             <motion.button
               key={group.sgt_idx}
               whileHover={{ backgroundColor: "rgba(239, 246, 255, 1)" }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
               onClick={(e) => {
                 e.stopPropagation();
-                onGroupSelect(group.sgt_idx);
-                onClose();
+                e.preventDefault();
+                console.log('[GroupSelector] 그룹 선택 클릭:', group.sgt_idx, group.sgt_title);
+                
+                // 즉시 onGroupSelect 호출하고 드롭다운 닫기
+                setTimeout(() => {
+                  onGroupSelect(group.sgt_idx);
+                  onClose();
+                }, 0);
               }}
               className={`w-full px-4 py-3 text-left text-sm focus:outline-none transition-colors flex items-center justify-between border-b border-gray-100 last:border-b-0 ${
                 selectedGroupId === group.sgt_idx 
                   ? 'font-semibold text-indigo-700' 
                   : 'text-gray-800'
               }`}
+              data-group-option="true"
             >
               <span className="truncate">{group.sgt_title}</span>
               {selectedGroupId === group.sgt_idx && (

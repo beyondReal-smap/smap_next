@@ -5723,7 +5723,7 @@ export default function SchedulePage() {
             position: 'fixed',
             bottom: '90px',
             right: '20px',
-            zIndex: 9999,
+            zIndex: 8000, // 모달(z-index: 50, 10000)보다 낮게 설정
             background: '#0113A3',
             width: '56px',
             height: '56px',
@@ -5782,7 +5782,7 @@ export default function SchedulePage() {
                       <motion.div 
             className="add-event-modal fixed inset-0 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
             onClick={closeAddModal}
-            style={{ zIndex: 50 }}
+            style={{ zIndex: 9999 }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
