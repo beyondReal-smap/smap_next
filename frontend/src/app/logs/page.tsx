@@ -79,7 +79,7 @@ const LocationSummaryCard = dynamic(() => import('../../components/logs/Location
 
 const GroupSelector = dynamic(() => import('../../components/location/GroupSelector'), {
   loading: () => (
-    <div className="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 animate-pulse">
+    <div className="w-full px-4 pt-3 rounded-xl bg-white border border-gray-200 animate-pulse">
       <div className="flex items-center justify-between">
         <div className="h-4 bg-gray-200 rounded flex-1 mr-2"></div>
         <div className="w-4 h-4 bg-gray-200 rounded"></div>
@@ -897,7 +897,7 @@ export default function LogsPage() {
   const startEndMarkers = useRef<any[]>([]); // 시작/종료 마커들을 위한 ref
   const stayTimeMarkers = useRef<any[]>([]); // 체류시간 마커들을 위한 ref
   const arrowMarkers = useRef<any[]>([]); // 화살표 마커들 저장할 배열 추가
-    const currentPositionMarker = useRef<any>(null); // 슬라이더 현재 위치 마커를 위한 ref
+  const currentPositionMarker = useRef<any>(null); // 슬라이더 현재 위치 마커를 위한 ref
   const sliderRef = useRef<HTMLDivElement>(null); // 슬라이더 요소를 위한 ref
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true);
@@ -3836,7 +3836,9 @@ export default function LogsPage() {
         // 유효하지 않은 clientX 값 체크
         if (isNaN(clientX) || !isFinite(clientX)) return;
         
-        const percentage = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+        // 간단한 퍼센트 기반 슬라이더 계산
+        const relativeX = clientX - rect.left;
+        const percentage = Math.max(0, Math.min(100, (relativeX / rect.width) * 100));
         
         // 유효하지 않은 percentage 값 체크
         if (isNaN(percentage) || !isFinite(percentage)) return;
@@ -4181,12 +4183,12 @@ export default function LogsPage() {
       
       console.log('[LOGS] 일별 위치 기록 카운트 조회 완료:', response);
       
-      // 데이터 검증 수행 (초기 로딩이 아닌 경우에만)
-      if (!isInitialLoading && dataValidationState.lastValidationTime) {
-        setTimeout(() => {
-          validateAndResyncData(groupId);
-        }, 2000);
-      }
+      // 데이터 검증 수행 (비활성화 - 주기적 검증 불필요)
+      // if (!isInitialLoading && dataValidationState.lastValidationTime) {
+      //   setTimeout(() => {
+      //     validateAndResyncData(groupId);
+      //   }, 2000);
+      // }
     } catch (error) {
       console.error('[LOGS] 일별 위치 기록 카운트 조회 실패:', error);
       handleDataError(error, 'loadDailyLocationCounts');
@@ -4424,32 +4426,33 @@ export default function LogsPage() {
   }, [groupMembers, dailyCountsData, memberActivityData]);
 
   // 데이터 검증 자동 수행 (초기 로딩 완료 후)
-  useEffect(() => {
-    if (!selectedGroupId || isInitialLoading || dataValidationState.isValidating) {
-      return;
-    }
+  // 자동 데이터 검증 타이머 (비활성화 - 주기적 검증 불필요)
+  // useEffect(() => {
+  //   if (!selectedGroupId || isInitialLoading || dataValidationState.isValidating) {
+  //     return;
+  //   }
 
-    // 초기 로딩이 완료된 후 30초 후부터 검증 시작
-    const validationTimer = setTimeout(() => {
-      if (!isInitialLoading && selectedGroupId) {
-        console.log('[데이터 검증] 자동 검증 시작:', selectedGroupId);
-        validateAndResyncData(selectedGroupId);
-      }
-    }, 30000);
+  //   // 자동 검증 비활성화 (주기적 검증 불필요)
+  //   // const validationTimer = setTimeout(() => {
+  //   //   if (!isInitialLoading && selectedGroupId) {
+  //   //     console.log('[데이터 검증] 자동 검증 시작:', selectedGroupId);
+  //   //     validateAndResyncData(selectedGroupId);
+  //   //   }
+  //   // }, 30000);
 
-    // 주기적 검증 (5분마다)
-    const periodicValidationTimer = setInterval(() => {
-      if (!isInitialLoading && selectedGroupId && !dataValidationState.isValidating) {
-        console.log('[데이터 검증] 주기적 검증 시작:', selectedGroupId);
-        validateAndResyncData(selectedGroupId);
-      }
-    }, 300000); // 5분
+  //   // // 주기적 검증 (5분마다)
+  //   // const periodicValidationTimer = setInterval(() => {
+  //   //   if (!isInitialLoading && selectedGroupId && !dataValidationState.isValidating) {
+  //   //     console.log('[데이터 검증] 주기적 검증 시작:', selectedGroupId);
+  //   //     validateAndResyncData(selectedGroupId);
+  //   //   }
+  //   // }, 300000); // 5분
 
-    return () => {
-      clearTimeout(validationTimer);
-      clearInterval(periodicValidationTimer);
-    };
-  }, [selectedGroupId, isInitialLoading, dataValidationState.isValidating]);
+  //   // return () => {
+  //   //   clearTimeout(validationTimer);
+  //   //   clearInterval(periodicValidationTimer);
+  //   // };
+  // }, [selectedGroupId, isInitialLoading, dataValidationState.isValidating]);
 
   // 로딩 상태 안전장치 - 30초 후 강제 종료
   useEffect(() => {
@@ -4616,6 +4619,13 @@ export default function LogsPage() {
       }
       
       console.log('[loadDateMemberData] ===== 통합 데이터 로딩 완료 =====');
+    
+    // 🎯 데이터 로딩 완료 후 슬라이더를 시작점으로 리셋
+    setTimeout(() => {
+      setSliderValue(0);
+      setIsSliderDragging(false);
+      console.log('[loadDateMemberData] 슬라이더를 시작점(0%)으로 리셋 완료');
+    }, 200);
       
     } catch (error) {
       console.error('[loadDateMemberData] 오류:', error);
@@ -6714,6 +6724,13 @@ export default function LogsPage() {
     }, 200);
 
     console.log('[renderLocationDataOnMap] 통합 지도 렌더링 완료');
+    
+    // 🎯 슬라이더를 항상 시작점(0%)으로 리셋 
+    setTimeout(() => {
+      setSliderValue(0);
+      setIsSliderDragging(false);
+      console.log('[renderLocationDataOnMap] 슬라이더를 시작점(0%)으로 리셋 완료');
+    }, 100);
   };
 
   return (
@@ -6822,7 +6839,7 @@ export default function LogsPage() {
             </div>
           )}
           
-          {/* 플로팅 통합 정보 카드 - jin의 기록 + 위치기록 요약 한 줄 */}
+          {/* 새로운 플로팅 통합 정보 카드 */}
           <AnimatePresence>
             {groupMembers.some(m => m.isSelected) && selectedDate && (
               <motion.div
@@ -6831,134 +6848,145 @@ export default function LogsPage() {
                 animate="animate"
                 exit="exit"
                 className="absolute left-0 right-0 z-40 z-floating-card flex justify-center px-4"
-                style={{
-                  top: '70px'
-                }}
+                style={{ top: '70px' }}
               >
                 <motion.div
-                   whileHover={{ 
-                     scale: 1.02, 
-                     y: -2,
-                     boxShadow: "0 12px 35px rgba(1, 19, 163, 0.25)"
-                   }}
-                   whileTap={{ scale: 0.98 }}
-                   onClick={() => setIsSidebarOpen(true)}
-                   className="bg-white/95 backdrop-blur-sm rounded-2xl px-4 pt-3 shadow-lg border border-white/30 cursor-pointer max-w-full"
-                   style={{
-                     background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(249, 250, 251, 0.95) 100%)',
-                     boxShadow: '0 8px 25px rgba(1, 19, 163, 0.15), 0 0 0 1px rgba(1, 19, 163, 0.05)',
-                   }}
-                 >
-                  <div className="flex items-center justify-between space-x-4">
-                    {/* 왼쪽: 멤버 정보 */}
-                    <div className="flex items-center space-x-4 flex-shrink-0">
-                      {/* 선택된 멤버 아바타 */}
-                      <div className="relative flex items-center">
-                        <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-white shadow-sm">
-                          <Image 
-                             src={(() => {
-                               const member = groupMembers.find(m => m.isSelected);
-                               return member ? getSafeImageUrl(member.photo, member.mt_gender, member.original_index) : '';
-                             })()}
-                             alt={groupMembers.find(m => m.isSelected)?.name || ''} 
-                             width={32}
-                             height={32}
-                             className="w-full h-full object-cover member-image"
-                             priority={true}
-                             placeholder="blur"
-                             blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
-                             onError={(e) => {
-                               const img = e.target as HTMLImageElement;
-                               const member = groupMembers.find(m => m.isSelected);
-                               if (member) {
-                                 const fallbackUrl = getDefaultImage(member.mt_gender, member.original_index);
-                                 if (img.src !== fallbackUrl) {
-                                   img.src = fallbackUrl;
-                                 }
-                               }
-                             }}
-                           />
-                        </div>
-                        <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>
-                      </div>
-                      
-                      {/* 멤버 이름과 날짜 정보 */}
-                      <div className="flex flex-col">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-semibold text-gray-800">
-                            {groupMembers.find(m => m.isSelected)?.name}
-                          </span>
-                          <span className="text-xs text-gray-500">의 기록</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <span className="text-xs font-medium" style={{ color: '#0113A3' }}>
-                            📅 {format(new Date(selectedDate), 'MM월 dd일 (E)', { locale: ko })}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* 로딩 상태 표시 */}
-                      {(isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) && (
-                        <div className="ml-1">
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          >
-                            <FiLoader className="w-4 h-4 text-blue-500" />
-                          </motion.div>
-                        </div>
-                      )}
-                    </div>
+                  whileHover={{ 
+                    scale: 1.03, 
+                    y: -3,
+                    boxShadow: "0 25px 50px rgba(0, 0, 0, 0.15)"
+                  }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="bg-white rounded-2xl px-3 pt-4 shadow-2xl border border-gray-100 cursor-pointer relative overflow-hidden"
+                  style={{
+                    background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+                    boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.05)',
+                    backdropFilter: 'blur(20px)',
+                    width: 'auto',
+                    minWidth: '320px'
+                  }}
+                >
+                  {/* 배경 장식 */}
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full -translate-y-12 translate-x-12 opacity-60"></div>
+                  
+                  <div className="relative flex items-center space-x-4">
+  {/* 멤버 프로필 영역 */}
+  <div className="flex items-center space-x-3 pb-1">
+    <div className="relative">
+      <div className="w-9 h-9 mb-2 rounded-full overflow-hidden ring-2 ring-white shadow bg-gradient-to-br from-gray-100 to-gray-200">
+        <Image 
+          src={(() => {
+            const member = groupMembers.find(m => m.isSelected);
+            return member ? getSafeImageUrl(member.photo, member.mt_gender, member.original_index) : '';
+          })()}
+          alt={groupMembers.find(m => m.isSelected)?.name || ''} 
+          width={32}
+          height={32}
+          className="w-full h-full object-cover"
+          priority={true}
+          placeholder="blur"
+          blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
+          onError={(e) => {
+            const img = e.target as HTMLImageElement;
+            const member = groupMembers.find(m => m.isSelected);
+            if (member) {
+              const fallbackUrl = getDefaultImage(member.mt_gender, member.original_index);
+              if (img.src !== fallbackUrl) {
+                img.src = fallbackUrl;
+              }
+            }
+          }}
+        />
+      </div>
+      <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 border-2 border-white rounded-full shadow-md"></div>
+    </div>
+    <div className="flex flex-col">
+      <div className="flex items-center space-x-1.5">
+        <span className="text-sm font-bold text-gray-900">
+          {groupMembers.find(m => m.isSelected)?.name}
+        </span>
+        <span className="text-xs text-gray-400">의 기록</span>
+      </div>
+      <div className="flex items-center space-x-1 mt-0.5">
+        <span className="text-xs font-medium text-blue-500">
+          📅 {format(new Date(selectedDate), 'MM월 dd일 (E)', { locale: ko })}
+        </span>
+      </div>
+    </div>
+  </div>
 
-                    {/* 오른쪽: 위치기록 요약 (로딩 중이 아닐 때만 표시) */}
-                    {!(isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) && (
-                      <div className="flex items-center space-x-3 text-xs flex-shrink-0">
-                        {/* 거리 */}
-                        <div className="flex flex-col items-center space-y-1">
-                          <FiTrendingUp className="w-3 h-3 text-amber-500" />
-                          <span className="font-medium text-gray-700 whitespace-nowrap">{locationSummary.distance}</span>
-                        </div>
-                        {/* 시간 */}
-                        <div className="flex flex-col items-center space-y-1">
-                          <FiClock className="w-3 h-3 text-blue-500" />
-                          <span className="font-medium text-gray-700 whitespace-nowrap">{locationSummary.time}</span>
-                        </div>
-                        {/* 걸음수 */}
-                        <div className="flex flex-col items-center space-y-1">
-                          <FiZap className="w-3 h-3 text-green-500" />
-                          <span className="font-medium text-gray-700 whitespace-nowrap">{locationSummary.steps}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+  {/* 구분선 */}
+  <div className="w-px h-8 bg-gradient-to-b from-transparent via-gray-200 to-transparent"></div>
+
+  {/* 통계 영역 2단 구조 */}
+  {(isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) ? (
+    <div className="flex items-center justify-center py-2 px-4">
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+      >
+        <FiLoader className="w-4 h-4 text-blue-500" />
+      </motion.div>
+      <span className="ml-2 text-xs text-gray-500">로딩 중...</span>
+    </div>
+  ) : (
+    <div className="flex items-center space-x-4">
+      <div className="flex flex-col items-center justify-center">
+        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center mb-0.5">
+          <FiTrendingUp className="w-2.5 h-2.5 text-white" />
+        </div>
+        <span className="text-xs font-semibold text-gray-700">{locationSummary.distance}</span>
+      </div>
+      <div className="flex flex-col items-center justify-center">
+        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center mb-0.5">
+          <FiClock className="w-2.5 h-2.5 text-white" />
+        </div>
+        <span className="text-xs font-semibold text-gray-700">{locationSummary.time}</span>
+      </div>
+      <div className="flex flex-col items-center justify-center">
+        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-400 to-green-500 flex items-center justify-center mb-0.5">
+          <FiZap className="w-2.5 h-2.5 text-white" />
+        </div>
+        <span className="text-xs font-semibold text-gray-700">{locationSummary.steps}</span>
+      </div>
+    </div>
+  )}
+</div>
                 </motion.div>
               </motion.div>
             )}
           </AnimatePresence>
+          
 
-          {/* 플로팅 경로따라가기 컨트롤 - 왼쪽 중단 (네비게이션 바 위) */}
+          {/* 새로운 경로따라가기 섹션 */}
           <AnimatePresence>
             {groupMembers.some(m => m.isSelected) && selectedDate && sortedLocationData.length > 0 && (
               <div className="logs-control-buttons">
-              
                 <motion.div
+                  initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 20, scale: 0.9 }}
                   whileHover={{ scale: 1.02, y: -2 }}
-                  className="bg-white/95 backdrop-blur-sm rounded-2xl p-3 shadow-lg border border-white/30 min-w-[220px]"
+                  className="bg-white/95 backdrop-blur-sm rounded-2xl px-3 py-2 shadow-lg border border-white/30 w-[210px]"
                   style={{
                     background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(249, 250, 251, 0.95) 100%)',
                     boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.05)',
                   }}
                 >
-                  <div className="flex items-center">
-                    <FiPlayCircle className="w-4 h-4 text-blue-500 mr-2" />
+                  {/* 헤더 섹션 */}
+                  <div className="flex items-center justify-start space-x-2 py-1">
+                    <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <FiPlayCircle className="w-3 h-3 text-white" />
+                    </div>
                     <h3 className="text-sm font-bold text-gray-900">경로 따라가기</h3>
                   </div>
                   
                   {/* 슬라이더 컨트롤 영역 */}
-                  <div className="px-2 py-1">
+                  <div className="px-3 pt-2 pb-1">
                     <div 
                       ref={sliderRef}
-                      className="relative w-full h-8 cursor-pointer select-none touch-none flex items-center"
+                      className="relative w-full h-6 cursor-pointer select-none touch-none"
                       style={{ 
                         touchAction: 'none',
                         userSelect: 'none',
@@ -6968,71 +6996,86 @@ export default function LogsPage() {
                       onMouseDown={handleSliderStart}
                       onTouchStart={handleSliderStart}
                     >
-                      {/* 트랙(전체 배경) */}
+                      {/* 트랙 배경 */}
                       <div
-  className="absolute h-3 rounded-full"
-  style={{
-    left: '12px',
-    right: '12px',
-    width: 'calc(100% - 24px)',
-    background: '#e5e7eb', // 트랙 (연한 회색)
-    top: 'calc(50% - 5px)',
-    zIndex: 0,
-  }}
-></div>
-                      {/* 예정 경로 (미진행 구간) */}
+                        className="absolute w-full h-2 bg-gray-200 rounded-full"
+                        style={{
+                          top: '50%',
+                          left: '0',
+                          transform: 'translateY(-50%)',
+                          zIndex: 1,
+                        }}
+                      />
+                      
+                      {/* 진행바 */}
                       <div
-  className="absolute h-3 rounded-full"
-  style={{
-    left: '12px',
-    width: 'calc(100% - 24px)',
-    background: '#cbd5e1', // 예정경로 (더 진한 회색)
-    top: 'calc(50% - 5px)',
-    zIndex: 1,
-  }}
-></div>
-{/* 진행바 (진행 구간) */}
-<div
-  className={`absolute h-3 bg-blue-500 rounded-full pointer-events-none ${
-    isSliderDragging ? '' : 'transition-all duration-150 ease-out'
-  }`}
-  style={{
-    left: '12px',
-    width: `calc(${sliderValue} * (100% - 24px) / 100)`,
-    top: 'calc(50% - 5px)',
-    zIndex: 2,
-    willChange: isSliderDragging ? 'width' : 'auto',
-    backfaceVisibility: 'hidden',
-    WebkitBackfaceVisibility: 'hidden'
-  }}
-></div>
-                      {/* 핸들 */}
-                      <div
-  className={`absolute bg-blue-500 border-2 border-white shadow-lg cursor-grab active:cursor-grabbing z-10 ${
-    isSliderDragging ? 'scale-110' : 'transition-all duration-150 ease-out hover:scale-105'
-  }`}
-  style={{
-    width: '24px',
-    height: '24px',
-    borderRadius: '50%',
-    left: `calc(12px + ${sliderValue} * (100% - 24px) / 100)`, // ← +12px 더하지 마세요!
-    top: 'calc(50% - 5px)',
-    pointerEvents: 'auto',
-    transform: 'translate(-50%, -50%)',
-    zIndex: 3,
-    willChange: isSliderDragging ? 'transform' : 'auto',
-    backfaceVisibility: 'hidden',
-    WebkitBackfaceVisibility: 'hidden'
-  }}
-></div>
+                        className={`absolute h-2 rounded-full ${
+                          isSliderDragging ? '' : 'transition-all duration-200 ease-out'
+                        }`}
+                        style={{
+                          top: '20%',
+                          left: '0',
+                          width: `${sliderValue}%`,
+                          transform: 'translateY(-50%)',
+                          maxWidth: '100%',
+                          backgroundColor: '#2C6BEE',
+                          zIndex: 2,
+                        }}
+                      />
+                      
+                                              {/* 핸들 */}
+                        <div
+                          className={`absolute w-5 h-5 border-2 rounded-full shadow-lg cursor-grab active:cursor-grabbing ${
+                            isSliderDragging ? 'scale-125' : 'transition-all duration-200 ease-out hover:scale-110'
+                          }`}
+                          style={{
+                            top: '-40%',
+                            left: `calc(${sliderValue}% - 5px)`,
+                            transform: 'translate(calc(-50% - 5px), -50%)',
+                            backgroundColor: '#2C6BEE',
+                            borderColor: '#2C6BEE',
+                            zIndex: 10,
+                          }}
+                        >
+                          {/* 핸들 내부 점 */}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 rounded-full" style={{backgroundColor: '#ffffff'}}></div>
+                          </div>
+                        </div>
                     </div>
-                    {/* 슬라이더 레이블 */}
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>시작</span>
-                      <span>{Math.round(sliderValue)}%</span>
-                      <span>종료</span>
+                    
+                    {/* 슬라이더 레이블 및 정보 */}
+                    <div className="flex justify-between items-center text-xs text-gray-500 mt-2 h-6">
+                      <div className="flex items-center justify-center h-full">
+                        <span className="text-xs">시작</span>
+                      </div>
+                      <div className="flex items-center justify-center px-2 py-1 rounded-full h-full" style={{backgroundColor: 'rgba(1, 19, 163, 0.1)'}}>
+                        <span className="font-semibold text-xs" style={{color: '#2C6BEE'}}>{Math.round(sliderValue)}%</span>
+                      </div>
+                      <div className="flex items-center justify-center h-full">
+                        <span className="text-xs">종료</span>
+                      </div>
                     </div>
                   </div>
+                  
+                  {/* 추가 정보 섹션 */}
+                  {/* <div className="mt-3 pt-3 border-t border-gray-100">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span className="text-gray-600">탐색 완료</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                          <span className="text-gray-600">미탐색 구간</span>
+                        </div>
+                      </div>
+                      <div className="text-gray-500">
+                        {isSliderDragging ? '🎯 경로 탐색 중...' : '👆 핸들을 드래그하여 경로 탐색'}
+                      </div>
+                    </div>
+                  </div> */}
                 </motion.div>
               </div>
             )}
@@ -7205,7 +7248,7 @@ export default function LogsPage() {
                 </div>
                 
                 <Suspense fallback={
-                  <div className="w-full px-4 py-3 rounded-xl bg-white border border-gray-200 animate-pulse">
+                  <div className="w-full px-4 rounded-xl bg-white border border-gray-200 animate-pulse">
                     <div className="flex items-center justify-between">
                       <div className="h-4 bg-gray-200 rounded flex-1 mr-2"></div>
                       <div className="w-4 h-4 bg-gray-200 rounded"></div>

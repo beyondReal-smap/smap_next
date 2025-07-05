@@ -218,7 +218,7 @@ export default function LogsLayout({
           /* 로그 페이지 버튼 위치 강제 설정 */
           .logs-page .logs-control-buttons {
             position: fixed !important;
-            bottom: 120px !important;
+            bottom: 90px !important;
             left: 16px !important;
             z-index: 9999 !important;
             transform: none !important;

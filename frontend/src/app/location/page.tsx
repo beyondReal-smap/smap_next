@@ -5957,7 +5957,7 @@ export default function LocationPage() {
                                         </motion.div>
                                       ))}
                                     </div>
-                                    {member.savedLocations.length > 5 && (
+                                    {member.savedLocations.length > 0 && (
                                       <div className="text-xs text-gray-400 text-center pt-2 border-t border-gray-200/50 mt-2">
                                         총 {member.savedLocations.length}개의 장소
                                       </div>

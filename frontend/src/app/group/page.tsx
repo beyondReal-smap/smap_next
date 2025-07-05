@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, Suspense, useCallback, useMemo, memo } from 'react';
+import { useState, useEffect, Suspense, useCallback, useMemo, memo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamicImport from 'next/dynamic';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import { 
   FaUsers, 
   FaLayerGroup, 
@@ -30,7 +30,7 @@ import {
   HiOutlineChevronLeft
 } from 'react-icons/hi2';
 import { RiKakaoTalkFill } from 'react-icons/ri';
-import { FiLink, FiX, FiCopy, FiSettings, FiPlus } from 'react-icons/fi';
+import { FiLink, FiX, FiCopy, FiSettings, FiPlus, FiUser, FiChevronDown } from 'react-icons/fi';
 import { MdOutlineMessage, MdGroupAdd } from 'react-icons/md';
 import { BsThreeDots } from 'react-icons/bs';
 import groupService, { Group, GroupStats } from '@/services/groupService';
@@ -42,6 +42,7 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 import authService from '@/services/authService';
 import { hapticFeedback } from '@/utils/haptic';
 import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
+import GroupSelector from '@/components/location/GroupSelector';
 
 // Dynamic imports for performance optimization
 const Modal = dynamicImport(() => import('@/components/ui/Modal'), {
@@ -121,6 +122,30 @@ const floatingButtonStyles = `
   backdrop-filter: blur(20px);
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* 사이드바 스크롤바 숨기기 */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 통일된 애니메이션 */
+.unified-animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 `;
 
@@ -500,6 +525,14 @@ function GroupPageContent() {
   const [isUpdatingGroup, setIsUpdatingGroup] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdatingMember, setIsUpdatingMember] = useState(false);
+
+  // 사이드바 관련 상태
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const sidebarDateX = useMotionValue(0);
+  const sidebarDraggingRef = useRef(false);
 
   // 그룹 목록 조회
   const fetchGroups = async () => {
@@ -1243,6 +1276,62 @@ function GroupPageContent() {
 
   const hideToastModal = () => {
     setToastModal(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // 사이드바 관련 함수들
+  const toggleSidebar = () => {
+    const newState = !isSidebarOpen;
+    setIsSidebarOpen(newState);
+    
+    // 햅틱 피드백
+    if (newState) {
+      hapticFeedback.homeSidebarOpen();
+      
+      // 사이드바가 열릴 때 기본적으로 첫 번째 그룹을 선택
+      if (groups.length > 0 && !selectedGroupId) {
+        const firstGroup = groups[0];
+        setSelectedGroupId(firstGroup.sgt_idx);
+        fetchGroupMembers(firstGroup);
+      }
+    } else {
+      hapticFeedback.homeSidebarClose();
+    }
+  };
+
+  const handleSidebarGroupSelect = async (groupId: number) => {
+    if (selectedGroupId !== groupId) {
+      setSelectedGroupId(groupId);
+      
+      // 선택된 그룹의 멤버들을 로드
+      const selectedGroup = groups.find(g => g.sgt_idx === groupId);
+      if (selectedGroup) {
+        await fetchGroupMembers(selectedGroup);
+      }
+      
+      // 그룹 선택 시 사이드바 닫기
+      setIsSidebarOpen(false);
+    }
+  };
+
+  // 사이드바 애니메이션 variants
+  const sidebarVariants = {
+    closed: { x: '-100%' },
+    open: { x: 0 }
+  };
+
+  const sidebarOverlayVariants = {
+    closed: { opacity: 0 },
+    open: { opacity: 1 }
+  };
+
+  const sidebarContentVariants = {
+    closed: { opacity: 0, x: -20 },
+    open: { opacity: 1, x: 0 }
+  };
+
+  const memberItemVariants = {
+    closed: { opacity: 0, y: 10 },
+    open: { opacity: 1, y: 0 }
   };
 
   // 🆕 캐시 데이터 확인 로그
@@ -2484,6 +2573,232 @@ function GroupPageContent() {
               </div>
             </motion.div>
           )}
+
+          {/* 플로팅 사이드바 토글 버튼 */}
+          <motion.button
+            initial={{ y: 100, opacity: 0, scale: 0.8 }}
+            animate={{ 
+              y: 0, 
+              opacity: 1, 
+              scale: 1,
+              transition: {
+                delay: 0.2,
+                type: "spring",
+                stiffness: 120,
+                damping: 25,
+                duration: 1.0
+              }
+            }}
+            whileHover={{ 
+              scale: 1.1,
+              y: -2,
+              transition: { duration: 0.2 }
+            }}
+            whileTap={{ scale: 0.9 }}
+            onClick={toggleSidebar}
+            data-floating-button
+            className="fixed bottom-24 right-4 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center z-50 floating-button"
+            style={{ backgroundColor: '#0113A3' }}
+          >
+            <motion.div
+              animate={{ rotate: isSidebarOpen ? 180 : 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <FiUser className="w-6 h-6 text-white" />
+            </motion.div>
+          </motion.button>
+
+          {/* 사이드바 */}
+          <AnimatePresence>
+            {isSidebarOpen && (
+              <>
+                {/* 오버레이 */}
+                <motion.div
+                  variants={sidebarOverlayVariants}
+                  initial="closed"
+                  animate="open"
+                  exit="closed"
+                  className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99995]"
+                  onClick={(e) => {
+                    // 플로팅 버튼 영역 클릭 시 사이드바 닫지 않음
+                    const target = e.target as HTMLElement;
+                    const floatingButton = document.querySelector('[data-floating-button]') as HTMLElement;
+                    if (floatingButton && floatingButton.contains(target)) {
+                      return;
+                    }
+                    setIsSidebarOpen(false);
+                  }}
+                  style={{
+                    // 모바일 사파리 최적화
+                    transform: 'translateZ(0)',
+                    willChange: 'opacity',
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden'
+                  }}
+                />
+                
+                {/* 사이드바 */}
+                <motion.div
+                  ref={sidebarRef}
+                  variants={sidebarVariants}
+                  initial="closed"
+                  animate="open"
+                  exit="closed"
+                  className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[99997] flex flex-col"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ 
+                    background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
+                    borderColor: 'rgba(1, 19, 163, 0.1)',
+                    height: 'calc(100vh - 40px)',
+                    // 모바일 사파리 최적화
+                    transform: 'translateZ(0)',
+                    willChange: 'transform',
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden',
+                    WebkitPerspective: 1000,
+                    WebkitTransform: 'translateZ(0)'
+                  }}
+                >
+                  <motion.div
+                    variants={sidebarContentVariants}
+                    initial="closed"
+                    animate="open"
+                    exit="closed"
+                    className="p-6 h-full flex flex-col relative z-10"
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)',
+                      paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)'
+                    }}
+                  >
+                    {/* 개선된 헤더 */}
+                    <div 
+                      className="flex items-center justify-between mb-6"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <motion.div 
+                          className="p-2 rounded-xl shadow-lg"
+                          style={{ backgroundColor: '#0113A3' }}
+                          whileHover={{ scale: 1.05, rotate: 5 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <FiUser className="w-5 h-5 text-white" />
+                        </motion.div>
+                        <div>
+                          <h2 className="text-xl font-bold bg-gray-900 bg-clip-text text-transparent">
+                            그룹 멤버
+                          </h2>
+                          <p className="text-sm text-gray-600">멤버를 선택해보세요</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 그룹 목록 섹션 */}
+                    <div className="mb-5">
+                      <div className="flex items-center space-x-2 mb-3">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#0113A3' }}></div>
+                        <h3 className="text-base font-semibold text-gray-800">그룹 목록</h3>
+                      </div>
+                      
+                      <div className="relative">
+                        <GroupSelector
+                          userGroups={groups}
+                          selectedGroupId={selectedGroupId}
+                          isGroupSelectorOpen={isGroupSelectorOpen}
+                          groupMemberCounts={groupMemberCounts}
+                          onOpen={() => setIsGroupSelectorOpen(true)}
+                          onClose={() => setIsGroupSelectorOpen(false)}
+                          onGroupSelect={(groupId) => {
+                            if (selectedGroupId !== groupId) {
+                              handleSidebarGroupSelect(groupId);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 그룹 멤버 목록 */}
+                    <div className="flex-1 min-h-0">
+                      <div className="flex items-center space-x-2 mb-4">
+                        <div className="w-2 h-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full"></div>
+                        <h3 className="text-base font-semibold text-gray-800">멤버 목록</h3>
+                        <div className="flex-1 h-px bg-gradient-to-r from-emerald-200/50 to-transparent"></div>
+                        <span className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-full backdrop-blur-sm">
+                          {groupMembers ? groupMembers.length : 0}명
+                        </span>
+                      </div>
+                      <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-24">
+                        {groupMembers && Array.isArray(groupMembers) && groupMembers.length > 0 ? (
+                          <motion.div variants={sidebarContentVariants} className="space-y-2">
+                            {groupMembers.map((member, index) => (
+                              <motion.div
+                                key={member.mt_idx}
+                                variants={memberItemVariants}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => {
+                                  handleMemberClick(member);
+                                  setIsSidebarOpen(false); // 멤버 선택 후 사이드바 닫기
+                                }}
+                                className="p-4 rounded-xl cursor-pointer transition-all duration-300 backdrop-blur-sm bg-white/60 hover:bg-white/90 border hover:shadow-md"
+                                style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}
+                              >
+                                <div className="flex items-center space-x-4">
+                                  <div className="relative">
+                                    <motion.div 
+                                      className="w-12 h-12 rounded-full overflow-hidden ring-2 ring-white/50"
+                                      transition={{ type: "spring", stiffness: 300 }}
+                                    >
+                                      <img 
+                                        src={getSafeImageUrl(member.photo || null, member.mt_gender, member.original_index)}
+                                        alt={member.mt_nickname || member.mt_name}
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => {
+                                          e.currentTarget.src = getDefaultImage(member.mt_gender, member.original_index);
+                                        }}
+                                      />
+                                    </motion.div>
+                                    {member.sgdt_owner_chk === 'Y' && (
+                                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center">
+                                        <FaCrown className="w-3 h-3 text-white" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center space-x-2">
+                                      <h4 className="text-sm font-semibold text-gray-900 truncate">
+                                        {member.mt_nickname || member.mt_name}
+                                      </h4>
+                                      {member.sgdt_leader_chk === 'Y' && (
+                                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                                          리더
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      {member.mt_email || '이메일 없음'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </motion.div>
+                            ))}
+                          </motion.div>
+                        ) : (
+                          <div className="text-center py-8">
+                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <FiUser className="w-8 h-8 text-gray-400" />
+                            </div>
+                            <p className="text-gray-500 text-sm">멤버가 없습니다</p>
+                            <p className="text-gray-400 text-xs mt-1">그룹을 선택해주세요</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </AnimatePresence>
       </div>
     </>
