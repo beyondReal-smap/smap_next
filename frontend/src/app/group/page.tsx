@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense, useCallback, useMemo, memo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamicImport from 'next/dynamic';
 import Image from 'next/image';
@@ -44,12 +44,12 @@ import { hapticFeedback } from '@/utils/haptic';
 import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
 import GroupSelector from '@/components/location/GroupSelector';
 
-// Dynamic imports for performance optimization
+// Dynamic imports for performance optimization - 로딩 컴포넌트 제거
 const Modal = dynamicImport(() => import('@/components/ui/Modal'), {
-  loading: () => <div className="animate-pulse bg-gray-200 rounded-lg h-32" />
+  ssr: false
 });
 const AnimatedHeader = dynamicImport(() => import('../../components/common/AnimatedHeader'), {
-  loading: () => <div className="h-14 bg-white/95 backdrop-blur-sm" />
+  ssr: false
 });
 
 export const dynamic = 'force-dynamic';
@@ -789,51 +789,26 @@ function GroupPageContent() {
     }
   };
 
-  // 인증 상태 확인 및 초기 데이터 로드
+  // 인증 상태 확인 및 초기 데이터 로드 - 간소화
   useEffect(() => {
     const initializeAuth = async () => {
-      // 인증 로딩 중이면 대기
+      console.log('[GROUP] 인증 상태 확인:', { isLoggedIn, user: user?.mt_idx, authLoading });
+
+      // 인증 로딩 중이면 잠시 대기
       if (authLoading) {
-        console.log('[GROUP] 인증 로딩 중...');
         return;
       }
 
-      console.log('[GROUP] 인증 상태 확인:', { isLoggedIn, user: user?.mt_idx });
-
-      // 추가 인증 상태 확인 (localStorage 직접 확인)
-      const hasToken = authService.getToken();
-      const hasUserData = authService.getUserData();
-      
-      console.log('[GROUP] 인증 데이터 상세 확인:', {
-        authContextLoggedIn: isLoggedIn,
-        hasToken: !!hasToken,
-        hasUserData: !!hasUserData,
-        contextUser: user?.mt_idx,
-        localUser: hasUserData?.mt_idx
-      });
-
-      // AuthContext와 localStorage 모두에서 인증 정보가 없을 때만 리다이렉트
-      if (!isLoggedIn && !hasToken && !hasUserData) {
-        console.log('[GROUP] 완전히 로그인되지 않음 - signin 페이지로 리다이렉트');
+      // 로그인되지 않은 경우 리다이렉트
+      if (!isLoggedIn && !authService.getToken()) {
+        console.log('[GROUP] 로그인되지 않음 - signin 페이지로 리다이렉트');
         router.push('/signin');
         return;
       }
-      
-      // AuthContext는 로그인 안됐지만 localStorage에 데이터가 있다면 동기화 대기
-      if (!isLoggedIn && (hasToken || hasUserData)) {
-        console.log('[GROUP] AuthContext 동기화 필요 - 잠시 대기 후 다시 확인');
-        // 동기화를 위해 잠시 대기
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // 동기화 후 다시 확인
-        console.log('[GROUP] 동기화 대기 완료, 다시 상태 확인');
-        return; // 다음 렌더링에서 다시 확인
-      }
 
-      // 사용자 정보가 있는 경우 그룹 데이터 로드 (AuthContext 또는 localStorage에서)
-      const currentUser = user || hasUserData;
-      if (currentUser) {
-        console.log('[GROUP] 사용자 정보 확인됨, 그룹 데이터 로드:', currentUser.mt_idx);
+      // 사용자 정보가 있으면 그룹 데이터 로드
+      if (isLoggedIn || authService.getToken()) {
+        console.log('[GROUP] 그룹 데이터 로드 시작');
         fetchGroups();
       }
     };
@@ -2829,11 +2804,7 @@ function GroupPageContent() {
   );
 }
 
-// Suspense로 감싸는 기본 export 함수
-export default function GroupPageWithSuspense() {
-  return (
-    <Suspense fallback={<IOSCompatibleSpinner message="로딩 중..." fullScreen />}> 
-      <GroupPageContent />
-    </Suspense>
-  );
+// 기본 export 함수 - Suspense 제거
+export default function GroupPage() {
+  return <GroupPageContent />;
 }

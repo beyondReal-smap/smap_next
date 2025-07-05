@@ -593,9 +593,23 @@ nav[style*="position:fixed"][id="bottom-navigation-bar"] {
 /* home 페이지 */
 [data-page="/home"] #bottom-navigation-bar,
 .home-page #bottom-navigation-bar,
-#home-page-container #bottom-navigation-bar {
-  bottom: 40px !important;
+#home-page-container #bottom-navigation-bar,
+body[data-page="/home"] #bottom-navigation-bar,
+html[data-page="/home"] #bottom-navigation-bar {
+  bottom: 0px !important;
   position: fixed !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 10000 !important;
+  left: 0px !important;
+  right: 0px !important;
+  width: 100% !important;
+  background-color: white !important;
+  border-top: 1px solid #e5e7eb !important;
+  transform: none !important;
+  -webkit-transform: none !important;
 }
 
 /* group 페이지 - 네비게이션 바를 40px 위로 */

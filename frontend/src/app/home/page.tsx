@@ -1049,6 +1049,25 @@ export default function HomePage() {
       setCriticalError(`환경 초기화 오류: ${error}`);
     }
   }, []);
+
+  // 홈 페이지임을 명시하기 위한 body 속성 설정
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.body.setAttribute('data-page', '/home');
+      document.documentElement.setAttribute('data-page', '/home');
+      // 네비게이션 바가 표시되도록 클래스 제거
+      document.body.classList.remove('hide-bottom-nav');
+      console.log('🏠 [HOME] 홈 페이지 body 속성 설정 완료');
+    }
+    
+    return () => {
+      if (typeof document !== 'undefined') {
+        document.body.removeAttribute('data-page');
+        document.documentElement.removeAttribute('data-page');
+        console.log('🏠 [HOME] 홈 페이지 body 속성 제거 완료');
+      }
+    };
+  }, []);
   
   // useEffect를 사용하여 클라이언트 사이드에서 날짜 관련 상태 초기화
   useEffect(() => {
@@ -5361,6 +5380,8 @@ export default function HomePage() {
     );
   }
 
+
+
   // 🛡️ 안전한 렌더링
   try {
     return (
@@ -5371,8 +5392,12 @@ export default function HomePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           className="min-h-screen relative overflow-hidden"
-          style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
+          style={{ 
+            background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
+            paddingBottom: '76px' // 네비게이션 바를 위한 하단 여백
+          }}
           data-react-mount="true"
+          data-page="/home"
           id="home-page-container"
         >
         {/* 통일된 헤더 애니메이션 */}
