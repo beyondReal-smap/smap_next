@@ -72,25 +72,43 @@ export default function BottomNavBar() {
         }
         
         // 1. 인라인 스타일 강제 설정
-        bottomNav.style.setProperty('position', 'fixed', 'important');
-        bottomNav.style.setProperty('bottom', targetBottom, 'important');
-        bottomNav.style.setProperty('top', 'auto', 'important');
-        bottomNav.style.setProperty('left', '0px', 'important');
-        bottomNav.style.setProperty('right', '0px', 'important');
-        bottomNav.style.setProperty('width', '100%', 'important');
-        bottomNav.style.setProperty('height', '40px', 'important');
-        bottomNav.style.setProperty('z-index', '999999', 'important');
-        bottomNav.style.setProperty('transform', 'none', 'important');
-        bottomNav.style.setProperty('-webkit-transform', 'none', 'important');
-        bottomNav.style.setProperty('animation', 'none', 'important');
-        bottomNav.style.setProperty('transition', 'none', 'important');
+        // 가장 강력한 방법으로 위치 강제 설정
+        bottomNav.setAttribute('style', `
+          position: fixed !important;
+          bottom: ${targetBottom} !important;
+          left: 0px !important;
+          right: 0px !important;
+          top: auto !important;
+          width: 100% !important;
+          height: auto !important;
+          min-height: 70px !important;
+          z-index: 999999 !important;
+          transform: none !important;
+          -webkit-transform: none !important;
+          animation: none !important;
+          transition: none !important;
+          display: block !important;
+          visibility: visible !important;
+          opacity: 1 !important;
+          background-color: white !important;
+          border-top: 1px solid #e5e7eb !important;
+          box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+          border-top-left-radius: 16px !important;
+          border-top-right-radius: 16px !important;
+          padding-top: 12px !important;
+          padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+          margin: 0px !important;
+        `);
         
         // 2. 클래스 강제 추가
         bottomNav.classList.add('forced-bottom-nav', 'position-fixed-bottom');
         bottomNav.setAttribute('data-forced-position', 'bottom-fixed');
         bottomNav.setAttribute('data-bottom', targetBottom.replace('px', ''));
         
-        console.log(`[BottomNavBar] 네비게이션 바 위치 조정 완료 (${targetBottom}) - 페이지: ${currentPath}`);
+        // 로그를 줄여서 무한반복 방지 (10% 확률로만 출력)
+        if (Math.random() < 0.1) {
+          console.log(`[BottomNavBar] 위치 조정 완료: ${targetBottom}`);
+        }
       }
     };
 
@@ -104,7 +122,7 @@ export default function BottomNavBar() {
                       if (target.id === 'bottom-navigation-bar') {
               const style = target.style;
               const currentPath = window.location.pathname;
-              const expectedBottom = ['/home', '/group', '/schedule', '/logs', '/location'].includes(currentPath) ? '40px' : '40px';
+              const expectedBottom = ['/home', '/group', '/schedule', '/logs', '/location'].includes(currentPath) ? '0px' : '0px';
               
               if (style.bottom !== expectedBottom || style.position !== 'fixed') {
                 needsForce = true;
@@ -121,8 +139,23 @@ export default function BottomNavBar() {
     // 즉시 실행
     forceBottomNavPosition();
     
-    // 일반 주기적 체크만 (빠른 체크 제거)
-    const normalInterval = setInterval(forceBottomNavPosition, 10000); // 10초마다로 변경
+    // 필요시에만 체크 (무한반복 방지)
+    const normalInterval = setInterval(() => {
+      const navBar = document.getElementById('bottom-navigation-bar');
+      if (navBar) {
+        const computedStyle = window.getComputedStyle(navBar);
+        const isCorrectlyPositioned = 
+          computedStyle.position === 'fixed' && 
+          computedStyle.bottom === '0px' && 
+          computedStyle.zIndex === '999999';
+        
+        // 위치가 잘못된 경우에만 수정
+        if (!isCorrectlyPositioned) {
+          console.log('[BottomNavBar] 위치 수정 필요, 강제 보정 실행');
+          forceBottomNavPosition();
+        }
+      }
+    }, 10000); // 10초마다만 체크
 
     // DOM 감시 시작 (제한적으로)
     const targetElement = document.getElementById('bottom-navigation-bar');
@@ -148,6 +181,53 @@ export default function BottomNavBar() {
       clearInterval(normalInterval);
       observer.disconnect();
     };
+  }, []);
+  
+  // 컴포넌트 마운트 후 한 번만 강제 설정 (무한반복 방지)
+  useEffect(() => {
+    const ensurePosition = () => {
+      const element = document.getElementById('bottom-navigation-bar');
+      if (element) {
+        const computedStyle = window.getComputedStyle(element);
+        const isCorrectlyPositioned = 
+          computedStyle.position === 'fixed' && 
+          computedStyle.bottom === '0px' && 
+          computedStyle.zIndex === '999999';
+        
+        if (!isCorrectlyPositioned) {
+          element.style.cssText = `
+            position: fixed !important;
+            bottom: 0px !important;
+            left: 0px !important;
+            right: 0px !important;
+            top: auto !important;
+            width: 100% !important;
+            height: auto !important;
+            min-height: 70px !important;
+            z-index: 999999 !important;
+            transform: none !important;
+            -webkit-transform: none !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            background-color: white !important;
+            border-top: 1px solid #e5e7eb !important;
+            box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+            border-top-left-radius: 16px !important;
+            border-top-right-radius: 16px !important;
+            padding-top: 12px !important;
+            padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+            margin: 0px !important;
+          `;
+          console.log('[BottomNavBar] 마운트 후 위치 수정 완료');
+        } else {
+          console.log('[BottomNavBar] 마운트 후 위치 정상 확인됨');
+        }
+      }
+    };
+    
+    // 마운트 후 한 번만 실행
+    setTimeout(ensurePosition, 500);
   }, []);
   
   // 네비게이션 메뉴 아이템
@@ -178,31 +258,27 @@ export default function BottomNavBar() {
       className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0"
       id="bottom-navigation-bar"
       style={{
-        position: 'fixed !important' as any,
-        bottom: '0px !important',
-        left: '0px !important',
-        right: '0px !important',
-        zIndex: 999,
+        position: 'fixed',
+        bottom: '0px',
+        left: '0px',
+        right: '0px',
+        zIndex: 999999,
         backgroundColor: 'white',
         borderTop: '1px solid #e5e7eb',
         boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
-        transform: 'translate3d(0, 0, 0)',
-        WebkitTransform: 'translate3d(0, 0, 0)',
-        backfaceVisibility: 'hidden',
-        WebkitBackfaceVisibility: 'hidden',
         borderTopLeftRadius: '16px',
         borderTopRightRadius: '16px',
-        borderRadius: '16px 16px 0 0',
-        overflow: 'visible',
-        willChange: 'auto',
-        paddingTop: '0px',
         margin: '0px',
-        height: '40px',
-        minHeight: '40px',
-        maxHeight: '40px',
-        // Safe Area 무시하고 완전히 하단에 붙이기
-        marginBottom: 'calc(-1 * env(safe-area-inset-bottom))',
-        paddingBottom: 'calc(0px + env(safe-area-inset-bottom))'
+        height: 'auto',
+        minHeight: '70px',
+        paddingTop: '12px',
+        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+        display: 'block',
+        visibility: 'visible',
+        opacity: 1,
+        transform: 'none',
+        WebkitTransform: 'none',
+        width: '100%'
       }}
     >
       <nav className="flex justify-around items-center px-2 m-0 p-0" style={{ margin: '0 !important', padding: '0 !important' }}>

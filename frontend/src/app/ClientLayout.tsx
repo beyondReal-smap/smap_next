@@ -205,16 +205,35 @@ export default function ClientLayout({
   }
 
   return (
-    <DataCacheProvider>
-      <AuthProvider>
-        <UserProvider>
-          <AuthGuard>
-            {children}
-            {!shouldHideNavBar && <BottomNavBar />}
-            {/* <PerformanceMonitor /> */}
-          </AuthGuard>
-        </UserProvider>
-      </AuthProvider>
-    </DataCacheProvider>
+    <>
+      <DataCacheProvider>
+        <AuthProvider>
+          <UserProvider>
+            <AuthGuard>
+              {children}
+              {/* <PerformanceMonitor /> */}
+            </AuthGuard>
+          </UserProvider>
+        </AuthProvider>
+      </DataCacheProvider>
+      
+      {/* 네비게이션 바를 최상위 레벨에서 렌더링하여 확실한 위치 고정 */}
+      {!shouldHideNavBar && (
+        <div 
+          style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 999999,
+            pointerEvents: 'none'
+          }}
+        >
+          <div style={{ pointerEvents: 'auto' }}>
+            <BottomNavBar />
+          </div>
+        </div>
+      )}
+    </>
   );
 } 

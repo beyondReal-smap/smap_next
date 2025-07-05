@@ -1057,6 +1057,62 @@ export default function HomePage() {
       document.documentElement.setAttribute('data-page', '/home');
       // 네비게이션 바가 표시되도록 클래스 제거
       document.body.classList.remove('hide-bottom-nav');
+      
+      // 네비게이션 바 위치 한 번만 강제 설정 (무한반복 방지)
+      const forceNavBarPosition = () => {
+        const navBar = document.getElementById('bottom-navigation-bar');
+        if (navBar) {
+          // 이미 올바르게 설정되어 있는지 확인
+          const computedStyle = window.getComputedStyle(navBar);
+          const isCorrectlyPositioned = 
+            computedStyle.position === 'fixed' && 
+            computedStyle.bottom === '0px' && 
+            computedStyle.zIndex === '999999';
+          
+          if (!isCorrectlyPositioned) {
+            console.log('🏠 [HOME] 네비게이션 바 위치 수정 필요:', {
+              position: computedStyle.position,
+              bottom: computedStyle.bottom,
+              zIndex: computedStyle.zIndex
+            });
+            
+            // 한 번만 강제로 위치 설정
+            navBar.style.cssText = `
+              position: fixed !important;
+              bottom: 0px !important;
+              left: 0px !important;
+              right: 0px !important;
+              top: auto !important;
+              width: 100% !important;
+              height: auto !important;
+              min-height: 70px !important;
+              z-index: 999999 !important;
+              transform: none !important;
+              -webkit-transform: none !important;
+              display: block !important;
+              visibility: visible !important;
+              opacity: 1 !important;
+              background-color: white !important;
+              border-top: 1px solid #e5e7eb !important;
+              box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+              border-top-left-radius: 16px !important;
+              border-top-right-radius: 16px !important;
+              padding-top: 12px !important;
+              padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+              margin: 0px !important;
+            `;
+            
+            navBar.classList.add('forced-fixed-bottom');
+            console.log('🏠 [HOME] 네비게이션 바 위치 수정 완료');
+          } else {
+            console.log('🏠 [HOME] 네비게이션 바 위치 정상 확인됨');
+          }
+        }
+      };
+      
+      // 초기 설정만 실행 (무한반복 방지)
+      setTimeout(forceNavBarPosition, 1000);
+      
       console.log('🏠 [HOME] 홈 페이지 body 속성 설정 완료');
     }
     
@@ -5394,7 +5450,7 @@ export default function HomePage() {
           className="min-h-screen relative overflow-hidden"
           style={{ 
             background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
-            paddingBottom: '76px' // 네비게이션 바를 위한 하단 여백
+            paddingBottom: '90px' // 네비게이션 바를 위한 하단 여백 (높이 증가로 인한 조정)
           }}
           data-react-mount="true"
           data-page="/home"

@@ -81,6 +81,18 @@ html {
 @supports (padding: max(0px)) {
   .header-fixed {
     padding-top: env(safe-area-inset-top) !important;
+    /* 헤더 드래그 방지 */
+    touch-action: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+    pointer-events: auto !important;
+  }
+  
+  /* 헤더 내부 요소들의 터치 이벤트는 허용 */
+  .header-fixed * {
+    touch-action: auto !important;
+    pointer-events: auto !important;
   }
   
   .navigation-fixed {
@@ -154,6 +166,14 @@ input:focus, select:focus, textarea:focus {
 .map-container-full {
   @apply -mt-6;
   margin-top: -24px !important;
+  z-index: 1 !important;
+  position: relative !important;
+}
+
+/* 지도 컨테이너가 네비게이션 바를 가리지 않도록 */
+.full-map-container {
+  z-index: 1 !important;
+  position: relative !important;
 }
 
 /* 반응형 타이포그래피 */
@@ -590,26 +610,43 @@ nav[style*="position:fixed"][id="bottom-navigation-bar"] {
 }
 
 /* 🔥 NEW: 페이지별 강제 스타일 덮어쓰기 */
-/* home 페이지 */
+/* 🔥 홈 페이지 전용 네비게이션 바 강제 위치 설정 */
 [data-page="/home"] #bottom-navigation-bar,
 .home-page #bottom-navigation-bar,
 #home-page-container #bottom-navigation-bar,
 body[data-page="/home"] #bottom-navigation-bar,
-html[data-page="/home"] #bottom-navigation-bar {
-  bottom: 0px !important;
+html[data-page="/home"] #bottom-navigation-bar,
+html body[data-page="/home"] #bottom-navigation-bar {
   position: fixed !important;
+  bottom: 0px !important;
+  left: 0px !important;
+  right: 0px !important;
+  top: auto !important;
+  z-index: 999999 !important;
+  width: 100vw !important;
+  height: auto !important;
+  min-height: 70px !important;
+  max-height: none !important;
+  margin: 0px !important;
+  padding-top: 12px !important;
+  padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  translate: none !important;
+  animation: none !important;
+  transition: none !important;
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
   pointer-events: auto !important;
-  z-index: 10000 !important;
-  left: 0px !important;
-  right: 0px !important;
-  width: 100% !important;
   background-color: white !important;
   border-top: 1px solid #e5e7eb !important;
-  transform: none !important;
-  -webkit-transform: none !important;
+  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  overflow: visible !important;
+  contain: none !important;
+  will-change: auto !important;
 }
 
 /* group 페이지 - 네비게이션 바를 40px 위로 */
@@ -674,12 +711,20 @@ body[data-page="/location"] nav,
   bottom: 40px !important;
   left: 0px !important;
   right: 0px !important;
-  z-index: 10000 !important;
+  z-index: 999999 !important;
+}
+
+/* 홈 페이지 네비게이션 바 강제 상단 배치 */
+[data-page="/home"] .bottom-navigation-fixed {
+  bottom: 0px !important;
+  z-index: 999999 !important;
 }
 
 /* 모든 네비게이션 요소에 클래스 강제 적용 */
 #bottom-navigation-bar {
   @apply bottom-navigation-fixed;
+  z-index: 999999 !important;
+  position: fixed !important;
 }
 
 /* schedule 페이지 전용 스타일 */
@@ -1512,4 +1557,57 @@ html, body, #__next, .min-h-screen {
 [id="bottom-navigation-bar"] {
   position: var(--bottom-navigation-position, fixed) !important;
   bottom: var(--bottom-navigation-bottom, 0px) !important;
+}
+
+/* 🔥🔥🔥 최종 보장: 모든 상황에서 네비게이션 바 화면 하단 고정 🔥🔥🔥 */
+#bottom-navigation-bar {
+  position: fixed !important;
+  bottom: 0px !important;
+  left: 0px !important;
+  right: 0px !important;
+  width: 100% !important;
+  z-index: 999999 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+}
+
+/* 인라인 스타일이 있어도 강제 덮어쓰기 */
+#bottom-navigation-bar[style] {
+  position: fixed !important;
+  bottom: 0px !important;
+  transform: none !important;
+}
+
+/* JavaScript로 설정된 모든 transform 무효화 */
+#bottom-navigation-bar[style*="transform"] {
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+/* 🔥🔥🔥 홈 페이지에서 추가한 강제 클래스 🔥🔥🔥 */
+.forced-fixed-bottom,
+#bottom-navigation-bar.forced-fixed-bottom {
+  position: fixed !important;
+  bottom: 0px !important;
+  left: 0px !important;
+  right: 0px !important;
+  top: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 70px !important;
+  z-index: 999999 !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  margin: 0px !important;
+  contain: none !important;
+}
+
+/* 절대적으로 최후 수단 */
+html body #bottom-navigation-bar {
+  position: fixed !important;
+  bottom: 0px !important;
+  z-index: 999999 !important;
 }
