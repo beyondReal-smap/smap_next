@@ -5099,7 +5099,7 @@ export default function LocationPage() {
           style={{
             background: '#0113A3',
             boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
-                          bottom: 'calc(48px + 20px)' // 네비게이션 바(48px) + 여유공간(20px)
+                          bottom: 'calc(48px + 40px)' // 네비게이션 바(48px) + 여유공간(50px) - 30px 위로 올림
           }}
         >
           {isSidebarOpen ? (

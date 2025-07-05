@@ -5678,11 +5678,20 @@ export default function LogsPage() {
     }
     
     const wasOpen = isSidebarOpen;
-    setIsSidebarOpen(!isSidebarOpen);
     
     if (wasOpen) {
+      // 닫기 상태 설정하여 중복 처리 방지
+      sidebarClosingRef.current = true;
+      
+      setIsSidebarOpen(false);
       console.log('[사이드바] 플로팅 버튼으로 닫기');
+      
+      // 일정 시간 후 닫기 상태 해제
+      setTimeout(() => {
+        sidebarClosingRef.current = false;
+      }, 500);
     } else {
+      setIsSidebarOpen(true);
       console.log('[사이드바] 플로팅 버튼으로 열기');
       // 사이드바가 열릴 때 선택된 멤버로 스크롤하고 선택된 날짜로 스크롤 조정
       setTimeout(() => {
@@ -5725,7 +5734,17 @@ export default function LogsPage() {
       
       if (isSidebarOpen && sidebarRef.current && !sidebarRef.current.contains(target)) {
         console.log('[사이드바] 외부 클릭/터치 감지 - 사이드바 닫기');
+        
+        // 닫기 상태 설정하여 중복 처리 방지
+        sidebarClosingRef.current = true;
+        
+        // 사이드바 닫기
         setIsSidebarOpen(false);
+        
+        // 일정 시간 후 닫기 상태 해제
+        setTimeout(() => {
+          sidebarClosingRef.current = false;
+        }, 500);
       }
     };
 
@@ -6977,95 +6996,101 @@ export default function LogsPage() {
                     boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.05)',
                     backdropFilter: 'blur(20px)',
                     width: 'auto',
-                    minWidth: '320px'
+                    minWidth: '380px'
                   }}
                 >
                   {/* 배경 장식 */}
                   <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full -translate-y-12 translate-x-12 opacity-60"></div>
                   
                   <div className="relative flex items-center space-x-4">
-  {/* 멤버 프로필 영역 */}
-  <div className="flex items-center space-x-3 pb-1">
-    <div className="relative">
-      <div className="w-9 h-9 mb-2 rounded-full overflow-hidden ring-2 ring-white shadow bg-gradient-to-br from-gray-100 to-gray-200">
-        <Image 
-          src={(() => {
-            const member = groupMembers.find(m => m.isSelected);
-            return member ? getSafeImageUrl(member.photo, member.mt_gender, member.original_index) : '';
-          })()}
-          alt={groupMembers.find(m => m.isSelected)?.name || ''} 
-          width={32}
-          height={32}
-          className="w-full h-full object-cover"
-          priority={true}
-          placeholder="blur"
-          blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
-          onError={(e) => {
-            const img = e.target as HTMLImageElement;
-            const member = groupMembers.find(m => m.isSelected);
-            if (member) {
-              const fallbackUrl = getDefaultImage(member.mt_gender, member.original_index);
-              if (img.src !== fallbackUrl) {
-                img.src = fallbackUrl;
-              }
-            }
-          }}
-        />
-      </div>
-      <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 border-2 border-white rounded-full shadow-md"></div>
-    </div>
-    <div className="flex flex-col">
-      <div className="flex items-center space-x-1.5">
-        <span className="text-sm font-bold text-gray-900">
-          {groupMembers.find(m => m.isSelected)?.name}
-        </span>
-        <span className="text-xs text-gray-400">의 기록</span>
-      </div>
-      <div className="flex items-center space-x-1 mt-0.5">
-        <span className="text-xs font-medium text-blue-500">
-          📅 {format(new Date(selectedDate), 'MM월 dd일 (E)', { locale: ko })}
-        </span>
-      </div>
-    </div>
-  </div>
+                    {/* 멤버 프로필 영역 */}
+                    <div className="flex items-center space-x-3 pb-1">
+                      <div className="relative">
+                        <div className="w-9 h-9 mb-2 rounded-full overflow-hidden ring-2 ring-white shadow bg-gradient-to-br from-gray-100 to-gray-200">
+                          <Image 
+                            src={(() => {
+                              const member = groupMembers.find(m => m.isSelected);
+                              return member ? getSafeImageUrl(member.photo, member.mt_gender, member.original_index) : '';
+                            })()}
+                            alt={groupMembers.find(m => m.isSelected)?.name || ''} 
+                            width={32}
+                            height={32}
+                            className="w-full h-full object-cover"
+                            priority={true}
+                            placeholder="blur"
+                            blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R+Kic6LbqN1NzKhDFl3HI7L7IlJWK3jKYBaKJmVdJKhg1Qg8yKjfpYZaGu7WZPYwNAR4vTYK5AAAAABJRU5ErkJggg=="
+                            onError={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              const member = groupMembers.find(m => m.isSelected);
+                              if (member) {
+                                const fallbackUrl = getDefaultImage(member.mt_gender, member.original_index);
+                                if (img.src !== fallbackUrl) {
+                                  img.src = fallbackUrl;
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-green-400 border-2 border-white rounded-full shadow-md"></div>
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="text-sm font-bold text-gray-900">
+                            {groupMembers.find(m => m.isSelected)?.name}
+                          </span>
+                          <span className="text-xs text-gray-400">의 기록</span>
+                        </div>
+                        <div className="flex items-center space-x-1 mt-0.5">
+                          <span className="text-xs font-medium text-blue-500" style={{ minWidth: '85px' }}>
+                            📅 {format(new Date(selectedDate), 'MM월 dd일 (E)', { locale: ko })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
 
-  {/* 구분선 */}
-  <div className="w-px h-8 bg-gradient-to-b from-transparent via-gray-200 to-transparent"></div>
+                    {/* 구분선 */}
+                    <div className="w-px h-8 bg-gradient-to-b from-transparent via-gray-200 to-transparent"></div>
 
-  {/* 통계 영역 2단 구조 */}
-  {(isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) ? (
-    <div className="flex items-center justify-center py-2 px-4">
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-      >
-        <FiLoader className="w-4 h-4 text-blue-500" />
-      </motion.div>
-      <span className="ml-2 text-xs text-gray-500">로딩 중...</span>
-    </div>
-  ) : (
-    <div className="flex items-center space-x-4">
-      <div className="flex flex-col items-center justify-center">
-        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center mb-0.5">
-          <FiTrendingUp className="w-2.5 h-2.5 text-white" />
-        </div>
-        <span className="text-xs font-semibold text-gray-700">{locationSummary.distance}</span>
-      </div>
-      <div className="flex flex-col items-center justify-center">
-        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center mb-0.5">
-          <FiClock className="w-2.5 h-2.5 text-white" />
-        </div>
-        <span className="text-xs font-semibold text-gray-700">{locationSummary.time}</span>
-      </div>
-      <div className="flex flex-col items-center justify-center">
-        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-400 to-green-500 flex items-center justify-center mb-0.5">
-          <FiZap className="w-2.5 h-2.5 text-white" />
-        </div>
-        <span className="text-xs font-semibold text-gray-700">{locationSummary.steps}</span>
-      </div>
-    </div>
-  )}
-</div>
+                    {/* 통계 영역 2단 구조 */}
+                    {(isLocationDataLoading || isDailyCountsLoading || isMemberActivityLoading) ? (
+                      <div className="flex items-center justify-center py-2 px-4">
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        >
+                          <FiLoader className="w-4 h-4 text-blue-500" />
+                        </motion.div>
+                        <span className="ml-2 text-xs text-gray-500">로딩 중...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-3">
+                        <div className="flex flex-col items-center justify-center" style={{ minWidth: '50px' }}>
+                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center mb-0.5">
+                            <FiTrendingUp className="w-2.5 h-2.5 text-white" />
+                          </div>
+                          <span className="text-xs font-semibold text-gray-700 whitespace-nowrap" style={{ minWidth: '50px', textAlign: 'center' }}>
+                            {locationSummary.distance}
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center" style={{ minWidth: '45px' }}>
+                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center mb-0.5">
+                            <FiClock className="w-2.5 h-2.5 text-white" />
+                          </div>
+                          <span className="text-xs font-semibold text-gray-700 whitespace-nowrap" style={{ minWidth: '45px', textAlign: 'center' }}>
+                            {locationSummary.time}
+                          </span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center" style={{ minWidth: '55px' }}>
+                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-400 to-green-500 flex items-center justify-center mb-0.5">
+                            <FiZap className="w-2.5 h-2.5 text-white" />
+                          </div>
+                          <span className="text-xs font-semibold text-gray-700 whitespace-nowrap" style={{ minWidth: '55px', textAlign: 'center' }}>
+                            {locationSummary.steps}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </motion.div>
               </motion.div>
             )}
@@ -7232,9 +7257,21 @@ export default function LogsPage() {
         {/* 알림 배지 (그룹멤버 수) */}
         {groupMembers.length > 0 && !isSidebarOpen && (
           <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
+            initial={{ scale: 0, x: 0, y: 0 }}
+            animate={{ scale: 1, x: 0, y: 0 }}
+            exit={{ scale: 0 }}
+            transition={{ 
+              type: "spring", 
+              stiffness: 300, 
+              damping: 25,
+              duration: 0.3 
+            }}
             className="absolute -top-1 -right-1 w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center"
+            style={{
+              transformOrigin: 'center',
+              top: '-4px',
+              right: '-4px'
+            }}
           >
             <span className="text-xs font-bold text-white">{groupMembers.length}</span>
           </motion.div>
@@ -7276,7 +7313,17 @@ export default function LogsPage() {
                 console.log('[사이드바] 드롭다운이 열려있어서 사이드바 닫기 취소');
                 return;
               }
+              
+              // 닫기 상태 설정하여 중복 처리 방지
+              sidebarClosingRef.current = true;
+              
+              // 사이드바 닫기
               setIsSidebarOpen(false);
+              
+              // 일정 시간 후 닫기 상태 해제
+              setTimeout(() => {
+                sidebarClosingRef.current = false;
+              }, 500);
             }}
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.preventDefault()}
@@ -7356,8 +7403,16 @@ export default function LogsPage() {
                         e.stopPropagation();
                         console.log('[사이드바] X 버튼으로 닫기');
                         
-                        // 외부 클릭과 동일하게 단순히 사이드바만 닫기
+                        // 닫기 상태 설정하여 중복 처리 방지
+                        sidebarClosingRef.current = true;
+                        
+                        // 사이드바 닫기
                         setIsSidebarOpen(false);
+                        
+                        // 일정 시간 후 닫기 상태 해제
+                        setTimeout(() => {
+                          sidebarClosingRef.current = false;
+                        }, 500);
                       }}
                   className="p-2 hover:bg-white/60 rounded-xl transition-all duration-200 backdrop-blur-sm"
                   data-sidebar-close-button="true"

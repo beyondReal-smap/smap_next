@@ -196,11 +196,13 @@ export default function BottomNavBar() {
         overflow: 'visible',
         willChange: 'auto',
         paddingTop: '0px',
-        paddingBottom: '0px',
         margin: '0px',
         height: '40px',
         minHeight: '40px',
-        maxHeight: '40px'
+        maxHeight: '40px',
+        // Safe Area 무시하고 완전히 하단에 붙이기
+        marginBottom: 'calc(-1 * env(safe-area-inset-bottom))',
+        paddingBottom: 'calc(0px + env(safe-area-inset-bottom))'
       }}
     >
       <nav className="flex justify-around items-center px-2 m-0 p-0" style={{ margin: '0 !important', padding: '0 !important' }}>
