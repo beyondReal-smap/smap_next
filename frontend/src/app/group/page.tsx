@@ -58,7 +58,7 @@ export const dynamic = 'force-dynamic';
 const floatingButtonStyles = `
 .floating-button {
   position: fixed;
-  bottom: 100px;
+          bottom: 64px;
   right: 16px;
   z-index: 40;
   background: #0113A3;
@@ -146,6 +146,30 @@ const floatingButtonStyles = `
   to {
     transform: rotate(360deg);
   }
+}
+
+/* 앱 고정 레이아웃 - 전체 스크롤 비활성화 */
+html, body {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: manipulation !important;
+}
+
+/* 모바일 사파리 bounce 효과 비활성화 */
+body {
+  overscroll-behavior: none !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* 모바일 앱 최적화 */
+* {
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
 }
 `;
 
@@ -1422,7 +1446,7 @@ function GroupPageContent() {
   return (
     <>
       <style jsx global>{floatingButtonStyles}</style>
-      <div className="min-h-screen relative" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}>
+      <div className="fixed inset-0 overflow-hidden" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}>
         
 
 
@@ -1491,12 +1515,12 @@ function GroupPageContent() {
             </div>
           </AnimatedHeader>
 
-        {/* 메인 컨텐츠 */}
-          <div className="pb-safe-nav pt-16 flex flex-col" style={{ 
-            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 56px)',
-            height: 'calc(100vh - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px))',
-            maxHeight: 'calc(100vh - env(safe-area-inset-top, 0px) - 56px - env(safe-area-inset-bottom, 0px))',
-            overflow: 'hidden'
+        {/* 메인 컨텐츠 - 고정 위치 */}
+          <div className="absolute inset-0 flex flex-col overflow-hidden" style={{ 
+            top: '56px', // 헤더 높이만큼 아래로
+                         bottom: '48px', // 네비게이션 바 높이만큼 위로
+            left: '0',
+            right: '0'
           }}>
             <AnimatePresence mode="wait">
               {currentView === 'list' ? (

@@ -5469,7 +5469,7 @@ export default function HomePage() {
           </AnimatedHeader>
 
         {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
-        {process.env.NODE_ENV === 'development' && (
+        {/* {process.env.NODE_ENV === 'development' && (
           <motion.div
             initial={{ x: -300, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -5510,7 +5510,7 @@ export default function HomePage() {
                )}
              </div>
           </motion.div>
-        )}
+        )} */}
 
         {/* 지도 영역 (화면 100% 차지, fixed 포지션으로 고정) */}
         <div 
@@ -5582,7 +5582,7 @@ export default function HomePage() {
         )}
         
         {/* 지도 컨트롤 버튼들 - 바텀시트 상태에 따라 위치 변경 */}
-        <div className={`${getControlsClassName()} map-controls`}>
+        {/* <div className={`${getControlsClassName()} map-controls`}>
             <button 
               onClick={() => updateMapPosition()}
               className="map-control-button"
@@ -5592,7 +5592,7 @@ export default function HomePage() {
                 <path fillRule="evenodd" d="m11.54 22.351.07.04.028.016a.76.76 0 0 0 .723 0l.028-.015.071-.041a16.975 16.975 0 0 0 1.144-.742 19.58 19.58 0 0 0 2.683-2.282c1.944-1.99 3.963-4.98 3.963-8.827a8.25 8.25 0 0 0-16.5 0c0 3.846 2.02 6.837 3.963 8.827a19.58 19.58 0 0 0 2.682 2.282 16.975 16.975 0 0 0 1.145.742ZM12 13.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clipRule="evenodd" />
               </svg>
             </button>
-                      </div>
+                      </div> */}
 
          {/* 플로팅 사이드바 토글 버튼 - 네비게이션 바 오른쪽 아래 */}
          <motion.button
@@ -6027,42 +6027,6 @@ export default function HomePage() {
            )}
          </AnimatePresence>
               </motion.div>
-        {/* 환경별 디버깅 정보 (개발 환경에서만 표시) */}
-        {typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && environment && domainDiagnostics && selectedDate && (
-          <div className="fixed bottom-4 right-4 z-[9999] max-w-xs">
-            <details className="bg-black/80 text-white text-xs p-3 rounded-lg backdrop-blur-sm">
-              <summary className="cursor-pointer font-semibold text-yellow-300 mb-2">
-                🌐 환경 진단 ({environment.isLocalhost ? 'localhost' : 'production'})
-              </summary>
-              <div className="space-y-1 mt-2 max-h-40 overflow-y-auto">
-                <div><strong>도메인:</strong> {domainDiagnostics.hostname}</div>
-                <div><strong>프로토콜:</strong> {domainDiagnostics.protocol}</div>
-                <div><strong>포트:</strong> {domainDiagnostics.port || 'N/A'}</div>
-                <div><strong>보안:</strong> {environment.isSecure ? '✅ HTTPS' : '❌ HTTP'}</div>
-                <div><strong>네트워크:</strong> {networkStatus ? '✅ 연결됨' : '❌ 오프라인'}</div>
-                <div><strong>지도 API:</strong></div>
-                <div className="ml-2">
-                  <div>• 네이버: {naverMapsLoaded ? '✅' : '❌'}</div>
-                  <div>• 구글: {googleMapsLoaded ? '✅' : '❌'}</div>
-                  <div>• 현재: {mapType}</div>
-                </div>
-                <div><strong>타임아웃:</strong> {environment.mapApiConfig.timeout}ms</div>
-                {mapApiLoader && (
-                  <div>
-                    <strong>로더 상태:</strong>
-                    <div className="ml-2">
-                      <div>• Naver: {mapApiLoader.getLoadingStatus('naver')}</div>
-                      <div>• Google: {mapApiLoader.getLoadingStatus('google')}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </details>
-          </div>
-        )}
-        
-        {/* <DebugPanel /> */}
-        {/* <LogParser /> */}
       </>
     );
   } catch (renderError) {

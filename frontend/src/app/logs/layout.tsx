@@ -243,15 +243,6 @@ export default function LogsLayout({
       <link rel="preconnect" href="https://118.67.130.71:8000" />
       <link rel="dns-prefetch" href="https://oapi.map.naver.com" />
       
-      {/* Preload fonts */}
-      <link
-        rel="preload"
-        href="/fonts/LINESeedKR-Rg.woff2"
-        as="font"
-        type="font/woff2"
-        crossOrigin="anonymous"
-      />
-      
       <div className="logs-page">
         {children}
       </div>

@@ -492,7 +492,7 @@ html, body, #__next, main {
 /* 경로따라가기 컨트롤 위치 강제 설정 */
 .logs-control-buttons {
   position: fixed !important;
-  bottom: 80px !important;
+  bottom: 20px !important;
   left: 16px !important;
   z-index: 9999 !important;
   transform: none !important;

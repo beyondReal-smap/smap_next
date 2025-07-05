@@ -95,6 +95,7 @@ import ErrorDisplay from './components/ErrorDisplay';
 import ErrorToast from './components/ErrorToast';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
 import InitialLoadingOverlay from './components/InitialLoadingOverlay';
+
 import { retryDataFetch, retryMapApiLoad, retryMapInitialization } from '@/utils/retryUtils';
 
 // window 전역 객체에 naver 프로퍼티 타입 선언
@@ -392,6 +393,53 @@ const floatingButtonVariants = {
 };
 
 const pageStyles = `
+/* 앱 고정 레이아웃 - 전체 스크롤 비활성화 */
+html, body {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: manipulation !important;
+  overscroll-behavior: contain !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  -khtml-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+}
+
+/* 사이드바 열린 상태에서 전체 스크롤 완전 차단 */
+body.sidebar-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  touch-action: none !important;
+  -webkit-overflow-scrolling: auto !important;
+}
+
+/* 사이드바 내부는 클릭과 스크롤 허용 */
+body.sidebar-open .sidebar-content {
+  touch-action: auto !important;
+  pointer-events: auto !important;
+}
+
+body.sidebar-open .sidebar-content * {
+  touch-action: auto !important;
+  pointer-events: auto !important;
+}
+
 /* 최적화된 애니메이션 */
 @keyframes slideUp {
   from {
@@ -461,7 +509,7 @@ const pageStyles = `
       padding-top: env(safe-area-inset-top) !important;
       min-height: 64px !important;
       height: auto !important;
-      z-index: 50 !important;
+      z-index: 999999 !important;
       will-change: transform !important;
       -webkit-transform: translateZ(0) !important;
       transform: translateZ(0) !important;
@@ -604,6 +652,15 @@ const pageStyles = `
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
 }
 
+/* 경로 따라가기 컨트롤 버튼 위치 */
+.logs-control-buttons {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+}
+
 
 
 /* 이미지 로딩 최적화 */
@@ -626,6 +683,37 @@ const pageStyles = `
 
 .will-change-opacity {
   will-change: opacity;
+}
+
+/* 앱 고정 레이아웃 - 전체 스크롤 비활성화 */
+html, body {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: manipulation !important;
+}
+
+/* 모바일 사파리 bounce 효과 비활성화 */
+body {
+  overscroll-behavior: none !important;
+  -webkit-overflow-scrolling: touch !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+}
+
+/* 모바일 앱 최적화 */
+* {
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
 }
 
 /* 터치 최적화 */
@@ -929,6 +1017,21 @@ export default function LogsPage() {
 
   // 사이드바 상태 추가
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    // 사이드바 열릴 때 전체 스크롤 완전 차단 (CSS만 사용)
+  useEffect(() => {
+    if (isSidebarOpen) {
+      // body에 sidebar-open 클래스 추가 (CSS로 스크롤 차단)
+      document.body.classList.add('sidebar-open');
+      console.log('[LOGS] 사이드바 열림 - CSS 스크롤 차단');
+      
+      return () => {
+        // body에서 sidebar-open 클래스 제거
+        document.body.classList.remove('sidebar-open');
+        console.log('[LOGS] 사이드바 닫힘 - 스크롤 상태 복원');
+      };
+    }
+  }, [isSidebarOpen]);
   const sidebarRef = useRef<HTMLDivElement>(null);
   
   // 사이드바 날짜 스크롤 관련 상태 추가
@@ -2015,13 +2118,7 @@ export default function LogsPage() {
   };
 
   const handleMemberSelect = useCallback(async (id: string, e?: React.MouseEvent | null): Promise<void> => {
-    // 이벤트 전파 중단 (이벤트 객체가 유효한 경우에만)
-    if (e && typeof e.preventDefault === 'function') {
-      e.preventDefault();
-    }
-    if (e && typeof e.stopPropagation === 'function') {
-      e.stopPropagation();
-    }
+    console.log('[handleMemberSelect] 멤버 선택 시작:', id);
     
     // 이벤트가 null인 경우는 자동 선택, 있는 경우는 사용자 선택
     const isUserManualSelection = e !== null && e !== undefined;
@@ -2491,6 +2588,11 @@ export default function LogsPage() {
   const handleCalendarSquareClick = async (member: GroupMember, dateString: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (typeof (e as any).stopImmediatePropagation === 'function') {
+      (e as any).stopImmediatePropagation();
+    }
+    
+    // CSS로 스크롤이 이미 차단되어 있으므로 추가 처리 불필요
     
     console.log(`[네모 캘린더] 클릭 시작 - 멤버: ${member.name}, 날짜: ${dateString}`);
     console.log(`[네모 캘린더] 현재 상태 - 선택된 멤버: ${groupMembers.find(m => m.isSelected)?.name}, 선택된 날짜: ${selectedDate}`);
@@ -5409,70 +5511,57 @@ export default function LogsPage() {
     console.log(`[${instanceId.current}] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작`);
   }, [setSelectedGroupId, setGroupMembers, setSelectedDate, setDailyCountsData, setMemberActivityData]);
 
-  // 그룹별 멤버 수 조회 - 지연 로딩으로 최적화 (메인 인스턴스에서만)
+  // 그룹별 멤버 수 조회 - 중복 실행 방지 및 캐시 없이 직접 조회
+  const groupMemberCountsLoadingRef = useRef<boolean>(false);
+  
   useEffect(() => {
     if (!isMainInstance.current) return;
-    
-    // 그룹 선택자가 열릴 때만 로딩하도록 지연 최적화
     if (!userGroups || userGroups.length === 0) return;
+    if (groupMemberCountsLoadingRef.current) return; // 이미 실행 중이면 중복 실행 방지
     
-    // 5초 후 지연 로딩 (초기 진입에 필수가 아님)
-    const delayedGroupCountLoader = setTimeout(async () => {
-      console.log(`[${instanceId.current}] 그룹 멤버 수 지연 로딩 시작:`, userGroups.length, '개 그룹');
+    groupMemberCountsLoadingRef.current = true;
+    
+    const loadGroupMemberCounts = async () => {
+      console.log(`[${instanceId.current}] 그룹 멤버 수 조회 시작:`, userGroups.length, '개 그룹');
       
       const counts: Record<number, number> = {};
       
-      // 현재 선택된 그룹만 우선 로딩
-      if (selectedGroupId && userGroups.find(g => g.sgt_idx === selectedGroupId)) {
+      // 모든 그룹의 멤버 수를 병렬로 조회
+      await Promise.all(userGroups.map(async (group) => {
         try {
-          const count = await getGroupMemberCount(selectedGroupId);
-          counts[selectedGroupId] = count;
-          console.log(`[${instanceId.current}] 현재 그룹(${selectedGroupId}) 멤버 수:`, count);
-          setGroupMemberCounts(counts);
+          const count = await getGroupMemberCount(group.sgt_idx);
+          counts[group.sgt_idx] = count;
+          console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수:`, count);
         } catch (error) {
-          console.error(`[${instanceId.current}] 현재 그룹(${selectedGroupId}) 멤버 수 조회 실패:`, error);
-          counts[selectedGroupId] = 0;
+          console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+          counts[group.sgt_idx] = 0;
         }
-      }
+      }));
       
-      // 나머지 그룹들은 더 지연해서 로딩
-      setTimeout(async () => {
-        console.log(`[${instanceId.current}] 나머지 그룹 멤버 수 로딩 시작`);
-        const remainingCounts = { ...counts };
-        
-        await Promise.all(userGroups.map(async (group) => {
-          if (group.sgt_idx === selectedGroupId) return; // 이미 로딩됨
-          
-          try {
-            const count = await getGroupMemberCount(group.sgt_idx);
-            remainingCounts[group.sgt_idx] = count;
-            console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수:`, count);
-          } catch (error) {
-            console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
-            remainingCounts[group.sgt_idx] = 0;
-          }
-        }));
-        
-        setGroupMemberCounts(remainingCounts);
-        console.log(`[${instanceId.current}] 전체 그룹 멤버 수 지연 로딩 완료:`, remainingCounts);
-      }, 3000); // 추가 3초 후
-      
-    }, 5000); // 5초 후 시작
+      setGroupMemberCounts(counts);
+      console.log(`[${instanceId.current}] 전체 그룹 멤버 수 조회 완료:`, counts);
+      groupMemberCountsLoadingRef.current = false;
+    };
     
-    return () => clearTimeout(delayedGroupCountLoader);
-  }, [userGroups, selectedGroupId]);
+    // 5초 후 실행
+    const timer = setTimeout(loadGroupMemberCounts, 5000);
+    
+    return () => {
+      clearTimeout(timer);
+      groupMemberCountsLoadingRef.current = false;
+    };
+  }, [userGroups]);
 
-  // 그룹 멤버 수를 가져오는 함수
+  // 그룹 멤버 수를 가져오는 함수 - 직접 조회
   const getGroupMemberCount = async (groupId: number): Promise<number> => {
     try {
+      console.log(`[${instanceId.current}] 그룹 ${groupId} 멤버 수 조회 시작`);
       const memberData = await memberService.getGroupMembers(groupId.toString());
-      return memberData ? memberData.length : 0;
+      const count = memberData ? memberData.length : 0;
+      console.log(`[${instanceId.current}] 그룹 ${groupId} 멤버 수 조회 완료: ${count}명`);
+      return count;
     } catch (error) {
-      console.error(`그룹 ${groupId} 멤버 수 조회 실패:`, error);
-      
-      // 사용자에게 에러 상황을 알림
-      handleDataError(error, `그룹 ${groupId} 멤버 조회`);
-      
+      console.error(`[${instanceId.current}] 그룹 ${groupId} 멤버 수 조회 실패:`, error);
       return 0;
     }
   };
@@ -5582,6 +5671,12 @@ export default function LogsPage() {
 
   // 사이드바 토글 함수 - 플로팅 버튼 전용
   const toggleSidebar = useCallback(() => {
+    // 닫기 중이면 토글 무시
+    if (sidebarClosingRef.current) {
+      console.log('[사이드바] 닫기 중 - 플로팅 버튼 토글 무시');
+      return;
+    }
+    
     const wasOpen = isSidebarOpen;
     setIsSidebarOpen(!isSidebarOpen);
     
@@ -5610,9 +5705,25 @@ export default function LogsPage() {
   }, [isSidebarOpen, setIsSidebarOpen, scrollSidebarDateToSelected, scrollToSelectedDate, scrollToTodayDate, scrollToSelectedMember, selectedDate]);
 
   // 사이드바 외부 클릭 처리
+  const sidebarClosingRef = useRef(false);
+  
   useEffect(() => {
     const handleSidebarClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (isSidebarOpen && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement;
+      
+      // 닫기 버튼 클릭인지 확인
+      if (target.closest('[data-sidebar-close-button="true"]')) {
+        console.log('[사이드바] 닫기 버튼 클릭 감지 - 외부 클릭 처리 무시');
+        return;
+      }
+      
+      // 사이드바가 닫히는 중이면 외부 클릭 무시
+      if (sidebarClosingRef.current) {
+        console.log('[사이드바] 닫기 중 - 외부 클릭 처리 무시');
+        return;
+      }
+      
+      if (isSidebarOpen && sidebarRef.current && !sidebarRef.current.contains(target)) {
         console.log('[사이드바] 외부 클릭/터치 감지 - 사이드바 닫기');
         setIsSidebarOpen(false);
       }
@@ -6747,19 +6858,19 @@ export default function LogsPage() {
         onSkip={handleInitialLoadingSkip}
       /> */}
       
-      {/* 메인 컨테이너 */}
+      {/* 메인 컨테이너 - 고정 레이아웃 */}
       <motion.div
         variants={pageVariants}
         initial="initial"
         animate="in"
         exit="out"
-        className="min-h-screen relative overflow-hidden hardware-accelerated" 
+        className="fixed inset-0 overflow-hidden hardware-accelerated" 
         style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
       >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+          className="fixed top-0 left-0 right-0 z-[9999] glass-effect header-fixed"
           style={{ paddingTop: 'env(safe-area-inset-top)' }}
         >
           <div className="flex items-center justify-between h-14 px-4">
@@ -6777,15 +6888,17 @@ export default function LogsPage() {
         {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
         
 
-        {/* 지도 영역 */}
+        {/* 지도 영역 - 고정 위치 */}
         <motion.div 
           variants={mapContainerVariants}
           initial="initial"
           animate="animate"
-          className="full-map-container hardware-accelerated" 
+          className="absolute inset-0 hardware-accelerated" 
           style={{ 
-            paddingTop: '0px', 
-            position: 'relative', // 로딩 오버레이를 위한 relative 포지션
+            top: '56px', // 헤더 높이만큼 아래로
+            bottom: '0px', // 네비게이션 바 아래 패딩 제거
+            left: '0',
+            right: '0',
             zIndex: 1 // 헤더보다 낮은 z-index
           }}
         >
@@ -6848,7 +6961,7 @@ export default function LogsPage() {
                 animate="animate"
                 exit="exit"
                 className="absolute left-0 right-0 z-40 z-floating-card flex justify-center px-4"
-                style={{ top: '70px' }}
+                style={{ top: '20px' }}
               >
                 <motion.div
                   whileHover={{ 
@@ -7094,13 +7207,14 @@ export default function LogsPage() {
         whileHover="hover"
         whileTap="tap"
         onClick={toggleSidebar}
-        className="fixed bottom-40 right-4 z-40 z-floating-button w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white touch-optimized"                                 
+        className="fixed w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white touch-optimized"                                 
         style={{
           background: '#0113A3',
           boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
-          bottom: '120px !important',
-          right: '16px !important',
-          zIndex: 40
+          bottom: '90px',
+          right: '16px',
+          zIndex: 9999,
+          position: 'fixed'
         }}
       >
         {isSidebarOpen ? (
@@ -7152,8 +7266,10 @@ export default function LogsPage() {
             initial="closed"
             animate="open"
             exit="closed"
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
-            onClick={() => {
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
               console.log('[사이드바] 오버레이 클릭으로 닫기');
               // 드롭다운이 열려있으면 사이드바를 닫지 않음
               if (isGroupSelectorOpen) {
@@ -7162,6 +7278,9 @@ export default function LogsPage() {
               }
               setIsSidebarOpen(false);
             }}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.preventDefault()}
+            onTouchEnd={(e) => e.stopPropagation()}
             style={{
               // 모바일 사파리 최적화
               transform: 'translateZ(0)',
@@ -7182,11 +7301,15 @@ export default function LogsPage() {
             initial="closed"
             animate="open"
             exit="closed"
-            className="fixed left-0 top-0 w-80 shadow-2xl border-r z-50 flex flex-col"
+            className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[9999] flex flex-col"
             style={{ 
               background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
               borderColor: 'rgba(1, 19, 163, 0.1)',
-              height: '95vh',
+              top: '0px',
+              bottom: '0px',
+              height: '100vh',
+              maxHeight: '100vh',
+              position: 'fixed',
               // 모바일 사파리 최적화
               transform: 'translateZ(0)',
               willChange: 'transform',
@@ -7196,13 +7319,19 @@ export default function LogsPage() {
               WebkitTransform: 'translateZ(0)'
             }}
             // 사이드바 드래그 비활성화 - 플로팅 버튼과 외부 클릭/X버튼으로만 제어
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => {
+              // 사이드바 내부의 스크롤은 허용하되, 외부로 전파되지 않도록
+              e.stopPropagation();
+            }}
+            onTouchEnd={(e) => e.stopPropagation()}
           >
             <motion.div
               variants={sidebarContentVariants}
               initial="closed"
               animate="open"
               exit="closed"
-              className="p-6 h-full flex flex-col relative z-10"
+              className="p-6 h-full flex flex-col relative z-10 overflow-hidden sidebar-content"
             >
               {/* 헤더 */}
               <div className="flex items-center justify-between mb-6">
@@ -7223,16 +7352,15 @@ export default function LogsPage() {
                 </div>
                                      <motion.button
                        whileTap={{ scale: 0.95 }}
-                       onClick={() => {
+                       onClick={(e) => {
+                        e.stopPropagation();
                         console.log('[사이드바] X 버튼으로 닫기');
-                        // 드롭다운이 열려있으면 사이드바를 닫지 않음
-                        if (isGroupSelectorOpen) {
-                          console.log('[사이드바] 드롭다운이 열려있어서 사이드바 닫기 취소');
-                          return;
-                        }
+                        
+                        // 외부 클릭과 동일하게 단순히 사이드바만 닫기
                         setIsSidebarOpen(false);
                       }}
                   className="p-2 hover:bg-white/60 rounded-xl transition-all duration-200 backdrop-blur-sm"
+                  data-sidebar-close-button="true"
                 >
                   <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -7273,7 +7401,7 @@ export default function LogsPage() {
               </div>
 
                 {/* 날짜 선택 섹션 */}
-                <div className="mb-5">
+                {/* <div className="mb-5">
                   <div className="flex items-center space-x-2 mb-3">
                     <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
                     <h3 className="text-base font-semibold text-gray-800">날짜 선택</h3>
@@ -7400,7 +7528,7 @@ export default function LogsPage() {
                       ))}
                     </motion.div>
                   </div>
-                </div>
+                </div> */}
 
                 {/* 멤버 목록 */}
               <div className="flex-1 min-h-0">
@@ -7412,7 +7540,7 @@ export default function LogsPage() {
                     {groupMembers.length}명
                   </span>
                 </div>
-                <div className="h-full overflow-y-auto hide-scrollbar space-y-3 pb-24">
+                <div className="flex-1 overflow-y-auto hide-scrollbar space-y-3 pb-4" style={{ maxHeight: 'calc(100vh - 400px)', overflowX: 'hidden' }}>
                   {groupMembers.length > 0 ? (
                     <motion.div variants={sidebarContentVariants} className="space-y-2">
                       {sortGroupMembers(groupMembers).map((member, index) => (
@@ -7423,6 +7551,7 @@ export default function LogsPage() {
                           custom={index}
                           whileTap={{ scale: 0.98 }}
                           onClick={(e) => {
+                            console.log('[멤버 클릭] 멤버 선택:', member.name);
                             handleMemberSelect(member.id, e);
                             // 멤버 선택 시 사이드바는 자동으로 닫힘 (handleMemberSelect에서 처리)
                           }}
@@ -7574,7 +7703,11 @@ export default function LogsPage() {
                                           ${isToday ? 'ring-2 ring-indigo-400' : ''}
                                         `}
                                         title={`${format(date, 'MM.dd(E)', { locale: ko })} - ${hasLog ? '활동 있음' : '활동 없음'}${isToday ? ' (오늘)' : ''}${isSelected ? ' (선택됨)' : hasLog ? ' (클릭하여 이동)' : ''}`}
-                                        onClick={hasLog ? (e) => handleCalendarSquareClick(member, dateString, e) : undefined}
+                                        onClick={hasLog ? (e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handleCalendarSquareClick(member, dateString, e);
+                                        } : undefined}
                                         style={{marginBottom: row === 0 ? '2px' : 0}}
                                       >
                                         {isToday ? '●' : ''}

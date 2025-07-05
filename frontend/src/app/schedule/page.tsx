@@ -173,7 +173,7 @@ html, body {
 /* Floating button styles from group/page.tsx */
 .floating-button {
   position: fixed;
-  bottom: 180px;
+          bottom: 64px;
   right: 20px;
   z-index: 40;
   background: #0113A3;
@@ -194,6 +194,30 @@ html, body {
 .floating-button:hover {
   transform: scale(1.1);
   box-shadow: 0 12px 35px rgba(1, 19, 163, 0.4);
+}
+
+/* 앱 고정 레이아웃 - 전체 스크롤 비활성화 */
+html, body {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: manipulation !important;
+}
+
+/* 모바일 사파리 bounce 효과 비활성화 */
+body {
+  overscroll-behavior: none !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* 모바일 앱 최적화 */
+* {
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
 }
 
 @keyframes floatIn {
@@ -3979,7 +4003,7 @@ export default function SchedulePage() {
   return (
     <>
       <style jsx global>{pageStyles}</style>
-      <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <div className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50">
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
             variant="simple"
@@ -4002,13 +4026,19 @@ export default function SchedulePage() {
             </div>
           </AnimatedHeader>
 
-        {/* 메인 컨텐츠 */}
+        {/* 메인 컨텐츠 - 고정 위치 */}
           <motion.div
             initial="initial"
             animate="in"
             exit="out"
             variants={pageVariants}
-            className="schedule-page-content px-4 space-y-5 pb-16"
+            className="absolute inset-0 px-4 space-y-5 pb-16 overflow-y-auto"
+            style={{ 
+              top: '56px', // 헤더 높이만큼 아래로
+                             bottom: '48px', // 네비게이션 바 높이만큼 위로
+              left: '0',
+              right: '0'
+            }}
           >
             {/* 캘린더 섹션 */}
             <motion.div

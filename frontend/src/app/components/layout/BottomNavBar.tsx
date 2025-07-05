@@ -8,6 +8,42 @@ import { hapticFeedback } from '../../../utils/haptic';
 export default function BottomNavBar() {
   const pathname = usePathname();
   
+  // 네비게이션 바 마진 제거를 위한 전역 스타일
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      #bottom-navigation-bar * {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #bottom-navigation-bar {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #bottom-navigation-bar nav {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #bottom-navigation-bar a {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #bottom-navigation-bar div {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      #bottom-navigation-bar span {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+  
   // 네비게이션 바 위치 강제 설정
   useEffect(() => {
     let isSettingPosition = false; // 무한 루프 방지 플래그
@@ -25,9 +61,9 @@ export default function BottomNavBar() {
         const currentPath = window.location.pathname;
         let targetBottom = '40px'; // 기본값
         
-        // 모든 페이지에서 40px 위로 설정
+        // 모든 페이지에서 0px로 설정 (화면 하단에 딱 붙임)
         if (['/home', '/group', '/schedule', '/logs', '/location'].includes(currentPath)) {
-          targetBottom = '40px'; // 모든 페이지는 40px 위로
+          targetBottom = '0px'; // 모든 페이지는 화면 하단에 딱 붙임
         }
         
         // 이미 올바른 값이면 실행하지 않음 (무한루프 방지)
@@ -42,6 +78,7 @@ export default function BottomNavBar() {
         bottomNav.style.setProperty('left', '0px', 'important');
         bottomNav.style.setProperty('right', '0px', 'important');
         bottomNav.style.setProperty('width', '100%', 'important');
+        bottomNav.style.setProperty('height', '40px', 'important');
         bottomNav.style.setProperty('z-index', '999999', 'important');
         bottomNav.style.setProperty('transform', 'none', 'important');
         bottomNav.style.setProperty('-webkit-transform', 'none', 'important');
@@ -138,11 +175,11 @@ export default function BottomNavBar() {
 
   return (
     <div 
-      className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl"
+      className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0"
       id="bottom-navigation-bar"
       style={{
         position: 'fixed !important' as any,
-        bottom: '40px !important',
+        bottom: '0px !important',
         left: '0px !important',
         right: '0px !important',
         zIndex: 999,
@@ -158,13 +195,15 @@ export default function BottomNavBar() {
         borderRadius: '16px 16px 0 0',
         overflow: 'visible',
         willChange: 'auto',
-        paddingTop: '12px',
-        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-        height: 'auto',
-        minHeight: '76px'
+        paddingTop: '0px',
+        paddingBottom: '0px',
+        margin: '0px',
+        height: '40px',
+        minHeight: '40px',
+        maxHeight: '40px'
       }}
     >
-      <nav className="flex justify-around items-center px-2">
+      <nav className="flex justify-around items-center px-2 m-0 p-0" style={{ margin: '0 !important', padding: '0 !important' }}>
         {navItems.map(({ name, path, icon }) => {
           const isActive = pathname === path;
           
@@ -173,15 +212,18 @@ export default function BottomNavBar() {
               key={path}
               href={path}
               onClick={() => handleNavClick({ name, path, icon })}
-              className="flex flex-col items-center space-y-1 transition-colors duration-200 flex-1 min-w-0 py-2"
+              className="flex flex-col items-center transition-colors duration-200 flex-1 min-w-0 m-0 p-0"
+              style={{ margin: '0 !important', padding: '0 !important' }}
             >
-              <div className="relative flex flex-col items-center space-y-1">
+                <div className="relative flex flex-col items-center m-0 p-0" style={{ margin: '0 !important', padding: '0 !important' }}>
                 {/* 아이콘 컨테이너 */}
                 <div 
-                  className="w-6 h-6 flex items-center justify-center relative"
+                  className="w-6 h-6 flex items-center justify-center relative m-0 p-0"
                   style={{ 
                     color: isActive ? '#0113A3' : '#6b7280',
-                    transform: 'none'
+                    transform: 'none',
+                    margin: '0 !important',
+                    padding: '0 !important'
                   }}
                 >
                   {/* 선택된 아이템 배경 표시 */}
@@ -255,11 +297,14 @@ export default function BottomNavBar() {
                 </div>
                 
                 {/* 텍스트 라벨 */}
-                <span 
+              <span 
                   className="text-xs font-medium relative z-10 text-center"
                   style={{ 
                     color: isActive ? '#0113A3' : '#6b7280',
-                    transform: 'none'
+                    transform: 'none',
+                    marginTop: '0px',
+                    marginBottom: '0px !important',
+                    margin: '0px !important',
                   }}
                 >
                   {name}

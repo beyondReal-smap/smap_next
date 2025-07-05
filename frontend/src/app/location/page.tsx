@@ -195,6 +195,30 @@ body {
   border: 1px solid rgba(99, 102, 241, 0.1);
 }
 
+/* 앱 고정 레이아웃 - 전체 스크롤 비활성화 */
+html, body {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: manipulation !important;
+}
+
+/* 모바일 사파리 bounce 효과 비활성화 */
+body {
+  overscroll-behavior: none !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* 모바일 앱 최적화 */
+* {
+  -webkit-tap-highlight-color: transparent !important;
+  -webkit-touch-callout: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
 /* 네이버 지도 zoom 컨트롤 위치 조정 - 헤더 아래로 이동 */
 .nmap_control_zoom {
   top: 180px !important;
@@ -4633,7 +4657,7 @@ export default function LocationPage() {
           isExiting ? "out" : "in"
         }
         variants={pageVariants}
-        className="w-full"
+        className="fixed inset-0 overflow-hidden"
         style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
       >
         {/* 통일된 헤더 애니메이션 */}
@@ -4679,12 +4703,15 @@ export default function LocationPage() {
             </div>
           </AnimatedHeader>
         
-        {/* 지도 영역 - logs/page.tsx와 동일한 구조 */}
+        {/* 지도 영역 - 고정 위치 */}
         <div 
-          className="full-map-container" 
+          className="absolute inset-0" 
           style={{ 
-            paddingTop: '0px', 
-            position: 'relative'
+            top: '56px', // 헤더 높이만큼 아래로
+            bottom: '48px', // 네비게이션 바 높이만큼 위로
+            left: '0',
+            right: '0',
+            zIndex: 1
           }}
         >
           {/* 스켈레톤 UI - 지도 로딩 중일 때 표시 */}
@@ -5072,7 +5099,7 @@ export default function LocationPage() {
           style={{
             background: '#0113A3',
             boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
-            bottom: 'calc(76px + 20px)' // 네비게이션 바(76px) + 여유공간(20px)
+                          bottom: 'calc(48px + 20px)' // 네비게이션 바(48px) + 여유공간(20px)
           }}
         >
           {isSidebarOpen ? (
@@ -5143,7 +5170,7 @@ export default function LocationPage() {
               style={{ 
                 background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                 borderColor: 'rgba(1, 19, 163, 0.1)',
-                height: 'calc(100vh - 76px)', // 네비게이션 바(76px) 높이만큼 여유 공간
+                height: 'calc(100vh - 48px)', // 네비게이션 바(48px) 높이만큼 여유 공간
                 // 모바일 사파리 최적화
                 transform: 'translateZ(0)',
                 willChange: 'transform',
@@ -5696,7 +5723,7 @@ export default function LocationPage() {
                                    style={{ 
                        background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                        borderColor: 'rgba(1, 19, 163, 0.1)',
-                       height: 'calc(100vh - 76px)' // 네비게이션 바 높이만큼 여유 공간
+                       height: 'calc(100vh - 48px)' // 네비게이션 바 높이만큼 여유 공간
                      }}
             >
               <motion.div
