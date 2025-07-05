@@ -362,35 +362,7 @@ const memberItemVariants = {
   })
 };
 
-// 플로팅 버튼 애니메이션 - 마지막에 나타남
-const floatingButtonVariants = {
-  initial: { 
-    scale: 0, 
-    opacity: 0 
-  },
-  animate: { 
-    scale: 1, 
-    opacity: 1,
-    transition: {
-      type: "spring" as const,
-      stiffness: 260,
-      damping: 20,
-      delay: 1.0
-    }
-  },
-  hover: { 
-    scale: 1.1,
-    transition: { 
-      duration: 0.2
-    }
-  },
-  tap: { 
-    scale: 0.95,
-    transition: { 
-      duration: 0.1 
-    }
-  }
-};
+
 
 const pageStyles = `
 /* 앱 고정 레이아웃 - 전체 스크롤 비활성화 */
@@ -7225,12 +7197,71 @@ export default function LogsPage() {
       </motion.div>
 
       {/* 플로팅 사이드바 토글 버튼 */}
+      {/* 사이드바 오버레이 */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            variants={sidebarOverlayVariants}
+            initial="closed"
+            animate="open"
+            exit="closed"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('[사이드바] 오버레이 클릭으로 닫기');
+              // 드롭다운이 열려있으면 사이드바를 닫지 않음
+              if (isGroupSelectorOpen) {
+                console.log('[사이드바] 드롭다운이 열려있어서 사이드바 닫기 취소');
+                return;
+              }
+              
+              // 닫기 상태 설정하여 중복 처리 방지
+              sidebarClosingRef.current = true;
+              
+              // 사이드바 닫기
+              setIsSidebarOpen(false);
+              
+              // 일정 시간 후 닫기 상태 해제
+              setTimeout(() => {
+                sidebarClosingRef.current = false;
+              }, 500);
+            }}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.preventDefault()}
+            onTouchEnd={(e) => e.stopPropagation()}
+            style={{
+              // 모바일 사파리 최적화
+              transform: 'translateZ(0)',
+              willChange: 'opacity',
+              backfaceVisibility: 'hidden',
+              WebkitBackfaceVisibility: 'hidden'
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* 플로팅 사이드바 토글 버튼 */}
       <motion.button
-        variants={floatingButtonVariants}
-        initial="initial"
-        animate="animate"
-        whileHover="hover"
-        whileTap="tap"
+        initial={{ y: 100, opacity: 0, scale: 0.8 }}
+        animate={{ 
+          y: 0, 
+          opacity: 1, 
+          scale: 1,
+          transition: {
+            delay: 0.2,
+            type: "spring",
+            stiffness: 120,
+            damping: 25,
+            duration: 1.0
+          }
+        }}
+        whileHover={{ 
+          scale: 1.1,
+          y: -2,
+          transition: { duration: 0.2 }
+        }}
+        whileTap={{ scale: 0.9 }}
         onClick={toggleSidebar}
         className="fixed w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white touch-optimized"                                 
         style={{
@@ -7238,7 +7269,7 @@ export default function LogsPage() {
           boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
           bottom: '90px',
           right: '16px',
-          zIndex: 9999,
+          zIndex: 99999,
           position: 'fixed'
         }}
       >
@@ -7257,8 +7288,8 @@ export default function LogsPage() {
         {/* 알림 배지 (그룹멤버 수) */}
         {groupMembers.length > 0 && !isSidebarOpen && (
           <motion.div
-            initial={{ scale: 0, x: 0, y: 0 }}
-            animate={{ scale: 1, x: 0, y: 0 }}
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
             exit={{ scale: 0 }}
             transition={{ 
               type: "spring", 
@@ -7266,11 +7297,12 @@ export default function LogsPage() {
               damping: 25,
               duration: 0.3 
             }}
-            className="absolute -top-1 -right-1 w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center"
+            className="absolute w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center"
             style={{
               transformOrigin: 'center',
               top: '-4px',
-              right: '-4px'
+              right: '-4px',
+              position: 'absolute'
             }}
           >
             <span className="text-xs font-bold text-white">{groupMembers.length}</span>

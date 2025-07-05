@@ -7,7 +7,11 @@ const nextConfig = {
   experimental: {
     optimizeCss: true,
     scrollRestoration: true,
+    optimizePackageImports: ['framer-motion'],
   },
+  
+  // 폰트 최적화
+  optimizeFonts: true,
   
   // 개발 모드 설정
   ...(process.env.NODE_ENV === 'development' && {

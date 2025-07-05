@@ -170,30 +170,15 @@ html, body {
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 }
 
-/* Floating button styles from group/page.tsx */
+/* Floating button styles - 애니메이션 충돌 방지 */
 .floating-button {
-  position: fixed;
-          bottom: 64px;
-  right: 20px;
-  z-index: 40;
-  background: #0113A3;
-      box-shadow: 0 8px 25px rgba(1, 19, 163, 0.3);
-  transition: all 0.2s ease;
-  touch-action: manipulation;
-  user-select: none;
-  /* Ensure it's a circle */
-  width: 56px; /* Example size, adjust as needed */
-  height: 56px; /* Example size, adjust as needed */
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: floatIn 0.8s ease-out forwards;
-}
-
-.floating-button:hover {
-  transform: scale(1.1);
-  box-shadow: 0 12px 35px rgba(1, 19, 163, 0.4);
+  touch-action: manipulation !important;
+  user-select: none !important;
+  border: none !important;
+  outline: none !important;
+  pointer-events: auto !important; /* 클릭 이벤트 보장 */
+  cursor: pointer !important;
+  /* CSS transition 제거 - Framer Motion이 모든 애니메이션 처리 */
 }
 
 /* 앱 고정 레이아웃 - 전체 스크롤 비활성화 */
@@ -206,10 +191,52 @@ html, body {
   touch-action: manipulation !important;
 }
 
+/* floating-button이 보이도록 body에서 overflow 예외 처리 */
+body {
+  overflow: visible !important; /* floating-button을 위해 visible로 변경 */
+}
+
 /* 모바일 사파리 bounce 효과 비활성화 */
 body {
   overscroll-behavior: none !important;
   -webkit-overflow-scrolling: touch !important;
+}
+
+/* 스크롤바 완전히 숨기기 - 모든 브라우저 대응 */
+* {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* Internet Explorer 10+ */
+}
+
+*::-webkit-scrollbar {
+  display: none !important; /* Safari and Chrome */
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+*::-webkit-scrollbar-track {
+  display: none !important;
+}
+
+*::-webkit-scrollbar-thumb {
+  display: none !important;
+}
+
+/* 컨테이너 요소들의 스크롤바 숨김 */
+.main-container,
+.content-area,
+.scroll-container,
+div[style*="overflow"],
+div[style*="scroll"] {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.main-container::-webkit-scrollbar,
+.content-area::-webkit-scrollbar,
+.scroll-container::-webkit-scrollbar {
+  display: none !important;
 }
 
 /* 모바일 앱 최적화 */
@@ -626,7 +653,7 @@ const MobileCalendar = memo(({
   };
 
   return (
-    <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+    <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-100 mt-4">
       {/* 캘린더 헤더 */}
       <div className="flex items-center justify-between mb-4">
         <motion.button
@@ -4003,7 +4030,7 @@ export default function SchedulePage() {
   return (
     <>
       <style jsx global>{pageStyles}</style>
-      <div className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <div className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container">
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
             variant="simple"
@@ -4032,7 +4059,7 @@ export default function SchedulePage() {
             animate="in"
             exit="out"
             variants={pageVariants}
-            className="absolute inset-0 px-4 space-y-5 pb-16 overflow-y-auto"
+            className="absolute inset-0 px-4 space-y-5 pb-16 overflow-y-auto content-area"
             style={{ 
               top: '56px', // 헤더 높이만큼 아래로
                              bottom: '48px', // 네비게이션 바 높이만큼 위로
@@ -4689,7 +4716,7 @@ export default function SchedulePage() {
                       <div className="p-6">
                         <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">알림 설정</h3>
                         
-                        <div ref={alarmScrollRef} className="space-y-2 max-h-64 overflow-y-auto">
+                        <div ref={alarmScrollRef} className="space-y-2 max-h-64 overflow-y-auto scroll-container">
                           {['없음', '정시', '5분 전', '10분 전', '15분 전', '30분 전', '1시간 전', '1일 전'].map((option) => (
                             <button
                               key={option}
@@ -4935,7 +4962,7 @@ export default function SchedulePage() {
                         {/* 시간 선택 */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-3 text-center">시간</label>
-                          <div ref={hourScrollRef} className="modal-scroll-area max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
+                          <div ref={hourScrollRef} className="modal-scroll-area max-h-32 overflow-y-auto border border-gray-200 rounded-lg scroll-container">
                             {Array.from({ length: 24 }, (_, i) => (
                               <motion.button
                                 key={i}
@@ -4957,7 +4984,7 @@ export default function SchedulePage() {
                         {/* 분 선택 */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-3 text-center">분</label>
-                          <div ref={minuteScrollRef} className="modal-scroll-area max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
+                          <div ref={minuteScrollRef} className="modal-scroll-area max-h-32 overflow-y-auto border border-gray-200 rounded-lg scroll-container">
                             {Array.from({ length: 12 }, (_, i) => i * 5).map((minute) => (
                               <motion.button
                                 key={minute}
@@ -5111,7 +5138,7 @@ export default function SchedulePage() {
                     )}
 
                     {/* 검색 결과 영역 - 스크롤 가능 */}
-                    <div className="modal-scroll-area flex-1 overflow-y-auto">
+                    <div className="modal-scroll-area flex-1 overflow-y-auto scroll-container">
                       {isSearchingLocation ? (
                         <div className="text-center py-8 px-6">
                           <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -5693,25 +5720,57 @@ export default function SchedulePage() {
           onClick={handleOpenAddEventModal}
           className="floating-button w-14 h-14 rounded-full flex items-center justify-center text-white"
           style={{
-            boxShadow: '0 10px 25px rgba(79, 70, 229, 0.3), 0 4px 10px rgba(0, 0, 0, 0.1)',
+            position: 'fixed',
+            bottom: '90px',
+            right: '20px',
+            zIndex: 9999,
+            background: '#0113A3',
+            width: '56px',
+            height: '56px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: 'none',
+            boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
           }}
-          initial={{ opacity: 0 }}
+          initial={{ y: 100, opacity: 0, scale: 0.8 }}
           animate={{ 
-            opacity: 1,
-            transition: {
-              delay: 0.2,
-              duration: 0.3
+            y: 0, 
+            opacity: 1, 
+            scale: 1
+          }}
+          transition={{
+            delay: 0.2,
+            y: {
+              duration: 0.6,
+              ease: [0.25, 0.46, 0.45, 0.94]
+            },
+            opacity: {
+              duration: 0.4,
+              ease: "easeOut"
+            },
+            scale: {
+              duration: 0.5,
+              ease: [0.34, 1.56, 0.64, 1]
             }
           }}
-          exit={{ opacity: 0 }}
+          exit={{ y: 100, opacity: 0, scale: 0.8 }}
           whileHover={{ 
             scale: 1.1,
             y: -2,
-            transition: { duration: 0.2 }
+            boxShadow: "0 12px 35px rgba(1, 19, 163, 0.4)",
+            transition: { 
+              duration: 0.2,
+              ease: "easeOut"
+            }
           }}
           whileTap={{ 
             scale: 0.9,
-            transition: { duration: 0.1 }
+            transition: { 
+              duration: 0.1,
+              ease: "easeInOut"
+            }
           }}
         >
           <FiPlus className="w-6 h-6" />
@@ -5837,7 +5896,7 @@ export default function SchedulePage() {
 
               {/* 스크롤 가능한 폼 영역 */}
               <div 
-                className="flex-1 overflow-y-auto"
+                className="flex-1 overflow-y-auto scroll-container"
                 onTouchStart={(e) => {
                   // 터치 시작점 기록 (스크롤과 드래그 구분용)
                   const touch = e.touches[0];
@@ -5925,7 +5984,7 @@ export default function SchedulePage() {
                                   animate={{ opacity: 1, y: 0 }}
                                   exit={{ opacity: 0, y: -10 }}
                                   transition={{ duration: 0.2 }}
-                                  className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto"
+                                  className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto scroll-container"
                                 >
                                   {isLoadingGroups ? (
                                     <div className="p-4 text-center text-gray-500">
