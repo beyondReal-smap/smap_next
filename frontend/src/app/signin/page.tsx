@@ -2825,7 +2825,7 @@ const SignInPage = () => {
     (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = true;
     
     // 🧪 테스트 모드: 강제로 웹 SDK 사용 (디버깅용)
-    const FORCE_WEB_SDK = true; // TODO: 테스트 후 false로 변경
+    const FORCE_WEB_SDK = false; // 테스트 완료 - 정상 플로우 사용
     
     if (FORCE_WEB_SDK) {
       console.log('🧪 [TEST MODE] 강제 웹 SDK 모드 활성화');
