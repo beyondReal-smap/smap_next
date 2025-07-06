@@ -132,7 +132,7 @@ const SignInPage = () => {
     // 안전하게 window 객체 확인
     if (typeof window === 'undefined') {
       console.log('[INIT] 서버사이드에서 실행됨, 스킵');
-      return undefined;
+      return;
     }
     
     console.log('[INIT] 클라이언트사이드 초기화 시작');
@@ -156,15 +156,15 @@ const SignInPage = () => {
       console.warn('[SIGNIN] sessionStorage 접근 실패:', error);
     }
     
-    // 카카오 콜백 함수 등록 (구글 로그인과 동일한 패턴)
-    (window as any).onNativeKakaoLoginSuccess = async (userInfo: any) => {
-      console.log('🎯 [NATIVE CALLBACK] iOS 카카오 로그인 성공:', userInfo);
-      
+    // 카카오 로그인 성공 처리 함수 (안전한 버전)
+    const processKakaoLoginSuccess = async (userInfo: any) => {
       try {
         console.log('🔄 [NATIVE CALLBACK] 백엔드 카카오 인증 API 호출 시작');
         
         // 진행 중 플래그 해제
-        (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
+        if (typeof window !== 'undefined') {
+          (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
+        }
         
         // 백엔드 API로 access_token 전송
         const response = await fetch('/api/kakao-auth', {
@@ -214,7 +214,7 @@ const SignInPage = () => {
             
             // 회원가입 페이지로 이동
             window.location.href = '/register?social=kakao';
-            return undefined;
+            return;
             
           } else {
             console.log('[NATIVE CALLBACK] 기존회원 - 홈으로 이동');
@@ -223,75 +223,146 @@ const SignInPage = () => {
             if (data.user) {
               console.log('[NATIVE CALLBACK] 사용자 데이터 설정:', data.user);
               
-              // 1. AuthService에 토큰 저장 (가장 중요!)
-              if (data.token) {
-                console.log('[NATIVE CALLBACK] JWT 토큰 저장:', data.token ? '토큰 있음' : '토큰 없음');
-                authService.setToken(data.token);
-              } else {
-                console.warn('[NATIVE CALLBACK] 백엔드에서 토큰을 받지 못했습니다.');
+              // 1. AuthService에 토큰 저장 (안전한 방식)
+              try {
+                if (data.token && authService?.setToken) {
+                  console.log('[NATIVE CALLBACK] JWT 토큰 저장:', data.token ? '토큰 있음' : '토큰 없음');
+                  authService.setToken(data.token);
+                } else {
+                  console.warn('[NATIVE CALLBACK] 백엔드에서 토큰을 받지 못했거나 AuthService를 사용할 수 없습니다.');
+                }
+              } catch (tokenError) {
+                console.error('[NATIVE CALLBACK] 토큰 저장 실패:', tokenError);
               }
               
-              // 2. AuthContext 상태 업데이트
-              await refreshAuthState();
-              
-              // 3. 포괄적 데이터 캐싱
+              // 2. AuthContext 상태 업데이트 (안전한 방식)
               try {
-                await saveComprehensiveData({
-                  userProfile: data.user
-                });
-                console.log('[NATIVE CALLBACK] 포괄적 데이터 캐싱 완료');
+                if (refreshAuthState && typeof refreshAuthState === 'function') {
+                  await refreshAuthState();
+                  console.log('[NATIVE CALLBACK] AuthContext 상태 업데이트 완료');
+                }
+              } catch (authError) {
+                console.error('[NATIVE CALLBACK] AuthContext 상태 업데이트 실패:', authError);
+              }
+              
+              // 3. 포괄적 데이터 캐싱 (안전한 방식)
+              try {
+                if (saveComprehensiveData && typeof saveComprehensiveData === 'function') {
+                  await saveComprehensiveData({
+                    userProfile: data.user
+                  });
+                  console.log('[NATIVE CALLBACK] 포괄적 데이터 캐싱 완료');
+                }
               } catch (cacheError) {
                 console.warn('[NATIVE CALLBACK] 데이터 캐싱 실패:', cacheError);
               }
             }
             
-            // 📄 상태 초기화
-            setIsLoading(false);
-            setError(null);
+            // 📄 상태 초기화 (안전한 방식)
+            try {
+              if (setIsLoading && typeof setIsLoading === 'function') {
+                setIsLoading(false);
+              }
+              if (setError && typeof setError === 'function') {
+                setError(null);
+              }
+            } catch (stateError) {
+              console.warn('[NATIVE CALLBACK] 상태 초기화 실패:', stateError);
+            }
             
             console.log('[NATIVE CALLBACK] 홈으로 이동');
-            window.location.href = '/home';
+            
+            // 안전한 페이지 이동
+            try {
+              if (typeof window !== 'undefined' && window.location) {
+                window.location.href = '/home';
+              }
+            } catch (redirectError) {
+              console.error('[NATIVE CALLBACK] 페이지 이동 실패:', redirectError);
+              // 대체 방법으로 router 사용
+              if (router && router.push) {
+                router.push('/home');
+              }
+            }
           }
         } else {
           console.error('[NATIVE CALLBACK] 백엔드 카카오 인증 실패:', data.error);
           
-          // 진행 중 플래그 해제
-          (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
-          setIsLoading(false);
-          
-          // 탈퇴한 사용자인지 확인
-          if (data.isWithdrawnUser) {
-            setError('탈퇴한 계정입니다. 새로운 계정으로 가입해주세요.');
-          } else {
-            setError(data.error || '카카오 로그인에 실패했습니다.');
+          try {
+            // 진행 중 플래그 해제
+            (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
+            
+            // 상태 업데이트 (안전한 방식)
+            if (setIsLoading && typeof setIsLoading === 'function') {
+              setIsLoading(false);
+            }
+            
+            // 탈퇴한 사용자인지 확인
+            if (setError && typeof setError === 'function') {
+              if (data.isWithdrawnUser) {
+                setError('탈퇴한 계정입니다. 새로운 계정으로 가입해주세요.');
+              } else {
+                setError(data.error || '카카오 로그인에 실패했습니다.');
+              }
+            }
+            
+            // 햅틱 피드백 (에러)
+            triggerHapticFeedback(HapticFeedbackType.ERROR);
+          } catch (errorHandlingError) {
+            console.error('[NATIVE CALLBACK] 에러 처리 중 오류:', errorHandlingError);
           }
-          
-          // 햅틱 피드백 (에러)
-          triggerHapticFeedback(HapticFeedbackType.ERROR);
         }
       } catch (error) {
         console.error('[NATIVE CALLBACK] 카카오 로그인 처리 중 오류:', error);
         
-        // 진행 중 플래그 해제
-        (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
-        setIsLoading(false);
-        setError('카카오 로그인 처리 중 오류가 발생했습니다.');
-        
-        // 햅틱 피드백 (에러)
-        triggerHapticFeedback(HapticFeedbackType.ERROR);
+        try {
+          // 진행 중 플래그 해제
+          (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
+          
+          // 상태 업데이트 (안전한 방식)
+          if (setIsLoading && typeof setIsLoading === 'function') {
+            setIsLoading(false);
+          }
+          
+          if (setError && typeof setError === 'function') {
+            setError('카카오 로그인 처리 중 오류가 발생했습니다.');
+          }
+          
+          // 햅틱 피드백 (에러)
+          triggerHapticFeedback(HapticFeedbackType.ERROR);
+        } catch (catchError) {
+          console.error('[NATIVE CALLBACK] catch 블록 처리 중 오류:', catchError);
+        }
       }
+    };
+
+    // 카카오 콜백 함수 등록
+    (window as any).onNativeKakaoLoginSuccess = (userInfo: any) => {
+      console.log('🎯 [NATIVE CALLBACK] iOS 카카오 로그인 성공:', userInfo);
+      processKakaoLoginSuccess(userInfo).catch(console.error);
     };
     
     (window as any).onNativeKakaoLoginError = (error: any) => {
       console.error('❌ [NATIVE CALLBACK] iOS 카카오 로그인 실패:', error);
       
-      // 진행 중 플래그 해제
-      (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
-      setIsLoading(false);
-      setError('카카오 로그인에 실패했습니다.');
-      
-      // 햅틱 피드백 (에러)
-      triggerHapticFeedback(HapticFeedbackType.ERROR);
+      try {
+        // 진행 중 플래그 해제
+        (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
+        
+        // 상태 업데이트 (안전한 방식)
+        if (setIsLoading && typeof setIsLoading === 'function') {
+          setIsLoading(false);
+        }
+        
+        if (setError && typeof setError === 'function') {
+          setError('카카오 로그인에 실패했습니다.');
+        }
+        
+        // 햅틱 피드백 (에러)
+        triggerHapticFeedback(HapticFeedbackType.ERROR);
+      } catch (callbackError) {
+        console.error('❌ [NATIVE CALLBACK] 에러 콜백 처리 중 오류:', callbackError);
+      }
     };
     
     console.log('✅ [INIT] 초기화 완료');
@@ -567,7 +638,7 @@ const SignInPage = () => {
             
             // 회원가입 페이지로 이동
             window.location.href = '/register?social=google';
-            return undefined;
+            return;
             
           } else {
             console.log('[NATIVE CALLBACK] 기존회원 - 홈으로 이동');

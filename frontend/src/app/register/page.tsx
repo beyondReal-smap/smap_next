@@ -120,6 +120,24 @@ export default function RegisterPage() {
   React.useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
+      /* 헤더 강제 고정 스타일 */
+      .register-header-fixed {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 9999 !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        transform: none !important;
+        animation: none !important;
+        transition: none !important;
+        min-height: 60px !important;
+        height: auto !important;
+        width: 100% !important;
+      }
+      
       @media (max-height: 600px) {
         .register-content {
           padding-top: 0.5rem !important;
@@ -209,6 +227,7 @@ export default function RegisterPage() {
       document.head.removeChild(style);
     };
   }, []);
+
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(REGISTER_STEPS.TERMS);
   const [isLoading, setIsLoading] = useState(false);
@@ -308,6 +327,30 @@ export default function RegisterPage() {
       }
     }
   }, []);
+
+  // 헤더 강제 표시 유지
+  useEffect(() => {
+    const headerElement = document.querySelector('.register-header-fixed') as HTMLElement;
+    if (headerElement) {
+      const forceHeaderVisible = () => {
+        headerElement.style.display = 'block';
+        headerElement.style.visibility = 'visible';
+        headerElement.style.opacity = '1';
+        headerElement.style.position = 'fixed';
+        headerElement.style.top = '0';
+        headerElement.style.zIndex = '9999';
+        headerElement.style.transform = 'none';
+      };
+
+      // 초기 설정
+      forceHeaderVisible();
+
+      // 주기적으로 체크
+      const interval = setInterval(forceHeaderVisible, 100);
+
+      return () => clearInterval(interval);
+    }
+  }, [currentStep]);
 
   // 전화번호 포맷팅 함수
   const formatPhoneNumber = (value: string) => {
@@ -1028,9 +1071,9 @@ export default function RegisterPage() {
 
   return (
           <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative" style={{background: 'linear-gradient(to bottom right, #eff6ff, #ffffff, #faf5ff)'}}>
-      {/* 고정 헤더 */}
+      {/* 고정 헤더 - 강제 표시 */}
       <header 
-        className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-lg border-b border-gray-100/50 shadow-sm"
+        className="register-header-fixed fixed top-0 left-0 right-0 bg-white/70 backdrop-blur-lg border-b border-gray-100/50 shadow-sm"
         style={{
           backdropFilter: 'blur(10px)',
           background: 'rgba(255, 255, 255, 0.7)',
@@ -1045,7 +1088,13 @@ export default function RegisterPage() {
           top: 0,
           left: 0,
           right: 0,
-          zIndex: 50
+          zIndex: 9999,
+          transform: 'none',
+          animation: 'none',
+          transition: 'none',
+          minHeight: '60px',
+          height: 'auto',
+          width: '100%'
         }}
       >
         <div className="flex items-center justify-between h-14 px-4">
