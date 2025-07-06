@@ -94,11 +94,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // 로그인되지 않은 상태에서 보호된 페이지 접근 시 signin으로 리다이렉트
+    // 로그인되지 않은 상태에서 보호된 페이지 접근 시 즉시 signin으로 리다이렉트
     // 단, 이미 signin 페이지에 있으면 리다이렉트하지 않음
     if (!isLoggedIn && pathname !== '/signin') {
-      console.log('[AUTH GUARD] 인증되지 않은 접근, signin으로 리다이렉트:', pathname);
-      router.push('/signin');
+      console.log('[AUTH GUARD] 인증되지 않은 접근, 즉시 signin으로 리다이렉트:', pathname);
+      router.replace('/signin'); // push 대신 replace 사용으로 뒤로가기 방지
       return;
     }
 
@@ -110,11 +110,12 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     return <IOSCompatibleSpinner message="로딩 중..." fullScreen />;
   }
 
-  // 인증되지 않은 사용자가 보호된 페이지에 접근하려는 경우
-  // 단, signin 페이지는 제외 (이미 signin 페이지에 있으면 스피너 표시하지 않음)
+  // 인증되지 않은 사용자가 보호된 페이지에 접근하려는 경우 즉시 리다이렉트
+  // 빈 화면 표시 없이 바로 signin으로 이동
   if (!isLoggedIn && !PUBLIC_ROUTES.includes(pathname) && pathname !== '/signin') {
-    console.log('[AUTH GUARD] 인증되지 않은 사용자, 빈 화면 표시 (리다이렉트 대기)');
-    return <IOSCompatibleSpinner message="로그인 페이지로 이동 중..." fullScreen />;
+    console.log('[AUTH GUARD] 인증되지 않은 사용자, 즉시 signin으로 리다이렉트');
+    router.push('/signin');
+    return null; // 빈 화면 대신 null 반환으로 즉시 리다이렉트
   }
 
   return <>{children}</>;

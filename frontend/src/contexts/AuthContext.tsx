@@ -433,6 +433,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       globalPreloadingState.isPreloading = false;
       
       console.log('[AUTH] 로그아웃 완료');
+      
+      // 5. 즉시 signin 페이지로 리다이렉트
+      if (typeof window !== 'undefined') {
+        console.log('[AUTH] 즉시 signin 페이지로 리다이렉트');
+        window.location.replace('/signin');
+      }
     } catch (error) {
       console.error('[AUTH CONTEXT] 로그아웃 실패:', error);
       
@@ -446,6 +452,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       clearAllCache(); // 에러 시에도 캐시는 삭제
       dispatch({ type: 'LOGOUT' });
+      
+      // 에러 발생 시에도 signin 페이지로 리다이렉트
+      if (typeof window !== 'undefined') {
+        console.log('[AUTH] 에러 발생 시에도 signin 페이지로 리다이렉트');
+        window.location.replace('/signin');
+      }
     }
   };
 
