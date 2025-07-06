@@ -366,7 +366,7 @@ export default function WithdrawPage() {
           right: 0,
           zIndex: 9999,
           width: '100%',
-          paddingTop: 'env(safe-area-inset-top)'
+                      paddingTop: '0px'
         }}
       >
         <motion.div 

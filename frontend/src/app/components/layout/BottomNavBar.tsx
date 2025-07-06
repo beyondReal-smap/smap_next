@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { hapticFeedback } from '../../../utils/haptic';
@@ -10,6 +10,30 @@ export default function BottomNavBar() {
   
   // home 페이지 여부 확인
   const isHomePage = pathname === '/home';
+  
+  // 랜덤 깜빡임을 위한 상태
+  const [randomDelays, setRandomDelays] = useState([0, 0, 0]);
+  
+  // 랜덤 딜레이 업데이트 (3-5초마다)
+  useEffect(() => {
+    const updateRandomDelays = () => {
+      setRandomDelays([
+        Math.random() * 2,
+        Math.random() * 2.5,
+        Math.random() * 1.8
+      ]);
+    };
+    
+    // 초기 설정
+    updateRandomDelays();
+    
+    // 3-5초마다 랜덤하게 업데이트
+    const interval = setInterval(() => {
+      updateRandomDelays();
+    }, 3000 + Math.random() * 2000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   // iOS 감지 및 body에 클래스 추가
   useEffect(() => {
@@ -184,11 +208,11 @@ export default function BottomNavBar() {
                     />
                   )}
                   
-                  {/* 반짝이는 별 효과 */}
+                  {/* 랜덤 깜빡이는 점 효과 */}
                   {isActive && (
                     <>
                       <div
-                        className="absolute"
+                        className="absolute random-blink-dot"
                         style={{
                           top: '-4px',
                           right: '-4px',
@@ -196,12 +220,12 @@ export default function BottomNavBar() {
                           height: '4px',
                           background: '#0113A3',
                           borderRadius: '50%',
-                          animation: 'sparkle 1.5s ease-in-out infinite',
-                          animationDelay: '0s'
+                          animation: 'randomBlink 2s infinite',
+                          animationDelay: `${randomDelays[0]}s`
                         }}
                       />
                       <div
-                        className="absolute"
+                        className="absolute random-blink-dot"
                         style={{
                           top: '12px',
                           left: '-6px',
@@ -209,12 +233,12 @@ export default function BottomNavBar() {
                           height: '3px',
                           background: '#0113A3',
                           borderRadius: '50%',
-                          animation: 'sparkle 1.5s ease-in-out infinite',
-                          animationDelay: '0.5s'
+                          animation: 'randomBlink 2.5s infinite',
+                          animationDelay: `${randomDelays[1]}s`
                         }}
                       />
                       <div
-                        className="absolute"
+                        className="absolute random-blink-dot"
                         style={{
                           bottom: '-2px',
                           right: '-2px',
@@ -222,8 +246,8 @@ export default function BottomNavBar() {
                           height: '2px',
                           background: '#0113A3',
                           borderRadius: '50%',
-                          animation: 'sparkle 1.5s ease-in-out infinite',
-                          animationDelay: '1s'
+                          animation: 'randomBlink 1.8s infinite',
+                          animationDelay: `${randomDelays[2]}s`
                         }}
                       />
                     </>

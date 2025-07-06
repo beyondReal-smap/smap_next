@@ -479,7 +479,7 @@ body.sidebar-open .sidebar-content * {
       top: 0 !important;
       left: 0 !important;
       right: 0 !important;
-      padding-top: env(safe-area-inset-top) !important;
+      padding-top: 0px !important;
       min-height: 64px !important;
       height: auto !important;
       z-index: 999999 !important;
@@ -492,7 +492,7 @@ body.sidebar-open .sidebar-content * {
     
     /* 안드로이드에서만 지도 컨테이너 상단 마진 증가 */
     .full-map-container {
-      padding-top: max(72px, calc(env(safe-area-inset-top) + 72px)) !important;
+      padding-top: 72px !important;
     }
   }
 }
@@ -6864,7 +6864,7 @@ export default function LogsPage() {
         <AnimatedHeader 
           variant="simple"
           className="fixed top-0 left-0 right-0 z-[9999] glass-effect header-fixed"
-          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+                      style={{ paddingTop: '0px' }}
         >
           <div className="flex items-center justify-between h-14 px-4">
             <div className="flex items-center space-x-3">

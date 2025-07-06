@@ -94,6 +94,18 @@ const pageStyles = `
   }
 }
 
+/* 시머 애니메이션 */
+@keyframes shimmer {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+@keyframes shimmerMove {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
 /* 로딩 중일 때는 애니메이션 비활성화 */
 .loading .group-content,
 .loading .group-card {
@@ -1412,7 +1424,7 @@ function GroupPageContent() {
         <AnimatedHeader 
             variant="simple"
             className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
-            style={{ paddingTop: 'env(safe-area-inset-top)' }}
+            style={{ paddingTop: '0px' }}
           >
             <div className="flex items-center justify-between h-14 px-4">
               <AnimatePresence mode="wait">
@@ -1519,23 +1531,55 @@ function GroupPageContent() {
                         <div className="p-4 space-y-3 min-h-[300px]">
                           {loading ? (
                             <div className="space-y-3">
-                              {/* 스켈레톤 그룹 카드들 */}
+                              {/* 향상된 스켈레톤 그룹 카드들 */}
                               {[1, 2, 3, 4].map((index) => (
-                                <div key={index} className="animate-pulse">
-                                  <div className="rounded-xl p-4 bg-gray-100">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center flex-1 mr-3">
-                                        <div className="p-2 bg-gray-200 rounded-xl mr-4">
-                                          <div className="w-12 h-12 bg-gray-300 rounded-lg"></div>
+                                <div 
+                                  key={index} 
+                                  className="rounded-xl p-4 cursor-pointer relative overflow-hidden"
+                                  style={{ 
+                                    background: 'linear-gradient(to right, rgba(240, 249, 255, 0.8), rgba(219, 234, 254, 0.8))',
+                                    animation: `shimmer 1.5s infinite linear ${index * 0.2}s`
+                                  }}
+                                >
+                                  {/* 시머 효과 오버레이 */}
+                                  <div 
+                                    className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                                    style={{
+                                      animation: `shimmerMove 1.5s infinite linear ${index * 0.2}s`
+                                    }}
+                                  />
+                                  
+                                  <div className="flex items-center justify-between relative">
+                                    <div className="flex items-center flex-1 mr-3">
+                                      {/* 그룹 아이콘 스켈레톤 */}
+                                      <div className="p-2 bg-white rounded-xl mr-4">
+                                        <div className="w-12 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+                                      </div>
+                                      
+                                      {/* 그룹 정보 스켈레톤 */}
+                                      <div className="flex-1">
+                                        {/* 그룹 이름 */}
+                                        <div className="h-5 bg-gray-200 rounded mb-2 animate-pulse" style={{ width: `${70 + Math.random() * 20}%` }}></div>
+                                        
+                                        {/* 그룹 설명 */}
+                                        <div className="space-y-1 mb-2">
+                                          <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ width: `${80 + Math.random() * 15}%` }}></div>
+                                          <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ width: `${40 + Math.random() * 30}%` }}></div>
                                         </div>
-                                        <div className="flex-1">
-                                          <div className="h-5 bg-gray-300 rounded mb-2 w-3/4"></div>
-                                          <div className="h-4 bg-gray-300 rounded mb-2 w-full"></div>
-                                          <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+                                        
+                                        {/* 멤버 수와 날짜 */}
+                                        <div className="flex items-center space-x-4">
+                                          <div className="flex items-center">
+                                            <div className="w-3 h-3 bg-blue-200 rounded-full mr-1 animate-pulse"></div>
+                                            <div className="h-3 bg-blue-200 rounded animate-pulse w-8"></div>
+                                          </div>
+                                          <div className="h-3 bg-blue-200 rounded animate-pulse w-16"></div>
                                         </div>
                                       </div>
-                                      <div className="w-5 h-5 bg-gray-300 rounded"></div>
                                     </div>
+                                    
+                                    {/* 화살표 아이콘 스켈레톤 */}
+                                    <div className="w-5 h-5 bg-blue-200 rounded animate-pulse"></div>
                                   </div>
                                 </div>
                               ))}

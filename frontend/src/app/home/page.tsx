@@ -203,8 +203,8 @@ html, body {
   -webkit-backdrop-filter: blur(20px) !important;
   will-change: transform !important;
   transform: translateZ(0) !important;
-  /* iOS Safari 상단 노치 대응 */
-  padding-top: env(safe-area-inset-top, 0px);
+  /* iOS Safari 상단 노치 대응 제거 */
+  padding-top: 0px;
   /* iOS 웹뷰에서 고정 요소 최적화 */
   -webkit-transform: translateZ(0);
   -webkit-perspective: 1000;
@@ -231,9 +231,9 @@ html, body {
   -webkit-backface-visibility: hidden;
 }
 
-/* iOS Safe Area 대응 */
+/* iOS Safe Area 대응 제거 */
 .safe-area-padding-top {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: 0px;
 }
 
 .safe-area-padding-bottom {
@@ -5411,7 +5411,7 @@ export default function HomePage() {
         <AnimatedHeader 
           variant="enhanced"
           className={`fixed top-0 left-0 right-0 glass-effect header-fixed ${isSidebarOpen ? 'z-40' : 'z-50'}`}
-          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+                      style={{ paddingTop: '0px' }}
         >
             <div className="flex items-center justify-between h-14 px-4">
               <div className="flex items-center space-x-3">
@@ -5697,7 +5697,7 @@ export default function HomePage() {
                      className="p-6 h-full flex flex-col relative z-10"
                      onClick={(e) => e.stopPropagation()}
                      style={{
-                       paddingTop: 'calc(env(safe-area-inset-top) + 1.5rem)',
+                       paddingTop: '1.5rem',
                        paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)'
                      }}
                    >

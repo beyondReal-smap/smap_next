@@ -1037,7 +1037,7 @@ export default function RegisterPage() {
           background: 'rgba(255, 255, 255, 0.7)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
-          paddingTop: 'env(safe-area-inset-top)'
+                      paddingTop: '0px'
         }}
       >
         <div className="flex items-center justify-between h-14 px-4">

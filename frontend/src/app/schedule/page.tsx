@@ -4027,7 +4027,7 @@ export default function SchedulePage() {
         <AnimatedHeader 
             variant="simple"
             className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
-            style={{ paddingTop: 'env(safe-area-inset-top)' }}
+            style={{ paddingTop: '0px' }}
           >
             <div className="flex items-center justify-between h-14 px-4">
               <div className="flex items-center space-x-3">
