@@ -1570,7 +1570,7 @@ export default function SchedulePage() {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.1, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] as const }}
           className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
-          style={{ paddingTop: 'env(safe-area-inset-top)' }}
+          style={{ paddingTop: '0px' }}
         >
                       <div className="flex items-center justify-between h-14 px-4">
             <div className="flex items-center space-x-3">

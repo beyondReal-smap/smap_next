@@ -51,7 +51,10 @@ const defaultHeaderStyle: React.CSSProperties = {
   WebkitPerspective: 1000,
   WebkitBackfaceVisibility: 'hidden',
   padding: 0,
+  paddingTop: 0,
   margin: 0,
+  marginTop: 0,
+  top: 0,
   minHeight: 'auto',
   height: 'auto',
   // 안드로이드 최적화
@@ -111,7 +114,10 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
         zIndex: 50,
         opacity: 1,
         visibility: 'visible',
-        display: 'block'
+        display: 'block',
+        // 헤더 위 모든 여백 제거
+        paddingTop: 0,
+        marginTop: 0
       }}
       // 안드로이드에서 애니메이션 우선순위 설정
       {...(isAndroid && {

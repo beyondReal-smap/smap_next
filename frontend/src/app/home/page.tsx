@@ -1071,6 +1071,59 @@ export default function HomePage() {
       }
     };
   }, []);
+
+  // 헤더 상단 패딩 강제 제거 (런타임)
+  useEffect(() => {
+    const forceRemoveHeaderPadding = () => {
+      if (typeof document === 'undefined') return;
+      
+      // 모든 헤더 관련 요소 선택
+      const selectors = [
+        'header',
+        '.header-fixed',
+        '.glass-effect',
+        '.register-header-fixed',
+        '.schedule-header',
+        '.logs-header',
+        '.location-header',
+        '.group-header',
+        '.home-header',
+        '[role="banner"]',
+        '#home-page-container'
+      ];
+      
+      selectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach((element: Element) => {
+          const htmlElement = element as HTMLElement;
+          htmlElement.style.paddingTop = '0px';
+          htmlElement.style.marginTop = '0px';
+          htmlElement.style.setProperty('padding-top', '0px', 'important');
+          htmlElement.style.setProperty('margin-top', '0px', 'important');
+          if (selector === 'header' || selector.includes('header')) {
+            htmlElement.style.setProperty('top', '0px', 'important');
+            htmlElement.style.setProperty('position', 'fixed', 'important');
+          }
+        });
+      });
+      
+      // body와 html 요소도 확인
+      document.body.style.setProperty('padding-top', '0px', 'important');
+      document.body.style.setProperty('margin-top', '0px', 'important');
+      document.documentElement.style.setProperty('padding-top', '0px', 'important');
+      document.documentElement.style.setProperty('margin-top', '0px', 'important');
+    };
+    
+    // 즉시 실행
+    forceRemoveHeaderPadding();
+    
+    // 정기적으로 강제 적용 (다른 스타일이 덮어쓸 수 있으므로)
+    const interval = setInterval(forceRemoveHeaderPadding, 500);
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
   
   // useEffect를 사용하여 클라이언트 사이드에서 날짜 관련 상태 초기화
   useEffect(() => {
@@ -5401,7 +5454,10 @@ export default function HomePage() {
           className="min-h-screen relative"
           style={{ 
             background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
-            paddingBottom: '72px' // 네비게이션 바를 위한 하단 여백 (56px + 16px)
+            paddingBottom: '72px', // 네비게이션 바를 위한 하단 여백 (56px + 16px)
+            paddingTop: '0px', // 상단 패딩 강제 제거
+            marginTop: '0px', // 상단 마진 강제 제거
+            top: '0px' // 최상단 고정
           }}
           data-react-mount="true"
           data-page="/home"
@@ -5411,7 +5467,12 @@ export default function HomePage() {
         <AnimatedHeader 
           variant="enhanced"
           className={`fixed top-0 left-0 right-0 glass-effect header-fixed ${isSidebarOpen ? 'z-40' : 'z-50'}`}
-                      style={{ paddingTop: '0px' }}
+          style={{ 
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px',
+            position: 'fixed'
+          }}
         >
             <div className="flex items-center justify-between h-14 px-4">
               <div className="flex items-center space-x-3">

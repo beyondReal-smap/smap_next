@@ -76,7 +76,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       {/* 헤더 (조건부 렌더링) */}
       {!isNoHeader && (
-        <header className="bg-white shadow-sm fixed top-0 left-0 right-0 z-10">
+        <header className="bg-white shadow-sm fixed left-0 right-0 z-10" style={{ top: '0px', paddingTop: '0px', marginTop: '0px' }}>
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             {isSimplifiedHeader ? (
               // 간소화된 헤더 (그룹, 일정, 내장소, 로그 페이지, /schedule/add 포함)

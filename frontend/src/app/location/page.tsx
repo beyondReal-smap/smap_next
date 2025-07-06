@@ -672,6 +672,59 @@ export default function LocationPage() {
     }
   }, []);
 
+  // 헤더 상단 패딩 강제 제거 (런타임)
+  useEffect(() => {
+    const forceRemoveHeaderPadding = () => {
+      if (typeof document === 'undefined') return;
+      
+      // 모든 헤더 관련 요소 선택
+      const selectors = [
+        'header',
+        '.header-fixed',
+        '.glass-effect',
+        '.location-header',
+        '.register-header-fixed',
+        '.logs-header',
+        '.group-header',
+        '.schedule-header',
+        '.home-header',
+        '[role="banner"]',
+        '#location-page-container'
+      ];
+      
+      selectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach((element: Element) => {
+          const htmlElement = element as HTMLElement;
+          htmlElement.style.paddingTop = '0px';
+          htmlElement.style.marginTop = '0px';
+          htmlElement.style.setProperty('padding-top', '0px', 'important');
+          htmlElement.style.setProperty('margin-top', '0px', 'important');
+          if (selector === 'header' || selector.includes('header')) {
+            htmlElement.style.setProperty('top', '0px', 'important');
+            htmlElement.style.setProperty('position', 'fixed', 'important');
+          }
+        });
+      });
+      
+      // body와 html 요소도 확인
+      document.body.style.setProperty('padding-top', '0px', 'important');
+      document.body.style.setProperty('margin-top', '0px', 'important');
+      document.documentElement.style.setProperty('padding-top', '0px', 'important');
+      document.documentElement.style.setProperty('margin-top', '0px', 'important');
+    };
+    
+    // 즉시 실행
+    forceRemoveHeaderPadding();
+    
+    // 정기적으로 강제 적용 (다른 스타일이 덮어쓸 수 있으므로)
+    const interval = setInterval(forceRemoveHeaderPadding, 500);
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
 
   
   // 상태 관리
@@ -4994,13 +5047,24 @@ export default function LocationPage() {
         }
         variants={pageVariants}
         className="fixed inset-0 overflow-hidden"
-        style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}
+        id="location-page-container"
+        style={{ 
+          background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
+          paddingTop: '0px',
+          marginTop: '0px',
+          top: '0px'
+        }}
       >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
             variant="simple"
-            className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
-            style={{ paddingTop: '0px' }}
+            className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed location-header"
+            style={{ 
+              paddingTop: '0px',
+              marginTop: '0px',
+              top: '0px',
+              position: 'fixed'
+            }}
           >
             <div className="flex items-center justify-between h-14 px-4">
               <div className="flex items-center space-x-3">

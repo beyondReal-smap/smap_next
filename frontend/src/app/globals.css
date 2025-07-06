@@ -75,11 +75,20 @@ html {
   height: 100%;
   /* iOS 스크롤 바운스 방지 */
   overscroll-behavior: none;
+  /* 상단 여백 완전 제거 */
+  padding-top: 0px !important;
+  margin-top: 0px !important;
+  /* iOS safe-area 무시 */
+  padding-top: 0px !important;
+  padding-top: constant(safe-area-inset-top, 0px) !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
 }
 
 /* 헤더 및 네비게이션 기본 스타일 */
 .header-fixed {
   padding-top: 0px !important; /* 모든 페이지에서 헤더 위 패딩 제거 */
+  margin-top: 0px !important; /* 헤더 위 마진도 제거 */
+  top: 0px !important; /* 헤더를 화면 최상단에 고정 */
   /* 헤더 드래그 방지 */
   touch-action: none !important;
   -webkit-user-select: none !important;
@@ -92,6 +101,90 @@ html {
 .header-fixed * {
   touch-action: auto !important;
   pointer-events: auto !important;
+}
+
+/* 모든 헤더 요소의 상단 여백 강제 제거 - 최고 우선순위 */
+html, body {
+  padding-top: 0px !important;
+  margin-top: 0px !important;
+}
+
+header, 
+.header-fixed, 
+[role="banner"],
+.glass-effect,
+motion-header,
+.register-header-fixed,
+.schedule-header,
+.logs-header,
+.location-header,
+.group-header,
+.home-header {
+  padding-top: 0px !important;
+  margin-top: 0px !important;
+  top: 0px !important;
+  /* iOS safe-area 완전 무시 */
+  padding-top: 0px !important;
+  margin-top: 0px !important;
+  /* WebKit 관련 패딩 제거 */
+  -webkit-padding-before: 0px !important;
+  -webkit-margin-before: 0px !important;
+  /* 모든 방향 패딩 체크 */
+  padding-block-start: 0px !important;
+  margin-block-start: 0px !important;
+  /* 상속된 패딩 제거 */
+  padding-inline-start: 0px !important;
+  margin-inline-start: 0px !important;
+}
+
+/* framer-motion 헤더 강제 스타일 */
+div[style*="position: fixed"][style*="top:"],
+div[style*="position:fixed"][style*="top:"] {
+  top: 0px !important;
+  padding-top: 0px !important;
+  margin-top: 0px !important;
+}
+
+/* CSS 변수로 설정된 패딩도 제거 */
+:root {
+  --header-padding-top: 0px !important;
+  --safe-area-inset-top: 0px !important;
+}
+
+/* env() 함수 관련 패딩 제거 */
+* {
+  --safe-area-inset-top: 0px !important;
+}
+
+/* iOS WebView safe-area 완전 무시 */
+@supports (padding: max(0px)) {
+  header, 
+  .header-fixed, 
+  .glass-effect {
+    padding-top: 0px !important;
+    padding-top: max(0px, 0px) !important;
+  }
+}
+
+/* 런타임 강제 스타일 적용 */
+/* 모든 header와 관련 요소들의 스타일을 JavaScript로도 강제 적용하기 위한 클래스 */
+.force-no-top-padding {
+  padding-top: 0px !important;
+  margin-top: 0px !important;
+  top: 0px !important;
+}
+
+/* 페이지 컨테이너 강제 스타일 */
+#home-page-container,
+#schedule-page-container,
+#logs-page-container,
+#location-page-container,
+#group-page-container,
+#register-page-container,
+#signin-page-container {
+  padding-top: 0px !important;
+  margin-top: 0px !important;
+  top: 0px !important;
 }
 
 .navigation-fixed {
