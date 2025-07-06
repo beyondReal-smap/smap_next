@@ -8,6 +8,25 @@ import { hapticFeedback } from '../../../utils/haptic';
 export default function BottomNavBar() {
   const pathname = usePathname();
   
+  // home 페이지 여부 확인
+  const isHomePage = pathname === '/home';
+  
+  // iOS 감지 및 body에 클래스 추가
+  useEffect(() => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    if (isIOS) {
+      // iOS 디바이스일 때 body에 클래스 추가
+      document.body.classList.add('ios-device');
+    } else {
+      document.body.classList.add('android-device');
+    }
+    
+    return () => {
+      document.body.classList.remove('ios-device', 'android-device');
+    };
+  }, []);
+  
   // 네비게이션 바 마진 제거를 위한 전역 스타일
   useEffect(() => {
     const style = document.createElement('style');
@@ -44,185 +63,9 @@ export default function BottomNavBar() {
     };
   }, []);
   
-  // 네비게이션 바 위치 강제 설정
-  useEffect(() => {
-    let isSettingPosition = false; // 무한 루프 방지 플래그
-    
-    // 🔥 강제 위치 설정 (조건부 실행으로 무한루프 방지)
-    const forceBottomNavPosition = () => {
-      if (isSettingPosition) return; // 이미 설정 중이면 무시
-      
-      const bottomNav = document.getElementById('bottom-navigation-bar');
-      if (bottomNav) {
-        const currentPath = window.location.pathname;
-        
-
-        
-        // 다른 페이지들
-        const currentBottom = bottomNav.style.bottom;
-        const currentPosition = bottomNav.style.position;
-        let targetBottom = '0px'; // 모든 페이지는 화면 하단에 딱 붙임
-        
-        // 이미 올바른 값이면 실행하지 않음 (무한루프 방지)
-        if (currentPosition === 'fixed' && currentBottom === targetBottom) {
-          return;
-        }
-        
-        // 1. 인라인 스타일 강제 설정
-        bottomNav.setAttribute('style', `
-          position: fixed !important;
-          bottom: ${targetBottom} !important;
-          left: 0px !important;
-          right: 0px !important;
-          top: auto !important;
-          width: 100% !important;
-          height: auto !important;
-          min-height: 70px !important;
-          z-index: 999999 !important;
-          transform: none !important;
-          -webkit-transform: none !important;
-          animation: none !important;
-          transition: none !important;
-          display: block !important;
-          visibility: visible !important;
-          opacity: 1 !important;
-          background-color: white !important;
-          border-top: 1px solid #e5e7eb !important;
-          box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-          border-top-left-radius: 16px !important;
-          border-top-right-radius: 16px !important;
-          padding-top: 12px !important;
-          padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
-          margin: 0px !important;
-        `);
-        
-        // 2. 클래스 강제 추가
-        bottomNav.classList.add('forced-bottom-nav', 'position-fixed-bottom');
-        bottomNav.setAttribute('data-forced-position', 'bottom-fixed');
-        bottomNav.setAttribute('data-bottom', targetBottom.replace('px', ''));
-        
-        // 로그 출력 제거 (무한반복 방지)
-      }
-    };
-
-    // DOM 변경 감시 (더 제한적으로)
-    const observer = new MutationObserver((mutations) => {
-      let needsForce = false;
-      
-      mutations.forEach((mutation) => {
-        if (mutation.type === 'attributes' && mutation.target instanceof HTMLElement) {
-          const target = mutation.target;
-                      if (target.id === 'bottom-navigation-bar') {
-              const style = target.style;
-              const currentPath = window.location.pathname;
-              const expectedBottom = ['/home', '/group', '/schedule', '/logs', '/location'].includes(currentPath) ? '0px' : '0px';
-              
-              if (style.bottom !== expectedBottom || style.position !== 'fixed') {
-                needsForce = true;
-              }
-            }
-        }
-      });
-      
-      if (needsForce) {
-        forceBottomNavPosition();
-      }
-    });
-
-    // 즉시 실행
-    forceBottomNavPosition();
-    
-    // 필요시에만 체크 (무한반복 방지)
-    const normalInterval = setInterval(() => {
-      const navBar = document.getElementById('bottom-navigation-bar');
-      if (navBar) {
-        const computedStyle = window.getComputedStyle(navBar);
-        const isCorrectlyPositioned = 
-          computedStyle.position === 'fixed' && 
-          computedStyle.bottom === '0px' && 
-          computedStyle.zIndex === '999999' &&
-          computedStyle.display === 'block' &&
-          computedStyle.visibility === 'visible';
-        
-        // 위치가 잘못된 경우에만 수정 (로그 출력 없이)
-        if (!isCorrectlyPositioned) {
-          forceBottomNavPosition();
-        }
-      }
-    }, 10000); // 10초마다만 체크
-
-    // DOM 감시 시작 (제한적으로)
-    const targetElement = document.getElementById('bottom-navigation-bar');
-    if (targetElement) {
-      observer.observe(targetElement, {
-        attributes: true,
-        attributeFilter: ['style'],
-        subtree: false
-      });
-    }
-
-    // 페이지 로드 완료 후 한 번만 실행
-    if (document.readyState === 'complete') {
-      setTimeout(forceBottomNavPosition, 500);
-    } else {
-      window.addEventListener('load', () => {
-        setTimeout(forceBottomNavPosition, 500);
-      });
-    }
-
-    // cleanup
-    return () => {
-      clearInterval(normalInterval);
-      observer.disconnect();
-    };
-  }, []);
+  // 네비게이션 바 위치는 CSS로만 관리 (JavaScript 강제 설정 제거)
   
-  // 컴포넌트 마운트 후 한 번만 강제 설정 (무한반복 방지)
-  useEffect(() => {
-    const ensurePosition = () => {
-      const element = document.getElementById('bottom-navigation-bar');
-      if (element) {
-        const computedStyle = window.getComputedStyle(element);
-        const isCorrectlyPositioned = 
-          computedStyle.position === 'fixed' && 
-          computedStyle.bottom === '0px' && 
-          computedStyle.zIndex === '999999';
-        
-        if (!isCorrectlyPositioned) {
-          element.style.cssText = `
-            position: fixed !important;
-            bottom: 0px !important;
-            left: 0px !important;
-            right: 0px !important;
-            top: auto !important;
-            width: 100% !important;
-            height: auto !important;
-            min-height: 70px !important;
-            z-index: 999999 !important;
-            transform: none !important;
-            -webkit-transform: none !important;
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            background-color: white !important;
-            border-top: 1px solid #e5e7eb !important;
-            box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-            border-top-left-radius: 16px !important;
-            border-top-right-radius: 16px !important;
-            padding-top: 12px !important;
-            padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
-            margin: 0px !important;
-          `;
-          console.log('[BottomNavBar] 마운트 후 위치 수정 완료');
-        } else {
-          console.log('[BottomNavBar] 마운트 후 위치 정상 확인됨');
-        }
-      }
-    };
-    
-    // 마운트 후 한 번만 실행
-    setTimeout(ensurePosition, 500);
-  }, []);
+  // 위치 설정은 CSS와 인라인 스타일로만 처리 (JavaScript 제거)
   
   // 네비게이션 메뉴 아이템
   const navItems = [
@@ -253,29 +96,39 @@ export default function BottomNavBar() {
       id="bottom-navigation-bar"
       style={{
         position: 'fixed',
-        bottom: '0px',
+        bottom: isHomePage ? '72px' : '0px',
         left: '0px',
         right: '0px',
         zIndex: 999999,
-        backgroundColor: 'white',
-        borderTop: '1px solid #e5e7eb',
-        boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06)',
-        borderTopLeftRadius: '16px',
-        borderTopRightRadius: '16px',
-        margin: '0px',
-        height: 'auto',
-        minHeight: '70px',
-        paddingTop: '12px',
-        paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+        width: '100%',
+        minHeight: '72px',
         display: 'block',
         visibility: 'visible',
         opacity: 1,
         transform: 'none',
         WebkitTransform: 'none',
-        width: '100%'
+        pointerEvents: 'auto',
+        backgroundColor: 'white',
+        borderTop: '1px solid #e5e7eb',
+        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
+        borderTopLeftRadius: '16px',
+        borderTopRightRadius: '16px',
+        borderBottomLeftRadius: '0px',
+        borderBottomRightRadius: '0px',
+        overflow: 'hidden'
       }}
     >
-      <nav className="flex justify-around items-center px-2 m-0 p-0" style={{ margin: '0 !important', padding: '0 !important' }}>
+      <nav 
+        className="flex justify-around items-center px-2 m-0 p-0 h-full" 
+        style={{ 
+          margin: '0 !important', 
+          padding: '0 !important',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-around'
+        }}
+      >
         {navItems.map(({ name, path, icon }) => {
           const isActive = pathname === path;
           
@@ -284,18 +137,39 @@ export default function BottomNavBar() {
               key={path}
               href={path}
               onClick={() => handleNavClick({ name, path, icon })}
-              className="flex flex-col items-center transition-colors duration-200 flex-1 min-w-0 m-0 p-0"
-              style={{ margin: '0 !important', padding: '0 !important' }}
+              className="flex flex-col items-center justify-center transition-colors duration-200 flex-1 min-w-0 m-0 p-0 h-full"
+              style={{ 
+                margin: '0 !important', 
+                padding: '0 !important',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
             >
-                <div className="relative flex flex-col items-center m-0 p-0" style={{ margin: '0 !important', padding: '0 !important' }}>
+                <div 
+                  className="relative flex flex-col items-center justify-center m-0 p-0" 
+                  style={{ 
+                    margin: '0 !important', 
+                    padding: '0 !important',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '2px'
+                  }}
+                >
                 {/* 아이콘 컨테이너 */}
                 <div 
-                  className="w-6 h-6 flex items-center justify-center relative m-0 p-0"
+                  className="w-5 h-5 flex items-center justify-center relative m-0 p-0"
                   style={{ 
                     color: isActive ? '#0113A3' : '#6b7280',
                     transform: 'none',
                     margin: '0 !important',
-                    padding: '0 !important'
+                    padding: '0 !important',
+                    filter: isActive ? 'drop-shadow(0 0 4px rgba(1, 19, 163, 0.3))' : 'none',
+                    animation: isActive ? 'icon-glow 2s ease-in-out infinite alternate' : 'none'
                   }}
                 >
                   {/* 선택된 아이템 배경 표시 */}
@@ -303,15 +177,62 @@ export default function BottomNavBar() {
                     <div
                       className="absolute inset-0 rounded-full"
                       style={{ 
-                        background: 'radial-gradient(circle, rgba(1, 19, 163, 0.1) 0%, transparent 70%)'
+                        background: 'radial-gradient(circle, rgba(1, 19, 163, 0.1) 0%, transparent 70%)',
+                        animation: 'gentle-glow 2s ease-in-out infinite alternate',
+                        WebkitAnimation: 'gentle-glow 2s ease-in-out infinite alternate'
                       }}
                     />
+                  )}
+                  
+                  {/* 반짝이는 별 효과 */}
+                  {isActive && (
+                    <>
+                      <div
+                        className="absolute"
+                        style={{
+                          top: '-4px',
+                          right: '-4px',
+                          width: '4px',
+                          height: '4px',
+                          background: '#0113A3',
+                          borderRadius: '50%',
+                          animation: 'sparkle 1.5s ease-in-out infinite',
+                          animationDelay: '0s'
+                        }}
+                      />
+                      <div
+                        className="absolute"
+                        style={{
+                          top: '12px',
+                          left: '-6px',
+                          width: '3px',
+                          height: '3px',
+                          background: '#0113A3',
+                          borderRadius: '50%',
+                          animation: 'sparkle 1.5s ease-in-out infinite',
+                          animationDelay: '0.5s'
+                        }}
+                      />
+                      <div
+                        className="absolute"
+                        style={{
+                          bottom: '-2px',
+                          right: '-2px',
+                          width: '2px',
+                          height: '2px',
+                          background: '#0113A3',
+                          borderRadius: '50%',
+                          animation: 'sparkle 1.5s ease-in-out infinite',
+                          animationDelay: '1s'
+                        }}
+                      />
+                    </>
                   )}
                   
                   {/* 홈 아이콘 */}
                   {icon === 'home' && (
                     <svg 
-                      className="w-6 h-6 relative z-10" 
+                      className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -323,7 +244,7 @@ export default function BottomNavBar() {
                   {/* 사용자 그룹 아이콘 */}
                   {icon === 'users' && (
                     <svg 
-                      className="w-6 h-6 relative z-10" 
+                      className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -335,7 +256,7 @@ export default function BottomNavBar() {
                   {/* 달력 아이콘 */}
                   {icon === 'calendar' && (
                     <svg 
-                      className="w-6 h-6 relative z-10" 
+                      className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -347,7 +268,7 @@ export default function BottomNavBar() {
                   {/* 지도 핀 아이콘 */}
                   {icon === 'map-pin' && (
                     <svg 
-                      className="w-6 h-6 relative z-10" 
+                      className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -358,7 +279,7 @@ export default function BottomNavBar() {
                   {/* 문서 아이콘 */}
                   {icon === 'document' && (
                     <svg 
-                      className="w-6 h-6 relative z-10" 
+                      className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
@@ -374,9 +295,9 @@ export default function BottomNavBar() {
                   style={{ 
                     color: isActive ? '#0113A3' : '#6b7280',
                     transform: 'none',
-                    marginTop: '0px',
-                    marginBottom: '0px !important',
                     margin: '0px !important',
+                    fontSize: '11px',
+                    lineHeight: '14px'
                   }}
                 >
                   {name}

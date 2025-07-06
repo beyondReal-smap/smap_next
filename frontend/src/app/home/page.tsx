@@ -110,7 +110,7 @@ import DebugPanel from '../components/layout/DebugPanel';
 import LogParser from '../components/layout/LogParser';
 import AnimatedHeader from '../../components/common/AnimatedHeader';
 import GroupSelector from '@/components/location/GroupSelector';
-import BottomNavBar from '../components/layout/BottomNavBar';
+// BottomNavBar는 ClientLayout에서 전역으로 관리됨
 
 declare global {
   interface Window {
@@ -340,13 +340,13 @@ html, body {
 
 /* 지도 화면 전체 차지하기 위한 스타일 */
 .full-map-container {
-  position: fixed !important;
-  top: 0 !important; /* 헤더 아래부터 시작하지 않고 화면 최상단부터 시작 */
+  position: absolute !important;
+  top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  width: 100% !important;
+  height: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
   overflow: visible !important; /* 지도 터치 이벤트를 위해 visible로 변경 */
@@ -837,6 +837,9 @@ export default function HomePage() {
   const [componentError, setComponentError] = useState<string | null>(null);
   
   useEffect(() => {
+    // home 페이지 식별을 위한 data-page 속성 설정
+    document.body.setAttribute('data-page', '/home');
+    
     const handleError = (error: ErrorEvent) => {
       console.error('🏠 [HOME] ❌ 전역 에러 감지:', {
         message: error.message,
@@ -5390,10 +5393,10 @@ export default function HomePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
-          className="min-h-screen relative overflow-hidden"
+          className="min-h-screen relative"
           style={{ 
             background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
-            paddingBottom: '90px' // 네비게이션 바를 위한 하단 여백 (높이 증가로 인한 조정)
+            paddingBottom: '72px' // 네비게이션 바를 위한 하단 여백 (56px + 16px)
           }}
           data-react-mount="true"
           data-page="/home"
@@ -5541,7 +5544,6 @@ export default function HomePage() {
           className="full-map-container" 
           style={{ 
             paddingTop: '0px',
-            position: 'relative',
             touchAction: 'manipulation',
             overflow: 'visible'
           }}
@@ -5651,7 +5653,7 @@ export default function HomePage() {
              boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
              zIndex: 999999, // 사이드바보다 훨씬 높은 z-index
              position: 'fixed',
-             bottom: '80px !important', // 10px 아래로 이동 (기존 106px에서 96px로)
+             bottom: '72px !important', // 네비게이션 바(56px) + 여백(16px) = 72px
              right: '16px',
              pointerEvents: 'auto' // 항상 클릭 가능하도록 설정
            }}
@@ -6053,9 +6055,6 @@ export default function HomePage() {
            )}
          </AnimatePresence>
               </motion.div>
-              
-              {/* 하단 네비게이션 바 */}
-              <BottomNavBar />
       </>
     );
   } catch (renderError) {

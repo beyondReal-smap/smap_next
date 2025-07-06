@@ -30,7 +30,7 @@
   --border-radius-xl: 1rem;
   --border-radius-full: 9999px;
   --bottom-nav-position: 0px;
-  --bottom-nav-height: 76px;
+  --bottom-nav-height: 56px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -64,7 +64,7 @@ body {
   /* iOS 터치 이벤트 최적화 */
   touch-action: manipulation;
   /* 🔥 하단 네비게이션을 위한 body 패딩 */
-  padding-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: 72px !important;
   margin-bottom: 0 !important;
 }
 
@@ -77,30 +77,37 @@ html {
   overscroll-behavior: none;
 }
 
-/* iOS Safe Area 전역 적용 */
-@supports (padding: max(0px)) {
-  .header-fixed {
-    padding-top: env(safe-area-inset-top) !important;
-    /* 헤더 드래그 방지 */
-    touch-action: none !important;
-    -webkit-user-select: none !important;
-    user-select: none !important;
-    -webkit-touch-callout: none !important;
-    pointer-events: auto !important;
-  }
-  
-  /* 헤더 내부 요소들의 터치 이벤트는 허용 */
-  .header-fixed * {
-    touch-action: auto !important;
-    pointer-events: auto !important;
-  }
-  
-  .navigation-fixed {
-    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
-    border-top-left-radius: 20px !important;
-    border-top-right-radius: 20px !important;
-    overflow: hidden !important;
-  }
+/* 헤더 및 네비게이션 기본 스타일 */
+.header-fixed {
+  padding-top: 16px !important;
+  /* 헤더 드래그 방지 */
+  touch-action: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  pointer-events: auto !important;
+}
+
+/* home, group, schedule, location, logs 페이지에서 헤더 상단 패딩 제거 */
+[data-page="/home"] .header-fixed,
+[data-page="/group"] .header-fixed,
+[data-page="/schedule"] .header-fixed,
+[data-page="/location"] .header-fixed,
+[data-page="/logs"] .header-fixed {
+  padding-top: 0px !important;
+}
+
+/* 헤더 내부 요소들의 터치 이벤트는 허용 */
+.header-fixed * {
+  touch-action: auto !important;
+  pointer-events: auto !important;
+}
+
+.navigation-fixed {
+  padding-bottom: 8px !important;
+  border-top-left-radius: 20px !important;
+  border-top-right-radius: 20px !important;
+  overflow: hidden !important;
 }
 
 .font-suite {
@@ -374,13 +381,13 @@ div.fixed#bottom-navigation-bar {
   border-top-left-radius: 16px !important;
   border-top-right-radius: 16px !important;
   overflow: visible !important;
-  min-height: 76px !important;
+  min-height: 56px !important;
   height: auto !important;
   width: 100% !important;
   max-width: 100% !important;
   margin: 0px !important;
-  padding-top: 12px !important;
-  padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  padding-top: 8px !important;
+  padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
 }
 
 /* 🔥 인라인 스타일까지 덮어쓰는 최강 선택자 */
@@ -480,8 +487,6 @@ body[data-page="group"] #bottom-navigation-bar,
 body[data-page="schedule"] #bottom-navigation-bar,
 body[data-page="logs"] #bottom-navigation-bar,
 body[data-page="location"] #bottom-navigation-bar {
-  bottom: 0px !important;
-  position: fixed !important;
 }
 
 /* 모든 브라우저 지원 */
@@ -619,65 +624,29 @@ html[data-page="/home"] #bottom-navigation-bar,
 html body[data-page="/home"] #bottom-navigation-bar {
   position: fixed !important;
   bottom: 0px !important;
-  left: 0px !important;
-  right: 0px !important;
-  top: auto !important;
-  z-index: 999999 !important;
-  width: 100vw !important;
-  height: auto !important;
-  min-height: 70px !important;
-  max-height: none !important;
-  margin: 0px !important;
-  padding-top: 12px !important;
-  padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-  translate: none !important;
-  animation: none !important;
-  transition: none !important;
-  display: block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  background-color: white !important;
-  border-top: 1px solid #e5e7eb !important;
-  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-  border-top-left-radius: 16px !important;
-  border-top-right-radius: 16px !important;
-  overflow: visible !important;
-  contain: none !important;
-  will-change: auto !important;
 }
 
-/* group 페이지 - 네비게이션 바를 40px 위로 */
+/* group 페이지 - 네비게이션 바를 화면 하단에 고정 */
 [data-page="/group"] #bottom-navigation-bar,
 .group-page #bottom-navigation-bar {
-  bottom: 40px !important;
+  bottom: 0px !important;
   position: fixed !important;
 }
 
 /* schedule 페이지 */
 [data-page="/schedule"] #bottom-navigation-bar,
 .schedule-page-container #bottom-navigation-bar {
-  bottom: 40px !important;
+  bottom: 0px !important;
   position: fixed !important;
 }
 
 /* logs 페이지 */
 [data-page="/logs"] #bottom-navigation-bar,
 .logs-page #bottom-navigation-bar {
-  bottom: 40px !important;
+  bottom: 0px !important;
   position: fixed !important;
 }
 
-/* location 페이지 - 30px 아래로 (강제 적용) */
-[data-page="/location"] #bottom-navigation-bar,
-.location-page #bottom-navigation-bar,
-body[data-page="/location"] #bottom-navigation-bar,
-html body[data-page="/location"] #bottom-navigation-bar,
-#location-page-container #bottom-navigation-bar,
-.location-page-container #bottom-navigation-bar,
-body[data-page="/location"] nav,
 
 
 
@@ -689,35 +658,39 @@ body[data-page="/location"] nav,
 
 /* 🔥 CRITICAL: CSS 변수를 사용한 모든 bottom 속성 강제 설정 */
 :root {
-  --bottom-nav-position: 40px !important;
+  --bottom-nav-position: 0px !important;
 }
 
 [id="bottom-navigation-bar"] {
-  bottom: var(--bottom-nav-position, 40px) !important;
+  bottom: var(--bottom-nav-position, 0px) !important;
 }
 
 /* location 페이지 전용 CSS 변수 오버라이드 */
 [data-page="/location"] {
-  --bottom-nav-position: -20px !important;
+  --bottom-nav-position: 0px !important;
 }
 
 [data-page="/location"] [id="bottom-navigation-bar"] {
-  bottom: -20px !important;
+  bottom: 0px !important;
 }
 
 /* 🔥 CRITICAL: 네비게이션 바 전용 클래스로 강제 적용 */
 .bottom-navigation-fixed {
   position: fixed !important;
-  bottom: 40px !important;
+  bottom: 0px !important;
   left: 0px !important;
   right: 0px !important;
   z-index: 999999 !important;
 }
 
-/* 홈 페이지 네비게이션 바 강제 상단 배치 */
-[data-page="/home"] .bottom-navigation-fixed {
+/* 홈 페이지 네비게이션 바 강제 하단 배치 */
+[data-page="/home"] .bottom-navigation-fixed,
+[data-page="/home"] #bottom-navigation-bar {
   bottom: 0px !important;
   z-index: 999999 !important;
+  position: fixed !important;
+  transform: translateY(0px) !important;
+  -webkit-transform: translateY(0px) !important;
 }
 
 /* 모든 네비게이션 요소에 클래스 강제 적용 */
@@ -817,6 +790,79 @@ div[style*="zIndex: 9999"] * {
   100% { -webkit-transform: rotate(360deg); transform: rotate(360deg); }
 }
 
+/* 네비게이션 바 gentle glow 애니메이션 */
+@-webkit-keyframes gentle-glow {
+  0% { 
+    background: radial-gradient(circle, rgba(1, 19, 163, 0.1) 0%, transparent 70%);
+    opacity: 0.8;
+  }
+  100% { 
+    background: radial-gradient(circle, rgba(1, 19, 163, 0.15) 0%, transparent 70%);
+    opacity: 1;
+  }
+}
+
+@keyframes gentle-glow {
+  0% { 
+    background: radial-gradient(circle, rgba(1, 19, 163, 0.1) 0%, transparent 70%);
+    opacity: 0.8;
+  }
+  100% { 
+    background: radial-gradient(circle, rgba(1, 19, 163, 0.15) 0%, transparent 70%);
+    opacity: 1;
+  }
+}
+
+/* 아이콘 glow 애니메이션 */
+@-webkit-keyframes icon-glow {
+  0% { 
+    filter: drop-shadow(0 0 4px rgba(1, 19, 163, 0.3));
+  }
+  100% { 
+    filter: drop-shadow(0 0 8px rgba(1, 19, 163, 0.6));
+  }
+}
+
+@keyframes icon-glow {
+  0% { 
+    filter: drop-shadow(0 0 4px rgba(1, 19, 163, 0.3));
+  }
+  100% { 
+    filter: drop-shadow(0 0 8px rgba(1, 19, 163, 0.6));
+  }
+}
+
+/* 반짝이는 별 애니메이션 */
+@-webkit-keyframes sparkle {
+  0% { 
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% { 
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
+@keyframes sparkle {
+  0% { 
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% { 
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
 /* Tailwind의 animate-spin이 작동하지 않을 때 대체 */
 .animate-spin {
   -webkit-animation: continuous-spin 1s linear infinite !important;
@@ -829,31 +875,34 @@ div[style*="zIndex: 9999"] * {
   display: inline-block !important;
 }
 
-/* 하단 네비게이션 라운드 처리 강제 적용 */
-nav.navigation-fixed,
-.navigation-fixed {
-  border-top-left-radius: 20px !important;
-  border-top-right-radius: 20px !important;
-  border-radius: 20px 20px 0 0 !important;
+/* BottomNavBar 전용 스타일 */
+#bottom-navigation-bar {
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
   overflow: hidden !important;
-}
-
-/* 더 구체적인 선택자로 강제 적용 */
-nav[class*="navigation-fixed"] {
-  border-top-left-radius: 20px !important;
-  border-top-right-radius: 20px !important;
-  border-radius: 20px 20px 0 0 !important;
-  overflow: hidden !important;
+  /* 애니메이션 완전 비활성화 */
+  transition: none !important;
+  animation: none !important;
+  transform: translateZ(0) !important;
+  will-change: auto !important;
+  /* 위치 강제 고정 */
+  position: fixed !important;
+  bottom: 40px !important;
+  top: auto !important;
+  left: 0 !important;
+  right: 0 !important;
+  margin: 0 !important;
+  z-index: 999999 !important;
 }
 
 /* 네비게이션 바 높이만큼의 공백을 위한 클래스 */
 .sidebar-bottom-spacing {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: 64px !important;
 }
 
 /* 사이드바 스크롤 영역에 네비게이션 바 높이만큼의 공백 추가 */
 .sidebar-scroll-area {
-  padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: 64px !important;
 }
 
 /* 모바일 최적화 레이아웃 */
@@ -861,28 +910,14 @@ nav[class*="navigation-fixed"] {
   @apply w-full max-w-md mx-auto px-4;
 }
 
-/* Android WebView에서 safe-area-inset-top이 지원되지 않는 경우 */
-@supports not (padding-top: env(safe-area-inset-top)) {
-  .schedule-page-content {
-    padding-top: 5rem !important; /* 80px 고정값 */
-  }
+/* schedule과 logs 페이지 헤더 패딩 */
+.schedule-page-content {
+  padding-top: 4rem !important; /* 64px 고정값 */
 }
 
-/* 🚨 logs 페이지 헤더 패딩 동기화 */
 .logs-page-content {
-  padding-top: calc(3.5rem + max(16px, env(safe-area-inset-top)) + 1rem) !important;
+  padding-top: 4rem !important; /* 64px 고정값 */
   padding-bottom: 1rem !important;
-}
-@supports not (padding-top: env(safe-area-inset-top)) {
-  .logs-page-content {
-    padding-top: 5rem !important;
-    padding-bottom: 1rem !important;
-  }
-  
-  .schedule-page-content {
-    padding-top: 5rem !important;
-    padding-bottom: 1rem !important;
-  }
 }
 
 /* 하단 네비게이션이 없는 페이지에서는 패딩 제거 */
@@ -890,22 +925,22 @@ body:has(.hide-bottom-nav) {
   padding-bottom: 0 !important;
 }
 
-/* 기본 메인 콘텐츠 영역 여백 - 네비게이션 바가 화면 밖에 있을 때 */
+/* 기본 메인 콘텐츠 영역 여백 */
 main {
-  margin-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  margin-bottom: 16px !important;
 }
 
-/* home, group, schedule, logs 페이지: 네비게이션 바가 40px 위에 있으므로 여백 필요 */
+/* home, group, schedule, logs 페이지: 네비게이션 바 여백 */
 [data-page="/home"] main,
 [data-page="/group"] main,
 [data-page="/schedule"] main,
 [data-page="/logs"] main {
-  margin-bottom: calc(116px + env(safe-area-inset-bottom)) !important;
+  margin-bottom: 72px !important;
 }
 
-/* location 페이지: 네비게이션 바가 화면 아래쪽에 있으므로 여백 불필요 */
+/* location 페이지: 기본 여백 */
 [data-page="/location"] main {
-  margin-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  margin-bottom: 16px !important;
 }
 
 /* 하단 네비게이션이 없는 페이지에서는 메인 마진 제거 */
@@ -917,7 +952,7 @@ body:has(.hide-bottom-nav) main {
 .scroll-container,
 .overflow-y-auto,
 .h-screen {
-  padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: 16px !important;
 }
 
 /* home, group, schedule, logs 페이지 스크롤 컨테이너 */
@@ -933,14 +968,14 @@ body:has(.hide-bottom-nav) main {
 [data-page="/logs"] .scroll-container,
 [data-page="/logs"] .overflow-y-auto,
 [data-page="/logs"] .h-screen {
-  padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: 16px !important;
 }
 
 /* location 페이지 스크롤 컨테이너 */
 [data-page="/location"] .scroll-container,
 [data-page="/location"] .overflow-y-auto,
 [data-page="/location"] .h-screen {
-  padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: 16px !important;
 }
 
 /* 하단 네비게이션이 없는 페이지에서는 스크롤 컨테이너 패딩 제거 */
@@ -952,46 +987,45 @@ body:has(.hide-bottom-nav) .h-screen {
 
 /* 🔥 하단 네비게이션을 위한 전역 여백 클래스 */
 .pb-safe-nav {
-  padding-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: 56px !important;
 }
 
 .mb-safe-nav {
-  margin-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+  margin-bottom: 56px !important;
 }
 
 /* 기존 pb-20 클래스를 하단 네비게이션에 안전한 값으로 오버라이드 */
 .pb-20 {
-  padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: 72px !important;
 }
 
 /* 기존 pb-24 클래스도 강화 */
 .pb-24 {
-  padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: 72px !important;
 }
 
 /* h-screen 클래스를 사용하는 요소들의 최대 높이 조정 */
 .h-screen {
-  height: calc(100vh - 76px - env(safe-area-inset-bottom)) !important;
+  height: calc(100vh - 56px) !important;
 }
 
 /* flex flex-col 패턴에서 마지막 자식 요소에 안전한 여백 */
 .flex.flex-col > *:last-child {
-  margin-bottom: max(16px, env(safe-area-inset-bottom)) !important;
+  margin-bottom: 16px !important;
 }
 
 /* 스크롤 컨테이너의 하단 여백 보장 */
 .overflow-y-auto:last-child,
 .overflow-auto:last-child {
-  padding-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: 56px !important;
 }
 
-/* 더 강력한 네비게이션 바 위치 고정 - 모든 선택자 */
-nav[class*="bottom"],
-div[class*="bottom"],
-[class*="BottomNav"],
-[class*="bottomNav"],
-[class*="navigation"] {
-  bottom: var(--bottom-nav-position) !important;
+/* BottomNavBar 컴포넌트 전용 선택자 */
+#bottom-navigation-bar nav,
+#bottom-navigation-bar [class*="flex"] {
+  /* 내부 요소 스타일 최적화 */
+  transition: color 0.2s ease !important;
+  transform: none !important;
 }
 
 /* JavaScript를 통한 강제 위치 설정 */
@@ -1000,6 +1034,21 @@ script {
 }
 
 /* 네비게이션 바 위치 강제 설정을 위한 스크립트 */
+
+/* BottomNavBar 추가 보장 스타일 */
+#bottom-navigation-bar,
+div[id="bottom-navigation-bar"] {
+  /* 기본 스타일 보장 */
+  background-color: white !important;
+  border-top: 1px solid #e5e7eb !important;
+  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  min-height: 56px !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+}
 
 /* 🔥 기본 플로팅 버튼 위치 (네비게이션 바가 화면 밖에 있을 때) */
 .fixed.bottom-20,
@@ -1117,438 +1166,6 @@ body #bottom-navigation-bar,
 }
 
 /* 🔥 ULTIMATE: 모든 상황에서 네비게이션 바 최하단 고정 */
-html, body {
-  --force-bottom-nav: 0px !important;
-}
-
-html #bottom-navigation-bar,
-body #bottom-navigation-bar,
-* #bottom-navigation-bar,
-[id="bottom-navigation-bar"] {
-  bottom: 0px !important;
-  position: fixed !important;
-  z-index: 10000 !important;
-}
-
-/* 🔥 페이지 컨테이너별 강제 설정 */
-.min-h-screen #bottom-navigation-bar,
-.h-screen #bottom-navigation-bar,
-div[class*="page"] #bottom-navigation-bar {
-  bottom: 0px !important;
-  position: fixed !important;
-}
-
-/* 🔥 ULTIMATE OVERRIDE: 모든 가능한 상황에서 네비게이션 바 최하단 고정 */
-#bottom-navigation-bar,
-[id="bottom-navigation-bar"],
-nav[id="bottom-navigation-bar"],
-div[id="bottom-navigation-bar"],
-*[id="bottom-navigation-bar"] {
-  position: fixed !important;
-  bottom: 0px !important;
-  left: 0px !important;
-  right: 0px !important;
-  width: 100% !important;
-  z-index: 10000 !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-  margin: 0px !important;
-  padding-top: 12px !important;
-  padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
-  min-height: 76px !important;
-  height: auto !important;
-  background-color: white !important;
-  border-top: 1px solid #e5e7eb !important;
-  border-top-left-radius: 16px !important;
-  border-top-right-radius: 16px !important;
-  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  display: block !important;
-}
-
-/* 인라인 스타일도 강제로 덮어쓰기 */
-#bottom-navigation-bar[style*="bottom"],
-#bottom-navigation-bar[style*="position"],
-#bottom-navigation-bar[style*="transform"],
-[id="bottom-navigation-bar"][style*="bottom"],
-[id="bottom-navigation-bar"][style*="position"],
-[id="bottom-navigation-bar"][style*="transform"] {
-  bottom: 20px !important;
-  position: fixed !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-}
-
-/* React/Framer Motion이 설정한 모든 스타일 강제 덮어쓰기 */
-div[style*="position: absolute"][id="bottom-navigation-bar"],
-div[style*="position: relative"][id="bottom-navigation-bar"],
-div[style*="position:absolute"][id="bottom-navigation-bar"],
-div[style*="position:relative"][id="bottom-navigation-bar"],
-div[style*="transform"][id="bottom-navigation-bar"],
-div[style*="translateY"][id="bottom-navigation-bar"],
-div[style*="translateX"][id="bottom-navigation-bar"],
-div[style*="translate3d"][id="bottom-navigation-bar"] {
-  position: fixed !important;
-  bottom: 0px !important;
-  top: auto !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-}
-
-/* 모든 데이터 속성과 클래스를 가진 요소들 */
-[data-testid="bottom-navigation"][id="bottom-navigation-bar"],
-[data-component="BottomNavBar"][id="bottom-navigation-bar"],
-nav[class*="bottom"][id="bottom-navigation-bar"],
-div[class*="bottom"][id="bottom-navigation-bar"],
-div[class*="nav"][id="bottom-navigation-bar"],
-div[class*="navigation"][id="bottom-navigation-bar"],
-*[class*="fixed"][id="bottom-navigation-bar"] {
-  position: fixed !important;
-  bottom: 0px !important;
-  top: auto !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-  z-index: 999999 !important;
-}
-
-/* 모든 CSS 선택자 특이성을 무력화 */
-html body #bottom-navigation-bar,
-html body div#bottom-navigation-bar,
-html body nav#bottom-navigation-bar,
-html body *#bottom-navigation-bar {
-  position: fixed !important;
-  bottom: 0px !important;
-  top: auto !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-}
-
-/* 모든 미디어 쿼리에서 강제 적용 */
-
-/* 모든 브라우저 지원 */
-@supports (position: fixed) {
-  #bottom-navigation-bar,
-  [id="bottom-navigation-bar"] {
-    position: fixed !important;
-    bottom: 0px !important;
-    top: auto !important;
-  }
-}
-
-@supports (-webkit-touch-callout: none) {
-  #bottom-navigation-bar,
-  [id="bottom-navigation-bar"] {
-    position: fixed !important;
-    bottom: 0px !important;
-    top: auto !important;
-  }
-}
-
-@supports not (-webkit-touch-callout: none) {
-  #bottom-navigation-bar,
-  [id="bottom-navigation-bar"] {
-    position: fixed !important;
-    bottom: 0px !important;
-    top: auto !important;
-  }
-}
-
-/* 네비게이션 바 내부 모든 요소들도 transform 제거 */
-#bottom-navigation-bar *,
-[id="bottom-navigation-bar"] *,
-#bottom-navigation-bar nav,
-#bottom-navigation-bar div,
-#bottom-navigation-bar a,
-#bottom-navigation-bar button,
-#bottom-navigation-bar span,
-#bottom-navigation-bar svg {
-  transform: none !important;
-  -webkit-transform: none !important;
-  -moz-transform: none !important;
-  -ms-transform: none !important;
-  -o-transform: none !important;
-  animation: none !important;
-  transition: color 0.2s ease !important;
-  will-change: auto !important;
-  contain: none !important;
-}
-
-/* Framer Motion 관련 모든 요소 차단 */
-#bottom-navigation-bar [data-framer-component],
-#bottom-navigation-bar .motion-div,
-#bottom-navigation-bar [class*="motion-"],
-#bottom-navigation-bar [style*="transform"],
-[id="bottom-navigation-bar"] [data-framer-component],
-[id="bottom-navigation-bar"] .motion-div,
-[id="bottom-navigation-bar"] [class*="motion-"],
-[id="bottom-navigation-bar"] [style*="transform"] {
-  transform: none !important;
-  -webkit-transform: none !important;
-  animation: none !important;
-  transition: color 0.2s ease !important;
-}
-
-/* 페이지별 특수 선택자들 */
-body[data-page="/home"] #bottom-navigation-bar,
-body[data-page="/group"] #bottom-navigation-bar,
-body[data-page="/schedule"] #bottom-navigation-bar,
-body[data-page="/logs"] #bottom-navigation-bar,
-body[data-page="/location"] #bottom-navigation-bar,
-.home-page #bottom-navigation-bar,
-.group-page #bottom-navigation-bar,
-.schedule-page #bottom-navigation-bar,
-.logs-page #bottom-navigation-bar,
-.location-page #bottom-navigation-bar {
-  position: fixed !important;
-  bottom: 0px !important;
-  top: auto !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-}
-
-/* CSS 변수 강제 설정 */
-:root {
-  --bottom-nav-position: 0px !important;
-  --bottom-nav-bottom: 0px !important;
-  --bottom-nav-transform: none !important;
-}
-
-/* CSS 변수를 사용한 모든 bottom 속성 강제 0px 설정 */
-[id="bottom-navigation-bar"] {
-  bottom: 0px !important;
-  bottom: var(--bottom-nav-position, 0px) !important;
-  transform: var(--bottom-nav-transform, none) !important;
-}
-
-/* 🔥 가상 선택자를 통한 강제 적용 */
-#bottom-navigation-bar::before,
-#bottom-navigation-bar::after,
-[id="bottom-navigation-bar"]::before,
-[id="bottom-navigation-bar"]::after {
-  content: none !important;
-  display: none !important;
-}
-
-/* 🔥 모든 레이아웃 엔진 대응 */
-#bottom-navigation-bar {
-  -webkit-box-sizing: border-box !important;
-  -moz-box-sizing: border-box !important;
-  box-sizing: border-box !important;
-  -webkit-flex: none !important;
-  -ms-flex: none !important;
-  flex: none !important;
-  -webkit-align-self: auto !important;
-  -ms-flex-item-align: auto !important;
-  align-self: auto !important;
-  -webkit-justify-self: auto !important;
-  justify-self: auto !important;
-  -ms-grid-row: auto !important;
-  -ms-grid-column: auto !important;
-  grid-area: auto !important;
-}
-
-/* 🔥 절대 위치 강제 설정 (최후의 수단) */
-#bottom-navigation-bar {
-  position: fixed !important;
-  inset: auto 0px 40px 0px !important;
-  bottom: 0px !important;
-  top: auto !important;
-  left: 0px !important;
-  right: 0px !important;
-}
-
-/* 🔥 모든 possible 컨테이너 내에서 강제 적용 */
-.container #bottom-navigation-bar,
-.wrapper #bottom-navigation-bar,
-.main #bottom-navigation-bar,
-main #bottom-navigation-bar,
-body > #bottom-navigation-bar,
-html > body > #bottom-navigation-bar {
-  position: fixed !important;
-  bottom: 0px !important;
-  top: auto !important;
-}
-
-/* 🔥 스택 컨텍스트 강제 생성 */
-#bottom-navigation-bar {
-  z-index: 999999 !important;
-  isolation: isolate !important;
-}
-
-/* 🔥 위치 관련 모든 속성 강제 설정 */
-#bottom-navigation-bar {
-  position: fixed !important;
-  display: block !important;
-  bottom: 0px !important;
-  top: auto !important;
-  left: 0px !important;
-  right: 0px !important;
-  width: 100% !important;
-  margin: 0px !important;
-  float: none !important;
-  clear: none !important;
-  vertical-align: baseline !important;
-}
-
-/* 🔥🔥🔥 JavaScript에서 추가한 강제 클래스들 🔥🔥🔥 */
-.forced-bottom-nav,
-.position-fixed-bottom,
-[data-forced-position="bottom-fixed"],
-[data-bottom="40"] {
-  position: fixed !important;
-  bottom: 0px !important;
-  top: auto !important;
-  left: 0px !important;
-  right: 0px !important;
-  width: 100% !important;
-  height: auto !important;
-  min-height: 76px !important;
-  z-index: 999999 !important;
-  margin: 0px !important;
-  padding-top: 12px !important;
-  padding-bottom: max(12px, env(safe-area-inset-bottom)) !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-  -moz-transform: none !important;
-  -ms-transform: none !important;
-  -o-transform: none !important;
-  animation: none !important;
-  transition: none !important;
-  background-color: white !important;
-  border-top: 1px solid #e5e7eb !important;
-  border-top-left-radius: 16px !important;
-  border-top-right-radius: 16px !important;
-  box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  display: block !important;
-  overflow: visible !important;
-  contain: none !important;
-  will-change: auto !important;
-  backface-visibility: visible !important;
-  -webkit-backface-visibility: visible !important;
-  perspective: none !important;
-  -webkit-perspective: none !important;
-  transform-style: flat !important;
-  -webkit-transform-style: flat !important;
-}
-
-/* 강제 클래스가 있는 요소의 내부 요소들도 강제 적용 */
-.forced-bottom-nav *,
-.position-fixed-bottom *,
-[data-forced-position="bottom-fixed"] *,
-[data-bottom="0"] * {
-  transform: none !important;
-  -webkit-transform: none !important;
-  -moz-transform: none !important;
-  -ms-transform: none !important;
-  -o-transform: none !important;
-  animation: none !important;
-  transition: color 0.2s ease !important;
-  will-change: auto !important;
-  contain: none !important;
-}
-
-/* 🔥 최고 우선순위: ID와 클래스 조합 선택자 */
-#bottom-navigation-bar.forced-bottom-nav,
-#bottom-navigation-bar.position-fixed-bottom,
-div#bottom-navigation-bar.forced-bottom-nav,
-nav#bottom-navigation-bar.forced-bottom-nav {
-  position: fixed !important;
-  bottom: 0px !important;
-  top: auto !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-  z-index: 999999 !important;
-}
-
-/* 🔥 모든 가능한 조합으로 강제 적용 */
-html body #bottom-navigation-bar.forced-bottom-nav,
-html body div#bottom-navigation-bar.forced-bottom-nav,
-html body nav#bottom-navigation-bar.forced-bottom-nav,
-html body *#bottom-navigation-bar.forced-bottom-nav {
-  position: fixed !important;
-  bottom: 0px !important;
-  top: auto !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-}
-
-/* 🔥🔥🔥 FRAMER MOTION 완전 차단 🔥🔥🔥 */
-/* 모든 Framer Motion 컴포넌트에서 네비게이션 바 transform 차단 */
-.motion-div #bottom-navigation-bar,
-[data-framer-component] #bottom-navigation-bar,
-[data-framer-name] #bottom-navigation-bar,
-[data-framer-component-type] #bottom-navigation-bar,
-[style*="will-change"] #bottom-navigation-bar,
-[style*="transform"] #bottom-navigation-bar,
-*[class*="motion"] #bottom-navigation-bar,
-*[class*="framer"] #bottom-navigation-bar {
-  position: fixed !important;
-  bottom: 0px !important;
-  top: auto !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-  transition: none !important;
-  animation: none !important;
-  will-change: auto !important;
-}
-
-/* React 애니메이션 라이브러리들 전체 차단 */
-[data-react-spring] #bottom-navigation-bar,
-[data-aos] #bottom-navigation-bar,
-[data-animate] #bottom-navigation-bar,
-.react-transition-group #bottom-navigation-bar,
-.react-spring #bottom-navigation-bar,
-.aos-animate #bottom-navigation-bar {
-  position: fixed !important;
-  bottom: 0px !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-}
-
-/* CSS 애니메이션 전체 차단 */
-@media (prefers-reduced-motion: no-preference) {
-  #bottom-navigation-bar,
-  #bottom-navigation-bar *,
-  [id="bottom-navigation-bar"],
-  [id="bottom-navigation-bar"] * {
-    animation: none !important;
-    transition: none !important;
-    transform: none !important;
-    -webkit-transform: none !important;
-  }
-}
-
-/* 모든 CSS 변수를 통한 위치 제어 차단 */
-#bottom-navigation-bar {
-  --transform: none !important;
-  --translate-y: 0px !important;
-  --translate-x: 0px !important;
-  --translate3d: 0px, 0px, 0px !important;
-  --bottom: 0px !important;
-  --top: auto !important;
-  --position: fixed !important;
-}
-
-/* JavaScript가 설정하는 모든 스타일 속성 강제 덮어쓰기 */
-#bottom-navigation-bar[style*="transform"],
-#bottom-navigation-bar[style*="translate"],
-#bottom-navigation-bar[style*="matrix"],
-#bottom-navigation-bar[style*="bottom"],
-#bottom-navigation-bar[style*="top"],
-#bottom-navigation-bar[style*="position"] {
-  position: fixed !important;
-  bottom: 0px !important;
-  top: auto !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-}
-
-/* 최종 보장: 모든 상황에서 네비게이션 바 고정 */
 html, body, #__next, .min-h-screen {
   --bottom-navigation-position: fixed !important;
   --bottom-navigation-bottom: 0px !important;
@@ -1560,7 +1177,7 @@ html, body, #__next, .min-h-screen {
   bottom: var(--bottom-navigation-bottom, 0px) !important;
 }
 
-/* 🔥🔥🔥 최종 보장: 모든 상황에서 네비게이션 바 화면 하단 고정 🔥🔥🔥 */
+/* 🔥🔥🔥 최종 보장: 모든 상황에서 네비게이션 바 화면 하단에 고정 🔥🔥🔥 */
 #bottom-navigation-bar {
   position: fixed !important;
   bottom: 0px !important;
@@ -1595,7 +1212,7 @@ html, body, #__next, .min-h-screen {
   top: auto !important;
   width: 100% !important;
   height: auto !important;
-  min-height: 70px !important;
+  min-height: 56px !important;
   z-index: 999999 !important;
   transform: none !important;
   -webkit-transform: none !important;
@@ -1622,4 +1239,169 @@ html body #bottom-navigation-bar {
   background: #0113A3 !important;
   box-shadow: 0 8px 25px rgba(1, 19, 163, 0.3) !important;
   pointer-events: auto !important;
+}
+
+/* 🔥🔥🔥 HOME 페이지 전용 네비게이션바 강제 고정 🔥🔥🔥 */
+[data-page="/home"] #bottom-navigation-bar,
+body[data-page="/home"] #bottom-navigation-bar,
+html[data-page="/home"] #bottom-navigation-bar,
+html body[data-page="/home"] #bottom-navigation-bar,
+[data-page="/home"] #bottom-navigation-bar[style],
+body[data-page="/home"] #bottom-navigation-bar[style],
+html[data-page="/home"] #bottom-navigation-bar[style],
+html body[data-page="/home"] #bottom-navigation-bar[style] {
+  position: fixed !important;
+  bottom: 72px !important;
+  left: 0px !important;
+  right: 0px !important;
+  z-index: 999999 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+/* 🔥🔥🔥 최종 보장: 모든 페이지에서 네비게이션바를 화면 하단에 고정 🔥🔥🔥 */
+#bottom-navigation-bar {
+  bottom: 0px !important;
+}
+
+/* 모든 페이지별 설정 통일 */
+[data-page="/home"] #bottom-navigation-bar,
+[data-page="/group"] #bottom-navigation-bar,
+[data-page="/schedule"] #bottom-navigation-bar,
+[data-page="/logs"] #bottom-navigation-bar,
+body[data-page="/home"] #bottom-navigation-bar,
+body[data-page="/group"] #bottom-navigation-bar,
+body[data-page="/schedule"] #bottom-navigation-bar,
+body[data-page="/logs"] #bottom-navigation-bar,
+html[data-page="/home"] #bottom-navigation-bar,
+html[data-page="/group"] #bottom-navigation-bar,
+html[data-page="/schedule"] #bottom-navigation-bar,
+html[data-page="/logs"] #bottom-navigation-bar,
+html body[data-page="/home"] #bottom-navigation-bar,
+html body[data-page="/group"] #bottom-navigation-bar,
+html body[data-page="/schedule"] #bottom-navigation-bar,
+html body[data-page="/logs"] #bottom-navigation-bar {
+  position: fixed !important;
+  bottom: 0px !important;
+}
+
+/* location 페이지도 다른 페이지와 동일하게 화면 하단에 고정 */
+[data-page="/location"] #bottom-navigation-bar,
+body[data-page="/location"] #bottom-navigation-bar,
+html[data-page="/location"] #bottom-navigation-bar,
+html body[data-page="/location"] #bottom-navigation-bar {
+  bottom: 0px !important;
+}
+
+/* 🔥 HOME 페이지 네비게이션 바 강제 표시 보장 */
+#home-page-container #bottom-navigation-bar,
+[data-page="/home"] #bottom-navigation-bar {
+  position: fixed !important;
+  bottom: 0px !important;
+  left: 0px !important;
+  right: 0px !important;
+  z-index: 999999 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+/* 🔥🔥🔥 ULTIMATE FINAL: 모든 페이지에서 네비게이션바 위치 완전 통일 🔥🔥🔥 */
+/* 이 스타일은 모든 다른 스타일을 덮어씁니다 */
+#bottom-navigation-bar {
+  position: fixed !important;
+  bottom: 0px !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 999999 !important;
+  width: 100% !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  min-height: 72px !important;
+  background: white !important;
+  border-top: 1px solid #e5e7eb !important;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1) !important;
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  overflow: hidden !important;
+}
+
+/* iOS 디바이스 전용 스타일 */
+.ios-device #bottom-navigation-bar {
+  height: calc(72px + env(safe-area-inset-bottom)) !important;
+  padding-bottom: env(safe-area-inset-bottom) !important;
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  overflow: hidden !important;
+}
+
+/* 안드로이드 디바이스 전용 스타일 */
+.android-device #bottom-navigation-bar {
+  height: 72px !important;
+  padding-bottom: 0px !important;
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  overflow: hidden !important;
+}
+
+/* 최고 우선순위 라운드 처리 - 모든 상황에서 적용 */
+#bottom-navigation-bar,
+#bottom-navigation-bar[style],
+div[id="bottom-navigation-bar"],
+div[id="bottom-navigation-bar"][style] {
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  border-bottom-left-radius: 0px !important;
+  border-bottom-right-radius: 0px !important;
+  overflow: hidden !important;
+}
+
+/* 인라인 스타일이 있어도 강제 적용 */
+#bottom-navigation-bar[style] {
+  bottom: 0px !important;
+  position: fixed !important;
+  z-index: 999999 !important;
+}
+
+/* 🔥🔥🔥 FINAL OVERRIDE: 라운드 처리 최종 강제 적용 🔥🔥🔥 */
+/* 이 규칙은 파일 맨 마지막에 위치하여 모든 다른 규칙을 덮어씁니다 */
+html body #bottom-navigation-bar,
+html body div#bottom-navigation-bar,
+html body [id="bottom-navigation-bar"],
+html body *#bottom-navigation-bar,
+#bottom-navigation-bar,
+div#bottom-navigation-bar,
+[id="bottom-navigation-bar"],
+*#bottom-navigation-bar {
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  border-bottom-left-radius: 0px !important;
+  border-bottom-right-radius: 0px !important;
+  border-radius: 16px 16px 0px 0px !important;
+  overflow: hidden !important;
+}
+
+/* 인라인 스타일이 있어도 라운드 강제 적용 */
+html body #bottom-navigation-bar[style],
+html body div#bottom-navigation-bar[style],
+html body [id="bottom-navigation-bar"][style],
+#bottom-navigation-bar[style],
+div#bottom-navigation-bar[style],
+[id="bottom-navigation-bar"][style] {
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  border-bottom-left-radius: 0px !important;
+  border-bottom-right-radius: 0px !important;
+  border-radius: 16px 16px 0px 0px !important;
+  overflow: hidden !important;
 }

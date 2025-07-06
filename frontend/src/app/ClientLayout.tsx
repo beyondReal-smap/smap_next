@@ -168,9 +168,13 @@ export default function ClientLayout({
            pathname === '/'; // 루트 페이지에서만 추가로 숨김
   }, [pathname]);
 
-  // body에 클래스 추가/제거
+  // body에 클래스 및 data-page 속성 추가/제거
   useEffect(() => {
     if (typeof document !== 'undefined') {
+      // data-page 속성 설정 (CSS에서 페이지별 스타일링을 위해)
+      document.body.setAttribute('data-page', pathname);
+      document.documentElement.setAttribute('data-page', pathname);
+      
       if (shouldHideNavBar) {
         document.body.classList.add('hide-bottom-nav');
       } else {
@@ -178,13 +182,15 @@ export default function ClientLayout({
       }
     }
     
-    // 컴포넌트 언마운트 시 클래스 제거
+    // 컴포넌트 언마운트 시 클래스 및 속성 제거
     return () => {
       if (typeof document !== 'undefined') {
         document.body.classList.remove('hide-bottom-nav');
+        document.body.removeAttribute('data-page');
+        document.documentElement.removeAttribute('data-page');
       }
     };
-  }, [shouldHideNavBar]);
+  }, [shouldHideNavBar, pathname]);
   
   // 디버깅용 로그 - 개발 환경에서만 출력
   React.useEffect(() => {
@@ -217,23 +223,8 @@ export default function ClientLayout({
         </AuthProvider>
       </DataCacheProvider>
       
-      {/* 네비게이션 바를 최상위 레벨에서 렌더링하여 확실한 위치 고정 */}
-      {!shouldHideNavBar && (
-        <div 
-          style={{
-            position: 'fixed',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            zIndex: 999999,
-            pointerEvents: 'none'
-          }}
-        >
-          <div style={{ pointerEvents: 'auto' }}>
-            <BottomNavBar />
-          </div>
-        </div>
-      )}
+      {/* 전역 네비게이션 바 - 모든 페이지에서 일관된 위치 보장 */}
+      {!shouldHideNavBar && <BottomNavBar />}
     </>
   );
 } 
