@@ -36,16 +36,35 @@ enum HapticFeedbackType {
 
 // 햅틱 피드백 함수
 const triggerHapticFeedback = (type: HapticFeedbackType) => {
-  if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
-    const patterns = {
-      [HapticFeedbackType.LIGHT]: [10],
-      [HapticFeedbackType.MEDIUM]: [20],
-      [HapticFeedbackType.HEAVY]: [30],
-      [HapticFeedbackType.SUCCESS]: [50, 100, 50],
-      [HapticFeedbackType.WARNING]: [100, 50, 100],
-      [HapticFeedbackType.ERROR]: [200, 100, 200]
-    };
-    window.navigator.vibrate(patterns[type]);
+  if (typeof window !== 'undefined') {
+    // iOS 네이티브 햅틱 시도
+    try {
+      if ((window as any).webkit?.messageHandlers?.smapIos) {
+        (window as any).webkit.messageHandlers.smapIos.postMessage({
+          type: 'haptic',
+          param: type
+        });
+        return;
+      }
+    } catch (error) {
+      // 개발 환경에서는 조용히 처리
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🎮 [HAPTIC] ${type} 햅틱 피드백 (개발 환경)`);
+      }
+    }
+    
+    // 웹 환경에서는 vibrate API 사용
+    if (window.navigator && window.navigator.vibrate) {
+      const patterns = {
+        [HapticFeedbackType.LIGHT]: [10],
+        [HapticFeedbackType.MEDIUM]: [20],
+        [HapticFeedbackType.HEAVY]: [30],
+        [HapticFeedbackType.SUCCESS]: [50, 100, 50],
+        [HapticFeedbackType.WARNING]: [100, 50, 100],
+        [HapticFeedbackType.ERROR]: [200, 100, 200]
+      };
+      window.navigator.vibrate(patterns[type]);
+    }
   }
 };
 
@@ -76,6 +95,37 @@ const SignInPage = () => {
     location: typeof window !== 'undefined' ? window.location.href : 'unknown',
     timestamp: new Date().toISOString()
   });
+
+  // 🚨 모바일 웹앱 고정 스타일 적용
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // body 스크롤 방지
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+      document.documentElement.style.overflow = 'hidden';
+      
+      // 뒤로가기 방지
+      const preventBack = (e: PopStateEvent) => {
+        e.preventDefault();
+        window.history.pushState(null, '', window.location.href);
+      };
+      
+      window.history.pushState(null, '', window.location.href);
+      window.addEventListener('popstate', preventBack);
+      
+      return () => {
+        // 정리
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+        document.documentElement.style.overflow = '';
+        window.removeEventListener('popstate', preventBack);
+      };
+    }
+  }, []);
 
   // 🚨 페이지 초기화 및 에러 모달 상태 복원
   useEffect(() => {
@@ -745,11 +795,15 @@ const SignInPage = () => {
     // 즉시 한 번 확인
     checkNativeData();
     
-    // 🔍 즉시 강제 핸들러 확인 (더 상세한 디버깅)
-    setTimeout(() => {
-      console.log('🔍 [FORCE HANDLER CHECK] 5초 후 상세 핸들러 확인');
-      forceCheckHandlers();
-    }, 5000);
+    // 🔍 즉시 강제 핸들러 확인 (iOS 환경에서만)
+    if (isIOSWebView) {
+      setTimeout(() => {
+        console.log('🔍 [FORCE HANDLER CHECK] 5초 후 상세 핸들러 확인');
+        forceCheckHandlers();
+      }, 5000);
+    } else {
+      console.log('🔍 [FORCE HANDLER CHECK] 개발 환경에서는 핸들러 체크 생략');
+    }
     
     // iOS 로그 전송
     sendLogToiOS('info', '📱 로그인 페이지 로드', {
@@ -2989,7 +3043,7 @@ const SignInPage = () => {
     console.log('🔍 [FORCE CHECK] messageHandlers 타입:', typeof messageHandlers);
     
     if (!messageHandlers) {
-      console.log('❌ [FORCE CHECK] messageHandlers 객체 없음');
+      console.warn('⚠️ [FORCE CHECK] messageHandlers 객체 없음 (개발 환경에서는 정상)');
       return undefined;
     }
     
@@ -3002,10 +3056,10 @@ const SignInPage = () => {
         if (handler && typeof handler.postMessage === 'function') {
           console.log(`✅ [FORCE CHECK] ${handlerName} 핸들러 정상`);
         } else {
-          console.error(`❌ [FORCE CHECK] ${handlerName} postMessage 함수 없음`);
+          console.warn(`⚠️ [FORCE CHECK] ${handlerName} postMessage 함수 없음 (개발 환경에서는 정상)`);
         }
       } catch (error) {
-        console.error(`❌ [FORCE CHECK] ${handlerName} 테스트 실패:`, error);
+        console.warn(`⚠️ [FORCE CHECK] ${handlerName} 테스트 실패 (개발 환경에서는 정상):`, error);
       }
     });
     
@@ -3099,7 +3153,21 @@ const SignInPage = () => {
   return (
     <motion.div 
       className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8"
-      style={{background: 'linear-gradient(to bottom right, #eff6ff, #faf5ff, #fdf2f8)'}}
+      style={{
+        background: 'linear-gradient(to bottom right, #eff6ff, #faf5ff, #fdf2f8)',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        overflow: 'auto',
+        touchAction: 'manipulation',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
+        WebkitTapHighlightColor: 'transparent',
+        WebkitOverflowScrolling: 'touch'
+      }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -3110,18 +3178,23 @@ const SignInPage = () => {
         duration: 0.6
       }}
     >
-      <motion.div 
-        className="max-w-md w-full space-y-6 bg-white p-6 sm:p-8 rounded-xl shadow-2xl"
-        initial={{ opacity: 0, scale: 0.95, y: 30 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{
-          type: "spring",
-          stiffness: 280,
-          damping: 25,
-          delay: 0.1,
-          duration: 0.5
-        }}
-      >
+              <motion.div 
+          className="max-w-md w-full space-y-6 bg-white p-6 sm:p-8 rounded-xl shadow-2xl"
+          style={{
+            userSelect: 'auto',
+            WebkitUserSelect: 'auto',
+            touchAction: 'auto'
+          }}
+          initial={{ opacity: 0, scale: 0.95, y: 30 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{
+            type: "spring",
+            stiffness: 280,
+            damping: 25,
+            delay: 0.1,
+            duration: 0.5
+          }}
+        >
         <motion.div 
           className="text-center"
           initial={{ opacity: 0, y: 20 }}
@@ -3160,7 +3233,7 @@ const SignInPage = () => {
               전화번호
             </label>
             <div className="relative">
-              <div className="absolute left-4 top-0 bottom-0 flex items-center z-10 pointer-events-none">
+              <div className="absolute inset-y-0 left-4 flex items-center z-10 pointer-events-none">
                 <FiPhone className={`w-4 h-4 transition-colors duration-200 ${
                   focusedField === 'phone' || phoneNumber ? '' : 'text-gray-400'
                 }`} 
@@ -3203,7 +3276,7 @@ const SignInPage = () => {
               비밀번호
             </label>
             <div className="relative">
-              <div className="absolute left-4 top-0 bottom-0 flex items-center z-10 pointer-events-none">
+              <div className="absolute inset-y-0 left-4 flex items-center z-10 pointer-events-none">
                 <FiLock className={`w-4 h-4 transition-colors duration-200 ${
                   focusedField === 'password' || password ? '' : 'text-gray-400'
                 }`} 

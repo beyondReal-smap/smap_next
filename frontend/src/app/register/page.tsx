@@ -26,7 +26,6 @@ import {
   FiChevronLeft,
   FiChevronRight
 } from 'react-icons/fi';
-import AnimatedHeader from '../../components/common/AnimatedHeader';
 import groupService from '@/services/groupService';
 
 // 회원가입 단계 정의
@@ -1029,15 +1028,24 @@ export default function RegisterPage() {
 
   return (
           <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative" style={{background: 'linear-gradient(to bottom right, #eff6ff, #ffffff, #faf5ff)'}}>
-      {/* 통일된 헤더 애니메이션 */}
-      <AnimatedHeader 
-        className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-lg border-b border-gray-100/50 shadow-sm header-fixed"
+      {/* 고정 헤더 */}
+      <header 
+        className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-lg border-b border-gray-100/50 shadow-sm"
         style={{
           backdropFilter: 'blur(10px)',
           background: 'rgba(255, 255, 255, 0.7)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
-                      paddingTop: '0px'
+          padding: 0,
+          margin: 0,
+          display: 'block',
+          visibility: 'visible',
+          opacity: 1,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 50
         }}
       >
         <div className="flex items-center justify-between h-14 px-4">
@@ -1071,15 +1079,15 @@ export default function RegisterPage() {
         {currentStep !== REGISTER_STEPS.COMPLETE && (
           <div className="h-1 bg-gray-200">
             <motion.div 
-                              className="h-full"
-                style={{backgroundColor: '#0113A3'}}
+              className="h-full"
+              style={{backgroundColor: '#0113A3'}}
               initial={{ width: 0 }}
               animate={{ width: `${getProgress()}%` }}
               transition={{ duration: 0.5 }}
             />
-        </div>
+          </div>
         )}
-      </AnimatedHeader>
+      </header>
 
       {/* 메인 콘텐츠 */}
       <div className="flex-1 flex flex-col pt-14 pb-24 px-6 overflow-y-auto register-main register-scroll">
@@ -1935,9 +1943,15 @@ export default function RegisterPage() {
         <motion.div 
           initial={{ y: 100 }}
           animate={{ y: 0 }}
-          className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 safe-area-bottom"
+          className="fixed bottom-0 left-0 right-0 p-4 safe-area-bottom"
           data-bottom-button
-          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+          style={{ 
+            paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+            background: 'linear-gradient(to bottom right, rgba(239, 246, 255, 0.95), rgba(255, 255, 255, 0.95), rgba(250, 245, 255, 0.95))',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            borderTop: '1px solid rgba(229, 231, 235, 0.3)'
+          }}
         >
           <motion.button
             onClick={() => {

@@ -42,10 +42,6 @@ const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.use
 
 // 기본 헤더 스타일
 const defaultHeaderStyle: React.CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
   background: 'rgba(255, 255, 255, 0.95)',
   backdropFilter: 'blur(20px)',
   WebkitBackdropFilter: 'blur(20px)',
@@ -54,10 +50,10 @@ const defaultHeaderStyle: React.CSSProperties = {
   willChange: 'transform',
   WebkitPerspective: 1000,
   WebkitBackfaceVisibility: 'hidden',
-          paddingTop: '0px',
+  padding: 0,
+  margin: 0,
   minHeight: 'auto',
   height: 'auto',
-  zIndex: 50,
   // 안드로이드 최적화
   ...(isAndroid && {
     transform: 'translate3d(0, 0, 0)',
@@ -82,7 +78,6 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
   delay,
   duration
 }) => {
-  const [hasAnimated, setHasAnimated] = React.useState(false);
   const animation = headerAnimations[variant];
   
   // 커스텀 delay나 duration이 제공된 경우 사용
@@ -95,30 +90,28 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
   // 안드로이드에서 애니메이션 지연 시간 조정
   const androidAdjustedTransition = isAndroid ? {
     ...customTransition,
-    delay: (customTransition.delay || 0) + 0.1, // 안드로이드에서 약간 더 지연
-    duration: (customTransition.duration || 0.4) * 1.2 // 안드로이드에서 약간 더 긴 지속시간
+    delay: (customTransition.delay || 0) + 0.1,
+    duration: (customTransition.duration || 0.4) * 1.2
   } : customTransition;
-
-  // 한 번 애니메이션이 실행된 후에는 더 이상 초기 애니메이션을 실행하지 않음
-  React.useEffect(() => {
-    if (!hasAnimated) {
-      const timer = setTimeout(() => {
-        setHasAnimated(true);
-      }, (androidAdjustedTransition.delay || 0) * 1000 + (androidAdjustedTransition.duration || 0.4) * 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [hasAnimated, androidAdjustedTransition.delay, androidAdjustedTransition.duration]);
 
   return (
     <motion.header
-      initial={hasAnimated ? animation.animate : animation.initial}
+      initial={animation.initial}
       animate={animation.animate}
-      transition={hasAnimated ? { duration: 0 } : androidAdjustedTransition}
+      transition={androidAdjustedTransition}
       className={`${className} ${isAndroid ? 'android-optimized' : ''}`}
       style={{
         ...defaultHeaderStyle,
-        ...style
+        ...style,
+        // 헤더가 항상 표시되도록 강제 설정
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        opacity: 1,
+        visibility: 'visible',
+        display: 'block'
       }}
       // 안드로이드에서 애니메이션 우선순위 설정
       {...(isAndroid && {
