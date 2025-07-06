@@ -2790,32 +2790,55 @@ const SignInPage = () => {
 
   // Google 로그인 핸들러 (플랫폼별 분리된 버전)
   const handleGoogleLogin = async () => {
-    console.log('🚀 [GOOGLE LOGIN] 버튼 클릭됨!', {
+    console.log('🎯 [GOOGLE LOGIN] === handleGoogleLogin 함수 진입 ===');
+    console.log('🚀 [GOOGLE LOGIN] 환경 상태 확인:', {
       isLoading,
       isIOSWebView,
       isAndroidWebView,
       isWebEnvironment,
       hasGoogleSDK: !!(window as any).google?.accounts?.id,
       hasWebKit: !!(window as any).webkit?.messageHandlers?.smapIos,
+      hasmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
+      webkitMessageHandlers: Object.keys((window as any).webkit?.messageHandlers || {}),
       timestamp: Date.now()
     });
     
+    // 상태 체크
     if (isLoading) {
-      console.log('🚫 [GOOGLE LOGIN] 이미 로딩 중입니다.');
+      console.log('🚫 [GOOGLE LOGIN] 이미 로딩 중이므로 종료합니다.');
       return undefined;
     }
     
     // 중복 실행 방지를 위한 플래그 체크
     if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
-      console.log('🚫 [GOOGLE LOGIN] 이미 진행 중인 로그인이 있습니다.');
+      console.log('🚫 [GOOGLE LOGIN] 이미 진행 중인 로그인이 있으므로 종료합니다.');
       return undefined;
     }
+    
+    console.log('✅ [GOOGLE LOGIN] 상태 체크 완료, 로그인 프로세스 시작');
     
     setIsLoading(true);
     setError(null);
     
     // 진행 중 플래그 설정
     (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = true;
+    
+    // 🧪 테스트 모드: 강제로 웹 SDK 사용 (디버깅용)
+    const FORCE_WEB_SDK = true; // TODO: 테스트 후 false로 변경
+    
+    if (FORCE_WEB_SDK) {
+      console.log('🧪 [TEST MODE] 강제 웹 SDK 모드 활성화');
+      try {
+        await handleGoogleSDKLogin();
+        return undefined;
+      } catch (error) {
+        console.error('❌ [TEST MODE] 웹 SDK 테스트 실패:', error);
+        setIsLoading(false);
+        (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = false;
+        setError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
+        return undefined;
+      }
+    }
     
     try {
       // 환경 감지 상태 출력
@@ -3523,7 +3546,7 @@ const SignInPage = () => {
             <div className="relative">
               <button
                 type="button"
-                onClick={(e) => {
+                onClick={async (e) => {
                   console.log('🔥 [GOOGLE LOGIN] 버튼 클릭됨!');
                   sendLogToiOS('info', '🔥 Google 로그인 버튼 클릭됨', {
                     timestamp: new Date().toISOString(),
@@ -3535,8 +3558,17 @@ const SignInPage = () => {
                   // 햅틱 피드백 (버튼 클릭 시)
                   triggerHapticFeedback(HapticFeedbackType.LIGHT);
                   
-                  // 실제 핸들러 호출
-                  handleGoogleLogin();
+                  // 실제 핸들러 호출 (await와 에러 처리 추가)
+                  try {
+                    console.log('🚀 [GOOGLE LOGIN] handleGoogleLogin 함수 호출 시작');
+                    await handleGoogleLogin();
+                    console.log('✅ [GOOGLE LOGIN] handleGoogleLogin 함수 완료');
+                  } catch (error) {
+                    console.error('❌ [GOOGLE LOGIN] handleGoogleLogin 함수 오류:', error);
+                    setError('Google 로그인 중 오류가 발생했습니다. 다시 시도해주세요.');
+                    setIsLoading(false);
+                    (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = false;
+                  }
                 }}
                 disabled={isLoading}
                 className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
