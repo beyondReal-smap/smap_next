@@ -161,15 +161,40 @@ export default function ClientLayout({
     unregisterServiceWorker();
   }, []);
 
-  // 네비게이션 바를 숨길 페이지들 - 최소한으로 제한
+  // 🔥 강화된 네비게이션 바 숨김 조건 체크
   const shouldHideNavBar = React.useMemo(() => {
-    // 오직 로그인/회원가입 관련 페이지에서만 숨김
+    // 기본 히든 페이지들
     const hideNavBarPages = ['/signin', '/register', '/login', '/social-login'];
-    return hideNavBarPages.some(page => pathname.startsWith(page)) || 
-           pathname === '/'; // 루트 페이지에서만 추가로 숨김
+    let shouldHide = hideNavBarPages.some(page => pathname?.startsWith(page)) || pathname === '/';
+    
+    // 런타임 체크
+    if (typeof window !== 'undefined') {
+      const multipleChecks = [
+        // pathname 기반 체크
+        hideNavBarPages.some(page => window.location.pathname?.startsWith(page)) || window.location.pathname === '/',
+        // HTML 속성 체크  
+        document.documentElement.getAttribute('data-signin') === 'true',
+        document.body.getAttribute('data-page') === '/signin',
+        document.body.classList.contains('signin-page'),
+        document.body.classList.contains('hide-bottom-nav'),
+        // CSS 변수 체크
+        getComputedStyle(document.body).getPropertyValue('--bottom-nav-display')?.trim() === 'none'
+      ];
+      
+      if (multipleChecks.some(check => check === true)) {
+        shouldHide = true;
+      }
+    }
+    
+    console.log('[ClientLayout] 네비게이션 바 숨김 체크:', { 
+      pathname, 
+      shouldHide,
+      windowPath: typeof window !== 'undefined' ? window.location.pathname : 'N/A'
+    });
+    return shouldHide;
   }, [pathname]);
 
-  // body에 클래스 및 data-page 속성 추가/제거
+  // body에 클래스 및 data-page 속성 추가/제거 - 즉시 적용
   useEffect(() => {
     if (typeof document !== 'undefined') {
       // data-page 속성 설정 (CSS에서 페이지별 스타일링을 위해)
@@ -177,9 +202,37 @@ export default function ClientLayout({
       document.documentElement.setAttribute('data-page', pathname);
       
       if (shouldHideNavBar) {
+        console.log('[ClientLayout] 네비게이션 바 숨김 클래스 추가');
         document.body.classList.add('hide-bottom-nav');
+        document.body.style.setProperty('--bottom-nav-display', 'none', 'important');
+        
+        // 추가 숨김 처리 - 즉시 적용 (네비게이션 바 + 헤더)
+        const elementsToHide = document.querySelectorAll('nav[role="navigation"], .bottom-nav, #bottom-navigation-bar, header, .header-fixed, .glass-effect, [role="banner"]');
+        elementsToHide.forEach(element => {
+          (element as HTMLElement).style.display = 'none';
+          (element as HTMLElement).style.visibility = 'hidden';
+          (element as HTMLElement).style.opacity = '0';
+          (element as HTMLElement).style.position = 'absolute';
+          (element as HTMLElement).style.top = '-9999px';
+          (element as HTMLElement).style.left = '-9999px';
+          (element as HTMLElement).style.zIndex = '-9999';
+        });
       } else {
+        console.log('[ClientLayout] 네비게이션 바 숨김 클래스 제거');
         document.body.classList.remove('hide-bottom-nav');
+        document.body.style.removeProperty('--bottom-nav-display');
+        
+        // 네비게이션 바와 헤더 복원
+        const elementsToRestore = document.querySelectorAll('nav[role="navigation"], .bottom-nav, #bottom-navigation-bar, header, .header-fixed, .glass-effect, [role="banner"]');
+        elementsToRestore.forEach(element => {
+          (element as HTMLElement).style.removeProperty('display');
+          (element as HTMLElement).style.removeProperty('visibility');
+          (element as HTMLElement).style.removeProperty('opacity');
+          (element as HTMLElement).style.removeProperty('position');
+          (element as HTMLElement).style.removeProperty('top');
+          (element as HTMLElement).style.removeProperty('left');
+          (element as HTMLElement).style.removeProperty('z-index');
+        });
       }
     }
     
@@ -189,6 +242,7 @@ export default function ClientLayout({
         document.body.classList.remove('hide-bottom-nav');
         document.body.removeAttribute('data-page');
         document.documentElement.removeAttribute('data-page');
+        document.body.style.removeProperty('--bottom-nav-display');
       }
     };
   }, [shouldHideNavBar, pathname]);
@@ -219,13 +273,15 @@ export default function ClientLayout({
             <AuthGuard>
               {children}
               {/* <PerformanceMonitor /> */}
+              
+              {/* 🔥 조건부 BottomNavBar 렌더링 - 더블 체크 */}
+              {!shouldHideNavBar && (
+                <BottomNavBar />
+              )}
             </AuthGuard>
           </UserProvider>
         </AuthProvider>
       </DataCacheProvider>
-      
-      {/* 전역 네비게이션 바 - 모든 페이지에서 일관된 위치 보장 */}
-      {!shouldHideNavBar && <BottomNavBar />}
     </>
   );
 } 

@@ -135,6 +135,118 @@ export default function RootLayout({
         
         {/* 폰트 프리로드 제거 - CSS에서 필요시 로드되도록 함 */}
         
+        {/* Signin 페이지 네비게이션 즉시 숨김 - 최우선 로드 */}
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            /* 페이지 로드 즉시 모든 네비게이션 요소 숨김 */
+            html[data-signin="true"] nav,
+            html[data-signin="true"] header,
+            html[data-signin="true"] .header-fixed,
+            html[data-signin="true"] .glass-effect,
+            html[data-signin="true"] [role="banner"],
+            html[data-signin="true"] [role="navigation"],
+            html[data-signin="true"] .bottom-nav,
+            html[data-signin="true"] #bottom-navigation-bar,
+            body[data-page="/signin"] nav,
+            body[data-page="/signin"] header,
+            body[data-page="/signin"] .header-fixed,
+            body[data-page="/signin"] .glass-effect,
+            body[data-page="/signin"] [role="banner"],
+            body[data-page="/signin"] [role="navigation"],
+            body[data-page="/signin"] .bottom-nav,
+            body[data-page="/signin"] #bottom-navigation-bar {
+              display: none !important;
+              visibility: hidden !important;
+              opacity: 0 !important;
+              position: absolute !important;
+              top: -10000px !important;
+              left: -10000px !important;
+              z-index: -10000 !important;
+              height: 0 !important;
+              width: 0 !important;
+              overflow: hidden !important;
+              transform: translateY(-100vh) scale(0) !important;
+              pointer-events: none !important;
+            }
+            
+            /* signin 페이지 body 스타일 */
+            body.signin-page {
+              overflow: hidden !important;
+              position: fixed !important;
+              width: 100% !important;
+              height: 100% !important;
+            }
+            
+            body.signin-page * {
+              -webkit-user-select: none !important;
+              user-select: none !important;
+            }
+          `
+        }} />
+
+        {/* Signin 페이지 감지 및 즉시 적용 스크립트 */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              // 현재 경로가 signin인지 즉시 확인
+              if (typeof window !== 'undefined' && window.location.pathname === '/signin') {
+                console.log('[SIGNIN IMMEDIATE] signin 페이지 감지, 즉시 숨김 적용');
+                
+                // HTML 요소에 즉시 속성 추가
+                document.documentElement.setAttribute('data-signin', 'true');
+                document.body.classList.add('signin-page');
+                document.body.setAttribute('data-page', '/signin');
+                
+                // 네비게이션 요소들 즉시 숨김 - 동기적 실행
+                const hideElements = function() {
+                  const selectors = [
+                    'nav', 'header', '.header-fixed', '.glass-effect', 
+                    '[role="banner"]', '[role="navigation"]', 
+                    '.bottom-nav', '#bottom-navigation-bar'
+                  ];
+                  
+                  selectors.forEach(function(selector) {
+                    try {
+                      const elements = document.querySelectorAll(selector);
+                      elements.forEach(function(element) {
+                        element.style.display = 'none';
+                        element.style.visibility = 'hidden';
+                        element.style.opacity = '0';
+                        element.style.position = 'absolute';
+                        element.style.top = '-10000px';
+                        element.style.left = '-10000px';
+                        element.style.zIndex = '-10000';
+                        element.style.transform = 'translateY(-100vh) scale(0)';
+                        element.style.pointerEvents = 'none';
+                      });
+                    } catch (e) {
+                      console.warn('[SIGNIN IMMEDIATE] 요소 숨김 오류:', e);
+                    }
+                  });
+                };
+                
+                // DOM이 로드되면 즉시 실행
+                if (document.readyState === 'loading') {
+                  document.addEventListener('DOMContentLoaded', hideElements);
+                } else {
+                  hideElements();
+                }
+                
+                // 추가 안전망 - 짧은 간격으로 숨김 재실행
+                let hideAttempts = 0;
+                const forceHide = function() {
+                  if (hideAttempts < 10) {
+                    hideElements();
+                    hideAttempts++;
+                    setTimeout(forceHide, 10);
+                  }
+                };
+                forceHide();
+              }
+            })();
+          `
+        }} />
+
         {/* 전역 에러 핸들러 (가장 먼저 로드) */}
         <script src="/error-handler.js" async></script>
         
