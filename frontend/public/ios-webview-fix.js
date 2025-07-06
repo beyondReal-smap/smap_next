@@ -884,12 +884,13 @@
         document.addEventListener('click', function(event) {
           const target = event.target;
           
-          // 구글 로그인 버튼 감지 (다양한 선택자로)
-          if (target.closest('[data-provider="google"]') || 
+          // 구글 로그인 버튼 감지 (다양한 선택자로) - React 핸들러 제외
+          if ((target.closest('[data-provider="google"]') || 
               target.closest('.google-login') ||
               target.closest('[class*="google"]') ||
               target.textContent?.includes('Google') ||
-              target.textContent?.includes('구글')) {
+              target.textContent?.includes('구글')) &&
+              !target.closest('[data-google-login="react-handler"]')) { // React 핸들러 제외
             
             console.log('Google login button clicked');
             event.preventDefault();

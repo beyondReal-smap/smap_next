@@ -2790,6 +2790,7 @@ const SignInPage = () => {
 
   // Google 로그인 핸들러 (플랫폼별 분리된 버전)
   const handleGoogleLogin = async () => {
+    console.log('🎯🎯🎯 [GOOGLE LOGIN] handleGoogleLogin 함수 정의 확인됨!');
     console.log('🎯 [GOOGLE LOGIN] === handleGoogleLogin 함수 진입 ===');
     console.log('🚀 [GOOGLE LOGIN] 환경 상태 확인:', {
       isLoading,
@@ -3543,11 +3544,34 @@ const SignInPage = () => {
 
           <div className="mt-4 grid grid-cols-1 gap-3">
             {/* Google 로그인 버튼 */}
-            <div className="relative">
+            <div className="relative" style={{ zIndex: 10 }}>
               <button
                 type="button"
-                onClick={async (e) => {
+                data-google-login="react-handler"
+                onClickCapture={(e) => {
+                  // 캡처링 단계에서 먼저 처리
+                  console.log('🔥 [GOOGLE LOGIN] React 버튼 클릭 캡처됨!');
+                  (e.nativeEvent as any).stopImmediatePropagation?.(); // 즉시 전파 중단
+                  
+                  // 이벤트 전파 중단
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
                   console.log('🔥 [GOOGLE LOGIN] 버튼 클릭됨!');
+                  console.log('🔍 [GOOGLE LOGIN] 클릭 이벤트 상세:', {
+                    target: e.target,
+                    currentTarget: e.currentTarget,
+                    isLoading,
+                    disabled: e.currentTarget.disabled,
+                    timestamp: Date.now()
+                  });
+                  
+                  // 버튼이 비활성화되어 있으면 함수 종료
+                  if (isLoading || e.currentTarget.disabled) {
+                    console.log('🚫 [GOOGLE LOGIN] 버튼이 비활성화되어 있어 클릭 무시');
+                    return;
+                  }
+                  
                   sendLogToiOS('info', '🔥 Google 로그인 버튼 클릭됨', {
                     timestamp: new Date().toISOString(),
                     event: 'button_click',
@@ -3558,20 +3582,28 @@ const SignInPage = () => {
                   // 햅틱 피드백 (버튼 클릭 시)
                   triggerHapticFeedback(HapticFeedbackType.LIGHT);
                   
-                  // 실제 핸들러 호출 (await와 에러 처리 추가)
-                  try {
-                    console.log('🚀 [GOOGLE LOGIN] handleGoogleLogin 함수 호출 시작');
-                    await handleGoogleLogin();
-                    console.log('✅ [GOOGLE LOGIN] handleGoogleLogin 함수 완료');
-                  } catch (error) {
-                    console.error('❌ [GOOGLE LOGIN] handleGoogleLogin 함수 오류:', error);
-                    setError('Google 로그인 중 오류가 발생했습니다. 다시 시도해주세요.');
-                    setIsLoading(false);
-                    (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = false;
-                  }
+                  // 실제 핸들러 호출 (동기 방식으로 변경)
+                  console.log('🚀 [GOOGLE LOGIN] handleGoogleLogin 함수 호출 시작');
+                  
+                  // Promise 형태로 호출하고 에러 처리
+                  handleGoogleLogin()
+                    .then(() => {
+                      console.log('✅ [GOOGLE LOGIN] handleGoogleLogin 함수 완료');
+                    })
+                    .catch((error) => {
+                      console.error('❌ [GOOGLE LOGIN] handleGoogleLogin 함수 오류:', error);
+                      setError('Google 로그인 중 오류가 발생했습니다. 다시 시도해주세요.');
+                      setIsLoading(false);
+                      (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = false;
+                    });
                 }}
                 disabled={isLoading}
                 className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
+                style={{ 
+                  zIndex: 100, 
+                  position: 'relative',
+                  pointerEvents: isLoading ? 'none' : 'auto'
+                }}
                 onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3'}
                 onBlur={(e) => (e.target as HTMLButtonElement).style.boxShadow = ''}
               >
