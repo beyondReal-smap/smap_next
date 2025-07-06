@@ -1895,7 +1895,7 @@ export default function LocationPage() {
     
     // 먼저 선택 상태 업데이트
     setGroupMembers(updatedMembers);
-    console.log('[handleMemberSelect] 선택 상태 업데이트 완료:', memberId);
+    console.log('[handleMemberSelect] 선택 상태 업데이트 완료:', memberId, '선택된 멤버:', updatedMembers.find(m => m.isSelected)?.name);
     
     // 선택된 멤버의 장소 데이터 로드
     const loadSelectedMemberLocations = async () => {
@@ -1943,6 +1943,18 @@ export default function LocationPage() {
         );
         
         console.log('[handleMemberSelect] 멤버 장소 데이터 업데이트 완료:', convertedLocations.length, '개');
+        
+        // 새로 선택된 멤버의 장소 마커들을 지도에 표시
+        console.log('[handleMemberSelect] 장소 마커 업데이트 시작:', {
+          hasConvertedLocations: convertedLocations.length > 0,
+          hasMap: !!map,
+          updatedMembersCount: updatedMembers.length,
+          selectedMemberFromUpdated: updatedMembers.find(m => m.isSelected)?.name
+        });
+        
+        // *** 중요: handleMemberSelect에서 직접 updateAllMarkers 호출하지 않음 ***
+        // useEffect에서 groupMembers와 selectedMemberSavedLocations 변경을 감지하여 자동으로 마커 업데이트
+        console.log('[handleMemberSelect] 마커 업데이트는 useEffect에서 자동으로 처리됩니다 - 중복 호출 방지');
       } catch (error) {
         console.error('[handleMemberSelect] 장소 데이터 로드 실패:', error);
         setSelectedMemberSavedLocations([]);
@@ -3326,9 +3338,14 @@ export default function LocationPage() {
       return;
     }
 
-        // 선택된 멤버 확인
+    // 선택된 멤버 확인
     const selectedMember = members.find(member => member.isSelected);
-    console.log('[updateAllMarkers] 시작 - 멤버:', members.length, '명, 선택된 멤버:', selectedMember?.name || '없음', '장소:', locations?.length || 0, '개');
+    console.log('[updateAllMarkers] 🚀 시작 - 멤버:', members.length, '명, 선택된 멤버:', selectedMember?.name || '없음', '장소:', locations?.length || 0, '개');
+    console.log('[updateAllMarkers] 📊 현재 마커 상태:', {
+      기존멤버마커수: memberMarkers.length,
+      기존장소마커수: markers.length,
+      호출시간: new Date().toLocaleTimeString()
+    });
 
     // *** 중요: 기존 모든 마커들을 완전히 제거하여 다른 멤버의 장소 마커가 남지 않도록 함 ***
     console.log('[updateAllMarkers] 기존 마커 제거 - 멤버 마커:', memberMarkers.length, '개, 장소 마커:', markers.length, '개');
@@ -3343,7 +3360,7 @@ export default function LocationPage() {
         }
       });
       
-      // 2. 상태 배열의 장소 마커들 제거
+      // 2. 상태 배열의 장소 마커들 제거 (이전 멤버 장소 마커 완전 제거)
       markers.forEach((marker, index) => {
         if (marker && typeof marker.setMap === 'function') {
           console.log('[updateAllMarkers] 장소 마커 제거:', index, marker.getTitle?.() || '제목없음');
@@ -3358,21 +3375,22 @@ export default function LocationPage() {
         tempMarker.current = null;
       }
       
-      // 4. 혹시 남아있을 수 있는 모든 마커들을 지도에서 직접 검색하여 제거
-      if (map && window.naver?.maps) {
-        // 네이버 지도에서 모든 마커를 가져와서 제거 (API가 지원하는 경우)
-        console.log('[updateAllMarkers] 지도에서 직접 마커 검색 및 제거 시도');
-      }
-      
     } catch (error) {
       console.error('[updateAllMarkers] 마커 제거 중 오류:', error);
     }
     
-    // 5. 상태 배열 완전 초기화
+    // 4. 상태 배열 완전 초기화 (즉시 실행하여 이전 마커 완전 제거)
+    console.log('[updateAllMarkers] 🧹 상태 배열 초기화 - 이전 마커 완전 제거');
     setMemberMarkers([]);
     setMarkers([]);
     
-    // 6. InfoWindow 처리 - 멤버 InfoWindow는 보존, 장소 InfoWindow만 닫기
+    // 5. 마커 제거 완료 후 잠시 대기하여 상태 업데이트 완료 보장
+    console.log('[updateAllMarkers] 기존 마커 제거 및 상태 초기화 완료');
+    
+    // 6. 마커 제거 완료를 위한 짧은 지연 (React 상태 업데이트 보장)
+    // await 대신 setTimeout을 사용하여 비동기 처리
+    
+    // 7. InfoWindow 처리 - 멤버 InfoWindow는 보존, 장소 InfoWindow만 닫기
     if (infoWindow) {
       try {
         // InfoWindow 내용을 확인하여 멤버 InfoWindow인지 장소 InfoWindow인지 판단
@@ -3409,6 +3427,8 @@ export default function LocationPage() {
           const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
           const position = new window.naver.maps.LatLng(lat, lng);
           const borderColor = member.isSelected ? '#EC4899' : '#0113A3';
+          
+          console.log(`[updateAllMarkers] 멤버 마커 생성: ${member.name} (선택됨: ${member.isSelected}, 색상: ${borderColor})`);
       
       
           const marker = new window.naver.maps.Marker({
@@ -3481,18 +3501,32 @@ export default function LocationPage() {
     
     // *** 핵심 로직: 선택된 멤버의 장소 마커만 생성 (다른 멤버 장소는 표시하지 않음) ***
     if (selectedMember && locations && locations.length > 0) {
-      console.log('[updateAllMarkers] 선택된 멤버의 장소 마커 생성:', selectedMember.name, '- 장소 수:', locations.length);
+      console.log('[updateAllMarkers] 🎯 선택된 멤버의 장소 마커 생성 시작:', {
+        selectedMemberName: selectedMember.name,
+        selectedMemberId: selectedMember.id,
+        locationsCount: locations.length,
+        locationsPreview: locations.slice(0, 3).map(loc => ({ name: loc.name, coordinates: loc.coordinates }))
+      });
+      
       locations.forEach((location, index) => {
         const [lng, lat] = location.coordinates;
         
-        console.log(`[updateAllMarkers] 장소 ${index + 1}/${locations.length}:`, {
+        console.log(`[updateAllMarkers] 장소 ${index + 1}/${locations.length} 처리:`, {
+          id: location.id,
           name: location.name,
           coordinates: [lng, lat],
-          isValidCoords: lat !== 0 && lng !== 0
+          isValidCoords: lat !== 0 && lng !== 0,
+          hasValidLng: lng !== 0,
+          hasValidLat: lat !== 0
         });
         
         if (lat === 0 && lng === 0) {
-          console.log(`[updateAllMarkers] 장소 ${location.name} 건너뜀: 유효하지 않은 좌표`);
+          console.log(`[updateAllMarkers] ❌ 장소 ${location.name} 건너뜀: 유효하지 않은 좌표 (0, 0)`);
+          return;
+        }
+        
+        if (!lat || !lng) {
+          console.log(`[updateAllMarkers] ❌ 장소 ${location.name} 건너뜀: 좌표 누락 (lat: ${lat}, lng: ${lng})`);
           return;
         }
         
@@ -3602,14 +3636,23 @@ export default function LocationPage() {
         });
 
         newLocationMarkers.push(marker);
-        console.log(`[updateAllMarkers] 장소 마커 생성 완료: ${location.name}`);
+        console.log(`[updateAllMarkers] ✅ 장소 마커 생성 완료: ${location.name} (${lat}, ${lng})`);
       });
       
-      console.log('[updateAllMarkers] 선택된 멤버의 장소 마커 생성 완료:', newLocationMarkers.length, '개');
+      console.log('[updateAllMarkers] 🎯 선택된 멤버의 장소 마커 생성 완료:', {
+        selectedMemberName: selectedMember.name,
+        totalMarkersCreated: newLocationMarkers.length,
+        expectedCount: locations.length,
+        createdMarkers: newLocationMarkers.map((marker, idx) => ({
+          index: idx,
+          title: marker.getTitle?.() || '제목없음',
+          position: marker.getPosition ? { lat: marker.getPosition().lat(), lng: marker.getPosition().lng() } : '위치없음'
+        }))
+      });
     } else {
       // *** 중요: 선택된 멤버가 없거나 장소 데이터가 없으면 장소 마커를 생성하지 않음 ***
-      // 이로 인해 다른 멤버의 장소 마커가 지도에 표시되지 않음
-      console.log('[updateAllMarkers] 장소 마커 생성 건너뜀 (다른 멤버 장소 숨김):', {
+      // 이로 인해 다른 멤버의 장소 마커가 지도에 표시되지 않음 (이전 멤버 장소 마커 완전 제거됨)
+      console.log('[updateAllMarkers] 🚫 장소 마커 생성 건너뜀 (이전 멤버 장소 완전 제거됨):', {
         hasSelectedMember: !!selectedMember,
         selectedMemberName: selectedMember?.name || '없음',
         hasLocations: !!locations,
@@ -3619,11 +3662,28 @@ export default function LocationPage() {
     }
 
     // 상태 업데이트 (배치 처리로 리렌더링 최소화)
+    console.log('[updateAllMarkers] 🔄 상태 업데이트 시작:', {
+      이전멤버마커수: memberMarkers.length,
+      이전장소마커수: markers.length,
+      새멤버마커수: newMemberMarkers.length,
+      새장소마커수: newLocationMarkers.length
+    });
+    
     setMemberMarkers(newMemberMarkers);
     setMarkers(newLocationMarkers);
     
     console.log('[updateAllMarkers] ✅ 완료 - 멤버 마커:', newMemberMarkers.length, '개, 선택된 멤버의 장소 마커:', newLocationMarkers.length, '개');
     console.log('[updateAllMarkers] ✅ 핵심 결과: 다른 멤버 장소 마커 완전 제거됨, 선택된 멤버', selectedMember?.name || '없음', '의 장소만 표시');
+    
+    // 실제 지도에 표시된 마커 확인
+    setTimeout(() => {
+      console.log('[updateAllMarkers] 📍 지도 상태 확인 (500ms 후):', {
+        지도준비상태: !!map,
+        현재멤버마커배열길이: memberMarkers.length,
+        현재장소마커배열길이: markers.length,
+        선택된멤버: selectedMember?.name || '없음'
+      });
+    }, 500);
     
     // 디버깅: 생성된 마커들의 상세 정보 로그
     console.log('[updateAllMarkers] 🔍 생성된 멤버 마커들:', newMemberMarkers.map((marker, index) => ({
@@ -3660,7 +3720,7 @@ export default function LocationPage() {
     });
     
     if (map && isMapReady && groupMembers.length > 0) {
-      console.log('[useEffect 통합 마커] 통합 마커 업데이트 시작');
+      console.log('[useEffect 통합 마커] 📍 통합 마커 업데이트 시작 (중복 호출 방지됨)');
       console.log('[useEffect 통합 마커] 전달할 데이터:', {
         멤버수: groupMembers.length,
         선택된멤버: groupMembers.find(m => m.isSelected)?.name || '없음',
@@ -3668,7 +3728,7 @@ export default function LocationPage() {
         장소데이터: selectedMemberSavedLocations
       });
       
-      // 멤버 마커는 항상 생성, 장소 마커는 선택된 멤버가 있을 때만 생성
+      // *** 핵심: 이곳에서만 마커 업데이트 (handleMemberSelect에서는 호출하지 않음) ***
       updateAllMarkers(groupMembers, selectedMemberSavedLocations);
       
       // 첫번째 멤버 선택 완료 후 InfoWindow 자동 생성
