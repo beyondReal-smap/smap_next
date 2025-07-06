@@ -95,6 +95,7 @@ import ErrorDisplay from './components/ErrorDisplay';
 import ErrorToast from './components/ErrorToast';
 import { MapSkeleton } from '@/components/common/MapSkeleton';
 import InitialLoadingOverlay from './components/InitialLoadingOverlay';
+import FloatingButton from '../../components/common/FloatingButton';
 
 import { retryDataFetch, retryMapApiLoad, retryMapInitialization } from '@/utils/retryUtils';
 
@@ -6912,7 +6913,7 @@ export default function LogsPage() {
             <div 
               className="absolute right-[10px] z-30 z-zoom-control flex flex-col"
               style={{
-                top: '150px'
+                top: '100px'
               }}
             >
               <motion.button
@@ -6953,7 +6954,7 @@ export default function LogsPage() {
                 animate="animate"
                 exit="exit"
                 className="absolute left-0 right-0 z-40 z-floating-card flex justify-center px-4"
-                style={{ top: '20px' }}
+                style={{ top: '10px' }}
               >
                 <motion.div
                   whileHover={{ 
@@ -7073,7 +7074,15 @@ export default function LogsPage() {
           {/* 새로운 경로따라가기 섹션 */}
           <AnimatePresence>
             {groupMembers.some(m => m.isSelected) && selectedDate && sortedLocationData.length > 0 && (
-              <div className="logs-control-buttons">
+              <div 
+                className="logs-control-buttons"
+                style={{
+                  position: 'fixed',
+                  bottom: '70px',
+                  left: '16px',
+                  zIndex: 9989
+                }}
+              >
                 <motion.div
                   initial={{ opacity: 0, y: 20, scale: 0.9 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -7124,7 +7133,7 @@ export default function LogsPage() {
                           isSliderDragging ? '' : 'transition-all duration-200 ease-out'
                         }`}
                         style={{
-                          top: '20%',
+                          top: '50%',
                           left: '0',
                           width: `${sliderValue}%`,
                           transform: 'translateY(-50%)',
@@ -7140,8 +7149,8 @@ export default function LogsPage() {
                             isSliderDragging ? 'scale-125' : 'transition-all duration-200 ease-out hover:scale-110'
                           }`}
                           style={{
-                            top: '-40%',
-                            left: `calc(${sliderValue}% - 5px)`,
+                            top: '50%',
+                            left: `calc(${sliderValue}% + 5px)`,
                             transform: 'translate(calc(-50% - 5px), -50%)',
                             backgroundColor: '#2C6BEE',
                             borderColor: '#2C6BEE',
@@ -7243,90 +7252,17 @@ export default function LogsPage() {
       </AnimatePresence>
 
       {/* 플로팅 사이드바 토글 버튼 */}
-      <motion.button
-        initial={{ y: 100, opacity: 0, scale: 0.8 }}
-        animate={{ 
-          y: 0, 
-          opacity: 1, 
-          scale: 1,
-          transition: {
-            delay: 0.2,
-            type: "spring",
-            stiffness: 120,
-            damping: 25,
-            duration: 1.0
-          }
-        }}
-        whileHover={{ 
-          scale: 1.1,
-          y: -2,
-          transition: { duration: 0.2 }
-        }}
-        whileTap={{ scale: 0.9 }}
+      <FloatingButton
+        variant="logs"
         onClick={toggleSidebar}
-        className="fixed w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white touch-optimized"                                 
+        isOpen={isSidebarOpen}
+        badgeCount={groupMembers.length}
         style={{
-          background: '#0113A3',
-          boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
           bottom: '90px',
           right: '16px',
-          zIndex: 99999,
-          position: 'fixed'
+          zIndex: 99999
         }}
-      >
-        {isSidebarOpen ? (
-          // 닫기 아이콘 (X)
-          <svg className="w-6 h-6 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        ) : (
-          // 그룹 멤버 아이콘 (채워진 스타일)
-          <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
-          </svg>
-        )}
-        
-        {/* 알림 배지 (그룹멤버 수) */}
-        {groupMembers.length > 0 && !isSidebarOpen && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            exit={{ scale: 0 }}
-            transition={{ 
-              type: "spring", 
-              stiffness: 300, 
-              damping: 25,
-              duration: 0.3 
-            }}
-            className="absolute w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center"
-            style={{
-              transformOrigin: 'center',
-              top: '-4px',
-              right: '-4px',
-              position: 'absolute'
-            }}
-          >
-            <span className="text-xs font-bold text-white">{groupMembers.length}</span>
-          </motion.div>
-        )}
-        
-        {/* 펄스 효과 */}
-        {!isSidebarOpen && (
-          <motion.div
-            className="absolute inset-0 rounded-full"
-            style={{ background: '#0113A3' }}
-            animate={{
-              scale: [1, 1.4, 1],
-              opacity: [0.6, 0, 0.6]
-            }}
-            transition={{
-              duration: 2.5,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-        )}
-      </motion.button>
+      />
 
       {/* 사이드바 오버레이 */}
       <AnimatePresence>

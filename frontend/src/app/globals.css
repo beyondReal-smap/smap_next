@@ -1230,12 +1230,12 @@ html body #bottom-navigation-bar {
   z-index: 999999 !important;
 }
 
-/* 플로팅 버튼 초기 위치 고정 */
+/* 플로팅 버튼 초기 위치 고정 - 네비게이션 바 위쪽 */
 [data-floating-button="true"] {
   position: fixed !important;
-  bottom: 10px !important;
+  bottom: 70px !important;
   right: 16px !important;
-  z-index: 999999 !important;
+  z-index: 9990 !important;
   background: #0113A3 !important;
   box-shadow: 0 8px 25px rgba(1, 19, 163, 0.3) !important;
   pointer-events: auto !important;

@@ -110,6 +110,7 @@ import DebugPanel from '../components/layout/DebugPanel';
 import LogParser from '../components/layout/LogParser';
 import AnimatedHeader from '../../components/common/AnimatedHeader';
 import GroupSelector from '@/components/location/GroupSelector';
+import FloatingButton from '../../components/common/FloatingButton';
 // BottomNavBar는 ClientLayout에서 전역으로 관리됨
 
 declare global {
@@ -5238,77 +5239,7 @@ export default function HomePage() {
     }
   };
 
-  // 🚨 Critical Error가 있으면 즉시 에러 화면 표시
-  if (criticalError) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Critical Error</h3>
-            <p className="text-sm text-gray-600 mb-4">{criticalError}</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
-            >
-              페이지 새로고침
-            </button>
-            <button 
-              onClick={() => setCriticalError(null)}
-              className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
-            >
-              오류 무시하고 계속
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 🚨 iOS 시뮬레이터 에러 처리 UI
-  if (componentError) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-lg p-6 max-w-lg w-full">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">홈 페이지 오류 발생</h3>
-            <p className="text-sm text-gray-600 mb-4 break-words">{componentError}</p>
-            <div className="flex flex-col gap-2">
-              <button 
-                onClick={() => {
-                  console.log('[HOME ERROR] 사용자가 앱 재시작 요청');
-                  setComponentError(null);
-                  window.location.reload();
-                }}
-                className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
-              >
-                앱 다시 시작
-              </button>
-              <button 
-                onClick={() => {
-                  console.log('[HOME ERROR] 사용자가 홈으로 강제 이동 요청');
-                  setComponentError(null);
-                  window.location.href = '/home';
-                }}
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                홈으로 강제 이동
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // 에러 상태를 조건부 렌더링으로 처리 (hooks 순서 유지)
 
   // 렌더링 시도 횟수 증가 및 DOM 안전성 체크 (iOS WebView 최적화)
   useEffect(() => {
@@ -5350,42 +5281,116 @@ export default function HomePage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // 마운트되지 않은 상태에서는 최소한의 로딩 화면 표시 (iOS WebView 최적화)
-  if (!isMounted) {
-    return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        backgroundColor: '#f8fafc'
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            border: '3px solid #e2e8f0',
-            borderTop: '3px solid #3b82f6',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 16px'
-          }}></div>
-          <p style={{ color: '#64748b', fontSize: '14px' }}>로딩 중...</p>
-        </div>
-        <style jsx>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
-      </div>
-    );
-  }
+  // 마운트 상태를 조건부 렌더링으로 처리 (hooks 순서 유지)
 
 
 
   // 🛡️ 안전한 렌더링
   try {
+    // Critical Error 상태 처리
+    if (criticalError) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Critical Error</h3>
+              <p className="text-sm text-gray-600 mb-4">{criticalError}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="w-full bg-red-500 text-white py-2 px-4 rounded-lg hover:bg-red-600 transition-colors"
+              >
+                페이지 새로고침
+              </button>
+              <button 
+                onClick={() => setCriticalError(null)}
+                className="w-full mt-2 bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                오류 무시하고 계속
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Component Error 상태 처리
+    if (componentError) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-lg p-6 max-w-lg w-full">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">홈 페이지 오류 발생</h3>
+              <p className="text-sm text-gray-600 mb-4 break-words">{componentError}</p>
+              <div className="flex flex-col gap-2">
+                <button 
+                  onClick={() => {
+                    console.log('[HOME ERROR] 사용자가 앱 재시작 요청');
+                    setComponentError(null);
+                    window.location.reload();
+                  }}
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  앱 다시 시작
+                </button>
+                <button 
+                  onClick={() => {
+                    console.log('[HOME ERROR] 사용자가 홈으로 강제 이동 요청');
+                    setComponentError(null);
+                    window.location.href = '/home';
+                  }}
+                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  홈으로 강제 이동
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 마운트되지 않은 상태 처리
+    if (!isMounted) {
+      return (
+        <div style={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          backgroundColor: '#f8fafc'
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '3px solid #e2e8f0',
+              borderTop: '3px solid #3b82f6',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 16px'
+            }}></div>
+            <p style={{ color: '#64748b', fontSize: '14px' }}>로딩 중...</p>
+          </div>
+          <style jsx>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      );
+    }
+
     return (
       <>
         <style jsx global>{mobileStyles}</style>
@@ -5621,83 +5626,15 @@ export default function HomePage() {
                       </div> */}
 
          {/* 플로팅 사이드바 토글 버튼 - 네비게이션 바 오른쪽 아래 */}
-         <motion.button
-           initial={{ y: 100, opacity: 0, scale: 0.8 }}
-           animate={{ 
-             y: -80, 
-             opacity: 1, 
-             scale: 1,
-             transition: {
-               delay: 0.2,
-               type: "spring",
-               stiffness: 120,
-               damping: 25,
-               duration: 1.0
-             }
-           }}
-           whileHover={{ 
-             scale: 1.1,
-             y: -2,
-             transition: { duration: 0.2 }
-           }}
-           whileTap={{ scale: 0.9 }}
-           onClick={(e) => {
-             e.stopPropagation(); // 이벤트 전파 방지
+         <FloatingButton
+           variant="home"
+           onClick={() => {
              console.log('플로팅 버튼 클릭됨, 현재 사이드바 상태:', isSidebarOpen);
              toggleSidebar();
            }}
-                      className="fixed w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
-           data-floating-button="true"
-           style={{
-             background: '#0113A3',
-             boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
-             zIndex: 999999, // 사이드바보다 훨씬 높은 z-index
-             position: 'fixed',
-             bottom: '72px !important', // 네비게이션 바(56px) + 여백(16px) = 72px
-             right: '16px',
-             pointerEvents: 'auto' // 항상 클릭 가능하도록 설정
-           }}
-         >
-           {isSidebarOpen ? (
-             // 닫기 아이콘 (X)
-             <svg className="w-6 h-6 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-             </svg>
-           ) : (
-             // 그룹 멤버 아이콘 (채워진 스타일)
-             <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-               <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
-             </svg>
-           )}
-           
-           {/* 알림 배지 (그룹멤버 수) */}
-           {groupMembers.length > 0 && !isSidebarOpen && (
-             <motion.div
-               initial={{ scale: 0 }}
-               animate={{ scale: 1 }}
-               className="absolute -top-1 -right-1 w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center"
-             >
-               <span className="text-xs font-bold text-white">{groupMembers.length}</span>
-             </motion.div>
-           )}
-           
-           {/* 펄스 효과 */}
-           {!isSidebarOpen && (
-             <motion.div
-               className="absolute inset-0 rounded-full"
-               style={{ background: '#0113A3' }}
-               animate={{
-                 scale: [1, 1.4, 1],
-                 opacity: [0.6, 0, 0.6]
-               }}
-               transition={{
-                 duration: 2.5,
-                 repeat: Infinity,
-                 ease: "easeInOut"
-               }}
-             />
-           )}
-         </motion.button>
+           isOpen={isSidebarOpen}
+           badgeCount={groupMembers.length}
+         />
 
          {/* 바텀시트 제거됨 */}
 

@@ -215,26 +215,7 @@ export default function LogsLayout({
             opacity: 1;
           }
 
-          /* 로그 페이지 버튼 위치 강제 설정 */
-          .logs-page .logs-control-buttons {
-            position: fixed !important;
-            bottom: 90px !important;
-            left: 16px !important;
-            z-index: 9999 !important;
-            transform: none !important;
-          }
-
-          .logs-page .logs-control-buttons * {
-            position: relative !important;
-            transform: none !important;
-          }
-
-          /* 네비게이션 바 위쪽 버튼 위치 */
-          .logs-page .logs-control-buttons button {
-            position: relative !important;
-            transform: none !important;
-            z-index: 9999 !important;
-          }
+          /* 로그 페이지 버튼 스타일 제거됨 - 통합 플로팅 버튼 사용 */
         `
       }} />
       

@@ -31,6 +31,7 @@ import {
 } from 'react-icons/hi2';
 import { RiKakaoTalkFill } from 'react-icons/ri';
 import { FiLink, FiX, FiCopy, FiSettings, FiPlus, FiUser, FiChevronDown } from 'react-icons/fi';
+import FloatingButton from '../../components/common/FloatingButton';
 import { MdOutlineMessage, MdGroupAdd } from 'react-icons/md';
 import { BsThreeDots } from 'react-icons/bs';
 import groupService, { Group, GroupStats } from '@/services/groupService';
@@ -54,21 +55,8 @@ const AnimatedHeader = dynamicImport(() => import('../../components/common/Anima
 
 export const dynamic = 'force-dynamic';
 
-// 플로팅 버튼 스타일
-const floatingButtonStyles = `
-.floating-button {
-  position: fixed;
-  bottom: 90px;
-  right: 16px;
-  z-index: 40;
-  background: #0113A3;
-  box-shadow: 0 8px 25px rgba(1, 19, 163, 0.3);
-  transition: all 0.3s ease;
-  touch-action: manipulation;
-  user-select: none;
-  animation: floatIn 0.8s ease-out 0.2s both;
-}
-
+// 페이지 스타일 (플로팅 버튼 스타일 제거됨 - 통합 컴포넌트 사용)
+const pageStyles = `
 @keyframes floatIn {
   from {
     transform: translateY(100px) scale(0.8);
@@ -111,11 +99,6 @@ const floatingButtonStyles = `
 .loading .group-card {
   opacity: 1;
   animation: none;
-}
-
-.floating-button:hover {
-  transform: scale(1.1);
-  box-shadow: 0 12px 35px rgba(1, 19, 163, 0.4);
 }
 
 .glass-effect {
@@ -1420,7 +1403,7 @@ function GroupPageContent() {
 
   return (
     <>
-      <style jsx global>{floatingButtonStyles}</style>
+              <style jsx global>{pageStyles}</style>
       <div className="fixed inset-0 overflow-hidden" style={{ background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)' }}>
         
 
@@ -1956,29 +1939,10 @@ function GroupPageContent() {
 
         {/* 플로팅 추가 버튼 - 전체 페이지 기준 */}
         {currentView === 'list' && (
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ 
-              opacity: 1, 
-              scale: 1,
-              transition: {
-                delay: 0.2,
-                type: "spring",
-                stiffness: 120,
-                damping: 25,
-                duration: 0.6
-              }
-            }}
-            whileHover={{ 
-              scale: 1.1,
-              transition: { duration: 0.2 }
-            }}
-            whileTap={{ scale: 0.9 }}
+          <FloatingButton
+            variant="group"
             onClick={() => setIsAddModalOpen(true)}
-            className="floating-button w-14 h-14 rounded-full flex items-center justify-center text-white"
-          >
-            <FiPlus className="w-6 h-6 stroke-2" />
-          </motion.button>
+          />
         )}
 
         {/* 모달들 */}

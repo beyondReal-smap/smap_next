@@ -1359,9 +1359,10 @@
             for (const node of mutation.addedNodes) {
               if (node.nodeType === 1) { // Element node
                 const tagName = node.tagName?.toLowerCase();
+                const className = typeof node.className === 'string' ? node.className : (node.className?.toString() || '');
                 if (tagName === 'header' || tagName === 'nav' || 
-                    node.className?.includes('header') || 
-                    node.className?.includes('navigation')) {
+                    className.includes('header') || 
+                    className.includes('navigation')) {
                   shouldReapply = true;
                   break;
                 }

@@ -41,6 +41,7 @@ import scheduleService, { Schedule, UserPermission } from '../../services/schedu
 import pushNotificationService, { ScheduleNotificationContext, GroupMemberInfo } from '../../services/pushNotificationService';
 import { useDataCache } from '../../contexts/DataCacheContext';
 import { hapticFeedback } from '../../utils/haptic';
+import FloatingButton from '../../components/common/FloatingButton';
 
 // Dynamic Imports for better code splitting
 const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
@@ -170,16 +171,7 @@ html, body {
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 }
 
-/* Floating button styles - 애니메이션 충돌 방지 */
-.floating-button {
-  touch-action: manipulation !important;
-  user-select: none !important;
-  border: none !important;
-  outline: none !important;
-  pointer-events: auto !important; /* 클릭 이벤트 보장 */
-  cursor: pointer !important;
-  /* CSS transition 제거 - Framer Motion이 모든 애니메이션 처리 */
-}
+/* 플로팅 버튼 스타일 제거됨 - 통합 컴포넌트 사용 */
 
 /* 앱 고정 레이아웃 - 전체 스크롤 비활성화 */
 html, body {
@@ -5716,65 +5708,10 @@ export default function SchedulePage() {
       </div>
 
       {/* 플로팅 버튼 - 일정 추가 */}
-      <motion.button
-          onClick={handleOpenAddEventModal}
-          className="floating-button w-14 h-14 rounded-full flex items-center justify-center text-white"
-          style={{
-            position: 'fixed',
-            bottom: '90px',
-            right: '20px',
-            zIndex: 8000, // 모달(z-index: 50, 10000)보다 낮게 설정
-            background: '#0113A3',
-            width: '56px',
-            height: '56px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: 'none',
-            boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
-          }}
-          initial={{ y: 100, opacity: 0, scale: 0.8 }}
-          animate={{ 
-            y: 0, 
-            opacity: 1, 
-            scale: 1
-          }}
-          transition={{
-            delay: 0.2,
-            y: {
-              duration: 0.6,
-              ease: [0.25, 0.46, 0.45, 0.94]
-            },
-            opacity: {
-              duration: 0.4,
-              ease: "easeOut"
-            },
-            scale: {
-              duration: 0.5,
-              ease: [0.34, 1.56, 0.64, 1]
-            }
-          }}
-          exit={{ y: 100, opacity: 0, scale: 0.8 }}
-          whileHover={{ 
-            scale: 1.1,
-            y: -2,
-            boxShadow: "0 12px 35px rgba(1, 19, 163, 0.4)",
-            transition: { 
-              duration: 0.2,
-              ease: "easeOut"
-            }
-          }}
-          whileTap={{ 
-            scale: 0.9,
-            transition: { 
-              duration: 0.1,
-              ease: "easeInOut"
-            }
-          }}
-        >
-          <FiPlus className="w-6 h-6" />
-        </motion.button>
+      <FloatingButton
+        variant="schedule"
+        onClick={handleOpenAddEventModal}
+      />
 
       {/* 일정 추가/수정 모달 */}
       <AnimatePresence>

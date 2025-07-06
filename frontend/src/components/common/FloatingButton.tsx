@@ -1,0 +1,204 @@
+'use client';
+
+import React from 'react';
+import { motion } from 'framer-motion';
+import { usePathname } from 'next/navigation';
+import { FiPlus, FiUser, FiX } from 'react-icons/fi';
+
+export interface FloatingButtonProps {
+  // 기본 props
+  onClick: () => void;
+  
+  // 페이지별 커스터마이징
+  variant?: 'home' | 'group' | 'schedule' | 'location' | 'logs' | 'custom';
+  
+  // 커스텀 설정 (variant가 'custom'일 때 사용)
+  icon?: React.ReactNode;
+  backgroundColor?: string;
+  position?: {
+    bottom?: string;
+    right?: string;
+  };
+  
+  // 상태 관리 (home, location, logs 페이지용)
+  isOpen?: boolean;
+  
+  // 배지 표시 (home 페이지용)
+  badgeCount?: number;
+  
+  // 애니메이션 설정
+  delay?: number;
+  disabled?: boolean;
+  
+  // 추가 스타일
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+const FloatingButton: React.FC<FloatingButtonProps> = ({
+  onClick,
+  variant = 'custom',
+  icon,
+  backgroundColor = '#0113A3',
+  position = { bottom: '90px', right: '16px' },
+  isOpen = false,
+  badgeCount,
+  delay = 0.2,
+  disabled = false,
+  className = '',
+  style = {}
+}) => {
+  // hooks는 항상 같은 순서로 호출되어야 함
+  const pathname = usePathname();
+
+  // 페이지별 기본 설정
+  const getVariantConfig = () => {
+    switch (variant) {
+      case 'home':
+        return {
+          icon: isOpen ? (
+            <FiX className="w-6 h-6" />
+          ) : (
+            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
+            </svg>
+          ),
+          position: { bottom: '90px', right: '16px' },
+          backgroundColor: '#0113A3'
+        };
+      
+      case 'group':
+        return {
+          icon: <FiPlus className="w-6 h-6 stroke-2" />,
+          position: { bottom: '90px', right: '16px' },
+          backgroundColor: '#0113A3'
+        };
+      
+      case 'schedule':
+        return {
+          icon: <FiPlus className="w-6 h-6" />,
+          position: { bottom: '90px', right: '16px' },
+          backgroundColor: '#0113A3'
+        };
+      
+      case 'location':
+        return {
+          icon: isOpen ? (
+            <FiX className="w-6 h-6" />
+          ) : (
+            <FiUser className="w-6 h-6" />
+          ),
+          position: { bottom: '90px', right: '16px' },
+          backgroundColor: '#0113A3'
+        };
+      
+      case 'logs':
+        return {
+          icon: isOpen ? (
+            <FiX className="w-6 h-6" />
+          ) : (
+            <FiUser className="w-6 h-6" />
+          ),
+          position: { bottom: '90px', right: '16px' },
+          backgroundColor: '#0113A3'
+        };
+      
+      default:
+        return {
+          icon: icon || <FiPlus className="w-6 h-6" />,
+          position,
+          backgroundColor
+        };
+    }
+  };
+
+  const config = getVariantConfig();
+
+  // 애니메이션 variants
+  const buttonVariants = {
+    initial: { 
+      y: 100, 
+      opacity: 0, 
+      scale: 0.8 
+    },
+    animate: { 
+      y: 0, 
+      opacity: 1, 
+      scale: 1,
+      transition: {
+        delay,
+        type: "spring" as const,
+        stiffness: 120,
+        damping: 25,
+        duration: 1.0
+      }
+    },
+    hover: { 
+      scale: 1.1,
+      y: -2,
+      transition: { duration: 0.2 }
+    },
+    tap: { 
+      scale: 0.9 
+    }
+  };
+
+  return (
+    <motion.button
+      variants={buttonVariants}
+      initial="initial"
+      animate="animate"
+      whileHover={!disabled ? "hover" : undefined}
+      whileTap={!disabled ? "tap" : undefined}
+      onClick={disabled ? undefined : onClick}
+      className={`fixed w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white touch-optimized ${className}`}
+      disabled={disabled}
+      style={{
+        background: config.backgroundColor,
+        boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
+        zIndex: 9990,
+        position: 'fixed',
+        bottom: config.position.bottom,
+        right: config.position.right,
+        pointerEvents: disabled ? 'none' : 'auto',
+        opacity: disabled ? 0.5 : 1,
+        ...style
+      }}
+      data-floating-button="true"
+    >
+      {config.icon}
+      
+      {/* 배지 표시 (home 페이지용) */}
+      {badgeCount !== undefined && badgeCount > 0 && !isOpen && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="absolute -top-1 -right-1 w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center"
+        >
+          <span className="text-xs font-bold text-white">
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </span>
+        </motion.div>
+      )}
+      
+      {/* 펄스 효과 (home, location, logs 페이지의 닫힌 상태용) */}
+      {(variant === 'home' || variant === 'location' || variant === 'logs') && !isOpen && (
+        <motion.div
+          className="absolute inset-0 rounded-full"
+          style={{ background: config.backgroundColor }}
+          animate={{
+            scale: [1, 1.4, 1],
+            opacity: [0.6, 0, 0.6]
+          }}
+          transition={{
+            duration: 2.5,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+      )}
+    </motion.button>
+  );
+};
+
+export default FloatingButton; 
