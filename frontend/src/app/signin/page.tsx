@@ -1443,17 +1443,70 @@ const SignInPage = () => {
           userAgent: navigator.userAgent
         });
         
-        // 최대 2회까지만 재시도
-        if (retryCount < 2) {
-          console.log('[GOOGLE SDK] 3초 후 재시도...');
-          await new Promise(resolve => setTimeout(resolve, 3000));
+        // Google SDK를 동적으로 로드해보기
+        console.log('[GOOGLE SDK] Google Identity Services SDK 동적 로드 시도...');
+        
+        try {
+          // 기존 스크립트가 있는지 확인
+          let existingScript = document.querySelector('script[src*="accounts.google.com/gsi/client"]');
           
+          if (!existingScript) {
+            // 새로운 스크립트 태그 생성
+            const script = document.createElement('script');
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            script.defer = true;
+            
+            // 스크립트 로드 완료 대기
+            await new Promise((resolve, reject) => {
+              script.onload = () => {
+                console.log('[GOOGLE SDK] Google Identity Services SDK 로드 완료');
+                resolve(true);
+              };
+              script.onerror = () => {
+                console.error('[GOOGLE SDK] Google Identity Services SDK 로드 실패');
+                reject(new Error('SDK 로드 실패'));
+              };
+              
+              document.head.appendChild(script);
+              
+              // 10초 타임아웃
+              setTimeout(() => reject(new Error('SDK 로드 타임아웃')), 10000);
+            });
+            
+            console.log('[GOOGLE SDK] 스크립트 추가 완료, SDK 초기화 대기...');
+            
+            // SDK 초기화 대기 (최대 3초)
+            let attempts = 0;
+            while (attempts < 15 && !(window as any).google?.accounts?.id) {
+              await new Promise(resolve => setTimeout(resolve, 200));
+              attempts++;
+            }
+          }
+          
+          // SDK가 로드되었는지 재확인
           if ((window as any).google?.accounts?.id) {
-            console.log('[GOOGLE SDK] 재시도 성공 - SDK 사용 가능');
-            // 재귀 호출로 다시 시도
+            console.log('[GOOGLE SDK] 동적 로드 성공! 재귀 호출로 다시 시도');
             return handleGoogleSDKLogin(retryCount + 1);
           } else {
-            console.log('[GOOGLE SDK] 재시도해도 SDK 없음');
+            throw new Error('Google SDK 동적 로드 후에도 사용할 수 없음');
+          }
+          
+        } catch (sdkError) {
+          console.error('[GOOGLE SDK] 동적 로드 실패:', sdkError);
+          
+          // 최대 2회까지만 재시도
+          if (retryCount < 2) {
+            console.log('[GOOGLE SDK] 3초 후 기존 재시도 로직 실행...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            if ((window as any).google?.accounts?.id) {
+              console.log('[GOOGLE SDK] 재시도 성공 - SDK 사용 가능');
+              // 재귀 호출로 다시 시도
+              return handleGoogleSDKLogin(retryCount + 1);
+            } else {
+              console.log('[GOOGLE SDK] 재시도해도 SDK 없음');
+            }
           }
         }
         
@@ -1462,6 +1515,9 @@ const SignInPage = () => {
       
     } catch (error: any) {
       console.error('[GOOGLE SDK] 초기화 실패:', error);
+      (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = false;
+      throw error;
+    } finally {
       (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = false;
     }
   };
@@ -2734,6 +2790,16 @@ const SignInPage = () => {
 
   // Google 로그인 핸들러 (플랫폼별 분리된 버전)
   const handleGoogleLogin = async () => {
+    console.log('🚀 [GOOGLE LOGIN] 버튼 클릭됨!', {
+      isLoading,
+      isIOSWebView,
+      isAndroidWebView,
+      isWebEnvironment,
+      hasGoogleSDK: !!(window as any).google?.accounts?.id,
+      hasWebKit: !!(window as any).webkit?.messageHandlers?.smapIos,
+      timestamp: Date.now()
+    });
+    
     if (isLoading) {
       console.log('🚫 [GOOGLE LOGIN] 이미 로딩 중입니다.');
       return undefined;
@@ -2791,16 +2857,23 @@ const SignInPage = () => {
             
             console.log('✅ [GOOGLE LOGIN] iOS 네이티브 호출 성공, 콜백 대기 중...');
             
-            // iOS 환경에서 3초 후 웹 SDK 폴백 (시간 증가)
+            // iOS 환경에서 1.5초 후 웹 SDK 폴백 (시간 단축으로 빠른 응답)
             setTimeout(() => {
               console.log('🔍 [IOS FALLBACK] iOS Google Sign-In 응답 확인 중...');
               
               // 진행 중 플래그가 여전히 설정되어 있으면 웹 SDK로 폴백
               if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
-                console.log('⚠️ [IOS FALLBACK] iOS 네이티브 응답 없음, 웹 SDK로 폴백');
-                handleGoogleSDKLogin();
+                console.log('⚠️ [IOS FALLBACK] iOS 네이티브 응답 없음, 웹 SDK로 폴백 시작');
+                handleGoogleSDKLogin().catch(error => {
+                  console.error('❌ [IOS FALLBACK] 웹 SDK 폴백 실패:', error);
+                  setIsLoading(false);
+                  (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = false;
+                  setError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
+                });
+              } else {
+                console.log('✅ [IOS FALLBACK] iOS 네이티브 응답이 있었거나 이미 처리됨');
               }
-            }, 3000);
+            }, 1500); // 3초 → 1.5초로 단축
             
             return undefined;
           } catch (error) {
@@ -2810,10 +2883,17 @@ const SignInPage = () => {
             return undefined;
           }
         } else {
-          console.warn('🍎 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 인터페이스가 없습니다. 웹 SDK로 폴백합니다');
+          console.warn('🍎 [GOOGLE LOGIN] iOS 네이티브 Google 로그인 인터페이스가 없습니다. 웹 SDK로 즉시 폴백합니다');
           
           // iOS에서 네이티브 인터페이스가 없으면 웹 SDK 사용
-          await handleGoogleSDKLogin();
+          try {
+            await handleGoogleSDKLogin();
+          } catch (error) {
+            console.error('❌ [IOS FALLBACK] 웹 SDK 폴백 실패:', error);
+            setIsLoading(false);
+            (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = false;
+            setError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
+          }
         }
         
         return undefined; // iOS 처리가 완료되면 함수 종료
