@@ -4483,7 +4483,7 @@ export default function LocationPage() {
 
   // 사이드바 토글 함수
   const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
+    setIsSidebarOpen(prev => !prev);
   };
 
   // 장소 선택 핸들러 (사이드바에서 장소 클릭 시)
@@ -5363,75 +5363,88 @@ export default function LocationPage() {
         </AnimatePresence>
 
         {/* 플로팅 사이드바 토글 버튼 */}
-        <motion.button
-          initial={{ y: 100, opacity: 0, scale: 0.8 }}
-          animate={{ 
-            y: 0, 
-            opacity: 1, 
-            scale: 1,
-            transition: {
-              delay: 0.2,
-              type: "spring",
-              stiffness: 120,
-              damping: 25,
-              duration: 1.0
-            }
-          }}
-          whileHover={{ 
-            scale: 1.1,
-            y: -2,
-            transition: { duration: 0.2 }
-          }}
-          whileTap={{ scale: 0.9 }}
-          onClick={toggleSidebar}
-          className="fixed right-4 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white"
-          style={{
-            background: '#0113A3',
-            boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
-            bottom: 'calc(48px + 40px)', // 네비게이션 바(48px) + 여유공간(50px) - 30px 위로 올림
-            zIndex: 99999999 // 매우 높은 z-index로 설정하여 모든 오버레이 위에 표시
-          }}
-        >
-          {isSidebarOpen ? (
-            // 닫기 아이콘 (X)
-            <svg className="w-6 h-6 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          ) : (
-            // 그룹 멤버 아이콘 (채워진 스타일)
-            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
-            </svg>
-          )}
-          
-          {/* 알림 배지 (그룹멤버 수) */}
-          {groupMembers.length > 0 && !isSidebarOpen && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="absolute -top-1 -right-1 w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center"
-            >
-              <span className="text-xs font-bold text-white">{groupMembers.length}</span>
-            </motion.div>
-          )}
-          
-          {/* 펄스 효과 */}
-          {!isSidebarOpen && (
-            <motion.div
-              className="absolute inset-0 rounded-full"
-              style={{ background: '#0113A3' }}
-              animate={{
-                scale: [1, 1.4, 1],
-                opacity: [0.6, 0, 0.6]
-              }}
-              transition={{
-                duration: 2.5,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-            />
-          )}
-        </motion.button>
+        {typeof window !== 'undefined' && ReactDOM.createPortal(
+          <motion.button
+            key={`toggle-button-${isSidebarOpen}`} // 상태 변경 시 리렌더링 강제
+            initial={{ y: 100, opacity: 0, scale: 0.8 }}
+            animate={{ 
+              y: 0, 
+              opacity: 1, 
+              scale: 1,
+              transition: {
+                delay: 0.2,
+                type: "spring",
+                stiffness: 120,
+                damping: 25,
+                duration: 1.0
+              }
+            }}
+            whileHover={{ 
+              scale: 1.1,
+              y: -2,
+              transition: { duration: 0.2 }
+            }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => {
+              console.log('[토글 버튼] 클릭됨, 현재 상태:', isSidebarOpen);
+              // 강제로 상태 토글 (최신 상태를 확실히 반영)
+              setIsSidebarOpen(prevState => {
+                const newState = !prevState;
+                console.log('[토글 버튼] 상태 변경:', prevState, '->', newState);
+                return newState;
+              });
+            }}
+            className="fixed right-4 w-14 h-14 rounded-full shadow-lg flex items-center justify-center text-white pointer-events-auto"
+            style={{
+              background: '#0113A3',
+              boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
+              bottom: 'calc(48px + 40px)',
+              zIndex: 9998,
+              position: 'fixed'
+            }}
+          >
+            {isSidebarOpen ? (
+              // 닫기 아이콘 (X)
+              <svg className="w-6 h-6 stroke-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              // 그룹 멤버 아이콘 (채워진 스타일)
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
+              </svg>
+            )}
+            
+            {/* 알림 배지 (그룹멤버 수) */}
+            {groupMembers.length > 0 && !isSidebarOpen && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute -top-1 -right-1 w-5 h-5 bg-pink-500 rounded-full flex items-center justify-center"
+              >
+                <span className="text-xs font-bold text-white">{groupMembers.length}</span>
+              </motion.div>
+            )}
+            
+            {/* 펄스 효과 */}
+            {!isSidebarOpen && (
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{ background: '#0113A3' }}
+                animate={{
+                  scale: [1, 1.4, 1],
+                  opacity: [0.6, 0, 0.6]
+                }}
+                transition={{
+                  duration: 2.5,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+            )}
+          </motion.button>,
+          document.body
+        )}
 
         {/* 사이드바 오버레이 */}
         <AnimatePresence>
@@ -5442,6 +5455,7 @@ export default function LocationPage() {
               animate="open"
               exit="closed"
               className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]"
+              style={{ zIndex: 9998 }}
               onClick={() => setIsSidebarOpen(false)}
             />
           )}

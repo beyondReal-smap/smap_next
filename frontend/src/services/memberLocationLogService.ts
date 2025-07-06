@@ -21,9 +21,9 @@ const normalizeDate = (date: string): string => {
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const standardToday = new Date().toISOString().split('T')[0];
   
-  // 요청된 날짜가 오늘 날짜인 경우 WebKit 정규화된 날짜로 변환
+  // 요청된 날짜가 오늘 날짜인 경우에만 WebKit 정규화된 날짜로 변환
   if (date === standardToday || date === today) {
-    console.log('[memberLocationLogService] WebKit 금일 날짜 정규화:', {
+    console.log('[memberLocationLogService] WebKit 금일 날짜 정규화 (오늘만):', {
       원본요청: date,
       정규화결과: today,
       시간대: Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -31,6 +31,12 @@ const normalizeDate = (date: string): string => {
     return today;
   }
   
+  // 과거 날짜는 원본 그대로 반환 (정규화하지 않음)
+  console.log('[memberLocationLogService] 과거 날짜 정규화 건너뜀:', {
+    원본요청: date,
+    오늘날짜: today,
+    시간대: Intl.DateTimeFormat().resolvedOptions().timeZone
+  });
   return date;
 };
 
@@ -520,17 +526,14 @@ class MemberLocationLogService {
       const isWebKitEnv = isWebKit();
       const isIOSWebViewEnv = isIOSWebView();
       
-      // WebKit 환경에서 날짜 정규화
-      const normalizedDate = normalizeDate(date);
-      
       console.log('[MemberLocationLogService] 체류시간 분석 조회 시작:', { 
-        memberId, 원본날짜: date, 정규화날짜: normalizedDate, minSpeed, maxAccuracy, minDuration,
+        memberId, 날짜: date, minSpeed, maxAccuracy, minDuration,
         isWebKit: isWebKitEnv,
         isIOSWebView: isIOSWebViewEnv
       });
       
       const params = new URLSearchParams({
-        date: normalizedDate,
+        date: date,
         min_speed: minSpeed.toString(),
         max_accuracy: maxAccuracy.toString(),
         min_duration: minDuration.toString()
@@ -621,17 +624,14 @@ class MemberLocationLogService {
       const isWebKitEnv = isWebKit();
       const isIOSWebViewEnv = isIOSWebView();
       
-      // WebKit 환경에서 날짜 정규화
-      const normalizedDate = normalizeDate(date);
-      
       console.log('[MemberLocationLogService] 지도 마커 데이터 조회 시작:', { 
-        memberId, 원본날짜: date, 정규화날짜: normalizedDate, minSpeed, maxAccuracy,
+        memberId, 날짜: date, minSpeed, maxAccuracy,
         isWebKit: isWebKitEnv,
         isIOSWebView: isIOSWebViewEnv
       });
       
       const params = new URLSearchParams({
-        date: normalizedDate,
+        date: date,
         min_speed: minSpeed.toString(),
         max_accuracy: maxAccuracy.toString()
       });

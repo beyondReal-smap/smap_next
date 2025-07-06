@@ -2908,14 +2908,14 @@ export default function LogsPage() {
 
     // 캐시에서 먼저 확인 (멤버별로 구분하여 확인)
     if (selectedGroupId) {
-      // WebKit 환경에서 금일 날짜 보정
+      // WebKit 환경에서 금일 날짜 보정 - 과거 날짜는 보정하지 않음
       let adjustedDate = date;
       const todayString = getTodayDateString();
       const isRequestingToday = date === format(new Date(), 'yyyy-MM-dd') || date === todayString;
       
       if (isWebKitEnv && isRequestingToday) {
         adjustedDate = todayString;
-        console.log('[loadLocationData] WebKit 환경 금일 날짜 보정:', {
+        console.log('[loadLocationData] WebKit 환경 금일 날짜 보정 (오늘만):', {
           원본요청날짜: date,
           보정된날짜: adjustedDate,
           오늘날짜: todayString
@@ -3085,14 +3085,15 @@ export default function LogsPage() {
       // 강화된 API 호출 로직 - 개별 호출로 변경하여 더 정확한 에러 추적
       console.log('[loadLocationData] 🎯 강화된 API 호출 시작');
       
-      // WebKit 환경에서 API 호출용 날짜 정규화
+      // WebKit 환경에서 API 호출용 날짜 정규화 - 과거 날짜는 정규화하지 않음
       let apiDate = date;
       const todayString = getTodayDateString();
       const isRequestingToday = date === format(new Date(), 'yyyy-MM-dd') || date === todayString;
       
+      // 과거 날짜는 정규화하지 않고 원본 날짜 사용
       if (isWebKitEnv && isRequestingToday) {
         apiDate = todayString;
-        console.log('[loadLocationData] WebKit API 호출 날짜 정규화:', {
+        console.log('[loadLocationData] WebKit API 호출 날짜 정규화 (오늘만):', {
           원본날짜: date,
           정규화날짜: apiDate,
           금일날짜: todayString,
@@ -7014,7 +7015,7 @@ export default function LogsPage() {
                         </div>
                         <div className="flex items-center space-x-1 mt-0.5">
                           <span className="text-xs font-medium text-blue-500" style={{ minWidth: '85px' }}>
-                            📅 {format(new Date(selectedDate), 'MM월 dd일 (E)', { locale: ko })}
+                            {format(new Date(selectedDate), 'MM월 dd일 (E)', { locale: ko })}
                           </span>
                         </div>
                       </div>
