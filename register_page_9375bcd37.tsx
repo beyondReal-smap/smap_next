@@ -26,6 +26,7 @@ import {
   FiChevronLeft,
   FiChevronRight
 } from 'react-icons/fi';
+import AnimatedHeader from '../../components/common/AnimatedHeader';
 import groupService from '@/services/groupService';
 
 // 회원가입 단계 정의
@@ -120,24 +121,6 @@ export default function RegisterPage() {
   React.useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
-      /* 헤더 강제 고정 스타일 */
-      .register-header-fixed {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        z-index: 9999 !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        transform: none !important;
-        animation: none !important;
-        transition: none !important;
-        min-height: 60px !important;
-        height: auto !important;
-        width: 100% !important;
-      }
-      
       @media (max-height: 600px) {
         .register-content {
           padding-top: 0.5rem !important;
@@ -227,7 +210,6 @@ export default function RegisterPage() {
       document.head.removeChild(style);
     };
   }, []);
-
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(REGISTER_STEPS.TERMS);
   const [isLoading, setIsLoading] = useState(false);
@@ -327,30 +309,6 @@ export default function RegisterPage() {
       }
     }
   }, []);
-
-  // 헤더 강제 표시 유지
-  useEffect(() => {
-    const headerElement = document.querySelector('.register-header-fixed') as HTMLElement;
-    if (headerElement) {
-      const forceHeaderVisible = () => {
-        headerElement.style.display = 'block';
-        headerElement.style.visibility = 'visible';
-        headerElement.style.opacity = '1';
-        headerElement.style.position = 'fixed';
-        headerElement.style.top = '0';
-        headerElement.style.zIndex = '9999';
-        headerElement.style.transform = 'none';
-      };
-
-      // 초기 설정
-      forceHeaderVisible();
-
-      // 주기적으로 체크
-      const interval = setInterval(forceHeaderVisible, 100);
-
-      return () => clearInterval(interval);
-    }
-  }, [currentStep]);
 
   // 전화번호 포맷팅 함수
   const formatPhoneNumber = (value: string) => {
@@ -1071,32 +1029,15 @@ export default function RegisterPage() {
 
   return (
           <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative" style={{background: 'linear-gradient(to bottom right, #eff6ff, #ffffff, #faf5ff)'}}>
-      {/* 고정 헤더 - 강제 표시 */}
-      <header 
-        className="register-header-fixed fixed top-0 left-0 right-0 bg-white/70 backdrop-blur-lg border-b border-gray-100/50 shadow-sm"
+      {/* 통일된 헤더 애니메이션 */}
+      <AnimatedHeader 
+        className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-lg border-b border-gray-100/50 shadow-sm header-fixed"
         style={{
           backdropFilter: 'blur(10px)',
           background: 'rgba(255, 255, 255, 0.7)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
           boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
-          padding: 0,
-          paddingTop: 0,
-          margin: 0,
-          marginTop: 0,
-          display: 'block',
-          visibility: 'visible',
-          opacity: 1,
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 9999,
-          transform: 'none',
-          animation: 'none',
-          transition: 'none',
-          minHeight: '60px',
-          height: 'auto',
-          width: '100%'
+                      paddingTop: '0px'
         }}
       >
         <div className="flex items-center justify-between h-14 px-4">
@@ -1130,15 +1071,15 @@ export default function RegisterPage() {
         {currentStep !== REGISTER_STEPS.COMPLETE && (
           <div className="h-1 bg-gray-200">
             <motion.div 
-              className="h-full"
-              style={{backgroundColor: '#0113A3'}}
+                              className="h-full"
+                style={{backgroundColor: '#0113A3'}}
               initial={{ width: 0 }}
               animate={{ width: `${getProgress()}%` }}
               transition={{ duration: 0.5 }}
             />
-          </div>
+        </div>
         )}
-      </header>
+      </AnimatedHeader>
 
       {/* 메인 콘텐츠 */}
       <div className="flex-1 flex flex-col pt-14 pb-24 px-6 overflow-y-auto register-main register-scroll">
@@ -1279,7 +1220,7 @@ export default function RegisterPage() {
                     전화번호
                   </label>
                   <div className="relative register-input-container">
-                    <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                    <div className="absolute left-5 top-0 bottom-0 flex items-center z-10 pointer-events-none">
                       <FiPhone className="w-4 h-4 transition-colors duration-200" 
                         style={{color: focusedField === 'phone' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
@@ -1461,7 +1402,7 @@ export default function RegisterPage() {
                     비밀번호
               </label>
                   <div className="relative register-input-container">
-                    <div className="absolute left-4 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                    <div className="absolute left-4 top-0 bottom-0 flex items-center z-10 pointer-events-none">
                       <FiLock className="w-4 h-4 transition-colors duration-200" 
                         style={{color: focusedField === 'password' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
@@ -1485,7 +1426,7 @@ export default function RegisterPage() {
                       className="w-full pl-8 pr-8 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
                       style={{ outline: 'none' }}
                     />
-                    <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                    <div className="absolute right-2.5 top-0 bottom-0 flex items-center">
                                             <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
@@ -1538,7 +1479,7 @@ export default function RegisterPage() {
                     비밀번호 확인
               </label>
                   <div className="relative register-input-container">
-                    <div className="absolute left-4 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                    <div className="absolute left-4 top-0 bottom-0 flex items-center z-10 pointer-events-none">
                       <FiLock className="w-4 h-4 transition-colors duration-200" 
                         style={{color: focusedField === 'passwordConfirm' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
@@ -1558,7 +1499,7 @@ export default function RegisterPage() {
                       className="w-full pl-8 pr-10 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
                       style={{ outline: 'none' }}
                     />
-                    <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                    <div className="absolute right-2.5 top-0 bottom-0 flex items-center">
                       <button
                         type="button"
                         onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
@@ -1624,7 +1565,7 @@ export default function RegisterPage() {
                     </p>
                   )}
                   <div className="relative register-input-container">
-                    <div className="absolute left-4 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                    <div className="absolute left-4 top-0 bottom-0 flex items-center z-10 pointer-events-none">
                       <FiMail className="w-4 h-4 transition-colors duration-200" 
                         style={{color: focusedField === 'email' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
@@ -1655,14 +1596,14 @@ export default function RegisterPage() {
                       style={{ outline: 'none' }}
                     />
                     {registerData.mt_email && !emailError && (
-                      <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                      <div className="absolute right-2.5 top-0 bottom-0 flex items-center">
                         <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       </div>
                     )}
                     {emailError && !registerData.isSocialLogin && (
-                      <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                      <div className="absolute right-2.5 top-0 bottom-0 flex items-center">
                         <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -1994,15 +1935,9 @@ export default function RegisterPage() {
         <motion.div 
           initial={{ y: 100 }}
           animate={{ y: 0 }}
-          className="fixed bottom-0 left-0 right-0 p-4 safe-area-bottom"
+          className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100 safe-area-bottom"
           data-bottom-button
-          style={{ 
-            paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-            background: 'linear-gradient(to bottom right, rgba(239, 246, 255, 0.95), rgba(255, 255, 255, 0.95), rgba(250, 245, 255, 0.95))',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            borderTop: '1px solid rgba(229, 231, 235, 0.3)'
-          }}
+          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
         >
           <motion.button
             onClick={() => {

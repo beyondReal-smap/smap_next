@@ -161,12 +161,22 @@ export default function ClientLayout({
     unregisterServiceWorker();
   }, []);
 
-  // 네비게이션 바를 숨길 페이지들 - 최소한으로 제한
+  // 네비게이션 바를 보여줄 페이지들만 지정 - 화이트리스트 방식
   const shouldHideNavBar = React.useMemo(() => {
-    // 오직 로그인/회원가입 관련 페이지에서만 숨김
-    const hideNavBarPages = ['/signin', '/register', '/login', '/social-login'];
-    return hideNavBarPages.some(page => pathname.startsWith(page)) || 
-           pathname === '/'; // 루트 페이지에서만 추가로 숨김
+    // 네비게이션바를 보여줄 페이지들 (정확한 경로 매칭)
+    const showNavBarPages = ['/home', '/group', '/schedule', '/location', '/logs'];
+    
+    // 현재 경로가 지정된 페이지들 중 하나로 시작하는지 확인
+    const shouldShow = showNavBarPages.some(page => pathname?.startsWith(page));
+    
+    console.log('[ClientLayout] 네비게이션 바 표시 조건 체크:', { 
+      pathname, 
+      shouldShow, 
+      showNavBarPages,
+      shouldHide: !shouldShow
+    });
+    
+    return !shouldShow; // 지정된 페이지가 아니면 숨김
   }, [pathname]);
 
   // body에 클래스 및 data-page 속성 추가/제거
