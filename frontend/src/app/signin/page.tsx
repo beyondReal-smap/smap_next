@@ -89,15 +89,6 @@ const iosLogger = {
 
 
 const SignInPage = () => {
-  // 🚨 페이지 초기 로딩 상태 관리
-  const [isPageLoading, setIsPageLoading] = useState(true);
-
-  // 페이지 초기화 완료 타이머 (즉시 로딩 해제)
-  useEffect(() => {
-    console.log('[SIGNIN PAGE] 페이지 초기화 완료, 로딩 스피너 숨김');
-    setIsPageLoading(false);
-  }, []);
-  
   // 🚨 페이지 로드 디버깅
   console.log('[SIGNIN PAGE] 컴포넌트 로딩 시작', {
     userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
@@ -105,60 +96,15 @@ const SignInPage = () => {
     timestamp: new Date().toISOString()
   });
 
-  // 🚨 모바일 웹앱 고정 스타일 적용 및 네비게이션 바 숨김
+  // 🚨 모바일 웹앱 고정 스타일 적용
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // 네비게이션 바 및 헤더 즉시 숨김 (CSS로 강제)
-      document.documentElement.setAttribute('data-signin', 'true');
-      document.body.classList.add('hide-bottom-nav', 'signin-loading', 'signin-page');
-      document.body.setAttribute('data-page', '/signin');
-      document.body.style.setProperty('--bottom-nav-display', 'none', 'important');
-      
-      // 🔥 네비게이션 바 완전 제거 함수 (더 정확한 선택자)
-      const removeNavigation = () => {
-        const elementsToHide = document.querySelectorAll(
-          'nav[role="navigation"], .bottom-nav, #bottom-navigation-bar, .bottom-navigation, nav[class*="bottom"], div[class*="bottom-nav"]'
-        );
-        elementsToHide.forEach(element => {
-          (element as HTMLElement).style.display = 'none';
-          (element as HTMLElement).style.visibility = 'hidden';
-          (element as HTMLElement).style.opacity = '0';
-          (element as HTMLElement).style.position = 'absolute';
-          (element as HTMLElement).style.top = '-99999px';
-          (element as HTMLElement).style.left = '-99999px';
-          (element as HTMLElement).style.zIndex = '-99999';
-          (element as HTMLElement).style.width = '0';
-          (element as HTMLElement).style.height = '0';
-          (element as HTMLElement).style.overflow = 'hidden';
-          (element as HTMLElement).style.transform = 'scale(0) translateY(-100vh)';
-          // DOM에서 완전 제거
-          if (element.id === 'bottom-navigation-bar') {
-            element.remove();
-          }
-        });
-      };
-      
-      // 즉시 실행
-      removeNavigation();
-      
-      // 10ms마다 10회 반복하여 완전 차단
-      const forceHideInterval = setInterval(() => {
-        removeNavigation();
-      }, 10);
-      
-      setTimeout(() => clearInterval(forceHideInterval), 100);
-      
-      // 50ms마다 지속적 모니터링
-      const persistentHideInterval = setInterval(() => {
-        removeNavigation();
-      }, 50);
-      
-      // body 스크롤 설정 (자연스러운 스크롤 허용)
-      document.body.style.overflow = 'auto';
-      document.body.style.position = 'relative';
+      // body 스크롤 방지
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
       document.body.style.width = '100%';
-      document.body.style.height = 'auto';
-      document.documentElement.style.overflow = 'auto';
+      document.body.style.height = '100%';
+      document.documentElement.style.overflow = 'hidden';
       
       // 뒤로가기 방지
       const preventBack = (e: PopStateEvent) => {
@@ -166,22 +112,17 @@ const SignInPage = () => {
         window.history.pushState(null, '', window.location.href);
       };
       
-      window.addEventListener('popstate', preventBack);
       window.history.pushState(null, '', window.location.href);
+      window.addEventListener('popstate', preventBack);
       
       return () => {
-        // 클린업
-        clearInterval(persistentHideInterval);
-        window.removeEventListener('popstate', preventBack);
-        document.documentElement.removeAttribute('data-signin');
-        document.body.classList.remove('hide-bottom-nav', 'signin-loading', 'signin-page');
-        document.body.removeAttribute('data-page');
-        document.body.style.removeProperty('--bottom-nav-display');
+        // 정리
         document.body.style.overflow = '';
         document.body.style.position = '';
         document.body.style.width = '';
         document.body.style.height = '';
         document.documentElement.style.overflow = '';
+        window.removeEventListener('popstate', preventBack);
       };
     }
   }, []);
@@ -3384,31 +3325,17 @@ const SignInPage = () => {
   }
   */
 
-  // 페이지 초기 로딩 중이면 로딩 스피너 표시
-  if (isPageLoading) {
-    return (
-      <div 
-        className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50"
-        style={{
-          background: 'linear-gradient(to bottom right, #eff6ff, #faf5ff, #fdf2f8)',
-          minHeight: '100vh',
-          width: '100%'
-        }}
-      >
-        <div className="bg-white/80 backdrop-blur-sm px-8 py-6 rounded-xl shadow-lg">
-          <IOSCompatibleSpinner size="lg" message="SMAP 로딩 중..." />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <motion.div 
       className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8"
       style={{
         background: 'linear-gradient(to bottom right, #eff6ff, #faf5ff, #fdf2f8)',
-        minHeight: '100vh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
         width: '100%',
+        height: '100%',
+        overflow: 'auto',
         touchAction: 'manipulation',
         userSelect: 'none',
         WebkitUserSelect: 'none',

@@ -8,78 +8,6 @@ import { hapticFeedback } from '../../../utils/haptic';
 export default function BottomNavBar() {
   const pathname = usePathname();
   
-  // 🔥 강화된 네비게이션 바 숨김 조건 - 먼저 체크
-  const hiddenPages = ['/signin', '/register', '/login', '/social-login', '/'];
-  const shouldHideNavBar = hiddenPages.some(page => pathname?.startsWith(page)) || pathname === '/';
-  
-  // 🔥 추가 런타임 안전 체크들
-  const [isHidden, setIsHidden] = useState(true);
-  
-  React.useEffect(() => {
-    if (typeof window === 'undefined') {
-      setIsHidden(true);
-      return;
-    }
-    
-    // 다중 체크 시스템
-    const checks = [
-      // 1. pathname 체크
-      hiddenPages.some(page => pathname?.startsWith(page)) || pathname === '/',
-      // 2. window.location 체크
-      hiddenPages.some(page => window.location.pathname?.startsWith(page)) || window.location.pathname === '/',
-      // 3. HTML 속성 체크
-      document.documentElement.getAttribute('data-signin') === 'true',
-      document.body.getAttribute('data-page') === '/signin',
-      document.body.classList.contains('signin-page'),
-      document.body.classList.contains('hide-bottom-nav'),
-      // 4. CSS 변수 체크
-      getComputedStyle(document.body).getPropertyValue('--bottom-nav-display')?.trim() === 'none'
-    ];
-    
-    const shouldHide = checks.some(check => check === true);
-    
-    console.log('[BottomNavBar] 숨김 체크:', {
-      pathname,
-      windowPath: window.location.pathname,
-      dataSignin: document.documentElement.getAttribute('data-signin'),
-      dataPage: document.body.getAttribute('data-page'),
-      signinClass: document.body.classList.contains('signin-page'),
-      hideNavClass: document.body.classList.contains('hide-bottom-nav'),
-      cssVar: getComputedStyle(document.body).getPropertyValue('--bottom-nav-display'),
-      shouldHide,
-      checks
-    });
-    
-    setIsHidden(shouldHide);
-  }, [pathname, shouldHideNavBar]);
-  
-  // 🔥 1차 조건부 렌더링 - 가장 빠른 체크
-  if (shouldHideNavBar) {
-    console.log('[BottomNavBar] pathname 기반 숨김:', pathname);
-    return null;
-  }
-  
-  // 🔥 2차 조건부 렌더링 - 런타임 체크
-  if (isHidden) {
-    console.log('[BottomNavBar] 런타임 체크 기반 숨김');
-    return null;
-  }
-  
-  // 🔥 3차 조건부 렌더링 - window 객체 체크
-  if (typeof window !== 'undefined') {
-    const isSigninPage = window.location.pathname === '/signin' ||
-                        window.location.pathname === '/register' ||
-                        window.location.pathname === '/login' ||
-                        window.location.pathname === '/social-login' ||
-                        window.location.pathname === '/' ||
-                        document.documentElement.getAttribute('data-signin') === 'true' ||
-                        document.body.classList.contains('signin-page');
-    if (isSigninPage) {
-      console.log('[BottomNavBar] window 기반 숨김:', window.location.pathname);
-      return null;
-    }
-  }
-  
   // home 페이지 여부 확인
   const isHomePage = pathname === '/home';
   
@@ -159,6 +87,10 @@ export default function BottomNavBar() {
     };
   }, []);
   
+  // 네비게이션 바 위치는 CSS로만 관리 (JavaScript 강제 설정 제거)
+  
+  // 위치 설정은 CSS와 인라인 스타일로만 처리 (JavaScript 제거)
+  
   // 네비게이션 메뉴 아이템
   const navItems = [
     { name: '홈', path: '/home', icon: 'home' },
@@ -182,28 +114,45 @@ export default function BottomNavBar() {
     }
   };
 
-  console.log('[BottomNavBar] 렌더링 진행:', { pathname, isHidden });
-
   return (
     <div 
       className="fixed left-0 right-0 bg-white border-t shadow-xl z-[999] rounded-t-2xl m-0 p-0"
       id="bottom-navigation-bar"
       style={{
-        bottom: '0px',
         position: 'fixed',
+        bottom: isHomePage ? '72px' : '0px',
         left: '0px',
         right: '0px',
         zIndex: 999999,
-        margin: '0 !important',
-        padding: '0 !important',
-        transform: 'translateZ(0)',
-        WebkitTransform: 'translateZ(0)',
+        width: '100%',
+        minHeight: '72px',
+        display: 'block',
+        visibility: 'visible',
+        opacity: 1,
+        transform: 'none',
+        WebkitTransform: 'none',
         pointerEvents: 'auto',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-around'
+        backgroundColor: 'white',
+        borderTop: '1px solid #e5e7eb',
+        boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
+        borderTopLeftRadius: '16px',
+        borderTopRightRadius: '16px',
+        borderBottomLeftRadius: '0px',
+        borderBottomRightRadius: '0px',
+        overflow: 'hidden'
       }}
     >
+      <nav 
+        className="flex justify-around items-center px-2 m-0 p-0 h-full" 
+        style={{ 
+          margin: '0 !important', 
+          padding: '0 !important',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-around'
+        }}
+      >
         {navItems.map(({ name, path, icon }) => {
           const isActive = pathname === path;
           
@@ -316,14 +265,15 @@ export default function BottomNavBar() {
                     </svg>
                   )}
                   
-                  {/* 사용자들 아이콘 */}
+                  {/* 사용자 그룹 아이콘 */}
                   {icon === 'users' && (
                     <svg 
                       className="w-5 h-5 relative z-10" 
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
-                      <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z" />
+                      <path fillRule="evenodd" d="M8.25 6.75a3.75 3.75 0 1 1 7.5 0 3.75 3.75 0 0 1-7.5 0ZM15.75 9.75a3 3 0 1 1 6 0 3 3 0 0 1-6 0ZM2.25 9.75a3 3 0 1 1 6 0 3 3 0 0 1-6 0ZM6.31 15.117A6.745 6.745 0 0 1 12 12a6.745 6.745 0 0 1 6.709 7.498.75.75 0 0 1-.372.568A12.696 12.696 0 0 1 12 21.75c-2.305 0-4.47-.612-6.337-1.684a.75.75 0 0 1-.372-.568 6.787 6.787 0 0 1 1.019-4.38Z" clipRule="evenodd" />
+                      <path d="M5.082 14.254a8.287 8.287 0 0 0-1.308 5.135 9.687 9.687 0 0 1-1.764-.44l-.115-.04a.563.563 0 0 1-.373-.487l-.01-.121a3.75 3.75 0 0 1 3.57-4.047ZM20.226 19.389a8.287 8.287 0 0 0-1.308-5.135 3.75 3.75 0 0 1 3.57 4.047l-.01.121a.563.563 0 0 1-.373.486l-.115.041c-.07.027-.22.07-.544.14-.42.094-.85.174-1.27.24.15-.171.2-.26.05-.94Z" />
                     </svg>
                   )}
                   
@@ -364,25 +314,23 @@ export default function BottomNavBar() {
                 </div>
                 
                 {/* 텍스트 라벨 */}
-                <span 
-                  className="text-xs relative z-10 m-0 p-0" 
+              <span 
+                  className="text-xs font-medium relative z-10 text-center"
                   style={{ 
                     color: isActive ? '#0113A3' : '#6b7280',
-                    fontWeight: isActive ? '600' : '400',
-                    fontSize: '10px',
-                    lineHeight: 1,
-                    margin: '0 !important',
-                    padding: '0 !important',
-                    textAlign: 'center',
-                    filter: isActive ? 'drop-shadow(0 0 2px rgba(1, 19, 163, 0.2))' : 'none'
+                    transform: 'none',
+                    margin: '0px !important',
+                    fontSize: '11px',
+                    lineHeight: '14px'
                   }}
                 >
                   {name}
                 </span>
-                </div>
+              </div>
             </Link>
           );
         })}
+      </nav>
     </div>
   );
 } 

@@ -187,193 +187,6 @@ div[style*="position:fixed"][style*="top:"] {
   top: 0px !important;
 }
 
-/* 네비게이션 바 및 헤더 강제 숨김 (signin 페이지용) */
-.hide-bottom-nav nav[role="navigation"],
-.hide-bottom-nav .bottom-nav,
-.hide-bottom-nav .bottom-navigation,
-.hide-bottom-nav header,
-.hide-bottom-nav .header-fixed,
-.hide-bottom-nav .glass-effect,
-.hide-bottom-nav [role="banner"],
-body[data-page="/signin"] nav[role="navigation"],
-body[data-page="/signin"] .bottom-nav,
-body[data-page="/signin"] .bottom-navigation,
-body[data-page="/signin"] header,
-body[data-page="/signin"] .header-fixed,
-body[data-page="/signin"] .glass-effect,
-body[data-page="/signin"] [role="banner"],
-body[data-page="/signin"] #bottom-navigation-bar,
-body[data-page="/register"] #bottom-navigation-bar,
-body[data-page="/login"] #bottom-navigation-bar,
-body[data-page="/social-login"] #bottom-navigation-bar,
-body[data-page="/"] #bottom-navigation-bar {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  transform: translateY(-100px) !important;
-  transition: none !important;
-  position: absolute !important;
-  top: -9999px !important;
-  left: -9999px !important;
-  z-index: -9999 !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-}
-
-/* CSS 변수를 통한 네비게이션 바 제어 */
-body {
-  --bottom-nav-display: block;
-}
-
-body.hide-bottom-nav {
-  --bottom-nav-display: none !important;
-}
-
-body.signin-page {
-  --bottom-nav-display: none !important;
-}
-
-[role="navigation"] {
-  display: var(--bottom-nav-display, block) !important;
-}
-
-/* 🔥🔥🔥 SIGNIN 페이지 전용 최고 우선순위 숨김 규칙 🔥🔥🔥 */
-html[data-signin="true"] nav,
-html[data-signin="true"] header,
-html[data-signin="true"] .header,
-html[data-signin="true"] .nav,
-html[data-signin="true"] .navigation,
-html[data-signin="true"] .top-bar,
-html[data-signin="true"] .app-bar,
-html[data-signin="true"] .header-fixed,
-html[data-signin="true"] .glass-effect,
-html[data-signin="true"] [role="banner"],
-html[data-signin="true"] [role="navigation"],
-html[data-signin="true"] .bottom-nav,
-html[data-signin="true"] #bottom-navigation-bar,
-body[data-page="/signin"] nav,
-body[data-page="/signin"] header,
-body[data-page="/signin"] .header,
-body[data-page="/signin"] .nav,
-body[data-page="/signin"] .navigation,
-body[data-page="/signin"] .top-bar,
-body[data-page="/signin"] .app-bar,
-body[data-page="/signin"] .header-fixed,
-body[data-page="/signin"] .glass-effect,
-body[data-page="/signin"] [role="banner"],
-body[data-page="/signin"] [role="navigation"],
-body[data-page="/signin"] .bottom-nav,
-body[data-page="/signin"] #bottom-navigation-bar,
-body.signin-page nav,
-body.signin-page header,
-body.signin-page .header,
-body.signin-page .nav,
-body.signin-page .navigation,
-body.signin-page .top-bar,
-body.signin-page .app-bar,
-body.signin-page .header-fixed,
-body.signin-page .glass-effect,
-body.signin-page [role="banner"],
-body.signin-page [role="navigation"],
-body.signin-page .bottom-nav,
-body.signin-page #bottom-navigation-bar {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  position: absolute !important;
-  top: -999999px !important;
-  left: -999999px !important;
-  z-index: -999999 !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-  transform: scale(0) translateY(-100vh) !important;
-  -webkit-transform: scale(0) translateY(-100vh) !important;
-  contain: layout style paint !important;
-}
-
-/* 🔥 절대적 차단 - 어떤 CSS 클래스나 인라인 스타일이 있어도 강제 적용 */
-#bottom-navigation-bar[style],
-nav[id="bottom-navigation-bar"][style],
-div[id="bottom-navigation-bar"][style],
-*[id="bottom-navigation-bar"][style] {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  position: absolute !important;
-  top: -999999px !important;
-  left: -999999px !important;
-  z-index: -999999 !important;
-  width: 0 !important;
-  height: 0 !important;
-}
-
-/* signin 페이지에서 네비게이션 관련 요소만 정확히 차단 */
-body[data-page="/signin"] nav[id*="nav"],
-body[data-page="/signin"] div[class*="bottom-nav"],
-body[data-page="/signin"] nav[class*="bottom"],
-body[data-page="/signin"] *[role="navigation"],
-body[data-page="/signin"] .bottom-navigation,
-body.signin-page nav[id*="nav"],
-body.signin-page div[class*="bottom-nav"],
-body.signin-page nav[class*="bottom"],
-body.signin-page *[role="navigation"],
-body.signin-page .bottom-navigation,
-html[data-signin="true"] nav[id*="nav"],
-html[data-signin="true"] div[class*="bottom-nav"],
-html[data-signin="true"] nav[class*="bottom"],
-html[data-signin="true"] *[role="navigation"],
-html[data-signin="true"] .bottom-navigation {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  position: absolute !important;
-  top: -999999px !important;
-  left: -999999px !important;
-  z-index: -999999 !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-}
-
-/* 🔥🔥🔥 최종 보장: 특정 ID와 클래스명 완전 차단 🔥🔥🔥 */
-body[data-page="/signin"] #bottom-navigation-bar,
-body[data-page="/register"] #bottom-navigation-bar,
-body[data-page="/login"] #bottom-navigation-bar,
-body[data-page="/social-login"] #bottom-navigation-bar,
-body[data-page="/"] #bottom-navigation-bar,
-body.signin-page #bottom-navigation-bar,
-body.register-page #bottom-navigation-bar,
-body.login-page #bottom-navigation-bar,
-body.hide-bottom-nav #bottom-navigation-bar,
-html[data-signin="true"] #bottom-navigation-bar,
-*[data-signin="true"] #bottom-navigation-bar {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  position: absolute !important;
-  top: -999999px !important;
-  left: -999999px !important;
-  right: auto !important;
-  bottom: auto !important;
-  z-index: -999999 !important;
-  width: 0 !important;
-  height: 0 !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  max-width: 0 !important;
-  max-height: 0 !important;
-  overflow: hidden !important;
-  transform: scale(0) translateY(-200vh) translateX(-200vw) !important;
-  -webkit-transform: scale(0) translateY(-200vh) translateX(-200vw) !important;
-  contain: layout style paint !important;
-  isolation: isolate !important;
-}
-
 .navigation-fixed {
   padding-bottom: 8px !important;
   border-top-left-radius: 20px !important;
@@ -604,7 +417,7 @@ div[style*="z-index: 10000"],
 div[style*="zIndex: 10000"],
 div[style*="z-index: 99999"],
 div[style*="zIndex: 99999"] {
-  z-index: 999999 !important;
+  z-index: 99999 !important;
 }
 
 /* 모달 내부 스크롤 영역 터치 최적화 */
@@ -1494,6 +1307,153 @@ html, body, #__next, .min-h-screen {
   z-index: 999999 !important;
   transform: translateZ(0) !important;
   -webkit-transform: translateZ(0) !important;
+}
+
+/* 인라인 스타일이 있어도 강제 덮어쓰기 */
+#bottom-navigation-bar[style] {
+  position: fixed !important;
+  bottom: 0px !important;
+  transform: none !important;
+}
+
+/* JavaScript로 설정된 모든 transform 무효화 */
+#bottom-navigation-bar[style*="transform"] {
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+/* 🔥🔥🔥 홈 페이지에서 추가한 강제 클래스 🔥🔥🔥 */
+.forced-fixed-bottom,
+#bottom-navigation-bar.forced-fixed-bottom {
+  position: fixed !important;
+  bottom: 0px !important;
+  left: 0px !important;
+  right: 0px !important;
+  top: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 56px !important;
+  z-index: 999999 !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  margin: 0px !important;
+  contain: none !important;
+}
+
+/* 절대적으로 최후 수단 */
+html body #bottom-navigation-bar {
+  position: fixed !important;
+  bottom: 0px !important;
+  z-index: 999999 !important;
+}
+
+/* 플로팅 버튼 초기 위치 고정 - 네비게이션 바 위쪽 */
+[data-floating-button="true"] {
+  position: fixed !important;
+  bottom: 70px !important;
+  right: 16px !important;
+  z-index: 9990 !important;
+  background: #0113A3 !important;
+  box-shadow: 0 8px 25px rgba(1, 19, 163, 0.3) !important;
+  pointer-events: auto !important;
+}
+
+/* 🔥🔥🔥 HOME 페이지 전용 네비게이션바 강제 고정 🔥🔥🔥 */
+[data-page="/home"] #bottom-navigation-bar,
+body[data-page="/home"] #bottom-navigation-bar,
+html[data-page="/home"] #bottom-navigation-bar,
+html body[data-page="/home"] #bottom-navigation-bar,
+[data-page="/home"] #bottom-navigation-bar[style],
+body[data-page="/home"] #bottom-navigation-bar[style],
+html[data-page="/home"] #bottom-navigation-bar[style],
+html body[data-page="/home"] #bottom-navigation-bar[style] {
+  position: fixed !important;
+  bottom: 72px !important;
+  left: 0px !important;
+  right: 0px !important;
+  z-index: 999999 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+/* 🔥🔥🔥 최종 보장: 모든 페이지에서 네비게이션바를 화면 하단에 고정 🔥🔥🔥 */
+#bottom-navigation-bar {
+  bottom: 0px !important;
+}
+
+/* 모든 페이지별 설정 통일 */
+[data-page="/home"] #bottom-navigation-bar,
+[data-page="/group"] #bottom-navigation-bar,
+[data-page="/schedule"] #bottom-navigation-bar,
+[data-page="/logs"] #bottom-navigation-bar,
+body[data-page="/home"] #bottom-navigation-bar,
+body[data-page="/group"] #bottom-navigation-bar,
+body[data-page="/schedule"] #bottom-navigation-bar,
+body[data-page="/logs"] #bottom-navigation-bar,
+html[data-page="/home"] #bottom-navigation-bar,
+html[data-page="/group"] #bottom-navigation-bar,
+html[data-page="/schedule"] #bottom-navigation-bar,
+html[data-page="/logs"] #bottom-navigation-bar,
+html body[data-page="/home"] #bottom-navigation-bar,
+html body[data-page="/group"] #bottom-navigation-bar,
+html body[data-page="/schedule"] #bottom-navigation-bar,
+html body[data-page="/logs"] #bottom-navigation-bar {
+  position: fixed !important;
+  bottom: 0px !important;
+}
+
+/* location 페이지도 다른 페이지와 동일하게 화면 하단에 고정 */
+[data-page="/location"] #bottom-navigation-bar,
+body[data-page="/location"] #bottom-navigation-bar,
+html[data-page="/location"] #bottom-navigation-bar,
+html body[data-page="/location"] #bottom-navigation-bar {
+  bottom: 0px !important;
+}
+
+/* 🔥 HOME 페이지 네비게이션 바 강제 표시 보장 */
+#home-page-container #bottom-navigation-bar,
+[data-page="/home"] #bottom-navigation-bar {
+  position: fixed !important;
+  bottom: 0px !important;
+  left: 0px !important;
+  right: 0px !important;
+  z-index: 999999 !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+/* 🔥🔥🔥 ULTIMATE FINAL: 모든 페이지에서 네비게이션바 위치 완전 통일 🔥🔥🔥 */
+/* 이 스타일은 모든 다른 스타일을 덮어씁니다 */
+#bottom-navigation-bar {
+  position: fixed !important;
+  bottom: 0px !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 999999 !important;
+  width: 100% !important;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  min-height: 72px !important;
+  background: white !important;
+  border-top: 1px solid #e5e7eb !important;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1) !important;
+  border-top-left-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  overflow: hidden !important;
 }
 
 /* iOS 디바이스 전용 스타일 */
