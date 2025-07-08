@@ -27,6 +27,7 @@ import {
   FiChevronRight
 } from 'react-icons/fi';
 import groupService from '@/services/groupService';
+import AnimatedHeader from '@/components/common/AnimatedHeader';
 
 // 회원가입 단계 정의
 const REGISTER_STEPS = {
@@ -116,110 +117,10 @@ interface RegisterData {
 }
 
 export default function RegisterPage() {
-  // 모바일 키보드 대응을 위한 스타일
+  // 모바일 키보드 대응을 위한 간단한 스타일 - home 페이지와 동일한 패턴
   React.useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
-      /* iOS WebView 헤더 강제 고정 */
-      #register-header {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        z-index: 99999 !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        transform: none !important;
-        animation: none !important;
-        transition: none !important;
-        min-height: 60px !important;
-        height: auto !important;
-        width: 100% !important;
-        background: rgba(255, 255, 255, 0.95) !important;
-        border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
-        box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
-        will-change: auto !important;
-        contain: layout style paint !important;
-      }
-      
-      /* iOS Safari 특별 대응 */
-      @supports (-webkit-touch-callout: none) {
-        #register-header {
-          position: fixed !important;
-          top: 0 !important;
-          left: 0 !important;
-          right: 0 !important;
-          z-index: 99999 !important;
-          -webkit-transform: none !important;
-          transform: none !important;
-          -webkit-backface-visibility: hidden !important;
-          backface-visibility: hidden !important;
-          -webkit-perspective: 1000 !important;
-          perspective: 1000 !important;
-        }
-      }
-      
-      /* 헤더 강제 고정 스타일 */
-      /* 헤더 강제 고정 스타일 */
-      .register-header-fixed {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        z-index: 9999 !important;
-        display: block !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        transform: none !important;
-        animation: none !important;
-        transition: none !important;
-        min-height: 60px !important;
-        height: auto !important;
-        width: 100% !important;
-      }
-      
-      @media (max-height: 600px) {
-        .register-content {
-          padding-top: 0.5rem !important;
-          padding-bottom: 0.5rem !important;
-        }
-        .register-header {
-          margin-bottom: 1rem !important;
-        }
-        .register-form {
-          gap: 0.75rem !important;
-        }
-        .register-main {
-          padding-bottom: 6rem !important; /* 하단 버튼 공간 확보 */
-        }
-      }
-      
-      @media (max-height: 500px) {
-        .register-header h2 {
-          font-size: 1.25rem !important;
-        }
-        .register-header p {
-          font-size: 0.875rem !important;
-        }
-        .register-form {
-          gap: 0.5rem !important;
-        }
-      }
-      
-      /* iOS Safari 대응 */
-      @supports (-webkit-touch-callout: none) {
-        .register-main {
-          min-height: -webkit-fill-available;
-        }
-      }
-      
-      /* 키보드 올라올 때 스크롤 보장 */
-      .register-scroll {
-        -webkit-overflow-scrolling: touch;
-        overscroll-behavior: contain;
-      }
-      
       /* 모바일 입력 필드 최적화 */
       @media (max-width: 480px) {
         .register-input {
@@ -230,36 +131,10 @@ export default function RegisterPage() {
         }
       }
       
-      /* placeholder 텍스트 크기 조정 */
-      .register-input::placeholder {
-        font-size: 0.875rem; /* 14px */
-        color: #9CA3AF; /* gray-400 */
-      }
-      
-      /* 입력 필드 테두리 최적화 */
-      .register-input {
-        box-sizing: border-box;
-        margin: 3px; /* 포커스 링을 위한 여백 증가 */
-      }
-      
-      .register-form > div {
-        padding: 4px; /* 각 입력 필드 컨테이너에 여백 증가 */
-        margin: 0 -2px; /* 좌우 마진으로 공간 확보 */
-      }
-      
-      .register-form {
-        padding: 0 6px; /* 폼 전체에 좌우 패딩 추가 */
-      }
-      
-      /* 입력 필드 컨테이너 추가 여백 */
-      .register-input-container {
-        padding: 0 4px; /* 입력 필드 주변 추가 여백 */
-        margin: 0 -2px; /* 컨테이너 마진으로 공간 확보 */
-      }
-      
-      /* 포커스 링이 잘리지 않도록 추가 처리 */
-      .register-input:focus {
-        transform: scale(0.998); /* 아주 약간 축소하여 여백 확보 */
+      /* 키보드 올라올 때 스크롤 보장 */
+      .register-scroll {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
       }
     `;
     document.head.appendChild(style);
@@ -369,77 +244,12 @@ export default function RegisterPage() {
     }
   }, []);
 
-  // 헤더 강제 표시 유지
-  useEffect(() => {
-    const headerElement = document.getElementById('register-header') as HTMLElement;
-    if (headerElement) {
-      const forceHeaderVisible = () => {
-        headerElement.style.setProperty('display', 'block', 'important');
-        headerElement.style.setProperty('visibility', 'visible', 'important');
-        headerElement.style.setProperty('opacity', '1', 'important');
-        headerElement.style.setProperty('position', 'fixed', 'important');
-        headerElement.style.setProperty('top', '0', 'important');
-        headerElement.style.setProperty('left', '0', 'important');
-        headerElement.style.setProperty('right', '0', 'important');
-        headerElement.style.setProperty('z-index', '99999', 'important');
-        headerElement.style.setProperty('transform', 'none', 'important');
-        headerElement.style.setProperty('animation', 'none', 'important');
-        headerElement.style.setProperty('transition', 'none', 'important');
-        headerElement.style.setProperty('min-height', '60px', 'important');
-        headerElement.style.setProperty('height', 'auto', 'important');
-        headerElement.style.setProperty('width', '100%', 'important');
-        headerElement.style.setProperty('background', 'rgba(255, 255, 255, 0.95)', 'important');
-        headerElement.style.setProperty('border-bottom', '1px solid rgba(229, 231, 235, 0.8)', 'important');
-        headerElement.style.setProperty('box-shadow', '0 2px 16px rgba(0, 0, 0, 0.08)', 'important');
-      };
-
-      // 초기 설정
-      forceHeaderVisible();
-
-      // 주기적으로 체크 (iOS에서는 더 자주 체크)
-      const interval = setInterval(forceHeaderVisible, isIOS() ? 50 : 100);
-
-      // 스크롤 이벤트에서도 헤더 강제 표시
-      const handleScroll = () => {
-        forceHeaderVisible();
-      };
-
-      // 터치 이벤트에서도 헤더 강제 표시
-      const handleTouch = () => {
-        forceHeaderVisible();
-      };
-
-      window.addEventListener('scroll', handleScroll, { passive: true });
-      window.addEventListener('touchstart', handleTouch, { passive: true });
-      window.addEventListener('touchmove', handleScroll, { passive: true });
-      window.addEventListener('touchend', handleTouch, { passive: true });
-
-      // MutationObserver로 헤더 변경 감지
-      const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-          if (mutation.type === 'attributes' || mutation.type === 'childList') {
-            forceHeaderVisible();
-          }
-        });
-      });
-
-      observer.observe(headerElement, {
-        attributes: true,
-        childList: true,
-        subtree: true,
-        attributeFilter: ['style', 'class']
-      });
-
-      return () => {
-        clearInterval(interval);
-        window.removeEventListener('scroll', handleScroll);
-        window.removeEventListener('touchstart', handleTouch);
-        window.removeEventListener('touchmove', handleScroll);
-        window.removeEventListener('touchend', handleTouch);
-        observer.disconnect();
-      };
-    }
-  }, [currentStep]);
+  // 진행률 계산
+  const getProgress = () => {
+    const steps = Object.values(REGISTER_STEPS);
+    const currentIndex = steps.indexOf(currentStep);
+    return ((currentIndex + 1) / (steps.length - 1)) * 100; // COMPLETE 제외
+  };
 
   // 전화번호 포맷팅 함수
   const formatPhoneNumber = (value: string) => {
@@ -1151,44 +961,17 @@ export default function RegisterPage() {
     }
   };
 
-  // 진행률 계산
-  const getProgress = () => {
-    const steps = Object.values(REGISTER_STEPS);
-    const currentIndex = steps.indexOf(currentStep);
-    return ((currentIndex + 1) / (steps.length - 1)) * 100; // COMPLETE 제외
-  };
-
   return (
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative" style={{background: 'linear-gradient(to bottom right, #eff6ff, #ffffff, #faf5ff)'}}>
-      {/* 고정 헤더 - 강제 표시 */}
-      <header 
-        id="register-header"
-        className="register-header-fixed fixed top-0 left-0 right-0 bg-white/70 backdrop-blur-lg border-b border-gray-100/50 shadow-sm"
-        style={{
-          backdropFilter: 'blur(10px)',
-          background: 'rgba(255, 255, 255, 0.95) !important',
-          borderBottom: '1px solid rgba(229, 231, 235, 0.8) !important',
-          boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08) !important',
-          padding: '0 !important',
-          paddingTop: '0 !important',
-          margin: '0 !important',
-          marginTop: '0 !important',
-          display: 'block !important',
-          visibility: 'visible' as any,
-          opacity: '1 !important',
-          position: 'fixed' as any,
-          top: '0 !important',
-          left: '0 !important',
-          right: '0 !important',
-          zIndex: '99999 !important',
-          transform: 'none !important',
-          animation: 'none !important',
-          transition: 'none !important',
-          minHeight: '60px !important',
-          height: 'auto !important',
-          width: '100% !important',
-          willChange: 'auto !important',
-          contain: 'layout style paint !important'
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative" style={{background: 'linear-gradient(to bottom right, #eff6ff, #ffffff, #faf5ff)'}}>
+      {/* 통일된 헤더 애니메이션 */}
+      <AnimatedHeader 
+        variant="enhanced"
+        className="fixed top-0 left-0 right-0 glass-effect header-fixed z-50"
+        style={{ 
+          paddingTop: '0px',
+          marginTop: '0px',
+          top: '0px',
+          position: 'fixed'
         }}
       >
         <div className="flex items-center justify-between h-14 px-4">
@@ -1230,7 +1013,7 @@ export default function RegisterPage() {
             />
           </div>
         )}
-      </header>
+      </AnimatedHeader>
 
       {/* 메인 콘텐츠 */}
       <div className="flex-1 flex flex-col pt-14 pb-24 px-6 overflow-y-auto register-main register-scroll">

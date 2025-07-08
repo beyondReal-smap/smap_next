@@ -3,9 +3,12 @@ import type { Metadata, Viewport } from 'next'
 // import { Suspense } from 'react' // Suspense는 ClientLayout 내부 또는 필요시 사용
 import { lineSeed } from './fonts'; // LINE SEED 폰트 임포트
 // import { BottomNavBar } from './components/layout' // 직접 사용하지 않음
-  import ClientLayout from './ClientLayout'; // ClientLayout import
-  import config, { APP_INFO, getLocalizedAppInfo } from '../config'
+import ClientLayout from './ClientLayout'; // ClientLayout import
+import config, { APP_INFO, getLocalizedAppInfo } from '../config'
 import Script from 'next/script'
+import { Inter } from 'next/font/google'
+
+const inter = Inter({ subsets: ['latin'] })
 
 // 언어 설정에 따른 메타데이터 생성
 const getMetadata = (): Metadata => {
@@ -13,11 +16,8 @@ const getMetadata = (): Metadata => {
   const localizedInfo = getLocalizedAppInfo(locale)
   
   return {
-    title: {
-      default: localizedInfo.APP_TITLE,
-      template: `%s | ${localizedInfo.APP_TITLE}`,
-    },
-    description: localizedInfo.DESCRIPTION,
+    title: 'SMAP - 스마트 위치 공유 플랫폼',
+    description: '실시간 위치 공유와 그룹 관리 서비스',
     authors: [{ name: localizedInfo.APP_AUTHOR }],
     keywords: [
       'SMAP', '스케줄', '지도', '일정관리', '위치공유', 
@@ -107,10 +107,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover', // iOS Safe Area 완전 활용
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#1f2937' },
-  ],
+  themeColor: '#ffffff',
   colorScheme: 'light',
 }
 
@@ -309,14 +306,14 @@ export default function RootLayout({
         {/* 에러 핸들러 스크립트 */}
         <Script src="/error-handler.js" strategy="beforeInteractive" />
       </head>
-              <body className={`${lineSeed.variable} font-sans antialiased`} suppressHydrationWarning>
-         <ClientLayout>
-           {/* ClientLayout이 children을 받아 내부에서 main 등의 구조를 관리하도록 위임 가능 */} 
-           {/* 또는 여기서 최소한의 구조만 남기고 ClientLayout에 더 많은 책임을 부여 */} 
-           {children} 
-         </ClientLayout>
-         {/* DatePicker 캘린더 포털용 div 추가 */}
-         <div id="root-portal"></div>
+      <body className={`${lineSeed.variable} font-sans antialiased ${inter.className}`} suppressHydrationWarning>
+        <ClientLayout>
+          {/* ClientLayout이 children을 받아 내부에서 main 등의 구조를 관리하도록 위임 가능 */} 
+          {/* 또는 여기서 최소한의 구조만 남기고 ClientLayout에 더 많은 책임을 부여 */} 
+          {children} 
+        </ClientLayout>
+        {/* DatePicker 캘린더 포털용 div 추가 */}
+        <div id="root-portal"></div>
         
         {/* 성능 모니터링 (개발 환경에서만) */}
         {process.env.NODE_ENV === 'development' && (

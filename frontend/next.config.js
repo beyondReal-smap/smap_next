@@ -3,25 +3,20 @@ const nextConfig = {
   // React 최적화 - Strict Mode 비활성화 (컴포넌트 이중 마운트 방지)
   reactStrictMode: false,
   
-  // 실험적 기능들 (최소한만)
+  // 실험적 기능들 (Vercel 최적화)
   experimental: {
     optimizeCss: true,
     scrollRestoration: true,
     optimizePackageImports: ['framer-motion'],
   },
   
-  // 폰트 최적화
-  optimizeFonts: true,
+  // 폰트 최적화는 기본으로 활성화되어 있음
   
-  // 개발 모드 설정
+  // 개발 모드 설정 (Vercel 최적화)
   ...(process.env.NODE_ENV === 'development' && {
     onDemandEntries: {
       maxInactiveAge: 25 * 1000,
       pagesBufferLength: 2,
-    },
-    devIndicators: {
-      buildActivity: true,
-      buildActivityPosition: 'bottom-right',
     },
   }),
   
