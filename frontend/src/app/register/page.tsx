@@ -120,6 +120,47 @@ export default function RegisterPage() {
   React.useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
+      /* iOS WebView 헤더 강제 고정 */
+      #register-header {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 99999 !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        transform: none !important;
+        animation: none !important;
+        transition: none !important;
+        min-height: 60px !important;
+        height: auto !important;
+        width: 100% !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+        box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+        will-change: auto !important;
+        contain: layout style paint !important;
+      }
+      
+      /* iOS Safari 특별 대응 */
+      @supports (-webkit-touch-callout: none) {
+        #register-header {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          z-index: 99999 !important;
+          -webkit-transform: none !important;
+          transform: none !important;
+          -webkit-backface-visibility: hidden !important;
+          backface-visibility: hidden !important;
+          -webkit-perspective: 1000 !important;
+          perspective: 1000 !important;
+        }
+      }
+      
+      /* 헤더 강제 고정 스타일 */
       /* 헤더 강제 고정 스타일 */
       .register-header-fixed {
         position: fixed !important;
@@ -330,25 +371,73 @@ export default function RegisterPage() {
 
   // 헤더 강제 표시 유지
   useEffect(() => {
-    const headerElement = document.querySelector('.register-header-fixed') as HTMLElement;
+    const headerElement = document.getElementById('register-header') as HTMLElement;
     if (headerElement) {
       const forceHeaderVisible = () => {
-        headerElement.style.display = 'block';
-        headerElement.style.visibility = 'visible';
-        headerElement.style.opacity = '1';
-        headerElement.style.position = 'fixed';
-        headerElement.style.top = '0';
-        headerElement.style.zIndex = '9999';
-        headerElement.style.transform = 'none';
+        headerElement.style.setProperty('display', 'block', 'important');
+        headerElement.style.setProperty('visibility', 'visible', 'important');
+        headerElement.style.setProperty('opacity', '1', 'important');
+        headerElement.style.setProperty('position', 'fixed', 'important');
+        headerElement.style.setProperty('top', '0', 'important');
+        headerElement.style.setProperty('left', '0', 'important');
+        headerElement.style.setProperty('right', '0', 'important');
+        headerElement.style.setProperty('z-index', '99999', 'important');
+        headerElement.style.setProperty('transform', 'none', 'important');
+        headerElement.style.setProperty('animation', 'none', 'important');
+        headerElement.style.setProperty('transition', 'none', 'important');
+        headerElement.style.setProperty('min-height', '60px', 'important');
+        headerElement.style.setProperty('height', 'auto', 'important');
+        headerElement.style.setProperty('width', '100%', 'important');
+        headerElement.style.setProperty('background', 'rgba(255, 255, 255, 0.95)', 'important');
+        headerElement.style.setProperty('border-bottom', '1px solid rgba(229, 231, 235, 0.8)', 'important');
+        headerElement.style.setProperty('box-shadow', '0 2px 16px rgba(0, 0, 0, 0.08)', 'important');
       };
 
       // 초기 설정
       forceHeaderVisible();
 
-      // 주기적으로 체크
-      const interval = setInterval(forceHeaderVisible, 100);
+      // 주기적으로 체크 (iOS에서는 더 자주 체크)
+      const interval = setInterval(forceHeaderVisible, isIOS() ? 50 : 100);
 
-      return () => clearInterval(interval);
+      // 스크롤 이벤트에서도 헤더 강제 표시
+      const handleScroll = () => {
+        forceHeaderVisible();
+      };
+
+      // 터치 이벤트에서도 헤더 강제 표시
+      const handleTouch = () => {
+        forceHeaderVisible();
+      };
+
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      window.addEventListener('touchstart', handleTouch, { passive: true });
+      window.addEventListener('touchmove', handleScroll, { passive: true });
+      window.addEventListener('touchend', handleTouch, { passive: true });
+
+      // MutationObserver로 헤더 변경 감지
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          if (mutation.type === 'attributes' || mutation.type === 'childList') {
+            forceHeaderVisible();
+          }
+        });
+      });
+
+      observer.observe(headerElement, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        attributeFilter: ['style', 'class']
+      });
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('touchstart', handleTouch);
+        window.removeEventListener('touchmove', handleScroll);
+        window.removeEventListener('touchend', handleTouch);
+        observer.disconnect();
+      };
     }
   }, [currentStep]);
 
@@ -1073,30 +1162,33 @@ export default function RegisterPage() {
           <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative" style={{background: 'linear-gradient(to bottom right, #eff6ff, #ffffff, #faf5ff)'}}>
       {/* 고정 헤더 - 강제 표시 */}
       <header 
+        id="register-header"
         className="register-header-fixed fixed top-0 left-0 right-0 bg-white/70 backdrop-blur-lg border-b border-gray-100/50 shadow-sm"
         style={{
           backdropFilter: 'blur(10px)',
-          background: 'rgba(255, 255, 255, 0.7)',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-          boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
-          padding: 0,
-          paddingTop: 0,
-          margin: 0,
-          marginTop: 0,
-          display: 'block',
-          visibility: 'visible',
-          opacity: 1,
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 9999,
-          transform: 'none',
-          animation: 'none',
-          transition: 'none',
-          minHeight: '60px',
-          height: 'auto',
-          width: '100%'
+          background: 'rgba(255, 255, 255, 0.95) !important',
+          borderBottom: '1px solid rgba(229, 231, 235, 0.8) !important',
+          boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08) !important',
+          padding: '0 !important',
+          paddingTop: '0 !important',
+          margin: '0 !important',
+          marginTop: '0 !important',
+          display: 'block !important',
+          visibility: 'visible' as any,
+          opacity: '1 !important',
+          position: 'fixed' as any,
+          top: '0 !important',
+          left: '0 !important',
+          right: '0 !important',
+          zIndex: '99999 !important',
+          transform: 'none !important',
+          animation: 'none !important',
+          transition: 'none !important',
+          minHeight: '60px !important',
+          height: 'auto !important',
+          width: '100% !important',
+          willChange: 'auto !important',
+          contain: 'layout style paint !important'
         }}
       >
         <div className="flex items-center justify-between h-14 px-4">
