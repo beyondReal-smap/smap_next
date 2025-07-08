@@ -35,35 +35,6 @@ enum HapticFeedbackType {
 }
 
 const SignInPage = () => {
-  // 반드시 컴포넌트 내부에 선언!
-  const triggerHapticFeedback = (type: HapticFeedbackType) => {
-    if (typeof window !== 'undefined') {
-      try {
-        if ((window as any).webkit?.messageHandlers?.smapIos) {
-          (window as any).webkit.messageHandlers.smapIos.postMessage({
-            type: 'haptic',
-            param: type
-          });
-          return;
-        }
-      } catch (error) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`🎮 [HAPTIC] ${type} 햅틱 피드백 (개발 환경)`);
-        }
-      }
-      if (window.navigator && window.navigator.vibrate) {
-        const patterns = {
-          [HapticFeedbackType.LIGHT]: [10],
-          [HapticFeedbackType.MEDIUM]: [20],
-          [HapticFeedbackType.HEAVY]: [30],
-          [HapticFeedbackType.SUCCESS]: [50, 100, 50],
-          [HapticFeedbackType.WARNING]: [100, 50, 100],
-          [HapticFeedbackType.ERROR]: [200, 100, 200]
-        };
-        window.navigator.vibrate(patterns[type]);
-      }
-    }
-  };
 
   // iOS 로거 함수 (컴포넌트 내부로 이동)
   const iosLogger = {
@@ -82,6 +53,40 @@ const SignInPage = () => {
   };
 
   // 햅틱 피드백 함수 (컴포넌트 내부로 이동)
+  const triggerHapticFeedback = (type: HapticFeedbackType) => {
+    console.log('🎮 [HAPTIC] 햅틱 피드백 호출:', type);
+    try {
+      // iOS 네이티브 햅틱 시도
+      if ((window as any).webkit?.messageHandlers?.smapIos) {
+        (window as any).webkit.messageHandlers.smapIos.postMessage({
+          type: 'haptic',
+          param: type
+        });
+        console.log('🎮 [HAPTIC] iOS 네이티브 햅틱 전송 완료');
+        return;
+      }
+    } catch (error) {
+      console.log('🎮 [HAPTIC] iOS 네이티브 햅틱 실패:', error);
+      // 개발 환경에서는 조용히 처리
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`🎮 [HAPTIC] ${type} 햅틱 피드백 (개발 환경)`);
+      }
+    }
+    
+    // 웹 환경에서는 vibrate API 사용
+    if (window.navigator && window.navigator.vibrate) {
+      const patterns = {
+        [HapticFeedbackType.LIGHT]: [10],
+        [HapticFeedbackType.MEDIUM]: [20],
+        [HapticFeedbackType.HEAVY]: [30],
+        [HapticFeedbackType.SUCCESS]: [50, 100, 50],
+        [HapticFeedbackType.WARNING]: [100, 50, 100],
+        [HapticFeedbackType.ERROR]: [200, 100, 200]
+      };
+      window.navigator.vibrate(patterns[type]);
+      console.log('🎮 [HAPTIC] 웹 vibrate API 사용');
+    }
+  };
   
   // 🚨 페이지 로드 디버깅
   console.log('[SIGNIN PAGE] 컴포넌트 로딩 시작', {
@@ -168,18 +173,41 @@ const SignInPage = () => {
     
     // 카카오 콜백 함수 등록 (간단한 버전)
     (window as any).onNativeKakaoLoginSuccess = (userInfo: any) => {
-      console.log('🎯 [NATIVE CALLBACK] iOS 카카오 로그인 성공:', userInfo);
+      console.log('🎯 [NATIVE CALLBACK] === iOS 카카오 로그인 성공 콜백 호출됨 ===');
+      console.log('🎯 [NATIVE CALLBACK] userInfo:', userInfo);
+      console.log('🎯 [NATIVE CALLBACK] userInfo.accessToken:', userInfo?.accessToken);
+      console.log('🎯 [NATIVE CALLBACK] kakaoSignInSuccess 함수 존재 여부:', !!(window as any).kakaoSignInSuccess);
+      
       // 새로운 핸들러가 처리하도록 위임
       if ((window as any).kakaoSignInSuccess) {
-        (window as any).kakaoSignInSuccess(userInfo.accessToken, userInfo);
+        console.log('🎯 [NATIVE CALLBACK] 새로운 핸들러로 위임 시작');
+        try {
+          (window as any).kakaoSignInSuccess(userInfo.accessToken, userInfo);
+          console.log('🎯 [NATIVE CALLBACK] 새로운 핸들러 호출 완료');
+        } catch (error) {
+          console.error('🎯 [NATIVE CALLBACK] 새로운 핸들러 호출 실패:', error);
+        }
+      } else {
+        console.error('🎯 [NATIVE CALLBACK] kakaoSignInSuccess 함수가 없습니다!');
       }
     };
     
     (window as any).onNativeKakaoLoginError = (error: any) => {
-      console.error('❌ [NATIVE CALLBACK] iOS 카카오 로그인 실패:', error);
+      console.error('❌ [NATIVE CALLBACK] === iOS 카카오 로그인 실패 콜백 호출됨 ===');
+      console.error('❌ [NATIVE CALLBACK] error:', error);
+      console.error('❌ [NATIVE CALLBACK] kakaoSignInError 함수 존재 여부:', !!(window as any).kakaoSignInError);
+      
       // 새로운 핸들러가 처리하도록 위임
       if ((window as any).kakaoSignInError) {
-        (window as any).kakaoSignInError(error);
+        console.log('❌ [NATIVE CALLBACK] 새로운 핸들러로 위임 시작');
+        try {
+          (window as any).kakaoSignInError(error);
+          console.log('❌ [NATIVE CALLBACK] 새로운 핸들러 호출 완료');
+        } catch (handlerError) {
+          console.error('❌ [NATIVE CALLBACK] 새로운 핸들러 호출 실패:', handlerError);
+        }
+      } else {
+        console.error('❌ [NATIVE CALLBACK] kakaoSignInError 함수가 없습니다!');
       }
     };
     

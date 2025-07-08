@@ -4,7 +4,12 @@
 (function() {
     'use strict';
     
-    console.log('📱 [KAKAO-HANDLER] 카카오 로그인 핸들러 초기화');
+    console.log('📱 [KAKAO-HANDLER] 카카오 로그인 핸들러 초기화 시작');
+    console.log('📱 [KAKAO-HANDLER] 현재 URL:', window.location.href);
+    console.log('📱 [KAKAO-HANDLER] User Agent:', navigator.userAgent);
+    console.log('📱 [KAKAO-HANDLER] WebKit 존재 여부:', !!(window.webkit));
+    console.log('📱 [KAKAO-HANDLER] WebKit MessageHandlers 존재 여부:', !!(window.webkit && window.webkit.messageHandlers));
+    console.log('📱 [KAKAO-HANDLER] smapIos 핸들러 존재 여부:', !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.smapIos));
     
     // 햅틱 피드백 함수 (안전한 버전)
     function triggerHaptic(type) {
@@ -47,14 +52,17 @@
     
     // 카카오 로그인 성공 처리
     window.kakaoSignInSuccess = function(token, userInfo) {
-        console.log('📱 [KAKAO-HANDLER] 카카오 로그인 성공:', {
-            hasToken: !!token,
-            hasUserInfo: !!userInfo
-        });
+        console.log('📱 [KAKAO-HANDLER] === 카카오 로그인 성공 함수 호출됨 ===');
+        console.log('📱 [KAKAO-HANDLER] 토큰 존재 여부:', !!token);
+        console.log('📱 [KAKAO-HANDLER] userInfo 존재 여부:', !!userInfo);
+        console.log('📱 [KAKAO-HANDLER] userInfo 타입:', typeof userInfo);
+        console.log('📱 [KAKAO-HANDLER] userInfo 내용:', userInfo);
         
         try {
             // 성공 햅틱 피드백
+            console.log('📱 [KAKAO-HANDLER] 햅틱 피드백 호출 시작');
             triggerHaptic('success');
+            console.log('📱 [KAKAO-HANDLER] 햅틱 피드백 호출 완료');
             
             // userInfo 파싱
             let parsedUserInfo = userInfo;
