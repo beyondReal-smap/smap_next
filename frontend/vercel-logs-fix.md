@@ -2,7 +2,8 @@
 
 ## 문제 상황
 - 로컬에서는 logs 페이지가 정상적으로 로드됨
-- Vercel 배포 후 logs 페이지가 로드되지 않음
+- Vercel 배포 후 logs 페이지에서 404 에러 발생
+- 미들웨어에서 인증 체크로 인한 라우팅 문제
 - iOS WebView에서도 동일한 문제 발생
 
 ## 주요 수정 사항
@@ -30,8 +31,14 @@
 - Vercel 환경에 맞는 타임아웃 메시지
 
 ### 6. 디버깅 패널 추가
-- 개발 환경에서 Vercel 상태 확인 가능
+- 개발 환경 및 Vercel 환경에서 상태 확인 가능
 - 로딩 단계별 상태 표시
+- 인증 상태 실시간 확인
+
+### 7. 미들웨어 인증 체크 개선
+- Vercel 환경에서 더 관대한 인증 체크
+- 여러 토큰 소스 확인 (auth-token, client-token, token)
+- 클라이언트 사이드 인증 처리로 위임
 
 ## 환경 변수 확인
 
@@ -58,6 +65,9 @@ NEXTAUTH_URL=https://nextstep.smap.site
 ### 1. 브라우저 콘솔 확인
 ```javascript
 // 다음 로그들이 정상적으로 출력되는지 확인
+[MIDDLEWARE] Vercel 환경 - 관대한 인증 체크
+[MIDDLEWARE] Vercel 환경에서 토큰 없음, 클라이언트 처리로 위임: /logs
+[LOGS] Vercel 환경 인증 체크: { isLoggedIn: true, authLoading: false, user: {...} }
 [LOGS] Naver Maps API 로딩 시작
 🗺️ [LOGS] Vercel/iOS 환경 - 최소 모듈 로드
 [LOGS] Naver Maps API 로드 완료

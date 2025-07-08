@@ -874,6 +874,11 @@ let globalComponentInstances = 0;
 export default function LogsPage() {
   const router = useRouter();
   
+  // Vercel 환경 감지
+  const isVercel = typeof window !== 'undefined' && 
+                  (window.location.hostname.includes('vercel.app') || 
+                   window.location.hostname.includes('nextstep.smap.site'));
+  
   // 인증 관련 상태 추가 (home/page.tsx와 동일)
   const { user, isLoggedIn, loading: authLoading } = useAuth();
   // UserContext 사용
@@ -1614,6 +1619,45 @@ export default function LogsPage() {
       }
     };
   }, [userGroups, selectedGroupId]);
+
+  // Vercel 환경에서의 인증 체크
+  useEffect(() => {
+    if (isVercel && !authLoading) {
+      console.log('[LOGS] Vercel 환경 인증 체크:', { isLoggedIn, authLoading, user });
+      
+      // Vercel 환경에서는 더 관대한 인증 체크
+      if (!isLoggedIn) {
+        // 로컬 스토리지에서 토큰 확인
+        const hasToken = typeof window !== 'undefined' && 
+                        (localStorage.getItem('auth-token') || 
+                         localStorage.getItem('client-token') || 
+                         localStorage.getItem('token'));
+        
+        const hasUserData = typeof window !== 'undefined' && 
+                           localStorage.getItem('user-data');
+        
+        // 쿠키에서도 토큰 확인
+        const hasCookieToken = typeof window !== 'undefined' && 
+                              document.cookie.includes('auth-token=') || 
+                              document.cookie.includes('client-token=') || 
+                              document.cookie.includes('token=');
+        
+        console.log('[LOGS] Vercel 인증 소스 확인:', {
+          hasToken,
+          hasUserData,
+          hasCookieToken,
+          totalAuthSources: [hasToken, hasUserData, hasCookieToken].filter(Boolean).length
+        });
+        
+        // 모든 인증 소스가 없을 때만 리다이렉트
+        if (!hasToken && !hasUserData && !hasCookieToken) {
+          console.log('[LOGS] Vercel 환경에서 인증 없음, signin으로 리다이렉트');
+          router.push('/signin');
+          return;
+        }
+      }
+    }
+  }, [isVercel, isLoggedIn, authLoading, user, router]);
 
   useEffect(() => {
     loadNaverMapsAPI();
@@ -6983,12 +7027,16 @@ export default function LogsPage() {
         </AnimatedHeader>
 
                 {/* 🚨 Vercel/iOS 디버깅 패널 (개발 환경에서만 표시) */}
-        {process.env.NODE_ENV === 'development' && (
+        {(process.env.NODE_ENV === 'development' || isVercel) && (
           <div className="fixed top-16 left-4 z-[9998] bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-gray-200 max-w-xs">
             <div className="text-xs font-mono space-y-1">
               <div className="flex items-center space-x-2">
                 <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                <span>Vercel: {typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('nextstep.smap.site')) ? 'Yes' : 'No'}</span>
+                <span>Vercel: {isVercel ? 'Yes' : 'No'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span>Auth: {isLoggedIn ? 'Yes' : 'No'}</span>
               </div>
               <div className="flex items-center space-x-2">
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
