@@ -202,6 +202,17 @@ const nextConfig = {
   // 전원 헤더 비활성화
   poweredByHeader: false,
   
+  // Vercel 환경 최적화
+  ...(process.env.VERCEL && {
+    experimental: {
+      ...nextConfig.experimental,
+      // Vercel에서 더 안정적인 빌드
+      optimizePackageImports: ['framer-motion', 'react-icons'],
+      // 메모리 사용량 최적화
+      memoryBasedWorkers: true,
+    },
+  }),
+  
   // ESLint 빌드 시 무시
   eslint: {
     ignoreDuringBuilds: false,

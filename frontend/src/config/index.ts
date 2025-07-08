@@ -53,7 +53,17 @@ export const API_KEYS = {
     if (typeof window !== 'undefined') {
       const currentDomain = window.location.host;
       const domainClientId = MAP_CONFIG.NAVER.CLIENT_IDS[currentDomain as keyof typeof MAP_CONFIG.NAVER.CLIENT_IDS];
-      console.log(`🗺️ [NAVER MAPS] 도메인: ${currentDomain}, Client ID: ${domainClientId || '기본값'}`);
+      
+      // Vercel 환경 감지 및 로깅
+      const isVercel = currentDomain.includes('vercel.app') || currentDomain.includes('nextstep.smap.site');
+      console.log(`🗺️ [NAVER MAPS] 도메인: ${currentDomain}, Vercel: ${isVercel}, Client ID: ${domainClientId || '기본값'}`);
+      
+      // Vercel 환경에서는 환경 변수 우선 사용
+      if (isVercel && process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID) {
+        console.log(`🗺️ [NAVER MAPS] Vercel 환경에서 환경 변수 사용: ${process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID.substring(0, 8)}...`);
+        return process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID;
+      }
+      
       return domainClientId || process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '91y2nh0yff';
     }
     return process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || '91y2nh0yff';
@@ -72,7 +82,17 @@ export const API_KEYS = {
     if (typeof window !== 'undefined') {
       const currentDomain = window.location.host;
       const domainClientId = GOOGLE_CONFIG.OAUTH.CLIENT_IDS[currentDomain as keyof typeof GOOGLE_CONFIG.OAUTH.CLIENT_IDS];
-      console.log(`🔐 [GOOGLE OAUTH] 도메인: ${currentDomain}, Client ID: ${domainClientId ? domainClientId.substring(0, 12) + '...' : '기본값'}`);
+      
+      // Vercel 환경 감지 및 로깅
+      const isVercel = currentDomain.includes('vercel.app') || currentDomain.includes('nextstep.smap.site');
+      console.log(`🔐 [GOOGLE OAUTH] 도메인: ${currentDomain}, Vercel: ${isVercel}, Client ID: ${domainClientId ? domainClientId.substring(0, 12) + '...' : '기본값'}`);
+      
+      // Vercel 환경에서는 환경 변수 우선 사용
+      if (isVercel && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
+        console.log(`🔐 [GOOGLE OAUTH] Vercel 환경에서 환경 변수 사용: ${process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID.substring(0, 12)}...`);
+        return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      }
+      
       return domainClientId || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com';
     }
     return process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com';
@@ -94,6 +114,8 @@ export const MAP_CONFIG = {
       'app.smap.site',
       'smap.site',
       '118.67.130.71:3000',  // IP 주소 도메인
+      // Vercel 환경
+      '*.vercel.app',
       // 개발 환경
       'localhost:3000',
       '127.0.0.1:3000',
@@ -103,6 +125,7 @@ export const MAP_CONFIG = {
       'nextstep.smap.site': '91y2nh0yff',  // 운영 환경용
       'app2.smap.site': '91y2nh0yff',      // 스테이징용
       'localhost:3000': '91y2nh0yff',      // 개발용
+      // Vercel 환경은 환경 변수에서 가져옴
     },
     // 네이버 지도 옵션
     DEFAULT_OPTIONS: {
@@ -132,6 +155,8 @@ export const GOOGLE_CONFIG = {
       'app2.smap.site',
       'app.smap.site',
       'smap.site',
+      // Vercel 환경
+      '*.vercel.app',
       // 개발 환경
       'localhost:3000',
       '127.0.0.1:3000',
@@ -144,6 +169,7 @@ export const GOOGLE_CONFIG = {
       'nextstep.smap.site': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',  // ✅ 실제 등록된 Client ID
       'app2.smap.site': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',      // 스테이징용
       'localhost:3000': '283271180972-i0a3sa543o61ov4uoegg0thv1fvc8fvm.apps.googleusercontent.com',      // 개발용
+      // Vercel 환경은 환경 변수에서 가져옴
     },
   },
   // Mapbox 설정

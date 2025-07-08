@@ -1276,6 +1276,10 @@ export default function LogsPage() {
   // 에러 처리 헬퍼 함수
   const handleDataError = (error: any, context: string) => {
     const timestamp = new Date().toISOString();
+    const isVercel = typeof window !== 'undefined' && 
+                    (window.location.hostname.includes('vercel.app') || 
+                     window.location.hostname.includes('nextstep.smap.site'));
+    
     console.error(`[${context}] 💥 데이터 로딩 오류 발생:`, {
       error,
       context,
@@ -1283,6 +1287,7 @@ export default function LogsPage() {
       userAgent: navigator.userAgent,
       isOnline: navigator.onLine,
       url: window.location.href,
+      isVercel,
       selectedMember: groupMembers.find(m => m.isSelected)?.name,
       selectedDate,
       selectedGroupId
@@ -1346,7 +1351,12 @@ export default function LogsPage() {
              error?.message?.includes('fetch') ||
              error?.message?.includes('핵심 API 호출이 모두 실패')) {
       errorType = 'network';
-      errorMessage = '네트워크 연결에 문제가 있습니다. 연결 상태를 확인하고 다시 시도해주세요.';
+      // Vercel 환경에서는 더 구체적인 메시지 제공
+      if (isVercel) {
+        errorMessage = 'Vercel 환경에서 네트워크 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.';
+      } else {
+        errorMessage = '네트워크 연결에 문제가 있습니다. 연결 상태를 확인하고 다시 시도해주세요.';
+      }
       retryable = true;
     }
     // 기타 알 수 없는 오류
@@ -1435,9 +1445,15 @@ export default function LogsPage() {
 
   // 백업 타이머 - 초기 로딩이 너무 오래 걸리는 경우 강제 완료
   useEffect(() => {
+    // Vercel 환경에서는 더 짧은 백업 타이머 사용
+    const isVercel = typeof window !== 'undefined' && 
+                    (window.location.hostname.includes('vercel.app') || 
+                     window.location.hostname.includes('nextstep.smap.site'));
+    const backupTimeout = isVercel ? 8000 : 10000; // Vercel: 8초, 기타: 10초
+    
     const backupTimer = setTimeout(() => {
       if (isInitialLoading && !hasInitialLoadFailed) {
-        console.log('[LOGS] 백업 타이머 - 초기 로딩 강제 완료');
+        console.log(`[LOGS] 백업 타이머 - 초기 로딩 강제 완료 (${backupTimeout}ms)`);
         setIsInitialLoading(false);
         setIsMapLoading(false);
         setIsInitialDataLoaded(true);
@@ -1446,7 +1462,7 @@ export default function LogsPage() {
         setLoadingStep('complete');
         setLoadingProgress(100);
       }
-    }, 10000); // 10초 백업 타이머
+    }, backupTimeout);
 
     return () => clearTimeout(backupTimer);
   }, [isInitialLoading, hasInitialLoadFailed]);
@@ -1492,7 +1508,9 @@ export default function LogsPage() {
     const dynamicClientId = API_KEYS.NAVER_MAPS_CLIENT_ID;
     console.log(`🗺️ [LOGS] 네이버 지도 Client ID 사용: ${dynamicClientId}`);
     
-    // 프로덕션 환경에서는 서브모듈 최소화 (로딩 속도 최적화)
+    // Vercel 환경 감지 및 최적화
+    const isVercel = window.location.hostname.includes('vercel.app') || 
+                    window.location.hostname.includes('nextstep.smap.site');
     const isProduction = window.location.hostname.includes('.smap.site');
     const isIOSWebView = typeof window !== 'undefined' && 
                         window.webkit && 
@@ -1502,15 +1520,16 @@ export default function LogsPage() {
     const naverMapUrl = new URL(`https://oapi.map.naver.com/openapi/v3/maps.js`);
     naverMapUrl.searchParams.append('ncpKeyId', dynamicClientId);
     
-    if (!isIOSWebView && !isProduction) {
+    // Vercel 환경에서는 최소 모듈만 로드 (안정성 우선)
+    if (isVercel || isIOSWebView) {
+      naverMapUrl.searchParams.append('submodules', 'geocoder');
+      console.log(`🗺️ [LOGS] Vercel/iOS 환경 - 최소 모듈 로드`);
+    } else if (!isProduction) {
       // 개발 환경에서만 전체 서브모듈 로드
       naverMapUrl.searchParams.append('submodules', 'geocoder,drawing,visualization');
-    } else if (!isIOSWebView && isProduction) {
+    } else {
       // 프로덕션에서는 필수 모듈만 로드 (빠른 초기화)
       naverMapUrl.searchParams.append('submodules', 'geocoder,drawing');
-    } else {
-      // iOS WebView에서는 최소 모듈만 (호환성 우선)
-      naverMapUrl.searchParams.append('submodules', 'geocoder');
     }
     
     console.log(`🗺️ [LOGS] 네이버 지도 URL: ${naverMapUrl.toString()}`);
@@ -1546,8 +1565,8 @@ export default function LogsPage() {
     
     document.head.appendChild(script);
     
-    // 타임아웃 설정 (iOS WebView에서는 더 긴 시간)
-    const timeout = isIOSWebView ? 15000 : 10000;
+    // Vercel 환경에서는 더 긴 타임아웃 설정
+    const timeout = isVercel ? 20000 : (isIOSWebView ? 15000 : 10000);
     setTimeout(() => {
       if (!window.naver?.maps && !hasErrorOccurred) {
         console.warn(`[LOGS] 네이버 지도 로드 타임아웃 (${timeout}ms)`);
@@ -3563,9 +3582,17 @@ export default function LogsPage() {
         console.log(`[loadLocationData] 🔄 네트워크 오류 감지 - 스마트 재시도 (${retryCount + 1}/2):`, errorMessage);
         setRetryCount(prev => prev + 1);
         
-        // 적응적 지연 (첫 번째는 2초, 두 번째는 5초)
-        const retryDelay = retryCount === 0 ? 2000 : 5000;
-        console.log(`[loadLocationData] ⏰ ${retryDelay}ms 후 재시도 예정`);
+        // Vercel 환경에서는 더 긴 지연 시간 사용
+        const isVercel = typeof window !== 'undefined' && 
+                        (window.location.hostname.includes('vercel.app') || 
+                         window.location.hostname.includes('nextstep.smap.site'));
+        
+        // 적응적 지연 (Vercel: 첫 번째 3초, 두 번째 8초 / 기타: 첫 번째 2초, 두 번째 5초)
+        const retryDelay = isVercel 
+          ? (retryCount === 0 ? 3000 : 8000)
+          : (retryCount === 0 ? 2000 : 5000);
+        
+        console.log(`[loadLocationData] ⏰ ${retryDelay}ms 후 재시도 예정 (Vercel: ${isVercel})`);
         
         setTimeout(() => {
           console.log(`[loadLocationData] 🚀 스마트 재시도 실행 중... (${retryCount + 1}/2)`);
@@ -4586,8 +4613,14 @@ export default function LogsPage() {
   // 로딩 상태 안전장치 - 30초 후 강제 종료
   useEffect(() => {
     if (isLocationDataLoading) {
+      // Vercel 환경에서는 더 짧은 안전장치 타이머 사용
+      const isVercel = typeof window !== 'undefined' && 
+                      (window.location.hostname.includes('vercel.app') || 
+                       window.location.hostname.includes('nextstep.smap.site'));
+      const safetyTimeout = isVercel ? 20000 : 30000; // Vercel: 20초, 기타: 30초
+      
       const timeoutId = setTimeout(() => {
-        console.warn('[안전장치] 로딩이 30초 이상 지속되어 강제 종료');
+        console.warn(`[안전장치] 로딩이 ${safetyTimeout/1000}초 이상 지속되어 강제 종료 (Vercel: ${isVercel})`);
         setIsLocationDataLoading(false);
         loadLocationDataExecutingRef.current.executing = false;
         loadLocationDataExecutingRef.current.currentRequest = undefined;
@@ -4596,10 +4629,12 @@ export default function LogsPage() {
         // 타임아웃 에러 표시
         setDataError({
           type: 'network',
-          message: '데이터 로딩 시간이 초과되었습니다. 다시 시도해주세요.',
+          message: isVercel 
+            ? 'Vercel 환경에서 데이터 로딩 시간이 초과되었습니다. 다시 시도해주세요.'
+            : '데이터 로딩 시간이 초과되었습니다. 다시 시도해주세요.',
           retryable: true
         });
-      }, 30000);
+      }, safetyTimeout);
 
       return () => clearTimeout(timeoutId);
     }
@@ -5484,15 +5519,20 @@ export default function LogsPage() {
       
       console.log(`[${instanceId.current}] 초기 로딩 실패 감지 - 자동 재시도 시작`);
       
-      // 1초 후 재시도 (성능 최적화)
+      // Vercel 환경에서는 더 짧은 재시도 간격 사용
+      const isVercel = typeof window !== 'undefined' && 
+                      (window.location.hostname.includes('vercel.app') || 
+                       window.location.hostname.includes('nextstep.smap.site'));
+      const retryDelay = isVercel ? 500 : 1000; // Vercel: 0.5초, 기타: 1초
+      
       const retryTimer = setTimeout(() => {
         if (groupMembers.length === 0 && selectedGroupId) {
-          console.log(`[${instanceId.current}] 1초 후 자동 재시도 실행`);
+          console.log(`[${instanceId.current}] ${retryDelay}ms 후 자동 재시도 실행 (Vercel: ${isVercel})`);
           hasExecuted.current = false; // 재시도를 위해 플래그 리셋
           dataFetchedRef.current.members = false;
           fetchDataExecutingRef.current = false;
         }
-      }, 1000); // 3000ms → 1000ms (67% 단축)
+      }, retryDelay);
       
       return () => clearTimeout(retryTimer);
     }
@@ -6895,14 +6935,14 @@ export default function LogsPage() {
       <style jsx global>{pageStyles}</style>
       
       {/* 초기 로딩 오버레이 */}
-      {/* <InitialLoadingOverlay
+      <InitialLoadingOverlay
         isVisible={isInitialLoading}
         loadingStep={loadingStep}
         progress={loadingProgress}
         hasFailed={hasInitialLoadFailed}
         onRetry={handleInitialLoadingRetry}
         onSkip={handleInitialLoadingSkip}
-      /> */}
+      />
       
       {/* 메인 컨테이너 - 고정 레이아웃 */}
       <motion.div
@@ -6942,8 +6982,33 @@ export default function LogsPage() {
           </div>
         </AnimatedHeader>
 
-        {/* 🚨 iOS 시뮬레이터 디버깅 패널 (개발 환경에서만 표시) */}
-        
+                {/* 🚨 Vercel/iOS 디버깅 패널 (개발 환경에서만 표시) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="fixed top-16 left-4 z-[9998] bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-gray-200 max-w-xs">
+            <div className="text-xs font-mono space-y-1">
+              <div className="flex items-center space-x-2">
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                <span>Vercel: {typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('nextstep.smap.site')) ? 'Yes' : 'No'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span>Maps: {naverMapsLoaded ? 'Loaded' : 'Loading'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                <span>Members: {groupMembers.length}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
+                <span>Step: {loadingStep}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                <span>Failed: {hasInitialLoadFailed ? 'Yes' : 'No'}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 지도 영역 - 고정 위치 */}
         <motion.div 
