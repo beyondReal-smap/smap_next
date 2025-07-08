@@ -58,12 +58,22 @@ export function useGoogleSignIn() {
       };
 
       (window as any).googleSignInError = (errorMessage: string) => {
+        // 에러 메시지를 한글로 변환
+        let userFriendlyMessage = errorMessage;
+        if (errorMessage.includes('cancelled') || errorMessage.includes('canceled') || errorMessage.includes('The user canceled the sign-in-flow')) {
+          userFriendlyMessage = '로그인을 취소했습니다.';
+        } else if (errorMessage.includes('network') || errorMessage.includes('Network')) {
+          userFriendlyMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
+        } else if (errorMessage.includes('configuration') || errorMessage.includes('Configuration')) {
+          userFriendlyMessage = 'Google 로그인 설정에 문제가 있습니다. 앱을 다시 시작해주세요.';
+        }
+        
         setState(prev => ({
           ...prev,
           isLoading: false,
-          error: errorMessage
+          error: userFriendlyMessage
         }));
-        console.error('Google Sign-In 오류:', errorMessage);
+        console.error('Google Sign-In 오류:', userFriendlyMessage);
       };
 
       (window as any).googleSignOutSuccess = () => {

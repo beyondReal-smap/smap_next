@@ -187,7 +187,7 @@ export default function ClientLayout({
       document.documentElement.setAttribute('data-page', pathname);
       
       if (shouldHideNavBar) {
-        document.body.classList.add('hide-bottom-nav');
+          document.body.classList.add('hide-bottom-nav');
       } else {
         document.body.classList.remove('hide-bottom-nav');
       }

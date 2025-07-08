@@ -2060,6 +2060,18 @@ const SignInPage = () => {
       (window as any).googleSignInError = (errorMessage: string) => {
         console.error('[GOOGLE LOGIN] iOS 네이티브 Google Sign-In 실패:', errorMessage);
         
+        // 🚨 즉시 진행 중 플래그 해제 및 안정성 확보
+        delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
+        delete (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__;
+        
+        // 🚨 페이지 안정성 확보 - 네비게이션 차단
+        console.log('[GOOGLE LOGIN ERROR] 페이지 안정성 확보 시작');
+        
+        // 불필요한 리다이렉트나 네비게이션 방지
+        blockAllEffectsRef.current = true;
+        isRedirectingRef.current = false;
+        preventRemountRef.current = false;
+        
         // 강제로 로딩 상태 해제
         setIsLoading(false);
         
@@ -2068,8 +2080,8 @@ const SignInPage = () => {
         
         // 에러 메시지에 따른 사용자 친화적 메시지 제공
         let userFriendlyMessage = errorMessage;
-        if (errorMessage.includes('cancelled') || errorMessage.includes('canceled')) {
-          userFriendlyMessage = '사용자가 Google 로그인을 취소했습니다.';
+        if (errorMessage.includes('cancelled') || errorMessage.includes('canceled') || errorMessage.includes('The user canceled the sign-in-flow')) {
+          userFriendlyMessage = '로그인을 취소했습니다.';
         } else if (errorMessage.includes('network') || errorMessage.includes('Network')) {
           userFriendlyMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
         } else if (errorMessage.includes('configuration') || errorMessage.includes('Configuration')) {
@@ -2079,10 +2091,21 @@ const SignInPage = () => {
         // Google 로그인 에러 햅틱 피드백
         triggerHapticFeedback(HapticFeedbackType.ERROR);
         
-        // 에러 모달 강제 표시 - setTimeout으로 확실히 실행
+        // 🚨 안전한 에러 모달 표시 - 페이지 고정
         console.log('[GOOGLE LOGIN] 에러 모달 강제 표시:', userFriendlyMessage);
+        
+        // 페이지가 사라지지 않도록 즉시 고정
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+        
         setTimeout(() => {
-          showError(`Google 로그인 실패: ${userFriendlyMessage}`);
+          console.log('[GOOGLE LOGIN ERROR] showError 호출:', userFriendlyMessage);
+          showError(userFriendlyMessage);
+          
+          // 플래그 일부 해제 (모달이 표시된 후)
+          setTimeout(() => {
+            blockAllEffectsRef.current = false;
+          }, 500);
         }, 100);
       };
 
@@ -2467,9 +2490,38 @@ const SignInPage = () => {
     setShowErrorModal(false);
     setErrorModalMessage('');
     
-    // 페이지 스크롤 복구
+    // 페이지 스크롤 복구 - 강화된 버전
     document.body.style.overflow = '';
     document.documentElement.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
+    document.body.style.height = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    
+    // 🔧 페이지 위치 복원 - 페이지가 위로 올라가는 현상 방지
+    setTimeout(() => {
+      // 현재 스크롤 위치 저장
+      const currentScrollTop = window.scrollY || document.documentElement.scrollTop;
+      
+      // 페이지를 원래 위치로 복원
+      window.scrollTo({
+        top: 0,
+        left: 0,
+        behavior: 'auto' // 즉시 이동
+      });
+      
+      // viewport meta 태그 확인 및 복원
+      const viewport = document.querySelector('meta[name="viewport"]');
+      if (viewport) {
+        const content = viewport.getAttribute('content');
+        if (!content?.includes('user-scalable=no')) {
+          viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0, minimum-scale=1.0');
+        }
+      }
+      
+      console.log('[SIGNIN] 페이지 위치 복원 완료');
+    }, 50);
     
     // 플래그 리셋 (즉시)
     errorProcessedRef.current = false;
@@ -2510,9 +2562,25 @@ const SignInPage = () => {
     
     console.log('[SIGNIN] ⚡ 즉시 전역 플래그 설정 완료 (브라우저 저장소 포함)');
     
-    // 🚨 즉시 페이지 고정
+    // 🚨 즉시 페이지 고정 - 강화된 버전
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+    document.body.style.top = '0';
+    document.body.style.left = '0';
+    
+    // viewport meta 태그 강제 설정
+    let viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover');
+    } else {
+      viewport = document.createElement('meta');
+      viewport.setAttribute('name', 'viewport');
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover');
+      document.head.appendChild(viewport);
+    }
     
     // 🚨 안전한 기본 이벤트 차단
     const emergencyBlocker = (e: Event) => {
@@ -3706,23 +3774,47 @@ const SignInPage = () => {
           <AnimatePresence>
             {shouldShowModal && (
               <>
-                {/* 배경 오버레이 */}
+                {/* 배경 오버레이 - 강화된 고정 */}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999]"
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    touchAction: 'none',
+                    userSelect: 'none',
+                    WebkitUserSelect: 'none',
+                    WebkitTouchCallout: 'none',
+                    overflow: 'hidden'
+                  }}
                   onClick={closeErrorModal}
                 />
                 
-                {/* 에러 모달 */}
+                {/* 에러 모달 - 강화된 고정 */}
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                  className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                  className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
+                    touchAction: 'none',
+                    pointerEvents: 'none'
+                  }}
                 >
-                  <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
+                  <div 
+                    className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto"
+                    style={{ pointerEvents: 'auto' }}
+                  >
                     <div className="p-6">
                       {/* 에러 아이콘 */}
                       <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-4">
@@ -3731,7 +3823,7 @@ const SignInPage = () => {
                       
                       {/* 제목 */}
                       <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
-                        로그인 실패
+                        {displayMessage.includes('취소') ? '로그인 취소' : '로그인 실패'}
                       </h3>
                       
                       {/* 메시지 */}

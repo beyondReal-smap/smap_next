@@ -6913,7 +6913,7 @@ export default function LogsPage() {
         className="fixed inset-0 overflow-hidden hardware-accelerated" 
         id="logs-page-container"
         style={{ 
-          background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
+          background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)', 
           paddingTop: '0px',
           marginTop: '0px',
           top: '0px'

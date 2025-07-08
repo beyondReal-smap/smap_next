@@ -1134,17 +1134,26 @@ window.googleSignInError = function(error) {
         window.SmapApp.haptic.error();
     }
     
-    // 에러 처리
-    const errorMessage = typeof error === 'string' ? error : (error.message || '구글 로그인에 실패했습니다.');
+    // 에러 메시지를 한글로 변환
+    const originalMessage = typeof error === 'string' ? error : (error.message || '구글 로그인에 실패했습니다.');
+    let userFriendlyMessage = originalMessage;
+    
+    if (originalMessage.includes('cancelled') || originalMessage.includes('canceled') || originalMessage.includes('The user canceled the sign-in-flow')) {
+        userFriendlyMessage = '로그인을 취소했습니다.';
+    } else if (originalMessage.includes('network') || originalMessage.includes('Network')) {
+        userFriendlyMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
+    } else if (originalMessage.includes('configuration') || originalMessage.includes('Configuration')) {
+        userFriendlyMessage = 'Google 로그인 설정에 문제가 있습니다. 앱을 다시 시작해주세요.';
+    }
     
     if (window.handleNativeGoogleLoginError) {
-        window.handleNativeGoogleLoginError(error);
+        window.handleNativeGoogleLoginError(userFriendlyMessage);
     } else {
         // 백업 처리
         if (window.showError) {
-            window.showError(errorMessage);
+            window.showError(userFriendlyMessage);
         } else {
-            alert(errorMessage);
+            alert(userFriendlyMessage);
         }
     }
 };
