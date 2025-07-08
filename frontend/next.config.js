@@ -205,10 +205,10 @@ const nextConfig = {
   // Vercel 환경 최적화
   ...(process.env.VERCEL && {
     experimental: {
-      ...nextConfig.experimental,
-      // Vercel에서 더 안정적인 빌드
+      optimizeCss: true,
+      scrollRestoration: true,
       optimizePackageImports: ['framer-motion', 'react-icons'],
-      // 메모리 사용량 최적화
+      // Vercel에서 더 안정적인 빌드
       memoryBasedWorkers: true,
     },
   }),
