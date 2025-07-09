@@ -13,14 +13,14 @@
   "env": {
     "NODE_ENV": "production"
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/logs",
-      "dest": "/logs"
+      "source": "/logs",
+      "destination": "/logs"
     },
     {
-      "src": "/(.*)",
-      "dest": "/$1"
+      "source": "/logs/(.*)",
+      "destination": "/logs/$1"
     }
   ],
   "headers": [

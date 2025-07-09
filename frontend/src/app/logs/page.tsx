@@ -11,6 +11,10 @@ import { FiPlus, FiTrendingUp, FiClock, FiZap, FiPlayCircle, FiSettings, FiUser,
 import { FaCrown } from 'react-icons/fa';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
+
+// Vercel 빌드 최적화를 위한 메타데이터
+export const dynamicConfig = 'force-dynamic';
+export const revalidate = 0;
 import { API_KEYS, MAP_CONFIG } from '../../config'; 
 import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';

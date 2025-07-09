@@ -19,6 +19,18 @@ const publicPaths = [
   '/test-location-modal'
 ];
 
+// Vercel 환경에서 클라이언트 사이드 인증으로 처리할 경로들
+const clientAuthPaths = [
+  '/home',
+  '/group',
+  '/schedule',
+  '/location',
+  '/logs',
+  '/members',
+  '/notice',
+  '/setting'
+];
+
 // API 경로들 (별도 처리)
 const apiPaths = ['/api'];
 
@@ -45,6 +57,12 @@ export function middleware(request: NextRequest) {
   // Vercel 환경에서는 더 관대한 인증 체크
   if (isVercel) {
     console.log('[MIDDLEWARE] Vercel 환경 - 관대한 인증 체크');
+    
+    // 클라이언트 사이드 인증으로 처리할 경로들은 항상 통과
+    if (clientAuthPaths.some(path => pathname.startsWith(path))) {
+      console.log('[MIDDLEWARE] Vercel 환경 - 클라이언트 사이드 인증 경로, 통과:', pathname);
+      return NextResponse.next();
+    }
     
     // 여러 쿠키에서 토큰 확인
     const authToken = request.cookies.get('auth-token')?.value;

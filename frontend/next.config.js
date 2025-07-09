@@ -221,6 +221,16 @@ const nextConfig = {
   // 출력 설정 - iOS WebView 호환성
   output: 'standalone',
   
+  // 정적 경로 명시적 설정 (Vercel 빌드 최적화)
+  async rewrites() {
+    return [
+      {
+        source: '/logs/:path*',
+        destination: '/logs/:path*',
+      },
+    ];
+  },
+  
 
   
   // SWC 컴파일러 최적화 설정 (JSX Runtime 포함)
