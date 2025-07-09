@@ -7,6 +7,7 @@ import { FiPhone, FiLock, FiMail, FiEye, FiEyeOff, FiAlertCircle, FiCheckCircle,
 import { FcGoogle } from 'react-icons/fc';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import authService from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
@@ -3325,7 +3326,15 @@ const SignInPage = () => {
             duration: 0.4
           }}
         >
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center justify-center gap-3">
+            <Image 
+              src="/images/smap_logo.webp" 
+              alt="SMAP Logo"
+              width={32}
+              height={32}
+              className="rounded-lg shadow-md"
+              priority
+            />
             SMAP 로그인
           </h2>
           <p className="mt-2 text-sm text-gray-600">

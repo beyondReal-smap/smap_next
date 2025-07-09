@@ -31,7 +31,7 @@ import {
 import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
 import { hapticFeedback, triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
-import AnimatedHeader from '../../components/common/AnimatedHeader';
+
 
 // 기본 이미지 가져오기 함수 (schedule/page.tsx에서 가져옴)
 const getDefaultImage = (gender: number | null | undefined, index: number): string => {
@@ -409,55 +409,15 @@ export default function SettingsPage() {
   return (
     <>
       <style jsx global>{pageAnimations}</style>
-      <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-        {/* 통일된 헤더 애니메이션 */}
-        <AnimatedHeader 
-          variant="enhanced"
-          className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
-        >
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="flex items-center justify-between h-14 px-4"
+      <div className="flex-1 flex flex-col">
+        {/* 메인 컨텐츠 */}
+        <div className="flex-1 flex flex-col pt-4 pb-24 px-4 overflow-y-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="space-y-6"
           >
-            <div className="flex items-center space-x-3">
-              <motion.button 
-                onClick={handleBack}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5, duration: 0.4 }}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </motion.button>
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, duration: 0.4 }}
-                className="flex items-center space-x-3"
-              >
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">설정</h1>
-                  <p className="text-xs text-gray-500">앱 설정과 계정 관리</p>
-                </div>
-              </motion.div>
-            </div>
-
-          </motion.div>
-        </AnimatedHeader>
-
-        {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="schedule-page-content px-4 pt-20 space-y-6"
-        >
 
 
           {/* 메뉴 섹션들 */}
@@ -518,10 +478,9 @@ export default function SettingsPage() {
             <div className="text-sm text-gray-600 mb-1">SMAP</div>
             <div className="text-xs text-gray-500">버전 1.0.0</div>
           </motion.div>
+          </div>
+          </motion.div>
         </div>
-
-
-        </motion.div>
       </div>
     </>
   );

@@ -27,18 +27,7 @@ import {
   FiChevronRight
 } from 'react-icons/fi';
 import groupService from '@/services/groupService';
-import AnimatedHeader from '@/components/common/AnimatedHeader';
-
-// 회원가입 단계 정의
-const REGISTER_STEPS = {
-  TERMS: 'terms',
-  PHONE: 'phone',
-  VERIFICATION: 'verification',
-  BASIC_INFO: 'basic_info',
-  PROFILE: 'profile',
-  LOCATION: 'location',
-  COMPLETE: 'complete'
-};
+import { REGISTER_STEPS, useRegisterContext } from './RegisterContext';
 
 // 약관 데이터
 const TERMS_DATA = [
@@ -145,7 +134,13 @@ export default function RegisterPage() {
   }, []);
 
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState(REGISTER_STEPS.TERMS);
+  // Context에서 단계 관리
+  const { 
+    currentStep, 
+    setCurrentStep,
+    birthModalOpen,
+    setBirthModalOpen 
+  } = useRegisterContext();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
@@ -164,7 +159,6 @@ export default function RegisterPage() {
     hasNumber: false,
     hasSpecialChar: false
   });
-  const [birthModalOpen, setBirthModalOpen] = useState(false);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [calendarCurrentMonth, setCalendarCurrentMonth] = useState(dayjs());
@@ -201,6 +195,118 @@ export default function RegisterPage() {
 
   const [isJoiningGroup, setIsJoiningGroup] = useState(false);
   const [isOpeningApp, setIsOpeningApp] = useState(false);
+
+  // 웹 API를 사용한 위치 정보 요청
+  const requestLocationWithWebAPI = React.useCallback(() => {
+    console.log('🌐 [LOCATION] 웹 API로 위치 정보 요청 시작');
+    
+    const options = {
+      enableHighAccuracy: true, // 높은 정확도 요청
+      timeout: 10000, // 10초 타임아웃
+      maximumAge: 300000 // 5분 이내 캐시된 위치 허용
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        console.log('✅ [LOCATION] 위치 정보 가져오기 성공:', position.coords);
+        setRegisterData(prev => ({
+          ...prev,
+          mt_lat: position.coords.latitude,
+          mt_long: position.coords.longitude
+        }));
+        setLocationLoading(false);
+        setLocationError('');
+      },
+      (error) => {
+        console.error('❌ [LOCATION] 위치 정보 가져오기 실패:', error);
+        setLocationLoading(false);
+        
+        let errorMessage = '';
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = '위치 권한이 거부되었습니다. 설정에서 위치 권한을 허용해주세요.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = '위치 정보를 사용할 수 없습니다. GPS가 활성화되어 있는지 확인해주세요.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = '위치 정보 요청이 시간 초과되었습니다. 다시 시도해주세요.';
+            break;
+          default:
+            errorMessage = '위치 정보를 가져오는 중 오류가 발생했습니다.';
+            break;
+        }
+        setLocationError(errorMessage);
+      },
+      options
+    );
+  }, [setRegisterData, setLocationLoading, setLocationError]);
+
+  // 네이티브 앱 위치 권한 응답 콜백 등록
+  useEffect(() => {
+    // iOS 위치 권한 요청 성공 콜백
+    (window as any).onLocationPermissionGranted = (locationData: any) => {
+      console.log('🎯 [LOCATION CALLBACK] iOS 위치 권한 허용 및 위치 정보 수신:', locationData);
+      
+      if (locationData && locationData.latitude && locationData.longitude) {
+        setRegisterData(prev => ({
+          ...prev,
+          mt_lat: locationData.latitude,
+          mt_long: locationData.longitude
+        }));
+        setLocationLoading(false);
+        setLocationError('');
+        console.log('✅ [LOCATION CALLBACK] 위치 정보 저장 완료');
+      } else {
+        console.log('⚠️ [LOCATION CALLBACK] 위치 데이터가 불완전함, 웹 API로 폴백');
+        requestLocationWithWebAPI();
+      }
+    };
+
+    // iOS 위치 권한 요청 거부 콜백
+    (window as any).onLocationPermissionDenied = (error: any) => {
+      console.log('❌ [LOCATION CALLBACK] iOS 위치 권한 거부:', error);
+      setLocationLoading(false);
+      setLocationError('위치 권한이 거부되었습니다. 설정에서 위치 권한을 허용해주세요.');
+    };
+
+    // Android 위치 권한 요청 성공 콜백
+    (window as any).onAndroidLocationSuccess = (locationData: any) => {
+      console.log('🎯 [LOCATION CALLBACK] Android 위치 정보 수신:', locationData);
+      
+      if (locationData && locationData.latitude && locationData.longitude) {
+        setRegisterData(prev => ({
+          ...prev,
+          mt_lat: locationData.latitude,
+          mt_long: locationData.longitude
+        }));
+        setLocationLoading(false);
+        setLocationError('');
+        console.log('✅ [LOCATION CALLBACK] Android 위치 정보 저장 완료');
+      } else {
+        console.log('⚠️ [LOCATION CALLBACK] Android 위치 데이터가 불완전함, 웹 API로 폴백');
+        requestLocationWithWebAPI();
+      }
+    };
+
+    // Android 위치 권한 요청 거부 콜백
+    (window as any).onAndroidLocationError = (error: any) => {
+      console.log('❌ [LOCATION CALLBACK] Android 위치 권한 거부:', error);
+      setLocationLoading(false);
+      setLocationError('위치 권한이 거부되었습니다. 설정에서 위치 권한을 허용해주세요.');
+    };
+
+    console.log('📱 [LOCATION] 네이티브 위치 권한 콜백 함수들 등록 완료');
+
+    // 컴포넌트 언마운트 시 콜백 정리
+    return () => {
+      delete (window as any).onLocationPermissionGranted;
+      delete (window as any).onLocationPermissionDenied;
+      delete (window as any).onAndroidLocationSuccess;
+      delete (window as any).onAndroidLocationError;
+      console.log('🧹 [LOCATION] 네이티브 위치 권한 콜백 함수들 정리 완료');
+    };
+  }, [requestLocationWithWebAPI, setRegisterData, setLocationLoading, setLocationError]);
 
   // 소셜 로그인 데이터 초기화
   useEffect(() => {
@@ -440,7 +546,8 @@ export default function RegisterPage() {
   // 뒤로가기
   const handleBack = () => {
     if (currentStep === REGISTER_STEPS.TERMS) {
-      router.back();
+      // 첫 번째 단계에서는 로그인 페이지로 이동
+      router.push('/login');
     } else {
       const steps = Object.values(REGISTER_STEPS);
       const currentIndex = steps.indexOf(currentStep);
@@ -622,6 +729,16 @@ export default function RegisterPage() {
 
   // 위치 정보 가져오기
   const handleGetLocation = () => {
+    console.log('🗺️ [LOCATION] 위치 정보 요청 시작');
+    console.log('🗺️ [LOCATION] 환경 감지:', {
+      isIOS: isIOS(),
+      isAndroid: isAndroid(),
+      isMobile: isMobile(),
+      hasWebKit: !!(window as any).webkit?.messageHandlers?.smapIos,
+      hasAndroidBridge: !!(window as any).SmapApp,
+      userAgent: navigator.userAgent.substring(0, 100)
+    });
+
     if (!navigator.geolocation) {
       setLocationError('이 브라우저는 위치 서비스를 지원하지 않습니다.');
       return;
@@ -630,46 +747,66 @@ export default function RegisterPage() {
     setLocationLoading(true);
     setLocationError('');
 
-    const options = {
-      enableHighAccuracy: true, // 높은 정확도 요청
-      timeout: 10000, // 10초 타임아웃
-      maximumAge: 300000 // 5분 이내 캐시된 위치 허용
-    };
+    // 네이티브 앱 환경에서 네이티브 위치 권한 요청
+    if (isIOS() && (window as any).webkit?.messageHandlers?.smapIos) {
+      console.log('🍎 [LOCATION] iOS 네이티브 위치 권한 요청');
+      
+      try {
+        // iOS 네이티브 위치 권한 요청
+        (window as any).webkit.messageHandlers.smapIos.postMessage({
+          type: 'requestLocationPermission',
+          param: '',
+          timestamp: Date.now(),
+          source: 'register_location'
+        });
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        console.log('위치 정보 가져오기 성공:', position.coords);
-        setRegisterData(prev => ({
-          ...prev,
-          mt_lat: position.coords.latitude,
-          mt_long: position.coords.longitude
-        }));
-        setLocationLoading(false);
-        setLocationError('');
-      },
-      (error) => {
-        console.error('위치 정보 가져오기 실패:', error);
-        setLocationLoading(false);
-        
-        let errorMessage = '';
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = '위치 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해주세요.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = '위치 정보를 사용할 수 없습니다. GPS가 활성화되어 있는지 확인해주세요.';
-            break;
-          case error.TIMEOUT:
-            errorMessage = '위치 정보 요청이 시간 초과되었습니다. 다시 시도해주세요.';
-            break;
-          default:
-            errorMessage = '위치 정보를 가져오는 중 오류가 발생했습니다.';
-            break;
-        }
-        setLocationError(errorMessage);
-      },
-      options
-    );
+        console.log('📱 [LOCATION] iOS 네이티브 위치 권한 요청 호출 완료');
+
+        // iOS에서 3초 후 웹 API로 폴백
+        setTimeout(() => {
+          console.log('🔍 [LOCATION] iOS 위치 권한 응답 확인 중...');
+          if (locationLoading) {
+            console.log('⚠️ [LOCATION] iOS 네이티브 응답 없음, 웹 API로 폴백');
+            requestLocationWithWebAPI();
+          }
+        }, 3000);
+
+        return;
+      } catch (error) {
+        console.error('❌ [LOCATION] iOS 네이티브 위치 권한 요청 실패:', error);
+        requestLocationWithWebAPI();
+        return;
+      }
+    }
+
+    // Android 네이티브 위치 권한 요청
+    if (isAndroid() && (window as any).SmapApp?.requestLocationPermission) {
+      console.log('🤖 [LOCATION] Android 네이티브 위치 권한 요청');
+      
+      try {
+        (window as any).SmapApp.requestLocationPermission();
+        console.log('📱 [LOCATION] Android 네이티브 위치 권한 요청 호출 완료');
+
+        // Android에서 3초 후 웹 API로 폴백
+        setTimeout(() => {
+          console.log('🔍 [LOCATION] Android 위치 권한 응답 확인 중...');
+          if (locationLoading) {
+            console.log('⚠️ [LOCATION] Android 네이티브 응답 없음, 웹 API로 폴백');
+            requestLocationWithWebAPI();
+          }
+        }, 3000);
+
+        return;
+      } catch (error) {
+        console.error('❌ [LOCATION] Android 네이티브 위치 권한 요청 실패:', error);
+        requestLocationWithWebAPI();
+        return;
+      }
+    }
+
+    // 일반 브라우저 환경에서는 웹 API 사용
+    console.log('🌐 [LOCATION] 웹 브라우저 환경 - 웹 API 사용');
+    requestLocationWithWebAPI();
   };
 
   // 회원가입 완료
@@ -962,61 +1099,30 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col relative" style={{background: 'linear-gradient(to bottom right, #eff6ff, #ffffff, #faf5ff)'}}>
-      {/* 통일된 헤더 애니메이션 */}
-      <AnimatedHeader 
-        variant="enhanced"
-        className="fixed top-0 left-0 right-0 glass-effect header-fixed z-50"
-        style={{ 
-          paddingTop: '0px',
-          marginTop: '0px',
-          top: '0px',
-          position: 'fixed'
-        }}
-      >
-        <div className="flex items-center justify-between h-14 px-4">
-          <div className="flex items-center space-x-3">
-            <motion.button 
-              onClick={handleBack}
-              className="p-2 transition-all duration-200"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </motion.button>
-            <div className="flex items-center space-x-3">
-              <div className="min-w-0">
-                <h1 className="text-lg font-bold text-gray-900 whitespace-nowrap">회원가입</h1>
-                {currentStep !== REGISTER_STEPS.COMPLETE && (
-                  <p className="text-xs text-gray-500 whitespace-nowrap">
-                    {Object.values(REGISTER_STEPS).indexOf(currentStep) + 1} / {Object.values(REGISTER_STEPS).length - 1}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <div className="w-9" /> {/* 균형을 위한 빈 공간 */}
+    <div className="absolute inset-0 overflow-y-auto content-area" style={{ 
+      top: '0', // 헤더 높이는 layout에서 처리됨
+      left: '0',
+      right: '0',
+      bottom: '0'
+    }}>
+      {/* 진행률 바 - 헤더 바로 아래에 고정 */}
+      {currentStep !== REGISTER_STEPS.COMPLETE && (
+        <div className="fixed left-0 right-0 h-1 bg-gray-200 z-40" style={{ top: '8px' }}>
+          <motion.div 
+            className="h-full"
+            style={{backgroundColor: '#0113A3'}}
+            initial={{ width: 0 }}
+            animate={{ width: `${getProgress()}%` }}
+            transition={{ duration: 0.5 }}
+          />
         </div>
-        
-        {/* 진행률 바 */}
-        {currentStep !== REGISTER_STEPS.COMPLETE && (
-          <div className="h-1 bg-gray-200">
-            <motion.div 
-              className="h-full"
-              style={{backgroundColor: '#0113A3'}}
-              initial={{ width: 0 }}
-              animate={{ width: `${getProgress()}%` }}
-              transition={{ duration: 0.5 }}
-            />
-          </div>
-        )}
-      </AnimatedHeader>
+      )}
 
       {/* 메인 콘텐츠 */}
-      <div className="flex-1 flex flex-col pt-14 pb-24 px-6 overflow-y-auto register-main register-scroll">
+      <div className="px-4 space-y-5 pb-16 overflow-y-auto content-area" style={{ 
+        paddingTop: currentStep !== REGISTER_STEPS.COMPLETE ? '24px' : '20px', // 진행률 바가 있을 때는 더 많은 패딩
+        minHeight: 'calc(100vh - 56px)' // 헤더 높이 고려
+      }}>
         <div className="flex-1 flex items-center justify-center min-h-0">
           <div className="w-full max-w-md mx-auto py-4 register-content">
             <AnimatePresence mode="wait">
@@ -1154,7 +1260,7 @@ export default function RegisterPage() {
                     전화번호
                   </label>
                   <div className="relative register-input-container">
-                    <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                    <div className="absolute left-6 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
                       <FiPhone className="w-4 h-4 transition-colors duration-200" 
                         style={{color: focusedField === 'phone' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
@@ -1173,7 +1279,7 @@ export default function RegisterPage() {
                       }}
                       placeholder="010-1234-5678"
                       maxLength={13}
-                      className="w-full pl-10 pr-6 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:border-transparent register-input"
+                      className="w-full pl-12 pr-6 py-4 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:border-transparent register-input"
                       style={{outlineOffset: '2px'}}
                     />
                   </div>
@@ -1250,7 +1356,7 @@ export default function RegisterPage() {
                     }}
                     placeholder="123456"
                     maxLength={6}
-                    className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent text-center text-2xl font-mono tracking-widest register-input"
+                    className="w-full px-5 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent text-center text-2xl font-mono tracking-widest register-input"
                     onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0113A3'}
                     onBlur={(e) => e.target.style.boxShadow = ''}
                     style={{ outline: 'none' }}
@@ -1335,8 +1441,8 @@ export default function RegisterPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     비밀번호
               </label>
-                  <div className="relative register-input-container">
-                    <div className="absolute left-4 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                  <div className="relative register-input-container px-0.5">
+                    <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
                       <FiLock className="w-4 h-4 transition-colors duration-200" 
                         style={{color: focusedField === 'password' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
@@ -1357,7 +1463,7 @@ export default function RegisterPage() {
                         e.target.style.boxShadow = '';
                       }}
                       placeholder="8자 이상, 대소문자, 숫자, 특수문자 포함"
-                      className="w-full pl-8 pr-8 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
+                      className="w-full pl-11 pr-10 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
                       style={{ outline: 'none' }}
                     />
                     <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
@@ -1412,8 +1518,8 @@ export default function RegisterPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     비밀번호 확인
               </label>
-                  <div className="relative register-input-container">
-                    <div className="absolute left-4 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                  <div className="relative register-input-container px-0.5">
+                    <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
                       <FiLock className="w-4 h-4 transition-colors duration-200" 
                         style={{color: focusedField === 'passwordConfirm' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
@@ -1430,7 +1536,7 @@ export default function RegisterPage() {
                         e.target.style.boxShadow = '';
                       }}
                       placeholder="비밀번호를 다시 입력해주세요"
-                      className="w-full pl-8 pr-10 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
+                      className="w-full pl-11 pr-12 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
                       style={{ outline: 'none' }}
                     />
                     <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
@@ -1455,7 +1561,7 @@ export default function RegisterPage() {
             </div>
 
                 {/* 이름 */}
-            <div>
+            <div className="px-0.5">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     이름
               </label>
@@ -1464,7 +1570,7 @@ export default function RegisterPage() {
                     value={registerData.mt_name}
                     onChange={(e) => setRegisterData(prev => ({ ...prev, mt_name: e.target.value }))}
                     placeholder="실명을 입력해주세요"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
+                    className="w-full px-5 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
                     onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0113A3'}
                     onBlur={(e) => e.target.style.boxShadow = ''}
                     style={{ outline: 'none' }}
@@ -1472,7 +1578,7 @@ export default function RegisterPage() {
                 </div>
 
                 {/* 닉네임 */}
-                <div>
+                <div className="px-0.5">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     닉네임
                   </label>
@@ -1481,7 +1587,7 @@ export default function RegisterPage() {
                     value={registerData.mt_nickname}
                     onChange={(e) => setRegisterData(prev => ({ ...prev, mt_nickname: e.target.value }))}
                     placeholder="다른 사용자에게 표시될 닉네임"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
+                    className="w-full px-5 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
                     onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0113A3'}
                     onBlur={(e) => e.target.style.boxShadow = ''}
                     style={{ outline: 'none' }}
@@ -1498,8 +1604,8 @@ export default function RegisterPage() {
                       {registerData.socialProvider === 'google' ? '구글' : '카카오'} 계정의 이메일이 ID로 사용됩니다
                     </p>
                   )}
-                  <div className="relative register-input-container">
-                    <div className="absolute left-4 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                  <div className="relative register-input-container px-0.5">
+                    <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
                       <FiMail className="w-4 h-4 transition-colors duration-200" 
                         style={{color: focusedField === 'email' ? '#0113A3' : '#9CA3AF'}} />
                     </div>
@@ -1524,7 +1630,7 @@ export default function RegisterPage() {
                       }}
                       placeholder={registerData.isSocialLogin ? '' : 'example@email.com'}
                       disabled={registerData.isSocialLogin}
-                      className={`w-full pl-8 pr-10 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
+                      className={`w-full pl-11 pr-12 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
                         registerData.isSocialLogin ? 'bg-gray-50 cursor-not-allowed' : ''
                       }`}
                       style={{ outline: 'none' }}
@@ -1873,7 +1979,7 @@ export default function RegisterPage() {
           data-bottom-button
           style={{ 
             paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-            background: 'linear-gradient(to bottom right, rgba(239, 246, 255, 0.95), rgba(255, 255, 255, 0.95), rgba(250, 245, 255, 0.95))',
+            background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.95), rgba(253, 244, 255, 0.95))',
             backdropFilter: 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',
             borderTop: '1px solid rgba(229, 231, 235, 0.3)'
