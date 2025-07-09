@@ -26,7 +26,12 @@ html, body {
   height: 100% !important;
   -webkit-overflow-scrolling: touch !important;
   touch-action: manipulation !important;
+  /* iOS 상단 여백 완전 제거 */
+  margin: 0 !important;
+  padding: 0 !important;
 }
+
+
 
 /* 모바일 사파리 bounce 효과 비활성화 */
 body {
@@ -198,17 +203,22 @@ function RegisterLayoutContent({
             position: 'fixed'
           }}
         >
-          <div className="flex items-center justify-between h-14 px-4">
+          <div className="flex items-center justify-between w-full" style={{
+            height: '64px',
+            minHeight: '64px',
+            padding: '0'
+          }}>
             <div className="flex items-center space-x-3">
               <motion.button 
                 onClick={handleBack}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                className="hover:bg-gray-100 rounded-full transition-all duration-200"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
+                style={{ padding: '8px', marginLeft: '8px' }}
               >
                 <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
               </motion.button>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center">
                 <div>
                   <h1 className="text-lg font-bold text-gray-900">회원가입</h1>
                   {!isComplete && (
@@ -241,7 +251,7 @@ function RegisterLayoutContent({
         <div 
           className="absolute inset-0 overflow-hidden"
           style={{ 
-            top: '56px', // 헤더 높이만큼 아래로
+            top: '64px', // 헤더 높이만큼 아래로
             left: '0',
             right: '0',
             bottom: '0'

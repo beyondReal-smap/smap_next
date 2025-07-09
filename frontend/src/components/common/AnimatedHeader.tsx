@@ -40,7 +40,8 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
     // 항상 표시되도록 강제 설정
     opacity: 1,
     visibility: 'visible',
-    display: 'block',
+    display: 'flex',
+    alignItems: 'center', // 수직 중앙 정렬
     // 모든 여백 제거
     padding: 0,
     margin: 0,

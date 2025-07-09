@@ -1107,7 +1107,7 @@ export default function RegisterPage() {
     }}>
       {/* 진행률 바 - 헤더 바로 아래에 고정 */}
       {currentStep !== REGISTER_STEPS.COMPLETE && (
-        <div className="fixed left-0 right-0 h-1 bg-gray-200 z-40" style={{ top: '8px' }}>
+        <div className="fixed left-0 right-0 h-1 bg-gray-200 z-40" style={{ top: '0px' }}>
           <motion.div 
             className="h-full"
             style={{backgroundColor: '#0113A3'}}
