@@ -784,7 +784,7 @@ function GroupPageContent() {
     }
   };
 
-  // 헤더 상단 패딩 강제 제거 (런타임)
+  // 헤더 상단 패딩 강제 제거 (런타임) - 애니메이션 간섭 방지
   useEffect(() => {
     const forceRemoveHeaderPadding = () => {
       if (typeof document === 'undefined') return;
@@ -826,15 +826,8 @@ function GroupPageContent() {
       document.documentElement.style.setProperty('margin-top', '0px', 'important');
     };
     
-    // 즉시 실행
+    // 즉시 실행 (애니메이션 간섭 방지)
     forceRemoveHeaderPadding();
-    
-    // 정기적으로 강제 적용 (다른 스타일이 덮어쓸 수 있으므로)
-    const interval = setInterval(forceRemoveHeaderPadding, 500);
-    
-    return () => {
-      clearInterval(interval);
-    };
   }, []);
 
   // 인증 상태 확인 및 초기 데이터 로드 - 간소화

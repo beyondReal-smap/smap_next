@@ -1267,6 +1267,50 @@ const SignInPage = () => {
           error_callback: (error: any) => {
             console.error('[GOOGLE SDK] 로그인 실패:', error);
             
+            // 진행 중 플래그 해제
+            (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = false;
+            setIsLoading(false);
+            
+            // 사용자 취소 여부 확인
+            const errorString = String(error);
+            const isCancelled = errorString.includes('popup_closed_by_user') || 
+                               errorString.includes('popup_blocked_by_browser') ||
+                               errorString.includes('cancelled') || 
+                               errorString.includes('canceled') ||
+                               errorString.includes('user_cancelled') ||
+                               error?.type === 'popup_closed';
+            
+                         if (isCancelled) {
+               console.log('[GOOGLE SDK] 사용자가 팝업을 닫거나 로그인을 취소함 - 페이지 완전 고정');
+               
+               // 🚨 페이지 완전 고정
+               freezePage();
+               
+               // 취소의 경우 가벼운 햅틱 피드백만 제공
+               triggerHapticFeedback(HapticFeedbackType.LIGHT);
+               
+               // 간단한 메시지만 표시하고 페이지는 그대로 유지
+               setApiError('로그인을 취소했습니다.');
+               
+               // 3초 후 메시지 자동 제거 및 모든 차단 해제
+               setTimeout(() => {
+                 setApiError('');
+                 unfreezePage();
+                 
+                 // 🚨 모든 차단 플래그 해제
+                 delete (window as any).__PREVENT_SIGNIN_NAVIGATION__;
+                 delete (window as any).__FORCE_BLOCK_NAVIGATION__;
+                 
+                 console.log('[GOOGLE SDK] 취소 시 모든 차단 플래그 해제 완료');
+               }, 3000);
+               
+               return; // 여기서 함수 종료 - 추가 처리 없음
+            }
+            
+            // 실제 에러의 경우 에러 햅틱 피드백
+            triggerHapticFeedback(HapticFeedbackType.ERROR);
+            
+            // 실제 에러 메시지 생성
             let errorMessage = 'Google 로그인에 실패했습니다.';
             if (window.location.hostname.includes('.smap.site')) {
               errorMessage += '\n\n프로덕션 환경에서 Google OAuth 설정을 확인해주세요.';
@@ -1278,9 +1322,8 @@ const SignInPage = () => {
               errorMessage += '\n\n다시 시도하거나 전화번호 로그인을 사용해주세요.';
             }
             
+            // 실제 에러의 경우 에러 모달 표시
             showError(errorMessage);
-            setIsLoading(false);
-            (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = false;
           }
         });
         
@@ -1401,6 +1444,31 @@ const SignInPage = () => {
   // 🔒 컴포넌트 마운트 추적 및 재마운트 방지 (강화) - 브라우저 저장소 상태 복원
   useEffect(() => {
     // React 모달만 사용하므로 DOM 직접 모달 정리 코드 제거
+    
+    // 🚨 페이지 로드 시 routeChange 차단 상태 확인
+    if ((window as any).__PREVENT_SIGNIN_NAVIGATION__ || 
+        (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ || 
+        (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__) {
+      console.log('[SIGNIN] 페이지 로드 시 구글 로그인 진행 중 감지 - 강력한 차단 실행');
+      
+      // 즉시 페이지 고정
+      freezePage();
+      
+      // iOS 네이티브에 차단 상태 알림
+      if ((window as any).webkit?.messageHandlers?.smapIos) {
+        (window as any).webkit.messageHandlers.smapIos.postMessage({
+          type: 'routeChangeBlocked',
+          reason: 'page_load_detected_google_login',
+          timestamp: Date.now()
+        });
+      }
+      
+      // 5초 후 고정 해제
+      setTimeout(() => {
+        unfreezePage();
+        console.log('[SIGNIN] 강제 페이지 고정 해제');
+      }, 5000);
+    }
     
     // 브라우저 저장소에서 에러 모달 상태 복원 (최우선)
     if (typeof window !== 'undefined') {
@@ -1609,6 +1677,207 @@ const SignInPage = () => {
     const isIOSWebView = !!(window as any).webkit && !!(window as any).webkit.messageHandlers;
     const isAndroidWebView = /Android/.test(navigator.userAgent);
     console.log('[GOOGLE LOGIN] 콜백 함수 등록 - 환경:', { isIOSWebView, isAndroidWebView });
+    
+    // 🚨 구글 로그인 중 페이지 네비게이션 방지
+    const preventGoogleLoginNavigation = () => {
+      console.log('[GOOGLE LOGIN] 네비게이션 방지 플래그 설정');
+      (window as any).__PREVENT_SIGNIN_NAVIGATION__ = true;
+      
+      // 5초 후 자동 해제
+      setTimeout(() => {
+        delete (window as any).__PREVENT_SIGNIN_NAVIGATION__;
+        console.log('[GOOGLE LOGIN] 네비게이션 방지 플래그 해제');
+      }, 5000);
+    };
+    
+    // 🚨 iOS 네이티브 routeChange 메시지 감지 및 차단
+    const handleRouteChange = (message: any) => {
+      console.log('[ROUTE CHANGE] iOS 네이티브 routeChange 메시지 감지:', message);
+      
+      // 구글 로그인 중일 때 routeChange 차단
+      if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__ || 
+          (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ ||
+          (window as any).__PREVENT_SIGNIN_NAVIGATION__ ||
+          (window as any).__FORCE_BLOCK_NAVIGATION__ ||
+          (window as any).__GOOGLE_LOGIN_CANCELLED__ ||
+          (window as any).__GOOGLE_LOGIN_WINDOW_OPENED__) {
+        console.log('[ROUTE CHANGE] 🚫 구글 로그인 중 - routeChange 차단');
+        
+        // iOS에 차단 메시지 전송
+        if ((window as any).webkit?.messageHandlers?.smapIos) {
+          (window as any).webkit.messageHandlers.smapIos.postMessage({
+            type: 'routeChangeBlocked',
+            reason: 'google_login_in_progress',
+            timestamp: Date.now()
+          });
+        }
+        
+        // 페이지 고정 (추가 보호)
+        freezePage();
+        
+        // 3초 후 고정 해제
+        setTimeout(() => {
+          unfreezePage();
+        }, 3000);
+        
+        return false; // 차단
+      }
+      
+      // signin 페이지로의 이동인 경우 추가 확인
+      if (message?.url && message.url.includes('/signin')) {
+        console.log('[ROUTE CHANGE] signin 페이지로의 이동 감지, 추가 차단 확인');
+        
+        // 구글 로그인 관련 플래그가 있으면 차단
+        if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__ || 
+            (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ ||
+            (window as any).__PREVENT_SIGNIN_NAVIGATION__ ||
+            (window as any).__FORCE_BLOCK_NAVIGATION__ ||
+            (window as any).__GOOGLE_LOGIN_CANCELLED__ ||
+            (window as any).__GOOGLE_LOGIN_WINDOW_OPENED__) {
+          console.log('[ROUTE CHANGE] 🚫 signin 페이지 이동 차단');
+          
+          // iOS에 차단 메시지 전송
+          if ((window as any).webkit?.messageHandlers?.smapIos) {
+            (window as any).webkit.messageHandlers.smapIos.postMessage({
+              type: 'routeChangeBlocked',
+              reason: 'signin_navigation_blocked',
+              timestamp: Date.now()
+            });
+          }
+          
+          return false; // 차단
+        }
+      }
+      
+      return true; // 허용
+    };
+    
+    // 전역 routeChange 핸들러 등록
+    (window as any).handleRouteChange = handleRouteChange;
+    
+    // 🚨 강력한 페이지 리다이렉션 차단
+    const preventRedirect = () => {
+      console.log('[REDIRECT BLOCK] 페이지 리다이렉션 차단 시도');
+      
+      // 현재 URL이 signin 페이지이고 구글 로그인 중이면 차단
+      if (window.location.pathname === '/signin' && 
+          ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__ || 
+           (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ ||
+           (window as any).__PREVENT_SIGNIN_NAVIGATION__)) {
+        
+        console.log('[REDIRECT BLOCK] 🚫 signin 페이지 리다이렉션 차단');
+        
+        // 페이지 고정
+        freezePage();
+        
+        // 3초 후 고정 해제
+        setTimeout(() => {
+          unfreezePage();
+        }, 3000);
+        
+        return false;
+      }
+      
+      return true;
+    };
+    
+    // 전역 리다이렉션 차단 핸들러 등록
+    (window as any).preventRedirect = preventRedirect;
+    
+    // 🚨 네비게이션 차단 (안전한 방식)
+    console.log('[NAVIGATION BLOCK] 🔒 네비게이션 차단 시스템 초기화');
+    
+    // beforeunload 이벤트를 사용한 차단
+    const preventLocationChange = (e: BeforeUnloadEvent) => {
+      if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__ || 
+          (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ ||
+          (window as any).__PREVENT_SIGNIN_NAVIGATION__ ||
+          (window as any).__FORCE_BLOCK_NAVIGATION__ ||
+          (window as any).__GOOGLE_LOGIN_CANCELLED__ ||
+          (window as any).__GOOGLE_LOGIN_WINDOW_OPENED__) {
+        console.log('[NAVIGATION BLOCK] 🚫 페이지 변경 시도 차단 (beforeunload)');
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    
+    // popstate 이벤트도 차단
+    const preventPopState = (e: PopStateEvent) => {
+      if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__ || 
+          (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ ||
+          (window as any).__PREVENT_SIGNIN_NAVIGATION__ ||
+          (window as any).__FORCE_BLOCK_NAVIGATION__ ||
+          (window as any).__GOOGLE_LOGIN_CANCELLED__ ||
+          (window as any).__GOOGLE_LOGIN_WINDOW_OPENED__) {
+        console.log('[NAVIGATION BLOCK] 🚫 popstate 이벤트 차단');
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    };
+    
+    // unload 이벤트도 차단
+    const preventUnload = (e: Event) => {
+      if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__ || 
+          (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ ||
+          (window as any).__PREVENT_SIGNIN_NAVIGATION__ ||
+          (window as any).__FORCE_BLOCK_NAVIGATION__ ||
+          (window as any).__GOOGLE_LOGIN_CANCELLED__ ||
+          (window as any).__GOOGLE_LOGIN_WINDOW_OPENED__) {
+        console.log('[NAVIGATION BLOCK] 🚫 unload 이벤트 차단');
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    };
+    
+    // 페이지 가시성 변경 감지
+    const preventVisibilityChange = () => {
+      if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__ || 
+          (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ ||
+          (window as any).__PREVENT_SIGNIN_NAVIGATION__ ||
+          (window as any).__FORCE_BLOCK_NAVIGATION__ ||
+          (window as any).__GOOGLE_LOGIN_CANCELLED__ ||
+          (window as any).__GOOGLE_LOGIN_WINDOW_OPENED__) {
+        console.log('[NAVIGATION BLOCK] 🚫 페이지 가시성 변경 감지, 차단');
+        // 페이지를 다시 포커스
+        window.focus();
+        return false;
+      }
+    };
+    
+    window.addEventListener('beforeunload', preventLocationChange);
+    window.addEventListener('popstate', preventPopState, true);
+    window.addEventListener('unload', preventUnload, true);
+    document.addEventListener('visibilitychange', preventVisibilityChange);
+    
+    // iOS 네이티브에 네비게이션 차단 요청
+    if (isIOSWebView) {
+      sendLogToiOS('info', '네비게이션 차단 시스템 활성화', {
+        timestamp: new Date().toISOString(),
+        flags: {
+          googleLoginInProgress: !!(window as any).__GOOGLE_LOGIN_IN_PROGRESS__,
+          googleSDKLoginInProgress: !!(window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__,
+          preventSigninNavigation: !!(window as any).__PREVENT_SIGNIN_NAVIGATION__,
+          forceBlockNavigation: !!(window as any).__FORCE_BLOCK_NAVIGATION__,
+          googleLoginCancelled: !!(window as any).__GOOGLE_LOGIN_CANCELLED__,
+          googleLoginWindowOpened: !!(window as any).__GOOGLE_LOGIN_WINDOW_OPENED__
+        }
+      });
+    }
+    
+    console.log('[NAVIGATION BLOCK] ✅ 네비게이션 차단 시스템 활성화 완료');
+    
+    // cleanup 함수에 제거 로직 추가
+    return () => {
+      window.removeEventListener('beforeunload', preventLocationChange);
+      window.removeEventListener('popstate', preventPopState, true);
+      window.removeEventListener('unload', preventUnload, true);
+      document.removeEventListener('visibilitychange', preventVisibilityChange);
+      
+      console.log('[NAVIGATION BLOCK] 🔄 네비게이션 차단 시스템 정리 완료');
+    };
     
     if (isIOSWebView || isAndroidWebView) {
       // Google Sign-In 성공 콜백 (iOS + Android 공통)
@@ -1936,53 +2205,92 @@ const SignInPage = () => {
       (window as any).googleSignInError = (errorMessage: string) => {
         console.error('[GOOGLE LOGIN] iOS 네이티브 Google Sign-In 실패:', errorMessage);
         
-        // 🚨 즉시 진행 중 플래그 해제 및 안정성 확보
+        // 진행 중 플래그 해제
         delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
         delete (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__;
         
-        // 🚨 페이지 안정성 확보 - 네비게이션 차단
-        console.log('[GOOGLE LOGIN ERROR] 페이지 안정성 확보 시작');
+        // 🚨 모든 차단 플래그 해제 (에러 시에도)
+        delete (window as any).__PREVENT_SIGNIN_NAVIGATION__;
+        delete (window as any).__FORCE_BLOCK_NAVIGATION__;
         
-        // 불필요한 리다이렉트나 네비게이션 방지
-        blockAllEffectsRef.current = true;
-        isRedirectingRef.current = false;
-        preventRemountRef.current = false;
-        
-        // 강제로 로딩 상태 해제
+        // 로딩 상태 해제
         setIsLoading(false);
         
         // iOS 로그 전송
-        sendLogToiOS('error', 'Google Sign-In 실패', { errorMessage });
+        sendLogToiOS('info', 'Google Sign-In 처리 완료', { errorMessage, type: 'user_action' });
         
         // 에러 메시지에 따른 사용자 친화적 메시지 제공
         let userFriendlyMessage = errorMessage;
-        if (errorMessage.includes('cancelled') || errorMessage.includes('canceled') || errorMessage.includes('The user canceled the sign-in-flow')) {
+        const isCancelled = errorMessage.includes('cancelled') || errorMessage.includes('canceled') || errorMessage.includes('The user canceled the sign-in-flow');
+        
+        // 🚨 iOS 네이티브에 구글 로그인 완료 알림 (에러 시에도)
+        if ((window as any).webkit?.messageHandlers?.smapIos) {
+          (window as any).webkit.messageHandlers.smapIos.postMessage({
+            type: 'googleLoginCompleted',
+            allowRouteChange: !isCancelled, // 취소된 경우에는 routeChange 방지
+            isError: true,
+            errorType: isCancelled ? 'cancelled' : 'error',
+            timestamp: Date.now()
+          });
+          console.log('[GOOGLE LOGIN] iOS 네이티브에 구글 로그인 완료 알림 전송 (에러)', {
+            allowRouteChange: !isCancelled,
+            isCancelled
+          });
+        }
+        
+        if (isCancelled) {
           userFriendlyMessage = '로그인을 취소했습니다.';
+          console.log('[GOOGLE LOGIN] 사용자가 로그인을 취소함 - 강력한 차단 활성화');
+          
+          // 🚨 강력한 차단 플래그 설정
+          (window as any).__GOOGLE_LOGIN_CANCELLED__ = true;
+          (window as any).__FORCE_BLOCK_NAVIGATION__ = true;
+          
+          // 🚨 페이지 완전 고정
+          freezePage();
+          
+          // 취소의 경우 가벼운 햅틱 피드백만 제공
+          triggerHapticFeedback(HapticFeedbackType.LIGHT);
+          
+          // 간단한 메시지만 표시하고 페이지는 그대로 유지
+          setApiError(userFriendlyMessage);
+          
+          // 🚨 iOS 네이티브에 취소 알림 (routeChange 방지)
+          if ((window as any).webkit?.messageHandlers?.smapIos) {
+            (window as any).webkit.messageHandlers.smapIos.postMessage({
+              type: 'googleLoginCancelled',
+              preventRouteChange: true,
+              timestamp: Date.now()
+            });
+            console.log('[GOOGLE LOGIN] iOS 네이티브에 구글 로그인 취소 알림 전송');
+          }
+          
+          // 5초 후 메시지 자동 제거 및 모든 차단 해제 (시간 연장)
+          setTimeout(() => {
+            setApiError('');
+            unfreezePage();
+            
+            // 🚨 모든 차단 플래그 해제
+            delete (window as any).__PREVENT_SIGNIN_NAVIGATION__;
+            delete (window as any).__FORCE_BLOCK_NAVIGATION__;
+            delete (window as any).__GOOGLE_LOGIN_CANCELLED__;
+            
+            console.log('[GOOGLE LOGIN] 취소 시 모든 차단 플래그 해제 완료');
+          }, 5000); // 3초 → 5초로 연장
+          
+          return; // 여기서 함수 종료 - 추가 처리 없음
         } else if (errorMessage.includes('network') || errorMessage.includes('Network')) {
           userFriendlyMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
         } else if (errorMessage.includes('configuration') || errorMessage.includes('Configuration')) {
           userFriendlyMessage = 'Google 로그인 설정에 문제가 있습니다. 앱을 다시 시작해주세요.';
         }
         
-        // Google 로그인 에러 햅틱 피드백
+        // 취소가 아닌 실제 에러의 경우에만 에러 햅틱 피드백
         triggerHapticFeedback(HapticFeedbackType.ERROR);
         
-        // 🚨 안전한 에러 모달 표시 - 페이지 고정
-        console.log('[GOOGLE LOGIN] 에러 모달 강제 표시:', userFriendlyMessage);
-        
-        // 페이지가 사라지지 않도록 즉시 고정
-        document.body.style.overflow = 'hidden';
-        document.documentElement.style.overflow = 'hidden';
-        
-        setTimeout(() => {
-          console.log('[GOOGLE LOGIN ERROR] showError 호출:', userFriendlyMessage);
-          showError(userFriendlyMessage);
-          
-          // 플래그 일부 해제 (모달이 표시된 후)
-          setTimeout(() => {
-            blockAllEffectsRef.current = false;
-          }, 500);
-        }, 100);
+        // 실제 에러의 경우 에러 모달 표시
+        console.log('[GOOGLE LOGIN] 실제 에러 발생:', userFriendlyMessage);
+        showError(userFriendlyMessage);
       };
 
       // iOS 앱에서 메시지를 받았는지 확인하는 콜백 (디버깅용)
@@ -2025,6 +2333,16 @@ const SignInPage = () => {
       return undefined;
     }
     
+    // 🚨 구글 로그인 진행 중일 때는 AuthContext 에러 무시
+    if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__ || (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__) {
+      console.log('[SIGNIN] 🚫 구글 로그인 진행 중 - AuthContext 에러 무시');
+      if (error) {
+        console.log('[SIGNIN] 구글 로그인 중 AuthContext 에러 초기화:', error);
+        setError(null);
+      }
+      return undefined;
+    }
+    
     console.log('[SIGNIN] 🚨 에러 감지 useEffect 실행:', { 
       error: !!error, 
       errorMessage: error, 
@@ -2038,6 +2356,14 @@ const SignInPage = () => {
     // 주로 자동 로그인 실패나 기타 AuthContext 에러만 처리
     if (error && !isLoggedIn && !loading && !showErrorModal && !errorProcessedRef.current) {
       console.log('[SIGNIN] ⚠️ AuthContext 에러 감지 (자동 로그인 실패 등):', error);
+      
+      // 🚨 구글 로그인 관련 에러는 무시
+      if (error.includes('Google') || error.includes('google') || error.includes('구글') || 
+          error.includes('취소') || error.includes('cancelled') || error.includes('canceled')) {
+        console.log('[SIGNIN] 구글 로그인 관련 에러 무시:', error);
+        setError(null);
+        return undefined;
+      }
       
       // 전화번호 로그인 관련 에러가 아닌 경우만 모달 표시
       if (!error.includes('아이디') && !error.includes('비밀번호') && !error.includes('ID') && !error.includes('password')) {
@@ -2768,6 +3094,64 @@ const SignInPage = () => {
     // 진행 중 플래그 설정
     (window as any).__GOOGLE_LOGIN_IN_PROGRESS__ = true;
     
+    // 🚨 네비게이션 방지 플래그 설정
+    (window as any).__PREVENT_SIGNIN_NAVIGATION__ = true;
+    console.log('[GOOGLE LOGIN] 네비게이션 방지 플래그 설정');
+    
+    // 🚨 즉시 페이지 고정 (예방적 차단)
+    freezePage();
+    
+    // 🚨 iOS 네이티브에 구글 로그인 시작 알림
+    if ((window as any).webkit?.messageHandlers?.smapIos) {
+      (window as any).webkit.messageHandlers.smapIos.postMessage({
+        type: 'googleLoginStarted',
+        preventRouteChange: true,
+        timestamp: Date.now()
+      });
+      console.log('[GOOGLE LOGIN] iOS 네이티브에 구글 로그인 시작 알림 전송');
+    }
+    
+    // 🚨 강력한 차단을 위한 추가 플래그
+    (window as any).__FORCE_BLOCK_NAVIGATION__ = true;
+    console.log('[GOOGLE LOGIN] 강제 네비게이션 차단 플래그 설정');
+    
+    // 🚨 구글 로그인 창 열림 감지 플래그
+    (window as any).__GOOGLE_LOGIN_WINDOW_OPENED__ = true;
+    console.log('[GOOGLE LOGIN] 구글 로그인 창 열림 플래그 설정');
+    
+    // 🚨 페이지 새로고침 방지
+    const preventRefresh = (e: BeforeUnloadEvent) => {
+      console.log('[GOOGLE LOGIN] 페이지 새로고침 방지 시도');
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    };
+    
+    window.addEventListener('beforeunload', preventRefresh);
+    
+    // 🚨 강력한 네비게이션 차단 (구글 로그인 창 열림 시)
+    const preventNavigationDuringGoogleLogin = (e: Event) => {
+      console.log('[GOOGLE LOGIN] 네비게이션 차단 시도 (구글 로그인 창 열림 중)');
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return false;
+    };
+    
+    // 모든 네비게이션 이벤트에 강력한 차단 적용
+    window.addEventListener('beforeunload', preventNavigationDuringGoogleLogin, true);
+    window.addEventListener('unload', preventNavigationDuringGoogleLogin, true);
+    window.addEventListener('popstate', preventNavigationDuringGoogleLogin, true);
+    
+    // 10초 후 모든 차단 해제 (구글 로그인 창이 닫힐 때까지 충분한 시간)
+    setTimeout(() => {
+      window.removeEventListener('beforeunload', preventRefresh);
+      window.removeEventListener('beforeunload', preventNavigationDuringGoogleLogin, true);
+      window.removeEventListener('unload', preventNavigationDuringGoogleLogin, true);
+      window.removeEventListener('popstate', preventNavigationDuringGoogleLogin, true);
+      delete (window as any).__GOOGLE_LOGIN_WINDOW_OPENED__;
+      console.log('[GOOGLE LOGIN] 구글 로그인 창 관련 차단 해제');
+    }, 10000); // 3초 → 10초로 연장
+    
     // 🧪 테스트 모드: 강제로 웹 SDK 사용 (디버깅용)
     const FORCE_WEB_SDK = false; // 테스트 완료 - 정상 플로우 사용
     
@@ -2973,18 +3357,67 @@ const SignInPage = () => {
       
       // 취소된 로그인인지 확인
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('canceled') || errorMessage.includes('cancelled')) {
-        console.log('ℹ️ [GOOGLE LOGIN] 사용자가 로그인을 취소했습니다.');
-        setError('로그인이 취소되었습니다. 다시 시도해주세요.');
-      } else {
-        setError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
-      }
+      const isCancelled = errorMessage.includes('canceled') || errorMessage.includes('cancelled') || 
+                          errorMessage.includes('user_cancelled') || errorMessage.includes('popup_closed');
       
-      triggerHapticFeedback(HapticFeedbackType.ERROR);
+             if (isCancelled) {
+         console.log('ℹ️ [GOOGLE LOGIN] 사용자가 로그인을 취소했습니다 - 페이지 완전 고정');
+         
+         // 🚨 페이지 완전 고정
+         freezePage();
+         
+         // 취소의 경우 가벼운 햅틱 피드백만 제공
+         triggerHapticFeedback(HapticFeedbackType.LIGHT);
+         
+         // 간단한 메시지만 표시하고 페이지는 그대로 유지
+         setApiError('로그인을 취소했습니다.');
+         
+         // 3초 후 메시지 자동 제거 및 모든 차단 해제
+         setTimeout(() => {
+           setApiError('');
+           unfreezePage();
+           
+           // 🚨 모든 차단 플래그 해제
+           delete (window as any).__PREVENT_SIGNIN_NAVIGATION__;
+           delete (window as any).__FORCE_BLOCK_NAVIGATION__;
+           
+           console.log('[GOOGLE LOGIN] catch 취소 시 모든 차단 플래그 해제 완료');
+         }, 3000);
+      } else {
+        // 실제 에러의 경우 에러 햅틱 피드백
+        triggerHapticFeedback(HapticFeedbackType.ERROR);
+        
+        // 실제 에러의 경우 직접 에러 메시지 표시 (AuthContext 에러 설정 안함)
+        setApiError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
+        
+        // 3초 후 메시지 자동 제거
+        setTimeout(() => {
+          setApiError('');
+        }, 3000);
+      }
     } finally {
       setIsLoading(false);
       // 진행 중 플래그 해제
       delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
+      
+      // 🚨 모든 차단 플래그 해제
+      delete (window as any).__PREVENT_SIGNIN_NAVIGATION__;
+      delete (window as any).__FORCE_BLOCK_NAVIGATION__;
+      
+      // 🚨 페이지 고정 해제
+      unfreezePage();
+      
+      // 🚨 iOS 네이티브에 구글 로그인 완료 알림
+      if ((window as any).webkit?.messageHandlers?.smapIos) {
+        (window as any).webkit.messageHandlers.smapIos.postMessage({
+          type: 'googleLoginCompleted',
+          allowRouteChange: true,
+          timestamp: Date.now()
+        });
+        console.log('[GOOGLE LOGIN] iOS 네이티브에 구글 로그인 완료 알림 전송');
+      }
+      
+      console.log('[GOOGLE LOGIN] 모든 차단 플래그 해제 완료');
     }
   };
 
@@ -3225,6 +3658,61 @@ const SignInPage = () => {
     } catch (error) {
       console.error('❌ [KAKAO RECOVER] 카카오 에러 복구 실패:', error);
     }
+  };
+
+  // 🚨 페이지 완전 고정 함수
+  const freezePage = () => {
+    console.log('[PAGE FREEZE] 페이지 완전 고정 시작');
+    
+    // 스크롤 방지
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    // 페이지 위치 고정
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+    document.body.style.top = '0';
+    document.body.style.left = '0';
+    
+    // 추가 안정성을 위한 CSS
+    document.body.style.touchAction = 'none';
+    document.body.style.userSelect = 'none';
+    document.body.style.webkitUserSelect = 'none';
+    
+    // React 상태 변화 방지
+    blockAllEffectsRef.current = true;
+    isRedirectingRef.current = false;
+    preventRemountRef.current = true;
+    
+    // 전역 고정 플래그 설정
+    (window as any).__PAGE_FROZEN__ = true;
+  };
+
+  // 🚨 페이지 고정 해제 함수
+  const unfreezePage = () => {
+    console.log('[PAGE FREEZE] 페이지 고정 해제 시작');
+    
+    // 스타일 복원
+    document.body.style.overflow = '';
+    document.documentElement.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
+    document.body.style.height = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.touchAction = '';
+    document.body.style.userSelect = '';
+    document.body.style.webkitUserSelect = '';
+    
+    // React 상태 변화 허용
+    blockAllEffectsRef.current = false;
+    preventRemountRef.current = false;
+    
+    // 전역 고정 플래그 해제
+    delete (window as any).__PAGE_FROZEN__;
+    
+    console.log('[PAGE FREEZE] 페이지 고정 해제 완료');
   };
 
   // 🔥 iOS 환경에서 네이티브 Google Sign-In 시도 (자동 실행 비활성화)
@@ -3579,7 +4067,7 @@ const SignInPage = () => {
             </div>
 
             {/* Kakao 로그인 버튼 */}
-            <button
+            {/* <button
               type="button"
               onClick={(e) => {
                 console.log('💬 [KAKAO LOGIN] 버튼 클릭됨!');
@@ -3607,7 +4095,7 @@ const SignInPage = () => {
               ) : (
                 'Kakao 계정으로 로그인'
               )}
-            </button>
+            </button> */}
           </div>
         </motion.div>
 

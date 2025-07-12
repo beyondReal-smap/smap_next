@@ -737,7 +737,7 @@ export default function SchedulePage() {
   // DataCache 컨텍스트 사용
   const { invalidateCache } = useDataCache();
   
-  // 헤더 상단 패딩 강제 제거 (런타임)
+  // 헤더 상단 패딩 강제 제거 (런타임) - 애니메이션 간섭 방지
   useEffect(() => {
     const forceRemoveHeaderPadding = () => {
       if (typeof document === 'undefined') return;
@@ -779,15 +779,8 @@ export default function SchedulePage() {
       document.documentElement.style.setProperty('margin-top', '0px', 'important');
     };
     
-    // 즉시 실행
+    // 즉시 실행 (애니메이션 간섭 방지)
     forceRemoveHeaderPadding();
-    
-    // 정기적으로 강제 적용 (다른 스타일이 덮어쓸 수 있으므로)
-    const interval = setInterval(forceRemoveHeaderPadding, 500);
-    
-    return () => {
-      clearInterval(interval);
-    };
   }, []);
 
   // 페이지 마운트 시 스크롤 설정

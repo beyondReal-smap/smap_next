@@ -12,9 +12,7 @@ import { FaCrown } from 'react-icons/fa';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 
-// Vercel 빌드 최적화를 위한 메타데이터
-export const dynamicConfig = 'force-dynamic';
-export const revalidate = 0;
+// Vercel 빌드 최적화를 위한 메타데이터 - 클라이언트 컴포넌트에서는 제거
 import { API_KEYS, MAP_CONFIG } from '../../config'; 
 import { useUser } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7009,26 +7007,39 @@ export default function LogsPage() {
       >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
-          variant="simple"
+          variant="enhanced"
           className="fixed top-0 left-0 right-0 z-[9999] glass-effect header-fixed logs-header"
           style={{ 
-            paddingTop: '0px',
-            marginTop: '0px',
-            top: '0px',
+            paddingTop: '0px !important',
+            marginTop: '0px !important',
+            padding: '0px !important',
+            margin: '0px !important',
+            top: '0px !important',
             position: 'fixed'
-          }}
+          } as React.CSSProperties}
         >
-          <div className="flex items-center justify-between h-14 px-4">
-            <div className="flex items-center space-x-3">
+            <div 
+              className="flex items-center" 
+              style={{ 
+                paddingLeft: '16px', 
+                paddingRight: '0px !important',  // 오른쪽 패딩 제거
+                paddingTop: '0px !important',    // 위쪽 패딩 제거
+                paddingBottom: '0px !important', // 아래쪽 패딩 제거
+                height: '56px',  // 정확한 높이 설정
+                width: '100%',
+                boxSizing: 'border-box',
+                position: 'relative'  // 절대 위치 아이콘들을 위한 relative 설정
+              }}
+            >
+              {/* 왼쪽 영역 - 고정 너비 */}
               <div className="flex items-center space-x-3">
                 <div>
-                  <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
+                  <h1 className="text-lg font-semibold text-gray-900">활동 로그</h1>
                   <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
                 </div>
               </div>
             </div>
-          </div>
-        </AnimatedHeader>
+          </AnimatedHeader>
 
                 {/* 🚨 Vercel/iOS 디버깅 패널 (개발 환경에서만 표시) */}
         {(process.env.NODE_ENV === 'development' || isVercel) && (

@@ -1,6 +1,6 @@
 'use client';
 
-export default function GroupLayout({
+export default function ScheduleLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -8,23 +8,23 @@ export default function GroupLayout({
   return (
     <>
       <style jsx global>{`
-        .group-layout header,
-        .group-layout .header-fixed,
-        .group-layout .glass-effect,
-        .group-layout .group-header,
-        .group-layout [role="banner"] {
+        .schedule-layout header,
+        .schedule-layout .header-fixed,
+        .schedule-layout .glass-effect,
+        .schedule-layout .schedule-header,
+        .schedule-layout [role="banner"] {
           padding-top: 0px !important;
           margin-top: 0px !important;
           top: 0px !important;
         }
         
-        .group-layout body,
-        .group-layout html {
+        .schedule-layout body,
+        .schedule-layout html {
           padding-top: 0px !important;
           margin-top: 0px !important;
         }
       `}</style>
-      <div className="min-h-screen group-layout">
+      <div className="min-h-screen schedule-layout">
         {children}
       </div>
     </>

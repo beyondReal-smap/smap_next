@@ -434,10 +434,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('[AUTH] 로그아웃 완료');
       
-      // 5. 즉시 signin 페이지로 리다이렉트
+      // 5. 즉시 signin 페이지로 리다이렉트 (네비게이션 방지 플래그 확인)
       if (typeof window !== 'undefined') {
+        // 🚨 구글 로그인 중일 때는 리다이렉트 방지
+        if ((window as any).__PREVENT_SIGNIN_NAVIGATION__) {
+          console.log('[AUTH] 구글 로그인 중 - signin 페이지 리다이렉트 방지');
+          return;
+        }
+        
         console.log('[AUTH] 즉시 signin 페이지로 리다이렉트');
-        window.location.replace('/signin');
+        try {
+          window.location.replace('/signin');
+        } catch (error) {
+          console.warn('[AUTH] window.location.replace 실패, 대체 방법 사용:', error);
+          // 대체 방법: router.push 사용
+          if (typeof window !== 'undefined' && window.location) {
+            window.location.href = '/signin';
+          }
+        }
       }
     } catch (error) {
       console.error('[AUTH CONTEXT] 로그아웃 실패:', error);
@@ -453,10 +467,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       clearAllCache(); // 에러 시에도 캐시는 삭제
       dispatch({ type: 'LOGOUT' });
       
-      // 에러 발생 시에도 signin 페이지로 리다이렉트
+      // 에러 발생 시에도 signin 페이지로 리다이렉트 (네비게이션 방지 플래그 확인)
       if (typeof window !== 'undefined') {
+        // 🚨 구글 로그인 중일 때는 리다이렉트 방지
+        if ((window as any).__PREVENT_SIGNIN_NAVIGATION__) {
+          console.log('[AUTH] 구글 로그인 중 - signin 페이지 리다이렉트 방지 (에러 시)');
+          return;
+        }
+        
         console.log('[AUTH] 에러 발생 시에도 signin 페이지로 리다이렉트');
-        window.location.replace('/signin');
+        try {
+          window.location.replace('/signin');
+        } catch (error) {
+          console.warn('[AUTH] window.location.replace 실패 (에러 시), 대체 방법 사용:', error);
+          // 대체 방법: router.push 사용
+          if (typeof window !== 'undefined' && window.location) {
+            window.location.href = '/signin';
+          }
+        }
       }
     }
   };

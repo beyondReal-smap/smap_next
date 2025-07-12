@@ -65,7 +65,7 @@ if (typeof window !== 'undefined') {
 
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense, useLayoutEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion, useMotionValue, AnimatePresence } from 'framer-motion';
@@ -1072,7 +1072,7 @@ export default function HomePage() {
     };
   }, []);
 
-  // 헤더 상단 패딩 강제 제거 (런타임)
+  // 헤더 상단 패딩 강제 제거 (런타임) - 아이콘 위치 조정 제거
   useEffect(() => {
     const forceRemoveHeaderPadding = () => {
       if (typeof document === 'undefined') return;
@@ -1114,15 +1114,8 @@ export default function HomePage() {
       document.documentElement.style.setProperty('margin-top', '0px', 'important');
     };
     
-    // 즉시 실행
+    // 즉시 실행 (아이콘 위치 조정은 제거)
     forceRemoveHeaderPadding();
-    
-    // 정기적으로 강제 적용 (다른 스타일이 덮어쓸 수 있으므로)
-    const interval = setInterval(forceRemoveHeaderPadding, 500);
-    
-    return () => {
-      clearInterval(interval);
-    };
   }, []);
   
   // useEffect를 사용하여 클라이언트 사이드에서 날짜 관련 상태 초기화
@@ -5468,26 +5461,60 @@ export default function HomePage() {
           variant="enhanced"
           className={`fixed top-0 left-0 right-0 glass-effect header-fixed ${isSidebarOpen ? 'z-40' : 'z-50'}`}
           style={{ 
-            paddingTop: '0px',
-            marginTop: '0px',
-            top: '0px',
+            paddingTop: '0px !important',
+            marginTop: '0px !important',
+            padding: '0px !important',
+            margin: '0px !important',
+            top: '0px !important',
             position: 'fixed'
-          }}
+          } as React.CSSProperties}
         >
-            <div className="flex items-center justify-between h-14 px-4">
+            <div 
+              className="flex items-center" 
+              style={{ 
+                paddingLeft: '16px', 
+                paddingRight: '0px !important',  // 오른쪽 패딩 제거
+                paddingTop: '0px !important',    // 위쪽 패딩 제거
+                paddingBottom: '0px !important', // 아래쪽 패딩 제거
+                height: '56px',  // 정확한 높이 설정
+                width: '100%',
+                boxSizing: 'border-box',
+                position: 'relative'  // 절대 위치 아이콘들을 위한 relative 설정
+              }}
+            >
+              {/* 왼쪽 영역 - 고정 너비 */}
               <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-3">
-                  <div>
-                    <h1 className="text-lg font-semibold text-gray-900">홈</h1>
-                    <p className="text-xs text-gray-500">그룹 멤버들과 실시간으로 소통해보세요</p>
-                  </div>
+                <div>
+                  <h1 className="text-lg font-semibold text-gray-900">홈</h1>
+                  <p className="text-xs text-gray-500">그룹 멤버들과 실시간으로 소통해보세요</p>
                 </div>
               </div>
               
-                                            <div className="flex items-center space-x-2">
+              {/* 오른쪽 영역 - 아이콘들 */}
+              <motion.div 
+                className="flex items-center justify-center"
+                style={{ 
+                  position: 'absolute',
+                  right: '16px',  // 절대 위치로 오른쪽에서 16px 떨어진 곳에 고정
+                  top: '0',
+                  bottom: '0',
+                  gap: '12px',  // 아이콘 간격 늘리기
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '56px'  // 헤더 높이와 동일하게 설정
+                }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ 
+                  duration: 0.6,
+                  delay: 0.2,
+                  ease: "easeOut"
+                }}
+              >
                 <motion.button
                  whileTap={{ scale: 0.98 }}
-                 className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200 relative"
+                 className="p-0.5 hover:bg-white/50 rounded-xl transition-all duration-200 relative"
                  onClick={async () => {
                    // 알림 페이지로 이동하면서 모든 알림을 읽음 처리
                    try {
@@ -5520,7 +5547,7 @@ export default function HomePage() {
                  <motion.button
                    whileHover={{ scale: 1.02 }}
                    whileTap={{ scale: 0.98 }}
-                   className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200"
+                   className="p-0.5 hover:bg-white/50 rounded-xl transition-all duration-200"
                    onClick={() => {
                      triggerHapticFeedback(HapticFeedbackType.LIGHT, '햅틱 테스트 페이지 이동', { 
                        component: 'home', 
@@ -5543,7 +5570,7 @@ export default function HomePage() {
                <motion.button
                  whileHover={{ scale: 1.02 }}
                  whileTap={{ scale: 0.98 }}
-                 className="p-1 hover:bg-white/50 rounded-xl transition-all duration-200"
+                 className="p-0.5 hover:bg-white/50 rounded-xl transition-all duration-200"
                  onClick={() => {
                    // 🎮 설정 페이지 이동 햅틱 피드백
                    triggerHapticFeedback(HapticFeedbackType.SELECTION, '설정 페이지 이동', { 
@@ -5557,7 +5584,7 @@ export default function HomePage() {
                    <path fillRule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 0 0-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 0 0-2.282.819l-.922 1.597a1.875 1.875 0 0 0 .432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 0 0 0 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 0 0-.432 2.385l.922 1.597a1.875 1.875 0 0 0 2.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.570.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 0 0 2.28-.819l.923-1.597a1.875 1.875 0 0 0-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 0 0 0-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 0 0-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 0 0-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 0 0-1.85-1.567h-1.843ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z" clipRule="evenodd" />
                  </svg>
                </motion.button>
-             </div>
+             </motion.div>
             </div>
           </AnimatedHeader>
 
@@ -5637,7 +5664,7 @@ export default function HomePage() {
         
         {/* 커스텀 줌 컨트롤 */}
         {((mapType === 'naver' && naverMap.current) || (mapType === 'google' && map.current)) && (
-          <div className="absolute top-[70px] right-[10px] z-30 flex flex-col">
+          <div className="absolute top-[80px] right-[16px] z-30 flex flex-col">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

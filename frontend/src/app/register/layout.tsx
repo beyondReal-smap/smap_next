@@ -18,79 +18,139 @@ const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHea
 
 // 통일된 페이지 스타일
 const pageStyles = `
-/* 앱 고정 레이아웃 - 전체 스크롤 비활성화 */
+/* 전체 화면 고정 - 네이티브 앱 스타일 */
 html, body {
-  overflow: hidden !important;
   position: fixed !important;
-  width: 100% !important;
-  height: 100% !important;
-  -webkit-overflow-scrolling: touch !important;
-  touch-action: manipulation !important;
-  /* iOS 상단 여백 완전 제거 */
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
   margin: 0 !important;
   padding: 0 !important;
-}
-
-
-
-/* 모바일 사파리 bounce 효과 비활성화 */
-body {
-  overscroll-behavior: none !important;
   -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: none !important;
+  touch-action: manipulation !important;
 }
 
-/* 스크롤바 완전히 숨기기 - 모든 브라우저 대응 */
+/* 모든 요소의 스크롤 완전 차단 */
 * {
-  scrollbar-width: none !important; /* Firefox */
-  -ms-overflow-style: none !important; /* Internet Explorer 10+ */
+  box-sizing: border-box !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  
+  /* 스크롤바 완전 제거 */
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
 *::-webkit-scrollbar {
-  display: none !important; /* Safari and Chrome */
+  display: none !important;
   width: 0 !important;
   height: 0 !important;
-  background: transparent !important;
 }
 
-*::-webkit-scrollbar-track {
-  display: none !important;
+/* 페이지 컨테이너 고정 */
+#register-page-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  z-index: 1 !important;
 }
 
-*::-webkit-scrollbar-thumb {
-  display: none !important;
+/* 헤더 고정 */
+.register-header-fixed,
+header.register-header-fixed {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  height: 64px !important;
+  z-index: 50 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
 }
 
-/* 모바일 앱 최적화 */
-* {
-  -webkit-tap-highlight-color: transparent !important;
-  -webkit-touch-callout: none !important;
-  -webkit-user-select: none !important;
-  user-select: none !important;
+/* 메인 컨텐츠 고정 */
+#register-main-content {
+  position: fixed !important;
+  top: 64px !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: calc(100vh - 64px) !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  z-index: 10 !important;
 }
 
-.glass-effect {
-  backdrop-filter: blur(20px);
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+/* 페이지 내부 컨텐츠 영역 고정 */
+.register-content-area {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 
-/* 모바일 입력 필드 최적화 */
+/* 스크롤 가능한 영역 제한 */
+.register-scroll-area {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: contain !important;
+  padding: 0 16px !important;
+  max-height: 100% !important;
+}
+
+/* 하단 고정 버튼 영역 */
+.register-bottom-fixed {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  z-index: 20 !important;
+  flex-shrink: 0 !important;
+}
+
+/* 모바일 최적화 */
 @media (max-width: 480px) {
   .register-input {
-    font-size: 16px !important; /* iOS 줌 방지 */
+    font-size: 16px !important;
   }
   .register-button {
-    min-height: 44px !important; /* 터치 친화적 크기 */
+    min-height: 44px !important;
   }
 }
 
-/* 키보드 올라올 때 스크롤 보장 */
-.register-scroll {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+/* 모바일 사파리 bounce 효과 완전 비활성화 */
+body {
+  position: fixed !important;
+  overflow: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior: none !important;
 }
 
-/* 캘린더 모달이 열릴 때 하단 버튼만 숨기기 (헤더는 유지) */
+/* 캘린더 모달이 열릴 때 하단 버튼만 숨기기 */
 .calendar-modal-open [data-bottom-button] {
   opacity: 0 !important;
   visibility: hidden !important;
@@ -98,7 +158,6 @@ body {
   transition: all 0.3s ease-in-out !important;
 }
 
-/* 부드러운 전환을 위한 기본 스타일 */
 [data-bottom-button] {
   transition: all 0.3s ease-in-out !important;
 }
@@ -107,7 +166,7 @@ header {
   transition: all 0.3s ease-in-out !important;
 }
 
-/* 캘린더 모달 전체 화면 보장 */
+/* 캘린더 모달 전체 화면 */
 .calendar-modal {
   position: fixed !important;
   top: 0 !important;
@@ -117,9 +176,9 @@ header {
   width: 100vw !important;
   height: 100vh !important;
   z-index: 99999 !important;
+  overflow: hidden !important;
 }
 
-/* 캘린더 모달 배경 */
 .calendar-modal-backdrop {
   position: fixed !important;
   top: 0 !important;
@@ -129,6 +188,79 @@ header {
   width: 100vw !important;
   height: 100vh !important;
   z-index: 99998 !important;
+}
+
+/* 입력 필드 포커스 시 화면 이동 방지 */
+input, textarea, select {
+  transform: translateZ(0) !important;
+  -webkit-backface-visibility: hidden !important;
+  backface-visibility: hidden !important;
+}
+
+/* 키보드 올라올 때 레이아웃 보호 */
+.keyboard-open {
+  height: 100vh !important;
+  overflow: hidden !important;
+}
+
+/* iOS 관련 추가 최적화 */
+@supports (-webkit-touch-callout: none) {
+  html, body {
+    position: fixed !important;
+    overflow: hidden !important;
+    height: 100vh !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  #register-page-container {
+    height: 100vh !important;
+    overflow: hidden !important;
+  }
+}
+
+/* Glass Effect 스타일 */
+.glass-effect {
+  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* 약관동의 체크박스 레이아웃 보호 */
+.terms-checkbox-container {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-direction: row !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+}
+
+.terms-checkbox-wrapper {
+  margin-right: 16px !important;
+  margin-left: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding: 0 !important;
+  position: relative !important;
+  flex-shrink: 0 !important;
+  width: 20px !important;
+  height: 20px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.terms-content-wrapper {
+  flex: 1 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: relative !important;
 }
 `;
 
@@ -145,6 +277,140 @@ function RegisterLayoutContent({
   const isSocialLogin = React.useMemo(() => {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('social') !== null;
+  }, []);
+
+  // iOS WebView 전용 강제 스타일 적용
+  React.useEffect(() => {
+    // 모든 환경에서 강제 적용 (iOS 문제 해결)
+    const forceRemoveTopSpacing = () => {
+      // HTML, Body 강제 설정
+      document.documentElement.style.setProperty('padding', '0', 'important');
+      document.documentElement.style.setProperty('margin', '0', 'important');
+      document.documentElement.style.setProperty('padding-top', '0', 'important');
+      document.documentElement.style.setProperty('margin-top', '0', 'important');
+      document.documentElement.style.setProperty('height', '100vh', 'important');
+      document.documentElement.style.setProperty('overflow', 'hidden', 'important');
+      document.documentElement.style.setProperty('position', 'fixed', 'important');
+      document.documentElement.style.setProperty('top', '0', 'important');
+      document.documentElement.style.setProperty('left', '0', 'important');
+      document.documentElement.style.setProperty('width', '100vw', 'important');
+      
+      document.body.style.setProperty('padding', '0', 'important');
+      document.body.style.setProperty('margin', '0', 'important');
+      document.body.style.setProperty('padding-top', '0', 'important');
+      document.body.style.setProperty('margin-top', '0', 'important');
+      document.body.style.setProperty('height', '100vh', 'important');
+      document.body.style.setProperty('overflow', 'hidden', 'important');
+      document.body.style.setProperty('position', 'fixed', 'important');
+      document.body.style.setProperty('top', '0', 'important');
+      document.body.style.setProperty('left', '0', 'important');
+      document.body.style.setProperty('right', '0', 'important');
+      document.body.style.setProperty('bottom', '0', 'important');
+      document.body.style.setProperty('width', '100vw', 'important');
+      
+      // 페이지 컨테이너 강제 설정
+      const pageContainer = document.getElementById('register-page-container');
+      if (pageContainer) {
+        pageContainer.style.setProperty('padding', '0', 'important');
+        pageContainer.style.setProperty('margin', '0', 'important');
+        pageContainer.style.setProperty('padding-top', '0', 'important');
+        pageContainer.style.setProperty('margin-top', '0', 'important');
+        pageContainer.style.setProperty('top', '0', 'important');
+        pageContainer.style.setProperty('position', 'fixed', 'important');
+        pageContainer.style.setProperty('width', '100vw', 'important');
+        pageContainer.style.setProperty('height', '100vh', 'important');
+        pageContainer.style.setProperty('overflow', 'hidden', 'important');
+      }
+      
+      // 헤더 강제 설정
+      const headers = document.querySelectorAll('header, .register-header-fixed');
+      headers.forEach(header => {
+        (header as HTMLElement).style.setProperty('padding', '0', 'important');
+        (header as HTMLElement).style.setProperty('margin', '0', 'important');
+        (header as HTMLElement).style.setProperty('padding-top', '0', 'important');
+        (header as HTMLElement).style.setProperty('margin-top', '0', 'important');
+        (header as HTMLElement).style.setProperty('top', '0', 'important');
+        (header as HTMLElement).style.setProperty('position', 'fixed', 'important');
+        (header as HTMLElement).style.setProperty('z-index', '9999', 'important');
+        (header as HTMLElement).style.setProperty('width', '100vw', 'important');
+        (header as HTMLElement).style.setProperty('height', '64px', 'important');
+      });
+      
+      // 메인 컨텐츠 강제 설정
+      const mainContent = document.getElementById('register-main-content');
+      if (mainContent) {
+        mainContent.style.setProperty('top', '64px', 'important');
+        mainContent.style.setProperty('position', 'fixed', 'important');
+        mainContent.style.setProperty('width', '100vw', 'important');
+        mainContent.style.setProperty('height', 'calc(100vh - 64px)', 'important');
+        mainContent.style.setProperty('overflow', 'hidden', 'important');
+      }
+      
+      // 스크롤 방지 강화
+      document.addEventListener('touchmove', (e) => {
+        // 특정 스크롤 영역이 아닌 경우 스크롤 방지
+        const target = e.target as HTMLElement;
+        if (!target.closest('.register-scroll-area')) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+      
+      // 키보드 이벤트 최적화
+      const handleKeyboardShow = () => {
+        document.body.classList.add('keyboard-open');
+      };
+      
+      const handleKeyboardHide = () => {
+        document.body.classList.remove('keyboard-open');
+      };
+      
+      // iOS 키보드 감지
+      if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        window.addEventListener('focusin', handleKeyboardShow);
+        window.addEventListener('focusout', handleKeyboardHide);
+      }
+      
+      console.log('🔧 [FORCE] Register 페이지 스크롤 방지 및 고정 레이아웃 적용 완료');
+    };
+    
+    // 즉시 실행
+    forceRemoveTopSpacing();
+    
+    // 100ms 후 다시 실행 (DOM 로딩 완료 후)
+    setTimeout(forceRemoveTopSpacing, 100);
+    
+    // 500ms 후 다시 실행 (모든 스타일 로딩 완료 후)
+    setTimeout(forceRemoveTopSpacing, 500);
+    
+    // viewport 설정
+    let viewportMeta = document.querySelector('meta[name="viewport"]');
+    if (!viewportMeta) {
+      viewportMeta = document.createElement('meta');
+      viewportMeta.setAttribute('name', 'viewport');
+      document.head.appendChild(viewportMeta);
+    }
+    
+    viewportMeta.setAttribute('content', 
+      'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
+    );
+    
+    // 페이지 가시성 변경 시에도 재적용
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        setTimeout(forceRemoveTopSpacing, 100);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // 키보드 이벤트 리스너 제거
+      if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        window.removeEventListener('focusin', () => {});
+        window.removeEventListener('focusout', () => {});
+      }
+    };
   }, []);
 
   const handleBack = () => {
@@ -187,9 +453,9 @@ function RegisterLayoutContent({
         id="register-page-container"
         style={{ 
           background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
-          paddingTop: '0px',
-          marginTop: '0px',
-          top: '0px'
+          padding: '0',
+          margin: '0',
+          top: '0'
         }}
       >
         {/* 통일된 헤더 애니메이션 */}
@@ -197,9 +463,11 @@ function RegisterLayoutContent({
           variant="simple"
           className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed register-header-fixed"
           style={{ 
-            paddingTop: '0px',
-            marginTop: '0px',
-            top: '0px',
+            padding: '0',
+            margin: '0',
+            paddingTop: '0',
+            marginTop: '0',
+            top: '0',
             position: 'fixed'
           }}
         >
@@ -249,13 +517,14 @@ function RegisterLayoutContent({
 
         {/* 메인 컨텐츠 - 고정 위치 */}
         <div 
-          className="absolute inset-0 overflow-hidden"
+          className="register-content-area"
           style={{ 
             top: '64px', // 헤더 높이만큼 아래로
             left: '0',
             right: '0',
             bottom: '0'
           }}
+          id="register-main-content"
         >
           {children}
         </div>

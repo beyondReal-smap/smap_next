@@ -31,6 +31,7 @@ import {
 import { HiSparkles } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
 import { hapticFeedback, triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import AnimatedHeader from '../../components/common/AnimatedHeader';
 
 
 // 기본 이미지 가져오기 함수 (schedule/page.tsx에서 가져옴)
@@ -410,8 +411,51 @@ export default function SettingsPage() {
     <>
       <style jsx global>{pageAnimations}</style>
       <div className="flex-1 flex flex-col">
+        {/* 헤더 */}
+        <AnimatedHeader 
+          variant="enhanced"
+          className="fixed top-0 left-0 right-0 glass-effect header-fixed z-50"
+          style={{ 
+            paddingTop: '0px !important',
+            marginTop: '0px !important',
+            padding: '0px !important',
+            margin: '0px !important',
+            top: '0px !important',
+            position: 'fixed'
+          } as React.CSSProperties}
+        >
+          <div 
+            className="flex items-center justify-between" 
+            style={{ 
+              paddingLeft: '16px', 
+              paddingRight: '16px',
+              paddingTop: '0px !important',
+              paddingBottom: '0px !important',
+              height: '56px',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+          >
+            {/* 왼쪽 - 뒤로가기 버튼과 제목 */}
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleBack}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div>
+                <h1 className="text-lg font-semibold text-gray-900">설정</h1>
+                <p className="text-xs text-gray-500">계정 및 앱 설정을 관리하세요</p>
+              </div>
+            </div>
+          </div>
+        </AnimatedHeader>
+        
         {/* 메인 컨텐츠 */}
-        <div className="flex-1 flex flex-col pt-4 pb-24 px-4 overflow-y-auto">
+        <div className="flex-1 flex flex-col pt-20 pb-24 px-4 overflow-y-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

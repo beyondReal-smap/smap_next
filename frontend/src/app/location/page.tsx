@@ -712,6 +712,30 @@ export default function LocationPage() {
       document.body.style.setProperty('margin-top', '0px', 'important');
       document.documentElement.style.setProperty('padding-top', '0px', 'important');
       document.documentElement.style.setProperty('margin-top', '0px', 'important');
+
+      // 헤더 아이콘 정렬 강제 적용
+      const headerIconContainer = document.querySelector('.header-fixed .flex.items-center.h-14');
+      if (headerIconContainer) {
+        const headerElement = headerIconContainer as HTMLElement;
+        headerElement.style.setProperty('display', 'flex', 'important');
+        headerElement.style.setProperty('align-items', 'center', 'important');
+        headerElement.style.setProperty('justify-content', 'space-between', 'important');
+        headerElement.style.setProperty('padding-left', '16px', 'important');
+        headerElement.style.setProperty('padding-right', '0px', 'important');
+        headerElement.style.setProperty('margin-right', '0px', 'important');
+      }
+
+      // 헤더 오른쪽 아이콘들 정렬
+      const iconContainer = document.querySelector('.header-fixed .flex.items-center.h-14 > div:last-child');
+      if (iconContainer) {
+        const iconElement = iconContainer as HTMLElement;
+        iconElement.style.setProperty('display', 'flex', 'important');
+        iconElement.style.setProperty('align-items', 'center', 'important');
+        iconElement.style.setProperty('gap', '16px', 'important');
+        iconElement.style.setProperty('margin-left', 'auto', 'important');
+        iconElement.style.setProperty('padding-right', '0px', 'important');
+        iconElement.style.setProperty('margin-right', '0px', 'important');
+      }
     };
     
     // 즉시 실행
@@ -1009,7 +1033,11 @@ export default function LocationPage() {
       const lng = parseCoordinate(selectedMember.mlt_long) || parseCoordinate(selectedMember.location?.lng);
       
       if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
-        const position = new window.naver.maps.LatLng(lat, lng);
+        const position = createSafeLatLng(lat, lng);
+        if (!position) {
+          console.warn('[moveToSelectedMember] LatLng 생성 실패');
+          return;
+        }
         map.panTo(position, {
           duration: 800,
           easing: 'easeOutCubic'
@@ -1182,7 +1210,11 @@ export default function LocationPage() {
       
         console.log('[패널 장소 선택] 임시 마커 생성:', coordinates);
       
-      const position = new window.naver.maps.LatLng(coordinates[1], coordinates[0]);
+      const position = createSafeLatLng(coordinates[1], coordinates[0]);
+      if (!position) {
+        console.warn('[handleSelectLocationForPanel] LatLng 생성 실패');
+        return;
+      }
         tempMarker.current = new window.naver.maps.Marker({
         position,
         map,
@@ -2038,7 +2070,11 @@ export default function LocationPage() {
           lat >= 33 && lat <= 43 && lng >= 124 && lng <= 132) { // 한국 영토 범위
         
         // 멤버 위치로 무조건 지도 중심 이동
-          const position = new window.naver.maps.LatLng(lat, lng);
+          const position = createSafeLatLng(lat, lng);
+          if (!position) {
+            console.warn('[handleMemberSelect] LatLng 생성 실패');
+            return;
+          }
           
         console.log('[handleMemberSelect] 지도 중심 이동 실행 (무조건):', {
             member: newlySelectedMember.name,
@@ -2242,7 +2278,11 @@ export default function LocationPage() {
             if (map && window.naver?.maps && lat && lng) {
               const photoForMarker = getSafeImageUrl(newlySelectedMember.photo, newlySelectedMember.mt_gender, newlySelectedMember.original_index);
               const borderColor = '#f59e0b'; // 선택된 멤버 색상
-              const memberPosition = new window.naver.maps.LatLng(lat, lng);
+              const memberPosition = createSafeLatLng(lat, lng);
+              if (!memberPosition) {
+                console.warn('[handleMemberSelect] 멤버 InfoWindow LatLng 생성 실패');
+                return;
+              }
 
               const memberInfoWindow = new window.naver.maps.InfoWindow({
                 content: `
@@ -2670,9 +2710,14 @@ export default function LocationPage() {
       try {
         // 첫 번째 그룹 멤버 위치로 지도 초기화
         const firstMember = groupMembers[0];
-        let initialCenter = new window.naver.maps.LatLng(37.5665, 126.9780); // 기본값
+        let initialCenter = createSafeLatLng(37.5665, 126.9780); // 기본값
         let initialZoom = 16;
         let foundMemberLocation = false;
+        
+        if (!initialCenter) {
+          console.error('[지도 초기화] 기본 LatLng 생성 실패');
+          return;
+        }
         
         const lat = parseCoordinate(firstMember.mlt_lat) || parseCoordinate(firstMember.location?.lat);
         const lng = parseCoordinate(firstMember.mlt_long) || parseCoordinate(firstMember.location?.lng);
@@ -2686,10 +2731,13 @@ export default function LocationPage() {
         
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
           // 첫 번째 멤버 위치로 지도 중심 설정
-          initialCenter = new window.naver.maps.LatLng(lat, lng);
-          initialZoom = 16;
-          foundMemberLocation = true;
-          console.log('[지도 초기화] 첫 번째 멤버 위치로 초기화:', firstMember.name, { lat, lng });
+          const memberCenter = createSafeLatLng(lat, lng);
+          if (memberCenter) {
+            initialCenter = memberCenter;
+            initialZoom = 16;
+            foundMemberLocation = true;
+            console.log('[지도 초기화] 첫 번째 멤버 위치로 초기화:', firstMember.name, { lat, lng });
+          }
         }
         
         if (!foundMemberLocation) {
@@ -3090,6 +3138,21 @@ export default function LocationPage() {
     return null;
   };
 
+  // 안전한 LatLng 생성 함수
+  const createSafeLatLng = (lat: number, lng: number): any | null => {
+    try {
+      if (window.naver && window.naver.maps && window.naver.maps.LatLng) {
+        return new window.naver.maps.LatLng(lat, lng);
+      } else {
+        console.warn('[createSafeLatLng] LatLng 생성 실패 - 네이버 지도 API 미준비');
+        return null;
+      }
+    } catch (error) {
+      console.error('[createSafeLatLng] LatLng 생성 오류:', error);
+      return null;
+    }
+  };
+
   // 안전한 이미지 URL 가져오기 헬퍼 함수
   const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
     // 그룹멤버 리스트와 동일한 로직: 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
@@ -3129,7 +3192,12 @@ export default function LocationPage() {
       }
 
       return new Promise((resolve) => {
-        const coord = new window.naver.maps.LatLng(lat, lng);
+        const coord = createSafeLatLng(lat, lng);
+        if (!coord) {
+          console.warn('[getAddressFromCoordinates] LatLng 생성 실패');
+          resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+          return;
+        }
         
         window.naver.maps.Service.reverseGeocode({
           coords: coord,
@@ -3249,7 +3317,11 @@ export default function LocationPage() {
       // 유효한 좌표인지 확인
       if (lat === 0 && lng === 0) return;
       
-      const position = new window.naver.maps.LatLng(lat, lng);
+      const position = createSafeLatLng(lat, lng);
+      if (!position) {
+        console.warn('[updateMapMarkers] LatLng 생성 실패');
+        return;
+      }
       
       // 개선된 애니메이션 마커 생성
       // 선택 상태 확인 - 현재 선택된 장소 ID와 정확히 일치하는지 확인
@@ -3345,7 +3417,11 @@ export default function LocationPage() {
         // 바텀시트에 가려지지 않도록 남쪽으로 오프셋 적용하여 지도 중심 이동
         const [lng, lat] = location.coordinates;
         const offsetLat = lat - 0.002;
-        const offsetPosition = new window.naver.maps.LatLng(offsetLat, lng);
+        const offsetPosition = createSafeLatLng(offsetLat, lng);
+        if (!offsetPosition) {
+          console.warn('[updateMapMarkers] 오프셋 LatLng 생성 실패');
+          return;
+        }
         map.panTo(offsetPosition, {
           duration: 800,
           easing: 'easeOutCubic'
@@ -3373,8 +3449,8 @@ export default function LocationPage() {
 
   // 통합 마커 업데이트 함수 - 멤버 마커와 선택된 멤버의 장소 마커만 동시 생성
   const updateAllMarkers = (members: GroupMember[], locations: LocationData[] | null) => {
-    if (!map || !window.naver || !isMapReady) {
-      console.log('[updateAllMarkers] 지도가 준비되지 않음');
+    if (!map || !window.naver || !window.naver.maps || !window.naver.maps.LatLng || !isMapReady) {
+      console.log('[updateAllMarkers] 지도가 준비되지 않음 - 네이버 지도 API 로딩 중');
       return;
     }
 
@@ -3465,7 +3541,14 @@ export default function LocationPage() {
 
         if (lat !== null && lng !== null && lat !== 0 && lng !== 0) {
           const photoForMarker = getSafeImageUrl(member.photo, member.mt_gender, member.original_index);
-          const position = new window.naver.maps.LatLng(lat, lng);
+          
+          // 안전한 LatLng 생성
+          const position = createSafeLatLng(lat, lng);
+          if (!position) {
+            console.warn('[updateAllMarkers] 멤버 마커 LatLng 생성 실패');
+            return;
+          }
+          
           const borderColor = member.isSelected ? '#EC4899' : '#0113A3';
           
           console.log(`[updateAllMarkers] 멤버 마커 생성: ${member.name} (선택됨: ${member.isSelected}, 색상: ${borderColor})`);
@@ -3570,7 +3653,13 @@ export default function LocationPage() {
           return;
         }
         
-        const position = new window.naver.maps.LatLng(lat, lng);
+        // 안전한 LatLng 생성
+        const position = createSafeLatLng(lat, lng);
+        if (!position) {
+          console.warn('[updateAllMarkers] 장소 마커 LatLng 생성 실패');
+          return;
+        }
+        
         const isMarkerSelected = selectedLocationIdRef.current === location.id;
         
         const memberCount = members.length;
@@ -3658,7 +3747,11 @@ export default function LocationPage() {
 
           // 장소 위치로 지도 중심 이동
           const [lng, lat] = location.coordinates;
-          const position = new window.naver.maps.LatLng(lat, lng);
+          const position = createSafeLatLng(lat, lng);
+          if (!position) {
+            console.warn('[updateAllMarkers] 장소 마커 클릭 LatLng 생성 실패');
+            return;
+          }
           map.panTo(position, {
             duration: 800,
             easing: 'easeOutCubic'
@@ -4433,7 +4526,11 @@ export default function LocationPage() {
     }
     
     // 장소 위치로 지도 중심 이동
-    const position = new window.naver.maps.LatLng(lat, lng);
+    const position = createSafeLatLng(lat, lng);
+    if (!position) {
+      console.warn('[handleLocationCardClick] LatLng 생성 실패');
+      return;
+    }
     
     // 지도 중심을 해당 위치로 이동
     map.setCenter(position);
@@ -4614,7 +4711,11 @@ export default function LocationPage() {
         console.log('[handleLocationSelect] 지도 이동:', { lat, lng });
         
         // 즉시 지도 중심 이동 (강제) - 여러 번 호출하여 확실히 이동
-        const targetPosition = new window.naver.maps.LatLng(lat, lng);
+        const targetPosition = createSafeLatLng(lat, lng);
+        if (!targetPosition) {
+          console.warn('[handleLocationSelect] LatLng 생성 실패');
+          return;
+        }
         map.setCenter(targetPosition);
         
         // 추가로 panTo도 사용하여 더 확실하게 이동
@@ -5066,21 +5167,53 @@ export default function LocationPage() {
               position: 'fixed'
             }}
           >
-            <div className="flex items-center justify-between h-14 px-4">
+            <div 
+              className="flex items-center" 
+              style={{ 
+                paddingLeft: '16px', 
+                paddingRight: '0px !important',  // 오른쪽 패딩 제거
+                paddingTop: '0px !important',    // 위쪽 패딩 제거
+                paddingBottom: '0px !important', // 아래쪽 패딩 제거
+                height: '56px',  // 정확한 높이 설정
+                width: '100%',
+                boxSizing: 'border-box',
+                position: 'relative'  // 절대 위치 아이콘들을 위한 relative 설정
+              }}
+            >
+              {/* 왼쪽 영역 - 고정 너비 */}
               <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-3">
-                  <div>
-                    <h1 className="text-lg font-bold text-gray-900">내 장소</h1>
-                    <p className="text-xs text-gray-500">그룹 멤버들과 장소를 공유해보세요</p>
-                  </div>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">내 장소</h1>
+                  <p className="text-xs text-gray-500">그룹 멤버들과 장소를 공유해보세요</p>
                 </div>
               </div>
               
-              <div className="flex items-center space-x-2">
+              {/* 오른쪽 영역 - 아이콘들 */}
+              <motion.div 
+                className="flex items-center justify-center"
+                style={{ 
+                  position: 'absolute',
+                  right: '16px',  // 절대 위치로 오른쪽에서 16px 떨어진 곳에 고정
+                  top: '0',
+                  bottom: '0',
+                  gap: '12px',  // 아이콘 간격 늘리기
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  height: '56px'  // 헤더 높이와 동일하게 설정
+                }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ 
+                  duration: 0.6,
+                  delay: 0.2,
+                  ease: "easeOut"
+                }}
+              >
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="p-2 hover:bg-white/50 rounded-xl transition-all duration-200 mobile-button"
+                  className="p-0.5 hover:bg-white/50 rounded-xl transition-all duration-200 mobile-button"
                   onClick={() => {
                     setIsLocationInfoPanelOpen(true);
                     setIsEditingPanel(false);
@@ -5097,9 +5230,9 @@ export default function LocationPage() {
                     });
                   }}
                 >
-                  <FiSearch className="w-5 h-5 text-gray-600" />
+                  <FiSearch className="w-6 h-6 text-gray-600" />
                 </motion.button>
-              </div>
+              </motion.div>
             </div>
           </AnimatedHeader>
         
@@ -5127,7 +5260,7 @@ export default function LocationPage() {
           
           {/* 커스텀 줌 컨트롤 */}
           {map && (
-                          <div className="absolute top-[70px] right-[10px] z-30 flex flex-col">
+                          <div className="absolute top-[80px] right-[16px] z-30 flex flex-col">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

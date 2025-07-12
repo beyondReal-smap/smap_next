@@ -106,7 +106,7 @@ interface RegisterData {
 }
 
 export default function RegisterPage() {
-  // 모바일 키보드 대응을 위한 간단한 스타일 - home 페이지와 동일한 패턴
+  // 모바일 키보드 대응을 위한 간단한 스타일
   React.useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
@@ -1099,15 +1099,10 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="absolute inset-0 overflow-y-auto content-area" style={{ 
-      top: '0', // 헤더 높이는 layout에서 처리됨
-      left: '0',
-      right: '0',
-      bottom: '0'
-    }}>
-      {/* 진행률 바 - 헤더 바로 아래에 고정 */}
+    <div className="register-content-area">
+      {/* 진행률 바 - 상단 고정 */}
       {currentStep !== REGISTER_STEPS.COMPLETE && (
-        <div className="fixed left-0 right-0 h-1 bg-gray-200 z-40" style={{ top: '0px' }}>
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200 z-40">
           <motion.div 
             className="h-full"
             style={{backgroundColor: '#0113A3'}}
@@ -1118,10 +1113,10 @@ export default function RegisterPage() {
         </div>
       )}
 
-      {/* 메인 콘텐츠 */}
-      <div className="px-4 space-y-5 pb-16 overflow-y-auto content-area" style={{ 
-        paddingTop: currentStep !== REGISTER_STEPS.COMPLETE ? '24px' : '20px', // 진행률 바가 있을 때는 더 많은 패딩
-        minHeight: 'calc(100vh - 56px)' // 헤더 높이 고려
+      {/* 스크롤 가능한 메인 콘텐츠 영역 */}
+      <div className="register-scroll-area" style={{ 
+        paddingTop: currentStep !== REGISTER_STEPS.COMPLETE ? '24px' : '20px', // 진행률 바 공간
+        paddingBottom: currentStep !== REGISTER_STEPS.COMPLETE ? '100px' : '20px' // 하단 버튼 공간
       }}>
         <div className="flex-1 flex items-center justify-center min-h-0">
           <div className="w-full max-w-md mx-auto py-4 register-content">
@@ -1135,7 +1130,12 @@ export default function RegisterPage() {
               exit={{ opacity: 0, x: -50 }}
               className="w-full h-full flex flex-col"
             >
-              <div className="text-center mb-4 register-header">
+              <div 
+                className="text-center register-header"
+                style={{
+                  marginBottom: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '0' : '16px' // iOS에서만 마진 제거
+                }}
+              >
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
                   <FiFileText className="w-6 h-6 text-white" />
                 </div>
@@ -1161,42 +1161,66 @@ export default function RegisterPage() {
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-3 pb-4 register-form">
+              <div className="flex-1 overflow-y-auto space-y-3 pb-4 register-form" style={{paddingTop: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '120px' : '2px' }}>
                 {/* 전체 동의 */}
                 <div className="bg-white rounded-xl p-4 border-2" style={{borderColor: '#e0e7ff'}}>
-                  <label className="flex items-center space-x-4 cursor-pointer">
-                    <div className="w-1"></div> {/* 왼쪽 공백 */}
-                    <div className="relative">
-                      <input
-                        type="checkbox"
-                        checked={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)}
-                        onChange={(e) => handleAllAgree(e.target.checked)}
-                        className="sr-only"
-                      />
-                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                        TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)
-                          ? 'border-gray-300' 
-                          : 'border-gray-300'
-                      }`}
-                        style={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) 
-                          ? {backgroundColor: '#0113A3', borderColor: '#0113A3'} 
-                          : {}}>
-                        {TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) && (
-                          <FiCheck className="w-3 h-3 text-white" />
-                        )}
+                  <label className="block cursor-pointer">
+                    <div style={{
+                      display: 'table',
+                      width: '100%',
+                      tableLayout: 'fixed'
+                    }}>
+                      <div style={{
+                        display: 'table-cell',
+                        width: '36px',
+                        verticalAlign: 'top',
+                        paddingTop: '2px' // iOS만 1.5개 분량 아래로
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)}
+                          onChange={(e) => handleAllAgree(e.target.checked)}
+                          className="sr-only"
+                        />
+                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                          TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)
+                            ? 'border-gray-300' 
+                            : 'border-gray-300'
+                        }`}
+                          style={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) 
+                            ? {backgroundColor: '#0113A3', borderColor: '#0113A3'} 
+                            : {}}>
+                          {TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) && (
+                            <FiCheck className="w-3 h-3 text-white" />
+                          )}
+                        </div>
+                      </div>
+                      <div style={{
+                        display: 'table-cell',
+                        verticalAlign: 'top',
+                        paddingLeft: '0'
+                      }}>
+                        <span className="font-semibold text-gray-900">전체 동의</span>
                       </div>
                     </div>
-                    <span className="font-semibold text-gray-900">전체 동의</span>
                   </label>
                 </div>
 
                 {/* 개별 약관 */}
                 {TERMS_DATA.map((term) => (
                   <div key={term.id} className="bg-white rounded-xl p-3 border border-gray-100">
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <div className="flex items-center space-x-4">
-                        <div className="w-1"></div> {/* 왼쪽 공백 */}
-                        <div className="relative">
+                    <label className="block cursor-pointer">
+                      <div style={{
+                        display: 'table',
+                        width: '100%',
+                        tableLayout: 'fixed'
+                      }}>
+                                                 <div style={{
+                           display: 'table-cell',
+                           width: '36px',
+                           verticalAlign: 'top',
+                           paddingTop: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '24px' : '2px' // iOS만 1.5개 분량 아래로
+                         }}>
                           <input
                             type="checkbox"
                             checked={registerData[term.id as keyof RegisterData] as boolean}
@@ -1216,7 +1240,11 @@ export default function RegisterPage() {
                             )}
                           </div>
                         </div>
-            <div>
+                        <div style={{
+                          display: 'table-cell',
+                          verticalAlign: 'top',
+                          paddingLeft: '0'
+                        }}>
                           <div className="flex items-center space-x-2">
                             <span className="text-sm font-medium text-gray-900">{term.title}</span>
                             {term.required && (
@@ -1225,12 +1253,16 @@ export default function RegisterPage() {
                           </div>
                           <p className="text-xs text-gray-500 mt-1" style={{ wordBreak: 'keep-all' }}>{term.content}</p>
                         </div>
+                        <div style={{
+                          display: 'table-cell',
+                          width: '24px',
+                          verticalAlign: 'middle',
+                          textAlign: 'right'
+                        }}>
+                          <FiArrowRight className="w-4 h-4 text-gray-400" />
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-1">
-                        <FiArrowRight className="w-4 h-4 text-gray-400" />
-                        <div className="w-2"></div> {/* 오른쪽 공백 */}
-                      </div>
-              </label>
+                    </label>
                   </div>
                 ))}
               </div>
@@ -1365,8 +1397,46 @@ export default function RegisterPage() {
                     <p className="text-sm text-gray-500 mt-2 text-center">
                       {Math.floor(verificationTimer / 60)}:{(verificationTimer % 60).toString().padStart(2, '0')} 후 만료
                     </p>
-              )}
-            </div>
+                  )}
+                  
+                  {/* 재발송 텍스트 버튼 */}
+                  <div className="text-center mt-4">
+                    <button
+                      onClick={() => {
+                        // 인증번호가 발송되지 않은 경우 이전 단계로 이동
+                        if (!verificationSent) {
+                          setCurrentStep(REGISTER_STEPS.PHONE);
+                          setRegisterData(prev => ({ ...prev, verification_code: '' }));
+                          return;
+                        }
+                        
+                        // 3분 쿨다운 체크
+                        const now = Date.now();
+                        if (lastSentTime && (now - lastSentTime) < 180000) {
+                          const remainingTime = Math.ceil((180000 - (now - lastSentTime)) / 1000);
+                          const minutes = Math.floor(remainingTime / 60);
+                          const seconds = remainingTime % 60;
+                          setErrorModal({
+                            isOpen: true,
+                            title: '재발송 제한',
+                            message: `같은 번호로는 ${minutes}분 ${seconds}초 후에 재발송이 가능합니다.`,
+                            isCountdown: true,
+                            style: { wordBreak: 'keep-all' }
+                          });
+                          setCountdownTime(remainingTime);
+                          return;
+                        }
+                        
+                        // 인증번호 재발송
+                        handleSendVerification();
+                      }}
+                      disabled={isLoading}
+                      className="text-sm text-gray-600 hover:text-gray-800 underline disabled:opacity-50"
+                    >
+                      {!verificationSent ? '이전 단계로' : '인증번호 재발송'}
+                    </button>
+                  </div>
+                </div>
 
                 <div className="flex space-x-3">
                   <button
@@ -1970,56 +2040,62 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      {/* 하단 버튼 */}
-      {currentStep !== REGISTER_STEPS.COMPLETE && currentStep !== REGISTER_STEPS.VERIFICATION && (
-        <motion.div 
-          initial={{ y: 100 }}
-          animate={{ y: 0 }}
-          className="fixed bottom-0 left-0 right-0 p-4 safe-area-bottom"
-          data-bottom-button
-          style={{ 
-            paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
-            background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.95), rgba(253, 244, 255, 0.95))',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            borderTop: '1px solid rgba(229, 231, 235, 0.3)'
-          }}
-        >
-          <motion.button
-            onClick={() => {
-              console.log('하단 버튼 클릭됨, 현재 단계:', currentStep);
-              console.log('isStepValid():', isStepValid());
-              console.log('isLoading:', isLoading);
-              
-              if (currentStep === REGISTER_STEPS.PHONE) {
-                console.log('인증번호 발송 함수 호출');
-                handleSendVerification();
-              } else if (currentStep === REGISTER_STEPS.LOCATION) {
-                console.log('회원가입 완료 함수 호출');
-                handleRegister();
-              } else {
-                console.log('다음 단계 함수 호출');
-                handleNext();
-              }
+      {/* 하단 고정 버튼 */}
+      {currentStep !== REGISTER_STEPS.COMPLETE && (
+        <div className="register-bottom-fixed">
+          <motion.div 
+            initial={{ y: 100 }}
+            animate={{ y: 0 }}
+            className="p-4 safe-area-bottom"
+            data-bottom-button
+            style={{ 
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
+              background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.95), rgba(253, 244, 255, 0.95))',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              borderTop: '1px solid rgba(229, 231, 235, 0.3)'
             }}
-            disabled={!isStepValid() || isLoading || locationLoading}
-            whileHover={{ scale: (isStepValid() && !locationLoading) ? 1.02 : 1 }}
-            whileTap={{ scale: (isStepValid() && !locationLoading) ? 0.98 : 1 }}
-            className={`w-full py-4 rounded-xl font-semibold text-lg transition-all register-button ${
-              (isStepValid() && !locationLoading)
-                ? 'text-white shadow-lg'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-            style={(isStepValid() && !locationLoading) 
-              ? {backgroundColor: '#0113A3'} 
-              : {}}
           >
-            {isLoading ? '처리 중...' : 
-             locationLoading ? '위치 정보 가져오는 중...' :
-             currentStep === REGISTER_STEPS.PHONE ? '인증번호 발송' :
-             currentStep === REGISTER_STEPS.LOCATION ? '회원가입 완료' : '다음'}
-          </motion.button>
-        </motion.div>
+            <motion.button
+              onClick={() => {
+                console.log('하단 버튼 클릭됨, 현재 단계:', currentStep);
+                console.log('isStepValid():', isStepValid());
+                console.log('isLoading:', isLoading);
+                
+                if (currentStep === REGISTER_STEPS.PHONE) {
+                  console.log('인증번호 발송 함수 호출');
+                  handleSendVerification();
+                } else if (currentStep === REGISTER_STEPS.VERIFICATION) {
+                  console.log('인증번호 확인 함수 호출');
+                  handleVerifyCode();
+                } else if (currentStep === REGISTER_STEPS.LOCATION) {
+                  console.log('회원가입 완료 함수 호출');
+                  handleRegister();
+                } else {
+                  console.log('다음 단계 함수 호출');
+                  handleNext();
+                }
+              }}
+              disabled={!isStepValid() || isLoading || locationLoading}
+              whileHover={{ scale: (isStepValid() && !locationLoading) ? 1.02 : 1 }}
+              whileTap={{ scale: (isStepValid() && !locationLoading) ? 0.98 : 1 }}
+              className={`w-full py-4 rounded-xl font-semibold text-lg transition-all register-button ${
+                (isStepValid() && !locationLoading)
+                  ? 'text-white shadow-lg'
+                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+              style={(isStepValid() && !locationLoading) 
+                ? {backgroundColor: '#0113A3'} 
+                : {}}
+            >
+              {isLoading ? '처리 중...' : 
+               locationLoading ? '위치 정보 가져오는 중...' :
+               currentStep === REGISTER_STEPS.PHONE ? '인증번호 발송' :
+               currentStep === REGISTER_STEPS.VERIFICATION ? '인증번호 확인' :
+               currentStep === REGISTER_STEPS.LOCATION ? '회원가입 완료' : '다음'}
+            </motion.button>
+          </motion.div>
+        </div>
       )}
 
       {/* 오류 모달 */}

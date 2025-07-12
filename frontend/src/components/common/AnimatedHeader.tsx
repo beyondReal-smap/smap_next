@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 
 interface AnimatedHeaderProps {
   children: React.ReactNode;
@@ -9,15 +10,18 @@ interface AnimatedHeaderProps {
   duration?: number;
 }
 
-// iOS WebView 완벽 호환 고정 헤더 (애니메이션 제거)
+// iOS WebView 완벽 호환 고정 헤더 (애니메이션 복원)
 const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
   children,
   className = 'glass-effect header-fixed',
   style = {},
   variant = 'simple',
-  delay,
-  duration
+  delay = 0,
+  duration = 0.6
 }) => {
+  // iOS 감지
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  
   // 안정적인 고정 헤더 스타일
   const fixedHeaderStyle: React.CSSProperties = {
     position: 'fixed',
@@ -42,21 +46,44 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
     visibility: 'visible',
     display: 'flex',
     alignItems: 'center', // 수직 중앙 정렬
-    // 모든 여백 제거
-    padding: 0,
-    margin: 0,
-    paddingTop: 0,
-    marginTop: 0,
+    // 모든 여백 완전 제거
+    padding: '0px !important',
+    margin: '0px !important',
+    paddingTop: '0px !important',
+    marginTop: '0px !important',
+    // iOS 전용 상단 고정
+    ...(isIOS && {
+      top: '0px !important',
+      paddingTop: '0px !important',
+      marginTop: '0px !important'
+    }),
     ...style
   };
 
+  // 애니메이션 variants - 부드러운 페이드인 효과
+  const headerVariants = {
+    initial: { opacity: 0, y: -8 }, // 더 작은 y 값으로 자연스러운 움직임
+    animate: { 
+      opacity: 1, 
+      y: 0
+    }
+  };
+
   return (
-    <header
+    <motion.header
       className={className}
       style={fixedHeaderStyle}
+      variants={headerVariants}
+      initial="initial"
+      animate="animate"
+      transition={{
+        duration: duration * 0.8, // 더 빠른 애니메이션으로 자연스러움 증가
+        delay,
+        ease: [0.25, 0.1, 0.25, 1] // 커스텀 베지어 곡선으로 더 부드러운 애니메이션
+      }}
     >
       {children}
-    </header>
+    </motion.header>
   );
 };
 

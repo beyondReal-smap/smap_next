@@ -233,6 +233,24 @@ export default function HomeLayout({
             backface-visibility: hidden;
             perspective: 1000px;
           }
+
+          /* 헤더 패딩 강제 제거 */
+          .home-layout header,
+          .home-layout .header-fixed,
+          .home-layout .glass-effect {
+            padding: 0px !important;
+            margin: 0px !important;
+            padding-top: 0px !important;
+            margin-top: 0px !important;
+            top: 0px !important;
+          }
+
+          /* 헤더 내부 컨테이너 패딩 제거 */
+          .home-layout header > div,
+          .home-layout .header-fixed > div {
+            padding-top: 0px !important;
+            margin-top: 0px !important;
+          }
         `
       }} />
       
