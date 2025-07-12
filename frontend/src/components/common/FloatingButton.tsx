@@ -154,7 +154,7 @@ const FloatingButton: React.FC<FloatingButtonProps> = ({
       style={{
         background: config.backgroundColor,
         boxShadow: '0 8px 25px rgba(1, 19, 163, 0.3)',
-        zIndex: 9990,
+        zIndex: 999999,
         position: 'fixed',
         bottom: config.position.bottom,
         right: config.position.right,

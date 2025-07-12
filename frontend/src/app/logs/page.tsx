@@ -238,23 +238,7 @@ const pageVariants = {
   }
 };
 
-// 헤더 애니메이션 - 가장 먼저 나타남
-const headerVariants = {
-  initial: { 
-    opacity: 0, 
-    y: -20 
-  },
-  animate: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      duration: 0.5,
-      ease: [0.25, 0.46, 0.45, 0.94]
-    }
-  }
-};
-
-// 지도 컨테이너 애니메이션 - 헤더 다음
+// 지도 컨테이너 애니메이션
 const mapContainerVariants = {
   initial: { 
     opacity: 0, 
@@ -980,7 +964,7 @@ export default function LogsPage() {
   const [hasInitialLoadFailed, setHasInitialLoadFailed] = useState(false);
 
   // 첫 진입 애니메이션 상태 관리
-  const [showHeader, setShowHeader] = useState(true);
+
   const [showDateSelection, setShowDateSelection] = useState(false);
 
   // home/page.tsx와 동일한 바텀시트 상태 관리
@@ -1444,7 +1428,6 @@ export default function LogsPage() {
         setIsInitialLoading(false);
         setIsMapLoading(false);
         setIsInitialDataLoaded(true);
-        setShowHeader(true);
         setShowDateSelection(true);
       }, 500);
     }
@@ -1464,7 +1447,6 @@ export default function LogsPage() {
         setIsInitialLoading(false);
         setIsMapLoading(false);
         setIsInitialDataLoaded(true);
-        setShowHeader(true);
         setShowDateSelection(true);
         setLoadingStep('complete');
         setLoadingProgress(100);
@@ -1492,7 +1474,6 @@ export default function LogsPage() {
     setIsInitialLoading(false);
     setIsMapLoading(false);
     setIsInitialDataLoaded(true);
-    setShowHeader(true);
     setShowDateSelection(true);
     setLoadingStep('complete');
     setLoadingProgress(100);
@@ -7007,33 +6988,35 @@ export default function LogsPage() {
       >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
-          variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed logs-header"
-          style={{ 
-            paddingTop: '0px',
-            marginTop: '0px',
-            top: '0px',
-            position: 'fixed'
-          }}
-        >
-          <div className="flex items-center justify-between h-14 px-4">
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center space-x-3"
-            >
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
-                <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
+            variant="simple"
+            className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed logs-header"
+            style={{ 
+              paddingTop: '0px',
+              marginTop: '0px',
+              top: '0px',
+              position: 'fixed'
+            }}
+          >
+            <div className="flex items-center justify-between h-14 px-4">
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3 }}
+                className="flex items-center space-x-3"
+              >
+                <div className="flex items-center space-x-3">
+                  <div>
+                    <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
+                    <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
+                  </div>
+                </div>
+              </motion.div>
+              
+              <div className="flex items-center space-x-2">
+                {/* 필요시 추가 버튼들을 여기에 배치 */}
               </div>
-            </motion.div>
-            
-            <div className="flex items-center space-x-2">
-              {/* 필요시 추가 버튼들을 여기에 배치 */}
             </div>
-          </div>
-        </AnimatedHeader>
+          </AnimatedHeader>
 
                 {/* 🚨 Vercel/iOS 디버깅 패널 (개발 환경에서만 표시) */}
         {(process.env.NODE_ENV === 'development' || isVercel) && (
