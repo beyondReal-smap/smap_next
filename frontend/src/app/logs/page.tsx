@@ -7007,39 +7007,33 @@ export default function LogsPage() {
       >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
-          variant="enhanced"
-          className="fixed top-0 left-0 right-0 z-[9999] glass-effect header-fixed logs-header"
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed logs-header"
           style={{ 
-            paddingTop: '0px !important',
-            marginTop: '0px !important',
-            padding: '0px !important',
-            margin: '0px !important',
-            top: '0px !important',
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px',
             position: 'fixed'
-          } as React.CSSProperties}
+          }}
         >
-            <div 
-              className="flex items-center" 
-              style={{ 
-                paddingLeft: '16px', 
-                paddingRight: '0px !important',  // 오른쪽 패딩 제거
-                paddingTop: '0px !important',    // 위쪽 패딩 제거
-                paddingBottom: '0px !important', // 아래쪽 패딩 제거
-                height: '56px',  // 정확한 높이 설정
-                width: '100%',
-                boxSizing: 'border-box',
-                position: 'relative'  // 절대 위치 아이콘들을 위한 relative 설정
-              }}
+          <div className="flex items-center justify-between h-14 px-4">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center space-x-3"
             >
-              {/* 왼쪽 영역 - 고정 너비 */}
-              <div className="flex items-center space-x-3">
-                <div>
-                  <h1 className="text-lg font-semibold text-gray-900">활동 로그</h1>
-                  <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
-                </div>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
+                <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
               </div>
+            </motion.div>
+            
+            <div className="flex items-center space-x-2">
+              {/* 필요시 추가 버튼들을 여기에 배치 */}
             </div>
-          </AnimatedHeader>
+          </div>
+        </AnimatedHeader>
 
                 {/* 🚨 Vercel/iOS 디버깅 패널 (개발 환경에서만 표시) */}
         {(process.env.NODE_ENV === 'development' || isVercel) && (

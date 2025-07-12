@@ -434,10 +434,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('[AUTH] 로그아웃 완료');
       
-      // 5. 즉시 signin 페이지로 리다이렉트 (네비게이션 방지 플래그 확인)
+      // 5. 즉시 signin 페이지로 리다이렉트 (강화된 네비게이션 방지 플래그 확인)
       if (typeof window !== 'undefined') {
-        // 🚨 구글 로그인 중일 때는 리다이렉트 방지
-        if ((window as any).__PREVENT_SIGNIN_NAVIGATION__) {
+        // 간단한 구글 로그인 중일 때는 리다이렉트 방지
+        if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
           console.log('[AUTH] 구글 로그인 중 - signin 페이지 리다이렉트 방지');
           return;
         }

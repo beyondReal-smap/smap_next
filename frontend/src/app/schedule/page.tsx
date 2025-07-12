@@ -4089,14 +4089,23 @@ export default function SchedulePage() {
             }}
           >
             <div className="flex items-center justify-between h-14 px-4">
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-3">
-                  <div>
-                    <h1 className="text-lg font-semibold text-gray-900">일정</h1>
-                    <p className="text-xs text-gray-500">그룹 멤버들과 일정을 공유해보세요</p>
+              <AnimatePresence mode="wait">
+                <motion.div 
+                  key="schedule-header"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex items-center space-x-3"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div>
+                      <h1 className="text-lg font-bold text-gray-900">일정</h1>
+                      <p className="text-xs text-gray-500">그룹 멤버들과 일정을 공유해보세요</p>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </motion.div>
+              </AnimatePresence>
               
               <div className="flex items-center space-x-2">
                 {/* 필요시 추가 버튼들을 여기에 배치 */}

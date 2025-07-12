@@ -2734,9 +2734,9 @@ export default function LocationPage() {
           const memberCenter = createSafeLatLng(lat, lng);
           if (memberCenter) {
             initialCenter = memberCenter;
-            initialZoom = 16;
-            foundMemberLocation = true;
-            console.log('[지도 초기화] 첫 번째 멤버 위치로 초기화:', firstMember.name, { lat, lng });
+          initialZoom = 16;
+          foundMemberLocation = true;
+          console.log('[지도 초기화] 첫 번째 멤버 위치로 초기화:', firstMember.name, { lat, lng });
           }
         }
         
@@ -5181,12 +5181,23 @@ export default function LocationPage() {
               }}
             >
               {/* 왼쪽 영역 - 고정 너비 */}
-              <div className="flex items-center space-x-3">
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">내 장소</h1>
-                  <p className="text-xs text-gray-500">그룹 멤버들과 장소를 공유해보세요</p>
-                </div>
-              </div>
+              <AnimatePresence mode="wait">
+                <motion.div 
+                  key="location-header"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex items-center space-x-3"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div>
+                      <h1 className="text-lg font-bold text-gray-900">내 장소</h1>
+                      <p className="text-xs text-gray-500">그룹 멤버들과 장소를 공유해보세요</p>
+                    </div>
+                  </div>
+                </motion.div>
+              </AnimatePresence>
               
               {/* 오른쪽 영역 - 아이콘들 */}
               <motion.div 
