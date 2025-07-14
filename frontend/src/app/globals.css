@@ -45,159 +45,46 @@
   }
 }
 
+/* === 글로벌 리셋 및 레이아웃 기본 === */
+html, body, #__next, .min-h-screen {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
 body {
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(135deg, rgb(238, 242, 255) 0%, rgb(255, 255, 255) 35%, rgb(250, 245, 255) 100%);
-  margin: 0;
-  padding: 0;
-  font-family: var(--font-line-seed), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
-  /* 한글 텍스트 줄바꿈 최적화 */
+  font-family: var(--font-line-seed), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
   word-break: keep-all;
   word-wrap: break-word;
-  /* iOS 웹뷰 최적화 */
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* iOS 스크롤 최적화 */
-  -webkit-overflow-scrolling: touch;
-  /* iOS 터치 이벤트 최적화 */
-  touch-action: manipulation;
-  /* 🔥 하단 네비게이션을 위한 body 패딩 */
-  padding-bottom: 72px !important;
-  margin-bottom: 0 !important;
 }
 
-/* iOS 웹뷰에서 고정 요소 최적화 */
-html {
-  /* iOS 웹뷰 뷰포트 최적화 */
-  -webkit-text-size-adjust: 100%;
-  height: 100%;
-  /* iOS 스크롤 바운스 방지 */
-  overscroll-behavior: none;
-  /* 상단 여백 완전 제거 */
-  padding-top: 0px !important;
-  margin-top: 0px !important;
-  /* iOS safe-area 무시 */
-  padding-top: 0px !important;
-  padding-top: constant(safe-area-inset-top, 0px) !important;
-  padding-top: env(safe-area-inset-top, 0px) !important;
+/* === 헤더(상단바) 위쪽 여백 제거 === */
+header, .header-fixed, [role="banner"], .glass-effect, .home-header, .group-header, .schedule-header, .logs-header, .location-header {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
 }
 
-/* 헤더 및 네비게이션 기본 스타일 */
-.header-fixed {
-  padding-top: 0px !important; /* 모든 페이지에서 헤더 위 패딩 제거 */
-  margin-top: 0px !important; /* 헤더 위 마진도 제거 */
-  top: 0px !important; /* 헤더를 화면 최상단에 고정 */
-  /* 헤더 드래그 방지 */
-  touch-action: none !important;
-  -webkit-user-select: none !important;
-  user-select: none !important;
-  -webkit-touch-callout: none !important;
-  pointer-events: auto !important;
-}
-
-/* 헤더 내부 요소들의 터치 이벤트는 허용 */
-.header-fixed * {
-  touch-action: auto !important;
-  pointer-events: auto !important;
-}
-
-/* 모든 헤더 요소의 상단 여백 강제 제거 - 최고 우선순위 */
-html, body {
-  padding-top: 0px !important;
-  margin-top: 0px !important;
-}
-
-header, 
-.header-fixed, 
-[role="banner"],
-.glass-effect,
-motion-header,
-.register-header-fixed,
-.schedule-header,
-.logs-header,
-.location-header,
-.group-header,
-.home-header {
+/* === 헤더/네비게이션바 관련 강제 스타일 완전 제거 === */
+/*
+header, .header-fixed, [role="banner"], .glass-effect, motion-header, .register-header-fixed, .schedule-header, .logs-header, .location-header, .group-header, .home-header {
   padding-top: 0px !important;
   margin-top: 0px !important;
   top: 0px !important;
-  /* iOS safe-area 완전 무시 */
-  padding-top: 0px !important;
-  margin-top: 0px !important;
-  /* WebKit 관련 패딩 제거 */
   -webkit-padding-before: 0px !important;
   -webkit-margin-before: 0px !important;
-  /* 모든 방향 패딩 체크 */
   padding-block-start: 0px !important;
   margin-block-start: 0px !important;
-  /* 상속된 패딩 제거 */
   padding-inline-start: 0px !important;
   margin-inline-start: 0px !important;
 }
+*/
 
-/* framer-motion 헤더 강제 스타일 */
-div[style*="position: fixed"][style*="top:"],
-div[style*="position:fixed"][style*="top:"] {
-  top: 0px !important;
-  padding-top: 0px !important;
-  margin-top: 0px !important;
-}
-
-/* CSS 변수로 설정된 패딩도 제거 */
-:root {
-  --header-padding-top: 0px !important;
-  --safe-area-inset-top: 0px !important;
-}
-
-/* env() 함수 관련 패딩 제거 */
-* {
-  --safe-area-inset-top: 0px !important;
-}
-
-/* iOS WebView safe-area 완전 무시 */
-@supports (padding: max(0px)) {
-  header, 
-  .header-fixed, 
-  .glass-effect {
-    padding-top: 0px !important;
-    padding-top: max(0px, 0px) !important;
-  }
-}
-
-/* 런타임 강제 스타일 적용 */
-/* 모든 header와 관련 요소들의 스타일을 JavaScript로도 강제 적용하기 위한 클래스 */
-.force-no-top-padding {
-  padding-top: 0px !important;
-  margin-top: 0px !important;
-  top: 0px !important;
-}
-
-/* 페이지 컨테이너 강제 스타일 */
-#home-page-container,
-#schedule-page-container,
-#logs-page-container,
-#location-page-container,
-#group-page-container,
-#register-page-container,
-#signin-page-container {
-  padding-top: 0px !important;
-  margin-top: 0px !important;
-  top: 0px !important;
-}
-
-.navigation-fixed {
-  padding-bottom: 8px !important;
-  border-top-left-radius: 20px !important;
-  border-top-right-radius: 20px !important;
-  overflow: hidden !important;
-}
-
-.font-suite {
-  font-family: var(--font-lineseed), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
-
+/* === 유틸리티/컴포넌트 스타일, 애니메이션, 폰트 등은 기존대로 유지 === */
 /* 모바일 최적화 input 스타일 */
 input, select, textarea {
   @apply appearance-none rounded-md bg-white text-gray-800 border border-gray-300 p-3 shadow-sm w-full;
@@ -417,7 +304,7 @@ div[style*="z-index: 10000"],
 div[style*="zIndex: 10000"],
 div[style*="z-index: 99999"],
 div[style*="zIndex: 99999"] {
-  z-index: 99999 !important;
+  z-index: 999999 !important;
 }
 
 /* 모달 내부 스크롤 영역 터치 최적화 */
@@ -1058,6 +945,26 @@ main {
   margin-bottom: 72px !important;
 }
 
+/* === home, group, schedule 페이지 헤더 위쪽 padding 제거 === */
+[data-page="/home"] header,
+[data-page="/home"] .header-fixed,
+[data-page="/home"] [role="banner"],
+[data-page="/home"] .glass-effect,
+[data-page="/home"] .home-header,
+[data-page="/group"] header,
+[data-page="/group"] .header-fixed,
+[data-page="/group"] [role="banner"],
+[data-page="/group"] .glass-effect,
+[data-page="/group"] .group-header,
+[data-page="/schedule"] header,
+[data-page="/schedule"] .header-fixed,
+[data-page="/schedule"] [role="banner"],
+[data-page="/schedule"] .glass-effect,
+[data-page="/schedule"] .schedule-header {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
 /* location 페이지: 기본 여백 */
 [data-page="/location"] main {
   margin-bottom: 16px !important;
@@ -1371,7 +1278,7 @@ body[data-page="/home"] #bottom-navigation-bar[style],
 html[data-page="/home"] #bottom-navigation-bar[style],
 html body[data-page="/home"] #bottom-navigation-bar[style] {
   position: fixed !important;
-  bottom: 72px !important;
+  bottom: 0px !important;
   left: 0px !important;
   right: 0px !important;
   z-index: 999999 !important;

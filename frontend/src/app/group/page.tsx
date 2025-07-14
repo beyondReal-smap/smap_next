@@ -1547,7 +1547,7 @@ function GroupPageContent() {
 
         {/* 메인 컨텐츠 - 고정 위치 */}
           <div className="absolute inset-0 flex flex-col overflow-hidden" style={{ 
-            top: '56px', // 헤더 높이만큼 아래로
+            top: '0px', // 헤더 패딩 제거
                          bottom: '48px', // 네비게이션 바 높이만큼 위로
             left: '0',
             right: '0'

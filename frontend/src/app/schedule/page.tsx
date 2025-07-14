@@ -4121,7 +4121,7 @@ export default function SchedulePage() {
             variants={pageVariants}
             className="absolute inset-0 px-4 space-y-5 pb-16 overflow-y-auto content-area"
             style={{ 
-              top: '56px', // 헤더 높이만큼 아래로
+              top: '0px', // 헤더 패딩 제거
                              bottom: '48px', // 네비게이션 바 높이만큼 위로
               left: '0',
               right: '0'

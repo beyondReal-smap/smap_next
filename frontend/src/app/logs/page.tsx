@@ -6987,36 +6987,43 @@ export default function LogsPage() {
         }}
       >
         {/* 통일된 헤더 애니메이션 */}
-        <AnimatedHeader 
-            variant="simple"
-            className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed logs-header"
-            style={{ 
-              paddingTop: '0px',
-              marginTop: '0px',
-              top: '0px',
-              position: 'fixed'
-            }}
-          >
-            <div className="flex items-center justify-between h-14 px-4">
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3 }}
-                className="flex items-center space-x-3"
-              >
-                <div className="flex items-center space-x-3">
-                  <div>
-                    <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
-                    <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
-                  </div>
+        <motion.div
+          className="header-fixed glass-effect logs-header"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.3 }}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            paddingTop: 0,
+            marginTop: 0,
+            height: '56px', // h-14
+          }}
+        >
+          <div className="flex items-center justify-between h-14 px-4">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center space-x-3"
+            >
+              <div className="flex items-center space-x-3">
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">활동 로그</h1>
+                  <p className="text-xs text-gray-500">그룹 멤버들의 활동 기록을 확인해보세요</p>
                 </div>
-              </motion.div>
-              
-              <div className="flex items-center space-x-2">
-                {/* 필요시 추가 버튼들을 여기에 배치 */}
               </div>
+            </motion.div>
+            
+            <div className="flex items-center space-x-2">
+              {/* 필요시 추가 버튼들을 여기에 배치 */}
             </div>
-          </AnimatedHeader>
+          </div>
+        </motion.div>
 
                 {/* 🚨 Vercel/iOS 디버깅 패널 (개발 환경에서만 표시) */}
         {(process.env.NODE_ENV === 'development' || isVercel) && (
@@ -7057,7 +7064,7 @@ export default function LogsPage() {
           animate="animate"
           className="absolute inset-0 hardware-accelerated" 
           style={{ 
-            top: '56px', // 헤더 높이만큼 아래로
+            top: '0px', // 헤더 패딩 제거
             bottom: '0px', // 네비게이션 바 아래 패딩 제거
             left: '0',
             right: '0',
@@ -7592,136 +7599,6 @@ export default function LogsPage() {
 />
                 </Suspense>
               </div>
-
-                {/* 날짜 선택 섹션 */}
-                {/* <div className="mb-5">
-                  <div className="flex items-center space-x-2 mb-3">
-                    <div className="w-2 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
-                    <h3 className="text-base font-semibold text-gray-800">날짜 선택</h3>
-                    <div className="flex-1 h-px bg-gradient-to-r from-blue-200/50 to-transparent"></div>
-                    <span className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-full backdrop-blur-sm">
-                      {(() => {
-                        const recentDays = getRecentDays();
-                        const daysWithLogs = recentDays.filter(day => day.hasLogs).length;
-                        return `${daysWithLogs}일 기록`;
-                      })()}
-                    </span>
-                  </div>
-                  <div className="relative overflow-hidden rounded-xl bg-white/60 backdrop-blur-sm p-3 border" style={{ borderColor: 'rgba(1, 19, 163, 0.1)' }}>
-                    <motion.div
-                      ref={dateScrollContainerRef}
-                      className="flex space-x-2 cursor-grab active:cursor-grabbing"
-                      style={{ 
-                        x: sidebarDateX,
-                        touchAction: 'pan-x'
-                      }}
-                      drag="x"
-                      dragConstraints={{
-                        left: -(Math.max(0, (getRecentDays().length * 85) - 200)),
-                        right: 0
-                      }}
-                      data-calendar-swipe="true"
-                      onDragStart={() => {
-                        sidebarDraggingRef.current = true;
-                        console.log('📅 [Sidebar Calendar] Drag Start');
-                      }}
-                      onDragEnd={(e, info) => {
-                        console.log('📅 [Sidebar Calendar] Drag End - offset:', info.offset.x, 'velocity:', info.velocity.x);
-                        setTimeout(() => { sidebarDraggingRef.current = false; }, 50);
-
-                        const swipeThreshold = 50;
-                        const velocityThreshold = 200;
-
-                        let shouldChangeDate = false;
-                        let direction: 'prev' | 'next' | null = null;
-
-                        // 스와이프 거리나 속도로 날짜 변경 판단
-                        if (info.offset.x < -swipeThreshold || info.velocity.x < -velocityThreshold) {
-                          direction = 'next';
-                          shouldChangeDate = true;
-                        } else if (info.offset.x > swipeThreshold || info.velocity.x > velocityThreshold) {
-                          direction = 'prev';
-                          shouldChangeDate = true;
-                        }
-
-                        if (shouldChangeDate && direction) {
-                          const recentDays = getRecentDays();
-                          const currentIndex = recentDays.findIndex(day => day.value === selectedDate);
-                          
-                          if (direction === 'next' && currentIndex < recentDays.length - 1) {
-                            const nextDay = recentDays[currentIndex + 1];
-                            if (nextDay.hasLogs) {
-                              handleDateSelect(nextDay.value);
-                              console.log('📅 [Sidebar] 다음 날짜로 변경:', nextDay.value);
-                            }
-                          } else if (direction === 'prev' && currentIndex > 0) {
-                            const prevDay = recentDays[currentIndex - 1];
-                            if (prevDay.hasLogs) {
-                              handleDateSelect(prevDay.value);
-                              console.log('📅 [Sidebar] 이전 날짜로 변경:', prevDay.value);
-                            }
-                          }
-
-                          // 햅틱 피드백
-                          try {
-                            if ('vibrate' in navigator) {
-                              navigator.vibrate([15]);
-                            }
-                          } catch (err) {
-                            console.debug('햅틱 차단');
-                          }
-                        }
-
-                        // 원래 위치로 복원
-                        sidebarDateX.set(0);
-                      }}
-                    >
-                      {getRecentDays().map((day, index) => (
-                        <motion.button
-                          key={day.value}
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            
-                            // 햅틱 피드백
-                            try {
-                              if ('vibrate' in navigator) {
-                                navigator.vibrate([10]);
-                              }
-                            } catch (err) {
-                              console.debug('햅틱 피드백 차단');
-                            }
-                            
-                            // 오늘 날짜이거나 로그가 있는 날짜만 클릭 허용
-                            if (day.hasLogs || day.isToday) {
-                              console.log('[사이드바 날짜] 날짜 선택:', day.value, day.isToday ? '(오늘)' : '');
-                              handleDateSelect(day.value);
-                            }
-                          }}
-                          data-calendar-swipe="true"
-                          className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-normal transition-all duration-300 min-w-[80px] focus:outline-none ${
-                            selectedDate === day.value
-                              ? 'text-white shadow-lg scale-105'
-                              : day.hasLogs
-                              ? 'bg-white/80 text-gray-700 hover:bg-white hover:shadow-md hover:scale-102 border'
-                              : 'bg-gray-50/50 text-gray-400 line-through cursor-not-allowed border-gray-100'
-                          }`}
-                          style={selectedDate === day.value 
-                            ? { backgroundColor: '#0113A3' }
-                            : day.hasLogs
-                            ? { borderColor: 'rgba(1, 19, 163, 0.1)' }
-                            : { borderColor: 'rgba(156, 163, 175, 0.1)' }
-                          }
-                          disabled={!day.hasLogs && !day.isToday && selectedDate !== day.value}
-                        >
-                          {day.display}
-                        </motion.button>
-                      ))}
-                    </motion.div>
-                  </div>
-                </div> */}
 
                 {/* 멤버 목록 */}
               <div className="flex-1 min-h-0">

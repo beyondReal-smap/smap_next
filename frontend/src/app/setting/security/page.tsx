@@ -56,6 +56,73 @@ export default function SecurityPage() {
   return (
     <>
       <style jsx global>{`
+        html, body {
+          /* iOS WebView 최적화 */
+          -webkit-text-size-adjust: 100%;
+          -webkit-overflow-scrolling: touch;
+          /* iOS safe-area 완전 무시 */
+          padding-top: 0px !important;
+          margin-top: 0px !important;
+        }
+
+        /* iOS 전용 스타일 */
+        @supports (-webkit-touch-callout: none) {
+          html, body {
+            position: fixed !important;
+            width: 100% !important;
+            height: 100% !important;
+            overflow: hidden !important;
+          }
+          
+          #__next {
+            height: 100% !important;
+            overflow: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          
+            #setting-page-container {
+    height: 100vh !important;
+    height: -webkit-fill-available !important;
+    overflow: hidden !important;
+  }
+  
+  .content-area {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+          
+          /* iOS 헤더 강제 표시 */
+          header, .glass-effect, .header-fixed {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 999999 !important;
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            transform: translateZ(0) translateY(0) !important;
+            will-change: transform !important;
+            background: rgba(255, 255, 255, 0.98) !important;
+            backdrop-filter: blur(10px) !important;
+            -webkit-backdrop-filter: blur(10px) !important;
+            height: 56px !important;
+            min-height: 56px !important;
+            max-height: 56px !important;
+            width: 100% !important;
+            margin: 0 !important;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+          }
+          
+          /* iOS 헤더 내부 요소 */
+          header * {
+            pointer-events: auto !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+          }
+        }
+
         @keyframes slideInFromRight {
           from {
             transform: translateX(30px);
@@ -108,6 +175,7 @@ export default function SecurityPage() {
 
         .glass-effect {
           backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
           background: rgba(255, 255, 255, 0.7);
           border-bottom: 1px solid rgba(255, 255, 255, 0.2);
           box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
@@ -123,21 +191,32 @@ export default function SecurityPage() {
         }
       `}</style>
       
-      <div className={`bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-10 ${
+      <div className={`flex flex-col h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 ${
         isExiting ? 'animate-slideOutToRight' : 
         (shouldAnimate && isPageLoaded) ? 'animate-slideInFromRight' : 
         shouldAnimate ? 'initial-hidden' : ''
-      }`} style={{ 
-        position: 'relative',
-        width: '100%',
-        overflow: shouldAnimate && !isPageLoaded ? 'hidden' : 'visible'
-      }}>
+      }`}>
         {/* 개선된 헤더 */}
         <motion.header 
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.1, duration: 0.3 }}
           className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+          style={{ 
+            zIndex: 999999,
+            height: '56px',
+            minHeight: '56px',
+            maxHeight: '56px',
+            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            transform: 'translateZ(0)',
+            WebkitTransform: 'translateZ(0)',
+            willChange: 'transform',
+            visibility: 'visible',
+            opacity: 1,
+            display: 'flex'
+          } as React.CSSProperties}
         >
           <div className="flex items-center justify-between h-14 px-4">
             <div className="flex items-center space-x-3">
@@ -171,12 +250,12 @@ export default function SecurityPage() {
         </motion.header>
 
         {/* 메인 콘텐츠 */}
-        <div className="px-4 pt-20 pb-6 space-y-6">
+        <div className="flex-1 overflow-y-auto pt-[56px] pb-6 px-4">
           {/* 비밀번호 변경 섹션 */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.5 }}
+            transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6"
           >
             <div className="flex items-center space-x-3 mb-6">

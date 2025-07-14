@@ -163,36 +163,36 @@
     };
   }
   
-  // 네트워크 연결 상태 모니터링
-  let connectionRetryCount = 0;
-  const maxRetries = 3;
+  // 네트워크 연결 상태 모니터링 (비활성화됨)
+  // let connectionRetryCount = 0;
+  // const maxRetries = 3;
   
-  function checkConnection() {
-    if (isIOSWebView) {
-      // 간단한 연결 테스트
-      fetch('/api/health', { 
-        method: 'GET',
-        timeout: 5000,
-        cache: 'no-cache'
-      })
-      .then(response => {
-        console.log('Connection check successful');
-        connectionRetryCount = 0;
-      })
-      .catch(error => {
-        console.warn('Connection check failed:', error);
-        connectionRetryCount++;
-        
-        if (connectionRetryCount <= maxRetries) {
-          console.log(`Retrying connection... (${connectionRetryCount}/${maxRetries})`);
-          setTimeout(checkConnection, 2000 * connectionRetryCount);
-        } else {
-          console.error('Max connection retries reached, reloading page...');
-          window.location.reload();
-        }
-      });
-    }
-  }
+  // function checkConnection() {
+  //   if (isIOSWebView) {
+  //     // 간단한 연결 테스트
+  //     fetch('/api/health', { 
+  //       method: 'GET',
+  //       timeout: 5000,
+  //       cache: 'no-cache'
+  //     })
+  //     .then(response => {
+  //       console.log('Connection check successful');
+  //       connectionRetryCount = 0;
+  //     })
+  //     .catch(error => {
+  //       console.warn('Connection check failed:', error);
+  //       connectionRetryCount++;
+  //       
+  //       if (connectionRetryCount <= maxRetries) {
+  //         console.log(`Retrying connection... (${connectionRetryCount}/${maxRetries})`);
+  //         setTimeout(checkConnection, 2000 * connectionRetryCount);
+  //       } else {
+  //         console.error('Max connection retries reached, reloading page...');
+  //         window.location.reload();
+  //       }
+  //     });
+  //   }
+  // }
   
   // 페이지 로드 완료 시 iOS 앱에 알림 및 연결 확인
   window.addEventListener('load', function() {
@@ -206,24 +206,24 @@
       console.warn('Could not notify iOS app of page load:', e);
     }
     
-    // 연결 상태 확인 (3초 후)
-    setTimeout(checkConnection, 3000);
+    // 연결 상태 확인 (3초 후) - 비활성화됨
+    // setTimeout(checkConnection, 3000);
   });
   
-  // 페이지 가시성 변경 시 연결 확인
-  document.addEventListener('visibilitychange', function() {
-    if (!document.hidden && isIOSWebView) {
-      console.log('Page became visible, checking connection...');
-      setTimeout(checkConnection, 1000);
-    }
-  });
+  // 페이지 가시성 변경 시 연결 확인 - 비활성화됨
+  // document.addEventListener('visibilitychange', function() {
+  //   if (!document.hidden && isIOSWebView) {
+  //     console.log('Page became visible, checking connection...');
+  //     setTimeout(checkConnection, 1000);
+  //   }
+  // });
   
-  // iOS 앱 상태 변경 감지
-  window.addEventListener('pageshow', function(event) {
-    if (event.persisted && isIOSWebView) {
-      console.log('Page restored from cache, checking connection...');
-      setTimeout(checkConnection, 1000);
-    }
-  });
+  // iOS 앱 상태 변경 감지 - 비활성화됨
+  // window.addEventListener('pageshow', function(event) {
+  //   if (event.persisted && isIOSWebView) {
+  //     console.log('Page restored from cache, checking connection...');
+  //     setTimeout(checkConnection, 1000);
+  //   }
+  // });
   
 })(); 
