@@ -218,18 +218,11 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   
-  // 출력 설정 - iOS WebView 호환성
-  output: 'standalone',
+  // 출력 설정 - Vercel 호환성
+  output: 'export',
   
   // 정적 경로 명시적 설정 (Vercel 빌드 최적화)
-  async rewrites() {
-    return [
-      {
-        source: '/logs/:path*',
-        destination: '/logs/:path*',
-      },
-    ];
-  },
+  // rewrites는 vercel.json에서 처리
   
 
   

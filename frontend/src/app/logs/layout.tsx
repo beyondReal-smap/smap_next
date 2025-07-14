@@ -26,11 +26,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'SMAP - 활동 로그',
     description: '그룹 멤버들의 실시간 위치 기록과 활동 패턴을 확인하고 분석할 수 있는 활동 로그 페이지',
-    url: 'https://smap.co.kr/logs',
+    url: 'https://nextstep.smap.site/logs',
     siteName: 'SMAP',
     images: [
       {
-        url: 'https://smap.co.kr/images/og-logs.jpg',
+        url: 'https://nextstep.smap.site/images/og-logs.jpg',
         width: 1200,
         height: 630,
         alt: 'SMAP 활동 로그',
@@ -43,10 +43,10 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'SMAP - 활동 로그',
     description: '그룹 멤버들의 실시간 위치 기록과 활동 패턴을 확인하고 분석할 수 있는 활동 로그 페이지',
-    images: ['https://smap.co.kr/images/og-logs.jpg'],
+    images: ['https://nextstep.smap.site/images/og-logs.jpg'],
   },
   alternates: {
-    canonical: 'https://smap.co.kr/logs',
+    canonical: 'https://nextstep.smap.site/logs',
   },
 }
 

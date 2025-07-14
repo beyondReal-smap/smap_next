@@ -21,6 +21,10 @@
     {
       "source": "/logs/(.*)",
       "destination": "/logs/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/$1"
     }
   ],
   "headers": [
