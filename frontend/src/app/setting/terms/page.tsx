@@ -28,6 +28,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import authService from '@/services/authService';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import AnimatedHeader from '../../../components/common/AnimatedHeader';
+import apiClient from '@/services/apiClient';
 
 // 모바일 최적화된 CSS 애니메이션 (노란색 테마)
 const pageAnimations = `
@@ -389,26 +390,10 @@ export default function TermsPage() {
     try {
       console.log(`[TERMS] 동의 정보 조회 시작 - user_id: ${user.mt_idx}`);
       
-      // 실제 JWT 토큰 가져오기
-      const token = authService.getToken();
-      if (!token) {
-        throw new Error('인증 토큰이 없습니다.');
-      }
-      
-      // 백엔드 API 호출하여 동의 정보 조회
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://118.67.130.71:8000'}/api/v1/members/consent/${user.mt_idx}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      // 백엔드 API 호출하여 동의 정보 조회 (apiClient 사용)
+      const response = await apiClient.get(`/v1/members/consent/${user.mt_idx}`);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = response.data;
       console.log('[TERMS] 동의 정보 조회 응답:', result);
 
       if (result.success && result.data) {
@@ -530,32 +515,18 @@ export default function TermsPage() {
 
     setIsLoading(true);
     try {
-
-      // 실제 JWT 토큰 가져오기
-      const token = authService.getToken();
-      if (!token) {
-        throw new Error('인증 토큰이 없습니다.');
-      }
-
       const newConsentValue = term.isConsented ? 'N' : 'Y';
       
-      // 백엔드 API 호출하여 개별 동의 상태 변경
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://118.67.130.71:8000'}/api/v1/members/consent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          field: term.dbField,
-          value: newConsentValue
-        })
+      // 백엔드 API 호출하여 개별 동의 상태 변경 (apiClient 사용)
+      const response = await apiClient.post('/v1/members/consent', {
+        field: term.dbField,
+        value: newConsentValue
       });
 
-      const result = await response.json();
+      const result = response.data;
       console.log('[TERMS] 개별 동의 상태 변경 응답:', result);
 
-      if (!response.ok || !result.success) {
+      if (!result.success) {
         throw new Error(result.message || '동의 상태 변경 실패');
       }
 

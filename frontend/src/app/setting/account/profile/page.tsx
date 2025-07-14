@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom';
 import { FiUser, FiArrowLeft, FiSave, FiX, FiCheck, FiAlertTriangle, FiCalendar, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/ko';
+import AnimatedHeader from '../../../../components/common/AnimatedHeader';
 
 dayjs.locale('ko');
 
@@ -264,61 +265,43 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* 헤더 - 위에서 슬라이드 내려오는 애니메이션 */}
-      <motion.header 
-        initial={{ y: -100, opacity: 0, scale: 0.9 }}
-        animate={{ y: 0, opacity: 1, scale: 1 }}
-        transition={{ 
-          delay: 0.2, 
-          duration: 0.8, 
-          ease: [0.25, 0.46, 0.45, 0.94],
-          opacity: { duration: 0.6 },
-          scale: { duration: 0.6 }
-        }}
-        className="fixed top-0 left-0 right-0 z-20 bg-white/70 backdrop-blur-xl border-b border-white/20 shadow-sm header-fixed"
-                    style={{ paddingTop: '0px' }}
+      {/* 통일된 헤더 애니메이션 */}
+      <AnimatedHeader 
+        variant="enhanced"
+        className="setting-header"
       >
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-          className="flex items-center justify-between h-14 px-4"
+          transition={{ duration: 0.5 }}
+          className="setting-header-content"
         >
-          <div className="flex items-center space-x-3">
-            <motion.button 
-              onClick={handleBack}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.5, duration: 0.4 }}
-              className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </motion.button>
-            <motion.div 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.6, duration: 0.4 }}
-              className="flex items-center space-x-3"
-            >
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">프로필 편집</h1>
-                <p className="text-xs text-gray-500">개인 정보를 업데이트하세요</p>
-              </div>
-            </motion.div>
+          <motion.button 
+            onClick={handleBack}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+            className="setting-back-button"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </motion.button>
+          <div className="setting-header-text">
+            <h1 className="text-lg font-bold text-gray-900 leading-tight">프로필 편집</h1>
+            <p className="text-xs text-gray-500 leading-tight">개인 정보를 업데이트하세요</p>
           </div>
         </motion.div>
-      </motion.header>
+      </AnimatedHeader>
 
       {/* 스크롤 가능한 메인 컨텐츠 */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="px-4 pt-16 space-y-6 pb-24"
+        className="px-4 pt-0 space-y-6 pb-24"
       >
         {/* 프로필 정보 안내 카드 */}
         <motion.div 

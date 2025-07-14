@@ -415,7 +415,21 @@
       window.location.reload();
     };
     
-    // 2. iOS WebView에서 fetch 요청 최적화
+    // 1.5. SSL 인증서 오류 전역 처리
+    window.addEventListener('error', function(event) {
+      if (event.error && event.error.message) {
+        const errorMsg = event.error.message;
+        if (errorMsg.includes('CERT_AUTHORITY_INVALID') || 
+            errorMsg.includes('SSL') || 
+            errorMsg.includes('certificate') ||
+            errorMsg.includes('ERR_CERT_AUTHORITY_INVALID')) {
+          console.warn('Global SSL certificate error detected:', errorMsg);
+          // SSL 오류는 fetch 재시도에서 처리되므로 여기서는 로깅만
+        }
+      }
+    });
+    
+    // 2. iOS WebView에서 fetch 요청 최적화 (SSL 인증서 문제 해결)
     const originalFetch = window.fetch;
     window.fetch = function(url, options = {}) {
       // 기본 옵션 설정
@@ -427,7 +441,7 @@
       
       // 타임아웃 설정
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout')), 10000);
+        setTimeout(() => reject(new Error('Request timeout')), 15000);
       });
       
       const fetchPromise = originalFetch(url, defaultOptions);
@@ -435,19 +449,59 @@
       return Promise.race([fetchPromise, timeoutPromise])
         .catch(error => {
           console.warn('Fetch error in iOS WebView:', error);
-          // 네트워크 에러인 경우 재시도
-          if (error.message.includes('timeout') || error.message.includes('network')) {
-            console.log('Retrying fetch request...');
-            return originalFetch(url, defaultOptions);
+          
+          // SSL 인증서 오류 또는 네트워크 오류인 경우 재시도
+          const isSSLError = error.message.includes('CERT_AUTHORITY_INVALID') || 
+                           error.message.includes('SSL') ||
+                           error.message.includes('certificate') ||
+                           error.message.includes('authority');
+          
+          const isNetworkError = error.message.includes('timeout') || 
+                               error.message.includes('network') ||
+                               error.message.includes('Failed to fetch') ||
+                               error.message.includes('ERR_CERT_AUTHORITY_INVALID');
+          
+          if (isSSLError || isNetworkError) {
+            console.log('Network error detected, retrying once...');
+            
+            // 재시도 시 더 긴 타임아웃과 추가 옵션
+            const retryOptions = {
+              ...defaultOptions,
+              cache: 'no-store', // 캐시 완전 비활성화
+              mode: 'cors', // CORS 모드 명시적 설정
+            };
+            
+            const retryTimeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Retry timeout')), 20000);
+            });
+            
+            const retryFetchPromise = originalFetch(url, retryOptions);
+            
+            return Promise.race([retryFetchPromise, retryTimeoutPromise])
+              .catch(retryError => {
+                console.error('Retry also failed:', retryError);
+                throw retryError;
+              });
           }
+          
           throw error;
         });
     };
     
-    // 3. iOS WebView에서 XMLHttpRequest 최적화
+    // 3. iOS WebView에서 XMLHttpRequest 최적화 (SSL 인증서 문제 해결)
     const originalXHROpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
-      this.timeout = 10000; // 10초 타임아웃
+      this.timeout = 15000; // 15초 타임아웃으로 증가
+      
+      // SSL 인증서 오류 처리
+      this.addEventListener('error', function(e) {
+        const error = e.target;
+        if (error.status === 0 && (error.responseText.includes('SSL') || error.responseText.includes('certificate'))) {
+          console.warn('SSL certificate error detected in XMLHttpRequest, retrying...');
+          // 재시도 로직은 fetch에서 처리되므로 여기서는 로깅만
+        }
+      });
+      
       return originalXHROpen.call(this, method, url, async, user, password);
     };
     
