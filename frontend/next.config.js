@@ -218,8 +218,8 @@ const nextConfig = {
     ignoreBuildErrors: false,
   },
   
-  // 출력 설정 - Vercel 호환성
-  output: 'export',
+  // 출력 설정 - Vercel 호환성 (기본값 사용)
+  // output: 'standalone', // API 라우트와 충돌하므로 제거
   
   // 정적 경로 명시적 설정 (Vercel 빌드 최적화)
   // rewrites는 vercel.json에서 처리

@@ -1,5 +1,6 @@
 {
   "buildCommand": "npm run build",
+  "ignoreCommand": "echo 'Skipping build step'",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "npm install",
@@ -14,6 +15,10 @@
     "NODE_ENV": "production"
   },
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
     {
       "source": "/logs",
       "destination": "/logs"
