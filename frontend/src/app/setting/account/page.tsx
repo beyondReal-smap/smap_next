@@ -471,61 +471,36 @@ export default function AccountSettingsPage() {
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="enhanced"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
-          style={{ 
-            zIndex: 999999,
-            height: '56px',
-            minHeight: '56px',
-            maxHeight: '56px',
-            backgroundColor: 'rgba(255, 255, 255, 0.98)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            transform: 'translateZ(0)',
-            WebkitTransform: 'translateZ(0)',
-            willChange: 'transform',
-            visibility: 'visible',
-            opacity: 1,
-            display: 'flex'
-          } as React.CSSProperties}
+          className="setting-header"
         >
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="flex items-center justify-between h-14 px-4"
+            transition={{ duration: 0.5 }}
+            className="setting-header-content"
           >
-            <div className="flex items-center space-x-3">
-              <motion.button 
-                onClick={handleBack}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5, duration: 0.4 }}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </motion.button>
-              <motion.div 
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.6, duration: 0.4 }}
-                className="flex items-center space-x-3"
-              >
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">계정설정</h1>
-                  <p className="text-xs text-gray-500">프로필 및 개인정보 관리</p>
-                </div>
-              </motion.div>
+            <motion.button 
+              onClick={handleBack}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+              className="setting-back-button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </motion.button>
+            <div className="setting-header-text">
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">계정설정</h1>
+              <p className="text-xs text-gray-500 leading-tight">프로필 및 개인정보 관리</p>
             </div>
-
           </motion.div>
         </AnimatedHeader>
 
         {/* 스크롤 가능한 메인 컨텐츠 */}
-        <div className="flex-1 overflow-y-auto pt-[56px] pb-24 px-4">
+        <div className="flex-1 overflow-y-auto pb-24 px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

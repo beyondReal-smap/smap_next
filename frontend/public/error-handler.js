@@ -140,27 +140,29 @@
       warn: console.warn
     };
     
-    console.log = function(...args) {
-      originalConsole.log.apply(console, args);
-      try {
-        if (window.webkit.messageHandlers.consoleLog) {
-          window.webkit.messageHandlers.consoleLog.postMessage(args.join(' '));
-        }
-      } catch (e) {
-        // 무시
-      }
-    };
+    // console.log 오버라이드 제거 - 과도한 로깅 방지
+    // console.log = function(...args) {
+    //   originalConsole.log.apply(console, args);
+    //   try {
+    //     if (window.webkit.messageHandlers.consoleLog) {
+    //       window.webkit.messageHandlers.consoleLog.postMessage(args.join(' '));
+    //     }
+    //   } catch (e) {
+    //     // 무시
+    //   }
+    // };
     
-    console.error = function(...args) {
-      originalConsole.error.apply(console, args);
-      try {
-        if (window.webkit.messageHandlers.consoleError) {
-          window.webkit.messageHandlers.consoleError.postMessage(args.join(' '));
-        }
-      } catch (e) {
-        // 무시
-      }
-    };
+    // console.error 오버라이드 제거 - 과도한 로깅 방지
+    // console.error = function(...args) {
+    //   originalConsole.error.apply(console, args);
+    //   try {
+    //     if (window.webkit.messageHandlers.consoleError) {
+    //       window.webkit.messageHandlers.consoleError.postMessage(args.join(' '));
+    //     }
+    //   } catch (e) {
+    //     // 무시
+    //   }
+    // };
   }
   
   // 네트워크 연결 상태 모니터링 (비활성화됨)

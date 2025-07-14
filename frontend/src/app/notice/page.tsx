@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
@@ -27,7 +27,7 @@ const pageAnimations = `
 html, body {
   width: 100%;
   overflow-x: hidden;
-  position: relative;
+  position: static !important;
 }
 
 @keyframes slideInFromLeft {
@@ -122,146 +122,215 @@ export default function NoticePage() {
   const { user } = useAuth();
   const [notices, setNotices] = useState<PushLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const dataFetchedRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // 안정적인 데이터 로딩 함수
+  const loadNotices = useCallback(async (userId: number) => {
+    // 이전 요청이 있다면 취소
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // 새로운 AbortController 생성
+    abortControllerRef.current = new AbortController();
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const data = await notificationService.getMemberPushLogs(userId.toString());
+      
+      // 요청이 취소되었는지 확인
+      if (abortControllerRef.current.signal.aborted) {
+        return;
+      }
+      
+      if (data && Array.isArray(data)) {
+        // 읽지 않은 알림이 있으면 모두 읽음 처리
+        const unreadNotifications = data.filter(notification => notification.plt_read_chk === 'N');
+        if (unreadNotifications.length > 0) {
+          try {
+            await notificationService.markAllAsRead(userId);
+            
+            // 읽음 처리 후 데이터 다시 가져오기
+            const updatedData = await notificationService.getMemberPushLogs(userId.toString());
+            
+            // 요청이 취소되었는지 다시 확인
+            if (abortControllerRef.current.signal.aborted) {
+              return;
+            }
+            
+            setNotices(Array.isArray(updatedData) ? updatedData : []);
+          } catch (error) {
+            console.error('[NOTICE PAGE] 읽음 처리 실패:', error);
+            setNotices(data);
+          }
+        } else {
+          setNotices(data);
+        }
+      } else {
+        setNotices([]);
+      }
+      
+      setIsInitialized(true);
+      dataFetchedRef.current = true;
+      
+      // 데이터 로딩 완료 햅틱 피드백
+      triggerHapticFeedback(HapticFeedbackType.SUCCESS, '알림 데이터 로딩 완료', { 
+        component: 'notice', 
+        action: 'data-load-complete' 
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return; // 취소된 요청은 무시
+      }
+      
+      console.error('[NOTICE PAGE] Error fetching notices:', error);
+      setError('알림을 불러오는 중 오류가 발생했습니다.');
+      setNotices([]);
+      setIsInitialized(true);
+      dataFetchedRef.current = true;
+    } finally {
+      if (!abortControllerRef.current?.signal.aborted) {
+        setLoading(false);
+      }
+    }
+  }, []);
 
   // 공지사항 데이터 로드
   useEffect(() => {
-    // 이미 데이터를 가져왔으면 다시 가져오지 않음
-    if (dataFetchedRef.current) return;
+    if (!user?.mt_idx) {
+      return;
+    }
     
-    let isMounted = true;
+    // 이미 초기화되었으면 다시 로드하지 않음
+    if (isInitialized && dataFetchedRef.current) {
+      return;
+    }
     
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        if (!user?.mt_idx) {
-          console.error('[NOTICE PAGE] 사용자 정보가 없습니다.');
-          setNotices([]);
-          setLoading(false);
-          return;
-        }
-        
-        const data = await notificationService.getMemberPushLogs(user.mt_idx.toString());
-        
-        console.log('[NOTICE PAGE] Fetched data length:', Array.isArray(data) ? data.length : 'Data is not an array');
-        
-        // 읽지 않은 알림이 있으면 모두 읽음 처리
-        if (Array.isArray(data) && data.length > 0) {
-          const unreadNotifications = data.filter(notification => notification.plt_read_chk === 'N');
-          if (unreadNotifications.length > 0) {
-            try {
-              await notificationService.markAllAsRead(user.mt_idx);
-              console.log('[NOTICE PAGE] 읽지 않은 알림', unreadNotifications.length, '개 읽음 처리 완료');
-              
-              // 읽음 처리 후 데이터 다시 가져오기
-              const updatedData = await notificationService.getMemberPushLogs(user.mt_idx.toString());
-              if (isMounted) {
-                setNotices(Array.isArray(updatedData) ? updatedData : []);
-                dataFetchedRef.current = true;
-              }
-            } catch (error) {
-              console.error('[NOTICE PAGE] 읽음 처리 실패:', error);
-              // 읽음 처리 실패해도 기존 데이터는 표시
-              if (isMounted) {
-                setNotices(data);
-                dataFetchedRef.current = true;
-              }
-            }
-          } else {
-            // 읽지 않은 알림이 없으면 그대로 설정
-            if (isMounted) {
-              setNotices(data);
-              dataFetchedRef.current = true;
-            }
-          }
-        } else {
-          if (isMounted) {
-            console.error('[NOTICE PAGE] Fetched data is not an array. Setting notices to empty array.', data);
-            setNotices([]); // 데이터가 배열이 아니면 빈 배열로 설정
-            dataFetchedRef.current = true;
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching notices:', error);
-        if (isMounted) {
-          setNotices([]); // 에러 발생 시에도 빈 배열로 설정
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-          // 데이터 로딩 완료 햅틱 피드백
-          triggerHapticFeedback(HapticFeedbackType.SUCCESS, '알림 데이터 로딩 완료', { 
-            component: 'notice', 
-            action: 'data-load-complete' 
-          });
-        }
+    loadNotices(user.mt_idx);
+    
+    // 컴포넌트 언마운트 시 요청 취소
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
     };
+  }, [user?.mt_idx, loadNotices, isInitialized]);
 
-    fetchData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
+  // 헤더 위 여백 강제 제거 (group/schedule과 동일)
+  useEffect(() => {
+    const selectors = [
+      'header',
+      '.header-fixed',
+      '.glass-effect',
+      '.group-header',
+      '.register-header-fixed',
+      '.logs-header',
+      '.location-header',
+      '.schedule-header',
+      '.home-header',
+      '[role="banner"]',
+      '#notice-page-container'
+    ];
+    selectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach((element) => {
+        const htmlElement = element as HTMLElement;
+        htmlElement.style.paddingTop = '0px';
+        htmlElement.style.marginTop = '0px';
+        htmlElement.style.setProperty('padding-top', '0px', 'important');
+        htmlElement.style.setProperty('margin-top', '0px', 'important');
+        if (selector === 'header' || selector.includes('header')) {
+          htmlElement.style.setProperty('top', '0px', 'important');
+          htmlElement.style.setProperty('position', 'fixed', 'important');
+          htmlElement.style.setProperty('height', '64px', 'important');
+        }
+      });
+    });
+    
+    document.body.style.setProperty('padding-top', '0px', 'important');
+    document.body.style.setProperty('margin-top', '0px', 'important');
+    document.documentElement.style.setProperty('padding-top', '0px', 'important');
+    document.documentElement.style.setProperty('margin-top', '0px', 'important');
+  }, []);
 
   const handleBack = () => {
     triggerHapticFeedback(HapticFeedbackType.LIGHT);
-    router.back();
+    // 뒤로가기 버튼 클릭 시 홈으로 강제 이동
+    console.log('[NOTICE PAGE] 뒤로가기 버튼 클릭 - 홈으로 이동');
+    
+    // 즉시 window.location으로 강제 이동
+    window.location.href = '/home';
   };
 
   const handleNoticeClick = (notice: PushLog) => {
-    triggerHapticFeedback(HapticFeedbackType.LIGHT);
-    // 공지사항 상세 페이지로 이동 (PushLog의 plt_idx 사용)
-    router.push(`/notice/${notice.plt_idx}`);
+    try {
+      triggerHapticFeedback(HapticFeedbackType.LIGHT);
+      router.push(`/notice/${notice.plt_idx}`);
+    } catch (error) {
+      console.error('[NOTICE PAGE] Notice click error:', error);
+    }
   };
 
   // 날짜별 그룹핑 및 정렬
-  const sorted = [...notices].sort((a, b) => new Date(b.plt_sdate).getTime() - new Date(a.plt_sdate).getTime());
+  const sorted = notices && Array.isArray(notices) ? [...notices].sort((a, b) => new Date(b.plt_sdate).getTime() - new Date(a.plt_sdate).getTime()) : [];
   const grouped = groupByDate(sorted);
+
+  // 안전한 렌더링을 위한 조건부 체크
+  if (!user || !user.mt_idx) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse">
+            <FiBell className="w-6 h-6 text-blue-500" />
+          </div>
+          <p className="text-gray-500">사용자 정보를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
       <style jsx global>{pageAnimations}</style>
-      <div className="schedule-page-container bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-        {/* 고정 헤더 */}
-        <AnimatedHeader 
-          variant="enhanced"
-          className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        {/* 고정 헤더 (group 페이지와 동일한 스타일) */}
+        <AnimatedHeader
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed notice-header"
+          style={{ 
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px',
+            position: 'fixed',
+            height: '64px'
+          }}
         >
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="flex items-center justify-between h-14 px-4"
-          >
-            <div className="flex items-center space-x-3">
-              <motion.button 
+          <div className="flex items-center justify-between h-14 px-4">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center space-x-3"
+            >
+              <button
                 onClick={handleBack}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5, duration: 0.4 }}
                 className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-              </motion.button>
-              <motion.div 
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.6, duration: 0.4 }}
-                className="flex items-center space-x-3"
-              >
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">알림</h1>
-                  <p className="text-xs text-gray-500">최신 소식을 확인하세요</p>
-                </div>
-              </motion.div>
-            </div>
-          </motion.div>
+              </button>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">알림</h1>
+                <p className="text-xs text-gray-500">최신 소식을 확인하세요</p>
+              </div>
+            </motion.div>
+          </div>
         </AnimatedHeader>
 
         {/* 스크롤 가능한 메인 컨텐츠 */}
@@ -269,9 +338,10 @@ export default function NoticePage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="schedule-page-content px-4 pt-20 space-y-6 pb-24"
+          className="px-4 space-y-6 pb-24 min-h-screen"
+          style={{ paddingTop: '40px' }}
         >
-          {loading ? (
+          {loading || !isInitialized ? (
             /* 스켈레톤 로딩 */
             <div className="space-y-6 mt-6">
               {[1, 2, 3].map((sectionIndex) => (
@@ -332,25 +402,52 @@ export default function NoticePage() {
                 <p className="text-gray-500 text-sm">알림을 불러오는 중...</p>
               </motion.div>
             </div>
+          ) : error ? (
+            /* 에러 상태 */
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <FiBell className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">오류가 발생했습니다</h3>
+              <p className="text-gray-500 mb-4">{error}</p>
+              <button
+                onClick={() => {
+                  setError(null);
+                  setIsInitialized(false);
+                  dataFetchedRef.current = false;
+                  if (user?.mt_idx) {
+                    loadNotices(user.mt_idx);
+                  }
+                }}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                다시 시도
+              </button>
+            </div>
           ) : (
             /* 알림 목록 - 날짜별 그룹핑 */
             <div className="space-y-6">
-              {Object.entries(grouped).map(([date, items]) => (
+              {Object.entries(grouped).map(([date, items], sectionIndex) => (
                 <section key={date} className="relative">
-                  {/* 날짜 헤더 */}
+                  {/* 날짜 헤더 - 스크롤 시 고정 */}
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5 }}
-                    className="sticky top-1 z-[8] mb-5"
+                    className="sticky top-16 z-[8] mb-5"
+                    style={{ 
+                      top: '64px', // 헤더 높이만큼 아래에 고정
+                      zIndex: 8,
+                      position: 'sticky'
+                    }}
                   >
-                    <div className="bg-gray-900 backdrop-blur-md rounded-lg px-4 py-2 mx-2 shadow-sm border border-gray-800 text-white">
+                    <div className="bg-gray-900 backdrop-blur-md rounded-lg px-4 py-2 mx-2 shadow-sm border border-gray-800 text-white transition-all duration-300">
                       <div className="flex items-center justify-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
                         <span className="text-sm font-semibold text-white">
                           {format(new Date(date), 'MM월 dd일 (E)', { locale: ko })}
                         </span>
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
                       </div>
                     </div>
                   </motion.div>
@@ -359,7 +456,7 @@ export default function NoticePage() {
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6 }}
+                    transition={{ duration: 0.6, delay: sectionIndex * 0.1 }}
                     className="bg-white rounded-2xl shadow-sm border border-gray-200/50 mx-2 overflow-hidden"
                   >
                     {items.map((item, index) => (

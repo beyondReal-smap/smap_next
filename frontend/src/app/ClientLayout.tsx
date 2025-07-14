@@ -74,35 +74,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       console.log('[AUTH GUARD] 🚫 전역 에러 모달 활성화 - 모든 네비게이션 차단');
       return;
     }
-    
-    console.log('[AUTH GUARD] 상태 체크:', { 
-      pathname, 
-      isLoggedIn, 
-      loading, 
-      isPublicRoute: PUBLIC_ROUTES.includes(pathname) 
-    });
 
     // 로딩 중이면 대기
     if (loading) {
-      console.log('[AUTH GUARD] 로딩 중, 대기...');
       return;
     }
 
     // 공개 페이지는 인증 체크 안함
     if (PUBLIC_ROUTES.includes(pathname)) {
-      console.log('[AUTH GUARD] 공개 페이지, 인증 체크 생략:', pathname);
       return;
     }
 
     // 로그인되지 않은 상태에서 보호된 페이지 접근 시 즉시 signin으로 리다이렉트
     // 단, 이미 signin 페이지에 있으면 리다이렉트하지 않음
     if (!isLoggedIn && pathname !== '/signin') {
-      console.log('[AUTH GUARD] 인증되지 않은 접근, 즉시 signin으로 리다이렉트:', pathname);
+      console.log('[AUTH GUARD] 인증되지 않은 접근, signin으로 리다이렉트:', pathname);
       router.replace('/signin'); // push 대신 replace 사용으로 뒤로가기 방지
       return;
     }
-
-    console.log('[AUTH GUARD] 인증된 사용자, 접근 허용:', pathname);
   }, [isLoggedIn, loading, pathname, router]);
 
   // 로딩 중이면 로딩 화면 표시
@@ -169,14 +158,10 @@ export default function ClientLayout({
     // 현재 경로가 지정된 페이지들 중 하나로 시작하는지 확인
     const shouldShow = showNavBarPages.some(page => pathname?.startsWith(page));
     
-    console.log('[ClientLayout] 네비게이션 바 표시 조건 체크:', { 
-      pathname, 
-      shouldShow, 
-      showNavBarPages,
-      shouldHide: !shouldShow
-    });
+    // notice 페이지는 네비게이션 바를 숨기는 페이지로 명시적 처리
+    const isNoticePage = pathname?.startsWith('/notice');
     
-    return !shouldShow; // 지정된 페이지가 아니면 숨김
+    return !shouldShow || isNoticePage; // 지정된 페이지가 아니거나 notice 페이지면 숨김
   }, [pathname]);
 
   // body에 클래스 및 data-page 속성 추가/제거
@@ -203,11 +188,11 @@ export default function ClientLayout({
     };
   }, [shouldHideNavBar, pathname]);
   
-  // 디버깅용 로그 - 개발 환경에서만 출력
+  // 디버깅용 로그 - 개발 환경에서만 출력 (성능 최적화)
   React.useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('[ClientLayout] 현재 경로:', pathname);
-      console.log('[ClientLayout] 네비게이션 숨김 여부:', shouldHideNavBar);
+      // pathname이 실제로 변경될 때만 로그 출력
+      console.log('[ClientLayout] 경로 변경:', pathname, '네비게이션 숨김:', shouldHideNavBar);
     }
   }, [pathname, shouldHideNavBar]);
 

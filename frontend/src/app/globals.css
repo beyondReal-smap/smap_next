@@ -932,6 +932,174 @@ body:has(.hide-bottom-nav) {
   padding-bottom: 0 !important;
 }
 
+/* notice 페이지에서 고정 요소만 스타일 리셋 */
+
+/* notice 페이지 헤더는 모바일/웹앱 최적화 고정 헤더 */
+body[data-page="/notice"] .header-fixed,
+body[data-page="/notice"] header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  z-index: 100 !important;
+  background: #fff !important;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.04) !important;
+  border-bottom: 1px solid #eee !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+/* notice 페이지 메인 컨텐츠 영역 여백 조정 */
+body[data-page="/notice"] .min-h-screen > div:last-child {
+  padding-top: 40px !important;
+  margin-top: 0 !important;
+}
+
+/* notice 페이지 sticky 날짜 헤더 스타일 */
+body[data-page="/notice"] .sticky {
+  position: sticky !important;
+  top: 64px !important;
+  z-index: 8 !important;
+  background: rgba(17, 24, 39, 0.95) !important;
+  backdrop-filter: blur(10px) !important;
+  border-radius: 8px !important;
+  margin: 0 8px 20px 8px !important;
+}
+
+/* notice 페이지 강제 스타일 오버라이드 */
+body[data-page="/notice"] * {
+  box-sizing: border-box !important;
+}
+
+/* notice 페이지 헤더 고정 스타일 강화 */
+body[data-page="/notice"] header,
+body[data-page="/notice"] .header-fixed,
+body[data-page="/notice"] .notice-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  z-index: 100 !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* setting 페이지 헤더 스타일 - 한 곳에서 관리 */
+.setting-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 999999 !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+.setting-header-content {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  height: 56px !important;
+  padding: 0 16px !important;
+  gap: 12px !important;
+}
+
+.setting-back-button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  padding: 8px !important;
+}
+
+.setting-back-button:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+.setting-header-text {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  height: 100% !important;
+}
+
+.setting-header-text h1 {
+  line-height: 1.2 !important;
+  margin: 0 !important;
+}
+
+.setting-header-text p {
+  line-height: 1.2 !important;
+  margin: 0 !important;
+}
+
+/* setting 페이지 메인 컨텐츠 영역 여백 제거 */
+body[data-page="/setting"] .flex-1.overflow-y-auto {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* notice 페이지에서 고정 요소만 스타일 리셋 */
+
+/* notice 페이지 헤더는 모바일/웹앱 최적화 고정 헤더 */
+body[data-page="/notice"] .header-fixed,
+body[data-page="/notice"] header,
+body[data-page="/notice"] .notice-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  z-index: 100 !important;
+  background: #fff !important;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.04) !important;
+  border-bottom: 1px solid #eee !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  touch-action: manipulation !important;
+}
+
 /* 기본 메인 콘텐츠 영역 여백 */
 main {
   margin-bottom: 16px !important;

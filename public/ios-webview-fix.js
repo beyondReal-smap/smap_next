@@ -1209,13 +1209,14 @@
     function enforceFixedElements() {
       console.log('[iOS WebView] 고정 요소 (헤더/네비게이션) 최적화...');
       
-      // CSS 고정 요소 최적화 스타일 추가
+      // CSS 고정 요소 최적화 스타일 추가 (notice 페이지 제외)
       const fixedElementStyle = document.createElement('style');
       fixedElementStyle.id = 'ios-fixed-element-style';
       if (!document.getElementById('ios-fixed-element-style')) {
         fixedElementStyle.textContent = `
-          /* iOS 웹뷰 헤더 고정 보장 */
-          .header-fixed, header[class*="fixed"] {
+          /* iOS 웹뷰 헤더 고정 보장 (notice 페이지 제외) */
+          body:not([data-page="/notice"]) .header-fixed, 
+          body:not([data-page="/notice"]) header[class*="fixed"] {
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
@@ -1231,8 +1232,10 @@
             -webkit-backface-visibility: hidden !important;
           }
           
-          /* iOS 웹뷰 네비게이션 고정 보장 */
-          .navigation-fixed, nav[class*="fixed"], nav[class*="bottom"] {
+          /* iOS 웹뷰 네비게이션 고정 보장 (notice 페이지 제외) */
+          body:not([data-page="/notice"]) .navigation-fixed, 
+          body:not([data-page="/notice"]) nav[class*="fixed"], 
+          body:not([data-page="/notice"]) nav[class*="bottom"] {
             position: fixed !important;
             bottom: 0 !important;
             left: 0 !important;
@@ -1248,24 +1251,54 @@
             -webkit-backface-visibility: hidden !important;
           }
           
-          /* iOS Safe Area 대응 */
+          /* iOS Safe Area 대응 (notice 페이지 제외) */
           @supports (padding: max(0px)) {
-            .header-fixed, header[class*="fixed"] {
+            body:not([data-page="/notice"]) .header-fixed, 
+            body:not([data-page="/notice"]) header[class*="fixed"] {
               padding-top: max(16px, env(safe-area-inset-top)) !important;
             }
             
-            .navigation-fixed, nav[class*="fixed"], nav[class*="bottom"] {
+            body:not([data-page="/notice"]) .navigation-fixed, 
+            body:not([data-page="/notice"]) nav[class*="fixed"], 
+            body:not([data-page="/notice"]) nav[class*="bottom"] {
               padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
             }
           }
           
-          /* 모든 고정 요소에 대한 iOS 최적화 */
-          .fixed, [style*="position: fixed"], [style*="position:fixed"] {
+          /* 모든 고정 요소에 대한 iOS 최적화 (notice 페이지 제외) */
+          body:not([data-page="/notice"]) .fixed, 
+          body:not([data-page="/notice"]) [style*="position: fixed"], 
+          body:not([data-page="/notice"]) [style*="position:fixed"] {
             transform: translateZ(0) !important;
             -webkit-transform: translateZ(0) !important;
             will-change: transform !important;
             -webkit-perspective: 1000 !important;
             -webkit-backface-visibility: hidden !important;
+          }
+          
+          /* notice 페이지에서는 고정 요소 스타일 완전 제거 */
+          body[data-page="/notice"] .header-fixed,
+          body[data-page="/notice"] header[class*="fixed"],
+          body[data-page="/notice"] .navigation-fixed,
+          body[data-page="/notice"] nav[class*="fixed"],
+          body[data-page="/notice"] nav[class*="bottom"],
+          body[data-page="/notice"] .fixed,
+          body[data-page="/notice"] [style*="position: fixed"],
+          body[data-page="/notice"] [style*="position:fixed"] {
+            position: static !important;
+            top: auto !important;
+            bottom: auto !important;
+            left: auto !important;
+            right: auto !important;
+            z-index: auto !important;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            transform: none !important;
+            -webkit-transform: none !important;
+            will-change: auto !important;
+            -webkit-perspective: none !important;
+            -webkit-backface-visibility: visible !important;
           }
         `;
         document.head.appendChild(fixedElementStyle);
@@ -1273,6 +1306,11 @@
       
       // 헤더 요소 강제 고정
       function fixHeaders() {
+        // notice 페이지에서는 헤더 고정을 적용하지 않음
+        if (window.location.pathname.startsWith('/notice')) {
+          return;
+        }
+        
         const headerSelectors = [
           'header', 
           '.header-fixed', 
@@ -1305,6 +1343,11 @@
       
       // 네비게이션 요소 강제 고정 (location 페이지 제외)
       function fixNavigations() {
+        // notice 페이지와 location 페이지에서는 네비게이션 바 위치 조정하지 않음
+        if (window.location.pathname === '/location' || window.location.pathname.startsWith('/notice')) {
+          return;
+        }
+        
         const navSelectors = [
           'nav', 
           '.navigation-fixed', 
@@ -1316,11 +1359,6 @@
         navSelectors.forEach(selector => {
           const elements = document.querySelectorAll(selector);
           elements.forEach(nav => {
-            // location 페이지에서는 네비게이션 바 위치 조정하지 않음
-            if (window.location.pathname === '/location') {
-              return;
-            }
-            
             // 하단 네비게이션으로 보이는 요소들만
             const rect = nav.getBoundingClientRect();
             const isBottomNav = rect.bottom >= window.innerHeight - 100 || 

@@ -149,21 +149,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     
     // 🔥 강화된 중복 실행 방지 로직
     if (globalPreloadingState.isPreloading) {
-      console.log(`[AUTH] 프리로딩 이미 진행 중이므로 건너뛰기 (${source}):`, userId);
+      // 로깅 제거 - 과도한 로그 방지
       return;
     }
     
     if (globalPreloadingState.completedUsers.has(userId)) {
       const timeSinceLastPreload = now - globalPreloadingState.lastPreloadTime;
       if (timeSinceLastPreload < 10000) { // 10초 내 중복 방지
-        console.log(`[AUTH] 최근 프리로딩 완료된 사용자이므로 건너뛰기 (${source}):`, userId, `(${timeSinceLastPreload}ms 전)`);
+        // 로깅 제거 - 과도한 로그 방지
         dispatch({ type: 'SET_PRELOADING_COMPLETE', payload: true });
         return;
       }
     }
 
     globalPreloadingState.isPreloading = true;
-    console.log(`[AUTH] 🚀 데이터 프리로딩 시작 (${source}):`, userId);
+    // 로깅 제거 - 과도한 로그 방지
 
     // 프리로딩 타임아웃 설정 (10초로 단축 - UX 개선)
     const timeoutId = setTimeout(() => {
@@ -176,7 +176,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const results = await dataPreloadService.preloadAllData({
         userId,
         onProgress: (step: string, progress: number) => {
-          console.log(`[AUTH] 프리로딩 진행 (${source}): ${step} (${progress}%)`);
+          // 로깅 제거 - 과도한 로그 방지
         }
       });
 
@@ -186,19 +186,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // 캐시에 데이터 저장
       if (results.userProfile) {
         setUserProfile(results.userProfile.data);
-        console.log(`[AUTH] ✅ 사용자 프로필 캐시 저장 완료 (${source})`);
+        // 로깅 제거 - 과도한 로그 방지
       }
 
       if (results.userGroups && results.userGroups.length > 0) {
         setUserGroups(results.userGroups);
-        console.log(`[AUTH] ✅ 사용자 그룹 캐시 저장 완료 (${source}):`, results.userGroups.length);
+        // 로깅 제거 - 과도한 로그 방지
 
         // 각 그룹의 데이터 캐시 저장
         Object.keys(results.groupMembers).forEach(groupId => {
           const members = results.groupMembers[groupId];
           if (members) {
             setGroupMembers(parseInt(groupId), members);
-            console.log(`[AUTH] ✅ 그룹 ${groupId} 멤버 캐시 저장 완료 (${source}):`, members.length);
+            // 로깅 제거 - 과도한 로그 방지
           }
         });
 
@@ -207,7 +207,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (schedules) {
             const today = new Date().toISOString().split('T')[0];
             setScheduleData(parseInt(groupId), today, schedules);
-            console.log(`[AUTH] ✅ 그룹 ${groupId} 스케줄 캐시 저장 완료 (${source})`);
+            // 로깅 제거 - 과도한 로그 방지
           }
         });
 
@@ -215,7 +215,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const places = results.groupPlaces[groupId];
           if (places) {
             setGroupPlaces(parseInt(groupId), places);
-            console.log(`[AUTH] ✅ 그룹 ${groupId} 장소 캐시 저장 완료 (${source}):`, places.length);
+            // 로깅 제거 - 과도한 로그 방지
           }
         });
 
@@ -224,7 +224,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (locationData) {
             const today = new Date().toISOString().split('T')[0];
             setLocationData(parseInt(groupId), today, userId.toString(), locationData);
-            console.log(`[AUTH] ✅ 그룹 ${groupId} 오늘 위치 데이터 캐시 저장 완료 (${source})`);
+            // 로깅 제거 - 과도한 로그 방지
           }
         });
 
@@ -232,7 +232,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           const counts = results.dailyLocationCounts[groupId];
           if (counts) {
             setDailyLocationCounts(parseInt(groupId), counts);
-            console.log(`[AUTH] ✅ 그룹 ${groupId} 일별 카운트 캐시 저장 완료 (${source})`);
+            // 로깅 제거 - 과도한 로그 방지
           }
         });
       }
@@ -242,7 +242,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       globalPreloadingState.lastPreloadTime = now;
       dispatch({ type: 'SET_PRELOADING_COMPLETE', payload: true });
       
-      console.log(`[AUTH] 🎉 프리로딩 완료 (${source}):`, userId);
+      // 로깅 제거 - 과도한 로그 방지
     } catch (error) {
       console.error(`[AUTH] 데이터 프리로딩 실패 (${source}):`, error);
     } finally {
@@ -252,107 +252,76 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // 초기 인증 상태 확인
   useEffect(() => {
+    let isMounted = true;
+    let initializationTimeout: NodeJS.Timeout;
+    
     const initializeAuth = async () => {
       try {
         console.log('[AUTH CONTEXT] 초기 인증 상태 확인 시작');
         
-        // 1. NextAuth 세션 먼저 확인 (최신 상태) - 임시 비활성화
-        console.log('[AUTH CONTEXT] NextAuth 세션 확인 (비활성화됨)');
-        // const session = await getSession();
-        // const session = null;
-        
-        // NextAuth 세션 처리 (임시 비활성화)
-        /*
-        if (session?.backendData?.member) {
-          console.log('[AUTH CONTEXT] NextAuth 세션에서 사용자 데이터 발견:', session.backendData.member.mt_name, 'ID:', session.backendData.member.mt_idx);
-          
-          // 탈퇴한 사용자인지 확인 (mt_level이 1이면 탈퇴한 사용자)
-          if (session.backendData.member.mt_level === 1) {
-            console.log('[AUTH CONTEXT] 탈퇴한 사용자 세션 감지, 세션 정리:', session.backendData.member.mt_idx);
-            
-            // NextAuth 세션 정리
-            try {
-              const { signOut } = await import('next-auth/react');
-              await signOut({ redirect: false });
-              console.log('[AUTH CONTEXT] 탈퇴한 사용자 세션 정리 완료');
-            } catch (error) {
-              console.log('[AUTH CONTEXT] 세션 정리 오류:', error);
-            }
-            
-            // 기존 데이터 정리
-            authService.clearAuthData();
+        // 초기화 타임아웃 설정 (5초)
+        initializationTimeout = setTimeout(() => {
+          if (isMounted) {
+            console.warn('[AUTH CONTEXT] 초기화 타임아웃, 로딩 상태 해제');
             dispatch({ type: 'SET_LOADING', payload: false });
-            return;
           }
-          
-          // 기존 authService 데이터와 비교하여 다른 사용자면 초기화
-          const existingUserData = authService.getUserData();
-          if (existingUserData && existingUserData.mt_idx !== session.backendData.member.mt_idx) {
-            console.log('[AUTH CONTEXT] 다른 사용자 감지, 기존 데이터 초기화:', existingUserData.mt_idx, '->', session.backendData.member.mt_idx);
-            authService.clearAuthData(); // 기존 데이터 완전 삭제
-          }
-          
-          // NextAuth 세션의 데이터를 authService에 저장
-          const userData = session.backendData.member;
-          const token = session.backendData.token || '';
-          
-          console.log('[AUTH CONTEXT] 토큰 저장:', token ? '토큰 있음' : '토큰 없음');
-          
-          authService.setUserData(userData);
-          authService.setToken(token);
-          
-          // localStorage에도 직접 저장 (apiClient가 인식할 수 있도록)
-          if (typeof window !== 'undefined' && token) {
-            localStorage.setItem('auth-token', token);
-            console.log('[AUTH CONTEXT] localStorage에 토큰 저장 완료');
-          }
-          
-          dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
-          // 최신 데이터로 갱신
-          await refreshUserData();
-          
-          // 🚀 NextAuth 세션 사용자 프리로딩 실행 (백그라운드)
-          preloadUserData(userData.mt_idx, 'NextAuth').catch(error => {
-            console.error('[AUTH] NextAuth 사용자 프리로딩 실패:', error);
-          });
-          
-          return;
-        }
-        */
-
-        // 2. NextAuth 세션이 없으면 authService에서 로그인 상태 확인
+        }, 5000);
+        
+        // 2. authService에서 로그인 상태 확인
         const isLoggedInFromService = authService.isLoggedIn();
         console.log('[AUTH CONTEXT] authService.isLoggedIn():', isLoggedInFromService);
         
         if (isLoggedInFromService) {
           const userData = authService.getUserData();
           console.log('[AUTH CONTEXT] authService.getUserData():', userData);
-          if (userData) {
+          if (userData && isMounted) {
             console.log('[AUTH CONTEXT] authService에서 사용자 데이터 발견:', userData.mt_name);
             dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
-            // 최신 데이터로 갱신
-            await refreshUserData();
             
-            // 🚀 authService 사용자 프리로딩 실행 (백그라운드) - NextAuth와 다른 사용자일 때만
-            preloadUserData(userData.mt_idx, 'authService').catch(error => {
-              console.error('[AUTH] authService 사용자 프리로딩 실패:', error);
-            });
+            // 최신 데이터로 갱신 (에러 무시)
+            try {
+              await refreshUserData();
+            } catch (error) {
+              console.warn('[AUTH CONTEXT] 사용자 데이터 갱신 실패 (무시):', error);
+            }
+            
+            // 🚀 authService 사용자 프리로딩 실행 (백그라운드, 에러 무시)
+            if (isMounted) {
+              preloadUserData(userData.mt_idx, 'authService').catch(error => {
+                console.warn('[AUTH] authService 사용자 프리로딩 실패 (무시):', error);
+              });
+            }
             
             return;
           }
         }
 
         // 3. 둘 다 없으면 로그인되지 않은 상태
-        console.log('[AUTH CONTEXT] 로그인 상태 없음');
-        dispatch({ type: 'SET_LOADING', payload: false });
+        if (isMounted) {
+          console.log('[AUTH CONTEXT] 로그인 상태 없음');
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
         
       } catch (error) {
         console.error('[AUTH CONTEXT] 초기 인증 상태 확인 실패:', error);
-        dispatch({ type: 'SET_LOADING', payload: false });
+        if (isMounted) {
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
+      } finally {
+        if (initializationTimeout) {
+          clearTimeout(initializationTimeout);
+        }
       }
     };
 
     initializeAuth();
+    
+    return () => {
+      isMounted = false;
+      if (initializationTimeout) {
+        clearTimeout(initializationTimeout);
+      }
+    };
   }, []);
 
   // 로그인

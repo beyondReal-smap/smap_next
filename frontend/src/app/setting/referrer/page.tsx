@@ -24,6 +24,7 @@ import {
   FiTarget
 } from 'react-icons/fi';
 import { HiSparkles, HiCheckCircle } from 'react-icons/hi2';
+import AnimatedHeader from '../../../components/common/AnimatedHeader';
 
 // 모바일 최적화된 CSS 애니메이션
 const mobileAnimations = `
@@ -363,51 +364,36 @@ export default function ReferrerPage() {
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
         className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen pb-10"
       >
-        {/* 헤더 */}
-        <motion.header 
-          initial={{ y: -100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.3 }}
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+        {/* 통일된 헤더 애니메이션 */}
+        <AnimatedHeader 
+          variant="enhanced"
+          className="setting-header"
         >
-                      <div className="flex items-center justify-between h-14 px-4">
-            <div className="flex items-center space-x-3">
-              <motion.button 
-                onClick={handleBack}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </motion.button>
-              <div className="flex items-center space-x-3">
-                <motion.div
-                  initial={{ rotate: -180, scale: 0 }}
-                  animate={{ rotate: 0, scale: 1 }}
-                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                  className="p-2 bg-indigo-600 rounded-xl"
-                >
-                  <FiUserPlus className="w-5 h-5 text-white" />
-                </motion.div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">친구 초대</h1>
-                  <p className="text-xs text-gray-500">함께하면 더 즐거워요</p>
-                </div>
-              </div>
-            </div>
-            
-            <motion.button
-              onClick={() => setShowShareModal(true)}
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="setting-header-content"
+          >
+            <motion.button 
+              onClick={handleBack}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+              className="setting-back-button"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="p-2 bg-indigo-600 text-white rounded-xl shadow-lg"
             >
-              <FiShare2 className="w-5 h-5" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
             </motion.button>
-          </div>
-        </motion.header>
+            <div className="setting-header-text">
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">친구 초대</h1>
+              <p className="text-xs text-gray-500 leading-tight">함께하면 더 즐거워요</p>
+            </div>
+          </motion.div>
+        </AnimatedHeader>
 
         {/* 내 추천 코드 카드 */}
         <motion.div 

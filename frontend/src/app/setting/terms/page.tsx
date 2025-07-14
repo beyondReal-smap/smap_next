@@ -27,6 +27,7 @@ import { HiSparkles, HiCheckCircle } from 'react-icons/hi2';
 import { useAuth } from '@/contexts/AuthContext';
 import authService from '@/services/authService';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import AnimatedHeader from '../../../components/common/AnimatedHeader';
 
 // 모바일 최적화된 CSS 애니메이션 (노란색 테마)
 const pageAnimations = `
@@ -592,53 +593,36 @@ export default function TermsPage() {
     <>
       <style jsx global>{pageAnimations}</style>
       <div className="schedule-page-container bg-gradient-to-br from-yellow-50 via-white to-amber-50">
-        {/* 헤더 - 설정 페이지와 동일한 애니메이션 */}
-        <motion.header 
-          initial={{ y: -100, opacity: 0, scale: 0.9 }}
-          animate={{ y: 0, opacity: 1, scale: 1 }}
-          transition={{ 
-            delay: 0.2, 
-            duration: 0.8, 
-            ease: [0.25, 0.46, 0.45, 0.94],
-            opacity: { duration: 0.6 },
-            scale: { duration: 0.6 }
-          }}
-          className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
+        {/* 통일된 헤더 애니메이션 */}
+        <AnimatedHeader 
+          variant="enhanced"
+          className="setting-header"
         >
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="flex items-center justify-between h-14 px-4"
+            transition={{ duration: 0.5 }}
+            className="setting-header-content"
           >
-            <div className="flex items-center space-x-3">
-              <motion.button 
-                onClick={handleBack}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5, duration: 0.4 }}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </motion.button>
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, duration: 0.4 }}
-                className="flex items-center space-x-3"
-              >
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">약관 및 동의</h1>
-                  <p className="text-xs text-gray-500">서비스 이용 약관 관리</p>
-                </div>
-              </motion.div>
+            <motion.button 
+              onClick={handleBack}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+              className="setting-back-button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </motion.button>
+            <div className="setting-header-text">
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">약관 및 동의</h1>
+              <p className="text-xs text-gray-500 leading-tight">서비스 이용 약관 관리</p>
             </div>
           </motion.div>
-        </motion.header>
+        </AnimatedHeader>
 
         {/* 메인 컨텐츠 - 설정 페이지와 동일한 구조 */}
         <motion.div

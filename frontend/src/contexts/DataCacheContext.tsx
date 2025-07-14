@@ -192,7 +192,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
         expiresAt: timestamp + (CACHE_DURATION[key as keyof typeof CACHE_DURATION] || 10 * 60 * 1000)
       };
       localStorage.setItem(`smap_cache_${key}`, JSON.stringify(storageData));
-      console.log(`[DATA CACHE] 💾 localStorage 저장: ${key}`);
+      // 로깅 제거 - 과도한 로그 방지
     } catch (error) {
       console.warn(`[DATA CACHE] ⚠️ localStorage 저장 실패: ${key}`, error);
     }
@@ -209,7 +209,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
         return null;
       }
       
-      console.log(`[DATA CACHE] 📂 localStorage에서 로드: ${key}`);
+      // 로깅 제거 - 과도한 로그 방지
       return data;
     } catch (error) {
       console.warn(`[DATA CACHE] ⚠️ localStorage 로드 실패: ${key}`, error);
@@ -231,14 +231,12 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       
       // userProfile 타임스탬프 검사
       if (cleanedLastUpdated.userProfile > 0 && cleanedLastUpdated.userProfile < 9999999999) {
-        console.warn('[DATA CACHE] ⚠️ userProfile 타임스탬프 수정:', cleanedLastUpdated.userProfile);
         cleanedLastUpdated.userProfile = 0; // 무효화
         needsCleanup = true;
       }
       
       // userGroups 타임스탬프 검사
       if (cleanedLastUpdated.userGroups > 0 && cleanedLastUpdated.userGroups < 9999999999) {
-        console.warn('[DATA CACHE] ⚠️ userGroups 타임스탬프 수정:', cleanedLastUpdated.userGroups);
         cleanedLastUpdated.userGroups = 0; // 무효화
         needsCleanup = true;
       }
@@ -247,7 +245,6 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       Object.keys(cleanedLastUpdated.groupMembers).forEach(groupId => {
         const timestamp = cleanedLastUpdated.groupMembers[groupId];
         if (timestamp > 0 && timestamp < 9999999999) {
-          console.warn(`[DATA CACHE] ⚠️ groupMembers(${groupId}) 타임스탬프 수정:`, timestamp);
           cleanedLastUpdated.groupMembers[groupId] = 0; // 무효화
           needsCleanup = true;
         }
@@ -266,23 +263,14 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }, [isInitialized, cache.lastUpdated]);
 
-  // 캐시 상태 변화 추적 (디바운스 적용)
+  // 캐시 상태 변화 추적 (디바운스 적용, 로깅 최소화)
   React.useEffect(() => {
     if (!isInitialized) return;
     
     const timeoutId = setTimeout(() => {
-      const cacheStats = {
-        userProfile: cache.userProfile ? '존재' : '없음',
-        userGroups: cache.userGroups.length,
-        groupMembers: Object.keys(cache.groupMembers).length,
-        scheduleData: Object.keys(cache.scheduleData).length,
-        locationData: Object.keys(cache.locationData).length,
-        groupPlaces: Object.keys(cache.groupPlaces).length,
-        dailyLocationCounts: Object.keys(cache.dailyLocationCounts).length,
-      };
-      
-      console.log('[DATA CACHE] 📊 캐시 상태 업데이트:', cacheStats);
-    }, 500); // 500ms 디바운스
+      // 로깅 제거 - 과도한 로그 방지
+      // console.log('[DATA CACHE] 📊 캐시 상태 업데이트:', cacheStats);
+    }, 1000); // 1초로 증가
     
     return () => clearTimeout(timeoutId);
   }, [cache, isInitialized]);
@@ -353,32 +341,25 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
         return false;
     }
     
-    // 타임스탬프 검증 및 수정
+    // 타임스탬프 형식 오류 감지 및 수정 (초 단위로 저장된 경우)
     let correctedLastUpdate = lastUpdate;
     let timestampCorrected = false;
     
-    // lastUpdate가 초 단위로 저장된 경우 (10자리 숫자) 밀리초로 변환
-    if (lastUpdate > 0 && lastUpdate < 9999999999) { // 10자리 미만이면 초 단위
+    if (lastUpdate > 0 && lastUpdate < 9999999999) {
       correctedLastUpdate = lastUpdate * 1000;
       timestampCorrected = true;
-      console.warn(`[DATA CACHE] ⚠️ 타임스탬프 형식 오류 감지 및 수정: ${lastUpdate} → ${correctedLastUpdate}`);
+      // 로깅 제거 - 과도한 로그 방지
     }
     
     // 수정된 타임스탬프로 유효성 재계산
     const correctedElapsedMs = now - correctedLastUpdate;
     const correctedIsValid = correctedElapsedMs < actualDuration;
     
-    const elapsedSeconds = Math.round(correctedElapsedMs / 1000);
-    const maxSeconds = Math.round(actualDuration / 1000);
-    const status = correctedIsValid ? '유효' : '만료';
-    const softCheck = checkSoft ? ' (소프트)' : '';
-    const correctionNote = timestampCorrected ? ' (타임스탬프 수정됨)' : '';
-    
-    console.log(`[DATA CACHE] 캐시 유효성 검사: ${type}${groupId ? `(${groupId})` : ''}${date ? `[${date}]` : ''}${softCheck} - ${status} (${elapsedSeconds}초/${maxSeconds}초)${correctionNote}`);
+    // 로깅 제거 - 과도한 로그 방지
     
     // 타임스탬프가 수정되었고 캐시가 만료된 경우 캐시 무효화
     if (timestampCorrected && !correctedIsValid) {
-      console.log(`[DATA CACHE] 🔄 잘못된 타임스탬프로 인한 캐시 무효화: ${type}${groupId ? `(${groupId})` : ''}`);
+      // 로깅 제거 - 과도한 로그 방지
       // 해당 캐시 항목의 타임스탬프를 0으로 리셋하여 다음에 새로 로드하도록 함
       setTimeout(() => {
         invalidateCache(type, groupId, date);
@@ -390,7 +371,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // 위치 데이터 - set 함수를 먼저 정의
   const setLocationData = useCallback((groupId: number, date: string, memberId: string, data: any) => {
-    console.log(`[DATA CACHE] 💾 위치 데이터 캐시 저장 (${groupId}/${date}/${memberId}):`, data);
+    // 로깅 제거 - 과도한 로그 방지
     setCache(prev => ({
       ...prev,
       locationData: {
@@ -425,28 +406,28 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   const getLocationData = useCallback((groupId: number, date: string, memberId?: string) => {
     const isValid = isCacheValid('locationData', groupId, date);
     if (!isValid) {
-      console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 만료됨 (${groupId}/${date}${memberId ? `/${memberId}` : ''})`);
+      // 로깅 제거 - 과도한 로그 방지
       return null;
     }
 
     const locationData = cache.locationData[groupId]?.[date];
     if (!locationData) {
-      console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 데이터 없음 (${groupId}/${date}${memberId ? `/${memberId}` : ''})`);
+      // 로깅 제거 - 과도한 로그 방지
       return null;
     }
 
     if (memberId) {
       const memberData = locationData[memberId];
       if (memberData) {
-        console.log(`[DATA CACHE] ✅ 위치 데이터 캐시 히트 (${groupId}/${date}/${memberId}):`, memberData);
+        // 로깅 제거 - 과도한 로그 방지
         return memberData;
       } else {
-        console.log(`[DATA CACHE] ❌ 위치 데이터 캐시 미스 - 멤버 데이터 없음 (${groupId}/${date}/${memberId})`);
+        // 로깅 제거 - 과도한 로그 방지
         return null;
       }
     } else {
       // memberId가 없으면 전체 날짜 데이터 반환
-      console.log(`[DATA CACHE] ✅ 위치 데이터 캐시 히트 - 전체 날짜 (${groupId}/${date}):`, locationData);
+      // 로깅 제거 - 과도한 로그 방지
       return locationData;
     }
   }, [cache.locationData, isCacheValid]);
@@ -456,16 +437,16 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     const isValid = isCacheValid('groupPlaces', groupId);
     const places = cache.groupPlaces[groupId] || [];
     if (isValid && places.length > 0) {
-      console.log(`[DATA CACHE] ✅ 그룹 장소 캐시 히트 (${groupId}):`, places.length, '개');
+      // 로깅 제거 - 과도한 로그 방지
       return places;
     } else {
-      console.log(`[DATA CACHE] ❌ 그룹 장소 캐시 미스 (${groupId})`);
+      // 로깅 제거 - 과도한 로그 방지
       return [];
     }
   }, [cache.groupPlaces, isCacheValid]);
   
   const setGroupPlaces = useCallback((groupId: number, places: any[]) => {
-    console.log(`[DATA CACHE] 💾 그룹 장소 캐시 저장 (${groupId}):`, places.length, '개');
+    // 로깅 제거 - 과도한 로그 방지
     setCache(prev => ({
       ...prev,
       groupPlaces: {
@@ -484,7 +465,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // 일별 위치 카운트 - set 함수를 먼저 정의
   const setDailyLocationCounts = useCallback((groupId: number, counts: any) => {
-    console.log(`[DATA CACHE] 💾 일별 위치 카운트 캐시 저장 (${groupId}):`, counts);
+    // 로깅 제거 - 과도한 로그 방지
     setCache(prev => ({
       ...prev,
       dailyLocationCounts: {
@@ -505,10 +486,10 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     const isValid = isCacheValid('dailyLocationCounts', groupId);
     const counts = cache.dailyLocationCounts[groupId];
     if (isValid && counts) {
-      console.log(`[DATA CACHE] ✅ 일별 위치 카운트 캐시 히트 (${groupId}):`, counts);
+      // 로깅 제거 - 과도한 로그 방지
       return counts;
     } else {
-      console.log(`[DATA CACHE] ❌ 일별 위치 카운트 캐시 미스 (${groupId})`);
+      // 로깅 제거 - 과도한 로그 방지
       return null;
     }
   }, [cache.dailyLocationCounts, isCacheValid]);
@@ -527,11 +508,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       }
     });
     
-    console.log(`[DATA CACHE] 📅 멀티 날짜 위치 데이터 조회 (${groupId}):`, {
-      요청날짜: dates,
-      캐시히트: Object.keys(results),
-      캐시미스: missingDates
-    });
+    // 로깅 제거 - 과도한 로그 방지
     
     return { results, missingDates };
   }, [getLocationData]);
@@ -550,11 +527,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       }
     });
     
-    console.log(`[DATA CACHE] 👥 멀티 멤버 위치 데이터 조회 (${groupId}/${date}):`, {
-      요청멤버: memberIds,
-      캐시히트: Object.keys(results),
-      캐시미스: missingMembers
-    });
+    // 로깅 제거 - 과도한 로그 방지
     
     return { results, missingMembers };
   }, [getLocationData]);
@@ -577,13 +550,13 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       } : null
     };
     
-    console.log(`[DATA CACHE] 📊 캐시 상태 분석 (${groupId}${date ? `/${date}` : ''}):`, analysis);
+    // 로깅 제거 - 과도한 로그 방지
     return analysis;
   }, [cache, isCacheValid]);
 
   // 캐시 무효화
   const invalidateCache = useCallback((type: string, groupId?: number, date?: string) => {
-    console.log(`[DATA CACHE] 🗑️ 캐시 무효화: ${type}${groupId ? `(${groupId})` : ''}${date ? `[${date}]` : ''}`);
+    // 로깅 제거 - 과도한 로그 방지
     setCache(prev => {
       const newCache = { ...prev };
       
@@ -670,7 +643,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // 사용자 프로필 - set 함수를 먼저 정의
   const setUserProfile = useCallback((profile: UserProfile) => {
-    console.log('[DATA CACHE] 💾 사용자 프로필 캐시 저장:', profile);
+    // 로깅 제거 - 과도한 로그 방지
     setCache(prev => ({
       ...prev,
       userProfile: profile,
@@ -686,24 +659,24 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   const getUserProfile = useCallback(() => {
     const isValid = isCacheValid('userProfile');
     if (isValid && cache.userProfile) {
-      console.log('[DATA CACHE] ✅ 사용자 프로필 캐시 히트:', cache.userProfile);
+      // 로깅 제거 - 과도한 로그 방지
       return cache.userProfile;
     } else {
       // 캐시 미스 시 localStorage에서 로드 시도
       const localData = loadFromLocalStorage('userProfile');
       if (localData) {
-        console.log('[DATA CACHE] 📂 localStorage에서 사용자 프로필 로드:', localData);
+        // 로깅 제거 - 과도한 로그 방지
         setUserProfile(localData);
         return localData;
       }
-      console.log('[DATA CACHE] ❌ 사용자 프로필 캐시 미스');
+      // 로깅 제거 - 과도한 로그 방지
       return null;
     }
   }, [cache.userProfile, isCacheValid, loadFromLocalStorage, setUserProfile]);
   
   // 사용자 그룹 - set 함수를 먼저 정의
   const setUserGroups = useCallback((groups: GroupInfo[]) => {
-    console.log('[DATA CACHE] 💾 사용자 그룹 캐시 저장:', groups.length, '개');
+    // 로깅 제거 - 과도한 로그 방지
     setCache(prev => ({
       ...prev,
       userGroups: groups,
@@ -719,17 +692,17 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   const getUserGroups = useCallback(() => {
     const isValid = isCacheValid('userGroups');
     if (isValid && cache.userGroups.length > 0) {
-      console.log('[DATA CACHE] ✅ 사용자 그룹 캐시 히트:', cache.userGroups.length, '개');
+      // 로깅 제거 - 과도한 로그 방지
       return cache.userGroups;
     } else {
       // 캐시 미스 시 localStorage에서 로드 시도
       const localData = loadFromLocalStorage('userGroups');
       if (localData && localData.length > 0) {
-        console.log('[DATA CACHE] 📂 localStorage에서 사용자 그룹 로드:', localData.length, '개');
+        // 로깅 제거 - 과도한 로그 방지
         setUserGroups(localData);
         return localData;
       }
-      console.log('[DATA CACHE] ❌ 사용자 그룹 캐시 미스');
+      // 로깅 제거 - 과도한 로그 방지
       return [];
     }
   }, [cache.userGroups, isCacheValid, loadFromLocalStorage, setUserGroups]);
@@ -737,7 +710,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
   // 그룹 멤버 - set 함수를 먼저 정의
   const setGroupMembers = useCallback((groupId: number, members: GroupMember[]) => {
     const timestamp = Date.now();
-    console.log(`[DATA CACHE] 💾 그룹 멤버 캐시 저장 (${groupId}):`, members.length, '명', `타임스탬프: ${timestamp}`);
+    // 로깅 제거 - 과도한 로그 방지
     setCache(prev => ({
       ...prev,
       groupMembers: {
@@ -760,17 +733,17 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     const isValid = isCacheValid('groupMembers', groupId);
     const members = cache.groupMembers[groupId] || [];
     if (isValid && members.length > 0) {
-      console.log(`[DATA CACHE] ✅ 그룹 멤버 캐시 히트 (${groupId}):`, members.length, '명');
+      // 로깅 제거 - 과도한 로그 방지
       return members;
     } else {
       // 캐시 미스 시 localStorage에서 로드 시도
       const localData = loadFromLocalStorage(`groupMembers_${groupId}`);
       if (localData && localData.length > 0) {
-        console.log(`[DATA CACHE] 📂 localStorage에서 그룹 멤버 로드 (${groupId}):`, localData.length, '명');
+        // 로깅 제거 - 과도한 로그 방지
         setGroupMembers(groupId, localData);
         return localData;
       }
-      console.log(`[DATA CACHE] ❌ 그룹 멤버 캐시 미스 (${groupId})`);
+      // 로깅 제거 - 과도한 로그 방지
       return [];
     }
   }, [cache.groupMembers, isCacheValid, loadFromLocalStorage, setGroupMembers]);
@@ -781,21 +754,21 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     if (isValid && cache.scheduleData[groupId]) {
       if (date) {
         const schedules = cache.scheduleData[groupId]?.[date] || [];
-        console.log(`[DATA CACHE] ✅ 스케줄 데이터 캐시 히트 (${groupId}/${date}):`, schedules.length, '개');
+        // 로깅 제거 - 과도한 로그 방지
         return schedules;
       }
       // 날짜 지정이 없으면 전체 스케줄 반환
       const allSchedules = Object.values(cache.scheduleData[groupId] || {}).flat();
-      console.log(`[DATA CACHE] ✅ 전체 스케줄 데이터 캐시 히트 (${groupId}):`, allSchedules.length, '개');
+      // 로깅 제거 - 과도한 로그 방지
       return allSchedules;
     } else {
-      console.log(`[DATA CACHE] ❌ 스케줄 데이터 캐시 미스 (${groupId}/${date || 'all'})`);
+      // 로깅 제거 - 과도한 로그 방지
       return [];
     }
   }, [cache.scheduleData, isCacheValid]);
   
   const setScheduleData = useCallback((groupId: number, date: string, schedules: any[]) => {
-    console.log(`[DATA CACHE] 💾 스케줄 데이터 캐시 저장 (${groupId}/${date}):`, schedules.length, '개');
+    // 로깅 제거 - 과도한 로그 방지
     setCache(prev => ({
       ...prev,
       scheduleData: {
@@ -824,7 +797,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     locationData?: { [groupId: string]: { [date: string]: { [memberId: string]: any } } };
     dailyLocationCounts?: { [groupId: string]: any };
   }) => {
-    console.log('[DATA CACHE] 🚀 일괄 데이터 저장 시작');
+    // 로깅 제거 - 과도한 로그 방지
     
     if (data.userProfile) {
       setUserProfile(data.userProfile);
@@ -861,14 +834,16 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       });
     }
     
-    console.log('[DATA CACHE] ✅ 일괄 데이터 저장 완료');
+    // 로깅 제거 - 과도한 로그 방지
   }, [setUserProfile, setUserGroups, setGroupMembers, setLocationData, setDailyLocationCounts, saveToLocalStorage]);
 
   // 🆕 디버깅 및 상태 확인 함수들 추가
   const debugCacheStatus = useCallback(() => {
+    // 로깅 제거 - 과도한 로그 방지
     console.log('🔍 [DATA CACHE DEBUG] === 캐시 상태 전체 확인 ===');
     
     // 메모리 캐시 상태
+    // 로깅 제거 - 과도한 로그 방지
     console.log('📊 메모리 캐시 상태:');
     console.log('  - userProfile:', cache.userProfile ? '존재' : '없음', cache.userProfile);
     console.log('  - userGroups:', cache.userGroups.length, '개', cache.userGroups);
@@ -879,6 +854,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     console.log('  - dailyLocationCounts:', Object.keys(cache.dailyLocationCounts).length, '개 그룹');
     
     // 타임스탬프 상태
+    // 로깅 제거 - 과도한 로그 방지
     console.log('⏰ 타임스탬프 상태:');
     console.log('  - userProfile:', cache.lastUpdated.userProfile);
     console.log('  - userGroups:', cache.lastUpdated.userGroups);
@@ -889,6 +865,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     console.log('  - dailyLocationCounts:', cache.lastUpdated.dailyLocationCounts);
     
     // localStorage 상태
+    // 로깅 제거 - 과도한 로그 방지
     console.log('💾 localStorage 상태:');
     try {
       const localStorageKeys = Object.keys(localStorage).filter(key => key.startsWith('smap_cache_'));
@@ -902,6 +879,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
     
     // 캐시 유효성 검사
+    // 로깅 제거 - 과도한 로그 방지
     console.log('✅ 캐시 유효성 검사:');
     console.log('  - userProfile:', isCacheValid('userProfile'));
     console.log('  - userGroups:', isCacheValid('userGroups'));
@@ -913,6 +891,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       });
     }
     
+    // 로깅 제거 - 과도한 로그 방지
     console.log('🔍 [DATA CACHE DEBUG] === 확인 완료 ===');
   }, [cache, isCacheValid, loadFromLocalStorage]);
 
@@ -977,6 +956,7 @@ export const DataCacheProvider: React.FC<{ children: ReactNode }> = ({ children 
       console.warn('localStorage 수집 실패:', error);
     }
     
+    // 로깅 제거 - 과도한 로그 방지
     console.log('📤 [DATA CACHE EXPORT] 캐시 데이터 내보내기:', exportData);
     return exportData;
   }, [cache, loadFromLocalStorage]);

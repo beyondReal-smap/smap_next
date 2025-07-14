@@ -5513,12 +5513,11 @@ export default function HomePage() {
                   justifyContent: 'center',
                   height: '56px'  // 헤더 높이와 동일하게 설정
                 }}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={{ 
-                  duration: 0.6,
-                  delay: 0.2,
-                  ease: "easeOut"
+                  duration: 0.3,
+                  delay: 0.1
                 }}
               >
                 <button

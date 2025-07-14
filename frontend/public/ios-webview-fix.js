@@ -415,31 +415,28 @@
       window.location.reload();
     };
     
-    // 2. iOS WebView에서 fetch 요청 최적화
+    // 2. iOS WebView에서 fetch 요청 최적화 (안전한 버전)
     const originalFetch = window.fetch;
     window.fetch = function(url, options = {}) {
-      // 기본 옵션 설정
-      const defaultOptions = {
-        cache: 'no-cache',
-        credentials: 'same-origin',
-        ...options
+      // 기본 옵션 설정 (최소한의 설정만)
+      const fetchOptions = {
+        ...options,
+        credentials: options.credentials || 'same-origin'
       };
       
-      // 타임아웃 설정
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Request timeout')), 10000);
-      });
-      
-      const fetchPromise = originalFetch(url, defaultOptions);
-      
-      return Promise.race([fetchPromise, timeoutPromise])
+      // 원본 fetch 호출
+      return originalFetch(url, fetchOptions)
         .catch(error => {
           console.warn('Fetch error in iOS WebView:', error);
-          // 네트워크 에러인 경우 재시도
-          if (error.message.includes('timeout') || error.message.includes('network')) {
-            console.log('Retrying fetch request...');
-            return originalFetch(url, defaultOptions);
+          
+          // 특정 에러 타입에 대해서만 재시도
+          if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            console.log('Network error detected, retrying once...');
+            // 한 번만 재시도
+            return originalFetch(url, fetchOptions);
           }
+          
+          // 다른 에러는 그대로 전파
           throw error;
         });
     };
@@ -1215,8 +1212,9 @@
       fixedElementStyle.id = 'ios-fixed-element-style';
       if (!document.getElementById('ios-fixed-element-style')) {
         fixedElementStyle.textContent = `
-          /* iOS 웹뷰 헤더 고정 보장 */
-          .header-fixed, header[class*="fixed"] {
+          /* iOS 웹뷰 헤더 고정 보장 (notice, setting 페이지 제외) */
+          .header-fixed:not([data-page="/notice"]):not([data-page="/setting"]), 
+          header[class*="fixed"]:not([data-page="/notice"]):not([data-page="/setting"]) {
             position: fixed !important;
             top: 0 !important;
             left: 0 !important;
@@ -1272,8 +1270,13 @@
         document.head.appendChild(fixedElementStyle);
       }
       
-      // 헤더 요소 강제 고정
+      // 헤더 요소 강제 고정 (setting, notice 페이지 제외)
       function fixHeaders() {
+        // setting, notice 페이지에서는 헤더 강제 고정하지 않음
+        if (window.location.pathname.startsWith('/setting') || window.location.pathname.startsWith('/notice')) {
+          return;
+        }
+        
         const headerSelectors = [
           'header', 
           '.header-fixed', 
@@ -1304,7 +1307,7 @@
         });
       }
       
-      // 네비게이션 요소 강제 고정 (location 페이지 제외)
+      // 네비게이션 요소 강제 고정 (location, setting 페이지 제외)
       function fixNavigations() {
         const navSelectors = [
           'nav', 
@@ -1317,8 +1320,8 @@
         navSelectors.forEach(selector => {
           const elements = document.querySelectorAll(selector);
           elements.forEach(nav => {
-            // location 페이지에서는 네비게이션 바 위치 조정하지 않음
-            if (window.location.pathname === '/location') {
+            // location, setting 페이지에서는 네비게이션 바 위치 조정하지 않음
+            if (window.location.pathname === '/location' || window.location.pathname.startsWith('/setting')) {
               return;
             }
             

@@ -401,45 +401,33 @@ export default function CouponPage() {
       >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+          variant="enhanced"
+          className="setting-header"
         >
-                      <div className="flex items-center justify-between h-14 px-4">
-            <div className="flex items-center space-x-3">
-              <motion.button 
-                onClick={handleBack}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </motion.button>
-              <div className="flex items-center space-x-3">
-                <motion.div
-                  initial={{ rotate: -180, scale: 0 }}
-                  animate={{ rotate: 0, scale: 1 }}
-                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                  className="p-2 bg-pink-600 rounded-xl"
-                >
-                  <FiGift className="w-5 h-5 text-white" />
-                </motion.div>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">쿠폰함</h1>
-                  <p className="text-xs text-gray-500">할인 혜택을 확인하세요</p>
-                </div>
-              </div>
-            </div>
-            
-            <motion.button
-              onClick={() => setShowAddModal(true)}
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="setting-header-content"
+          >
+            <motion.button 
+              onClick={handleBack}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+              className="setting-back-button"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="p-2 bg-pink-600 text-white rounded-xl shadow-lg"
             >
-              <FiPlus className="w-5 h-5" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
             </motion.button>
-          </div>
+            <div className="setting-header-text">
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">쿠폰함</h1>
+              <p className="text-xs text-gray-500 leading-tight">할인 혜택을 확인하세요</p>
+            </div>
+          </motion.div>
         </AnimatedHeader>
 
         {/* 통계 카드 */}
