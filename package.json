@@ -23,6 +23,7 @@
     "@types/google.maps": "^3.55.3",
     "@types/node-fetch": "2.6.12",
     "@types/react": "^18.2.0",
+    "@vercel/analytics": "1.5.0",
     "@vercel/speed-insights": "1.2.0",
     "autoprefixer": "^10.4.17",
     "axios": "^1.6.7",

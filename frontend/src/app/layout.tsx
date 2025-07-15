@@ -8,6 +8,7 @@ import config, { APP_INFO, getLocalizedAppInfo } from '../config'
 import Script from 'next/script'
 import { Inter } from 'next/font/google'
 import { SpeedInsights } from "@vercel/speed-insights/next"
+import { Analytics } from "@vercel/analytics/next"
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -317,6 +318,8 @@ export default function RootLayout({
         <div id="root-portal"></div>
         {/* SpeedInsights for Vercel */}
         <SpeedInsights />
+        {/* Analytics for Vercel */}
+        <Analytics />
         {/* 성능 모니터링 (개발 환경에서만) */}
         {process.env.NODE_ENV === 'development' && (
           <script
