@@ -19,12 +19,12 @@
       "destination": "/api/$1"
     },
     {
-      "source": "/logs",
-      "destination": "/logs"
+      "source": "/activelog",
+      "destination": "/activelog"
     },
     {
-      "source": "/logs/(.*)",
-      "destination": "/logs/$1"
+      "source": "/activelog/(.*)",
+      "destination": "/activelog/$1"
     },
     {
       "source": "/(.*)",
