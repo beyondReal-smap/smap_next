@@ -150,10 +150,10 @@ export default function ClientLayout({
     unregisterServiceWorker();
   }, []);
 
-  // 네비게이션 바를 보여줄 페이지들만 지정 - 화이트리스트 방식
+      // 네비게이션 바를 보여줄 페이지들만 지정 - 화이트리스트 방식
   const shouldHideNavBar = React.useMemo(() => {
     // 네비게이션바를 보여줄 페이지들 (정확한 경로 매칭)
-    const showNavBarPages = ['/home', '/group', '/schedule', '/location', '/logs'];
+    const showNavBarPages = ['/home', '/group', '/schedule', '/location', '/activelog'];
     
     // 현재 경로가 지정된 페이지들 중 하나로 시작하는지 확인
     const shouldShow = showNavBarPages.some(page => pathname?.startsWith(page));

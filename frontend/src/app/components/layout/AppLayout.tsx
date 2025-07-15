@@ -30,11 +30,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
     { name: '그룹', path: '/group', icon: 'users' },
     { name: '일정', path: '/schedule', icon: 'calendar' },
     { name: '내장소', path: '/location', icon: 'map-pin' },
-    { name: '활동 로그', path: '/logs', icon: 'document' },
+    { name: '활동 로그', path: '/activelog', icon: 'document' },
   ];
   
   // 특정 페이지 확인 (일정, 내장소, 로그)
-  const simplifiedHeaderPages = ['/schedule', '/location', '/logs'];
+  const simplifiedHeaderPages = ['/schedule', '/location', '/activelog'];
   const isSimplifiedHeader = simplifiedHeaderPages.some(path => pathname?.startsWith(path) ?? false);
   
   // 헤더가 없는 페이지 확인 (그룹)

@@ -52,13 +52,13 @@ export default function HomePage() {
           <span className="text-sm font-medium text-gray-700">내장소</span>
         </Link>
         
-        <Link href="/logs" className="bg-white p-4 rounded-xl shadow-sm text-center hover:shadow-md transition-shadow">
+        <Link href="/activelog" className="bg-white p-4 rounded-xl shadow-sm text-center hover:shadow-md transition-shadow">
           <div className="w-12 h-12 mx-auto bg-indigo-100 rounded-full flex items-center justify-center mb-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <span className="text-sm font-medium text-gray-700">로그</span>
+          <span className="text-sm font-medium text-gray-700">활동로그</span>
         </Link>
       </div>
 

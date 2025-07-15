@@ -42,7 +42,7 @@ const LogParser = dynamic(() => import('../components/layout/LogParser'), {
   ssr: false
 });
 
-const MemberCalendar = dynamic(() => import('../../components/logs/MemberCalendar'), {
+const MemberCalendar = dynamic(() => import('../../components/activelog/MemberCalendar'), {
   loading: () => (
     <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 border border-white/50 shadow-lg animate-pulse">
       <div className="flex items-center space-x-3 mb-4">
@@ -62,7 +62,7 @@ const MemberCalendar = dynamic(() => import('../../components/logs/MemberCalenda
   ssr: false
 });
 
-const LocationSummaryCard = dynamic(() => import('../../components/logs/LocationSummaryCard'), {
+const LocationSummaryCard = dynamic(() => import('../../components/activelog/LocationSummaryCard'), {
   loading: () => (
     <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 border border-white/50 shadow-lg animate-pulse">
       <div className="grid grid-cols-3 gap-4">
@@ -107,14 +107,14 @@ declare global {
     naver: any;
     gradientPolylines?: any[];
     getRecentDaysDebugLogged?: boolean;
-    // google: any; // google은 logs 페이지에서 아직 사용하지 않으므로 주석 처리 또는 필요시 추가
+    // google: any; // google은 activelog 페이지에서 아직 사용하지 않으므로 주석 처리 또는 필요시 추가
   }
 }
 
 const NAVER_MAPS_CLIENT_ID = API_KEYS.NAVER_MAPS_CLIENT_ID;
 
 // --- home/page.tsx에서 가져온 인터페이스 및 데이터 시작 ---
-interface Location { // home/page.tsx의 Location 인터페이스 (필요시 logs의 기존 LocationData와 병합/조정)
+interface Location { // home/page.tsx의 Location 인터페이스 (필요시 activelog의 기존 LocationData와 병합/조정)
   lat: number;
   lng: number;
 }
@@ -544,7 +544,7 @@ body.sidebar-open .sidebar-content * {
   padding: 16px;
 }
 
-.logs-section {
+  .activelog-section {
   background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
   border: 1px solid rgba(34, 197, 94, 0.2);
   border-radius: 16px;
@@ -612,7 +612,7 @@ body.sidebar-open .sidebar-content * {
 }
 
 /* 경로 따라가기 컨트롤 버튼 위치 */
-.logs-control-buttons {
+  .activelog-control-buttons {
   position: fixed;
   bottom: 16px;
   left: 50%;
@@ -857,7 +857,7 @@ const sortGroupMembers = (members: GroupMember[]): GroupMember[] => {
 let globalPageExecuted = false;
 let globalComponentInstances = 0;
 
-export default function LogsPage() {
+export default function ActivelogPage() {
   const router = useRouter();
   
   // Vercel 환경 감지
@@ -869,7 +869,7 @@ export default function LogsPage() {
   const { user, isLoggedIn, loading: authLoading } = useAuth();
   // UserContext 사용
   const { userInfo, userGroups, isUserDataLoading, userDataError, refreshUserData } = useUser();
-    // DataCacheContext 사용 - LOGS 페이지에서는 캐시 비활성화
+    // DataCacheContext 사용 - ACTIVELOG 페이지에서는 캐시 비활성화
   const {
     getGroupMembers: getCachedGroupMembers,
     setGroupMembers: setCachedGroupMembers,
@@ -881,7 +881,7 @@ export default function LogsPage() {
     invalidateCache
   } = useDataCache();
 
-  // LOGS 페이지 전용 캐시 비활성화 설정
+      // ACTIVELOG 페이지 전용 캐시 비활성화 설정
   const DISABLE_CACHE = true;
   
   // home/page.tsx와 동일한 상태들 추가
@@ -954,7 +954,7 @@ export default function LogsPage() {
   const [naverMapsLoaded, setNaverMapsLoaded] = useState(false);
   const [isMapLoading, setIsMapLoading] = useState(true);
   const [isWaitingForMembers, setIsWaitingForMembers] = useState(true);
-  const [isMapInitializedLogs, setIsMapInitializedLogs] = useState(false); // Logs 페이지용 지도 초기화 상태
+  const [isMapInitializedActivelog, setIsMapInitializedActivelog] = useState(false); // Activelog 페이지용 지도 초기화 상태
   const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false); // 초기 데이터 로딩 상태 추가
 
   // 포괄적인 초기 로딩 상태 관리 추가
@@ -1097,14 +1097,14 @@ export default function LogsPage() {
         'header',
         '.header-fixed',
         '.glass-effect',
-        '.logs-header',
+        '.activelog-header',
         '.register-header-fixed',
         '.group-header',
         '.location-header',
         '.schedule-header',
         '.home-header',
         '[role="banner"]',
-        '#logs-page-container'
+        '#activelog-page-container'
       ];
       
       selectors.forEach(selector => {
@@ -1415,7 +1415,7 @@ export default function LogsPage() {
   useEffect(() => {
     if (
       naverMapsLoaded && 
-      isMapInitializedLogs && 
+      isMapInitializedActivelog && 
       groupMembers.length > 0 && 
       loadingStep !== 'complete'
     ) {
@@ -1431,7 +1431,7 @@ export default function LogsPage() {
         setShowDateSelection(true);
       }, 500);
     }
-  }, [naverMapsLoaded, isMapInitializedLogs, groupMembers.length, loadingStep]);
+      }, [naverMapsLoaded, isMapInitializedActivelog, groupMembers.length, loadingStep]);
 
   // 백업 타이머 - 초기 로딩이 너무 오래 걸리는 경우 강제 완료
   useEffect(() => {
@@ -1523,7 +1523,7 @@ export default function LogsPage() {
     console.log(`🗺️ [LOGS] 네이버 지도 URL: ${naverMapUrl.toString()}`);
     
     const script = document.createElement('script');
-    script.id = 'naver-maps-script-logs'; // 스크립트 ID 변경 (다른 페이지와 충돌 방지)
+    script.id = 'naver-maps-script-activelog'; // 스크립트 ID 변경 (다른 페이지와 충돌 방지)
     script.src = naverMapUrl.toString();
     script.async = true;
     script.defer = true;
@@ -1546,7 +1546,7 @@ export default function LogsPage() {
       setIsMapLoading(false);
     };
     
-    const existingScript = document.getElementById('naver-maps-script-logs');
+    const existingScript = document.getElementById('naver-maps-script-activelog');
     if (existingScript) {
       existingScript.remove();
     }
@@ -1695,7 +1695,7 @@ export default function LogsPage() {
         
         window.naver.maps.Event.addListener(map.current, 'init', () => {
             console.log('[LOGS 지도 초기화] 완료 - 데이터 로딩 준비됨');
-            setIsMapInitializedLogs(true); // 지도 초기화 완료 상태 설정
+            setIsMapInitializedActivelog(true); // 지도 초기화 완료 상태 설정
             setIsMapLoading(false);
             if(map.current) map.current.refresh(true);
             
@@ -1713,26 +1713,26 @@ export default function LogsPage() {
           if (isMapLoading) {
             console.warn('[LOGS 지도 초기화] 타임아웃 - 강제 완료');
             setIsMapLoading(false);
-            setIsMapInitializedLogs(true);
+            setIsMapInitializedActivelog(true);
           }
         }, 10000);
         
       } catch (error) {
         console.error('[LOGS 지도 초기화] 오류:', error);
         setIsMapLoading(false);
-        setIsMapInitializedLogs(true); // 오류 시에도 초기화 완료로 설정
+        setIsMapInitializedActivelog(true); // 오류 시에도 초기화 완료로 설정
       }
     }
   }, [naverMapsLoaded, isWaitingForMembers, groupMembers]);
 
   // 🗺️ 지도 초기화 완료 후 멤버 마커 업데이트
   useEffect(() => {
-    if (map.current && isMapInitializedLogs && groupMembers.length > 0) {
+    if (map.current && isMapInitializedActivelog && groupMembers.length > 0) {
       console.log('[LOGS 지도] 초기화 완료 후 멤버 마커 업데이트');
       // 멤버 마커 업데이트
       updateMemberMarkers(groupMembers, false);
     }
-  }, [isMapInitializedLogs]);
+  }, [isMapInitializedActivelog]);
 
   // 🧹 컴포넌트 정리
   useEffect(() => {
@@ -4832,7 +4832,7 @@ export default function LogsPage() {
   // 지도 마커 데이터가 변경될 때마다 지도에 마커 업데이트 (날짜 변경 중에는 방지)
   useEffect(() => {
     console.log('[LOGS] 마커 데이터 변경 감지:', {
-      isMapInitializedLogs,
+      isMapInitializedActivelog,
       mapMarkersDataLength: mapMarkersData.length,
       mapMarkersData: mapMarkersData.slice(0, 2), // 첫 2개만 로그
       isDateChanging: isDateChangingRef.current,
@@ -4846,7 +4846,7 @@ export default function LogsPage() {
     }
     
     // 마커 데이터가 있을 때만 지도 업데이트 수행 (빈 배열일 때는 건너뜀)
-    if (isMapInitializedLogs && mapMarkersData.length > 0) {
+    if (isMapInitializedActivelog && mapMarkersData.length > 0) {
       console.log('[LOGS] 지도에 마커 업데이트 실행:', mapMarkersData.length, '개');
       
       // 첫 번째 마커(시작지점)를 기준으로 지도 중심 조정
@@ -4896,20 +4896,20 @@ export default function LogsPage() {
     } else {
       console.log('[LOGS] 지도가 초기화되지 않아서 마커 업데이트 건너뜀');
     }
-  }, [mapMarkersData, isMapInitializedLogs, groupMembers]); // groupMembers 종속성 추가
+  }, [mapMarkersData, isMapInitializedActivelog, groupMembers]); // groupMembers 종속성 추가
 
   // 체류시간 데이터가 변경될 때마다 지도에 체류시간 마커 업데이트
   // (updateLocationLogMarkers 내에서 호출되므로 중복 실행 방지를 위해 주석 처리)
   // useEffect(() => {
-  //   if (isMapInitializedLogs && stayTimesData.length > 0) {
+  //   if (isMapInitializedActivelog && stayTimesData.length > 0) {
   //     console.log('[LOGS] 체류시간 데이터 변경 감지 - 지도에 체류시간 마커 업데이트:', stayTimesData.length, '개');
   //     updateStayTimeMarkers(stayTimesData);
   //   }
-  // }, [stayTimesData, isMapInitializedLogs]);
+  // }, [stayTimesData, isMapInitializedActivelog]);
 
   // 그룹 멤버가 변경될 때마다 멤버 마커 업데이트
   useEffect(() => {
-    if (isMapInitializedLogs && groupMembers.length > 0) {
+    if (isMapInitializedActivelog && groupMembers.length > 0) {
       console.log('[LOGS] 그룹 멤버 변경 감지 - 멤버 마커 업데이트:', groupMembers.length, '명');
       // 초기 진입 시에는 멤버 마커 업데이트 허용, 날짜 변경 중이고 초기화 완료된 경우에만 방지
       if (!isDateChangingRef.current || !firstMemberSelected) {
@@ -4933,7 +4933,7 @@ export default function LogsPage() {
         console.log('[LOGS] 날짜 변경 중으로 멤버 마커 업데이트 건너뜀 (초기화 완료 상태)');
       }
     }
-  }, [groupMembers, isMapInitializedLogs, sortedLocationData, firstMemberSelected]);
+  }, [groupMembers, isMapInitializedActivelog, sortedLocationData, firstMemberSelected]);
 
   // 슬라이더 드래그를 위한 전역 이벤트 리스너
   useEffect(() => {
@@ -4982,7 +4982,7 @@ export default function LogsPage() {
   // useEffect for auto-selecting the first member and updating map based on selection
   useEffect(() => {
     console.log("[LogsPage] 🔥 초기 진입 useEffect 실행됨:", {
-      isMapInitializedLogs,
+      isMapInitializedActivelog,
       groupMembersLength: groupMembers.length,
       hasSelectedMember: groupMembers.some(m => m.isSelected),
       selectedDate,
@@ -4998,9 +4998,9 @@ export default function LogsPage() {
     }
 
     // 모든 조건이 준비되었는지 확인
-    if (!isMapInitializedLogs || groupMembers.length === 0 || !selectedDate) {
+    if (!isMapInitializedActivelog || groupMembers.length === 0 || !selectedDate) {
       console.log("[LogsPage] 초기화 조건 미충족:", {
-        isMapInitializedLogs,
+        isMapInitializedActivelog,
         groupMembersLength: groupMembers.length,
         selectedDate
       });
@@ -5117,7 +5117,7 @@ export default function LogsPage() {
     // 비동기 초기화 실행
     initializeFirstMember();
     
-  }, [isMapInitializedLogs, groupMembers.length, selectedDate, firstMemberSelected, groupMembers, selectedGroupId, isUserDataLoading, userGroups.length]);
+  }, [isMapInitializedActivelog, groupMembers.length, selectedDate, firstMemberSelected, groupMembers, selectedGroupId, isUserDataLoading, userGroups.length]);
 
   // 백업 useEffect 제거됨 - 위의 통합 로직에서 처리
 
@@ -6120,7 +6120,7 @@ export default function LogsPage() {
   // 🚨 NEW: mapMarkersData 변경 감지 및 실시간 디버깅 업데이트
   useEffect(() => {
     console.log('[LOGS] 🔄 지도 마커 데이터 변경 감지:', {
-      isMapInitializedLogs: !!map.current,
+      isMapInitializedActivelog: !!map.current,
       mapMarkersDataLength: mapMarkersData?.length || 0,
       mapMarkersData: mapMarkersData || [],
       isDateChanging: isDateChangingRef.current
@@ -6978,7 +6978,7 @@ export default function LogsPage() {
         animate="in"
         exit="out"
         className="fixed inset-0 overflow-hidden hardware-accelerated" 
-        id="logs-page-container"
+        id="activelog-page-container"
         style={{ 
           background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)', 
           paddingTop: '0px',
@@ -6988,7 +6988,7 @@ export default function LogsPage() {
       >
         {/* 통일된 헤더 애니메이션 */}
         <motion.div
-          className="header-fixed glass-effect logs-header"
+                          className="header-fixed glass-effect activelog-header"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
@@ -7251,7 +7251,7 @@ export default function LogsPage() {
           <AnimatePresence>
             {groupMembers.some(m => m.isSelected) && selectedDate && sortedLocationData.length > 0 && (
               <div 
-                className="logs-control-buttons"
+                className="activelog-control-buttons"
                 style={{
                   position: 'fixed',
                   bottom: '70px',
@@ -7429,7 +7429,7 @@ export default function LogsPage() {
 
       {/* 플로팅 사이드바 토글 버튼 */}
       <FloatingButton
-        variant="logs"
+                        variant="activelog"
         onClick={toggleSidebar}
         isOpen={isSidebarOpen}
         badgeCount={groupMembers.length}

@@ -229,7 +229,7 @@ export default function NoticePage() {
       '.glass-effect',
       '.group-header',
       '.register-header-fixed',
-      '.logs-header',
+              '.activelog-header',
       '.location-header',
       '.schedule-header',
       '.home-header',

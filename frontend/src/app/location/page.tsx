@@ -684,7 +684,7 @@ export default function LocationPage() {
         '.glass-effect',
         '.location-header',
         '.register-header-fixed',
-        '.logs-header',
+        '.activelog-header',
         '.group-header',
         '.schedule-header',
         '.home-header',
@@ -1588,7 +1588,7 @@ export default function LocationPage() {
   };
 
   // 그룹 선택 핸들러
-  // 그룹 선택 핸들러 - logs/page.tsx 방식 적용
+          // 그룹 선택 핸들러 - activelog/page.tsx 방식 적용
   const handleGroupSelect = useCallback(async (groupId: number) => {
     console.log('[handleGroupSelect] 그룹 선택:', groupId, '현재 선택된 그룹:', selectedGroupId);
     
@@ -2744,7 +2744,7 @@ export default function LocationPage() {
           console.log('[지도 초기화] 멤버 위치를 찾을 수 없어 기본 위치로 초기화:', { lat: 37.5665, lng: 126.9780 });
         }
         
-      // home, logs 페이지와 동일한 MAP_CONFIG 사용으로 일관성 확보
+              // home, activelog 페이지와 동일한 MAP_CONFIG 사용으로 일관성 확보
       const mapOptions = {
         center: initialCenter,
         zoom: initialZoom,

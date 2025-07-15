@@ -1084,7 +1084,7 @@ export default function HomePage() {
         '.glass-effect',
         '.register-header-fixed',
         '.schedule-header',
-        '.logs-header',
+        '.activelog-header',
         '.location-header',
         '.group-header',
         '.home-header',

@@ -97,7 +97,7 @@ export default function BottomNavBar() {
     { name: '그룹', path: '/group', icon: 'users' },
     { name: '일정', path: '/schedule', icon: 'calendar' },
     { name: '내장소', path: '/location', icon: 'map-pin' },
-    { name: '활동 로그', path: '/logs', icon: 'document' },
+            { name: '활동 로그', path: '/activelog', icon: 'document' },
   ];
 
   // 네비게이션 메뉴 클릭 핸들러

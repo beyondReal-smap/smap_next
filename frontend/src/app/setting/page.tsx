@@ -271,7 +271,7 @@ export default function SettingsPage() {
       '.glass-effect',
       '.group-header',
       '.register-header-fixed',
-      '.logs-header',
+              '.activelog-header',
       '.location-header',
       '.schedule-header',
       '.home-header',
@@ -474,7 +474,7 @@ export default function SettingsPage() {
         </AnimatedHeader>
         
         {/* 메인 컨텐츠 */}
-        <div className="pb-24 px-4 space-y-6">
+        <div className="pb-24 px-4 pt-20 space-y-6">
           {menuSections.map((section, sectionIdx) => (
             <motion.div 
               key={sectionIdx}

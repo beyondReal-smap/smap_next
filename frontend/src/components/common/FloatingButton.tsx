@@ -10,7 +10,7 @@ export interface FloatingButtonProps {
   onClick: () => void;
   
   // 페이지별 커스터마이징
-  variant?: 'home' | 'group' | 'schedule' | 'location' | 'logs' | 'custom';
+  variant?: 'home' | 'group' | 'schedule' | 'location' | 'activelog' | 'custom';
   
   // 커스텀 설정 (variant가 'custom'일 때 사용)
   icon?: React.ReactNode;
@@ -20,7 +20,7 @@ export interface FloatingButtonProps {
     right?: string;
   };
   
-  // 상태 관리 (home, location, logs 페이지용)
+  // 상태 관리 (home, location, activelog 페이지용)
   isOpen?: boolean;
   
   // 배지 표시 (home 페이지용)
@@ -90,7 +90,7 @@ const FloatingButton: React.FC<FloatingButtonProps> = ({
           backgroundColor: '#0113A3'
         };
       
-      case 'logs':
+      case 'activelog':
         return {
           icon: isOpen ? (
             <FiX className="w-6 h-6" />
@@ -179,8 +179,8 @@ const FloatingButton: React.FC<FloatingButtonProps> = ({
         </motion.div>
       )}
       
-      {/* 펄스 효과 (home, location, logs 페이지의 닫힌 상태용) */}
-      {(variant === 'home' || variant === 'location' || variant === 'logs') && !isOpen && (
+      {/* 펄스 효과 (home, location, activelog 페이지의 닫힌 상태용) */}
+      {(variant === 'home' || variant === 'location' || variant === 'activelog') && !isOpen && (
         <motion.div
           className="absolute inset-0 rounded-full"
           style={{ background: config.backgroundColor }}
