@@ -1,6 +1,5 @@
 {
   "buildCommand": "npm run build",
-  "ignoreCommand": "echo 'Skipping build step'",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "npm install",
