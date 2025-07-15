@@ -150,7 +150,6 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: false,
   },
-  swcMinify: true,
   ...(process.env.NODE_ENV === 'development' && {
     devIndicators: {
       buildActivity: true,
