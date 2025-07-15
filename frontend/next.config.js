@@ -263,8 +263,4 @@ const nextConfig = {
   trailingSlash: false,
 };
 
-// module.exports = nextConfig; 
-module.exports = {
-  // output: "export", // ← 이 줄을 삭제 또는 주석 처리
-  // ...other config
-};
+module.exports = nextConfig;
