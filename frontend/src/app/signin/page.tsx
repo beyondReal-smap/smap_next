@@ -122,34 +122,34 @@ const SignInPage = () => {
     }
     
     // 🚨 DOM에 디버그 정보 표시 (시각적으로 확인 가능)
-    const debugDiv = document.createElement('div');
-    debugDiv.id = 'safari-debug-info';
-    debugDiv.style.cssText = `
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      background: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 10px;
-      border-radius: 5px;
-      font-size: 12px;
-      z-index: 9999;
-      max-width: 300px;
-      word-break: break-all;
-    `;
-    debugDiv.innerHTML = `
-      <div><strong>🔍 Safari Debug Info</strong></div>
-      <div>User Agent: ${navigator.userAgent.substring(0, 50)}...</div>
-      <div>URL: ${window.location.href}</div>
-      <div>WebKit: ${hasWebKit ? '✅' : '❌'}</div>
-      <div>MessageHandlers: ${hasMessageHandlers ? '✅' : '❌'}</div>
-      <div>Time: ${new Date().toLocaleTimeString()}</div>
-      <div style="margin-top: 5px;">
-        <button onclick="window.__SAFARI_DEBUG__.test()" style="margin-right: 5px; padding: 2px 5px;">Test</button>
-        <button onclick="window.__SAFARI_DEBUG__.checkEnvironment()" style="padding: 2px 5px;">Check</button>
-      </div>
-    `;
-    document.body.appendChild(debugDiv);
+    // const debugDiv = document.createElement('div');
+    // debugDiv.id = 'safari-debug-info';
+    // debugDiv.style.cssText = `
+    //   position: fixed;
+    //   top: 10px;
+    //   right: 10px;
+    //   background: rgba(0, 0, 0, 0.8);
+    //   color: white;
+    //   padding: 10px;
+    //   border-radius: 5px;
+    //   font-size: 12px;
+    //   z-index: 9999;
+    //   max-width: 300px;
+    //   word-break: break-all;
+    // `;
+    // debugDiv.innerHTML = `
+    //   <div><strong>🔍 Safari Debug Info</strong></div>
+    //   <div>User Agent: ${navigator.userAgent.substring(0, 50)}...</div>
+    //   <div>URL: ${window.location.href}</div>
+    //   <div>WebKit: ${hasWebKit ? '✅' : '❌'}</div>
+    //   <div>MessageHandlers: ${hasMessageHandlers ? '✅' : '❌'}</div>
+    //   <div>Time: ${new Date().toLocaleTimeString()}</div>
+    //   <div style="margin-top: 5px;">
+    //     <button onclick="window.__SAFARI_DEBUG__.test()" style="margin-right: 5px; padding: 2px 5px;">Test</button>
+    //     <button onclick="window.__SAFARI_DEBUG__.checkEnvironment()" style="padding: 2px 5px;">Check</button>
+    //   </div>
+    // `;
+    // document.body.appendChild(debugDiv);
     
     // 전역 함수 등록 (사파리 콘솔에서 직접 호출 가능)
     (window as any).__SAFARI_DEBUG__ = {

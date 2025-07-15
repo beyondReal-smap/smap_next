@@ -7025,38 +7025,6 @@ export default function ActivelogPage() {
           </div>
         </motion.div>
 
-                {/* 🚨 Vercel/iOS 디버깅 패널 (개발 환경에서만 표시) */}
-        {(process.env.NODE_ENV === 'development' || isVercel) && (
-          <div className="fixed top-16 left-4 z-[9998] bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-gray-200 max-w-xs">
-            <div className="text-xs font-mono space-y-1">
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-                <span>Vercel: {isVercel ? 'Yes' : 'No'}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                <span>Auth: {isLoggedIn ? 'Yes' : 'No'}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                <span>Maps: {naverMapsLoaded ? 'Loaded' : 'Loading'}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
-                <span>Members: {groupMembers.length}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-                <span>Step: {loadingStep}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                <span>Failed: {hasInitialLoadFailed ? 'Yes' : 'No'}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* 지도 영역 - 고정 위치 */}
         <motion.div 
           variants={mapContainerVariants}
@@ -7089,7 +7057,7 @@ export default function ActivelogPage() {
             <div 
               className="absolute right-[10px] z-30 z-zoom-control flex flex-col"
               style={{
-                top: '100px'
+                top: '150px'
               }}
             >
               <motion.button
@@ -7130,7 +7098,7 @@ export default function ActivelogPage() {
                 animate="animate"
                 exit="exit"
                 className="absolute left-0 right-0 z-40 z-floating-card flex justify-center px-4"
-                style={{ top: '10px' }}
+                style={{ top: '66px', left: '20px', right: '20px' }}
               >
                 <motion.div
                   whileHover={{ 

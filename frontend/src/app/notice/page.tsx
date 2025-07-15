@@ -30,6 +30,67 @@ html, body {
   position: static !important;
 }
 
+/* 🔥 CRITICAL: 헤더 강제 고정 스타일 */
+.notice-header-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 9999 !important;
+  width: 100vw !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+/* 헤더 내부 컨텐츠 */
+.notice-header-content {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  height: 64px !important;
+  padding: 0 16px !important;
+}
+
+/* Sticky 날짜 헤더 스타일 */
+.notice-date-header {
+  position: sticky !important;
+  top: 64px !important;
+  z-index: 100 !important;
+  background: rgba(17, 24, 39, 0.95) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-radius: 8px !important;
+  margin: 0 8px 20px 8px !important;
+  padding: 8px 16px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  transition: all 0.3s ease !important;
+}
+
+/* 메인 컨텐츠 영역 */
+.notice-main-content {
+  padding-top: 80px !important;
+  margin-top: 0 !important;
+  min-height: calc(100vh - 64px) !important;
+}
+
 @keyframes slideInFromLeft {
   from {
     transform: translateX(-30px);
@@ -221,41 +282,82 @@ export default function NoticePage() {
     };
   }, [user?.mt_idx, loadNotices, isInitialized]);
 
-  // 헤더 위 여백 강제 제거 (group/schedule과 동일)
+  // 헤더 위 여백 강제 제거 및 강제 고정 (notice 페이지 전용)
   useEffect(() => {
-    const selectors = [
-      'header',
-      '.header-fixed',
-      '.glass-effect',
-      '.group-header',
-      '.register-header-fixed',
-              '.activelog-header',
-      '.location-header',
-      '.schedule-header',
-      '.home-header',
-      '[role="banner"]',
-      '#notice-page-container'
-    ];
-    selectors.forEach(selector => {
-      const elements = document.querySelectorAll(selector);
-      elements.forEach((element) => {
-        const htmlElement = element as HTMLElement;
-        htmlElement.style.paddingTop = '0px';
-        htmlElement.style.marginTop = '0px';
-        htmlElement.style.setProperty('padding-top', '0px', 'important');
-        htmlElement.style.setProperty('margin-top', '0px', 'important');
-        if (selector === 'header' || selector.includes('header')) {
-          htmlElement.style.setProperty('top', '0px', 'important');
+    // 강제 헤더 고정을 위한 더욱 강력한 스타일링
+    const forceHeaderFixed = () => {
+      const selectors = [
+        'header',
+        '.header-fixed',
+        '.glass-effect',
+        '.notice-header',
+        '.notice-header-container',
+        '[role="banner"]',
+        '#notice-page-container'
+      ];
+      
+      selectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach((element) => {
+          const htmlElement = element as HTMLElement;
           htmlElement.style.setProperty('position', 'fixed', 'important');
+          htmlElement.style.setProperty('top', '0px', 'important');
+          htmlElement.style.setProperty('left', '0px', 'important');
+          htmlElement.style.setProperty('right', '0px', 'important');
+          htmlElement.style.setProperty('z-index', '9999', 'important');
+          htmlElement.style.setProperty('width', '100vw', 'important');
           htmlElement.style.setProperty('height', '64px', 'important');
-        }
+          htmlElement.style.setProperty('min-height', '64px', 'important');
+          htmlElement.style.setProperty('max-height', '64px', 'important');
+          htmlElement.style.setProperty('padding-top', '0px', 'important');
+          htmlElement.style.setProperty('margin-top', '0px', 'important');
+          htmlElement.style.setProperty('background', 'rgba(255, 255, 255, 0.98)', 'important');
+          htmlElement.style.setProperty('backdrop-filter', 'blur(20px)', 'important');
+          htmlElement.style.setProperty('-webkit-backdrop-filter', 'blur(20px)', 'important');
+          htmlElement.style.setProperty('border-bottom', '1px solid rgba(229, 231, 235, 0.8)', 'important');
+          htmlElement.style.setProperty('box-shadow', '0 2px 16px rgba(0, 0, 0, 0.08)', 'important');
+          htmlElement.style.setProperty('display', 'flex', 'important');
+          htmlElement.style.setProperty('align-items', 'center', 'important');
+          htmlElement.style.setProperty('transform', 'translateZ(0)', 'important');
+          htmlElement.style.setProperty('-webkit-transform', 'translateZ(0)', 'important');
+          htmlElement.style.setProperty('will-change', 'transform', 'important');
+          htmlElement.style.setProperty('visibility', 'visible', 'important');
+          htmlElement.style.setProperty('opacity', '1', 'important');
+        });
       });
+
+      // body와 html의 상단 여백 완전 제거
+      document.body.style.setProperty('padding-top', '0px', 'important');
+      document.body.style.setProperty('margin-top', '0px', 'important');
+      document.documentElement.style.setProperty('padding-top', '0px', 'important');
+      document.documentElement.style.setProperty('margin-top', '0px', 'important');
+
+      // 전역 CSS 클래스 추가
+      document.body.classList.add('notice-page-active');
+      document.documentElement.classList.add('notice-page-active');
+    };
+
+    // 즉시 실행
+    forceHeaderFixed();
+
+    // DOM 변경 감지하여 재적용
+    const observer = new MutationObserver(forceHeaderFixed);
+    observer.observe(document.body, { 
+      childList: true, 
+      subtree: true, 
+      attributes: true,
+      attributeFilter: ['style', 'class']
     });
-    
-    document.body.style.setProperty('padding-top', '0px', 'important');
-    document.body.style.setProperty('margin-top', '0px', 'important');
-    document.documentElement.style.setProperty('padding-top', '0px', 'important');
-    document.documentElement.style.setProperty('margin-top', '0px', 'important');
+
+    // 일정 간격으로 강제 재적용
+    const interval = setInterval(forceHeaderFixed, 1000);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+      document.body.classList.remove('notice-page-active');
+      document.documentElement.classList.remove('notice-page-active');
+    };
   }, []);
 
   const handleBack = () => {
@@ -298,19 +400,9 @@ export default function NoticePage() {
     <>
       <style jsx global>{pageAnimations}</style>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-        {/* 고정 헤더 (group 페이지와 동일한 스타일) */}
-        <AnimatedHeader
-          variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed notice-header"
-          style={{ 
-            paddingTop: '0px',
-            marginTop: '0px',
-            top: '0px',
-            position: 'fixed',
-            height: '64px'
-          }}
-        >
-          <div className="flex items-center justify-between h-14 px-4">
+        {/* 강제 고정 헤더 */}
+        <div className="notice-header-container">
+          <div className="notice-header-content">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -331,15 +423,14 @@ export default function NoticePage() {
               </div>
             </motion.div>
           </div>
-        </AnimatedHeader>
+        </div>
 
         {/* 스크롤 가능한 메인 컨텐츠 */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="px-4 space-y-6 pb-24 min-h-screen"
-          style={{ paddingTop: '40px' }}
+          className="notice-main-content px-4 space-y-6 pb-24"
         >
           {loading || !isInitialized ? (
             /* 스켈레톤 로딩 */
@@ -354,7 +445,7 @@ export default function NoticePage() {
                 >
                   {/* 날짜 헤더 스켈레톤 */}
                   <div className="mb-5">
-                    <div className="bg-gray-200 rounded-lg px-4 py-2 mx-2 animate-pulse">
+                    <div className="notice-date-header">
                       <div className="flex items-center justify-center space-x-2">
                         <div className="w-1.5 h-1.5 bg-gray-300 rounded-full"></div>
                         <div className="h-4 bg-gray-300 rounded w-24"></div>
@@ -429,28 +520,16 @@ export default function NoticePage() {
             <div className="space-y-6">
               {Object.entries(grouped).map(([date, items], sectionIndex) => (
                 <section key={date} className="relative">
-                  {/* 날짜 헤더 - 스크롤 시 고정 */}
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="sticky top-16 z-[8] mb-5"
-                    style={{ 
-                      top: '64px', // 헤더 높이만큼 아래에 고정
-                      zIndex: 8,
-                      position: 'sticky'
-                    }}
-                  >
-                    <div className="bg-gray-900 backdrop-blur-md rounded-lg px-4 py-2 mx-2 shadow-sm border border-gray-800 text-white transition-all duration-300">
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
-                        <span className="text-sm font-semibold text-white">
-                          {format(new Date(date), 'MM월 dd일 (E)', { locale: ko })}
-                        </span>
-                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
-                      </div>
+                  {/* 날짜 헤더 - Sticky 고정 */}
+                  <div className="notice-date-header">
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
+                      <span className="text-sm font-semibold text-white">
+                        {format(new Date(date), 'MM월 dd일 (E)', { locale: ko })}
+                      </span>
+                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
                     </div>
-                  </motion.div>
+                  </div>
 
                   {/* 알림 카드들 */}
                   <motion.div 
