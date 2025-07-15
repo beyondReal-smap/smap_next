@@ -219,12 +219,12 @@ const SignInPage = () => {
   // 🚨 모바일 웹앱 고정 스타일 적용
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // body 스크롤 방지
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
-      document.body.style.height = '100%';
-      document.documentElement.style.overflow = 'hidden';
+      // body 스크롤 방지 (임시 주석 처리)
+      // document.body.style.overflow = 'hidden';
+      // document.body.style.position = 'fixed';
+      // document.body.style.width = '100%';
+      // document.body.style.height = '100%';
+      // document.documentElement.style.overflow = 'hidden';
       
       // 뒤로가기 방지
       const preventBack = (e: PopStateEvent) => {
@@ -236,12 +236,12 @@ const SignInPage = () => {
       window.addEventListener('popstate', preventBack);
       
       return () => {
-        // 정리
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        document.body.style.width = '';
-        document.body.style.height = '';
-        document.documentElement.style.overflow = '';
+        // 정리 (임시 주석 처리)
+        // document.body.style.overflow = '';
+        // document.body.style.position = '';
+        // document.body.style.width = '';
+        // document.body.style.height = '';
+        // document.documentElement.style.overflow = '';
         window.removeEventListener('popstate', preventBack);
       };
     }
