@@ -5,12 +5,11 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { FiBell, FiChevronRight, FiClock, FiStar } from 'react-icons/fi';
+import { FiBell } from 'react-icons/fi';
 import { PushLog } from '@/types/push';
 import notificationService from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
-import AnimatedHeader from '../../components/common/AnimatedHeader';
 
 // 날짜별 그룹핑 함수
 function groupByDate(list: PushLog[]): Record<string, PushLog[]> {
@@ -22,163 +21,7 @@ function groupByDate(list: PushLog[]): Record<string, PushLog[]> {
   }, {});
 }
 
-// 모바일 최적화된 CSS 애니메이션
-const pageAnimations = `
-html, body {
-  width: 100%;
-  overflow-x: hidden;
-  position: static !important;
-}
-
-/* 🔥 CRITICAL: 헤더 강제 고정 스타일 */
-.notice-header-container {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 9999 !important;
-  width: 100vw !important;
-  height: 64px !important;
-  min-height: 64px !important;
-  max-height: 64px !important;
-  background: rgba(255, 255, 255, 0.98) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
-  display: flex !important;
-  align-items: center !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  transform: translateZ(0) !important;
-  -webkit-transform: translateZ(0) !important;
-  will-change: transform !important;
-  -webkit-user-select: none !important;
-  user-select: none !important;
-  touch-action: manipulation !important;
-}
-
-/* 헤더 내부 컨텐츠 */
-.notice-header-content {
-  display: flex !important;
-  align-items: center !important;
-  justify-content: space-between !important;
-  width: 100% !important;
-  height: 64px !important;
-  padding: 0 16px !important;
-}
-
-/* Sticky 날짜 헤더 스타일 */
-.notice-date-header {
-  position: sticky !important;
-  top: 64px !important;
-  z-index: 100 !important;
-  background: rgba(17, 24, 39, 0.95) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border-radius: 8px !important;
-  margin: 0 8px 20px 8px !important;
-  padding: 8px 16px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  transition: all 0.3s ease !important;
-}
-
-/* 메인 컨텐츠 영역 */
-.notice-main-content {
-  padding-top: 80px !important;
-  margin-top: 0 !important;
-  min-height: calc(100vh - 64px) !important;
-}
-
-@keyframes slideInFromLeft {
-  from {
-    transform: translateX(-30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideInFromBottom {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes fadeInScale {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
-  }
-}
-
-.animate-slideInFromLeft {
-  animation: slideInFromLeft 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-}
-
-.animate-slideInFromBottom {
-  animation: slideInFromBottom 0.5s ease-out forwards;
-}
-
-.animate-fadeInScale {
-  animation: fadeInScale 0.4s ease-out forwards;
-}
-
-.animate-pulseGlow {
-  animation: pulseGlow 2s infinite;
-}
-
-.glass-effect {
-  backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.7);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
-}
-
-.notice-item {
-  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  transform: translateX(0);
-}
-
-.notice-item:hover {
-  transform: translateX(4px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-}
-
-.notice-item:active {
-  transform: scale(0.98) translateX(2px);
-}
-
-.gradient-text {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-`;
-
-export default function NoticePage() {
+    export default function NoticePage() {
   const router = useRouter();
   const { user } = useAuth();
   const [notices, setNotices] = useState<PushLog[]>([]);
@@ -282,84 +125,6 @@ export default function NoticePage() {
     };
   }, [user?.mt_idx, loadNotices, isInitialized]);
 
-  // 헤더 위 여백 강제 제거 및 강제 고정 (notice 페이지 전용)
-  useEffect(() => {
-    // 강제 헤더 고정을 위한 더욱 강력한 스타일링
-    const forceHeaderFixed = () => {
-      const selectors = [
-        'header',
-        '.header-fixed',
-        '.glass-effect',
-        '.notice-header',
-        '.notice-header-container',
-        '[role="banner"]',
-        '#notice-page-container'
-      ];
-      
-      selectors.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        elements.forEach((element) => {
-          const htmlElement = element as HTMLElement;
-          htmlElement.style.setProperty('position', 'fixed', 'important');
-          htmlElement.style.setProperty('top', '0px', 'important');
-          htmlElement.style.setProperty('left', '0px', 'important');
-          htmlElement.style.setProperty('right', '0px', 'important');
-          htmlElement.style.setProperty('z-index', '9999', 'important');
-          htmlElement.style.setProperty('width', '100vw', 'important');
-          htmlElement.style.setProperty('height', '64px', 'important');
-          htmlElement.style.setProperty('min-height', '64px', 'important');
-          htmlElement.style.setProperty('max-height', '64px', 'important');
-          htmlElement.style.setProperty('padding-top', '0px', 'important');
-          htmlElement.style.setProperty('margin-top', '0px', 'important');
-          htmlElement.style.setProperty('background', 'rgba(255, 255, 255, 0.98)', 'important');
-          htmlElement.style.setProperty('backdrop-filter', 'blur(20px)', 'important');
-          htmlElement.style.setProperty('-webkit-backdrop-filter', 'blur(20px)', 'important');
-          htmlElement.style.setProperty('border-bottom', '1px solid rgba(229, 231, 235, 0.8)', 'important');
-          htmlElement.style.setProperty('box-shadow', '0 2px 16px rgba(0, 0, 0, 0.08)', 'important');
-          htmlElement.style.setProperty('display', 'flex', 'important');
-          htmlElement.style.setProperty('align-items', 'center', 'important');
-          htmlElement.style.setProperty('transform', 'translateZ(0)', 'important');
-          htmlElement.style.setProperty('-webkit-transform', 'translateZ(0)', 'important');
-          htmlElement.style.setProperty('will-change', 'transform', 'important');
-          htmlElement.style.setProperty('visibility', 'visible', 'important');
-          htmlElement.style.setProperty('opacity', '1', 'important');
-        });
-      });
-
-      // body와 html의 상단 여백 완전 제거
-      document.body.style.setProperty('padding-top', '0px', 'important');
-      document.body.style.setProperty('margin-top', '0px', 'important');
-      document.documentElement.style.setProperty('padding-top', '0px', 'important');
-      document.documentElement.style.setProperty('margin-top', '0px', 'important');
-
-      // 전역 CSS 클래스 추가
-      document.body.classList.add('notice-page-active');
-      document.documentElement.classList.add('notice-page-active');
-    };
-
-    // 즉시 실행
-    forceHeaderFixed();
-
-    // DOM 변경 감지하여 재적용
-    const observer = new MutationObserver(forceHeaderFixed);
-    observer.observe(document.body, { 
-      childList: true, 
-      subtree: true, 
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-
-    // 일정 간격으로 강제 재적용
-    const interval = setInterval(forceHeaderFixed, 1000);
-
-    return () => {
-      observer.disconnect();
-      clearInterval(interval);
-      document.body.classList.remove('notice-page-active');
-      document.documentElement.classList.remove('notice-page-active');
-    };
-  }, []);
-
   const handleBack = () => {
     triggerHapticFeedback(HapticFeedbackType.LIGHT);
     // 뒤로가기 버튼 클릭 시 홈으로 강제 이동
@@ -397,202 +162,161 @@ export default function NoticePage() {
   }
 
   return (
-    <>
-      <style jsx global>{pageAnimations}</style>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-        {/* 강제 고정 헤더 */}
-        <div className="notice-header-container">
-          <div className="notice-header-content">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center space-x-3"
-            >
-              <button
-                onClick={handleBack}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">알림</h1>
-                <p className="text-xs text-gray-500">최신 소식을 확인하세요</p>
-              </div>
-            </motion.div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+      {/* 간단한 고정 헤더 */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-b border-gray-200">
+        <div className="flex items-center px-4 py-3">
+          <button
+            onClick={handleBack}
+            className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="ml-3">
+            <h1 className="text-lg font-bold text-gray-900">알림</h1>
+            <p className="text-xs text-gray-500">최신 소식을 확인하세요</p>
           </div>
         </div>
-
-        {/* 스크롤 가능한 메인 컨텐츠 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="notice-main-content px-4 space-y-6 pb-24"
-        >
-          {loading || !isInitialized ? (
-            /* 스켈레톤 로딩 */
-            <div className="space-y-6 mt-6">
-              {[1, 2, 3].map((sectionIndex) => (
-                <motion.div
-                  key={sectionIndex}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: sectionIndex * 0.1, duration: 0.5 }}
-                  className="relative"
-                >
-                  {/* 날짜 헤더 스켈레톤 */}
-                  <div className="mb-5">
-                    <div className="notice-date-header">
-                      <div className="flex items-center justify-center space-x-2">
-                        <div className="w-1.5 h-1.5 bg-gray-300 rounded-full"></div>
-                        <div className="h-4 bg-gray-300 rounded w-24"></div>
-                        <div className="w-1.5 h-1.5 bg-gray-300 rounded-full"></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 알림 카드 스켈레톤 */}
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mx-2 overflow-hidden">
-                    {[1, 2, 3].map((itemIndex) => (
-                      <div 
-                        key={itemIndex}
-                        className={`flex items-start p-4 animate-pulse ${
-                          itemIndex !== 3 ? 'border-b border-gray-100' : ''
-                        }`}
-                      >
-                        <div className="flex-shrink-0 w-10 h-10 bg-gray-200 rounded-full mr-3 mt-0.5"></div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                            <div className="h-3 bg-gray-200 rounded w-12 ml-2"></div>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="h-3 bg-gray-200 rounded w-full"></div>
-                            <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              ))}
-              
-              {/* 로딩 메시지 */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5, duration: 0.5 }}
-                className="text-center py-8"
-              >
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse">
-                  <FiBell className="w-6 h-6 text-blue-500" />
-                </div>
-                <p className="text-gray-500 text-sm">알림을 불러오는 중...</p>
-              </motion.div>
-            </div>
-          ) : error ? (
-            /* 에러 상태 */
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FiBell className="w-8 h-8 text-red-500" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">오류가 발생했습니다</h3>
-              <p className="text-gray-500 mb-4">{error}</p>
-              <button
-                onClick={() => {
-                  setError(null);
-                  setIsInitialized(false);
-                  dataFetchedRef.current = false;
-                  if (user?.mt_idx) {
-                    loadNotices(user.mt_idx);
-                  }
-                }}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                다시 시도
-              </button>
-            </div>
-          ) : (
-            /* 알림 목록 - 날짜별 그룹핑 */
-            <div className="space-y-6">
-              {Object.entries(grouped).map(([date, items], sectionIndex) => (
-                <section key={date} className="relative">
-                  {/* 날짜 헤더 - Sticky 고정 */}
-                  <div className="notice-date-header">
-                    <div className="flex items-center justify-center space-x-2">
-                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-semibold text-white">
-                        {format(new Date(date), 'MM월 dd일 (E)', { locale: ko })}
-                      </span>
-                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
-                    </div>
-                  </div>
-
-                  {/* 알림 카드들 */}
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: sectionIndex * 0.1 }}
-                    className="bg-white rounded-2xl shadow-sm border border-gray-200/50 mx-2 overflow-hidden"
-                  >
-                    {items.map((item, index) => (
-                      <motion.div 
-                        key={item.plt_idx} 
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1, duration: 0.5 }}
-                        className={`flex items-start p-4 transition-colors cursor-pointer ${
-                          index !== items.length - 1 ? 'border-b border-gray-200' : ''
-                        } hover:bg-gray-50/50 active:bg-gray-100/50`}
-                        onClick={() => handleNoticeClick(item)}
-                        whileHover={{ x: 4 }}
-                        whileTap={{ scale: 0.98 }}
-                      >
-                        <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center mr-3 mt-0.5">
-                          <span className="text-lg">
-                            {item.plt_title.match(/\p{Extended_Pictographic}/u)?.[0] || '📢'}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between mb-1">
-                            <h3 className="font-semibold text-gray-900 text-sm leading-tight pr-2">
-                              {item.plt_title.replace(/\p{Extended_Pictographic}/u, '').trim()}
-                            </h3>
-                            <time className="text-xs text-blue-400 font-medium flex-shrink-0">
-                              {format(new Date(item.plt_sdate), 'a h:mm', { locale: ko })}
-                            </time>
-                          </div>
-                          <p className="text-gray-500 text-sm leading-relaxed whitespace-pre-line">
-                            {item.plt_content}
-                          </p>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                </section>
-              ))}
-              
-              {notices.length === 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                  className="text-center py-12"
-                >
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FiBell className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">알림이 없습니다</h3>
-                  <p className="text-gray-500">새로운 알림이 도착하면 여기에 표시됩니다.</p>
-                </motion.div>
-              )}
-            </div>
-          )}
-        </motion.div>
       </div>
-    </>
+
+      {/* 메인 컨텐츠 */}
+      <div className="pt-16 px-4 space-y-6 pb-24">
+        {loading || !isInitialized ? (
+          /* 스켈레톤 로딩 */
+          <div className="space-y-6 mt-6">
+            {[1, 2, 3].map((sectionIndex) => (
+              <div key={sectionIndex} className="relative">
+                {/* 날짜 헤더 스켈레톤 */}
+                <div className="mb-5">
+                  <div className="sticky top-16 bg-gray-800 rounded-xl mx-4 p-3" style={{ zIndex: 10 }}>
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-1.5 h-1.5 bg-gray-300 rounded-full"></div>
+                      <div className="h-4 bg-gray-300 rounded w-24"></div>
+                      <div className="w-1.5 h-1.5 bg-gray-300 rounded-full"></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 알림 카드 스켈레톤 */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mx-2 overflow-hidden">
+                  {[1, 2, 3].map((itemIndex) => (
+                    <div 
+                      key={itemIndex}
+                      className={`flex items-start p-4 animate-pulse ${
+                        itemIndex !== 3 ? 'border-b border-gray-100' : ''
+                      }`}
+                    >
+                      <div className="flex-shrink-0 w-10 h-10 bg-gray-200 rounded-full mr-3 mt-0.5"></div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                          <div className="h-3 bg-gray-200 rounded w-12 ml-2"></div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="h-3 bg-gray-200 rounded w-full"></div>
+                          <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            
+            {/* 로딩 메시지 */}
+            <div className="text-center py-8">
+              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3 animate-pulse">
+                <FiBell className="w-6 h-6 text-blue-500" />
+              </div>
+              <p className="text-gray-500 text-sm">알림을 불러오는 중...</p>
+            </div>
+          </div>
+        ) : error ? (
+          /* 에러 상태 */
+          <div className="text-center py-12">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FiBell className="w-8 h-8 text-red-500" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">오류가 발생했습니다</h3>
+            <p className="text-gray-500 mb-4">{error}</p>
+            <button
+              onClick={() => {
+                setError(null);
+                setIsInitialized(false);
+                dataFetchedRef.current = false;
+                if (user?.mt_idx) {
+                  loadNotices(user.mt_idx);
+                }
+              }}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              다시 시도
+            </button>
+          </div>
+        ) : (
+          /* 알림 목록 - 날짜별 그룹핑 */
+          <div className="space-y-6">
+            {Object.entries(grouped).map(([date, items], sectionIndex) => (
+              <section key={date} className="relative">
+                {/* 날짜 헤더 - Sticky 고정 */}
+                <div className="sticky top-16 bg-gray-800 rounded-xl mx-4 p-3 mb-4" style={{ zIndex: 10 }}>
+                  <div className="flex items-center justify-center space-x-2">
+                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-semibold text-white">
+                      {format(new Date(date), 'MM월 dd일 (E)', { locale: ko })}
+                    </span>
+                    <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+
+                {/* 알림 카드들 */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200/50 mx-2 overflow-hidden">
+                  {items.map((item, index) => (
+                    <div 
+                      key={item.plt_idx} 
+                      className={`flex items-start p-4 transition-colors cursor-pointer ${
+                        index !== items.length - 1 ? 'border-b border-gray-200' : ''
+                      } hover:bg-gray-50/50 active:bg-gray-100/50`}
+                      onClick={() => handleNoticeClick(item)}
+                    >
+                      <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center mr-3 mt-0.5">
+                        <span className="text-lg">
+                          {item.plt_title.match(/\p{Extended_Pictographic}/u)?.[0] || '📢'}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-1">
+                          <h3 className="font-semibold text-gray-900 text-sm leading-tight pr-2">
+                            {item.plt_title.replace(/\p{Extended_Pictographic}/u, '').trim()}
+                          </h3>
+                          <time className="text-xs text-blue-400 font-medium flex-shrink-0">
+                            {format(new Date(item.plt_sdate), 'a h:mm', { locale: ko })}
+                          </time>
+                        </div>
+                        <p className="text-gray-500 text-sm leading-relaxed whitespace-pre-line">
+                          {item.plt_content}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))}
+            
+            {notices.length === 0 && (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FiBell className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">알림이 없습니다</h3>
+                <p className="text-gray-500">새로운 알림이 도착하면 여기에 표시됩니다.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 } 

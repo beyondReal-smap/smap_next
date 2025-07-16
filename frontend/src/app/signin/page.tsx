@@ -2923,7 +2923,7 @@ const SignInPage = () => {
       }}
     >
               <motion.div 
-          className="max-w-md w-full space-y-6 bg-white p-6 sm:p-8 rounded-xl shadow-2xl"
+          className="max-w-xs w-full space-y-6 bg-white p-6 sm:p-8 rounded-xl shadow-2xl"
           style={{
             userSelect: 'auto',
             WebkitUserSelect: 'auto',

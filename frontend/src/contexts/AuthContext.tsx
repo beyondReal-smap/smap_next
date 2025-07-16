@@ -484,7 +484,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!state.user) return;
 
     try {
-      const userProfile = await authService.getUserProfile(state.user.mt_idx);
+      // 그룹 조회 없이 사용자 기본 정보만 가져오기
+      const userProfile = await authService.getUserBasicProfile(state.user.mt_idx);
       authService.setUserData(userProfile);
       dispatch({ type: 'LOGIN_SUCCESS', payload: userProfile });
     } catch (error: any) {

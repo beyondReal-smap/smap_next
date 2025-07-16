@@ -77,7 +77,31 @@ class AuthService {
   }
 
   /**
-   * 사용자 전체 프로필 조회 (사용자 정보 + 그룹 정보)
+   * 사용자 기본 정보만 조회 (그룹 정보 제외)
+   */
+  async getUserBasicProfile(mt_idx: number): Promise<UserProfile> {
+    try {
+      // 사용자 기본 정보만 조회
+      const memberResponse = await apiClient.get<Member>(`/members/${mt_idx}`);
+      const member = memberResponse.data;
+
+      const userProfile = {
+        ...member,
+        groups: [],
+        ownedGroups: [],
+        joinedGroups: []
+      };
+
+      console.log('[AUTH SERVICE] 사용자 기본 프로필 조회 완료:', userProfile.mt_name);
+      return userProfile;
+    } catch (error) {
+      console.error('[AUTH SERVICE] 사용자 기본 프로필 조회 실패:', error);
+      throw new Error('사용자 정보를 불러올 수 없습니다.');
+    }
+  }
+
+  /**
+   * 사용자 프로필 조회 (그룹 정보 포함)
    */
   async getUserProfile(mt_idx: number): Promise<UserProfile> {
     try {
