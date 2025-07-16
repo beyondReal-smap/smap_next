@@ -1165,17 +1165,8 @@ export default function RegisterPage() {
                 {/* 전체 동의 */}
                 <div className="bg-white rounded-xl p-4 border-2" style={{borderColor: '#e0e7ff'}}>
                   <label className="block cursor-pointer">
-                    <div style={{
-                      display: 'table',
-                      width: '100%',
-                      tableLayout: 'fixed'
-                    }}>
-                      <div style={{
-                        display: 'table-cell',
-                        width: '36px',
-                        verticalAlign: 'top',
-                        paddingTop: '2px' // iOS만 1.5개 분량 아래로
-                      }}>
+                                          <div className="flex items-center space-x-3">
+                        <div className="flex-shrink-0">
                         <input
                           type="checkbox"
                           checked={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)}
@@ -1195,11 +1186,7 @@ export default function RegisterPage() {
                           )}
                         </div>
                       </div>
-                      <div style={{
-                        display: 'table-cell',
-                        verticalAlign: 'top',
-                        paddingLeft: '0'
-                      }}>
+                      <div className="flex-1">
                         <span className="font-semibold text-gray-900">전체 동의</span>
                       </div>
                     </div>
@@ -1210,17 +1197,8 @@ export default function RegisterPage() {
                 {TERMS_DATA.map((term) => (
                   <div key={term.id} className="bg-white rounded-xl p-3 border border-gray-100">
                     <label className="block cursor-pointer">
-                      <div style={{
-                        display: 'table',
-                        width: '100%',
-                        tableLayout: 'fixed'
-                      }}>
-                                                 <div style={{
-                           display: 'table-cell',
-                           width: '36px',
-                           verticalAlign: 'top',
-                           paddingTop: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '24px' : '2px' // iOS만 1.5개 분량 아래로
-                         }}>
+                      <div className="flex items-center space-x-3">
+                        <div className="flex-shrink-0">
                           <input
                             type="checkbox"
                             checked={registerData[term.id as keyof RegisterData] as boolean}
@@ -1240,11 +1218,7 @@ export default function RegisterPage() {
                             )}
                           </div>
                         </div>
-                        <div style={{
-                          display: 'table-cell',
-                          verticalAlign: 'top',
-                          paddingLeft: '0'
-                        }}>
+                        <div className="flex-1">
                           <div className="flex items-center space-x-2">
                             <span className="text-sm font-medium text-gray-900">{term.title}</span>
                             {term.required && (
@@ -1253,12 +1227,7 @@ export default function RegisterPage() {
                           </div>
                           <p className="text-xs text-gray-500 mt-1" style={{ wordBreak: 'keep-all' }}>{term.content}</p>
                         </div>
-                        <div style={{
-                          display: 'table-cell',
-                          width: '24px',
-                          verticalAlign: 'middle',
-                          textAlign: 'right'
-                        }}>
+                        <div className="flex-shrink-0 mt-0.5">
                           <FiArrowRight className="w-4 h-4 text-gray-400" />
                         </div>
                       </div>
