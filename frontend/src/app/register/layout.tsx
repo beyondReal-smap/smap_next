@@ -11,7 +11,7 @@ import { HiOutlineChevronLeft } from 'react-icons/hi2';
 // Dynamic import for AnimatedHeader
 const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
   loading: () => (
-    <div className="h-14 bg-gradient-to-r from-[#0113A3] to-[#001a8a] animate-pulse" />
+    <div className="h-14 bg-white animate-pulse" />
   ),
   ssr: false
 });
