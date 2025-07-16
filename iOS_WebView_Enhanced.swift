@@ -5,6 +5,7 @@ import WebKit
 import UIKit
 import Network
 import os.log
+import CoreLocation
 
 class EnhancedWebViewController: UIViewController {
     
@@ -30,6 +31,9 @@ class EnhancedWebViewController: UIViewController {
     private let targetURL = "https://nextstep.smap.site"
     private let requestTimeout: TimeInterval = 30.0
     private let cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
+    
+    // MARK: - 📍 위치 관련
+    private var locationManager: CLLocationManager?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -1133,6 +1137,12 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         case "kakaoLogin":
             print("🚨🚨🚨 [KAKAO LOGIN] 카카오 로그인 요청 수신!")
             handleKakaoLogin()
+        case "requestLocationPermission":
+            print("📍 [LOCATION] 위치 권한 요청 수신!")
+            handleLocationPermissionRequest(param: param)
+        case "openSettings":
+            print("⚙️ [SETTINGS] 설정 열기 요청!")
+            handleOpenSettings()
         default:
             print("⚠️ [SMAP-iOS] 알 수 없는 타입: \(type)")
         }
@@ -1373,6 +1383,199 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
                 }
             }
         }
+    }
+    
+    // MARK: - 📍 위치 권한 처리
+    private func handleLocationPermissionRequest(param: Any?) {
+        print("📍 [LOCATION] 위치 권한 요청 처리 시작")
+        
+        // 위치 권한 상태 확인
+        let locationManager = CLLocationManager()
+        let authorizationStatus = locationManager.authorizationStatus
+        
+        print("📍 [LOCATION] 현재 권한 상태: \(authorizationStatus.rawValue)")
+        
+        switch authorizationStatus {
+        case .notDetermined:
+            // 권한 요청
+            requestLocationPermission()
+        case .denied, .restricted:
+            // 권한 거부됨 - 설정으로 이동 안내
+            showLocationPermissionAlert()
+        case .authorizedWhenInUse, .authorizedAlways:
+            // 권한 있음 - 위치 정보 가져오기
+            getCurrentLocation()
+        @unknown default:
+            // 알 수 없는 상태
+            showLocationPermissionAlert()
+        }
+    }
+    
+    private func requestLocationPermission() {
+        print("📍 [LOCATION] 위치 권한 요청 시작")
+        
+        let locationManager = CLLocationManager()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.requestWhenInUseAuthorization()
+        
+        // 위치 매니저를 유지하기 위해 프로퍼티로 저장
+        self.locationManager = locationManager
+    }
+    
+    private func getCurrentLocation() {
+        print("📍 [LOCATION] 현재 위치 가져오기 시작")
+        
+        let locationManager = CLLocationManager()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.requestLocation()
+        
+        // 위치 매니저를 유지하기 위해 프로퍼티로 저장
+        self.locationManager = locationManager
+    }
+    
+    private func showLocationPermissionAlert() {
+        print("📍 [LOCATION] 위치 권한 알림 표시")
+        
+        DispatchQueue.main.async {
+            let alert = UIAlertController(
+                title: NSLocalizedString("LOCATION_PERMISSION_TITLE", comment: "위치 권한 요청"),
+                message: NSLocalizedString("LOCATION_PERMISSION_MESSAGE", comment: "서비스 이용을 위해 위치 권한이 필요합니다. 설정에서 위치 권한을 허용해주세요."),
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(
+                title: NSLocalizedString("LOCATION_PERMISSION_SETTINGS", comment: "설정으로 이동"),
+                style: .default
+            ) { _ in
+                self.openAppSettings()
+            })
+            
+            alert.addAction(UIAlertAction(
+                title: NSLocalizedString("LOCATION_PERMISSION_CANCEL", comment: "취소"),
+                style: .cancel
+            ) { _ in
+                self.sendLocationPermissionResult(success: false, error: "권한 거부됨")
+            })
+            
+            self.present(alert, animated: true)
+        }
+    }
+    
+    private func handleOpenSettings() {
+        print("⚙️ [SETTINGS] 앱 설정 열기")
+        openAppSettings()
+    }
+    
+    private func openAppSettings() {
+        if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+            if UIApplication.shared.canOpenURL(settingsUrl) {
+                UIApplication.shared.open(settingsUrl)
+                print("✅ [SETTINGS] 앱 설정 열기 성공")
+            } else {
+                print("❌ [SETTINGS] 앱 설정 열기 실패")
+            }
+        }
+    }
+    
+    private func sendLocationPermissionResult(success: Bool, latitude: Double? = nil, longitude: Double? = nil, error: String? = nil) {
+        print("📍 [LOCATION] 웹으로 결과 전송: success=\(success)")
+        
+        let resultScript: String
+        if success, let lat = latitude, let lng = longitude {
+            resultScript = """
+                if (window.onLocationPermissionGranted) {
+                    console.log('📍 [iOS-NATIVE] 위치 권한 허용 콜백 실행');
+                    window.onLocationPermissionGranted({
+                        latitude: \(lat),
+                        longitude: \(lng),
+                        accuracy: 10.0,
+                        timestamp: Date.now(),
+                        source: 'ios-native'
+                    });
+                } else {
+                    console.log('⚠️ [iOS-NATIVE] onLocationPermissionGranted 함수를 찾을 수 없습니다');
+                }
+            """
+        } else {
+            resultScript = """
+                if (window.onLocationPermissionDenied) {
+                    console.log('📍 [iOS-NATIVE] 위치 권한 거부 콜백 실행');
+                    window.onLocationPermissionDenied({
+                        error: '\(error ?? "알 수 없는 오류")',
+                        source: 'ios-native'
+                    });
+                } else {
+                    console.log('⚠️ [iOS-NATIVE] onLocationPermissionDenied 함수를 찾을 수 없습니다');
+                }
+            """
+        }
+        
+        DispatchQueue.main.async {
+            self.webView?.evaluateJavaScript(resultScript) { result, error in
+                if let error = error {
+                    print("❌ [LOCATION] 웹 콜백 실행 실패: \(error)")
+                } else {
+                    print("✅ [LOCATION] 웹 콜백 실행 완료")
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 📍 CLLocationManagerDelegate
+extension EnhancedWebViewController: CLLocationManagerDelegate {
+    
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        print("📍 [LOCATION] 권한 상태 변경: \(status.rawValue)")
+        
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            print("✅ [LOCATION] 위치 권한 허용됨")
+            // 권한이 허용되면 위치 정보 가져오기
+            getCurrentLocation()
+        case .denied, .restricted:
+            print("❌ [LOCATION] 위치 권한 거부됨")
+            sendLocationPermissionResult(success: false, error: "위치 권한이 거부되었습니다")
+        case .notDetermined:
+            print("⏳ [LOCATION] 위치 권한 결정되지 않음")
+        @unknown default:
+            print("❓ [LOCATION] 알 수 없는 권한 상태")
+            sendLocationPermissionResult(success: false, error: "알 수 없는 권한 상태")
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else {
+            print("❌ [LOCATION] 위치 정보 없음")
+            sendLocationPermissionResult(success: false, error: "위치 정보를 가져올 수 없습니다")
+            return
+        }
+        
+        print("✅ [LOCATION] 위치 정보 수신: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+        
+        // 위치 매니저 정리
+        locationManager?.stopUpdatingLocation()
+        locationManager = nil
+        
+        // 웹으로 결과 전송
+        sendLocationPermissionResult(
+            success: true,
+            latitude: location.coordinate.latitude,
+            longitude: location.coordinate.longitude
+        )
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("❌ [LOCATION] 위치 정보 가져오기 실패: \(error.localizedDescription)")
+        
+        // 위치 매니저 정리
+        locationManager?.stopUpdatingLocation()
+        locationManager = nil
+        
+        // 웹으로 오류 전송
+        sendLocationPermissionResult(success: false, error: error.localizedDescription)
     }
 }
 

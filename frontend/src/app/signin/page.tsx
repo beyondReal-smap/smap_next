@@ -2913,124 +2913,142 @@ const SignInPage = () => {
   */
 
   return (
-    <motion.div 
-      className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8 relative"
-      style={{
-        background: 'linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c, #4facfe, #00f2fe)',
-        backgroundSize: '400% 400%',
+    <>
+      {/* 움직이는 배경 레이어 */}
+      <div style={{
         position: 'fixed',
         top: 0,
         left: 0,
-        width: '100%',
-        height: '100%',
+        width: '100vw',
+        height: '100vh',
+        zIndex: 0,
         overflow: 'hidden',
-        touchAction: 'none',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-        WebkitTouchCallout: 'none',
-        WebkitTapHighlightColor: 'transparent',
-        WebkitOverflowScrolling: 'auto'
-      }}
-      animate={{
-        backgroundPosition: ['0% 50%', '100% 50%', '0% 50%']
-      }}
-      transition={{
-        backgroundPosition: {
-          duration: 25,
-          repeat: Infinity,
-          ease: 'linear'
-        }
-      }}
-    >
-      {/* 배경 오버레이 */}
-      <motion.div
-        className="absolute inset-0 bg-white/10 backdrop-blur-sm"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 1 }}
-      />
-      
-      {/* 떠다니는 원형 요소들 */}
-      <motion.div
-        className="absolute top-20 left-10 w-24 h-24 bg-white/20 rounded-full blur-xl"
-        style={{ zIndex: 1 }}
-        animate={{
-          y: [0, -40, 0],
-          x: [0, 30, 0],
-          scale: [1, 1.3, 1],
-          rotate: [0, 180, 360]
+        pointerEvents: 'none',
+      }}>
+        <motion.div
+          style={{
+            width: '200vw',
+            height: '100vh',
+            background: 'linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c, #4facfe, #00f2fe)',
+            backgroundSize: '200% 100%',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            zIndex: 0,
+          }}
+          animate={{ x: ['0vw', '-100vw', '0vw'] }}
+          transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
+        />
+      </div>
+
+      {/* 메인 콘텐츠 컨테이너 */}
+      <motion.div 
+        className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8 relative"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          touchAction: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+          WebkitTapHighlightColor: 'transparent',
+          WebkitOverflowScrolling: 'auto',
+          zIndex: 1,
         }}
-        transition={{
-          duration: 10,
-          repeat: Infinity,
-          ease: 'easeInOut'
-        }}
-      />
-      <motion.div
-        className="absolute bottom-32 right-16 w-40 h-40 bg-white/15 rounded-full blur-xl"
-        style={{ zIndex: 1 }}
-        animate={{
-          y: [0, 50, 0],
-          x: [0, -40, 0],
-          scale: [1, 0.7, 1],
-          rotate: [0, -180, -360]
-        }}
-        transition={{
-          duration: 15,
-          repeat: Infinity,
-          ease: 'easeInOut',
-          delay: 3
-        }}
-      />
-      <motion.div
-        className="absolute top-1/2 left-1/3 w-20 h-20 bg-white/18 rounded-full blur-lg"
-        style={{ zIndex: 1 }}
-        animate={{
-          y: [0, -30, 0],
-          x: [0, 25, 0],
-          scale: [1, 1.2, 1],
-          rotate: [0, 90, 180]
-        }}
-        transition={{
-          duration: 12,
-          repeat: Infinity,
-          ease: 'easeInOut',
-          delay: 6
-        }}
-      />
-      <motion.div
-        className="absolute top-1/4 right-1/4 w-16 h-16 bg-white/12 rounded-full blur-md"
-        style={{ zIndex: 1 }}
-        animate={{
-          y: [0, 35, 0],
-          x: [0, -20, 0],
-          scale: [1, 0.9, 1],
-          rotate: [0, -90, -180]
-        }}
-        transition={{
-          duration: 8,
-          repeat: Infinity,
-          ease: 'easeInOut',
-          delay: 1
-        }}
-      />
-      <motion.div
-        className="absolute bottom-1/4 left-1/3 w-28 h-28 bg-white/10 rounded-full blur-lg"
-        style={{ zIndex: 1 }}
-        animate={{
-          y: [0, -25, 0],
-          x: [0, 35, 0],
-          scale: [1, 1.1, 1],
-          rotate: [0, 120, 240]
-        }}
-        transition={{
-          duration: 18,
-          repeat: Infinity,
-          ease: 'easeInOut',
-          delay: 4
-        }}
-      />
-              <motion.div 
+      >
+        {/* 배경 오버레이 */}
+        <motion.div
+          className="absolute inset-0 bg-white/10 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1 }}
+        />
+        
+        {/* 떠다니는 원형 요소들 */}
+        <motion.div
+          className="absolute top-20 left-10 w-24 h-24 bg-white/20 rounded-full blur-xl"
+          style={{ zIndex: 1 }}
+          animate={{
+            y: [0, -40, 0],
+            x: [0, 30, 0],
+            scale: [1, 1.3, 1],
+            rotate: [0, 180, 360]
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: 'easeInOut'
+          }}
+        />
+        <motion.div
+          className="absolute bottom-32 right-16 w-40 h-40 bg-white/15 rounded-full blur-xl"
+          style={{ zIndex: 1 }}
+          animate={{
+            y: [0, 50, 0],
+            x: [0, -40, 0],
+            scale: [1, 0.7, 1],
+            rotate: [0, -180, -360]
+          }}
+          transition={{
+            duration: 15,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: 3
+          }}
+        />
+        <motion.div
+          className="absolute top-1/2 left-1/3 w-20 h-20 bg-white/18 rounded-full blur-lg"
+          style={{ zIndex: 1 }}
+          animate={{
+            y: [0, -30, 0],
+            x: [0, 25, 0],
+            scale: [1, 1.2, 1],
+            rotate: [0, 90, 180]
+          }}
+          transition={{
+            duration: 12,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: 6
+          }}
+        />
+        <motion.div
+          className="absolute top-1/4 right-1/4 w-16 h-16 bg-white/12 rounded-full blur-md"
+          style={{ zIndex: 1 }}
+          animate={{
+            y: [0, 35, 0],
+            x: [0, -20, 0],
+            scale: [1, 0.9, 1],
+            rotate: [0, -90, -180]
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: 1
+          }}
+        />
+        <motion.div
+          className="absolute bottom-1/4 left-1/3 w-28 h-28 bg-white/10 rounded-full blur-lg"
+          style={{ zIndex: 1 }}
+          animate={{
+            y: [0, -25, 0],
+            x: [0, 35, 0],
+            scale: [1, 1.1, 1],
+            rotate: [0, 120, 240]
+          }}
+          transition={{
+            duration: 18,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: 4
+          }}
+        />
+                <motion.div 
           className="max-w-xs w-full space-y-6 bg-white/95 backdrop-blur-md p-6 sm:p-8 rounded-xl shadow-2xl relative z-10"
           style={{
             userSelect: 'auto',
@@ -3532,15 +3550,16 @@ const SignInPage = () => {
         );
       })()}
 
-      {/* 전체 화면 로딩 스피너 */}
-      {isLoading && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
-            <IOSCompatibleSpinner size="md" message="처리 중..." />
+        {/* 전체 화면 로딩 스피너 */}
+        {isLoading && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
+              <IOSCompatibleSpinner size="md" message="처리 중..." />
+            </div>
           </div>
-        </div>
-      )}
-    </motion.div>
+        )}
+      </motion.div>
+    </>
   );
 };
 
