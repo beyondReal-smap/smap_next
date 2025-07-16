@@ -2896,9 +2896,10 @@ const SignInPage = () => {
 
   return (
     <motion.div 
-      className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8"
+      className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
       style={{
-        background: 'linear-gradient(to bottom right, #eff6ff, #faf5ff, #fdf2f8)',
+        background: 'linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c, #4facfe, #00f2fe)',
+        backgroundSize: '400% 400%',
         position: 'fixed',
         top: 0,
         left: 0,
@@ -2912,31 +2913,140 @@ const SignInPage = () => {
         WebkitTapHighlightColor: 'transparent',
         WebkitOverflowScrolling: 'touch'
       }}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      transition={{
-        type: "spring",
-        stiffness: 260,
-        damping: 20,
-        duration: 0.6
+      animate={{
+        backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+        opacity: 1,
+        y: 0
       }}
+      transition={{
+        backgroundPosition: {
+          duration: 25,
+          repeat: Infinity,
+          ease: 'linear'
+        },
+        opacity: {
+          type: "spring",
+          stiffness: 200,
+          damping: 25,
+          duration: 1.2
+        },
+        y: {
+          type: "spring",
+          stiffness: 200,
+          damping: 25,
+          duration: 1.2
+        }
+      }}
+      initial={{ opacity: 0, y: 20 }}
+      exit={{ opacity: 0, y: -20 }}
     >
+      {/* 배경 오버레이 */}
+      <motion.div
+        className="absolute inset-0 bg-white/10 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1 }}
+      />
+      
+      {/* 떠다니는 원형 요소들 */}
+      <motion.div
+        className="absolute top-20 left-10 w-24 h-24 bg-white/20 rounded-full blur-xl"
+        style={{ zIndex: 1 }}
+        animate={{
+          y: [0, -40, 0],
+          x: [0, 30, 0],
+          scale: [1, 1.3, 1],
+          rotate: [0, 180, 360]
+        }}
+        transition={{
+          duration: 10,
+          repeat: Infinity,
+          ease: 'easeInOut'
+        }}
+      />
+      <motion.div
+        className="absolute bottom-32 right-16 w-40 h-40 bg-white/15 rounded-full blur-xl"
+        style={{ zIndex: 1 }}
+        animate={{
+          y: [0, 50, 0],
+          x: [0, -40, 0],
+          scale: [1, 0.7, 1],
+          rotate: [0, -180, -360]
+        }}
+        transition={{
+          duration: 15,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: 3
+        }}
+      />
+      <motion.div
+        className="absolute top-1/2 left-1/3 w-20 h-20 bg-white/18 rounded-full blur-lg"
+        style={{ zIndex: 1 }}
+        animate={{
+          y: [0, -30, 0],
+          x: [0, 25, 0],
+          scale: [1, 1.2, 1],
+          rotate: [0, 90, 180]
+        }}
+        transition={{
+          duration: 12,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: 6
+        }}
+      />
+      <motion.div
+        className="absolute top-1/4 right-1/4 w-16 h-16 bg-white/12 rounded-full blur-md"
+        style={{ zIndex: 1 }}
+        animate={{
+          y: [0, 35, 0],
+          x: [0, -20, 0],
+          scale: [1, 0.9, 1],
+          rotate: [0, -90, -180]
+        }}
+        transition={{
+          duration: 8,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: 1
+        }}
+      />
+      <motion.div
+        className="absolute bottom-1/4 left-1/3 w-28 h-28 bg-white/10 rounded-full blur-lg"
+        style={{ zIndex: 1 }}
+        animate={{
+          y: [0, -25, 0],
+          x: [0, 35, 0],
+          scale: [1, 1.1, 1],
+          rotate: [0, 120, 240]
+        }}
+        transition={{
+          duration: 18,
+          repeat: Infinity,
+          ease: 'easeInOut',
+          delay: 4
+        }}
+      />
               <motion.div 
-          className="max-w-xs w-full space-y-6 bg-white p-6 sm:p-8 rounded-xl shadow-2xl"
+          className="max-w-xs w-full space-y-6 bg-white/95 backdrop-blur-md p-6 sm:p-8 rounded-xl shadow-2xl relative z-10"
           style={{
             userSelect: 'auto',
             WebkitUserSelect: 'auto',
             touchAction: 'auto'
           }}
-          initial={{ opacity: 0, scale: 0.95, y: 30 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
+          initial={{ opacity: 0, scale: 0.95, y: 30, rotateX: -15 }}
+          animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
           transition={{
             type: "spring",
-            stiffness: 280,
-            damping: 25,
-            delay: 0.1,
-            duration: 0.5
+            stiffness: 200,
+            damping: 30,
+            delay: 0.5,
+            duration: 1.5
+          }}
+          whileHover={{ 
+            scale: 1.02,
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
           }}
         >
         <motion.div 
@@ -2947,40 +3057,87 @@ const SignInPage = () => {
             type: "spring",
             stiffness: 300,
             damping: 25,
-            delay: 0.2,
-            duration: 0.4
+            delay: 0.5,
+            duration: 0.6
           }}
         >
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900 flex items-center justify-center gap-3">
-            <Image 
-              src="/images/smap_logo.webp" 
-              alt="SMAP Logo"
-              width={32}
-              height={32}
-              className="rounded-lg shadow-md"
-              priority
-            />
-            SMAP 로그인
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
+                      <motion.h2 
+            className="text-2xl font-bold tracking-tight text-gray-900 flex items-center justify-center gap-3"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{
+              type: "spring",
+              stiffness: 250,
+              damping: 25,
+              delay: 0.8,
+              duration: 1.2
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 20,
+                delay: 1.0,
+                duration: 1.0
+              }}
+              whileHover={{ scale: 1.1 }}
+            >
+              <Image 
+                src="/images/smap_logo.webp" 
+                alt="SMAP Logo"
+                width={32}
+                height={32}
+                className="rounded-lg shadow-md"
+                priority
+              />
+            </motion.div>
+            <motion.span
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{
+                type: "spring",
+                stiffness: 250,
+                damping: 25,
+                delay: 1.2,
+                duration: 1.0
+              }}
+            >
+              SMAP 로그인
+            </motion.span>
+          </motion.h2>
+          <motion.p 
+            className="mt-2 text-sm text-gray-600"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              type: "spring",
+              stiffness: 250,
+              damping: 25,
+              delay: 1.5,
+              duration: 1.0
+            }}
+          >
             계정에 로그인하여 서비스를 이용하세요.
-          </p>
+          </motion.p>
         </motion.div>
 
-        <motion.div 
-          className="space-y-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            type: "spring",
-            stiffness: 300,
-            damping: 25,
-            delay: 0.3,
-            duration: 0.4
-          }}
-        >
+        <div className="space-y-4">
           {/* 전화번호 입력 */}
-          <div>
+          <motion.div
+            initial={{ opacity: 0, x: -30, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{
+              type: "spring",
+              stiffness: 300,
+              damping: 25,
+              delay: 1.8,
+              duration: 0.8
+            }}
+            whileHover={{ scale: 1.02 }}
+          >
             <label className="block text-sm font-medium text-gray-700 mb-1">
               전화번호
             </label>
@@ -3020,10 +3177,21 @@ const SignInPage = () => {
             {formErrors.phoneNumber && (
               <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>{formErrors.phoneNumber}</p>
             )}
-          </div>
+          </motion.div>
 
           {/* 비밀번호 입력 */}
-          <div>
+          <motion.div
+            initial={{ opacity: 0, x: -30, scale: 0.95 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={{
+              type: "spring",
+              stiffness: 300,
+              damping: 25,
+              delay: 2.0,
+              duration: 0.8
+            }}
+            whileHover={{ scale: 1.02 }}
+          >
             <label className="block text-sm font-medium text-gray-700 mb-1">
               비밀번호
             </label>
@@ -3062,21 +3230,22 @@ const SignInPage = () => {
             {formErrors.password && (
               <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>{formErrors.password}</p>
             )}
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
 
         {/* 로그인 버튼 */}
         <motion.form 
           onSubmit={handlePhoneNumberLogin}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: 30, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{
             type: "spring",
             stiffness: 300,
             damping: 25,
-            delay: 0.4,
-            duration: 0.4
+            delay: 2.2,
+            duration: 0.8
           }}
+          whileHover={{ scale: 1.02 }}
         >
           <button
             type="submit"
@@ -3096,16 +3265,17 @@ const SignInPage = () => {
           </button>
         </motion.form>
 
+        {/* 그룹 3: 구분선, Google 로그인 버튼, 회원가입 링크 - 한번에 등장 */}
         <motion.div 
           className="mt-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: 30, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{
             type: "spring",
             stiffness: 300,
             damping: 25,
-            delay: 0.5,
-            duration: 0.4
+            delay: 2.8,
+            duration: 1.0
           }}
         >
           <div className="relative">
@@ -3234,30 +3404,19 @@ const SignInPage = () => {
               )}
             </button> */}
           </div>
-        </motion.div>
 
-        {/* 회원가입 링크 */}
-        <motion.div 
-          className="text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            type: "spring",
-            stiffness: 300,
-            damping: 25,
-            delay: 0.6,
-            duration: 0.4
-          }}
-        >
-          <p className="text-sm text-gray-600">
-            아직 계정이 없으신가요?{' '}
-            <Link href="/register" className="font-medium transition-colors"
-              style={{color: '#0113A3'}}
-              onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#1e40af'}
-              onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#0113A3'}>
-              회원가입
-            </Link>
-          </p>
+          {/* 회원가입 링크 */}
+          <div className="text-center mt-4">
+            <p className="text-sm text-gray-600">
+              아직 계정이 없으신가요?{' '}
+              <Link href="/register" className="font-medium transition-colors"
+                style={{color: '#0113A3'}}
+                onMouseEnter={(e) => (e.target as HTMLElement).style.color = '#1e40af'}
+                onMouseLeave={(e) => (e.target as HTMLElement).style.color = '#0113A3'}>
+                회원가입
+              </Link>
+            </p>
+          </div>
         </motion.div>
       </motion.div>
 
