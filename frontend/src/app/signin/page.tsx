@@ -2852,6 +2852,24 @@ const SignInPage = () => {
     console.log('[PAGE FREEZE] 페이지 고정 해제 완료');
   };
 
+  // 페이지 스크롤 방지 및 고정
+  useEffect(() => {
+    // body 스타일 설정으로 스크롤 방지
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+    
+    // cleanup 함수
+    return () => {
+      document.body.style.overflow = originalStyle;
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+    };
+  }, []);
+
   // 🔥 iOS 환경에서 네이티브 Google Sign-In 시도 (자동 실행 비활성화)
   /*
   if (isIOSWebView && !isAndroidWebView) {
@@ -2896,7 +2914,7 @@ const SignInPage = () => {
 
   return (
     <motion.div 
-      className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
+      className="min-h-screen flex flex-col items-center justify-center py-6 px-4 sm:px-6 lg:px-8 relative"
       style={{
         background: 'linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #f5576c, #4facfe, #00f2fe)',
         backgroundSize: '400% 400%',
@@ -2905,40 +2923,24 @@ const SignInPage = () => {
         left: 0,
         width: '100%',
         height: '100%',
-        overflow: 'auto',
-        touchAction: 'manipulation',
+        overflow: 'hidden',
+        touchAction: 'none',
         userSelect: 'none',
         WebkitUserSelect: 'none',
         WebkitTouchCallout: 'none',
         WebkitTapHighlightColor: 'transparent',
-        WebkitOverflowScrolling: 'touch'
+        WebkitOverflowScrolling: 'auto'
       }}
       animate={{
-        backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-        opacity: 1,
-        y: 0
+        backgroundPosition: ['0% 50%', '100% 50%', '0% 50%']
       }}
       transition={{
         backgroundPosition: {
           duration: 25,
           repeat: Infinity,
           ease: 'linear'
-        },
-        opacity: {
-          type: "spring",
-          stiffness: 200,
-          damping: 25,
-          duration: 1.2
-        },
-        y: {
-          type: "spring",
-          stiffness: 200,
-          damping: 25,
-          duration: 1.2
         }
       }}
-      initial={{ opacity: 0, y: 20 }}
-      exit={{ opacity: 0, y: -20 }}
     >
       {/* 배경 오버레이 */}
       <motion.div
@@ -3033,10 +3035,12 @@ const SignInPage = () => {
           style={{
             userSelect: 'auto',
             WebkitUserSelect: 'auto',
-            touchAction: 'auto'
+            touchAction: 'auto',
+            position: 'relative',
+            transform: 'translateZ(0)'
           }}
-          initial={{ opacity: 0, scale: 0.95, y: 30, rotateX: -15 }}
-          animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
           transition={{
             type: "spring",
             stiffness: 200,
