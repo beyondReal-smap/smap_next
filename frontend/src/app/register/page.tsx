@@ -1161,7 +1161,7 @@ export default function RegisterPage() {
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-3 pb-4 register-form" style={{paddingTop: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '120px' : '2px' }}>
+              <div className="flex-1 overflow-y-auto space-y-3 pb-4 register-form" style={{paddingTop: '20px' }}>
                 {/* 전체 동의 */}
                 <div className="bg-white rounded-xl p-4 border-2" style={{borderColor: '#e0e7ff'}}>
                   <label className="block cursor-pointer">

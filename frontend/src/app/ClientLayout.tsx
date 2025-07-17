@@ -14,7 +14,14 @@ import { useMapPreloader } from '@/hooks/useMapPreloader';
 // import PerformanceMonitor from '@/components/PerformanceMonitor';
 
 // 인증이 필요하지 않은 페이지들 (루트 페이지는 자체적으로 리다이렉트 처리)
-const PUBLIC_ROUTES = ['/signin', '/register', '/login', '/social-login', '/'];
+const PUBLIC_ROUTES = ['/signin', '/register', '/login', '/social-login', '/', '/group'];
+
+// 그룹 가입 페이지는 공개 페이지로 처리 (인증 없이도 접근 가능)
+const isGroupJoinPage = (pathname: string) => {
+  const isJoinPage = /^\/group\/\d+\/join/.test(pathname);
+  console.log('[AUTH GUARD] isGroupJoinPage 체크:', { pathname, isJoinPage });
+  return isJoinPage;
+};
 
 import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
 
@@ -81,14 +88,25 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     // 공개 페이지는 인증 체크 안함
-    if (PUBLIC_ROUTES.includes(pathname)) {
+    if (PUBLIC_ROUTES.includes(pathname) || isGroupJoinPage(pathname)) {
+      console.log('[AUTH GUARD] 🟢 공개 페이지 접근 허용:', pathname, {
+        isPublicRoute: PUBLIC_ROUTES.includes(pathname),
+        isGroupJoinPage: isGroupJoinPage(pathname),
+        isLoggedIn,
+        loading
+      });
       return;
     }
 
     // 로그인되지 않은 상태에서 보호된 페이지 접근 시 즉시 signin으로 리다이렉트
     // 단, 이미 signin 페이지에 있으면 리다이렉트하지 않음
     if (!isLoggedIn && pathname !== '/signin') {
-      console.log('[AUTH GUARD] 인증되지 않은 접근, signin으로 리다이렉트:', pathname);
+      console.log('[AUTH GUARD] 🔴 인증되지 않은 접근, signin으로 리다이렉트:', pathname, {
+        isLoggedIn,
+        loading,
+        isGroupJoinPage: isGroupJoinPage(pathname),
+        isPublicRoute: PUBLIC_ROUTES.includes(pathname)
+      });
       router.replace('/signin'); // push 대신 replace 사용으로 뒤로가기 방지
       return;
     }
@@ -101,8 +119,13 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // 인증되지 않은 사용자가 보호된 페이지에 접근하려는 경우 즉시 리다이렉트
   // 빈 화면 표시 없이 바로 signin으로 이동
-  if (!isLoggedIn && !PUBLIC_ROUTES.includes(pathname) && pathname !== '/signin') {
-    console.log('[AUTH GUARD] 인증되지 않은 사용자, 즉시 signin으로 리다이렉트');
+  if (!isLoggedIn && !PUBLIC_ROUTES.includes(pathname) && !isGroupJoinPage(pathname) && pathname !== '/signin') {
+    console.log('[AUTH GUARD] 🔴 인증되지 않은 사용자, 즉시 signin으로 리다이렉트:', pathname, {
+      isLoggedIn,
+      loading,
+      isGroupJoinPage: isGroupJoinPage(pathname),
+      isPublicRoute: PUBLIC_ROUTES.includes(pathname)
+    });
     router.push('/signin');
     return null; // 빈 화면 대신 null 반환으로 즉시 리다이렉트
   }
@@ -161,7 +184,10 @@ export default function ClientLayout({
     // notice 페이지는 네비게이션 바를 숨기는 페이지로 명시적 처리
     const isNoticePage = pathname?.startsWith('/notice');
     
-    return !shouldShow || isNoticePage; // 지정된 페이지가 아니거나 notice 페이지면 숨김
+    // 그룹 가입 페이지 패턴 체크 (/group/숫자/join)
+    const isGroupJoinPage = /^\/group\/\d+\/join\/?$/.test(pathname || '');
+    
+    return !shouldShow || isNoticePage || isGroupJoinPage; // 지정된 페이지가 아니거나 notice 페이지이거나 그룹 가입 페이지면 숨김
   }, [pathname]);
 
   // body에 클래스 및 data-page 속성 추가/제거

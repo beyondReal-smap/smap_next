@@ -734,4 +734,51 @@ def join_new_member_to_group(
     except Exception as e:
         logger.error(f"[JOIN_NEW_MEMBER] 새 회원 그룹 가입 실패: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail="그룹 가입 중 오류가 발생했습니다.") 
+        raise HTTPException(status_code=500, detail="그룹 가입 중 오류가 발생했습니다.")
+
+@router.get("/{group_id}/public")
+def get_group_public_info(
+    group_id: int,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    그룹의 공개 정보를 조회합니다. (인증 없이 접근 가능)
+    그룹 가입 페이지에서 사용됩니다.
+    """
+    logger.info(f"[GET_GROUP_PUBLIC] 공개 그룹 정보 조회 - group_id: {group_id}")
+    
+    # 그룹 존재 확인
+    group = db.query(Group).filter(Group.sgt_idx == group_id).first()
+    if not group:
+        logger.error(f"[GET_GROUP_PUBLIC] 그룹을 찾을 수 없음 - group_id: {group_id}")
+        raise HTTPException(status_code=404, detail="그룹을 찾을 수 없습니다.")
+    
+    # 활성화된 그룹만 공개
+    if group.sgt_show != 'Y':
+        logger.error(f"[GET_GROUP_PUBLIC] 비활성화된 그룹 - group_id: {group_id}")
+        raise HTTPException(status_code=404, detail="존재하지 않는 그룹입니다.")
+    
+    # 그룹 멤버 수 조회
+    member_count = db.query(GroupDetail).filter(
+        and_(
+            GroupDetail.sgt_idx == group_id,
+            GroupDetail.sgdt_show == 'Y',
+            GroupDetail.sgdt_exit == 'N'
+        )
+    ).count()
+    
+    logger.info(f"[GET_GROUP_PUBLIC] 공개 그룹 정보 조회 성공 - group_id: {group_id}, member_count: {member_count}")
+    
+    # 공개 정보만 반환 (민감한 정보 제외)
+    return {
+        "success": True,
+        "data": {
+            "sgt_idx": group.sgt_idx,
+            "sgt_title": group.sgt_title,
+            "sgt_content": group.sgt_content,
+            "sgt_memo": group.sgt_memo,
+            "sgt_show": group.sgt_show,
+            "sgt_wdate": group.sgt_wdate.isoformat() if group.sgt_wdate else None,
+            "memberCount": member_count
+        }
+    } 

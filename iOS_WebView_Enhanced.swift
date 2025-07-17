@@ -512,6 +512,12 @@ class EnhancedWebViewController: UIViewController {
         webView.navigationDelegate = self
         webView.uiDelegate = self
         
+        // 🔍 웹 인스펙터 활성화 (Safari 개발자 도구 연결용)
+        if #available(iOS 16.4, *) {
+            webView.isInspectable = true
+            print("🔍 [WebView] 웹 인스펙터 활성화됨 (iOS 16.4+)")
+        }
+        
         // iOS WebView 최적화 설정
         webView.scrollView.bounces = true
         webView.scrollView.alwaysBounceVertical = true
@@ -540,6 +546,7 @@ class EnhancedWebViewController: UIViewController {
         ])
         
         print("🛠️ [WebView] 설정 완료")
+        print("🔍 [WebView] Safari 개발자 도구 연결 가능 - Safari > 개발 > [기기명] > [앱명]")
     }
     
     private func createOptimizedWebViewConfiguration() -> WKWebViewConfiguration {
@@ -550,6 +557,14 @@ class EnhancedWebViewController: UIViewController {
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
+        
+        // 🔍 개발자 도구 활성화 (Safari 웹 인스펙터 연결용)
+        #if DEBUG
+        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        config.preferences.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
+        print("🔍 [WebView] 개발자 도구 활성화됨 (DEBUG 모드)")
+        #endif
         
         // 🔐 App-Bound Domain 관련 설정 (iOS 14+) - 햅틱 동작을 위해 비활성화
         if #available(iOS 14.0, *) {
@@ -593,6 +608,8 @@ class EnhancedWebViewController: UIViewController {
         userContentController.add(self, name: "iosDebug")
         userContentController.add(self, name: "navigationDebug")
         userContentController.add(self, name: "performanceDebug")
+        userContentController.add(self, name: "consoleLog")
+        print("🔍 [DEBUG] 콘솔 로그 핸들러 등록됨")
         
         // 강제 햅틱 이벤트 리스너 스크립트 추가
         let hapticEventScript = """
@@ -752,6 +769,69 @@ class EnhancedWebViewController: UIViewController {
         // iOS WebView 최적화 스크립트
         (function() {
             'use strict';
+            
+            // 🔍 콘솔 로그 캡처 및 Safari 개발자 도구 연동
+            (function setupConsoleCapture() {
+                const originalConsole = {
+                    log: console.log,
+                    warn: console.warn,
+                    error: console.error,
+                    info: console.info,
+                    debug: console.debug
+                };
+                
+                function createConsoleWrapper(type, originalMethod) {
+                    return function(...args) {
+                        // 원본 콘솔 메서드 호출 (Safari 개발자 도구에서 볼 수 있음)
+                        originalMethod.apply(console, args);
+                        
+                        // iOS 네이티브로도 전달 (선택적)
+                        try {
+                            if (window.webkit?.messageHandlers?.consoleLog) {
+                                const message = args.map(arg => 
+                                    typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+                                ).join(' ');
+                                
+                                window.webkit.messageHandlers.consoleLog.postMessage({
+                                    type: type,
+                                    message: message,
+                                    timestamp: new Date().toISOString(),
+                                    url: window.location.href
+                                });
+                            }
+                        } catch (e) {
+                            // 네이티브 전달 실패는 무시
+                        }
+                    };
+                }
+                
+                // 모든 콘솔 메서드 래핑
+                console.log = createConsoleWrapper('log', originalConsole.log);
+                console.warn = createConsoleWrapper('warn', originalConsole.warn);
+                console.error = createConsoleWrapper('error', originalConsole.error);
+                console.info = createConsoleWrapper('info', originalConsole.info);
+                console.debug = createConsoleWrapper('debug', originalConsole.debug);
+                
+                console.log('🔍 [SMAP-iOS] 콘솔 로그 캡처 활성화됨 - Safari 개발자 도구에서 확인 가능');
+            })();
+            
+            // 🚨 전역 에러 캐처 (Safari 개발자 도구에서 에러 확인용)
+            window.addEventListener('error', function(event) {
+                console.error('🚨 [GLOBAL-ERROR]', {
+                    message: event.message,
+                    filename: event.filename,
+                    lineno: event.lineno,
+                    colno: event.colno,
+                    error: event.error ? event.error.stack : 'No stack trace'
+                });
+            });
+            
+            window.addEventListener('unhandledrejection', function(event) {
+                console.error('🚨 [UNHANDLED-PROMISE]', {
+                    reason: event.reason,
+                    promise: 'Promise rejection not handled'
+                });
+            });
             
             console.log('SMAP iOS WebView 최적화 스크립트 시작');
             
@@ -1109,6 +1189,8 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
             handleNavigationMessage(message)
         case "performanceDebug":
             handlePerformanceMessage(message)
+        case "consoleLog":
+            handleConsoleLog(message)
         default:
             print("⚠️ [Message] 알 수 없는 메시지: \(message.name)")
         }
@@ -1220,6 +1302,39 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         default:
             print("⚡ [Performance] 성능 메시지: \(type)")
         }
+    }
+    
+    // 🔍 콘솔 로그 처리 함수
+    private func handleConsoleLog(_ message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any] else { return }
+        
+        let type = body["type"] as? String ?? "log"
+        let logMessage = body["message"] as? String ?? ""
+        let timestamp = body["timestamp"] as? String ?? ""
+        let url = body["url"] as? String ?? ""
+        
+        // 네이티브 콘솔에도 출력 (중복 방지를 위해 선택적)
+        let formattedMessage = "🌐 [WEB-\(type.uppercased())] \(logMessage)"
+        
+        switch type {
+        case "error":
+            print("❌ \(formattedMessage)")
+        case "warn":
+            print("⚠️ \(formattedMessage)")
+        case "info":
+            print("ℹ️ \(formattedMessage)")
+        case "debug":
+            print("🔍 \(formattedMessage)")
+        default:
+            print("📝 \(formattedMessage)")
+        }
+        
+        // 디버그 모드에서는 자세한 정보 출력
+        #if DEBUG
+        if !timestamp.isEmpty || !url.isEmpty {
+            print("    📍 Time: \(timestamp), URL: \(url)")
+        }
+        #endif
     }
     
     // 강화된 햅틱 피드백 처리
@@ -1389,6 +1504,13 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
     private func handleLocationPermissionRequest(param: Any?) {
         print("📍 [LOCATION] 위치 권한 요청 처리 시작")
         
+        // 위치 서비스 활성화 상태 먼저 확인
+        guard CLLocationManager.locationServicesEnabled() else {
+            print("❌ [LOCATION] 위치 서비스가 비활성화됨")
+            sendLocationPermissionResult(success: false, error: "위치 서비스가 비활성화되어 있습니다. 설정에서 위치 서비스를 활성화해주세요.")
+            return
+        }
+        
         // 위치 권한 상태 확인
         let locationManager = CLLocationManager()
         let authorizationStatus = locationManager.authorizationStatus
@@ -1398,16 +1520,20 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         switch authorizationStatus {
         case .notDetermined:
             // 권한 요청
+            print("📍 [LOCATION] 권한 미결정 - 권한 요청")
             requestLocationPermission()
         case .denied, .restricted:
-            // 권한 거부됨 - 설정으로 이동 안내
+            // 권한 거부됨 - 설정 안내만 하고 팝업은 한 번만
+            print("❌ [LOCATION] 권한 거부됨 - 설정으로 이동 필요")
             showLocationPermissionAlert()
         case .authorizedWhenInUse, .authorizedAlways:
-            // 권한 있음 - 위치 정보 가져오기
+            // 권한 있음 - 바로 위치 정보 가져오기 (팝업 없음)
+            print("✅ [LOCATION] 권한 있음 - 위치 정보 가져오기")
             getCurrentLocation()
         @unknown default:
-            // 알 수 없는 상태
-            showLocationPermissionAlert()
+            // 알 수 없는 상태 - 로그만 남기고 에러 처리
+            print("❓ [LOCATION] 알 수 없는 권한 상태")
+            sendLocationPermissionResult(success: false, error: "알 수 없는 위치 권한 상태입니다.")
         }
     }
     
@@ -1438,6 +1564,12 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
     private func showLocationPermissionAlert() {
         print("📍 [LOCATION] 위치 권한 알림 표시")
         
+        // 이미 팝업이 표시 중인지 확인 (중복 방지)
+        if self.presentedViewController is UIAlertController {
+            print("⚠️ [LOCATION] 이미 팝업이 표시 중 - 중복 방지")
+            return
+        }
+        
         DispatchQueue.main.async {
             let alert = UIAlertController(
                 title: NSLocalizedString("LOCATION_PERMISSION_TITLE", comment: "위치 권한 요청"),
@@ -1456,7 +1588,7 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
                 title: NSLocalizedString("LOCATION_PERMISSION_CANCEL", comment: "취소"),
                 style: .cancel
             ) { _ in
-                self.sendLocationPermissionResult(success: false, error: "권한 거부됨")
+                self.sendLocationPermissionResult(success: false, error: "사용자가 권한 요청을 취소했습니다.")
             })
             
             self.present(alert, animated: true)
@@ -1574,8 +1706,31 @@ extension EnhancedWebViewController: CLLocationManagerDelegate {
         locationManager?.stopUpdatingLocation()
         locationManager = nil
         
-        // 웹으로 오류 전송
-        sendLocationPermissionResult(success: false, error: error.localizedDescription)
+        // 권한 관련 에러인지 확인
+        if let clError = error as? CLError {
+            switch clError.code {
+            case .denied:
+                // 권한이 거부된 경우에만 설정 안내
+                print("❌ [LOCATION] 권한 거부로 인한 실패")
+                sendLocationPermissionResult(success: false, error: "위치 권한이 거부되어 위치 정보를 가져올 수 없습니다.")
+            case .locationUnknown:
+                // 위치를 찾을 수 없는 경우 (GPS 신호 약함 등)
+                print("⚠️ [LOCATION] 위치를 찾을 수 없음 (GPS 신호 약함)")
+                sendLocationPermissionResult(success: false, error: "현재 위치를 찾을 수 없습니다. 잠시 후 다시 시도해주세요.")
+            case .network:
+                // 네트워크 에러
+                print("⚠️ [LOCATION] 네트워크 에러")
+                sendLocationPermissionResult(success: false, error: "네트워크 연결을 확인하고 다시 시도해주세요.")
+            default:
+                // 기타 에러
+                print("⚠️ [LOCATION] 기타 위치 에러: \(clError.localizedDescription)")
+                sendLocationPermissionResult(success: false, error: "위치 정보를 가져오는 중 오류가 발생했습니다.")
+            }
+        } else {
+            // CLError가 아닌 다른 에러
+            print("⚠️ [LOCATION] 알 수 없는 에러: \(error.localizedDescription)")
+            sendLocationPermissionResult(success: false, error: "위치 정보를 가져오는 중 오류가 발생했습니다.")
+        }
     }
 }
 

@@ -19,6 +19,13 @@ const publicPaths = [
   '/test-location-modal'
 ];
 
+// 그룹 가입 페이지 패턴 (정규표현식)
+const isGroupJoinPath = (pathname: string): boolean => {
+  const isJoinPath = /^\/group\/\d+\/join/.test(pathname);
+  console.log('[MIDDLEWARE] isGroupJoinPath 체크:', { pathname, isJoinPath });
+  return isJoinPath;
+};
+
 // Vercel 환경에서 클라이언트 사이드 인증으로 처리할 경로들
 const clientAuthPaths = [
   '/home',
@@ -43,9 +50,13 @@ export function middleware(request: NextRequest) {
   
   console.log('[MIDDLEWARE] 요청 경로:', pathname, 'Vercel:', isVercel);
   
-  // 공개 경로는 통과
-  if (publicPaths.some(path => pathname.startsWith(path))) {
-    console.log('[MIDDLEWARE] 공개 경로 통과:', pathname);
+  // 공개 경로는 통과 (그룹 가입 페이지도 포함)
+  if (publicPaths.some(path => pathname.startsWith(path)) || isGroupJoinPath(pathname)) {
+    console.log('[MIDDLEWARE] 🟢 공개 경로 통과:', pathname, {
+      isPublicPath: publicPaths.some(path => pathname.startsWith(path)),
+      isGroupJoinPath: isGroupJoinPath(pathname),
+      isVercel
+    });
     return NextResponse.next();
   }
 
