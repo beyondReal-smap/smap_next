@@ -216,6 +216,123 @@ input, textarea, select {
     height: 100vh !important;
     overflow: hidden !important;
   }
+  
+  /* iOS에서 스크롤 컨테이너 완전 고정 */
+  .register-form {
+    position: relative !important;
+    overflow-y: auto !important;
+    scroll-behavior: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    /* 스크롤 위치를 강제로 맨 위에 고정 */
+    scroll-snap-type: y mandatory !important;
+  }
+  
+  /* iOS에서 약관 섹션 완전 고정 */
+  .terms-agreement-section {
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    will-change: auto !important;
+    scroll-snap-align: start !important;
+  }
+  
+  /* iOS에서 모든 약관 카드 위치 고정 */
+  .terms-agreement-section .terms-card {
+    position: relative !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    will-change: auto !important;
+  }
+  
+  /* iOS에서 전체 동의 버튼 강제 고정 */
+  .terms-agreement-section .terms-all-agree {
+    position: relative !important;
+    top: 0 !important;
+    margin-top: 0 !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    will-change: auto !important;
+  }
+  
+  /* iOS에서 헤더와 폼 영역 완전 분리 */
+  .register-header {
+    position: relative !important;
+    z-index: 1 !important;
+    background: transparent !important;
+    margin-bottom: 16px !important;
+    padding-bottom: 0 !important;
+    flex-shrink: 0 !important;
+  }
+  
+  .register-form {
+    position: relative !important;
+    z-index: 2 !important;
+    margin-top: 16px !important;
+    padding-top: 16px !important;
+    background: transparent !important;
+    flex: 1 !important;
+  }
+  
+  /* iOS에서 약관 섹션 레이아웃 완전 고정 */
+  .terms-agreement-section {
+    margin-top: 20px !important;
+    padding-top: 20px !important;
+    background: transparent !important;
+    position: relative !important;
+    z-index: 3 !important;
+  }
+  
+  /* iOS에서 애니메이션 최적화 */
+  .register-content-area {
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+    transform: translateZ(0) !important;
+    -webkit-transform: translateZ(0) !important;
+  }
+  
+  /* iOS에서 모션 컴포넌트 최적화 */
+  [data-framer-component] {
+    -webkit-backface-visibility: hidden !important;
+    backface-visibility: hidden !important;
+    transform: translateZ(0) !important;
+    -webkit-transform: translateZ(0) !important;
+    will-change: auto !important;
+  }
+  
+  /* iOS에서 초기 상태 완전 고정 */
+  .register-content-area * {
+    transform: none !important;
+    -webkit-transform: none !important;
+    will-change: auto !important;
+    animation: none !important;
+    -webkit-animation: none !important;
+    transition: none !important;
+    -webkit-transition: none !important;
+  }
+  
+  /* iOS에서 framer-motion 애니메이션 완료 후 고정 */
+  .register-content-area [data-framer-component][data-framer-appear-id] {
+    transform: none !important;
+    -webkit-transform: none !important;
+    opacity: 1 !important;
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: auto !important;
+    bottom: auto !important;
+  }
+  
+  /* iOS에서 약관 카드들 완전 고정 */
+  .terms-agreement-section .terms-card {
+    position: relative !important;
+    transform: none !important;
+    -webkit-transform: none !important;
+    will-change: auto !important;
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 /* Glass Effect 스타일 */
@@ -225,7 +342,19 @@ input, textarea, select {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* 약관동의 체크박스 레이아웃 보호 */
+/* 약관동의 체크박스 레이아웃 안정화 */
+.terms-agreement-section {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  will-change: auto !important;
+  contain: layout !important;
+}
+
 .terms-checkbox-container {
   position: relative !important;
   display: flex !important;
@@ -239,10 +368,14 @@ input, textarea, select {
   bottom: auto !important;
   transform: none !important;
   -webkit-transform: none !important;
+  will-change: auto !important;
+  contain: layout !important;
+  height: auto !important;
+  min-height: 44px !important;
 }
 
 .terms-checkbox-wrapper {
-  margin-right: 16px !important;
+  margin-right: 12px !important;
   margin-left: 0 !important;
   margin-top: 0 !important;
   margin-bottom: 0 !important;
@@ -254,6 +387,9 @@ input, textarea, select {
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  will-change: auto !important;
 }
 
 .terms-content-wrapper {
@@ -261,6 +397,67 @@ input, textarea, select {
   margin: 0 !important;
   padding: 0 !important;
   position: relative !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  will-change: auto !important;
+}
+
+/* 약관 동의 카드들의 안정화 */
+.terms-agreement-section .terms-card {
+  position: relative !important;
+  display: flex !important;
+  padding: 8px !important;
+  border-radius: 12px !important;
+  background-color: white !important;
+  border: 1px solid #e5e7eb !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  will-change: auto !important;
+  contain: layout !important;
+}
+
+/* 체크박스 애니메이션 안정화 */
+.terms-checkbox {
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 20px !important;
+  height: 20px !important;
+  border: 2px solid #d1d5db !important;
+  border-radius: 4px !important;
+  transition: all 0.2s ease !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  will-change: auto !important;
+}
+
+.terms-checkbox.checked {
+  background-color: #0113A3 !important;
+  border-color: #0113A3 !important;
+}
+
+/* 전체 약관 동의 영역 강조 */
+.terms-agreement-section .terms-all-agree {
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* 개별 약관 카드 간격 */
+.terms-agreement-section .terms-card:not(.terms-all-agree) {
+  margin-top: 12px !important;
+  margin-bottom: 0 !important;
+}
+
+/* 모션 관련 최적화 */
+.register-form .terms-agreement-section * {
+  will-change: auto !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
 }
 `;
 

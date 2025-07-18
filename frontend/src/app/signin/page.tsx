@@ -16,6 +16,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import { RiKakaoTalkFill } from 'react-icons/ri';
 import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
+import groupService from '@/services/groupService';
 
 
 // 카카오 SDK 타입 정의
@@ -695,7 +696,18 @@ const SignInPage = () => {
               console.error('[NATIVE CALLBACK] AuthContext 동기화 실패:', error);
             }
             
-            // 7. 즉시 리다이렉션 (상태 안정화 완료)
+            // 7. 그룹 가입 처리
+            try {
+              const groupJoinResult = await handlePendingGroupJoin();
+              if (groupJoinResult) {
+                console.log('[NATIVE CALLBACK] ✅ 그룹 가입 처리 완료');
+              }
+            } catch (groupJoinError) {
+              console.error('[NATIVE CALLBACK] ❌ 그룹 가입 처리 중 오류:', groupJoinError);
+              // 그룹 가입 실패해도 로그인은 성공으로 처리
+            }
+            
+            // 8. 즉시 리다이렉션 (상태 안정화 완료)
             console.log('[NATIVE CALLBACK] 홈으로 즉시 리다이렉션 실행');
             router.replace('/home');
           }
@@ -796,6 +808,17 @@ const SignInPage = () => {
                 console.error('[NATIVE DATA] ❌ 로그인 후 데이터 프리로딩 오류:', preloadError);
                 // 프리로딩 실패해도 로그인은 성공으로 처리
               }
+            }
+            
+            // 그룹 가입 처리
+            try {
+              const groupJoinResult = await handlePendingGroupJoin();
+              if (groupJoinResult) {
+                console.log('[NATIVE DATA] ✅ 그룹 가입 처리 완료');
+              }
+            } catch (groupJoinError) {
+              console.error('[NATIVE DATA] ❌ 그룹 가입 처리 중 오류:', groupJoinError);
+              // 그룹 가입 실패해도 로그인은 성공으로 처리
             }
             
             // 즉시 리다이렉션
@@ -1362,6 +1385,17 @@ const SignInPage = () => {
                   console.log('[GOOGLE SDK] 인증 상태 동기화 성공!');
                 } else {
                   console.warn('[GOOGLE SDK] 인증 상태 동기화 시간 초과, 강제 진행');
+                }
+                
+                // 그룹 가입 처리
+                try {
+                  const groupJoinResult = await handlePendingGroupJoin();
+                  if (groupJoinResult) {
+                    console.log('[GOOGLE SDK] ✅ 그룹 가입 처리 완료');
+                  }
+                } catch (groupJoinError) {
+                  console.error('[GOOGLE SDK] ❌ 그룹 가입 처리 중 오류:', groupJoinError);
+                  // 그룹 가입 실패해도 로그인은 성공으로 처리
                 }
                 
                 // 성공 햅틱 피드백
@@ -1959,7 +1993,18 @@ const SignInPage = () => {
               // 5. 리다이렉트 플래그 설정
               isRedirectingRef.current = true;
               
-              // 6. 즉시 홈 페이지 이동
+              // 6. 그룹 가입 처리
+              try {
+                const groupJoinResult = await handlePendingGroupJoin();
+                if (groupJoinResult) {
+                  console.log('[GOOGLE LOGIN] ✅ 그룹 가입 처리 완료');
+                }
+              } catch (groupJoinError) {
+                console.error('[GOOGLE LOGIN] ❌ 그룹 가입 처리 중 오류:', groupJoinError);
+                // 그룹 가입 실패해도 로그인은 성공으로 처리
+              }
+              
+              // 7. 즉시 홈 페이지 이동
               console.log('[GOOGLE LOGIN] 🏠 홈 페이지로 즉시 이동');
                 router.replace('/home');
             }
@@ -2235,6 +2280,17 @@ const SignInPage = () => {
         }
       });
       
+      // 🚨 그룹 가입 처리
+      try {
+        const groupJoinResult = await handlePendingGroupJoin();
+        if (groupJoinResult) {
+          console.log('[SIGNIN] ✅ 그룹 가입 처리 완료');
+        }
+      } catch (groupJoinError) {
+        console.error('[SIGNIN] ❌ 그룹 가입 처리 중 오류:', groupJoinError);
+        // 그룹 가입 실패해도 로그인은 성공으로 처리
+      }
+      
       // 로그인 성공 햅틱 피드백
       triggerHapticFeedback(HapticFeedbackType.SUCCESS);
       console.log('🎮 [SIGNIN] 전화번호 로그인 성공 햅틱 피드백 실행');
@@ -2390,6 +2446,54 @@ const SignInPage = () => {
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     return false;
+  };
+
+  // 그룹 가입 처리 함수
+  const handlePendingGroupJoin = async () => {
+    try {
+      const pendingGroupJoin = localStorage.getItem('pendingGroupJoin');
+      if (!pendingGroupJoin) {
+        console.log('[SIGNIN] 대기 중인 그룹 가입 없음');
+        return false;
+      }
+
+      const groupData = JSON.parse(pendingGroupJoin);
+      const { groupId, groupTitle, timestamp } = groupData;
+
+      // 24시간 이내의 요청만 처리 (만료된 요청 방지)
+      const isExpired = Date.now() - timestamp > 24 * 60 * 60 * 1000;
+      if (isExpired) {
+        console.log('[SIGNIN] 만료된 그룹 가입 요청, 삭제');
+        localStorage.removeItem('pendingGroupJoin');
+        return false;
+      }
+
+      console.log('[SIGNIN] 대기 중인 그룹 가입 처리 시작:', { groupId, groupTitle });
+
+      // 그룹 가입 API 호출
+      await groupService.joinGroup(parseInt(groupId));
+
+      // 성공 시 localStorage에서 제거
+      localStorage.removeItem('pendingGroupJoin');
+
+      console.log(`[SIGNIN] 그룹 "${groupTitle}" 가입 완료!`);
+      
+      // 성공 알림 (선택사항)
+      showError(`그룹 "${groupTitle}"에 성공적으로 가입되었습니다!`);
+      
+      return true;
+
+    } catch (error) {
+      console.error('[SIGNIN] 자동 그룹 가입 실패:', error);
+      
+      // 실패해도 localStorage는 정리
+      localStorage.removeItem('pendingGroupJoin');
+      
+      // 에러 메시지 표시
+      showError('그룹 가입 중 오류가 발생했습니다. 나중에 다시 시도해주세요.');
+      
+      return false;
+    }
   };
 
     // Google 로그인 핸들러 (안전한 버전)

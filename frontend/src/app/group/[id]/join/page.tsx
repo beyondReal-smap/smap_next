@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import IOSCompatibleSpinner from '../../../../components/common/IOSCompatibleSpinner';
+import AnimatedHeader from '../../../../components/common/AnimatedHeader';
 import Image from 'next/image';
 import { FaUsers, FaDownload } from 'react-icons/fa';
-import { HiSparkles, HiDevicePhoneMobile } from 'react-icons/hi2';
+import { HiSparkles, HiDevicePhoneMobile, HiOutlineChevronLeft } from 'react-icons/hi2';
 import { IoSparklesSharp } from 'react-icons/io5';
 
 interface GroupInfo {
@@ -178,8 +180,44 @@ export default function GroupJoinPage() {
           window.open(APP_STORE_URL, '_blank');
         }, 3000);
       } else if (isAndroid()) {
-        const intentUrl = `intent://group/${groupId}/join#Intent;scheme=smap;package=com.dmonster.smap;S.browser_fallback_url=${encodeURIComponent(PLAY_STORE_URL)};end`;
-        window.location.href = intentUrl;
+        // 안드로이드에서 더 안정적인 방법 사용
+        const deepLink = `smap://group/${groupId}/join`;
+        let appOpened = false;
+        
+        // 페이지 가시성 변화를 감지하여 앱이 열렸는지 확인
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            appOpened = true;
+          }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        // 1. 딥링크 시도 (여러 방법)
+        try {
+          // 방법 1: window.location 사용
+          window.location.href = deepLink;
+        } catch (e) {
+          // 방법 2: iframe 사용
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = deepLink;
+          document.body.appendChild(iframe);
+          
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, 100);
+        }
+        
+        // 2초 후 앱이 열리지 않았으면 플레이스토어로 이동
+        setTimeout(() => {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          if (!appOpened) {
+            window.open(PLAY_STORE_URL, '_blank');
+          }
+        }, 2000);
       } else {
         // 데스크톱에서는 바로 스토어로
         window.open(APP_STORE_URL, '_blank');
@@ -197,12 +235,58 @@ export default function GroupJoinPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <IOSCompatibleSpinner 
-          message="그룹 정보를 불러오는 중..."
-          size="lg"
-        />
-      </div>
+      <>
+        {/* 헤더 */}
+        <AnimatedHeader 
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+          style={{ 
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px',
+            position: 'fixed'
+          }}
+        >
+          <div className="flex items-center justify-between h-14 px-4">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center space-x-3"
+            >
+              <motion.button 
+                onClick={() => router.back()}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1, duration: 0.4 }}
+              >
+                <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
+              </motion.button>
+              <motion.div 
+                className="flex items-center space-x-3"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+              >
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">그룹 초대</h1>
+                  <p className="text-xs text-gray-500">그룹 정보를 불러오는 중...</p>
+                </div>
+              </motion.div>
+            </motion.div>
+          </div>
+        </AnimatedHeader>
+        
+        <div className="min-h-screen flex items-center justify-center bg-white pt-16">
+          <IOSCompatibleSpinner 
+            message="그룹 정보를 불러오는 중..."
+            size="lg"
+          />
+        </div>
+      </>
     );
   }
 
@@ -228,20 +312,93 @@ export default function GroupJoinPage() {
           }
         `}</style>
         
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4">
-          <div 
+        {/* 헤더 */}
+        <AnimatedHeader 
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+          style={{ 
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px',
+            position: 'fixed'
+          }}
+        >
+          <div className="flex items-center justify-between h-14 px-4">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center space-x-3"
+            >
+              <motion.button 
+                onClick={() => router.back()}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1, duration: 0.4 }}
+              >
+                <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
+              </motion.button>
+              <motion.div 
+                className="flex items-center space-x-3"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2, duration: 0.4 }}
+              >
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">그룹 초대</h1>
+                  <p className="text-xs text-gray-500">오류가 발생했습니다</p>
+                </div>
+              </motion.div>
+            </motion.div>
+          </div>
+        </AnimatedHeader>
+        
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4 pt-16">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
             className="text-center p-6 bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl max-w-sm w-full"
           >
-            <div className="text-5xl mb-4">😕</div>
-            <h1 className="text-xl font-bold text-gray-800 mb-2">그룹을 찾을 수 없습니다</h1>
-            <p className="text-gray-600 text-sm mb-6">{error || '유효하지 않은 초대 링크입니다.'}</p>
-            <button
+            <motion.div 
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.5, duration: 0.3 }}
+              className="text-5xl mb-4"
+            >
+              😕
+            </motion.div>
+            <motion.h1 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6, duration: 0.4 }}
+              className="text-xl font-bold text-gray-800 mb-2"
+            >
+              그룹을 찾을 수 없습니다
+            </motion.h1>
+            <motion.p 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7, duration: 0.4 }}
+              className="text-gray-600 text-sm mb-6"
+            >
+              {error || '유효하지 않은 초대 링크입니다.'}
+            </motion.p>
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8, duration: 0.4 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => router.push('/')}
               className="px-6 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-medium text-sm shadow-lg hover:shadow-xl transition-all"
             >
               홈으로 돌아가기
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
         </div>
       </>
     );
@@ -298,26 +455,122 @@ export default function GroupJoinPage() {
         }
       `}</style>
       
-      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-200 to-pink-200 relative overflow-hidden">
-        {/* 배경 장식 */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-20 left-10 w-32 h-32 bg-white/20 rounded-full blur-xl"></div>
-          <div className="absolute bottom-20 right-10 w-40 h-40 bg-white/20 rounded-full blur-xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+      {/* 헤더 */}
+      <AnimatedHeader 
+        variant="simple"
+        className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
+        style={{ 
+          paddingTop: '0px',
+          marginTop: '0px',
+          top: '0px',
+          position: 'fixed'
+        }}
+      >
+        <div className="flex items-center justify-between h-14 px-4">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3 }}
+            className="flex items-center space-x-3"
+          >
+            <motion.button 
+              onClick={() => router.back()}
+              className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.1, duration: 0.4 }}
+            >
+              <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
+            </motion.button>
+            <motion.div 
+              className="flex items-center space-x-3"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2, duration: 0.4 }}
+            >
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">그룹 초대</h1>
+                <p className="text-xs text-gray-500">SMAP에서 함께해요!</p>
+              </div>
+            </motion.div>
+          </motion.div>
         </div>
+      </AnimatedHeader>
+      
+      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-200 to-pink-200 relative overflow-hidden pt-16">
+        {/* 배경 장식 */}
+        <motion.div 
+          className="absolute inset-0 overflow-hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3, duration: 0.8 }}
+        >
+          <motion.div 
+            className="absolute top-20 left-10 w-32 h-32 bg-white/20 rounded-full blur-xl"
+            animate={{ 
+              y: [0, -10, 0],
+              rotate: [0, 180, 360]
+            }}
+            transition={{ 
+              duration: 8, 
+              repeat: Infinity, 
+              ease: "easeInOut" 
+            }}
+          ></motion.div>
+          <motion.div 
+            className="absolute bottom-20 right-10 w-40 h-40 bg-white/20 rounded-full blur-xl"
+            animate={{ 
+              x: [0, 10, 0],
+              scale: [1, 1.1, 1]
+            }}
+            transition={{ 
+              duration: 6, 
+              repeat: Infinity, 
+              ease: "easeInOut" 
+            }}
+          ></motion.div>
+          <motion.div 
+            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-24 bg-white/10 rounded-full blur-xl"
+            animate={{ 
+              rotate: [0, 360],
+              scale: [1, 1.2, 1]
+            }}
+            transition={{ 
+              duration: 10, 
+              repeat: Infinity, 
+              ease: "linear" 
+            }}
+          ></motion.div>
+        </motion.div>
 
         <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
-          <div
+          <motion.div
             className="w-full max-w-xs"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
           >
             {/* 메인 카드 */}
-            <div
+            <motion.div
               className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-6 mb-4"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
             >
               {/* 로고 및 헤더 */}
-              <div className="text-center mb-6">
-                <div
+              <motion.div 
+                className="text-center mb-6"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.5 }}
+              >
+                <motion.div
                   className="w-16 h-16 mx-auto mb-4 relative"
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: 0.7, duration: 0.6, type: "spring", stiffness: 200 }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-br from-indigo-400 to-purple-600 rounded-full opacity-20 blur-md"></div>
                   <Image
@@ -328,70 +581,130 @@ export default function GroupJoinPage() {
                     className="rounded-full object-cover relative z-10 border-3 border-white shadow-lg"
                     priority
                   />
-                </div>
+                </motion.div>
                 
-                <div
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8, duration: 0.4 }}
                 >
                   <div className="flex items-center justify-center mb-2">
-                    <IoSparklesSharp className="text-yellow-500 text-lg mr-1" />
+                    <motion.div
+                      animate={{ rotate: [0, 360] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    >
+                      <IoSparklesSharp className="text-yellow-500 text-lg mr-1" />
+                    </motion.div>
                     <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                       그룹 초대
                     </h1>
-                    <IoSparklesSharp className="text-yellow-500 text-lg ml-1" />
+                    <motion.div
+                      animate={{ rotate: [0, -360] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                    >
+                      <IoSparklesSharp className="text-yellow-500 text-lg ml-1" />
+                    </motion.div>
                   </div>
                   <p className="text-gray-600 text-sm">SMAP에서 함께해요!</p>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
 
               {/* 그룹 정보 */}
-              <div
+              <motion.div
                 className="text-center mb-6"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.9, duration: 0.5 }}
               >
-                <div className="bg-gradient-to-r from-indigo-100 to-purple-100 rounded-2xl p-4 mb-4">
-                  <h2 className="text-xl font-bold text-gray-800 mb-2">{groupInfo.sgt_title}</h2>
+                <motion.div 
+                  className="bg-gradient-to-r from-indigo-100 to-purple-100 rounded-2xl p-4 mb-4"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 1.0, duration: 0.4 }}
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <motion.h2 
+                    className="text-xl font-bold text-gray-800 mb-2"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 1.1, duration: 0.4 }}
+                  >
+                    {groupInfo.sgt_title}
+                  </motion.h2>
                   
                   {(groupInfo.sgt_content || groupInfo.sgt_memo) && (
-                    <p className="text-gray-600 text-sm mb-3 leading-relaxed">
+                    <motion.p 
+                      className="text-gray-600 text-sm mb-3 leading-relaxed"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 1.2, duration: 0.4 }}
+                    >
                       {groupInfo.sgt_content || groupInfo.sgt_memo}
-                    </p>
+                    </motion.p>
                   )}
                   
-                  <div className="flex items-center justify-center bg-white rounded-xl py-2 px-3 shadow-sm">
+                  <motion.div 
+                    className="flex items-center justify-center bg-white rounded-xl py-2 px-3 shadow-sm"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 1.3, duration: 0.4 }}
+                  >
                     <FaUsers className="mr-2 text-indigo-500 text-sm" />
                     <span className="text-gray-700 font-medium text-sm">멤버 {groupInfo.memberCount}명</span>
-                  </div>
-                </div>
-              </div>
+                  </motion.div>
+                </motion.div>
+              </motion.div>
 
               {/* 앱 열기 버튼 */}
               {isMobile() && (
-                <div
+                <motion.div
                   className="mb-4"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 1.4, duration: 0.5 }}
                 >
-                  <button
+                  <motion.button
                     onClick={handleOpenApp}
                     className="w-full bg-gradient-to-r from-indigo-400 to-purple-500 text-white py-4 rounded-2xl font-bold text-base flex items-center justify-center space-x-2 shadow-xl hover:shadow-2xl transition-all relative overflow-hidden"
+                    whileHover={{ 
+                      scale: 1.02,
+                      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+                    }}
+                    whileTap={{ scale: 0.98 }}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 1.5, duration: 0.4, type: "spring" }}
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 opacity-0 hover:opacity-100 transition-opacity"></div>
-                    <HiDevicePhoneMobile className="text-xl relative z-10" />
+                    <motion.div
+                      animate={{ rotate: [0, 5, -5, 0] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                      <HiDevicePhoneMobile className="text-xl relative z-10" />
+                    </motion.div>
                     <span className="relative z-10">SMAP 앱에서 열기</span>
-                  </button>
+                  </motion.button>
                   
-                  <p className="text-center text-xs text-gray-500 mt-2">
+                  <motion.p 
+                    className="text-center text-xs text-gray-500 mt-2"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 1.6, duration: 0.4 }}
+                  >
                     💡 앱이 없다면 자동으로 스토어로 이동해요
-                  </p>
-                </div>
+                  </motion.p>
+                </motion.div>
               )}
 
               {/* 앱 다운로드 */}
-              <div
+              {/* <div
               >
-                {/* <div className="text-center mb-3">
+                <div className="text-center mb-3">
                   <FaDownload className="text-lg text-gray-600 mx-auto mb-1" />
                   <h3 className="text-sm font-bold text-gray-800">
                     {isMobile() ? '앱 다운로드' : 'SMAP 앱 다운로드'}
                   </h3>
-                </div> */}
+                </div>
                 
                 <div className="flex space-x-3">
                   <a
@@ -424,30 +737,36 @@ export default function GroupJoinPage() {
                     />
                   </a>
                 </div>
-              </div>
-            </div>
+              </div> */}
+            </motion.div>
 
             {/* 하단 안내 (데스크톱만) */}
             {!isMobile() && (
-              <div
+              <motion.div
                 className="text-center bg-white/20 backdrop-blur-sm rounded-2xl p-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8, duration: 0.4 }}
               >
-                <p className="text-white text-xs">
+                <p className="text-gray-500 text-xs">
                   📱 이 링크를 모바일에서 열면<br />
                   SMAP 앱에서 바로 그룹에 참여할 수 있어요
                 </p>
-              </div>
+              </motion.div>
             )}
 
             {/* 푸터 */}
-            <div
+            <motion.div
               className="text-center mt-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.9, duration: 0.4 }}
             >
               <p className="text-gray-700 text-xs">
                 © 2025 SMAP All rights reserved.
               </p>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </div>
       </div>
     </>

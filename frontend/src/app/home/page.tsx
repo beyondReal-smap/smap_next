@@ -211,6 +211,11 @@ html, body {
   -webkit-backface-visibility: hidden;
 }
 
+/* 사이드바가 열렸을 때 헤더 z-index 낮추기 */
+body.sidebar-open .header-fixed {
+  z-index: 10 !important;
+}
+
 /* iOS 웹뷰 하단 네비게이션 최적화 */
 .navigation-fixed {
   position: fixed !important;
@@ -5199,6 +5204,20 @@ export default function HomePage() {
       }
     };
   
+    // 사이드바 상태에 따른 body 클래스 관리
+    useEffect(() => {
+      if (isSidebarOpen) {
+        document.body.classList.add('sidebar-open');
+      } else {
+        document.body.classList.remove('sidebar-open');
+      }
+      
+      // 컴포넌트 언마운트 시 클래스 제거
+      return () => {
+        document.body.classList.remove('sidebar-open');
+      };
+    }, [isSidebarOpen]);
+
     // 사이드바 외부 클릭 시 닫기 (강화된 햅틱 피드백)
     useEffect(() => {
       const handleSidebarClickOutside = (event: MouseEvent) => {
@@ -5235,13 +5254,21 @@ export default function HomePage() {
     closed: {
       x: '-100%',
       transition: {
-        duration: 0.6
+        type: 'spring' as const,
+        stiffness: 500, // 300에서 500으로 높여서 더 빠르게
+        damping: 40, // 30에서 40으로 높여서 더 안정적
+        mass: 0.6, // 0.8에서 0.6으로 줄여서 더 가볍게
+        duration: 0.3 // 0.4에서 0.3으로 줄여서 더 빠르게
       }
     },
     open: {
       x: 0,
       transition: {
-        duration: 0.6
+        type: 'spring' as const,
+        stiffness: 500, // 300에서 500으로 높여서 더 빠르게
+        damping: 40, // 30에서 40으로 높여서 더 안정적
+        mass: 0.6, // 0.8에서 0.6으로 줄여서 더 가볍게
+        duration: 0.3 // 0.4에서 0.3으로 줄여서 더 빠르게
       }
     }
   };
@@ -5250,13 +5277,13 @@ export default function HomePage() {
     closed: {
       opacity: 0,
       transition: {
-        duration: 0.6
+        duration: 0.2 // 0.3에서 0.2로 줄여서 더 빠르게
       }
     },
     open: {
       opacity: 1,
       transition: {
-        duration: 0.6
+        duration: 0.2 // 0.3에서 0.2로 줄여서 더 빠르게
       }
     }
   };
@@ -5264,14 +5291,17 @@ export default function HomePage() {
   const sidebarContentVariants = {
     closed: {
       opacity: 0,
+      x: -30,
       transition: {
-        duration: 0.6
+        duration: 0.15 // 0.2에서 0.15로 줄여서 더 빠르게
       }
     },
     open: {
       opacity: 1,
+      x: 0,
       transition: {
-        duration: 0.6
+        duration: 0.25, // 0.4에서 0.25로 줄여서 더 빠르게
+        delay: 0.02 // 0.1에서 0.02로 줄여서 빠른 시작
       }
     }
   };
@@ -5739,7 +5769,7 @@ export default function HomePage() {
                  initial="closed"
                  animate="open"
                  exit="closed"
-                 className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99995]"
+                 className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[99999]"
                  onClick={(e) => {
                    // 플로팅 버튼 영역 클릭 시 사이드바 닫지 않음
                    const target = e.target as HTMLElement;
@@ -5765,7 +5795,7 @@ export default function HomePage() {
                    initial="closed"
                    animate="open"
                    exit="closed"
-                   className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[99997] flex flex-col"
+                   className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[999999] flex flex-col"
                    onClick={(e) => e.stopPropagation()}
                    style={{ 
                      background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',

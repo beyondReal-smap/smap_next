@@ -285,15 +285,21 @@ const sidebarVariants = {
   closed: {
     x: '-100%',
     transition: {
-      type: 'tween' as const,
-      duration: 0.4
+      type: 'spring' as const,
+      stiffness: 500, // 400에서 500으로 높여서 더 빠르게
+      damping: 40, // 35에서 40으로 높여서 더 안정적
+      mass: 0.6, // 0.7에서 0.6으로 줄여서 더 가볍게
+      duration: 0.3 // 0.35에서 0.3으로 줄여서 더 빠르게
     }
   },
   open: {
     x: 0,
     transition: {
-      type: 'tween' as const,
-      duration: 0.4
+      type: 'spring' as const,
+      stiffness: 500, // 400에서 500으로 높여서 더 빠르게
+      damping: 40, // 35에서 40으로 높여서 더 안정적
+      mass: 0.6, // 0.7에서 0.6으로 줄여서 더 가볍게
+      duration: 0.3 // 0.35에서 0.3으로 줄여서 더 빠르게
     }
   }
 };
@@ -302,13 +308,13 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.3
+      duration: 0.2 // 0.25에서 0.2로 줄여서 더 빠르게
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.3
+      duration: 0.2 // 0.25에서 0.2로 줄여서 더 빠르게
     }
   }
 };
@@ -316,37 +322,42 @@ const sidebarOverlayVariants = {
 const sidebarContentVariants = {
   closed: {
     opacity: 0,
+    x: -30,
     transition: {
       duration: 0.2
     }
   },
   open: {
     opacity: 1,
+    x: 0,
     transition: {
-      duration: 0.4,
-      delay: 0.1,
-      staggerChildren: 0.05,
-      delayChildren: 0.1
+      duration: 0.25, // 0.3에서 0.25로 더 줄여서 일관성 있게
+      delay: 0.02, // 0.05에서 0.02로 더 줄여서 즉시 시작
+      staggerChildren: 0.02, // 0.025에서 0.02로 더 줄여서 일관성 있게
+      delayChildren: 0.05 // 0.1에서 0.05로 더 줄여서 빠른 시작
     }
   }
 };
 
-// 멤버 아이템 애니메이션 - 순차적으로 나타남
+// 멤버 아이템 애니메이션 - 부드럽고 일관된 애니메이션
 const memberItemVariants = {
   closed: { 
     opacity: 0,
-    x: -20,
-    scale: 0.95
+    x: -8, // 움직임을 더 줄여서 부드럽게
+    scale: 0.99 // 스케일 변화 최소화
   },
-  open: (index: number) => ({ 
+  open: { 
     opacity: 1,
     x: 0,
     scale: 1,
     transition: {
-      duration: 0.3,
-      delay: index * 0.05
+      type: "spring" as const,
+      stiffness: 350, // 더 낮은 stiffness로 부드럽게
+      damping: 45, // 더 높은 damping으로 안정적
+      mass: 0.9, // 질량을 조정하여 자연스럽게
+      duration: 0.3 // 약간 늘려서 더 자연스럽게
     }
-  })
+  }
 };
 
 
@@ -7586,7 +7597,6 @@ export default function ActivelogPage() {
                           key={member.id}
                           id={`member-${member.id}`}
                           variants={memberItemVariants}
-                          custom={index}
                           whileTap={{ scale: 0.98 }}
                           onClick={(e) => {
                             console.log('[멤버 클릭] 멤버 선택:', member.name);

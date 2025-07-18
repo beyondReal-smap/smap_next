@@ -294,15 +294,21 @@ const sidebarVariants = {
   closed: {
     x: '-100%',
     transition: {
-      type: 'tween' as const,
-      duration: 0.6
+      type: 'spring' as const,
+      stiffness: 500, // 300에서 500으로 높여서 더 빠르게
+      damping: 40, // 30에서 40으로 높여서 더 안정적
+      mass: 0.6, // 0.8에서 0.6으로 줄여서 더 가볍게
+      duration: 0.3 // 0.4에서 0.3으로 줄여서 더 빠르게
     }
   },
   open: {
     x: 0,
     transition: {
-      type: 'tween' as const,
-      duration: 0.6
+      type: 'spring' as const,
+      stiffness: 500, // 300에서 500으로 높여서 더 빠르게
+      damping: 40, // 30에서 40으로 높여서 더 안정적
+      mass: 0.6, // 0.8에서 0.6으로 줄여서 더 가볍게
+      duration: 0.3 // 0.4에서 0.3으로 줄여서 더 빠르게
     }
   }
 };
@@ -311,13 +317,13 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.6
+      duration: 0.2 // 0.3에서 0.2로 줄여서 더 빠르게
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.6
+      duration: 0.2 // 0.3에서 0.2로 줄여서 더 빠르게
     }
   }
 };
@@ -325,14 +331,17 @@ const sidebarOverlayVariants = {
 const sidebarContentVariants = {
   closed: {
     opacity: 0,
+    x: -30,
     transition: {
-      duration: 0.6
+      duration: 0.15 // 0.2에서 0.15로 줄여서 더 빠르게
     }
   },
   open: {
     opacity: 1,
+    x: 0,
     transition: {
-      duration: 0.6
+      duration: 0.25, // 0.4에서 0.25로 줄여서 더 빠르게
+      delay: 0.02 // 0.1에서 0.02로 줄여서 빠른 시작
     }
   }
 };
