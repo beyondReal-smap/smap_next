@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { API_KEYS } from '../config';
 
 interface MapPreloadStatus {
@@ -22,6 +23,10 @@ let loadingInProgress = {
 
 export const useMapPreloader = () => {
   const hasInitialized = useRef(false);
+  const pathname = usePathname();
+  
+  // notice 페이지에서는 지도 프리로딩 비활성화
+  const isNoticePage = pathname?.startsWith('/notice');
 
   // 네이버 지도 API 프리로드
   const preloadNaverMaps = () => {
@@ -110,6 +115,12 @@ export const useMapPreloader = () => {
   useEffect(() => {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
+
+    // notice 페이지에서는 지도 프리로딩 건너뛰기
+    if (isNoticePage) {
+      console.log('[MapPreloader] Notice 페이지 - 지도 API 프리로딩 건너뛰기');
+      return;
+    }
 
     console.log('[MapPreloader] 지도 API 백그라운드 프리로딩 시작');
 

@@ -37,8 +37,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const simplifiedHeaderPages = ['/schedule', '/location', '/activelog'];
   const isSimplifiedHeader = simplifiedHeaderPages.some(path => pathname?.startsWith(path) ?? false);
   
-  // 헤더가 없는 페이지 확인 (그룹)
-  const noHeaderPages = ['/group'];
+  // 헤더가 없는 페이지 확인 (그룹, 알림)
+  const noHeaderPages = ['/group', '/notice'];
   const isNoHeader = noHeaderPages.some(path => pathname?.startsWith(path) ?? false);
   
   // 현재 페이지가 홈 페이지인지 확인

@@ -1235,9 +1235,8 @@ function GroupPageContent() {
         selectedMember.mt_idx
       );
       
-      setGroupMembers(prev => 
-        (prev && Array.isArray(prev)) ? prev.filter(member => member.mt_idx !== selectedMember.mt_idx) : []
-      );
+      // 멤버 목록을 다시 불러와서 최신 상태로 업데이트
+      await fetchGroupMembers(selectedGroup);
       
       setIsMemberManageModalOpen(false);
       setSelectedMember(null);
@@ -1365,8 +1364,21 @@ function GroupPageContent() {
   };
 
   const sidebarContentVariants = {
-    closed: { opacity: 0, x: -20 },
-    open: { opacity: 1, x: 0 }
+    closed: { 
+      opacity: 0, 
+      x: -20,
+      transition: {
+        duration: 0.2 // 사이드바와 완전히 동일한 duration
+      }
+    },
+    open: { 
+      opacity: 1, 
+      x: 0,
+      transition: {
+        duration: 0.2, // 사이드바와 완전히 동일한 duration
+        delay: 0.02 // 최소한의 지연
+      }
+    }
   };
 
   const memberItemVariants = {
@@ -1510,7 +1522,7 @@ function GroupPageContent() {
                      initial={{ opacity: 0, x: -20 }}
                      animate={{ opacity: 1, x: 0 }}
                      exit={{ opacity: 0, x: 20 }}
-                     transition={{ delay: 0.4, duration: 0.5 }}
+                     transition={{ duration: 0.3 }}
                      className="flex items-center space-x-3"
                    >
                      <motion.button 
@@ -1518,23 +1530,15 @@ function GroupPageContent() {
                        className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
                        whileHover={{ scale: 1.05 }}
                        whileTap={{ scale: 0.95 }}
-                       initial={{ opacity: 0, scale: 0.8 }}
-                       animate={{ opacity: 1, scale: 1 }}
-                       transition={{ delay: 0.5, duration: 0.4 }}
                      >
                        <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
                      </motion.button>
-                     <motion.div 
-                       className="flex items-center space-x-3"
-                       initial={{ opacity: 0, y: -10 }}
-                       animate={{ opacity: 1, y: 0 }}
-                       transition={{ delay: 0.6, duration: 0.4 }}
-                     >
+                     <div className="flex items-center space-x-3">
                        <div>
                          <h1 className="text-lg font-bold text-gray-900">그룹 상세</h1>
                          <p className="text-xs text-gray-500">멤버들과 함께하는 즐거운 공간</p>
                        </div>
-                     </motion.div>
+                       </div>
                    </motion.div>
                  )}
               </AnimatePresence>
@@ -1770,66 +1774,68 @@ function GroupPageContent() {
                   <div className="px-4 mb-4">
                     <div className="grid grid-cols-3 gap-3">
                       <motion.div 
-                        className="bg-gradient-to-r from-red-300 to-red-300 rounded-xl p-3 text-white text-center shadow-md"
+                        className="bg-gradient-to-r from-red-300 to-red-300 rounded-xl text-white text-center shadow-md flex flex-col justify-between"
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.2, duration: 0.5 }}
+                        style={{ minHeight: '120px', padding: '12px 12px 0 12px' }}
                       >
                         <FaUsers className="w-6 h-6 text-red-800 mx-auto mb-1" />
+                        <div className="flex items-center justify-center flex-1">
                         {membersLoading ? (
-                          <div className="flex items-center justify-center py-2">
                             <div className="text-center">
                               <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-1"></div>
-                              <div className="text-xs text-red-800">로딩중...</div>
-                            </div>
                           </div>
                         ) : (
                           <div className="text-lg font-bold">
-                            {groupStats?.member_count ?? groupMembers.length ?? 0}
+                              {groupStats?.member_count ?? groupMembers.filter(member => member.sgdt_show !== 'N').length ?? 0}
                           </div>
                         )}
+                        </div>
                         <p className="text-red-800 text-xs">멤버</p>
                       </motion.div>
                       <motion.div 
-                        className="bg-gradient-to-r from-yellow-300 to-yellow-300 rounded-xl p-3 text-white text-center shadow-md"
+                        className="bg-gradient-to-r from-yellow-300 to-yellow-300 rounded-xl text-white text-center shadow-md flex flex-col justify-between"
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.3, duration: 0.5 }}
+                        style={{ minHeight: '120px', padding: '12px 12px 0 12px' }}
                       >
                         <FaCalendarAlt className="w-6 h-6 text-yellow-800 mx-auto mb-1" />
+                        <div className="flex items-center justify-center flex-1">
                         {statsLoading ? (
-                          <div className="flex items-center justify-center py-2">
                             <div className="text-center">
                               <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-1"></div>
-                              <div className="text-xs text-yellow-800">로딩중...</div>
-                            </div>
+                              {/* <div className="text-xs text-yellow-800">로딩중...</div> */}
                           </div>
                         ) : (
                           <div className="text-lg font-bold">
                             {groupStats?.weekly_schedules ?? 0}
                           </div>
                         )}
+                        </div>
                         <p className="text-yellow-800 text-xs">주간 일정</p>
                       </motion.div>
                       <motion.div 
-                        className="bg-gradient-to-r from-blue-300 to-blue-300 rounded-xl p-3 text-white text-center shadow-md"
+                        className="bg-gradient-to-r from-blue-300 to-blue-300 rounded-xl text-white text-center shadow-md flex flex-col justify-between"
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.4, duration: 0.6 }}
+                        style={{ minHeight: '120px', padding: '12px 12px 0 12px' }}
                       >
                         <FaMapMarkerAlt className="w-6 h-6 text-blue-600 mx-auto mb-1" />
+                        <div className="flex items-center justify-center flex-1">
                         {statsLoading ? (
-                          <div className="flex items-center justify-center py-2">
                             <div className="text-center">
                               <div className="w-4 h-4 border-2 border-gray-200 border-t-blue-600 rounded-full unified-animate-spin mx-auto mb-1"></div>
-                              <div className="text-xs text-blue-800">로딩중...</div>
-                            </div>
+                              {/* <div className="text-xs text-blue-800">로딩중...</div> */}
                           </div>
                         ) : (
                           <div className="text-lg font-bold">
                             {groupStats?.total_locations ?? 0}
                           </div>
                         )}
+                        </div>
                         <p className="text-blue-800 text-xs">총 위치</p>
                       </motion.div>
                     </div>
@@ -1900,8 +1906,10 @@ function GroupPageContent() {
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            {groupMembers.length > 0 ? (
-                              (groupMembers && Array.isArray(groupMembers)) && groupMembers.map((member, index) => (
+                            {groupMembers.filter(member => member.sgdt_show !== 'N').length > 0 ? (
+                              (groupMembers && Array.isArray(groupMembers)) && groupMembers
+                                .filter(member => member.sgdt_show !== 'N')
+                                .map((member, index) => (
                                 <motion.div 
                                   key={member.mt_idx} 
                                   onClick={() => handleMemberClick(member)}
@@ -2579,7 +2587,8 @@ function GroupPageContent() {
           {/* 컴팩트 토스트 모달 */}
           {toastModal.isOpen && (
             <motion.div 
-              className="fixed bottom-20 left-4 z-[130] w-3/4 max-w-sm"
+              className="fixed left-4 z-[130] w-3/4 max-w-sm"
+              style={{ bottom: '67px' }} // 네비게이션바(64px) + 7px
               initial={{ opacity: 0, y: 50, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 50, scale: 0.9 }}

@@ -28,8 +28,8 @@ import {
 } from 'react-icons/fi';
 import { HiSparkles } from 'react-icons/hi2';
 import Image from 'next/image';
-import memberService from '@/services/memberService';
-import groupService, { Group } from '@/services/groupService';
+import memberService from '../../frontend/src/services/memberService';
+import groupService, { Group } from '../../frontend/src/services/groupService';
 
 dayjs.extend(isBetween);
 dayjs.locale('ko');
@@ -1084,16 +1084,11 @@ export default function SchedulePage() {
           initial="initial"
           animate="in"
           exit="out"
-          variants={pageVariants}
           className="px-4 pt-20 space-y-6"
           style={{ paddingBottom: '140px' }}
         >
           {/* 캘린더 섹션 */}
           <motion.div
-            variants={cardVariants}
-            initial="hidden"
-            animate="visible"
-            custom={0}
           >
             <MobileCalendar 
               selectedDay={selectedDay}
@@ -1105,10 +1100,10 @@ export default function SchedulePage() {
           {/* 선택된 날짜의 일정 목록 */}
           {selectedDay && (
             <motion.div
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              custom={1}
+              // variants={cardVariants}
+              // initial="hidden"
+              // animate="visible"
+              // custom={1}
             >
               <div className="bg-white rounded-3xl shadow-sm border border-gray-100">
                 {/* 헤더 */}
@@ -1260,11 +1255,6 @@ export default function SchedulePage() {
             document.body.style.overflow = 'hidden';
           }}
           className="fixed bottom-40 right-6 z-40 w-14 h-14 bg-gradient-to-r from-indigo-600 to-indigo-700 rounded-full flex items-center justify-center text-white shadow-lg mobile-button disabled:opacity-50"
-          variants={floatingButtonVariants}
-          initial="initial"
-          animate="animate"
-          whileHover="hover"
-          whileTap="tap"
           style={{
             filter: 'drop-shadow(0 4px 12px rgba(79, 70, 229, 0.4))'
           }}
@@ -1288,10 +1278,6 @@ export default function SchedulePage() {
                 onClick={e => e.stopPropagation()}
                 onWheel={e => e.stopPropagation()}
                 onTouchMove={e => e.stopPropagation()}
-                variants={modalVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
                 drag="y"
                 dragElastic={0.1}
                 dragMomentum={false}
@@ -1453,10 +1439,6 @@ export default function SchedulePage() {
                 onClick={e => e.stopPropagation()}
                 onWheel={e => e.stopPropagation()}
                 onTouchMove={e => e.stopPropagation()}
-                variants={modalVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
                 drag="y"
                 dragElastic={0.1}
                 dragMomentum={false}

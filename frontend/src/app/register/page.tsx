@@ -106,6 +106,25 @@ interface RegisterData {
 }
 
 export default function RegisterPage() {
+  const [isIOSReady, setIsIOSReady] = useState(false);
+  
+  // iOS 초기 렌더링 제어
+  React.useEffect(() => {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    if (isIOS) {
+      // iOS에서는 CSS가 완전히 로드될 때까지 대기
+      const timer = setTimeout(() => {
+        setIsIOSReady(true);
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    } else {
+      // 안드로이드/데스크탑에서는 즉시 표시
+      setIsIOSReady(true);
+    }
+  }, []);
+  
   // 모바일 키보드 대응을 위한 간단한 스타일
   React.useEffect(() => {
     const style = document.createElement('style');
@@ -124,6 +143,28 @@ export default function RegisterPage() {
       .register-scroll {
         -webkit-overflow-scrolling: touch;
         overscroll-behavior: contain;
+      }
+      
+      /* 모바일 최적화 */
+      @media screen and (max-width: 768px) {
+        .register-input {
+          font-size: 16px;
+        }
+        .register-button {
+          min-height: 44px;
+        }
+      }
+      
+      /* iOS 초기 렌더링 제어 */
+      @supports (-webkit-touch-callout: none) {
+        .register-content-area {
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+        
+        .register-content-area.ios-ready {
+          opacity: 1;
+        }
       }
     `;
     document.head.appendChild(style);
@@ -551,155 +592,24 @@ export default function RegisterPage() {
       // iOS 전용 강력한 위치 고정
       const forceFixPosition = () => {
         const registerForm = document.querySelector('.register-form') as HTMLElement;
-        const termsSection = document.querySelector('.terms-agreement-section') as HTMLElement;
-        const allAgreeButton = document.querySelector('.terms-all-agree') as HTMLElement;
         
         if (registerForm) {
-          // 스크롤 완전 초기화
+          // 스크롤만 초기화
           registerForm.scrollTop = 0;
           registerForm.scrollTo({ top: 0, behavior: 'auto' });
-          
-          if (isIOS) {
-            // iOS에서 스크롤 컨테이너 완전 고정
-            registerForm.style.transform = 'none';
-            registerForm.style.webkitTransform = 'none';
-            registerForm.style.position = 'relative';
-            registerForm.style.top = '0';
-            registerForm.style.overflow = 'auto';
-            registerForm.style.height = 'auto';
-          }
         }
         
-        if (termsSection) {
-          if (isIOS) {
-            // iOS에서 약관 섹션 완전 고정
-            termsSection.style.transform = 'none';
-            termsSection.style.webkitTransform = 'none';
-            termsSection.style.position = 'relative';
-            termsSection.style.top = '0';
-            termsSection.style.left = '0';
-            termsSection.style.willChange = 'auto';
-            termsSection.style.contain = 'layout';
-            termsSection.style.marginTop = '20px';
-            termsSection.style.paddingTop = '20px';
-            termsSection.style.background = 'transparent';
-            termsSection.style.zIndex = '3';
-          }
-        }
-        
-        // iOS에서 헤더와 폼 영역 분리
-        if (isIOS) {
-          const registerHeader = document.querySelector('.register-header') as HTMLElement;
-          if (registerHeader) {
-            registerHeader.style.position = 'relative';
-            registerHeader.style.zIndex = '1';
-            registerHeader.style.background = 'transparent';
-            registerHeader.style.marginBottom = '16px';
-            registerHeader.style.paddingBottom = '0';
-            registerHeader.style.flexShrink = '0';
-          }
-          
-          if (registerForm) {
-            registerForm.style.position = 'relative';
-            registerForm.style.zIndex = '2';
-            registerForm.style.marginTop = '16px';
-            registerForm.style.paddingTop = '16px';
-            registerForm.style.background = 'transparent';
-            registerForm.style.flex = '1';
-          }
-        }
-        
-        if (allAgreeButton && isIOS) {
-          // iOS에서 전체 동의 버튼 완전 고정
-          allAgreeButton.style.transform = 'none';
-          allAgreeButton.style.webkitTransform = 'none';
-          allAgreeButton.style.position = 'relative';
-          allAgreeButton.style.top = '0';
-          allAgreeButton.style.marginTop = '0';
-          allAgreeButton.style.willChange = 'auto';
-          
-          // 전체 동의 버튼이 화면에 보이도록 강제
-          allAgreeButton.scrollIntoView({ 
-            behavior: 'auto', 
-            block: 'start',
-            inline: 'nearest'
-          });
-        }
-        
-        // iOS에서 초기 레이아웃 상태 강제 고정
-        if (isIOS) {
-          // 모든 애니메이션과 변형 차단
-          const allElements = document.querySelectorAll('*');
-          allElements.forEach(el => {
-            const element = el as HTMLElement;
-            if (element.style) {
-              element.style.willChange = 'auto';
-              element.style.transform = element.style.transform || 'none';
-              element.style.webkitTransform = element.style.webkitTransform || 'none';
-            }
-          });
-          
-          // 약관 영역 완전 고정
-          if (termsSection) {
-            termsSection.style.position = 'relative';
-            termsSection.style.top = '0';
-            termsSection.style.left = '0';
-            termsSection.style.width = '100%';
-            termsSection.style.height = 'auto';
-          }
-        }
-        
-        console.log('🔧 [iOS FIX] 스크롤 위치 강제 고정 실행:', {
-          registerFormScrollTop: registerForm?.scrollTop,
-          hasTermsSection: !!termsSection,
-          hasAllAgreeButton: !!allAgreeButton,
-          timestamp: Date.now()
-        });
+        console.log('🔧 [iOS FIX] 스크롤 위치 초기화 완료');
       };
       
       if (isIOS) {
-        console.log('📱 [iOS] 약관 단계 진입 - 스크롤 위치 고정 시작');
+        console.log('📱 [iOS] 약관 단계 진입 - 스크롤 위치 초기화');
         
         const registerForm = document.querySelector('.register-form') as HTMLElement;
-        const termsSection = document.querySelector('.terms-agreement-section') as HTMLElement;
-        
-        // iOS에서는 즉시 + 여러 번 실행 + 애니메이션 완료 후에도 실행
-        forceFixPosition();
-        
-        // 레이아웃 완전 고정 함수 (iOS 전용)
-        const finalLayoutLock = () => {
-          console.log('🔒 [iOS] 최종 레이아웃 고정');
-          
-          // 모든 스타일 변경 차단
-          const style = document.createElement('style');
-          style.innerHTML = `
-            @supports (-webkit-touch-callout: none) {
-              .register-content-area,
-              .register-content-area * {
-                transform: none !important;
-                -webkit-transform: none !important;
-                will-change: auto !important;
-                animation: none !important;
-                transition: none !important;
-                position: relative !important;
-              }
-            }
-          `;
-          document.head.appendChild(style);
-        };
-
-        const timers = [
-          setTimeout(forceFixPosition, 10),
-          setTimeout(forceFixPosition, 50),
-          setTimeout(forceFixPosition, 100),
-          setTimeout(forceFixPosition, 200),
-          setTimeout(() => { forceFixPosition(); finalLayoutLock(); }, 500), // 최종 고정
-          setTimeout(forceFixPosition, 1000)
-        ];
-        
-        return () => {
-          timers.forEach(timer => clearTimeout(timer));
-        };
+        if (registerForm) {
+          registerForm.scrollTop = 0;
+          registerForm.scrollTo(0, 0);
+        }
       } else {
         // 안드로이드에서는 기본 스크롤 초기화만
         const registerForm = document.querySelector('.register-form') as HTMLElement;
@@ -1269,7 +1179,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="register-content-area">
+    <div className={`register-content-area ${isIOSReady ? 'ios-ready' : ''}`}>
       {/* 진행률 바 - 상단 고정 */}
       {currentStep !== REGISTER_STEPS.COMPLETE && (
         <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200 z-40">
@@ -1442,12 +1352,12 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                <div className="flex-1 overflow-y-auto pb-4 register-form" style={{
-                  paddingTop: '20px'
-                }}>
-                  <div className="terms-agreement-section">
+                                  <div className="flex-1 overflow-y-auto pb-4 register-form" style={{
+                    paddingTop: '20px'
+                  }}>
+                    <div className="terms-agreement-section">
                     {/* 전체 동의 */}
-                    <div className="terms-card terms-all-agree">
+                                          <div className="terms-card terms-all-agree">
                       <label className="block cursor-pointer w-full">
                         <div className="terms-checkbox-container">
                           <div className="terms-checkbox-wrapper">

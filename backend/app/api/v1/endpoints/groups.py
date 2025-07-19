@@ -30,6 +30,11 @@ class GroupJoinRequest(BaseModel):
     mt_idx: int
     sgt_idx: int
 
+# 멤버 탈퇴를 위한 스키마
+class MemberRemoveRequest(BaseModel):
+    sgdt_show: str = 'N'
+    sgdt_exit: str = 'Y'
+
 def get_current_user_id_from_token(authorization: str = Header(None)) -> Optional[int]:
     """
     Authorization 헤더에서 토큰을 추출하고 사용자 ID를 반환합니다.
@@ -780,5 +785,71 @@ def get_group_public_info(
             "sgt_show": group.sgt_show,
             "sgt_wdate": group.sgt_wdate.isoformat() if group.sgt_wdate else None,
             "memberCount": member_count
+        }
+    }
+
+@router.put("/{group_id}/members/{member_id}/remove")
+def remove_member_from_group(
+    group_id: int,
+    member_id: int,
+    remove_data: MemberRemoveRequest,
+    db: Session = Depends(deps.get_db)
+):
+    """
+    그룹에서 멤버를 탈퇴시킵니다 (소프트 삭제).
+    프론트엔드에서 호출하는 엔드포인트: /groups/{groupId}/members/{memberId}/remove
+    """
+    logger.info(f"[REMOVE_MEMBER] 멤버 탈퇴 처리 요청: {{ groupId: '{group_id}', memberId: '{member_id}' }}")
+    
+    # 그룹 존재 확인
+    group = db.query(Group).filter(Group.sgt_idx == group_id).first()
+    if not group:
+        logger.error(f"[REMOVE_MEMBER] 그룹을 찾을 수 없음 - group_id: {group_id}")
+        raise HTTPException(status_code=404, detail="그룹을 찾을 수 없습니다.")
+    
+    # 멤버가 그룹에 속해 있는지 확인
+    group_detail = db.query(GroupDetail).filter(
+        and_(
+            GroupDetail.sgt_idx == group_id,
+            GroupDetail.mt_idx == member_id,
+            GroupDetail.sgdt_show == 'Y'
+        )
+    ).first()
+    
+    if not group_detail:
+        logger.error(f"[REMOVE_MEMBER] 멤버를 그룹에서 찾을 수 없음 - group_id: {group_id}, member_id: {member_id}")
+        raise HTTPException(status_code=404, detail="멤버를 그룹에서 찾을 수 없습니다.")
+    
+    logger.info(f"[REMOVE_MEMBER] 멤버 조회 URL: https://118.67.130.71:8000/api/v1/group-members/member/{group_id}")
+    logger.info(f"[REMOVE_MEMBER] 조회된 멤버 수: {db.query(GroupDetail).filter(GroupDetail.sgt_idx == group_id).count()}")
+    logger.info(f"[REMOVE_MEMBER] 찾은 멤버: {group_detail.__dict__}")
+    
+    # 소프트 삭제 처리
+    logger.info(f"[REMOVE_MEMBER] 업데이트 전 상태 - sgdt_show: {group_detail.sgdt_show}, sgdt_exit: {group_detail.sgdt_exit}")
+    
+    group_detail.sgdt_show = 'N'
+    group_detail.sgdt_exit = 'Y'
+    group_detail.sgdt_udate = datetime.utcnow()
+    
+    logger.info(f"[REMOVE_MEMBER] 업데이트 후 상태 - sgdt_show: {group_detail.sgdt_show}, sgdt_exit: {group_detail.sgdt_exit}")
+    
+    db.add(group_detail)
+    db.commit()
+    db.refresh(group_detail)
+    
+    logger.info(f"[REMOVE_MEMBER] DB 커밋 후 상태 - sgdt_show: {group_detail.sgdt_show}, sgdt_exit: {group_detail.sgdt_exit}")
+    
+    logger.info(f"[REMOVE_MEMBER] 업데이트 URL: https://118.67.130.71:8000/api/v1/group-details/{group_detail.sgdt_idx}")
+    logger.info(f"[REMOVE_MEMBER] 업데이트 데이터: {{ sgdt_show: '{remove_data.sgdt_show}', sgdt_exit: '{remove_data.sgdt_exit}' }}")
+    logger.info(f"[REMOVE_MEMBER] 멤버 탈퇴 처리 성공: {group_detail.__dict__}")
+    
+    return {
+        "success": True,
+        "message": "멤버가 그룹에서 탈퇴되었습니다.",
+        "data": {
+            "sgdt_idx": group_detail.sgdt_idx,
+            "sgdt_show": group_detail.sgdt_show,
+            "sgdt_exit": group_detail.sgdt_exit,
+            "sgdt_udate": group_detail.sgdt_udate.isoformat()
         }
     } 

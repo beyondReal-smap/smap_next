@@ -2004,9 +2004,29 @@ const SignInPage = () => {
                 // 그룹 가입 실패해도 로그인은 성공으로 처리
               }
               
-              // 7. 즉시 홈 페이지 이동
-              console.log('[GOOGLE LOGIN] 🏠 홈 페이지로 즉시 이동');
+              // 7. 신규 사용자인 경우 회원가입 페이지로 이동, 기존 사용자는 홈으로 이동
+              if (data.isNewUser) {
+                console.log('[GOOGLE LOGIN] 🆕 신규 사용자 - 회원가입 페이지로 이동');
+                console.log('[GOOGLE LOGIN] 이메일 정보:', data.user.email);
+                
+                // 구글에서 받은 이메일을 회원가입 페이지로 전달
+                const registerData = {
+                  email: data.user.email,
+                  name: data.user.name,
+                  provider: 'google',
+                  googleId: data.user.google_id,
+                  profileImage: data.user.profile_image
+                };
+                
+                // 회원가입 데이터를 localStorage에 저장
+                localStorage.setItem('google_register_data', JSON.stringify(registerData));
+                
+                // 회원가입 페이지로 이동
+                router.replace('/register-new');
+              } else {
+                console.log('[GOOGLE LOGIN] 🏠 기존 사용자 - 홈 페이지로 이동');
                 router.replace('/home');
+              }
             }
           } else {
             throw new Error(data.error || '로그인에 실패했습니다.');

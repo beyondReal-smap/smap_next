@@ -324,17 +324,17 @@ const sidebarContentVariants = {
     opacity: 0,
     x: -30,
     transition: {
-      duration: 0.2
+      duration: 0.3 // 사이드바와 동일한 duration으로 맞춤
     }
   },
   open: {
     opacity: 1,
     x: 0,
     transition: {
-      duration: 0.25, // 0.3에서 0.25로 더 줄여서 일관성 있게
-      delay: 0.02, // 0.05에서 0.02로 더 줄여서 즉시 시작
-      staggerChildren: 0.02, // 0.025에서 0.02로 더 줄여서 일관성 있게
-      delayChildren: 0.05 // 0.1에서 0.05로 더 줄여서 빠른 시작
+      duration: 0.2, // 사이드바와 완전히 동일한 duration
+      delay: 0.02, // 최소한의 지연
+      staggerChildren: 0.02, // 자식 요소들의 순차 애니메이션
+      delayChildren: 0.05 // 자식 요소들의 시작 지연
     }
   }
 };

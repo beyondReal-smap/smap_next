@@ -5293,15 +5293,15 @@ export default function HomePage() {
       opacity: 0,
       x: -30,
       transition: {
-        duration: 0.15 // 0.2에서 0.15로 줄여서 더 빠르게
+        duration: 0.2 // 사이드바와 완전히 동일한 duration
       }
     },
     open: {
       opacity: 1,
       x: 0,
       transition: {
-        duration: 0.25, // 0.4에서 0.25로 줄여서 더 빠르게
-        delay: 0.02 // 0.1에서 0.02로 줄여서 빠른 시작
+        duration: 0.2, // 사이드바와 완전히 동일한 duration
+        delay: 0.02 // 최소한의 지연
       }
     }
   };

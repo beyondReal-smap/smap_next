@@ -113,13 +113,13 @@ export async function PUT(
 
     console.log('[Member Remove API] 찾은 멤버:', targetMember);
 
-    // 기존 group-details 업데이트 API 사용 (소프트 삭제)
+    // 새로운 groups 엔드포인트 사용 (소프트 삭제)
     const updateData = {
       sgdt_show: 'N',
       sgdt_exit: 'Y'
     };
 
-    const updateUrl = `https://118.67.130.71:8000/api/v1/group-details/${targetMember.sgdt_idx}`;
+    const updateUrl = `https://118.67.130.71:8000/api/v1/groups/${groupId}/members/${memberId}/remove`;
     console.log('[Member Remove API] 업데이트 URL:', updateUrl);
     console.log('[Member Remove API] 업데이트 데이터:', updateData);
 
