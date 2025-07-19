@@ -600,7 +600,12 @@ export default function TermsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="schedule-page-content px-4 pt-24 space-y-6"
+          className="schedule-page-content px-4 space-y-6"
+          style={{ 
+            paddingTop: '120px !important',
+            marginTop: '80px !important',
+            top: '80px !important'
+          }}
         >
           {/* 동의 현황 카드 - 노란색 테마 */}
           <motion.div 

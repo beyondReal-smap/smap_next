@@ -237,50 +237,7 @@ export default function GroupJoinPage() {
     return (
       <>
         {/* 헤더 */}
-        <AnimatedHeader 
-          variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
-          style={{ 
-            paddingTop: '0px',
-            marginTop: '0px',
-            top: '0px',
-            position: 'fixed'
-          }}
-        >
-          <div className="flex items-center justify-between h-14 px-4">
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center space-x-3"
-            >
-              <motion.button 
-                onClick={() => router.back()}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1, duration: 0.4 }}
-              >
-                <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
-              </motion.button>
-              <motion.div 
-                className="flex items-center space-x-3"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2, duration: 0.4 }}
-              >
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">그룹 초대</h1>
-                  <p className="text-xs text-gray-500">그룹 정보를 불러오는 중...</p>
-                </div>
-              </motion.div>
-            </motion.div>
-          </div>
-        </AnimatedHeader>
-        
-        <div className="min-h-screen flex items-center justify-center bg-white pt-16">
+        <div className="min-h-screen flex items-center justify-center bg-white">
           <IOSCompatibleSpinner 
             message="그룹 정보를 불러오는 중..."
             size="lg"
@@ -312,51 +269,7 @@ export default function GroupJoinPage() {
           }
         `}</style>
         
-        {/* 헤더 */}
-        <AnimatedHeader 
-          variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
-          style={{ 
-            paddingTop: '0px',
-            marginTop: '0px',
-            top: '0px',
-            position: 'fixed'
-          }}
-        >
-          <div className="flex items-center justify-between h-14 px-4">
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center space-x-3"
-            >
-              <motion.button 
-                onClick={() => router.back()}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1, duration: 0.4 }}
-              >
-                <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
-              </motion.button>
-              <motion.div 
-                className="flex items-center space-x-3"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2, duration: 0.4 }}
-              >
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">그룹 초대</h1>
-                  <p className="text-xs text-gray-500">오류가 발생했습니다</p>
-                </div>
-              </motion.div>
-            </motion.div>
-          </div>
-        </AnimatedHeader>
-        
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4 pt-16">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -455,51 +368,7 @@ export default function GroupJoinPage() {
         }
       `}</style>
       
-      {/* 헤더 */}
-      <AnimatedHeader 
-        variant="simple"
-        className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed"
-        style={{ 
-          paddingTop: '0px',
-          marginTop: '0px',
-          top: '0px',
-          position: 'fixed'
-        }}
-      >
-        <div className="flex items-center justify-between h-14 px-4">
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center space-x-3"
-          >
-            <motion.button 
-              onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1, duration: 0.4 }}
-            >
-              <HiOutlineChevronLeft className="w-5 h-5 text-gray-700" />
-            </motion.button>
-            <motion.div 
-              className="flex items-center space-x-3"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2, duration: 0.4 }}
-            >
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">그룹 초대</h1>
-                <p className="text-xs text-gray-500">SMAP에서 함께해요!</p>
-              </div>
-            </motion.div>
-          </motion.div>
-        </div>
-      </AnimatedHeader>
-      
-      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-200 to-pink-200 relative overflow-hidden pt-16">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-200 to-pink-200 relative overflow-hidden">
         {/* 배경 장식 */}
         <motion.div 
           className="absolute inset-0 overflow-hidden"
@@ -589,21 +458,11 @@ export default function GroupJoinPage() {
                   transition={{ delay: 0.8, duration: 0.4 }}
                 >
                   <div className="flex items-center justify-center mb-2">
-                    <motion.div
-                      animate={{ rotate: [0, 360] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                    >
-                      <IoSparklesSharp className="text-yellow-500 text-lg mr-1" />
-                    </motion.div>
+                    <IoSparklesSharp className="text-yellow-500 text-lg mr-1" />
                     <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                       그룹 초대
                     </h1>
-                    <motion.div
-                      animate={{ rotate: [0, -360] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                    >
-                      <IoSparklesSharp className="text-yellow-500 text-lg ml-1" />
-                    </motion.div>
+                    <IoSparklesSharp className="text-yellow-500 text-lg ml-1" />
                   </div>
                   <p className="text-gray-600 text-sm">SMAP에서 함께해요!</p>
                 </motion.div>
