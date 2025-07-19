@@ -390,7 +390,11 @@ export default function TermsPage() {
     try {
       console.log(`[TERMS] 동의 정보 조회 시작 - user_id: ${user.mt_idx}`);
       
-      // 백엔드 API 호출하여 동의 정보 조회 (apiClient 사용)
+      // 토큰 확인
+      const token = localStorage.getItem('auth-token');
+      console.log('[TERMS] 토큰 확인:', token ? '토큰 있음' : '토큰 없음');
+      
+      // 프론트엔드 API 라우트를 통해 동의 정보 조회
       const response = await apiClient.get(`/v1/members/consent/${user.mt_idx}`);
 
       const result = response.data;
@@ -517,7 +521,7 @@ export default function TermsPage() {
     try {
       const newConsentValue = term.isConsented ? 'N' : 'Y';
       
-      // 백엔드 API 호출하여 개별 동의 상태 변경 (apiClient 사용)
+      // 프론트엔드 API 라우트를 통해 개별 동의 상태 변경
       const response = await apiClient.post('/v1/members/consent', {
         field: term.dbField,
         value: newConsentValue
