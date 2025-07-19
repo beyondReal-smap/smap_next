@@ -285,21 +285,13 @@ const sidebarVariants = {
   closed: {
     x: '-100%',
     transition: {
-      type: 'spring' as const,
-      stiffness: 500, // 400에서 500으로 높여서 더 빠르게
-      damping: 40, // 35에서 40으로 높여서 더 안정적
-      mass: 0.6, // 0.7에서 0.6으로 줄여서 더 가볍게
-      duration: 0.3 // 0.35에서 0.3으로 줄여서 더 빠르게
+      duration: 0.25 // 더 빠르고 부드럽게
     }
   },
   open: {
     x: 0,
     transition: {
-      type: 'spring' as const,
-      stiffness: 500, // 400에서 500으로 높여서 더 빠르게
-      damping: 40, // 35에서 40으로 높여서 더 안정적
-      mass: 0.6, // 0.7에서 0.6으로 줄여서 더 가볍게
-      duration: 0.3 // 0.35에서 0.3으로 줄여서 더 빠르게
+      duration: 0.25 // 더 빠르고 부드럽게
     }
   }
 };
@@ -324,17 +316,17 @@ const sidebarContentVariants = {
     opacity: 0,
     x: -30,
     transition: {
-      duration: 0.3 // 사이드바와 동일한 duration으로 맞춤
+      duration: 0.25 // 사이드바와 동일한 duration으로 맞춤
     }
   },
   open: {
     opacity: 1,
     x: 0,
     transition: {
-      duration: 0.2, // 사이드바와 완전히 동일한 duration
-      delay: 0.02, // 최소한의 지연
-      staggerChildren: 0.02, // 자식 요소들의 순차 애니메이션
-      delayChildren: 0.05 // 자식 요소들의 시작 지연
+      duration: 0.25, // 사이드바와 완전히 동일한 duration
+      delay: 0, // 지연 제거
+      staggerChildren: 0, // 순차 애니메이션 제거
+      delayChildren: 0 // 자식 요소 지연 제거
     }
   }
 };
@@ -343,19 +335,15 @@ const sidebarContentVariants = {
 const memberItemVariants = {
   closed: { 
     opacity: 0,
-    x: -8, // 움직임을 더 줄여서 부드럽게
-    scale: 0.99 // 스케일 변화 최소화
+    x: -5, // 움직임을 더 줄여서 부드럽게
+    scale: 0.98 // 스케일 변화 최소화
   },
   open: { 
     opacity: 1,
     x: 0,
     scale: 1,
     transition: {
-      type: "spring" as const,
-      stiffness: 350, // 더 낮은 stiffness로 부드럽게
-      damping: 45, // 더 높은 damping으로 안정적
-      mass: 0.9, // 질량을 조정하여 자연스럽게
-      duration: 0.3 // 약간 늘려서 더 자연스럽게
+      duration: 0.2 // 더 빠르게
     }
   }
 };
@@ -7489,13 +7477,19 @@ export default function ActivelogPage() {
               WebkitPerspective: 1000,
               WebkitTransform: 'translateZ(0)'
             }}
-            // 사이드바 드래그 비활성화 - 플로팅 버튼과 외부 클릭/X버튼으로만 제어
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchMove={(e) => {
-              // 사이드바 내부의 스크롤은 허용하되, 외부로 전파되지 않도록
+            // 사이드바 터치 이벤트 최적화 - 스크롤 방해 방지
+            onTouchStart={(e) => {
+              // 사이드바 내부 터치만 처리
               e.stopPropagation();
             }}
-            onTouchEnd={(e) => e.stopPropagation()}
+            onTouchMove={(e) => {
+              // 스크롤을 방해하지 않도록 기본 동작 허용
+              // e.stopPropagation() 제거하여 스크롤이 자연스럽게 작동하도록 함
+            }}
+            onTouchEnd={(e) => {
+              // 사이드바 내부 터치만 처리
+              e.stopPropagation();
+            }}
           >
             <motion.div
               variants={sidebarContentVariants}
@@ -7589,7 +7583,17 @@ export default function ActivelogPage() {
                     {groupMembers.length}명
                   </span>
                 </div>
-                <div className="flex-1 overflow-y-auto hide-scrollbar space-y-3 pb-4" style={{ maxHeight: 'calc(100vh - 400px)', overflowX: 'hidden' }}>
+                <div 
+                  className="flex-1 overflow-y-auto hide-scrollbar space-y-3 pb-4" 
+                  style={{ 
+                    maxHeight: 'calc(100vh - 300px)', 
+                    overflowX: 'hidden',
+                    WebkitOverflowScrolling: 'touch',
+                    scrollBehavior: 'smooth',
+                    touchAction: 'pan-y',
+                    overscrollBehavior: 'contain'
+                  }}
+                >
                   {groupMembers.length > 0 ? (
                     <motion.div variants={sidebarContentVariants} className="space-y-2">
                       {sortGroupMembers(groupMembers).map((member, index) => (
@@ -7603,21 +7607,26 @@ export default function ActivelogPage() {
                             handleMemberSelect(member.id, e);
                             // 멤버 선택 시 사이드바는 자동으로 닫힘 (handleMemberSelect에서 처리)
                           }}
-                          className={`p-4 rounded-xl cursor-pointer transition-all duration-300 backdrop-blur-sm touch-optimized will-change-transform ${
+                          className={`p-4 rounded-xl cursor-pointer transition-all duration-200 backdrop-blur-sm touch-optimized ${
                             member.isSelected 
                               ? 'border-2 shadow-lg' 
                               : 'bg-white/60 hover:bg-white/90 border hover:shadow-md'
                           }`}
-                          style={member.isSelected 
-                            ? { 
-                                background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.8), rgba(253, 244, 255, 0.8))',
-                                borderColor: 'rgba(1, 19, 163, 0.3)',
-                                boxShadow: '0 10px 25px rgba(1, 19, 163, 0.1)'
-                              }
-                            : { 
-                                borderColor: 'rgba(1, 19, 163, 0.1)'
-                              }
-                          }
+                          style={{
+                            willChange: 'auto',
+                            transform: 'translateZ(0)',
+                            WebkitTransform: 'translateZ(0)',
+                            ...(member.isSelected 
+                              ? { 
+                                  background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.8), rgba(253, 244, 255, 0.8))',
+                                  borderColor: 'rgba(1, 19, 163, 0.3)',
+                                  boxShadow: '0 10px 25px rgba(1, 19, 163, 0.1)'
+                                }
+                              : { 
+                                  borderColor: 'rgba(1, 19, 163, 0.1)'
+                                }
+                            )
+                          }}
                         >
                           <div className="flex items-center space-x-4">
                             <div className="relative">

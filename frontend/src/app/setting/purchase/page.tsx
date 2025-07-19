@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiDownload, 
   FiX,
@@ -12,7 +12,8 @@ import {
   FiBarChart,
   FiInfo,
   FiClock,
-  FiFilter
+  FiFilter,
+  FiChevronLeft
 } from 'react-icons/fi';
 import { HiSparkles, HiCheckCircle } from 'react-icons/hi2';
 import { Order, OrderSummary, OrderListResponse, OrderStatus, OrderStatusLabels, PaymentType, PaymentTypeLabels } from '@/types/order';
@@ -367,12 +368,17 @@ export default function PurchasePage() {
     <>
       <style jsx global>{pageAnimations}</style>
       <div 
-        className="fixed inset-0 overflow-hidden bg-gradient-to-br from-green-50 via-white to-emerald-50 main-container"
+        className="min-h-screen bg-gradient-to-br from-green-50 via-white to-emerald-50 setting-page-active" 
         id="setting-purchase-page-container"
-        style={{
+        style={{ 
+          WebkitOverflowScrolling: 'touch',
           paddingTop: '0px',
           marginTop: '0px',
-          top: '0px'
+          top: '0px',
+          position: 'static',
+          overflow: 'visible',
+          transform: 'none',
+          willChange: 'auto'
         }}
       >
         {/* 통일된 헤더 애니메이션 */}
@@ -387,94 +393,31 @@ export default function PurchasePage() {
             zIndex: 2147483647,
             left: '0px',
             right: '0px',
-            width: '100vw',
-            height: '64px',
-            minHeight: '64px',
-            maxHeight: '64px',
-            background: 'rgba(255, 255, 255, 0.98)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
-            boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0',
-            margin: '0',
-            transform: 'translateZ(0)',
-            WebkitTransform: 'translateZ(0)',
-            willChange: 'transform',
-            visibility: 'visible',
-            opacity: '1',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            touchAction: 'manipulation',
-            pointerEvents: 'auto'
+            width: '100vw'
           }}
         >
-          <div className="flex items-center justify-between h-14 px-4" style={{ 
-            paddingLeft: '0px', 
-            paddingRight: '0px',
-            height: '64px',
-            minHeight: '64px',
-            maxHeight: '64px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center space-x-3"
-            >
-              <motion.button 
-                onClick={handleBack}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4 }}
-                className="flex items-center justify-center w-10 h-10 hover:bg-gray-100 rounded-full transition-all duration-200"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '40px',
-                  height: '40px',
-                  minWidth: '40px',
-                  minHeight: '40px',
-                  maxWidth: '40px',
-                  maxHeight: '40px'
-                }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+          <div className="flex items-center justify-between h-14 px-4">
+            <AnimatePresence mode="wait">
+              <motion.div 
+                key="purchase-header"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className="flex items-center space-x-3"
               >
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  className="w-5 h-5 text-gray-700" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                  style={{
-                    width: '20px',
-                    height: '20px',
-                    minWidth: '20px',
-                    minHeight: '20px',
-                    maxWidth: '20px',
-                    maxHeight: '20px',
-                    display: 'block',
-                    margin: '0',
-                    padding: '0',
-                    lineHeight: '1',
-                    verticalAlign: 'middle'
-                  }}
+                <button
+                  onClick={handleBack}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </motion.button>
-              <div className="flex flex-col justify-center" style={{ margin: '0', padding: '0' }}>
-                <h1 className="text-lg font-bold text-gray-900 leading-tight" style={{ margin: '0', padding: '0', lineHeight: '1.2' }}>구독 관리</h1>
-                <p className="text-xs text-gray-500 leading-tight" style={{ margin: '0', padding: '0', lineHeight: '1.2' }}>결제 내역 및 구독 관리</p>
-              </div>
-            </motion.div>
+                  <FiChevronLeft className="w-5 h-5 text-gray-700" />
+                </button>
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">구독 관리</h1>
+                  <p className="text-xs text-gray-500">결제 내역 및 구독 관리</p>
+                </div>
+              </motion.div>
+            </AnimatePresence>
             
             <div className="flex items-center space-x-2">
               {/* 필요시 추가 버튼들을 여기에 배치 */}
@@ -482,20 +425,8 @@ export default function PurchasePage() {
           </div>
         </AnimatedHeader>
 
-        {/* 메인 컨텐츠 - 고정 위치 (setting/notice 페이지와 동일한 구조) */}
-        <motion.div
-          initial="initial"
-          animate="in"
-          exit="out"
-          className="absolute inset-0 px-4 space-y-6 overflow-y-auto content-area"
-          style={{ 
-            top: '0px',
-            bottom: '0px',
-            left: '0',
-            right: '0',
-            paddingTop: '80px'
-          }}
-        >
+        {/* 메인 컨텐츠 */}
+        <main className="px-4 space-y-6 pb-24 setting-main-content" style={{ paddingTop: '7px' }}>
           {/* 지출 요약 카드 - 초록색 테마 */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -558,7 +489,7 @@ export default function PurchasePage() {
                   transition={{ delay: 0.4, duration: 0.6 }}
                 >
                   {/* 필터 - 초록색 테마 */}
-                  <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                  <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100" style={{ marginBottom: '20px' }}>
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="font-semibold text-gray-900">필터</h3>
                       <FiFilter className="w-4 h-4 text-gray-400" />
@@ -665,7 +596,7 @@ export default function PurchasePage() {
                 </motion.div>
             </div>
           </div>
-        </motion.div>
+        </main>
       </div>
     </>
   );

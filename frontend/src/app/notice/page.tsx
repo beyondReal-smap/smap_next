@@ -246,15 +246,15 @@ function groupByDate(list: PushLog[]): Record<string, PushLog[]> {
               transition={{ duration: 0.3 }}
               className="flex items-center space-x-3"
             >
-              <button
-                onClick={handleBack}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-              >
+          <button
+            onClick={handleBack}
+            className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+          >
                 <FiChevronLeft className="w-5 h-5 text-gray-700" />
-              </button>
+          </button>
               <div>
-                <h1 className="text-lg font-bold text-gray-900">알림</h1>
-                <p className="text-xs text-gray-500">최신 소식을 확인하세요</p>
+            <h1 className="text-lg font-bold text-gray-900">알림</h1>
+            <p className="text-xs text-gray-500">최신 소식을 확인하세요</p>
               </div>
             </motion.div>
           </AnimatePresence>
@@ -404,14 +404,14 @@ function groupByDate(list: PushLog[]): Record<string, PushLog[]> {
           </div>
         ) : (
           /* 알림이 없는 경우 */
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FiBell className="w-8 h-8 text-gray-400" />
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">알림이 없습니다</h3>
-            <p className="text-gray-500">새로운 알림이 도착하면 여기에 표시됩니다.</p>
-          </div>
-        )}
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FiBell className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">알림이 없습니다</h3>
+                <p className="text-gray-500">새로운 알림이 도착하면 여기에 표시됩니다.</p>
+              </div>
+            )}
       </main>
     </div>
   );

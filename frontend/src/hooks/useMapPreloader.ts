@@ -128,7 +128,7 @@ export const useMapPreloader = () => {
       const script = document.createElement('script');
       script.async = true;
       script.defer = true;
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEYS.GOOGLE_MAPS_API_KEY}&libraries=places,geometry&language=ko&region=KR&loading=async`;
+             script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEYS.GOOGLE_MAPS_API_KEY}&libraries=places,geometry&language=ko&region=KR&loading=async`;
       script.id = 'google-maps-preload';
 
       script.onload = () => {

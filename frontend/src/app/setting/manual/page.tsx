@@ -197,17 +197,17 @@ export default function ManualPage() {
             alignItems: 'center',
             justifyContent: 'space-between'
           }}>
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3 }}
               className="flex items-center space-x-3"
-            >
-              <motion.button 
-                onClick={handleBack}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4 }}
+          >
+            <motion.button 
+              onClick={handleBack}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
                 className="flex items-center justify-center w-10 h-10 hover:bg-gray-100 rounded-full transition-all duration-200"
                 style={{
                   display: 'flex',
@@ -220,9 +220,9 @@ export default function ManualPage() {
                   maxWidth: '40px',
                   maxHeight: '40px'
                 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
                 <svg 
                   xmlns="http://www.w3.org/2000/svg" 
                   className="w-5 h-5 text-gray-700" 
@@ -243,9 +243,9 @@ export default function ManualPage() {
                     verticalAlign: 'middle'
                   }}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </motion.button>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </motion.button>
               <div className="flex flex-col justify-center" style={{ margin: '0', padding: '0' }}>
                 <h1 className="text-lg font-bold text-gray-900 leading-tight" style={{ margin: '0', padding: '0', lineHeight: '1.2' }}>사용 가이드</h1>
                 <p className="text-xs text-gray-500 leading-tight" style={{ margin: '0', padding: '0', lineHeight: '1.2' }}>앱 사용법 및 도움말</p>
