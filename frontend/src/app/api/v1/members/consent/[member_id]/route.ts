@@ -3,10 +3,11 @@ import { verifyJWT } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { member_id: string } }
+  { params }: { params: Promise<{ member_id: string }> }
 ) {
+  const { member_id } = await params;
   try {
-    console.log('[CONSENT API] 동의 정보 조회 요청:', params.member_id);
+    console.log('[CONSENT API] 동의 정보 조회 요청:', member_id);
     
     // JWT 토큰 검증
     const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
@@ -30,7 +31,7 @@ export async function GET(
     }
 
     const currentUserId = decoded.mt_idx;
-    const requestedUserId = parseInt(params.member_id);
+    const requestedUserId = parseInt(member_id);
 
     // 본인 정보만 조회 가능
     if (currentUserId !== requestedUserId) {

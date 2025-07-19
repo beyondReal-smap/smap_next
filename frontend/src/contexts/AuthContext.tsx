@@ -7,6 +7,7 @@ import authService from '@/services/authService';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import dataPreloadService from '@/services/dataPreloadService';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
+import groupService from '@/services/groupService';
 
 // 전역 상태로 중복 실행 방지
 let globalPreloadingState = {
@@ -338,34 +339,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.data?.member) {
         dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.member });
 
-        // 🚀 로그인 성공 후 백그라운드에서 데이터 프리로딩 (비동기)
-        console.log('[AUTH] 🚀 로그인 성공 - 백그라운드 데이터 프리로딩 시작');
-        
         // 즉시 로딩 완료 처리 (사용자가 홈으로 빠르게 이동할 수 있도록)
         dispatch({ type: 'SET_LOADING', payload: false });
         
-        // 백그라운드에서 데이터 프리로딩 실행
-        comprehensivePreloadData(response.data.member.mt_idx)
-          .then(preloadResults => {
-            if (preloadResults.success) {
-              // DataCacheContext에 일괄 저장
-              saveComprehensiveData({
-                userProfile: preloadResults.userProfile,
-                userGroups: preloadResults.userGroups,
-                groupMembers: preloadResults.groupMembers,
-                locationData: preloadResults.locationData,
-                dailyLocationCounts: preloadResults.dailyCounts
-              });
-              
-              console.log('[AUTH] ✅ 백그라운드 데이터 프리로딩 완료');
-            } else {
-              console.warn('[AUTH] ⚠️ 백그라운드 데이터 프리로딩 실패:', preloadResults.errors);
-            }
-          })
-          .catch(preloadError => {
-            console.error('[AUTH] ❌ 백그라운드 데이터 프리로딩 오류:', preloadError);
-            // 프리로딩 실패해도 로그인은 성공으로 처리
-          });
+        // 백그라운드에서 최소한의 데이터만 프리로딩 (성능 최적화)
+        setTimeout(() => {
+          console.log('[AUTH] 🚀 백그라운드 최소 데이터 프리로딩 시작');
+          
+          // 사용자 그룹만 먼저 조회 (가장 중요한 데이터)
+          groupService.getCurrentUserGroups()
+            .then((groups: any[]) => {
+              if (groups && groups.length > 0) {
+                dispatch({ type: 'UPDATE_GROUPS', payload: groups as GroupWithMembers[] });
+                console.log('[AUTH] ✅ 백그라운드 그룹 데이터 로딩 완료');
+              }
+            })
+            .catch((error: any) => {
+              console.warn('[AUTH] ⚠️ 백그라운드 그룹 데이터 로딩 실패:', error);
+            });
+        }, 500);
       }
 
     } catch (error: any) {

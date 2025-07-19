@@ -310,8 +310,6 @@ export default function RootLayout({
       </head>
       <body className={`${lineSeed.variable} font-sans antialiased ${inter.className}`} suppressHydrationWarning>
         <ClientLayout>
-          {/* ClientLayout이 children을 받아 내부에서 main 등의 구조를 관리하도록 위임 가능 */} 
-          {/* 또는 여기서 최소한의 구조만 남기고 ClientLayout에 더 많은 책임을 부여 */} 
           {children} 
         </ClientLayout>
         {/* DatePicker 캘린더 포털용 div 추가 */}

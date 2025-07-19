@@ -1754,6 +1754,14 @@ export default function HomePage() {
       }
     };
 
+    // 로그인 후 홈 초기화 지연 플래그 확인
+    const shouldDelayInit = typeof window !== 'undefined' && (window as any).__DELAY_HOME_INIT__;
+    
+    if (shouldDelayInit) {
+      console.log('[HOME] 🚀 로그인 후 초기화 지연 중... (2초 후 데이터 로딩 시작)');
+      return;
+    }
+    
     // selectedGroupId가 있고, 현재 그룹의 데이터가 아직 로드되지 않았을 때만 실행
     if (selectedGroupId && (
       dataFetchedRef.current.currentGroupId !== selectedGroupId || 
@@ -2059,6 +2067,14 @@ export default function HomePage() {
       }
     };
 
+    // 로그인 후 홈 초기화 지연 플래그 확인
+    const shouldDelayInit = typeof window !== 'undefined' && (window as any).__DELAY_HOME_INIT__;
+    
+    if (shouldDelayInit) {
+      console.log('[HOME] 🗺️ 로그인 후 지도 초기화 지연 중... (2초 후 지도 로딩 시작)');
+      return;
+    }
+    
     // 즉시 실행 및 약간의 지연 후 재실행 (페이지 전환 후 상태 안정화 대기)
     forceMapInitialization();
     const initTimeout = setTimeout(forceMapInitialization, 500);

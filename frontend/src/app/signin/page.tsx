@@ -2297,15 +2297,19 @@ const SignInPage = () => {
       });
       
       // 즉시 홈으로 이동 (백그라운드에서 데이터 로딩)
+      // 홈 페이지 초기화 지연을 위한 플래그 설정
+      if (typeof window !== 'undefined') {
+        (window as any).__DELAY_HOME_INIT__ = true;
+        setTimeout(() => {
+          delete (window as any).__DELAY_HOME_INIT__;
+        }, 2000); // 2초 후 초기화 허용
+      }
+      
       router.replace('/home');
       
-      // 백그라운드에서 AuthContext 상태 동기화 및 그룹 가입 처리
+      // 백그라운드에서 그룹 가입 처리만 수행 (AuthContext는 이미 동기화됨)
       setTimeout(async () => {
         try {
-          // AuthContext 상태를 수동으로 동기화
-          await refreshAuthState();
-          console.log('[SIGNIN] 백그라운드 AuthContext 상태 동기화 완료');
-          
           // 그룹 가입 처리
           const groupJoinResult = await handlePendingGroupJoin();
           if (groupJoinResult) {

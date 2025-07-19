@@ -30,8 +30,8 @@ class AuthService {
           console.warn('[AUTH SERVICE] 응답에 토큰이 없음');
         }
         
-        // 사용자 전체 정보 조회 및 저장
-        const userProfile = await this.getUserProfile(response.data.data.member.mt_idx);
+        // 사용자 기본 정보만 조회 (그룹 정보는 나중에)
+        const userProfile = await this.getUserBasicProfile(response.data.data.member.mt_idx);
         this.setUserData(userProfile);
       } else {
         // 백엔드에서 success: false로 응답한 경우
