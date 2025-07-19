@@ -563,11 +563,24 @@ export default function TermsPage() {
   return (
     <>
       <style jsx global>{pageAnimations}</style>
-      <div className="schedule-page-container bg-gradient-to-br from-yellow-50 via-white to-amber-50">
+      <div 
+        className="schedule-page-container bg-gradient-to-br from-yellow-50 via-white to-amber-50"
+        data-page="/setting/terms"
+      >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="enhanced"
           className="setting-header"
+          style={{
+            zIndex: 9999,
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(10px)',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.1)'
+          }}
         >
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
@@ -600,11 +613,13 @@ export default function TermsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="schedule-page-content px-4 space-y-6"
+          className="px-4 space-y-6"
           style={{ 
-            paddingTop: '120px !important',
-            marginTop: '80px !important',
-            top: '80px !important'
+            paddingTop: '90px !important',
+            marginTop: '20px !important',
+            position: 'relative',
+            zIndex: 1,
+            minHeight: 'calc(100vh - 90px)'
           }}
         >
           {/* 동의 현황 카드 - 노란색 테마 */}
