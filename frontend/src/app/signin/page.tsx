@@ -1402,11 +1402,9 @@ const SignInPage = () => {
                 triggerHapticFeedback(HapticFeedbackType.SUCCESS);
                 console.log('🎮 [SIGNIN] Google 로그인 성공 햅틱 피드백 실행');
                 
-                // 추가 지연 후 홈으로 이동
-                setTimeout(() => {
-                  console.log('[GOOGLE SDK] 홈 페이지로 이동');
-                  router.push('/home');
-                }, 300); // 300ms 추가 지연
+                // 즉시 홈으로 이동
+                console.log('[GOOGLE SDK] 즉시 홈 페이지로 이동');
+                router.push('/home');
               } else {
                 throw new Error(data.error || 'Google 인증 실패');
               }
@@ -2287,49 +2285,36 @@ const SignInPage = () => {
         }
       });
       
-      // AuthContext 상태를 수동으로 동기화
-      await refreshAuthState();
-      console.log('[SIGNIN] AuthContext 상태 동기화 완료');
-      
-      // iOS 로그 전송 - AuthContext 동기화 완료
-      sendLogToiOS('info', '🔄 AuthContext 상태 동기화 완료', {
-        timestamp: new Date().toISOString(),
-        authState: {
-          isLoggedIn: isLoggedIn,
-          hasUser: !!authService.getUserData()
-        }
-      });
-      
-      // 🚨 그룹 가입 처리
-      try {
-        const groupJoinResult = await handlePendingGroupJoin();
-        if (groupJoinResult) {
-          console.log('[SIGNIN] ✅ 그룹 가입 처리 완료');
-        }
-      } catch (groupJoinError) {
-        console.error('[SIGNIN] ❌ 그룹 가입 처리 중 오류:', groupJoinError);
-        // 그룹 가입 실패해도 로그인은 성공으로 처리
-      }
-      
       // 로그인 성공 햅틱 피드백
       triggerHapticFeedback(HapticFeedbackType.SUCCESS);
       console.log('🎮 [SIGNIN] 전화번호 로그인 성공 햅틱 피드백 실행');
       
-      // 리다이렉트 플래그 설정
-      isRedirectingRef.current = true;
-      
-      // 모든 상태 업데이트 차단
-      blockAllEffectsRef.current = true;
-      
-      // iOS 로그 전송 - 리다이렉트 시작
-      sendLogToiOS('info', '🚀 Home 페이지로 리다이렉트 시작', {
+      // iOS 로그 전송 - 로그인 성공
+      sendLogToiOS('info', '✅ 전화번호 로그인 성공 - 즉시 홈으로 이동', {
         timestamp: new Date().toISOString(),
         redirectMethod: 'router.replace',
         targetPage: '/home'
       });
       
-      // router.replace 사용 (페이지 새로고침 없이 이동)
+      // 즉시 홈으로 이동 (백그라운드에서 데이터 로딩)
       router.replace('/home');
+      
+      // 백그라운드에서 AuthContext 상태 동기화 및 그룹 가입 처리
+      setTimeout(async () => {
+        try {
+          // AuthContext 상태를 수동으로 동기화
+          await refreshAuthState();
+          console.log('[SIGNIN] 백그라운드 AuthContext 상태 동기화 완료');
+          
+          // 그룹 가입 처리
+          const groupJoinResult = await handlePendingGroupJoin();
+          if (groupJoinResult) {
+            console.log('[SIGNIN] ✅ 백그라운드 그룹 가입 처리 완료');
+          }
+        } catch (error) {
+          console.error('[SIGNIN] ❌ 백그라운드 처리 중 오류:', error);
+        }
+      }, 100);
 
     } catch (err: any) {
       console.error('[SIGNIN] 🚨 로그인 오류 발생:', err);

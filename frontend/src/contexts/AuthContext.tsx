@@ -338,36 +338,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (response.data?.member) {
         dispatch({ type: 'LOGIN_SUCCESS', payload: response.data.member });
 
-        // 🚀 로그인 성공 시 모든 데이터 일괄 프리로딩
-        console.log('[AUTH] 🚀 로그인 성공 후 전체 데이터 프리로딩 시작');
-        try {
-          const preloadResults = await comprehensivePreloadData(response.data.member.mt_idx);
-          
-          if (preloadResults.success) {
-            // DataCacheContext에 일괄 저장
-            saveComprehensiveData({
-              userProfile: preloadResults.userProfile,
-              userGroups: preloadResults.userGroups,
-              groupMembers: preloadResults.groupMembers,
-              locationData: preloadResults.locationData,
-              dailyLocationCounts: preloadResults.dailyCounts
-            });
-            
-            console.log('[AUTH] ✅ 로그인 후 전체 데이터 프리로딩 완료');
-          } else {
-            console.warn('[AUTH] ⚠️ 로그인 후 데이터 프리로딩 실패:', preloadResults.errors);
-          }
-        } catch (preloadError) {
-          console.error('[AUTH] ❌ 로그인 후 데이터 프리로딩 오류:', preloadError);
-          // 프리로딩 실패해도 로그인은 성공으로 처리
-        }
+        // 🚀 로그인 성공 후 백그라운드에서 데이터 프리로딩 (비동기)
+        console.log('[AUTH] 🚀 로그인 성공 - 백그라운드 데이터 프리로딩 시작');
+        
+        // 즉시 로딩 완료 처리 (사용자가 홈으로 빠르게 이동할 수 있도록)
+        dispatch({ type: 'SET_LOADING', payload: false });
+        
+        // 백그라운드에서 데이터 프리로딩 실행
+        comprehensivePreloadData(response.data.member.mt_idx)
+          .then(preloadResults => {
+            if (preloadResults.success) {
+              // DataCacheContext에 일괄 저장
+              saveComprehensiveData({
+                userProfile: preloadResults.userProfile,
+                userGroups: preloadResults.userGroups,
+                groupMembers: preloadResults.groupMembers,
+                locationData: preloadResults.locationData,
+                dailyLocationCounts: preloadResults.dailyCounts
+              });
+              
+              console.log('[AUTH] ✅ 백그라운드 데이터 프리로딩 완료');
+            } else {
+              console.warn('[AUTH] ⚠️ 백그라운드 데이터 프리로딩 실패:', preloadResults.errors);
+            }
+          })
+          .catch(preloadError => {
+            console.error('[AUTH] ❌ 백그라운드 데이터 프리로딩 오류:', preloadError);
+            // 프리로딩 실패해도 로그인은 성공으로 처리
+          });
       }
 
     } catch (error: any) {
       console.error('[AUTH] 로그인 실패:', error);
       const errorMessage = error.response?.data?.message || error.message || '로그인에 실패했습니다.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
-    } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   };

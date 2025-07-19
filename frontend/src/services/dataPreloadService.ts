@@ -382,44 +382,12 @@ export const comprehensivePreloadData = async (userId: number) => {
           results.dailyCounts[groupId] = dailyCounts;
           console.log(`[COMPREHENSIVE PRELOAD] ✅ 그룹 ${groupId} 일별 카운트 조회 완료`);
 
-          // 3-3. 각 멤버별 최근 2주간 위치 데이터
-          const recentDates = [];
-          const today = new Date();
-          for (let i = 0; i < 14; i++) {
-            const date = new Date(today);
-            date.setDate(date.getDate() - i);
-            recentDates.push(date.toISOString().split('T')[0]);
-          }
-
-          for (const member of groupMembers) {
-            const memberId = member.mt_idx;
-            console.log(`[COMPREHENSIVE PRELOAD] 👤 멤버 ${member.mt_name} (${memberId}) 위치 데이터 조회 중`);
-            
-            // 최근 2주간 위치 데이터 병렬 조회
-            const locationPromises = recentDates.map(async (date) => {
-              try {
-                const locationData = await memberLocationLogService.getDailyLocationLogs(memberId, date);
-                return { date, memberId, data: locationData };
-              } catch (error) {
-                console.warn(`[COMPREHENSIVE PRELOAD] ⚠️ ${member.mt_name} ${date} 위치 데이터 조회 실패:`, error);
-                return { date, memberId, data: null, error };
-              }
-            });
-
-            const locationResults = await Promise.allSettled(locationPromises);
-            const successfulResults = locationResults
-              .filter(result => result.status === 'fulfilled' && result.value.data)
-              .map(result => (result as PromiseFulfilledResult<any>).value);
-
-            // 결과를 그룹/날짜/멤버별로 구조화
-            successfulResults.forEach(({ date, memberId, data }) => {
-              if (!results.locationData[groupId]) results.locationData[groupId] = {};
-              if (!results.locationData[groupId][date]) results.locationData[groupId][date] = {};
-              results.locationData[groupId][date][memberId] = data;
-            });
-
-            console.log(`[COMPREHENSIVE PRELOAD] ✅ 멤버 ${member.mt_name} 위치 데이터 완료: ${successfulResults.length}/14일`);
-          }
+          // 3-3. 오늘 위치 데이터만 조회 (성능 최적화)
+          const today = new Date().toISOString().split('T')[0];
+          console.log(`[COMPREHENSIVE PRELOAD] 📍 오늘(${today}) 위치 데이터만 조회 (성능 최적화)`);
+          
+          // 오늘 위치 데이터는 필요할 때 개별 조회하도록 변경
+          // 백그라운드 프리로딩에서는 기본 데이터만 로드
 
         } catch (error) {
           console.error(`[COMPREHENSIVE PRELOAD] ❌ 그룹 ${groupId} 처리 실패:`, error);
