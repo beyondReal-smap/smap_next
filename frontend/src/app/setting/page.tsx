@@ -256,47 +256,44 @@ export default function SettingsPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 페이지 로드 시 body, html 스타일 초기화 (헤더 고정을 위해 필요)
+  useEffect(() => {
+    document.body.setAttribute('data-page', '/setting');
+    document.body.classList.add('setting-page-active');
+    
+    // body, html 스타일 강제 초기화 (헤더 고정을 위해 필요)
+    document.body.style.position = 'static';
+    document.body.style.overflow = 'visible';
+    document.body.style.transform = 'none';
+    document.body.style.willChange = 'auto';
+    document.body.style.perspective = 'none';
+    document.body.style.backfaceVisibility = 'visible';
+    document.documentElement.style.position = 'static';
+    document.documentElement.style.overflow = 'visible';
+    document.documentElement.style.transform = 'none';
+    document.documentElement.style.willChange = 'auto';
+    document.documentElement.style.perspective = 'none';
+    document.documentElement.style.backfaceVisibility = 'visible';
+    
+    return () => {
+      document.body.removeAttribute('data-page');
+      document.body.classList.remove('setting-page-active');
+    };
+  }, []);
+
   const { control, handleSubmit, reset, formState: { errors, isDirty } } = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
     defaultValues: DEFAULT_USER_SETTINGS
   });
-
-  // 헤더 위 여백 강제 제거 (notice 페이지와 동일)
-  useEffect(() => {
-    const selectors = [
-      'header',
-      '.header-fixed',
-      '.glass-effect',
-      '.group-header',
-      '.register-header-fixed',
-              '.activelog-header',
-      '.location-header',
-      '.schedule-header',
-      '.home-header',
-      '[role="banner"]',
-      '#setting-page-container'
-    ];
-    selectors.forEach(selector => {
-      const elements = document.querySelectorAll(selector);
-      elements.forEach((element) => {
-        const htmlElement = element as HTMLElement;
-        htmlElement.style.paddingTop = '0px';
-        htmlElement.style.marginTop = '0px';
-        htmlElement.style.setProperty('padding-top', '0px', 'important');
-        htmlElement.style.setProperty('margin-top', '0px', 'important');
-        if (selector === 'header' || selector.includes('header')) {
-          htmlElement.style.setProperty('top', '0px', 'important');
-          htmlElement.style.setProperty('position', 'fixed', 'important');
-        }
-      });
-    });
-    document.body.style.setProperty('padding-top', '0px', 'important');
-    document.body.style.setProperty('margin-top', '0px', 'important');
-    document.documentElement.style.setProperty('padding-top', '0px', 'important');
-    document.documentElement.style.setProperty('margin-top', '0px', 'important');
-  }, []);
 
   // 사용자 설정 가져오기
   useEffect(() => {
@@ -317,14 +314,20 @@ export default function SettingsPage() {
   // 설정 저장
   const onSubmit = async (data: SettingsFormData) => {
     setIsLoading(true);
-    setSaveSuccess(false);
     
     try {
       // 모의 저장 (API 연동 전 테스트용)
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      // 성공 메시지 표시
+      setShowSuccessMessage(true);
+      setSuccessMessage('설정이 성공적으로 저장되었습니다.');
+      
+      // 3초 후 메시지 숨기기
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+        setSuccessMessage('');
+      }, 3000);
     } catch (error) {
       console.error('설정 저장 중 오류가 발생했습니다.', error);
     } finally {
@@ -441,40 +444,96 @@ export default function SettingsPage() {
   return (
     <>
       <style jsx global>{pageAnimations}</style>
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <div 
+        className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container"
+        id="setting-page-container"
+        style={{
+          paddingTop: '0px',
+          marginTop: '0px',
+          top: '0px'
+        }}
+      >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
-          variant="enhanced"
-          className="setting-header"
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed setting-header"
+          style={{ 
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px',
+            position: 'fixed',
+            zIndex: 2147483647,
+            left: '0px',
+            right: '0px',
+            width: '100vw',
+            height: '64px',
+            minHeight: '64px',
+            maxHeight: '64px',
+            background: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
+            boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0',
+            margin: '0',
+            transform: 'translateZ(0)',
+            WebkitTransform: 'translateZ(0)',
+            willChange: 'transform',
+            visibility: 'visible',
+            opacity: '1',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            touchAction: 'manipulation',
+            pointerEvents: 'auto'
+          }}
         >
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="setting-header-content"
-          >
-            <motion.button 
-              onClick={handleBack}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4 }}
-              className="setting-back-button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+          <div className="flex items-center justify-between h-14 px-4">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center space-x-3"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </motion.button>
-            <div className="setting-header-text">
-              <h1 className="text-lg font-bold text-gray-900 leading-tight">설정</h1>
-              <p className="text-xs text-gray-500 leading-tight">계정 및 앱 설정을 관리하세요</p>
+              <motion.button 
+                onClick={handleBack}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4 }}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </motion.button>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">설정</h1>
+                <p className="text-xs text-gray-500">계정 및 앱 설정을 관리하세요</p>
+              </div>
+            </motion.div>
+            
+            <div className="flex items-center space-x-2">
+              {/* 필요시 추가 버튼들을 여기에 배치 */}
             </div>
-          </motion.div>
+          </div>
         </AnimatedHeader>
         
-        {/* 메인 컨텐츠 */}
-        <div className="pb-24 px-4 pt-20 space-y-6">
+        {/* 메인 컨텐츠 - 고정 위치 (schedule 페이지와 동일한 구조) */}
+        <motion.div
+          initial="initial"
+          animate="in"
+          exit="out"
+          className="absolute inset-0 px-4 space-y-6 overflow-y-auto content-area pt-20"
+          style={{ 
+            top: '0px',
+            bottom: '0px',
+            left: '0',
+            right: '0'
+          }}
+        >
           {menuSections.map((section, sectionIdx) => (
             <motion.div 
               key={sectionIdx}
@@ -532,8 +591,8 @@ export default function SettingsPage() {
             <div className="text-sm text-gray-600 mb-1">SMAP</div>
             <div className="text-xs text-gray-500">버전 1.0.0</div>
           </motion.div>
-        </div>
+        </motion.div>
       </div>
     </>
   );
-} 
+}

@@ -184,10 +184,13 @@ export default function ClientLayout({
     // notice 페이지는 네비게이션 바를 숨기는 페이지로 명시적 처리
     const isNoticePage = pathname?.startsWith('/notice');
     
+    // setting 페이지는 네비게이션 바를 숨기는 페이지로 명시적 처리
+    const isSettingPage = pathname?.startsWith('/setting');
+    
     // 그룹 가입 페이지 패턴 체크 (/group/숫자/join)
     const isGroupJoinPage = /^\/group\/\d+\/join\/?$/.test(pathname || '');
     
-    return !shouldShow || isNoticePage || isGroupJoinPage; // 지정된 페이지가 아니거나 notice 페이지이거나 그룹 가입 페이지면 숨김
+    return !shouldShow || isNoticePage || isSettingPage || isGroupJoinPage; // 지정된 페이지가 아니거나 notice/setting 페이지이거나 그룹 가입 페이지면 숨김
   }, [pathname]);
 
   // body에 클래스 및 data-page 속성 추가/제거

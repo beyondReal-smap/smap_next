@@ -155,12 +155,12 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net",
-              "connect-src 'self' *.map.naver.com *.apigw.ntruss.com *.googleapis.com *.google.com *.navercorp.com *.naver.net *.pstatic.net 118.67.130.71:8000 https://118.67.130.71:8000 wss: ws: data: blob:",
-              "img-src 'self' data: blob: *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net",
-              "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com *.google.com accounts.google.com *.navercorp.com *.naver.net *.pstatic.net",
-              "font-src 'self' *.gstatic.com *.googleapis.com *.navercorp.com *.naver.net *.pstatic.net",
-              "frame-src 'self' *.google.com *.navercorp.com *.naver.net *.pstatic.net",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
+              "connect-src 'self' *.map.naver.com *.apigw.ntruss.com *.googleapis.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com 118.67.130.71:8000 https://118.67.130.71:8000 wss: ws: data: blob:",
+              "img-src 'self' data: blob: *.map.naver.com *.googleapis.com *.gstatic.com *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
+              "style-src 'self' 'unsafe-inline' *.googleapis.com *.gstatic.com *.google.com accounts.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
+              "font-src 'self' *.gstatic.com *.googleapis.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
+              "frame-src 'self' *.google.com *.navercorp.com *.naver.net *.pstatic.net *.vercel-scripts.com *.vercel.com",
               "worker-src 'self' blob:",
               "object-src 'none'",
               "base-uri 'self'"
