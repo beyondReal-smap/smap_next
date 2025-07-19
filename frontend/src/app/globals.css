@@ -2042,3 +2042,312 @@ html[data-page="/setting"] .setting-main-content,
   padding-top: 80px !important;
   -webkit-overflow-scrolling: touch !important;
 }
+
+/* setting/notice 페이지 컨테이너 스타일 (setting 페이지와 동일) */
+#setting-notice-page-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+#setting-notice-page-container .content-area {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow-y: auto !important;
+  padding-top: 80px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* setting/notice 페이지 헤더 버튼 정렬 강화 */
+#setting-notice-page-container .header-fixed button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+#setting-notice-page-container .header-fixed button svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* setting/notice 페이지 헤더 패딩 제거 */
+#setting-notice-page-container .header-fixed {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#setting-notice-page-container .header-fixed > div {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* setting/notice 페이지 헤더 텍스트 정렬 강화 */
+#setting-notice-page-container .header-fixed h1,
+#setting-notice-page-container .header-fixed p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  display: block !important;
+}
+
+#setting-notice-page-container .header-fixed .flex.flex-col {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+}
+
+/* 뒤로가기 버튼과 텍스트 상하 정렬 */
+#setting-notice-page-container .header-fixed .flex.items-center.space-x-3 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* setting/inquiry 페이지 컨테이너 스타일 (setting/notice 페이지와 동일) */
+#setting-inquiry-page-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+#setting-inquiry-page-container .content-area {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow-y: auto !important;
+  padding-top: 80px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* setting/inquiry 페이지 헤더 버튼 정렬 강화 */
+#setting-inquiry-page-container .header-fixed button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+#setting-inquiry-page-container .header-fixed button svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* setting/inquiry 페이지 헤더 패딩 제거 */
+#setting-inquiry-page-container .header-fixed {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#setting-inquiry-page-container .header-fixed > div {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* setting/inquiry 페이지 헤더 텍스트 정렬 강화 */
+#setting-inquiry-page-container .header-fixed h1,
+#setting-inquiry-page-container .header-fixed p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  display: block !important;
+}
+
+#setting-inquiry-page-container .header-fixed .flex.flex-col {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+}
+
+/* setting/inquiry 페이지 뒤로가기 버튼과 텍스트 상하 정렬 */
+#setting-inquiry-page-container .header-fixed .flex.items-center.space-x-3 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* setting/manual 페이지 컨테이너 스타일 (setting/notice 페이지와 동일) */
+#setting-manual-page-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+#setting-manual-page-container .content-area {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow-y: auto !important;
+  padding-top: 80px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* setting/manual 페이지 헤더 버튼 정렬 강화 */
+#setting-manual-page-container .header-fixed button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+#setting-manual-page-container .header-fixed button svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* setting/manual 페이지 헤더 패딩 제거 */
+#setting-manual-page-container .header-fixed {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#setting-manual-page-container .header-fixed > div {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* setting/manual 페이지 헤더 텍스트 정렬 강화 */
+#setting-manual-page-container .header-fixed h1,
+#setting-manual-page-container .header-fixed p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  display: block !important;
+}
+
+#setting-manual-page-container .header-fixed .flex.flex-col {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+}
+
+/* setting/manual 페이지 뒤로가기 버튼과 텍스트 상하 정렬 */
+#setting-manual-page-container .header-fixed .flex.items-center.space-x-3 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}

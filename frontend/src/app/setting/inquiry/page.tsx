@@ -284,44 +284,135 @@ ${message}
   return (
     <>
       <style jsx global>{pageAnimations}</style>
-      <div className="schedule-page-container bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <div 
+        className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container"
+        id="setting-inquiry-page-container"
+        style={{
+          paddingTop: '0px',
+          marginTop: '0px',
+          top: '0px'
+        }}
+      >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
-          variant="enhanced"
-          className="setting-header"
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed setting-header"
+          style={{ 
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px',
+            position: 'fixed',
+            zIndex: 2147483647,
+            left: '0px',
+            right: '0px',
+            width: '100vw',
+            height: '64px',
+            minHeight: '64px',
+            maxHeight: '64px',
+            background: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
+            boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            padding: '0',
+            margin: '0',
+            transform: 'translateZ(0)',
+            WebkitTransform: 'translateZ(0)',
+            willChange: 'transform',
+            visibility: 'visible',
+            opacity: '1',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            touchAction: 'manipulation',
+            pointerEvents: 'auto'
+          }}
         >
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="setting-header-content"
-          >
-            <motion.button 
-              onClick={handleBack}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4 }}
-              className="setting-back-button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+          <div className="flex items-center justify-between h-14 px-4" style={{ 
+            paddingLeft: '0px', 
+            paddingRight: '0px',
+            height: '64px',
+            minHeight: '64px',
+            maxHeight: '64px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center space-x-3"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </motion.button>
-            <div className="setting-header-text">
-              <h1 className="text-lg font-bold text-gray-900 leading-tight">1:1 문의</h1>
-              <p className="text-xs text-gray-500 leading-tight">궁금한 점을 문의하세요</p>
+              <motion.button 
+                onClick={handleBack}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4 }}
+                className="flex items-center justify-center w-10 h-10 hover:bg-gray-100 rounded-full transition-all duration-200"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '40px',
+                  height: '40px',
+                  minWidth: '40px',
+                  minHeight: '40px',
+                  maxWidth: '40px',
+                  maxHeight: '40px'
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className="w-5 h-5 text-gray-700" 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    minWidth: '20px',
+                    minHeight: '20px',
+                    maxWidth: '20px',
+                    maxHeight: '20px',
+                    display: 'block',
+                    margin: '0',
+                    padding: '0',
+                    lineHeight: '1',
+                    verticalAlign: 'middle'
+                  }}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </motion.button>
+              <div className="flex flex-col justify-center" style={{ margin: '0', padding: '0' }}>
+                <h1 className="text-lg font-bold text-gray-900 leading-tight" style={{ margin: '0', padding: '0', lineHeight: '1.2' }}>1:1 문의</h1>
+                <p className="text-xs text-gray-500 leading-tight" style={{ margin: '0', padding: '0', lineHeight: '1.2' }}>궁금한 점을 문의하세요</p>
+              </div>
+            </motion.div>
+            
+            <div className="flex items-center space-x-2">
+              {/* 필요시 추가 버튼들을 여기에 배치 */}
             </div>
-          </motion.div>
+          </div>
         </AnimatedHeader>
 
-        {/* schedule/page.tsx와 동일한 메인 컨텐츠 구조 */}
+        {/* 메인 컨텐츠 - 고정 위치 (setting/notice 페이지와 동일한 구조) */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="schedule-page-content px-4 pt-20 space-y-6 pb-6"
+          initial="initial"
+          animate="in"
+          exit="out"
+          className="absolute inset-0 px-4 space-y-6 overflow-y-auto content-area"
+          style={{ 
+            top: '0px',
+            bottom: '0px',
+            left: '0',
+            right: '0',
+            paddingTop: '80px'
+          }}
         >
           {/* 1:1 문의 정보 카드 - 주황색 테마 */}
           <motion.div 

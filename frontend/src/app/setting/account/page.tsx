@@ -500,7 +500,7 @@ export default function AccountSettingsPage() {
         </AnimatedHeader>
 
         {/* 스크롤 가능한 메인 컨텐츠 */}
-        <div className="flex-1 overflow-y-auto pb-24 px-4 pt-16">
+        <div className="flex-1 overflow-y-auto pb-24 px-4 pt-20">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
