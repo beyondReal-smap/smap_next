@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
+import navigationManager from '@/utils/navigationManager';
 
 // WebKit 환경 감지
 const isWebKit = () => {
@@ -317,17 +318,27 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       
-      // refresh 요청 자체가 401이면 토큰 갱신 시도하지 않음
-      if (originalRequest.url?.includes('/auth/refresh')) {
-        console.log('[API CLIENT] 토큰 갱신 요청이 401 - 무효한 토큰으로 판단하여 로그아웃 처리');
-        removeToken();
-        
-        // 로그인 페이지로 리다이렉트 (클라이언트 사이드에서만)
-        if (typeof window !== 'undefined') {
-          window.location.href = '/signin';
-        }
+      // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
+      if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+        console.log('[API CLIENT] 🚫 에러 모달 표시 중 - 401 에러 리다이렉트 방지');
         return Promise.reject(error);
       }
+      
+              // refresh 요청 자체가 401이면 토큰 갱신 시도하지 않음
+        if (originalRequest.url?.includes('/auth/refresh')) {
+          console.log('[API CLIENT] 토큰 갱신 요청이 401 - 무효한 토큰으로 판단하여 로그아웃 처리');
+          removeToken();
+          
+          // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
+          if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+            console.log('[API CLIENT] 🚫 에러 모달 표시 중 - 토큰 갱신 실패 리다이렉트 방지');
+            return Promise.reject(error);
+          }
+          
+          // 로그인 페이지로 리다이렉트 (NavigationManager 사용)
+          navigationManager.redirectToSignin();
+          return Promise.reject(error);
+        }
       
       try {
         console.log('[API CLIENT] 토큰 갱신 시도');
@@ -348,10 +359,14 @@ apiClient.interceptors.response.use(
         console.log('[API CLIENT] 토큰 갱신 실패 - 로그아웃 처리');
         removeToken();
         
-        // 로그인 페이지로 리다이렉트 (클라이언트 사이드에서만)
-        if (typeof window !== 'undefined') {
-          window.location.href = '/signin';
+        // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
+        if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+          console.log('[API CLIENT] 🚫 에러 모달 표시 중 - 토큰 갱신 실패 리다이렉트 방지');
+          return Promise.reject(error);
         }
+        
+        // 로그인 페이지로 리다이렉트 (NavigationManager 사용)
+        navigationManager.redirectToSignin();
       }
     }
     

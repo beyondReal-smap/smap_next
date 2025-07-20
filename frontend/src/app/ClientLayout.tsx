@@ -101,6 +101,12 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     // 로그인되지 않은 상태에서 보호된 페이지 접근 시 즉시 signin으로 리다이렉트
     // 단, 이미 signin 페이지에 있으면 리다이렉트하지 않음
     if (!isLoggedIn && pathname !== '/signin') {
+      // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
+      if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+        console.log('[AUTH GUARD] 🚫 에러 모달 표시 중 - 인증되지 않은 접근 리다이렉트 방지');
+        return;
+      }
+      
       console.log('[AUTH GUARD] 🔴 인증되지 않은 접근, signin으로 리다이렉트:', pathname, {
         isLoggedIn,
         loading,

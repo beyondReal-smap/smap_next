@@ -8,6 +8,7 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 import dataPreloadService from '@/services/dataPreloadService';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
 import groupService from '@/services/groupService';
+import navigationManager from '@/utils/navigationManager';
 
 // 전역 상태로 중복 실행 방지
 let globalPreloadingState = {
@@ -260,6 +261,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         console.log('[AUTH CONTEXT] 초기 인증 상태 확인 시작');
         
+        // 🚫 에러 모달이 표시 중이면 초기화 중단
+        if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+          console.log('[AUTH CONTEXT] 🚫 에러 모달 표시 중 - 초기화 중단');
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
+        
+        // 🚫 모든 리다이렉트가 차단된 상태라면 초기화 중단
+        if (typeof window !== 'undefined' && (window as any).__BLOCK_ALL_REDIRECTS__) {
+          console.log('[AUTH CONTEXT] 🚫 리다이렉트 차단 상태 - 초기화 중단');
+          dispatch({ type: 'SET_LOADING', payload: false });
+          return;
+        }
+        
         // 초기화 타임아웃 설정 (5초)
         initializationTimeout = setTimeout(() => {
           if (isMounted) {
@@ -362,6 +377,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     } catch (error: any) {
       console.error('[AUTH] 로그인 실패:', error);
+      
+      // 🚫 에러 모달이 표시 중이면 AuthContext 에러 처리 중단
+      if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+        console.log('[AUTH] 🚫 에러 모달 표시 중 - AuthContext 에러 처리 중단');
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return;
+      }
+      
+      // 🚫 모든 리다이렉트가 차단된 상태라면 AuthContext 에러 처리 중단
+      if (typeof window !== 'undefined' && (window as any).__BLOCK_ALL_REDIRECTS__) {
+        console.log('[AUTH] 🚫 리다이렉트 차단 상태 - AuthContext 에러 처리 중단');
+        dispatch({ type: 'SET_LOADING', payload: false });
+        return;
+      }
+      
       const errorMessage = error.response?.data?.message || error.message || '로그인에 실패했습니다.';
       dispatch({ type: 'SET_ERROR', payload: errorMessage });
       dispatch({ type: 'SET_LOADING', payload: false });
@@ -372,6 +402,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       console.log('[AUTH] 로그아웃 시작');
+      
+      // 🚫 에러 모달이 표시 중이면 로그아웃 중단
+      if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+        console.log('[AUTH] 🚫 에러 모달 표시 중 - 로그아웃 중단');
+        return;
+      }
+      
+      // 🚫 구글 로그인 중일 때는 로그아웃 중단
+      if (typeof window !== 'undefined' && (window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
+        console.log('[AUTH] 🚫 구글 로그인 중 - 로그아웃 중단');
+        return;
+      }
+      
+      // 🚫 모든 리다이렉트가 차단된 상태라면 로그아웃 중단
+      if (typeof window !== 'undefined' && (window as any).__BLOCK_ALL_REDIRECTS__) {
+        console.log('[AUTH] 🚫 리다이렉트 차단 상태 - 로그아웃 중단');
+        return;
+      }
       
       // 1. authService 로그아웃 (localStorage, 쿠키 정리)
       await authService.logout();
@@ -401,25 +449,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // 5. 즉시 signin 페이지로 리다이렉트 (강화된 네비게이션 방지 플래그 확인)
       if (typeof window !== 'undefined') {
-        // 간단한 구글 로그인 중일 때는 리다이렉트 방지
+        // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
+        if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+          console.log('[AUTH] 🚫 에러 모달 표시 중 - signin 페이지 리다이렉트 방지');
+          return;
+        }
+        
+        // 🚫 구글 로그인 중일 때는 리다이렉트 방지
         if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
           console.log('[AUTH] 구글 로그인 중 - signin 페이지 리다이렉트 방지');
           return;
         }
         
-        console.log('[AUTH] 즉시 signin 페이지로 리다이렉트');
-        try {
-          window.location.replace('/signin');
-        } catch (error) {
-          console.warn('[AUTH] window.location.replace 실패, 대체 방법 사용:', error);
-          // 대체 방법: router.push 사용
-          if (typeof window !== 'undefined' && window.location) {
-            window.location.href = '/signin';
-          }
+        // 🚫 모든 리다이렉트가 차단된 상태라면 리다이렉트 방지
+        if ((window as any).__BLOCK_ALL_REDIRECTS__) {
+          console.log('[AUTH] 🚫 리다이렉트 차단 상태 - signin 페이지 리다이렉트 방지');
+          return;
         }
+        
+        console.log('[AUTH] 즉시 signin 페이지로 리다이렉트');
+        navigationManager.redirectToSignin();
       }
     } catch (error) {
       console.error('[AUTH CONTEXT] 로그아웃 실패:', error);
+      
+      // 🚫 에러 모달이 표시 중이면 추가 처리 중단
+      if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+        console.log('[AUTH] 🚫 에러 모달 표시 중 - 로그아웃 에러 처리 중단');
+        return;
+      }
       
       // 로그아웃은 에러가 발생해도 상태를 초기화
       try {
@@ -434,22 +492,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // 에러 발생 시에도 signin 페이지로 리다이렉트 (네비게이션 방지 플래그 확인)
       if (typeof window !== 'undefined') {
-        // 🚨 구글 로그인 중일 때는 리다이렉트 방지
-        if ((window as any).__PREVENT_SIGNIN_NAVIGATION__) {
+        // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
+        if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+          console.log('[AUTH] 🚫 에러 모달 표시 중 - signin 페이지 리다이렉트 방지 (에러 시)');
+          return;
+        }
+        
+        // 🚫 구글 로그인 중일 때는 리다이렉트 방지
+        if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
           console.log('[AUTH] 구글 로그인 중 - signin 페이지 리다이렉트 방지 (에러 시)');
           return;
         }
         
-        console.log('[AUTH] 에러 발생 시에도 signin 페이지로 리다이렉트');
-        try {
-          window.location.replace('/signin');
-        } catch (error) {
-          console.warn('[AUTH] window.location.replace 실패 (에러 시), 대체 방법 사용:', error);
-          // 대체 방법: router.push 사용
-          if (typeof window !== 'undefined' && window.location) {
-            window.location.href = '/signin';
-          }
+        // 🚫 모든 리다이렉트가 차단된 상태라면 리다이렉트 방지
+        if ((window as any).__BLOCK_ALL_REDIRECTS__) {
+          console.log('[AUTH] 🚫 리다이렉트 차단 상태 - signin 페이지 리다이렉트 방지 (에러 시)');
+          return;
         }
+        
+        console.log('[AUTH] 에러 발생 시에도 signin 페이지로 리다이렉트');
+        navigationManager.redirectToSignin();
       }
     }
   };

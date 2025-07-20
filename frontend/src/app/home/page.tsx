@@ -879,6 +879,24 @@ export default function HomePage() {
   // 인증 관련 상태 추가
   const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
   
+  // NavigationManager 플래그 처리
+  useEffect(() => {
+    // 리다이렉트 플래그 처리 (NavigationManager에서 설정된 경우)
+    if ((window as any).__REDIRECT_TO_SIGNIN__) {
+      console.log('[HOME] NavigationManager signin 리다이렉트 플래그 감지 - 처리');
+      delete (window as any).__REDIRECT_TO_SIGNIN__;
+      delete (window as any).__REDIRECT_TIMESTAMP__;
+      // signin으로 리다이렉트 (Next.js 라우터 사용)
+      router.replace('/signin');
+    }
+    
+    if ((window as any).__REDIRECT_TO_HOME__) {
+      console.log('[HOME] NavigationManager 홈 리다이렉트 플래그 감지 - 이미 홈 페이지에 있으므로 무시');
+      delete (window as any).__REDIRECT_TO_HOME__;
+      delete (window as any).__REDIRECT_TIMESTAMP__;
+    }
+  }, [router]);
+  
   // 🔧 사용자 정보 디버깅
   useEffect(() => {
     if (user) {
@@ -1845,14 +1863,26 @@ export default function HomePage() {
               
               window.location.href = '/register?social=kakao';
               return; // 함수 종료
-            } else {
-              console.log('[HOME] 기존회원 - 로그인 완료');
-              // 페이지를 새로고침하여 로그인 상태 반영
-              console.log('[HOME] 카카오 로그인 후 페이지 새로고침');
-              window.location.reload();
+                      } else {
+            console.log('[HOME] 기존회원 - 로그인 완료');
+            // 페이지를 새로고침하지 않고 AuthContext 상태만 동기화
+            console.log('[HOME] 카카오 로그인 후 AuthContext 상태 동기화');
+            try {
+              // AuthContext 상태 동기화
+              if (typeof window !== 'undefined' && (window as any).__authContext__?.refreshAuthState) {
+                (window as any).__authContext__.refreshAuthState();
+              }
+            } catch (error) {
+              console.warn('[HOME] AuthContext 동기화 실패:', error);
             }
+          }
           } else {
             console.error('[HOME] 카카오 인증 실패:', data.error);
+            // 에러 모달이 표시 중이면 리다이렉트 방지
+            if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+              console.log('[HOME] 🚫 에러 모달 표시 중 - 카카오 로그인 실패 리다이렉트 방지');
+              return;
+            }
             alert(data.error || '카카오 로그인에 실패했습니다.');
             window.location.href = '/signin';
             return; // 함수 종료

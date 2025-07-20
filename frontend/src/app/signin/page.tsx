@@ -14,7 +14,7 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 import AlertModal from '@/components/ui/AlertModal';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
-import { RiKakaoTalkFill } from 'react-icons/ri';
+// 카카오 관련 import 제거
 import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
 import groupService from '@/services/groupService';
 
@@ -22,7 +22,7 @@ import groupService from '@/services/groupService';
 // 카카오 SDK 타입 정의
 declare global {
   interface Window {
-    Kakao: any;
+    // 카카오 관련 인터페이스 제거
   }
 }
 
@@ -96,6 +96,251 @@ const SignInPage = () => {
     location: typeof window !== 'undefined' ? window.location.href : 'unknown',
     timestamp: new Date().toISOString()
   });
+
+  // 🚨 강력한 리다이렉트 차단 시스템 초기화
+  useEffect(() => {
+    console.log('[REDIRECT BLOCK] 강력한 리다이렉트 차단 시스템 초기화');
+    
+    // 전역 리다이렉트 차단 플래그 설정
+    (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = false;
+    (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+    
+    // 리다이렉트 플래그 처리 (NavigationManager에서 설정된 경우)
+    if ((window as any).__REDIRECT_TO_SIGNIN__) {
+      console.log('[REDIRECT BLOCK] NavigationManager 리다이렉트 플래그 감지 - 이미 signin 페이지에 있으므로 무시');
+      delete (window as any).__REDIRECT_TO_SIGNIN__;
+      delete (window as any).__REDIRECT_TIMESTAMP__;
+    }
+    
+    if ((window as any).__REDIRECT_TO_HOME__) {
+      console.log('[REDIRECT BLOCK] NavigationManager 홈 리다이렉트 플래그 감지 - 처리');
+      delete (window as any).__REDIRECT_TO_HOME__;
+      delete (window as any).__REDIRECT_TIMESTAMP__;
+      // 홈으로 리다이렉트 (Next.js 라우터 사용)
+      router.replace('/home');
+    }
+    
+    // sessionStorage에서 상태 복원
+    const savedModalState = sessionStorage.getItem('signin_error_modal_active');
+    const savedRedirectBlock = sessionStorage.getItem('block_all_redirects');
+    const savedPhoneNumber = sessionStorage.getItem('signin_phone_number');
+    const savedErrorMessage = sessionStorage.getItem('signin_error_message');
+    
+    if (savedModalState === 'true') {
+      console.log('[REDIRECT BLOCK] sessionStorage에서 모달 상태 복원');
+      (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+      (window as any).__BLOCK_ALL_REDIRECTS__ = true;
+      
+      // 에러 모달 상태 복원
+      if (savedErrorMessage) {
+        setErrorModalMessage(savedErrorMessage);
+        setShowErrorModal(true);
+        console.log('[REDIRECT BLOCK] 에러 모달 상태 복원:', savedErrorMessage);
+      }
+    }
+    
+    if (savedRedirectBlock === 'true') {
+      console.log('[REDIRECT BLOCK] sessionStorage에서 리다이렉트 차단 상태 복원');
+      (window as any).__BLOCK_ALL_REDIRECTS__ = true;
+    }
+    
+    // 전화번호 복원
+    if (savedPhoneNumber) {
+      console.log('[REDIRECT BLOCK] sessionStorage에서 전화번호 복원:', savedPhoneNumber);
+      setPhoneNumber(savedPhoneNumber);
+      
+      // DOM에서도 복원
+      setTimeout(() => {
+        const phoneInput = document.querySelector('input[type="tel"]') as HTMLInputElement;
+        if (phoneInput && !phoneInput.value) {
+          phoneInput.value = savedPhoneNumber;
+          console.log('[REDIRECT BLOCK] DOM 전화번호 입력 필드 복원:', savedPhoneNumber);
+        }
+      }, 100);
+    }
+    
+    // window.location 오버라이드
+    const originalReplace = window.location.replace;
+    const originalAssign = window.location.assign;
+    
+    if (!(window as any).__LOCATION_OVERRIDDEN__) {
+      console.log('[REDIRECT BLOCK] window.location 오버라이드 시작');
+      
+      // href setter 오버라이드 (안전한 방법)
+      try {
+        const originalHref = Object.getOwnPropertyDescriptor(window.location, 'href');
+        
+        if (originalHref && originalHref.configurable) {
+          Object.defineProperty(window.location, 'href', {
+            set: function(value) {
+              console.log('[REDIRECT BLOCK] window.location.href 변경 시도:', value);
+              console.log('[REDIRECT BLOCK] 현재 차단 상태:', (window as any).__BLOCK_ALL_REDIRECTS__);
+              
+              if ((window as any).__BLOCK_ALL_REDIRECTS__) {
+                console.log('[REDIRECT BLOCK] 리다이렉트 차단됨:', value);
+                return;
+              }
+              
+              if (originalHref && originalHref.set) {
+                originalHref.set.call(this, value);
+              }
+            },
+            get: function() {
+              return originalHref ? originalHref.get?.call(this) : '';
+            },
+            configurable: true
+          });
+        } else {
+          console.log('[REDIRECT BLOCK] href 속성이 configurable하지 않음, 다른 방법 사용');
+        }
+      } catch (error) {
+        console.log('[REDIRECT BLOCK] href 속성 오버라이드 실패, 다른 방법 사용:', error);
+      }
+      
+      // replace 메서드 오버라이드
+      try {
+        window.location.replace = function(url: string) {
+          console.log('[REDIRECT BLOCK] window.location.replace 시도:', url);
+          console.log('[REDIRECT BLOCK] 현재 차단 상태:', (window as any).__BLOCK_ALL_REDIRECTS__);
+          
+          if ((window as any).__BLOCK_ALL_REDIRECTS__) {
+            console.log('[REDIRECT BLOCK] replace 차단됨:', url);
+            return;
+          }
+          
+          return originalReplace.call(this, url);
+        };
+      } catch (error) {
+        console.log('[REDIRECT BLOCK] replace 메서드 오버라이드 실패:', error);
+      }
+      
+      // assign 메서드 오버라이드
+      try {
+        window.location.assign = function(url: string) {
+          console.log('[REDIRECT BLOCK] window.location.assign 시도:', url);
+          console.log('[REDIRECT BLOCK] 현재 차단 상태:', (window as any).__BLOCK_ALL_REDIRECTS__);
+          
+          if ((window as any).__BLOCK_ALL_REDIRECTS__) {
+            console.log('[REDIRECT BLOCK] assign 차단됨:', url);
+            return;
+          }
+          
+          return originalAssign.call(this, url);
+        };
+      } catch (error) {
+        console.log('[REDIRECT BLOCK] assign 메서드 오버라이드 실패:', error);
+      }
+      
+      // 대안적인 리다이렉트 차단 방법
+      const originalPushState = window.history.pushState;
+      const originalReplaceState = window.history.replaceState;
+      
+      try {
+        window.history.pushState = function(state: any, title: string, url?: string) {
+          console.log('[REDIRECT BLOCK] history.pushState 시도:', url);
+          console.log('[REDIRECT BLOCK] 현재 차단 상태:', (window as any).__BLOCK_ALL_REDIRECTS__);
+          
+          if ((window as any).__BLOCK_ALL_REDIRECTS__ && url && url !== window.location.href) {
+            console.log('[REDIRECT BLOCK] pushState 차단됨:', url);
+            return;
+          }
+          
+          return originalPushState.call(this, state, title, url);
+        };
+        
+        window.history.replaceState = function(state: any, title: string, url?: string) {
+          console.log('[REDIRECT BLOCK] history.replaceState 시도:', url);
+          console.log('[REDIRECT BLOCK] 현재 차단 상태:', (window as any).__BLOCK_ALL_REDIRECTS__);
+          
+          if ((window as any).__BLOCK_ALL_REDIRECTS__ && url && url !== window.location.href) {
+            console.log('[REDIRECT BLOCK] replaceState 차단됨:', url);
+            return;
+          }
+          
+          return originalReplaceState.call(this, state, title, url);
+        };
+      } catch (error) {
+        console.log('[REDIRECT BLOCK] history 메서드 오버라이드 실패:', error);
+      }
+      
+      (window as any).__LOCATION_OVERRIDDEN__ = true;
+      console.log('[REDIRECT BLOCK] window.location 오버라이드 완료');
+    }
+    
+    // 전역 함수 등록
+    (window as any).__REDIRECT_CONTROL__ = {
+      blockRedirects: () => {
+        console.log('[REDIRECT BLOCK] 리다이렉트 차단 활성화');
+        (window as any).__BLOCK_ALL_REDIRECTS__ = true;
+        sessionStorage.setItem('block_all_redirects', 'true');
+        
+        // 추가적인 보호 장치
+        window.addEventListener('beforeunload', (e) => {
+          if ((window as any).__BLOCK_ALL_REDIRECTS__) {
+            e.preventDefault();
+            e.returnValue = '';
+            return '';
+          }
+        });
+      },
+      allowRedirects: () => {
+        console.log('[REDIRECT BLOCK] 리다이렉트 차단 해제');
+        (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+        sessionStorage.removeItem('block_all_redirects');
+      },
+      getStatus: () => {
+        return {
+          modalActive: (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__,
+          redirectBlocked: (window as any).__BLOCK_ALL_REDIRECTS__,
+          locationOverridden: (window as any).__LOCATION_OVERRIDDEN__
+        };
+      },
+      forceBlock: () => {
+        console.log('[REDIRECT BLOCK] 강제 리다이렉트 차단');
+        (window as any).__BLOCK_ALL_REDIRECTS__ = true;
+        sessionStorage.setItem('block_all_redirects', 'true');
+        
+        // 모든 리다이렉트 시도 차단
+        const blockAllRedirects = () => {
+          if ((window as any).__BLOCK_ALL_REDIRECTS__) {
+            console.log('[REDIRECT BLOCK] 강제 차단 - 모든 리다이렉트 시도 무시');
+            return false;
+          }
+        };
+        
+        // 이벤트 리스너 추가
+        window.addEventListener('beforeunload', blockAllRedirects);
+        window.addEventListener('popstate', blockAllRedirects);
+        
+        // 안전한 리다이렉트 차단
+        try {
+          const originalReplace = window.location.replace;
+          const originalAssign = window.location.assign;
+          
+          window.location.replace = function(url: string) {
+            if ((window as any).__BLOCK_ALL_REDIRECTS__) {
+              console.log('[REDIRECT BLOCK] 강제 차단 - replace 차단됨:', url);
+              return;
+            }
+            return originalReplace.call(this, url);
+          };
+          
+          window.location.assign = function(url: string) {
+            if ((window as any).__BLOCK_ALL_REDIRECTS__) {
+              console.log('[REDIRECT BLOCK] 강제 차단 - assign 차단됨:', url);
+              return;
+            }
+            return originalAssign.call(this, url);
+          };
+        } catch (error) {
+          console.log('[REDIRECT BLOCK] 강제 차단 설정 실패:', error);
+        }
+      }
+    };
+    
+    console.log('[REDIRECT BLOCK] 전역 제어 함수 등록 완료');
+    console.log('[REDIRECT BLOCK] 현재 상태:', (window as any).__REDIRECT_CONTROL__.getStatus());
+  }, []);
 
   // 🚨 사파리 시뮬레이터 디버깅을 위한 강제 로그
   useEffect(() => {
@@ -258,31 +503,20 @@ const SignInPage = () => {
     
     console.log('[INIT] 클라이언트사이드 초기화 시작');
     
-    // 새로운 카카오 로그인 핸들러 로드
-    try {
-      const script = document.createElement('script');
-      script.src = '/kakao-login-handler.js';
-      script.async = true;
-      script.onload = () => {
-        console.log('[INIT] 카카오 로그인 핸들러 로드 완료');
-      };
-      script.onerror = (error) => {
-        console.error('[INIT] 카카오 로그인 핸들러 로드 실패:', error);
-      };
-      document.head.appendChild(script);
-    } catch (error) {
-      console.error('[INIT] 카카오 로그인 핸들러 로드 중 오류:', error);
-    }
+    // 카카오 관련 스크립트 로드 제거
     
     // 에러 모달 상태 복원
     try {
       const savedErrorFlag = sessionStorage.getItem('__SIGNIN_ERROR_MODAL_ACTIVE__') === 'true';
-      if (savedErrorFlag) {
+      const savedRedirectBlock = sessionStorage.getItem('__BLOCK_ALL_REDIRECTS__') === 'true';
+      
+      if (savedErrorFlag || savedRedirectBlock) {
         console.log('[SIGNIN] 🔄 페이지 로드 시 브라우저 저장소에서 에러 모달 상태 복원');
         
         const savedErrorMessage = sessionStorage.getItem('__SIGNIN_ERROR_MESSAGE__') || '';
         (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
         (window as any).__SIGNIN_ERROR_MESSAGE__ = savedErrorMessage;
+        (window as any).__BLOCK_ALL_REDIRECTS__ = true; // 리다이렉트 차단 복원
         
         setShowErrorModal(true);
         if (savedErrorMessage) {
@@ -293,195 +527,12 @@ const SignInPage = () => {
       console.warn('[SIGNIN] sessionStorage 접근 실패:', error);
     }
     
-    // 카카오 콜백 함수 등록 (간단한 버전)
-    (window as any).onNativeKakaoLoginSuccess = (userInfo: any) => {
-      console.log('🎯 [NATIVE CALLBACK] === iOS 카카오 로그인 성공 콜백 호출됨 ===');
-      console.log('🎯 [NATIVE CALLBACK] userInfo:', userInfo);
-      console.log('🎯 [NATIVE CALLBACK] userInfo.accessToken:', userInfo?.accessToken);
-      console.log('🎯 [NATIVE CALLBACK] kakaoSignInSuccess 함수 존재 여부:', !!(window as any).kakaoSignInSuccess);
-      
-      // 새로운 핸들러가 처리하도록 위임
-      if ((window as any).kakaoSignInSuccess) {
-        console.log('🎯 [NATIVE CALLBACK] 새로운 핸들러로 위임 시작');
-        try {
-          (window as any).kakaoSignInSuccess(userInfo.accessToken, userInfo);
-          console.log('🎯 [NATIVE CALLBACK] 새로운 핸들러 호출 완료');
-        } catch (error) {
-          console.error('🎯 [NATIVE CALLBACK] 새로운 핸들러 호출 실패:', error);
-        }
-      } else {
-        console.error('🎯 [NATIVE CALLBACK] kakaoSignInSuccess 함수가 없습니다!');
-      }
-    };
-    
-    (window as any).onNativeKakaoLoginError = (error: any) => {
-      console.error('❌ [NATIVE CALLBACK] === iOS 카카오 로그인 실패 콜백 호출됨 ===');
-      console.error('❌ [NATIVE CALLBACK] error:', error);
-      console.error('❌ [NATIVE CALLBACK] kakaoSignInError 함수 존재 여부:', !!(window as any).kakaoSignInError);
-      
-      // 새로운 핸들러가 처리하도록 위임
-      if ((window as any).kakaoSignInError) {
-        console.log('❌ [NATIVE CALLBACK] 새로운 핸들러로 위임 시작');
-        try {
-          (window as any).kakaoSignInError(error);
-          console.log('❌ [NATIVE CALLBACK] 새로운 핸들러 호출 완료');
-        } catch (handlerError) {
-          console.error('❌ [NATIVE CALLBACK] 새로운 핸들러 호출 실패:', handlerError);
-        }
-      } else {
-        console.error('❌ [NATIVE CALLBACK] kakaoSignInError 함수가 없습니다!');
-      }
-    };
+    // 카카오 콜백 함수 등록 제거
     
     console.log('✅ [INIT] 초기화 완료');
   }, []);
 
-  // 카카오 로그인 함수 (구글 로그인과 동일한 패턴)
-  const handleKakaoLogin = async () => {
-    console.log('🎯🎯🎯 [KAKAO LOGIN] handleKakaoLogin 함수 정의 확인됨!');
-    console.log('🎯 [KAKAO LOGIN] === handleKakaoLogin 함수 진입 ===');
-    console.log('🚀 [KAKAO LOGIN] 환경 상태 확인:', {
-      isLoading,
-      isIOSWebView,
-      isAndroidWebView,
-      isWebEnvironment,
-      hasWebKit: !!(window as any).webkit?.messageHandlers?.smapIos,
-      hasmapIos: !!(window as any).webkit?.messageHandlers?.smapIos,
-      webkitMessageHandlers: Object.keys((window as any).webkit?.messageHandlers || {}),
-      timestamp: Date.now()
-    });
-    
-    // 상태 체크
-    if (isLoading) {
-      console.log('🚫 [KAKAO LOGIN] 이미 로딩 중이므로 종료합니다.');
-      return undefined;
-    }
-    
-    // 중복 실행 방지를 위한 플래그 체크
-    if ((window as any).__KAKAO_LOGIN_IN_PROGRESS__) {
-      console.log('🚫 [KAKAO LOGIN] 이미 진행 중인 로그인이 있으므로 종료합니다.');
-      return undefined;
-    }
-    
-    console.log('✅ [KAKAO LOGIN] 상태 체크 완료, 로그인 프로세스 시작');
-    
-    setIsLoading(true);
-    setError(null);
-    
-    // 진행 중 플래그 설정
-    (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = true;
-    
-    try {
-      // 환경 감지 상태 출력
-      console.log('🔍 [KAKAO LOGIN] 환경 감지 상태:', {
-        userAgent: navigator.userAgent.substring(0, 100),
-        isIOSWebView,
-        isAndroidWebView,
-        isWebEnvironment,
-        hasWebKit: !!(window as any).webkit,
-        hasAndroidBridge: !!(window as any).androidBridge,
-        platform: 'web'
-      });
-      
-      console.log('🚀 [KAKAO LOGIN] 시작', { 
-        platform: 'web',
-        isIOSWebView,
-        isAndroidWebView,
-        isWebEnvironment,
-        timestamp: Date.now()
-      });
-      
-      // 햅틱 피드백 (버튼 클릭 시)
-      triggerHapticFeedback(HapticFeedbackType.LIGHT);
-      
-      // iOS 환경 체크 및 처리
-      if (isIOSWebView) {
-        console.log('🍎 [KAKAO LOGIN] iOS 환경에서 카카오 로그인 시도');
-        
-        // iOS 네이티브 카카오 로그인 시도
-        if ((window as any).webkit?.messageHandlers?.smapIos) {
-          console.log('📱 [KAKAO LOGIN] iOS 네이티브 카카오 로그인 인터페이스 발견');
-          
-          try {
-            // iOS 네이티브 로그인 호출
-            (window as any).webkit.messageHandlers.smapIos.postMessage({
-              type: 'kakaoLogin',
-              param: '',
-              timestamp: Date.now(),
-              source: 'ios_native'
-            });
-            
-            console.log('✅ [KAKAO LOGIN] iOS 네이티브 호출 성공, 콜백 대기 중...');
-            
-            // iOS 환경에서 3초 후 폴백
-            setTimeout(() => {
-              console.log('🔍 [IOS FALLBACK] iOS 카카오 로그인 응답 확인 중...');
-              
-              // 진행 중 플래그가 여전히 설정되어 있으면 에러 처리
-              if ((window as any).__KAKAO_LOGIN_IN_PROGRESS__) {
-                console.log('⚠️ [IOS FALLBACK] iOS 네이티브 응답 없음');
-                (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
-                setIsLoading(false);
-                setError('카카오 로그인에 실패했습니다. 다시 시도해주세요.');
-              } else {
-                console.log('✅ [IOS FALLBACK] iOS 네이티브 응답이 있었거나 이미 처리됨');
-              }
-            }, 3000);
-            
-            return undefined;
-          } catch (error) {
-            console.error('❌ [KAKAO LOGIN] iOS 네이티브 호출 실패:', error);
-            (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
-            setIsLoading(false);
-            setError('카카오 로그인 중 오류가 발생했습니다.');
-            return undefined;
-          }
-        } else {
-          console.warn('🍎 [KAKAO LOGIN] iOS 네이티브 카카오 로그인 인터페이스가 없습니다.');
-          (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
-          setIsLoading(false);
-          setError('카카오 로그인은 앱에서만 지원됩니다.');
-        }
-        
-        return undefined; // iOS 처리가 완료되면 함수 종료
-      }
-      
-      // Android 환경 체크 및 처리
-      if (isAndroidWebView) {
-        console.log('🤖 [KAKAO LOGIN] Android 환경에서 카카오 로그인 시도');
-        console.log('⚠️ [KAKAO LOGIN] Android에서는 카카오 로그인이 제한적입니다.');
-        (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
-        setIsLoading(false);
-        setError('카카오 로그인은 iOS 앱에서만 지원됩니다.');
-        return undefined; // Android 처리가 완료되면 함수 종료
-      }
-      
-      // 웹 환경 또는 기타 환경
-      console.log('🌐 [KAKAO LOGIN] 웹 환경에서 카카오 로그인 시도');
-      (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
-      setIsLoading(false);
-      setError('카카오 로그인은 앱에서만 지원됩니다.');
-      
-    } catch (error) {
-      console.error('❌ [KAKAO LOGIN] 카카오 로그인 실패', { error });
-      
-      // 취소된 로그인인지 확인
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('canceled') || errorMessage.includes('cancelled')) {
-        console.log('ℹ️ [KAKAO LOGIN] 사용자가 로그인을 취소했습니다.');
-        setError('로그인이 취소되었습니다. 다시 시도해주세요.');
-      } else {
-        setError('카카오 로그인 중 오류가 발생했습니다. 다시 시도해주세요.');
-      }
-      
-      // 햅틱 피드백 (에러)
-      triggerHapticFeedback(HapticFeedbackType.ERROR);
-    } finally {
-      // 진행 중 플래그 제거
-      (window as any).__KAKAO_LOGIN_IN_PROGRESS__ = false;
-      setIsLoading(false);
-    }
-  };
+  // 카카오 로그인 함수 제거
 
   // 🚨 페이지 로드 즉시 브라우저 저장소에서 에러 모달 상태 확인 및 복원
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -556,14 +607,13 @@ const SignInPage = () => {
       handleGoogleSDKLogin();
     };
     
-    // 카카오 SDK 확인 함수 등록
-    (window as any).__SMAP_CHECK_KAKAO_SDK__ = checkKakaoSDKStatus;
+    // 카카오 SDK 확인 함수 제거
     
     console.log('🌐 [GLOBAL] 전역 테스트 함수들 등록 완료:');
     console.log('   - window.__SMAP_FORCE_CREATE_HANDLERS__()');
     console.log('   - window.__SMAP_CHECK_HANDLERS__()');
     console.log('   - window.__SMAP_EMERGENCY_GOOGLE_LOGIN__()');
-    console.log('   - window.__SMAP_CHECK_KAKAO_SDK__()');
+    console.log('   - 카카오 관련 함수 제거됨');
     console.log('🌐 [GLOBAL] Safari 콘솔에서 위 함수들을 직접 호출할 수 있습니다.');
     
     // 🧪 테스트 함수들 등록
@@ -1689,6 +1739,12 @@ const SignInPage = () => {
 
     // 로그인된 사용자는 홈으로 리다이렉트 (차단 플래그 재확인)
     if (isLoggedIn && !isRedirectingRef.current) {
+      // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
+      if (showErrorModal) {
+        console.log('[SIGNIN] 🚫 에러 모달 표시 중 - 홈 리다이렉트 차단');
+        return undefined;
+      }
+      
       // 리다이렉트 직전에 다시 한 번 차단 플래그 확인
       if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
         console.log('[SIGNIN] 🚫 로그인된 사용자지만 구글 로그인 중 - 홈 리다이렉트 차단');
@@ -2112,16 +2168,56 @@ const SignInPage = () => {
     };
   }, []);
 
-  // 에러 모달 상태 디버깅
+  // 에러 모달 상태 디버깅 및 안정화 (강화된 버전)
   useEffect(() => {
     console.log('[SIGNIN] 에러 모달 상태 변화:', { showErrorModal, errorModalMessage });
     if (showErrorModal && errorModalMessage) {
       console.log('[SIGNIN] ⚠️ 에러 모달이 표시되어야 함:', errorModalMessage);
+      
+      // 에러 모달이 표시되면 페이지 새로고침 방지
+      const preventRefresh = (e: BeforeUnloadEvent) => {
+        console.log('[SIGNIN] 🚫 beforeunload 이벤트 차단');
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      };
+      
+      const preventPopState = (e: PopStateEvent) => {
+        console.log('[SIGNIN] 🚫 popstate 이벤트 차단');
+        e.preventDefault();
+        window.history.pushState(null, '', window.location.href);
+      };
+      
+      const preventKeyDown = (e: KeyboardEvent) => {
+        // ESC 키 차단
+        if (e.key === 'Escape') {
+          console.log('[SIGNIN] 🚫 ESC 키 차단');
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      };
+      
+      window.addEventListener('beforeunload', preventRefresh);
+      window.addEventListener('popstate', preventPopState);
+      document.addEventListener('keydown', preventKeyDown);
+      
+      // 컴포넌트 언마운트 시 이벤트 리스너 제거
+      return () => {
+        window.removeEventListener('beforeunload', preventRefresh);
+        window.removeEventListener('popstate', preventPopState);
+        document.removeEventListener('keydown', preventKeyDown);
+      };
     }
   }, [showErrorModal, errorModalMessage]);
 
-  // AuthContext 에러 감지 및 에러 모달 표시 (간단한 버전)
+  // AuthContext 에러 감지 및 에러 모달 표시 (강화된 버전)
   useEffect(() => {
+    // 에러 모달이 이미 표시되어 있으면 AuthContext 에러 무시
+    if (showErrorModal) {
+      console.log('[SIGNIN] 에러 모달이 이미 표시되어 있어 AuthContext 에러 무시');
+      return undefined;
+    }
+    
     // 구글 로그인 진행 중일 때는 AuthContext 에러 무시
     if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__ || (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__) {
       if (error) {
@@ -2132,7 +2228,7 @@ const SignInPage = () => {
     }
     
     // 전화번호 로그인 에러는 catch 블록에서 직접 처리하므로 여기서는 제외
-    if (error && !isLoggedIn && !loading && !showErrorModal && !errorProcessedRef.current) {
+    if (error && !isLoggedIn && !loading && !errorProcessedRef.current) {
       console.log('[SIGNIN] AuthContext 에러 감지:', error);
       
       // 구글 로그인 관련 에러는 무시
@@ -2161,7 +2257,13 @@ const SignInPage = () => {
   // 로그인 상태 변화 디버깅 (error 제외)
   useEffect(() => {
     console.log('[SIGNIN] 로그인 상태 변화:', { isLoggedIn, loading, isCheckingAuth });
-  }, [isLoggedIn, loading, isCheckingAuth]);
+    
+    // 에러 모달이 표시되어 있으면 로그인 상태 변화로 인한 리다이렉트 방지
+    if (showErrorModal && (isLoggedIn || loading)) {
+      console.log('[SIGNIN] 🚫 에러 모달 표시 중 - 로그인 상태 변화 무시');
+      return;
+    }
+  }, [isLoggedIn, loading, isCheckingAuth, showErrorModal]);
 
   // 전화번호 포맷팅 함수 (register/page.tsx의 함수와 유사)
   const formatPhoneNumber = (value: string) => {
@@ -2200,6 +2302,14 @@ const SignInPage = () => {
     
     console.log('[SIGNIN] 로그인 시도 시작');
     
+    // 🚨 즉시 리다이렉트 차단 활성화 (로그인 시도 시작과 동시에)
+    if ((window as any).__REDIRECT_CONTROL__) {
+      (window as any).__REDIRECT_CONTROL__.forceBlock();
+    }
+    (window as any).__BLOCK_ALL_REDIRECTS__ = true;
+    sessionStorage.setItem('block_all_redirects', 'true');
+    console.log('[SIGNIN] 🚨 로그인 시도 시작과 동시에 리다이렉트 차단 활성화');
+    
     // iOS 로그 전송 - 로그인 시도 시작
     sendLogToiOS('info', '📱 전화번호 로그인 시도 시작', {
       timestamp: new Date().toISOString(),
@@ -2211,6 +2321,9 @@ const SignInPage = () => {
     setIsLoading(true);
     setApiError('');
     setFormErrors({});
+    
+    // 전화번호 저장 (로그인 실패 시에도 유지하기 위해)
+    const currentPhoneNumber = phoneNumber;
     
     // 기존 AuthContext 에러 초기화 및 에러 처리 플래그 리셋
     if (error) {
@@ -2276,6 +2389,19 @@ const SignInPage = () => {
 
       console.log('[SIGNIN] authService 로그인 성공 - AuthContext 상태 동기화 후 home으로 리다이렉션');
       
+      // AuthContext 상태 동기화 (로그인 성공 시)
+      try {
+        const userData = authService.getUserData();
+        if (userData) {
+          console.log('[SIGNIN] AuthContext 상태 동기화 시작:', userData.mt_name);
+          // AuthContext의 refreshAuthState 함수를 사용하여 상태 동기화
+          await refreshAuthState();
+          console.log('[SIGNIN] AuthContext 상태 동기화 완료');
+        }
+      } catch (error) {
+        console.warn('[SIGNIN] AuthContext 상태 동기화 실패 (무시):', error);
+      }
+      
       // iOS 로그 전송 - 로그인 성공
       sendLogToiOS('info', '✅ 전화번호 로그인 성공', {
         timestamp: new Date().toISOString(),
@@ -2295,6 +2421,14 @@ const SignInPage = () => {
         redirectMethod: 'router.replace',
         targetPage: '/home'
       });
+      
+      // 🚨 로그인 성공 시에만 리다이렉트 차단 해제
+      if ((window as any).__REDIRECT_CONTROL__) {
+        (window as any).__REDIRECT_CONTROL__.allowRedirects();
+      }
+      (window as any).__BLOCK_ALL_REDIRECTS__ = false;
+      sessionStorage.removeItem('block_all_redirects');
+      console.log('[SIGNIN] ✅ 로그인 성공 - 리다이렉트 차단 해제');
       
       // 즉시 홈으로 이동 (백그라운드에서 데이터 로딩)
       // 홈 페이지 초기화 지연을 위한 플래그 설정
@@ -2374,11 +2508,34 @@ const SignInPage = () => {
       console.log('🎮 [SIGNIN] 전화번호 로그인 실패 햅틱 피드백 실행');
       
       try {
+        // 로그인 실패 시 전화번호 유지 (강화된 버전)
+        console.log('[SIGNIN] 🔄 로그인 실패 시 전화번호 복원:', currentPhoneNumber);
+        setPhoneNumber(currentPhoneNumber);
+        
+        // sessionStorage에 전화번호 저장 (페이지 새로고침 시에도 유지)
+        sessionStorage.setItem('signin_phone_number', currentPhoneNumber);
+        console.log('[SIGNIN] 💾 sessionStorage에 전화번호 저장:', currentPhoneNumber);
+        
+        // 전화번호 복원 확인
+        setTimeout(() => {
+          console.log('[SIGNIN] 🔍 전화번호 복원 확인:', phoneNumber);
+          // DOM에서도 직접 확인
+          const phoneInput = document.querySelector('input[type="tel"]') as HTMLInputElement;
+          if (phoneInput) {
+            console.log('[SIGNIN] 🔍 DOM 전화번호 입력 필드 값:', phoneInput.value);
+            if (!phoneInput.value && currentPhoneNumber) {
+              phoneInput.value = currentPhoneNumber;
+              console.log('[SIGNIN] 🔄 DOM 전화번호 입력 필드 복원:', currentPhoneNumber);
+            }
+          }
+        }, 100);
+        
         showError(errorMessage);
         console.log('[SIGNIN] ✅ showError 함수 호출 완료');
         sendLogToiOS('info', '✅ 에러 모달 표시 완료', { 
           timestamp: new Date().toISOString(),
-          errorMessage 
+          errorMessage,
+          phoneNumberRestored: currentPhoneNumber
         });
       } catch (showErrorErr) {
         console.error('[SIGNIN] ❌ showError 함수 호출 실패:', showErrorErr);
@@ -2404,41 +2561,54 @@ const SignInPage = () => {
     }
   };
 
-  // 에러 모달 닫기 (간단한 버전)
+  // 에러 모달 닫기 (단순화된 버전)
   const closeErrorModal = () => {
-    console.log('[SIGNIN] 에러 모달 닫기');
+    console.log('[SIGNIN] 🔄 에러 모달 닫기 시작');
     
     // 모달 닫기
     setShowErrorModal(false);
     setErrorModalMessage('');
     
-    // 플래그 리셋
-    errorProcessedRef.current = false;
-    blockAllEffectsRef.current = false;
-    preventRemountRef.current = false;
-    isRedirectingRef.current = false;
+    // 로딩 상태 해제
+    setIsLoading(false);
+    
+    // 전화번호는 유지하고 비밀번호만 초기화
+    console.log('[SIGNIN] 🔄 에러 모달 닫기 - 전화번호 유지, 비밀번호 초기화');
+    setPassword('');
+    
+    // 전화번호 입력 필드에 포커스
+    setTimeout(() => {
+      const phoneInput = document.querySelector('input[type="tel"]') as HTMLInputElement;
+      if (phoneInput) {
+        phoneInput.focus();
+        
+        // 전화번호가 비어있다면 복원
+        if (!phoneInput.value && phoneNumber) {
+          phoneInput.value = phoneNumber;
+        }
+      }
+    }, 100);
+    
+    console.log('[SIGNIN] ✅ 에러 모달 닫기 완료');
+  };
+
+  // 🚨 에러 시 홈으로 이동하는 함수
+  const handleErrorAndGoHome = () => {
+    console.log('[SIGNIN] 에러 처리 후 홈으로 이동');
+    closeErrorModal();
+    // 카카오 에러 복구 함수 제거됨
+  };
+
+
+
+  // 에러 표시 헬퍼 함수 (단순화된 버전)
+  const showError = (message: string) => {
+    console.log('[SIGNIN] showError 함수 시작:', message);
     
     // 로딩 상태 해제
     setIsLoading(false);
     
-    console.log('[SIGNIN] 에러 모달 닫기 완료');
-  };
-
-  // 🚨 카카오 에러 시 홈으로 이동하는 함수
-  const handleErrorAndGoHome = () => {
-    console.log('[SIGNIN] 에러 처리 후 홈으로 이동');
-    closeErrorModal();
-    recoverFromKakaoError();
-  };
-
-
-
-  // 에러 표시 헬퍼 함수 (간단한 버전)
-  const showError = (message: string) => {
-    console.log('[SIGNIN] showError 함수 시작:', message);
-    
-    // 간단한 에러 모달 표시
-    setIsLoading(false);
+    // 에러 모달 표시
     setErrorModalMessage(message);
     setShowErrorModal(true);
     
@@ -2811,19 +2981,7 @@ const SignInPage = () => {
   };
 
   // 🔍 카카오 SDK 상태 확인 함수
-  const checkKakaoSDKStatus = () => {
-    console.log('🔍 [KAKAO SDK] 카카오 SDK 상태 확인');
-    
-    const kakao = (window as any).Kakao;
-    if (kakao) {
-      console.log('✅ [KAKAO SDK] Kakao 객체 발견');
-      console.log('🔍 [KAKAO SDK] Kakao.isInitialized():', kakao.isInitialized());
-      return true;
-    } else {
-      console.log('❌ [KAKAO SDK] Kakao 객체 없음');
-      return false;
-    }
-  };
+  // 카카오 SDK 확인 함수 제거
 
   // 🔍 테스트 함수들 등록
   const registerTestFunctions = () => {
@@ -2838,19 +2996,7 @@ const SignInPage = () => {
   };
 
   // 🔍 카카오 에러 복구 함수
-  const recoverFromKakaoError = () => {
-    console.log('🔍 [KAKAO RECOVER] 카카오 에러 복구 시도');
-    
-    try {
-      // 카카오 SDK 재초기화
-      if ((window as any).Kakao) {
-        (window as any).Kakao.init(process.env.NEXT_PUBLIC_KAKAO_APP_KEY);
-        console.log('✅ [KAKAO RECOVER] 카카오 SDK 재초기화 완료');
-      }
-    } catch (error) {
-      console.error('❌ [KAKAO RECOVER] 카카오 에러 복구 실패:', error);
-    }
-  };
+  // 카카오 에러 복구 함수 제거
 
   // 🚨 페이지 완전 고정 함수 (개선된 버전)
   const freezePage = () => {
@@ -3508,36 +3654,7 @@ const SignInPage = () => {
               )} */}
             </div>
 
-            {/* Kakao 로그인 버튼 */}
-            {/* <button
-              type="button"
-              onClick={(e) => {
-                console.log('💬 [KAKAO LOGIN] 버튼 클릭됨!');
-                sendLogToiOS('info', '💬 Kakao 로그인 버튼 클릭됨', {
-                  timestamp: new Date().toISOString(),
-                  event: 'button_click',
-                  isLoading: isLoading,
-                  buttonDisabled: isLoading
-                });
-                
-                // 햅틱 피드백 (버튼 클릭 시)
-                triggerHapticFeedback(HapticFeedbackType.LIGHT);
-                
-                // 실제 핸들러 호출
-                handleKakaoLogin();
-              }}
-              disabled={isLoading}
-              className="w-full inline-flex items-center justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-black bg-[#FEE500] hover:bg-[#F0D900] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-400 disabled:opacity-70 transition-all transform hover:scale-105 active:scale-95"
-              onFocus={(e) => (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #FEE500'}
-              onBlur={(e) => (e.target as HTMLButtonElement).style.boxShadow = ''}
-            >
-              <RiKakaoTalkFill className="w-5 h-5 mr-3" aria-hidden="true" />
-              {isLoading ? (
-                <LoadingSpinner message="로그인 중..." fullScreen={false} />
-              ) : (
-                'Kakao 계정으로 로그인'
-              )}
-            </button> */}
+            {/* 카카오 로그인 버튼 제거 */}
           </div>
 
           {/* 회원가입 링크 */}
@@ -3555,113 +3672,69 @@ const SignInPage = () => {
         </motion.div>
       </motion.div>
 
-      {/* 에러 모달 - 전역 플래그와 관계없이 항상 렌더링 */}
-      {(() => {
-        // 전역 플래그가 있을 때는 강제로 에러 모달 표시
-        const globalErrorFlag = (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__;
-        const globalErrorMessage = (window as any).__SIGNIN_ERROR_MESSAGE__;
-        const shouldShowModal = showErrorModal || globalErrorFlag;
-        const displayMessage = errorModalMessage || globalErrorMessage || '로그인 중 오류가 발생했습니다.';
-        
-        console.log('[SIGNIN] 에러 모달 렌더링 체크:', {
-          showErrorModal,
-          errorModalMessage,
-          isLoading,
-          globalErrorFlag,
-          globalErrorMessage,
-          shouldShowModal,
-          displayMessage
-        });
-        
-        return (
-          <AnimatePresence>
-            {shouldShowModal && (
-              <>
-                {/* 배경 오버레이 - 강화된 고정 */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999]"
-                  style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: '100vw',
-                    height: '100vh',
-                    touchAction: 'none',
-                    userSelect: 'none',
-                    WebkitUserSelect: 'none',
-                    WebkitTouchCallout: 'none',
-                    overflow: 'hidden'
-                  }}
-                  onClick={closeErrorModal}
-                />
+      {/* 에러 모달 - 단순화된 버전 */}
+      {showErrorModal && errorModalMessage && (
+        <>
+          {/* 배경 오버레이 */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999]"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                console.log('[SIGNIN] 배경 클릭으로 에러 모달 닫기');
+                closeErrorModal();
+              }
+            }}
+          />
+          
+          {/* 에러 모달 */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          >
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
+              <div className="p-6">
+                {/* 에러 아이콘 */}
+                <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-4">
+                  <FiAlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
                 
-                {/* 에러 모달 - 강화된 고정 */}
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                  className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-                  style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    width: '100vw',
-                    height: '100vh',
-                    touchAction: 'none',
-                    pointerEvents: 'none'
+                {/* 제목 */}
+                <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                  로그인에 실패했습니다
+                </h3>
+                
+                {/* 메시지 */}
+                <p className="text-gray-600 text-center mb-6">
+                  {errorModalMessage}
+                </p>
+                
+                {/* 추가 안내 */}
+                <p className="text-sm text-gray-500 text-center mb-6">
+                  전화번호는 유지되며, 비밀번호만 다시 입력해주세요.
+                </p>
+                
+                {/* 확인 버튼 */}
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('[SIGNIN] 에러 모달 확인 버튼 클릭');
+                    closeErrorModal();
                   }}
+                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
                 >
-                  <div 
-                    className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto"
-                    style={{ pointerEvents: 'auto' }}
-                  >
-                    <div className="p-6">
-                      {/* 에러 아이콘 */}
-                      <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-4">
-                        <FiAlertTriangle className="w-6 h-6 text-red-600" />
-                      </div>
-                      
-                      {/* 제목 */}
-                      <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
-                        {displayMessage.includes('취소') ? '로그인 취소' : '로그인 실패'}
-                      </h3>
-                      
-                      {/* 메시지 */}
-                      <p className="text-gray-600 text-center mb-6">
-                        {displayMessage}
-                      </p>
-                      
-                      {/* 버튼들 */}
-                      <div className="flex flex-col space-y-3">
-                        {/* KOE006 에러인 경우 홈으로 이동 버튼 표시 */}
-                        {(displayMessage.includes('카카오 앱 설정') || displayMessage.includes('KOE006')) && (
-                          <button
-                            onClick={handleErrorAndGoHome}
-                            className="w-full px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-                          >
-                            홈으로 이동
-                          </button>
-                        )}
-                        
-                        {/* 확인 버튼 */}
-                        <button
-                          onClick={closeErrorModal}
-                          className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-                        >
-                          확인
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-        );
-      })()}
+                  다시 시도
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
 
         {/* 전체 화면 로딩 스피너 */}
         {isLoading && (
