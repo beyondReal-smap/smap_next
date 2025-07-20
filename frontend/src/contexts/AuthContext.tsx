@@ -449,6 +449,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       // 5. 즉시 signin 페이지로 리다이렉트 (강화된 네비게이션 방지 플래그 확인)
       if (typeof window !== 'undefined') {
+        // 🔥 로그아웃 후 에러 상태 완전 정리
+        (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = false;
+        
         // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
         if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
           console.log('[AUTH] 🚫 에러 모달 표시 중 - signin 페이지 리다이렉트 방지');

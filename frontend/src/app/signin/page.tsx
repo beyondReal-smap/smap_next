@@ -1333,6 +1333,17 @@ const SignInPage = () => {
     
     (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = true;
     
+    // 🔥 Google SDK 토큰 캐시 정리 (로그아웃 후 재시도 문제 해결)
+    try {
+      if ((window as any).google?.accounts?.id) {
+        console.log('[GOOGLE SDK] 기존 토큰 캐시 정리 시작');
+        (window as any).google.accounts.id.cancel();
+        console.log('[GOOGLE SDK] 토큰 캐시 정리 완료');
+      }
+    } catch (cacheError) {
+      console.warn('[GOOGLE SDK] 토큰 캐시 정리 중 오류 (무시):', cacheError);
+    }
+    
     try {
       // Google Identity Services 초기화 (이미 로드되어 있다고 가정)
       if ((window as any).google?.accounts?.id) {
@@ -1375,8 +1386,11 @@ const SignInPage = () => {
           console.log('✅ [GOOGLE OAUTH] 도메인 검증 성공:', currentDomain);
         }
         
+        // 🔥 매번 새로운 상태로 초기화 (토큰 캐시 문제 해결)
         google.accounts.id.initialize({
           client_id: clientId,
+          auto_select: false, // 자동 선택 비활성화
+          cancel_on_tap_outside: true, // 외부 클릭 시 취소
           callback: async (response: any) => {
             console.log('[GOOGLE SDK] 로그인 성공, 백엔드로 토큰 전송:', response);
             
@@ -1529,25 +1543,31 @@ const SignInPage = () => {
           }
         });
         
-        // 로그인 팝업 띄우기 (중복 호출 방지)
+        // 🔥 로그인 시도 전 추가 정리
         try {
-          google.accounts.id.prompt((notification: any) => {
-            console.log('[GOOGLE SDK] Prompt notification:', notification);
-            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-              // 팝업이 표시되지 않은 경우 버튼 클릭 방식 사용
-              google.accounts.id.renderButton(
-                document.createElement('div'), // 임시 div
-                {
-                  theme: 'outline',
-                  size: 'large',
-                  type: 'standard',
-                  text: 'signin_with',
-                  shape: 'rectangular',
-                  logo_alignment: 'left'
-                }
-              );
-            }
-          });
+          // 기존 팝업이나 상태 정리
+          google.accounts.id.cancel();
+          
+          // 잠시 대기 후 팝업 띄우기
+          setTimeout(() => {
+            google.accounts.id.prompt((notification: any) => {
+              console.log('[GOOGLE SDK] Prompt notification:', notification);
+              if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+                // 팝업이 표시되지 않은 경우 버튼 클릭 방식 사용
+                google.accounts.id.renderButton(
+                  document.createElement('div'), // 임시 div
+                  {
+                    theme: 'outline',
+                    size: 'large',
+                    type: 'standard',
+                    text: 'signin_with',
+                    shape: 'rectangular',
+                    logo_alignment: 'left'
+                  }
+                );
+              }
+            });
+          }, 100);
         } catch (error) {
           console.error('[GOOGLE SDK] Prompt 호출 실패:', error);
           showError('Google 로그인 팝업을 열 수 없습니다.');
@@ -1648,6 +1668,12 @@ const SignInPage = () => {
     // 페이지 로드 시 이전 상태 정리
     console.log('[SIGNIN] 페이지 로드 시 이전 상태 정리 시작');
     
+    // 🔥 로그아웃 후 에러 모달 방지를 위한 추가 정리
+    if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+      console.log('[SIGNIN] 이전 에러 모달 상태 정리');
+      delete (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__;
+    }
+    
     // 이전 구글 로그인 상태 정리
     if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
       console.log('[SIGNIN] 이전 구글 로그인 상태 정리');
@@ -1688,10 +1714,23 @@ const SignInPage = () => {
       }
     }
     
-    // 로딩 상태 초기화
-          setIsLoading(false);
+    // 🔥 로그아웃 후 에러 상태 완전 초기화
+    setIsLoading(false);
     setError(null);
     setApiError('');
+    setShowErrorModal(false);
+    setErrorModalMessage('');
+    
+    // 🔥 URL에서 에러 파라미터 제거 (로그아웃 후 에러 모달 방지)
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('error')) {
+        console.log('[SIGNIN] URL에서 에러 파라미터 제거');
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('error');
+        window.history.replaceState({}, '', newUrl.toString());
+      }
+    }
     
     if (!componentMountedRef.current) {
       componentMountedRef.current = true;
@@ -1781,10 +1820,21 @@ const SignInPage = () => {
   //   }
   // }, []);
 
-  // URL 파라미터에서 에러 메시지 확인
+  // URL 파라미터에서 에러 메시지 확인 (로그아웃 후 에러 모달 방지)
   useEffect(() => {
     const error = searchParams.get('error');
     if (error) {
+      // 🔥 로그아웃 후 에러 모달 방지 - 컴포넌트 마운트 후 1초 이내의 에러는 무시
+      const timeSinceMount = Date.now() - (componentMountedRef.current ? 0 : Date.now());
+      if (timeSinceMount < 1000) {
+        console.log('[SIGNIN] 로그아웃 후 빠른 에러 감지 - 무시:', error);
+        // URL에서 error 파라미터만 제거
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('error');
+        window.history.replaceState({}, '', newUrl.toString());
+        return;
+      }
+      
       let errorMessage = '';
       switch (error) {
         case 'AccessDenied':
@@ -2607,6 +2657,9 @@ const SignInPage = () => {
     
     // 로딩 상태 해제
     setIsLoading(false);
+    
+    // 🔥 에러 모달 플래그 설정
+    (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
     
     // 에러 모달 표시
     setErrorModalMessage(message);

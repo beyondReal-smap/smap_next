@@ -37,6 +37,11 @@ class NavigationManagerImpl implements NavigationManager {
       return;
     }
 
+    // 🔥 로그아웃 후 에러 상태 완전 정리
+    if (typeof window !== 'undefined') {
+      (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = false;
+    }
+
     // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
     if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
       console.log('[NAVIGATION] 🚫 에러 모달 표시 중 - signin 리다이렉트 방지');

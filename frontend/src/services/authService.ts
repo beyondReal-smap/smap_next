@@ -329,7 +329,37 @@ class AuthService {
       
       // 쿠키에서도 토큰 삭제
       document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax';
-      console.log('[AUTH SERVICE] 로컬스토리지 및 쿠키 삭제 완료');
+      
+      // 🔥 Google SDK 토큰 캐시 정리 (로그아웃 후 재시도 문제 해결)
+      try {
+        if ((window as any).google?.accounts?.id) {
+          console.log('[AUTH SERVICE] Google SDK 토큰 캐시 정리 시작');
+          
+          // Google SDK의 내부 상태 초기화
+          (window as any).google.accounts.id.cancel();
+          
+          // 추가적인 캐시 정리
+          if ((window as any).google.accounts.id.disableAutoSelect) {
+            (window as any).google.accounts.id.disableAutoSelect();
+          }
+          
+          // Google SDK 재초기화 (캐시 완전 정리)
+          if ((window as any).google.accounts.id.initialize) {
+            const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-lamjiad6ljpa02fk30k6nh6arqq4rc4o.apps.googleusercontent.com';
+            (window as any).google.accounts.id.initialize({
+              client_id: clientId,
+              auto_select: false,
+              cancel_on_tap_outside: true
+            });
+          }
+          
+          console.log('[AUTH SERVICE] Google SDK 토큰 캐시 정리 완료');
+        }
+      } catch (googleError) {
+        console.warn('[AUTH SERVICE] Google SDK 캐시 정리 중 오류 (무시):', googleError);
+      }
+      
+      console.log('[AUTH SERVICE] 로컬스토리지, 쿠키, Google SDK 캐시 삭제 완료');
     }
   }
 
