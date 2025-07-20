@@ -1472,10 +1472,10 @@ const SignInPage = () => {
               } else {
                 throw new Error(data.error || 'Google 인증 실패');
               }
-            } catch (error) {
-              console.error('[GOOGLE SDK] 백엔드 인증 실패:', error);
-              showError('Google 로그인 처리 중 오류가 발생했습니다.');
-            } finally {
+                    } catch (error) {
+          console.error('[GOOGLE SDK] 백엔드 인증 실패:', error);
+          showError('Google 로그인에 실패했습니다.\n\n전화번호 로그인을 이용해주세요.');
+        } finally {
               setIsLoading(false);
               (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = false;
             }
@@ -1529,13 +1529,9 @@ const SignInPage = () => {
             // 실제 에러 메시지 생성
             let errorMessage = 'Google 로그인에 실패했습니다.';
             if (window.location.hostname.includes('.smap.site')) {
-              errorMessage += '\n\n프로덕션 환경에서 Google OAuth 설정을 확인해주세요.';
-              errorMessage += '\n\n해결 방법:';
-              errorMessage += '\n1. Google Cloud Console에서 도메인 등록 확인';
-              errorMessage += '\n2. Client ID 설정 확인';
-              errorMessage += '\n3. 전화번호 로그인 사용';
+              errorMessage = 'Google 로그인을 사용할 수 없습니다.\n\n전화번호 로그인을 이용해주세요.';
             } else {
-              errorMessage += '\n\n다시 시도하거나 전화번호 로그인을 사용해주세요.';
+              errorMessage = 'Google 로그인에 실패했습니다.\n\n다시 시도하거나 전화번호 로그인을 사용해주세요.';
             }
             
             // 실제 에러의 경우 에러 모달 표시
@@ -1570,7 +1566,7 @@ const SignInPage = () => {
           }, 100);
         } catch (error) {
           console.error('[GOOGLE SDK] Prompt 호출 실패:', error);
-          showError('Google 로그인 팝업을 열 수 없습니다.');
+          showError('Google 로그인을 사용할 수 없습니다.\n\n전화번호 로그인을 이용해주세요.');
           setIsLoading(false);
           (window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__ = false;
         }
@@ -1651,7 +1647,7 @@ const SignInPage = () => {
           }
         }
         
-        throw new Error('Google Identity Services를 사용할 수 없습니다.');
+        throw new Error('Google 로그인을 사용할 수 없습니다.');
       }
       
     } catch (error: any) {
@@ -2532,14 +2528,13 @@ const SignInPage = () => {
       console.log('[SIGNIN] 원본 에러 메시지:', errorMessage);
       
       // 사용자 친화적 에러 메시지 변환
-      if (errorMessage.includes('아이디') || errorMessage.includes('ID')) {
-        errorMessage = '등록되지 않은 전화번호입니다.';
-      } else if (errorMessage.includes('비밀번호') || errorMessage.includes('password')) {
-        errorMessage = '비밀번호가 일치하지 않습니다.';
-      } else if (errorMessage.includes('네트워크') || errorMessage.includes('network')) {
+      if (errorMessage.includes('네트워크') || errorMessage.includes('network') || errorMessage.includes('연결') || errorMessage.includes('timeout')) {
         errorMessage = '네트워크 연결을 확인하고 다시 시도해주세요.';
-      } else if (errorMessage.includes('서버') || errorMessage.includes('server')) {
+      } else if (errorMessage.includes('서버') || errorMessage.includes('server') || errorMessage.includes('오류') || errorMessage.includes('error')) {
         errorMessage = '서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.';
+      } else {
+        // 로그인 실패의 경우 (아이디/비밀번호 오류 포함) - 구체적인 원인을 알려주지 않음
+        errorMessage = '전화번호 또는 비밀번호를 확인해주세요.';
       }
       
       console.log('[SIGNIN] 🔥 변환된 에러 메시지:', errorMessage);
@@ -3470,7 +3465,6 @@ const SignInPage = () => {
               delay: 1.8,
               duration: 0.8
             }}
-            whileHover={{ scale: 1.02 }}
           >
             <label className="block text-sm font-medium text-gray-700 mb-1">
               전화번호
@@ -3524,7 +3518,6 @@ const SignInPage = () => {
               delay: 2.0,
               duration: 0.8
             }}
-            whileHover={{ scale: 1.02 }}
           >
             <label className="block text-sm font-medium text-gray-700 mb-1">
               비밀번호
@@ -3579,7 +3572,6 @@ const SignInPage = () => {
             delay: 2.2,
             duration: 0.8
           }}
-          whileHover={{ scale: 1.02 }}
         >
           <button
             type="submit"
@@ -3767,9 +3759,9 @@ const SignInPage = () => {
                 </p>
                 
                 {/* 추가 안내 */}
-                <p className="text-sm text-gray-500 text-center mb-6">
+                {/* <p className="text-sm text-gray-500 text-center mb-6">
                   전화번호는 유지되며, 비밀번호만 다시 입력해주세요.
-                </p>
+                </p> */}
                 
                 {/* 확인 버튼 */}
                 <button

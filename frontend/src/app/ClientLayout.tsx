@@ -14,7 +14,7 @@ import { useMapPreloader } from '@/hooks/useMapPreloader';
 // import PerformanceMonitor from '@/components/PerformanceMonitor';
 
 // 인증이 필요하지 않은 페이지들 (루트 페이지는 자체적으로 리다이렉트 처리)
-const PUBLIC_ROUTES = ['/signin', '/register', '/login', '/social-login', '/', '/group'];
+const PUBLIC_ROUTES = ['/signin', '/register', '/register/new-page', '/login', '/social-login', '/', '/group'];
 
 // 그룹 가입 페이지는 공개 페이지로 처리 (인증 없이도 접근 가능)
 const isGroupJoinPage = (pathname: string) => {

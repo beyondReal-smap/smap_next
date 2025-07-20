@@ -1203,33 +1203,24 @@ export default function RegisterPage() {
             <AnimatePresence mode="wait">
           {/* 약관 동의 단계 */}
           {currentStep === REGISTER_STEPS.TERMS && (
-            /iPad|iPhone|iPod/.test(navigator.userAgent) ? (
-              // iOS: 애니메이션 없이 바로 표시
-              <div
-                key="terms-ios"
-                className="w-full h-full flex flex-col"
-                style={{
-                  opacity: 1,
-                  transform: 'none',
-                  position: 'relative'
-                }}
-              >
-              <div 
-                className="text-center register-header"
-                style={{
-                  marginBottom: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '0' : '16px' // iOS에서만 마진 제거
-                }}
-              >
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
-                  <FiFileText className="w-6 h-6 text-white" />
+            <motion.div
+              key="terms"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              className="space-y-3"
+            >
+              <div className="text-center mb-4">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                  <FiFileText className="w-5 h-5 text-white" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">
+                <h2 className="text-lg font-bold text-gray-900 mb-1">
                   {registerData.isSocialLogin ? 
                     `${registerData.socialProvider === 'google' ? '구글' : '카카오'} 회원가입` : 
                     '서비스 이용약관'
                   }
                 </h2>
-                <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
+                <p className="text-xs text-gray-600">
                   {registerData.isSocialLogin ? 
                     `${registerData.socialProvider === 'google' ? '구글' : '카카오'} 계정으로 간편 회원가입을 진행합니다` :
                     'SMAP 서비스 이용을 위해 약관에 동의해주세요'
@@ -1237,7 +1228,7 @@ export default function RegisterPage() {
                 </p>
                 {registerData.isSocialLogin && (
                   <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-xs text-blue-700" style={{ wordBreak: 'keep-all' }}>
+                    <p className="text-xs text-blue-700">
                       📧 <strong>{registerData.mt_email}</strong><br/>
                       전화번호 인증 없이 간편하게 가입할 수 있습니다
                     </p>
@@ -1245,180 +1236,44 @@ export default function RegisterPage() {
                 )}
               </div>
 
-              <div className="flex-1 overflow-y-auto pb-4 register-form" style={{
-                paddingTop: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '0px' : '20px' // iOS에서는 패딩 제거
-              }}>
-                <div className="terms-agreement-section">
-                  {/* 전체 동의 */}
-                  <div className="terms-card terms-all-agree">
-                    <label className="block cursor-pointer w-full">
-                      <div className="terms-checkbox-container">
-                        <div className="terms-checkbox-wrapper">
-                          <input
-                            type="checkbox"
-                            checked={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)}
-                            onChange={(e) => handleAllAgree(e.target.checked)}
-                            className="sr-only"
-                          />
-                          <div className={`terms-checkbox ${
-                            TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) ? 'checked' : ''
-                          }`}>
-                            {TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) && (
-                              <FiCheck className="w-3 h-3 text-white" />
-                            )}
-                          </div>
+              {/* 전체 동의 */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)}
+                    onChange={(e) => handleAllAgree(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded"
+                  />
+                  <span className="font-medium text-gray-900 text-sm">전체 동의</span>
+                </label>
+              </div>
+
+              {/* 개별 약관 */}
+              <div className="space-y-2">
+                {TERMS_DATA.map((term) => (
+                  <div key={term.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={registerData[term.id as keyof RegisterData] as boolean}
+                        onChange={(e) => handleTermAgree(term.id, e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium text-gray-900 truncate">{term.title}</span>
+                          {term.required && (
+                            <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full flex-shrink-0">필수</span>
+                          )}
                         </div>
-                        <div className="terms-content-wrapper">
-                          <span className="font-semibold text-gray-900">전체 동의</span>
-                        </div>
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{term.content}</p>
                       </div>
                     </label>
                   </div>
-
-                  {/* 개별 약관 */}
-                  {TERMS_DATA.map((term) => (
-                    <div key={term.id} className="terms-card">
-                      <label className="block cursor-pointer w-full">
-                        <div className="terms-checkbox-container">
-                          <div className="terms-checkbox-wrapper">
-                            <input
-                              type="checkbox"
-                              checked={registerData[term.id as keyof RegisterData] as boolean}
-                              onChange={(e) => handleTermAgree(term.id, e.target.checked)}
-                              className="sr-only"
-                            />
-                            <div className={`terms-checkbox ${
-                              registerData[term.id as keyof RegisterData] ? 'checked' : ''
-                            }`}>
-                              {registerData[term.id as keyof RegisterData] && (
-                                <FiCheck className="w-3 h-3 text-white" />
-                              )}
-                            </div>
-                          </div>
-                                                     <div className="terms-content-wrapper">
-                             <div className="flex items-center space-x-2 mb-1">
-                               <span className="text-sm font-medium text-gray-900">{term.title}</span>
-                               {term.required && (
-                                 <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">필수</span>
-                               )}
-                             </div>
-                             <p className="text-xs text-gray-500" style={{ wordBreak: 'keep-all' }}>{term.content}</p>
-                           </div>
-                         </div>
-                       </label>
-                     </div>
-                   ))}
-                 </div>
-               </div>
+                ))}
               </div>
-            ) : (
-              // 안드로이드: 기존 애니메이션 유지
-              <motion.div
-                key="terms"
-                initial={{ opacity: 0, x: 50 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -50 }}
-                transition={{ duration: 0.5, ease: "easeInOut" }}
-                className="w-full h-full flex flex-col"
-              >
-                <div 
-                  className="text-center register-header"
-                  style={{
-                    marginBottom: /iPad|iPhone|iPod/.test(navigator.userAgent) ? '0' : '16px'
-                  }}
-                >
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
-                    <FiFileText className="w-6 h-6 text-white" />
-                  </div>
-                  <h2 className="text-xl font-bold text-gray-900 mb-1">
-                    {registerData.isSocialLogin ? 
-                      `${registerData.socialProvider === 'google' ? '구글' : '카카오'} 회원가입` : 
-                      '서비스 이용약관'
-                    }
-                  </h2>
-                  <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
-                    {registerData.isSocialLogin ? 
-                      `${registerData.socialProvider === 'google' ? '구글' : '카카오'} 계정으로 간편 회원가입을 진행합니다` :
-                      'SMAP 서비스 이용을 위해 약관에 동의해주세요'
-                    }
-                  </p>
-                  {registerData.isSocialLogin && (
-                    <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <p className="text-xs text-blue-700" style={{ wordBreak: 'keep-all' }}>
-                        📧 <strong>{registerData.mt_email}</strong><br/>
-                        전화번호 인증 없이 간편하게 가입할 수 있습니다
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                                  <div className="flex-1 overflow-y-auto pb-4 register-form" style={{
-                    paddingTop: '20px'
-                  }}>
-                    <div className="terms-agreement-section">
-                    {/* 전체 동의 */}
-                                          <div className="terms-card terms-all-agree">
-                      <label className="block cursor-pointer w-full">
-                        <div className="terms-checkbox-container">
-                          <div className="terms-checkbox-wrapper">
-                            <input
-                              type="checkbox"
-                              checked={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)}
-                              onChange={(e) => handleAllAgree(e.target.checked)}
-                              className="sr-only"
-                            />
-                            <div className={`terms-checkbox ${
-                              TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) ? 'checked' : ''
-                            }`}>
-                              {TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) && (
-                                <FiCheck className="w-3 h-3 text-white" />
-                              )}
-                            </div>
-                          </div>
-                          <div className="terms-content-wrapper">
-                            <span className="font-semibold text-gray-900">전체 동의</span>
-                          </div>
-                        </div>
-                      </label>
-                    </div>
-
-                    {/* 개별 약관 */}
-                    {TERMS_DATA.map((term) => (
-                      <div key={term.id} className="terms-card">
-                        <label className="block cursor-pointer w-full">
-                          <div className="terms-checkbox-container">
-                            <div className="terms-checkbox-wrapper">
-                              <input
-                                type="checkbox"
-                                checked={registerData[term.id as keyof RegisterData] as boolean}
-                                onChange={(e) => handleTermAgree(term.id, e.target.checked)}
-                                className="sr-only"
-                              />
-                              <div className={`terms-checkbox ${
-                                registerData[term.id as keyof RegisterData] ? 'checked' : ''
-                              }`}>
-                                {registerData[term.id as keyof RegisterData] && (
-                                  <FiCheck className="w-3 h-3 text-white" />
-                                )}
-                              </div>
-                            </div>
-                            <div className="terms-content-wrapper">
-                              <div className="flex items-center space-x-2 mb-1">
-                                <span className="text-sm font-medium text-gray-900">{term.title}</span>
-                                {term.required && (
-                                  <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">필수</span>
-                                )}
-                              </div>
-                              <p className="text-xs text-gray-500" style={{ wordBreak: 'keep-all' }}>{term.content}</p>
-                            </div>
-                          </div>
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            )
+            </motion.div>
           )}
 
           {/* 전화번호 입력 단계 */}
