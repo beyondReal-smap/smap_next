@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 
 interface AnimatedHeaderProps {
   children: React.ReactNode;
@@ -9,7 +10,7 @@ interface AnimatedHeaderProps {
   duration?: number;
 }
 
-// iOS WebView 완벽 호환 고정 헤더 (애니메이션 제거)
+// iOS WebView 완벽 호환 고정 헤더 (애니메이션 포함)
 const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
   children,
   className = 'glass-effect header-fixed',
@@ -40,9 +41,7 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
     willChange: 'auto',
     WebkitBackfaceVisibility: 'hidden',
     backfaceVisibility: 'hidden',
-    // 항상 표시되도록 강제 설정
-    opacity: 1,
-    visibility: 'visible',
+    // 애니메이션을 위해 opacity와 visibility 제거
     display: 'flex',
     alignItems: 'center',
     // 모든 여백 완전 제거
@@ -59,13 +58,35 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
     ...style
   };
 
+  // 애니메이션 변형
+  const animationVariants = {
+    simple: {
+      initial: { opacity: 0, x: -30 },
+      animate: { opacity: 1, x: 0 },
+      exit: { opacity: 0, x: -30 },
+      transition: { duration: 0.5, delay }
+    },
+    enhanced: {
+      initial: { opacity: 0, y: -20, scale: 0.95 },
+      animate: { opacity: 1, y: 0, scale: 1 },
+      exit: { opacity: 0, y: -20, scale: 0.95 },
+      transition: { duration, delay }
+    }
+  };
+
+  const currentVariant = animationVariants[variant];
+
   return (
-    <header
+    <motion.header
       className={className}
       style={fixedHeaderStyle}
+      initial={currentVariant.initial}
+      animate={currentVariant.animate}
+      exit={currentVariant.exit}
+      transition={currentVariant.transition}
     >
       {children}
-    </header>
+    </motion.header>
   );
 };
 

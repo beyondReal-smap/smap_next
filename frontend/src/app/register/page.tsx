@@ -113,12 +113,20 @@ export default function RegisterPage() {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     
     if (isIOS) {
-      // iOS에서는 CSS가 완전히 로드될 때까지 대기
-      const timer = setTimeout(() => {
-        setIsIOSReady(true);
-      }, 100);
+      // iOS에서는 더 긴 대기 시간과 DOMContentLoaded 이벤트 대기
+      const handleIOSReady = () => {
+        // DOM이 완전히 로드된 후 추가 대기
+        setTimeout(() => {
+          setIsIOSReady(true);
+        }, 300);
+      };
       
-      return () => clearTimeout(timer);
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', handleIOSReady);
+        return () => document.removeEventListener('DOMContentLoaded', handleIOSReady);
+      } else {
+        handleIOSReady();
+      }
     } else {
       // 안드로이드/데스크탑에서는 즉시 표시
       setIsIOSReady(true);
@@ -159,11 +167,44 @@ export default function RegisterPage() {
       @supports (-webkit-touch-callout: none) {
         .register-content-area {
           opacity: 0;
-          transition: opacity 0.3s ease;
+          visibility: hidden;
+          transition: opacity 0.5s ease, visibility 0.5s ease;
         }
         
         .register-content-area.ios-ready {
           opacity: 1;
+          visibility: visible;
+        }
+        
+        /* iOS에서 체크박스 렌더링 안정화 */
+        input[type="checkbox"] {
+          -webkit-appearance: none;
+          appearance: none;
+          background-color: #fff;
+          border: 2px solid #d1d5db;
+          border-radius: 4px;
+          display: inline-block;
+          position: relative;
+          width: 16px;
+          height: 16px;
+          flex-shrink: 0;
+        }
+        
+        input[type="checkbox"]:checked {
+          background-color: #0113A3;
+          border-color: #0113A3;
+        }
+        
+        input[type="checkbox"]:checked::after {
+          content: '';
+          position: absolute;
+          left: 4px;
+          top: 1px;
+          width: 4px;
+          height: 8px;
+          border: solid white;
+          border-width: 0 2px 2px 0;
+          transform: rotate(45deg);
         }
       }
     `;
@@ -1178,6 +1219,18 @@ export default function RegisterPage() {
     }
   };
 
+  // iOS에서 로딩 중일 때 로딩 화면 표시
+  if (!isIOSReady && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-white">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 text-sm">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`register-content-area ${isIOSReady ? 'ios-ready' : ''}`}>
       {/* 진행률 바 - 상단 고정 */}
@@ -1243,7 +1296,7 @@ export default function RegisterPage() {
                     type="checkbox"
                     checked={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)}
                     onChange={(e) => handleAllAgree(e.target.checked)}
-                    className="w-4 h-4 text-blue-600 rounded"
+                    className="w-4 h-4 rounded"
                   />
                   <span className="font-medium text-gray-900 text-sm">전체 동의</span>
                 </label>
@@ -1258,7 +1311,7 @@ export default function RegisterPage() {
                         type="checkbox"
                         checked={registerData[term.id as keyof RegisterData] as boolean}
                         onChange={(e) => handleTermAgree(term.id, e.target.checked)}
-                        className="w-4 h-4 text-blue-600 rounded flex-shrink-0"
+                        className="w-4 h-4 rounded flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-2">
@@ -1286,7 +1339,7 @@ export default function RegisterPage() {
               className="w-full h-full flex flex-col justify-center"
             >
               <div className="text-center mb-6">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
                   <FiPhone className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">전화번호 인증</h2>
@@ -1354,7 +1407,7 @@ export default function RegisterPage() {
               className="w-full h-full flex flex-col justify-center"
             >
               <div className="text-center mb-6">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
                   <FiShield className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">인증번호 입력</h2>
@@ -1505,7 +1558,7 @@ export default function RegisterPage() {
               className="w-full h-full flex flex-col"
             >
               <div className="text-center mb-4">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
                   <FiUser className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">기본 정보</h2>
@@ -1745,7 +1798,7 @@ export default function RegisterPage() {
               className="w-full h-full flex flex-col justify-center"
             >
               <div className="text-center mb-6">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
                   <FiHeart className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">프로필 정보</h2>
@@ -1830,7 +1883,7 @@ export default function RegisterPage() {
               className="w-full h-full flex flex-col justify-center"
             >
               <div className="text-center mb-6">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
                   <FiMapPin className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">위치 정보</h2>
@@ -1966,7 +2019,7 @@ export default function RegisterPage() {
                 transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
                 className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6"
               >
-                <FiCheck className="w-12 h-12 text-white" />
+                <FiCheck className="w-10 h-10 text-white" />
               </motion.div>
               
               <motion.div
@@ -2166,7 +2219,7 @@ export default function RegisterPage() {
               <div className="p-6">
                                   {/* 헤더 */}
                   <div className="text-center mb-4">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
                       <FiCalendar className="w-6 h-6 text-white" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 mb-1">생년월일 선택</h3>

@@ -64,7 +64,21 @@ body {
 }
 
 /* === 헤더(상단바) 위쪽 여백 제거 === */
-header, .header-fixed, [role="banner"], .glass-effect, .home-header, .group-header, .schedule-header, .logs-header, .location-header {
+header, [role="banner"], .glass-effect, .home-header, .group-header, .schedule-header, .logs-header, .location-header {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* 헤더 고정 스타일 강화 */
+.header-fixed {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 20 !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(10px) !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
   padding-top: 0 !important;
   margin-top: 0 !important;
 }
@@ -2041,28 +2055,127 @@ body[data-page="/setting/terms"] .schedule-page-content {
   /* margin-top: 20px !important; */
 }
 
-/* 헤더 높이에 맞춘 컨텐츠 간격 */
-body[data-page="/setting/terms"] .px-4.space-y-6 {
-  padding-top: 90px !important;
-  /* margin-top: 20px !important; */
-}
-
-/* iOS safe area 고려 */
-@supports (padding-top: env(safe-area-inset-top)) {
-  body[data-page="/setting/terms"] .px-4.space-y-6 {
-    padding-top: calc(90px + env(safe-area-inset-top)) !important;
-  }
-}
-
-body[data-page="/setting/terms"] .setting-header {
-  z-index: 9999 !important;
+/* setting/terms 페이지 헤더 고정 강화 */
+body[data-page="/setting/terms"] .header-fixed {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
+  z-index: 20 !important;
   background-color: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(10px) !important;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+/* setting/terms 페이지 메인 콘텐츠 패딩 */
+body[data-page="/setting/terms"] .pt-20 {
+  padding-top: 5rem !important;
+}
+
+/* iOS safe area 고려 */
+@supports (padding-top: env(safe-area-inset-top)) {
+  body[data-page="/setting/terms"] .pt-20 {
+    padding-top: calc(5rem + env(safe-area-inset-top)) !important;
+  }
+}
+
+/* 기존 setting-header 스타일 무효화 */
+body[data-page="/setting/terms"] .setting-header {
+  /* 모든 스타일 무효화 - 위의 새로운 스타일이 적용됨 */
+}
+
+/* ===== SETTING/TERMS 페이지 헤더 고정 - 모든 충돌 제거 ===== */
+/* 기존 모든 setting/terms 관련 스타일 무효화 */
+body[data-page="/setting/terms"] * {
+  position: static !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  will-change: auto !important;
+}
+
+/* 헤더만 완전 고정 */
+body[data-page="/setting/terms"] .header-fixed,
+body[data-page="/setting/terms"] .fixed.top-0.left-0.right-0.z-20.glass-effect.header-fixed,
+body[data-page="/setting/terms"] .AnimatedHeader,
+body[data-page="/setting/terms"] [data-framer-component-type="AnimatedHeader"],
+body[data-page="/setting/terms"] header,
+body[data-page="/setting/terms"] .glass-effect,
+body[data-page="/setting/terms"] .setting-header,
+body[data-page="/setting/terms"] .setting-header-content {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 99999 !important;
+  width: 100vw !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+/* 헤더 내부 요소들 고정 */
+body[data-page="/setting/terms"] .header-fixed *,
+body[data-page="/setting/terms"] .fixed.top-0.left-0.right-0.z-20.glass-effect.header-fixed *,
+body[data-page="/setting/terms"] .AnimatedHeader *,
+body[data-page="/setting/terms"] .setting-header * {
+  position: static !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  will-change: auto !important;
+}
+
+/* 메인 콘텐츠 패딩 조정 */
+body[data-page="/setting/terms"] .px-4.pt-20.space-y-6.pb-24 {
+  padding-top: 5rem !important;
+  margin-top: 0 !important;
+}
+
+/* 최강 헤더 고정 - 모든 것을 덮어씀 */
+body[data-page="/setting/terms"] .fixed.top-0.left-0.right-0.z-20.glass-effect.header-fixed {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 999999 !important;
+  width: 100vw !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
 }
 body[data-page="/setting"] .setting-main-content,
 html[data-page="/setting"] .setting-main-content,
@@ -2098,70 +2211,155 @@ html[data-page="/setting"] .setting-main-content,
   -webkit-overflow-scrolling: touch !important;
 }
 
-/* setting/notice 페이지 컨테이너 스타일 (setting 페이지와 동일) */
-#setting-notice-page-container {
+/* setting/notice 페이지 - notice 페이지와 동일한 헤더 고정 */
+/* notice 페이지의 헤더 고정 스타일을 그대로 적용 */
+body[data-page="/setting/notice"] .header-fixed,
+body[data-page="/setting/notice"] header,
+body[data-page="/setting/notice"] .notice-header,
+body[data-page="/setting/notice"] .fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  bottom: 0 !important;
-  overflow: hidden !important;
-  z-index: 1 !important;
-}
-
-#setting-notice-page-container .content-area {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  overflow-y: auto !important;
-  padding-top: 80px !important;
-  -webkit-overflow-scrolling: touch !important;
-}
-
-/* setting/notice 페이지 헤더 버튼 정렬 강화 */
-#setting-notice-page-container .header-fixed button {
+  width: 100vw !important;
+  z-index: 2147483647 !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  padding: 0 !important;
+  margin: 0 !important;
   display: flex !important;
   align-items: center !important;
-  justify-content: center !important;
-  width: 40px !important;
-  height: 40px !important;
-  min-width: 40px !important;
-  min-height: 40px !important;
-  max-width: 40px !important;
-  max-height: 40px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  outline: none !important;
-  background: transparent !important;
-  cursor: pointer !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
   user-select: none !important;
   -webkit-user-select: none !important;
   touch-action: manipulation !important;
+  pointer-events: auto !important;
 }
 
-#setting-notice-page-container .header-fixed button svg {
-  width: 20px !important;
-  height: 20px !important;
-  min-width: 20px !important;
-  min-height: 20px !important;
-  max-width: 20px !important;
-  max-height: 20px !important;
-  display: block !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  line-height: 1 !important;
-  vertical-align: middle !important;
-  flex-shrink: 0 !important;
-  flex-grow: 0 !important;
+/* setting/notice 페이지 메인 컨텐츠 영역 여백 조정 */
+body[data-page="/setting/notice"] .notice-main-content {
+  padding-top: 80px !important;
+  margin-top: 0 !important;
 }
 
-/* setting/notice 페이지 헤더 패딩 제거 */
-#setting-notice-page-container .header-fixed {
+/* setting/notice 페이지 강제 스타일 오버라이드 */
+body[data-page="/setting/notice"] * {
+  box-sizing: border-box !important;
+}
+
+/* 전역 헤더 고정 - data-page 없이도 작동 */
+.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 2147483647 !important;
+  width: 100vw !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
   padding: 0 !important;
   margin: 0 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+}
+
+/* 모든 부모 요소의 transform 무효화 */
+.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header *,
+.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header {
+  transform: none !important;
+  -webkit-transform: none !important;
+  -moz-transform: none !important;
+  -ms-transform: none !important;
+  position: static !important;
+}
+
+/* 헤더만 고정 유지 */
+.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 2147483647 !important;
+  width: 100vw !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+}
+
+/* 최강 헤더 고정 - 모든 것을 덮어씀 */
+header.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header,
+div.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header,
+[data-framer-component-type="AnimatedHeader"].fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 2147483647 !important;
+  width: 100vw !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
 }
 
 #setting-notice-page-container .header-fixed > div {
@@ -2420,4 +2618,673 @@ html[data-page="/setting"] .setting-main-content,
 
 .register-new-page-bottom-buttons * {
   position: relative !important;
+}
+
+/* setting/notice 페이지 컨테이너 스타일 (inquiry 페이지와 동일) */
+#setting-notice-page-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+#setting-notice-page-container .content-area {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow-y: auto !important;
+  padding-top: 80px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* setting/notice 페이지 헤더 버튼 정렬 강화 */
+#setting-notice-page-container .header-fixed button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+#setting-notice-page-container .header-fixed button svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* setting/notice 페이지 헤더 패딩 제거 */
+#setting-notice-page-container .header-fixed {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#setting-notice-page-container .header-fixed > div {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* setting/notice 페이지 헤더 텍스트 정렬 강화 */
+#setting-notice-page-container .header-fixed h1,
+#setting-notice-page-container .header-fixed p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  display: block !important;
+}
+
+#setting-notice-page-container .header-fixed .flex.flex-col {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+}
+
+/* setting/notice 페이지 뒤로가기 버튼과 텍스트 상하 정렬 */
+#setting-notice-page-container .header-fixed .flex.items-center.space-x-3 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* setting/inquiry2 페이지 컨테이너 스타일 (setting/notice 페이지와 동일) */
+#setting-inquiry2-page-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+#setting-inquiry2-page-container .content-area {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow-y: auto !important;
+  padding-top: 80px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* setting/inquiry2 페이지 헤더 버튼 정렬 강화 */
+#setting-inquiry2-page-container .header-fixed button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+#setting-inquiry2-page-container .header-fixed button svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* setting/inquiry2 페이지 헤더 패딩 제거 */
+#setting-inquiry2-page-container .header-fixed {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#setting-inquiry2-page-container .header-fixed > div {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* setting/inquiry2 페이지 헤더 텍스트 정렬 강화 */
+#setting-inquiry2-page-container .header-fixed h1,
+#setting-inquiry2-page-container .header-fixed p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  display: block !important;
+}
+
+#setting-inquiry2-page-container .header-fixed .flex.flex-col {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+}
+
+/* setting/inquiry2 페이지 뒤로가기 버튼과 텍스트 상하 정렬 */
+#setting-inquiry2-page-container .header-fixed .flex.items-center.space-x-3 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 고정 스타일 */
+body[data-page="/setting/notice/[id]"] .header-fixed,
+body[data-page="/setting/notice/[id]"] header,
+body[data-page="/setting/notice/[id]"] .notice-header,
+body[data-page="/setting/notice/[id]"] .fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  z-index: 2147483647 !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+}
+
+/* setting/notice/[id] 페이지 메인 컨텐츠 영역 여백 조정 */
+body[data-page="/setting/notice/[id]"] .notice-main-content {
+  padding-top: 80px !important;
+  margin-top: 0 !important;
+}
+
+/* setting/notice/[id] 페이지 강제 스타일 오버라이드 */
+body[data-page="/setting/notice/[id]"] * {
+  box-sizing: border-box !important;
+}
+
+/* 전역 헤더 고정 - data-page 없이도 작동 */
+.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 2147483647 !important;
+  width: 100vw !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+}
+
+/* setting/notice/[id] 페이지 컨테이너 스타일 */
+body[data-page="/setting/notice/[id]"] .min-h-screen {
+  position: static !important;
+  overflow: visible !important;
+  transform: none !important;
+  will-change: auto !important;
+  perspective: none !important;
+  backface-visibility: visible !important;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  z-index: auto !important;
+  background: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  display: block !important;
+  height: auto !important;
+  width: auto !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 버튼 정렬 강화 */
+body[data-page="/setting/notice/[id]"] .header-fixed button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+body[data-page="/setting/notice/[id]"] .header-fixed button svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 패딩 제거 */
+body[data-page="/setting/notice/[id]"] .header-fixed {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+body[data-page="/setting/notice/[id]"] .header-fixed > div {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 텍스트 정렬 강화 */
+body[data-page="/setting/notice/[id]"] .header-fixed h1,
+body[data-page="/setting/notice/[id]"] .header-fixed p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  display: block !important;
+}
+
+body[data-page="/setting/notice/[id]"] .header-fixed .flex.flex-col {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+}
+
+/* setting/notice/[id] 페이지 뒤로가기 버튼과 텍스트 상하 정렬 */
+body[data-page="/setting/notice/[id]"] .header-fixed .flex.items-center.space-x-3 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* setting/notice/[id] 페이지 뒤로가기 버튼과 텍스트 간격 조정 (data-page 버전) */
+body[data-page="/setting/notice/[id]"] .header-fixed .flex.items-center.space-x-3 > * {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body[data-page="/setting/notice/[id]"] .header-fixed .flex.items-center.space-x-3 button {
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
+body[data-page="/setting/notice/[id]"] .header-fixed .flex.items-center.space-x-3 div {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* setting/notice/[id] 페이지 컨테이너 스타일 (setting/notice 페이지와 동일) */
+#setting-notice-detail-page-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+#setting-notice-detail-page-container .notice-main-content {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow-y: auto !important;
+  padding-top: 80px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 버튼 정렬 강화 */
+#setting-notice-detail-page-container .header-fixed button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+#setting-notice-detail-page-container .header-fixed button svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 패딩 제거 */
+#setting-notice-detail-page-container .header-fixed {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#setting-notice-detail-page-container .header-fixed > div {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 텍스트 정렬 강화 */
+#setting-notice-detail-page-container .header-fixed h1,
+#setting-notice-detail-page-container .header-fixed p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  display: block !important;
+}
+
+#setting-notice-detail-page-container .header-fixed .flex.flex-col {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+}
+
+/* setting/notice/[id] 페이지 뒤로가기 버튼과 텍스트 상하 정렬 */
+#setting-notice-detail-page-container .header-fixed .flex.items-center.space-x-3 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* setting/notice/[id] 페이지 뒤로가기 버튼과 텍스트 간격 조정 */
+#setting-notice-detail-page-container .header-fixed .flex.items-center.space-x-3 > * {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#setting-notice-detail-page-container .header-fixed .flex.items-center.space-x-3 button {
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
+#setting-notice-detail-page-container .header-fixed .flex.items-center.space-x-3 div {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* setting/inquiry2 페이지 헤더 고정 스타일 */
+body[data-page="/setting/inquiry2"] .header-fixed,
+body[data-page="/setting/inquiry2"] header,
+body[data-page="/setting/inquiry2"] .inquiry2-header,
+body[data-page="/setting/inquiry2"] .fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.inquiry2-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  z-index: 2147483647 !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+}
+
+/* setting/inquiry2 페이지 메인 컨텐츠 영역 여백 조정 */
+body[data-page="/setting/inquiry2"] .inquiry2-main-content {
+  padding-top: 80px !important;
+  margin-top: 0 !important;
+}
+
+/* setting/inquiry2 페이지 강제 스타일 오버라이드 */
+body[data-page="/setting/inquiry2"] * {
+  box-sizing: border-box !important;
+}
+
+/* 전역 헤더 고정 - data-page 없이도 작동 */
+.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.inquiry2-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 2147483647 !important;
+  width: 100vw !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+}
+
+/* notice-header-fixed 클래스 강화 (globals.css) */
+.notice-header-fixed {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: auto !important;
+  z-index: 2147483647 !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  -moz-transform: none !important;
+  -ms-transform: none !important;
+  -o-transform: none !important;
+  will-change: auto !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
+  perspective: none !important;
+  -webkit-perspective: none !important;
+  touch-action: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  pointer-events: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+  width: 100vw !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  display: flex !important;
+  align-items: center !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* 부모 요소의 transform 초기화 (globals.css) */
+#setting-notice-page-container {
+  transform: none !important;
+  -webkit-transform: none !important;
+  -moz-transform: none !important;
+  -ms-transform: none !important;
+  -o-transform: none !important;
+  perspective: none !important;
+  -webkit-perspective: none !important;
+}
+
+/* 모든 부모 요소의 transform 초기화 (globals.css) */
+#setting-notice-page-container * {
+  transform: none !important;
+  -webkit-transform: none !important;
+  -moz-transform: none !important;
+  -ms-transform: none !important;
+  -o-transform: none !important;
+}
+
+/* 헤더만 예외적으로 고정 (globals.css) */
+#setting-notice-page-container .notice-header-fixed {
+  position: fixed !important;
+  transform: none !important;
+  -webkit-transform: none !important;
+  -moz-transform: none !important;
+  -ms-transform: none !important;
+  -o-transform: none !important;
 }

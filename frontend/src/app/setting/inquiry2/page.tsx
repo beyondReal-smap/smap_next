@@ -1,18 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { 
-  FiBell, 
-  FiCalendar, 
-  FiChevronRight,
-  FiEye,
-  FiFileText
-} from 'react-icons/fi';
-import { useAuth } from '@/contexts/AuthContext';
-import { hapticFeedback, triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FiBell, FiCalendar, FiChevronLeft } from 'react-icons/fi';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import AnimatedHeader from '../../../components/common/AnimatedHeader';
 
 // 공지사항 인터페이스
@@ -217,64 +210,10 @@ body, html {
 
 export default function NoticePage() {
   const router = useRouter();
-  const { user } = useAuth();
   const [notices, setNotices] = useState<Notice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [isAtTop, setIsAtTop] = useState(true);
-  const [isAtBottom, setIsAtBottom] = useState(false);
-  const mainRef = useRef<HTMLElement>(null);
-
-  // 스크롤 위치 감지
-  const handleScroll = () => {
-    if (!mainRef.current) return;
-    
-    const { scrollTop, scrollHeight, clientHeight } = mainRef.current;
-    
-    // 상단에 있는지 확인
-    setIsAtTop(scrollTop <= 0);
-    
-    // 하단에 있는지 확인 (1px 여유)
-    const isBottom = scrollTop + clientHeight >= scrollHeight - 1;
-    setIsAtBottom(isBottom);
-  };
-
-  // 터치 이벤트 방지
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (!mainRef.current) return;
-    
-    const { scrollTop, scrollHeight, clientHeight } = mainRef.current;
-    const touch = e.touches[0];
-    const startY = touch.clientY;
-    
-    const handleTouchMove = (e: TouchEvent) => {
-      const currentY = e.touches[0].clientY;
-      const deltaY = currentY - startY;
-      
-      // 상단에서 위로 스크롤하려고 할 때
-      if (scrollTop <= 0 && deltaY > 0) {
-        e.preventDefault();
-        return;
-      }
-      
-      // 하단에서 아래로 스크롤하려고 할 때
-      if (scrollTop + clientHeight >= scrollHeight - 1 && deltaY < 0) {
-        e.preventDefault();
-        return;
-      }
-    };
-    
-    const handleTouchEnd = () => {
-      document.removeEventListener('touchmove', handleTouchMove);
-      document.removeEventListener('touchend', handleTouchEnd);
-    };
-    
-    document.addEventListener('touchmove', handleTouchMove);
-    document.addEventListener('touchend', handleTouchEnd);
-  };
 
   // 페이지 마운트 시 body, html 스타일 초기화 (헤더 고정을 위해 필요)
   useEffect(() => {
@@ -335,64 +274,28 @@ export default function NoticePage() {
 
   return (
     <>
-      <style jsx global>{`
-        .glass-effect {
-          position: fixed !important;
-          top: 0 !important;
-          left: 0 !important;
-          right: 0 !important;
-          z-index: 9999 !important;
-          background: rgba(255, 255, 255, 0.8) !important;
-          backdrop-filter: blur(10px) !important;
-          -webkit-backdrop-filter: blur(10px) !important;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.2) !important;
-          box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
-          width: 100% !important;
-          height: auto !important;
-          transform: none !important;
-          -webkit-transform: none !important;
-          -moz-transform: none !important;
-          -ms-transform: none !important;
-          -o-transform: none !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          display: block !important;
-          overflow: visible !important;
-          will-change: auto !important;
-          backface-visibility: visible !important;
-          -webkit-backface-visibility: visible !important;
-          -webkit-perspective: none !important;
-          perspective: none !important;
-        }
-
-        body, html {
-          word-break: keep-all;
-        }
-      `}</style>
       <style jsx global>{pageAnimations}</style>
       <div 
-        className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 notice-page-active" 
-        id="setting-notice-page-container"
-        style={{ 
-          WebkitOverflowScrolling: 'touch',
+        className="fixed inset-0 overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-purple-50 main-container"
+        id="setting-inquiry2-page-container"
+        style={{
           paddingTop: '0px',
           marginTop: '0px',
-          top: '0px',
-          position: 'static',
-          overflow: 'visible',
-          transform: 'none',
-          willChange: 'auto'
+          top: '0px'
         }}
       >
-        {/* 헤더 */}
-        <div
-          className="glass-effect header-fixed notice-header"
+        {/* 통일된 헤더 애니메이션 - setting 페이지와 동일 */}
+        <AnimatedHeader 
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed inquiry2-header"
           style={{ 
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px',
             position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
             zIndex: 2147483647,
+            left: '0px',
+            right: '0px',
             width: '100vw',
             height: '64px',
             minHeight: '64px',
@@ -404,63 +307,70 @@ export default function NoticePage() {
             boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
             display: 'flex',
             alignItems: 'center',
-            padding: 0,
-            margin: 0,
+            padding: '0',
+            margin: '0',
             transform: 'translateZ(0)',
             WebkitTransform: 'translateZ(0)',
             willChange: 'transform',
             visibility: 'visible',
-            opacity: 1,
+            opacity: '1',
             userSelect: 'none',
             WebkitUserSelect: 'none',
             touchAction: 'manipulation',
             pointerEvents: 'auto'
           }}
         >
-          <header style={{ width: '100%' }}>
-            <motion.div
-              initial={{ opacity: 0, x: '-100%' }}
+          <div className="flex items-center justify-between h-14 px-4">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-              className="flex items-center justify-between h-14 px-4"
-              style={{ width: '100%' }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center space-x-3"
             >
-              <div className="flex items-center space-x-2">
-                <button 
-                  onClick={handleBack}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                  style={{ 
-                    transform: 'scale(1) !important',
-                    animation: 'none !important'
-                  }}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <div style={{ 
-                  transform: 'translateX(0) !important',
-                  animation: 'none !important'
-                }}>
-                  <h1 className="text-lg font-bold text-gray-900">공지사항</h1>
-                  <p className="text-xs text-gray-500">최신 소식을 확인하세요</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                {/* 필요시 추가 버튼들을 여기에 배치 */}
+              <motion.button 
+                onClick={handleBack}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4 }}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </motion.button>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">공지사항</h1>
+                <p className="text-xs text-gray-500">최신 소식을 확인하세요</p>
               </div>
             </motion.div>
-          </header>
-        </div>
+            
+            <div className="flex items-center space-x-2">
+              {/* 필요시 추가 버튼들을 여기에 배치 */}
+            </div>
+          </div>
+        </AnimatedHeader>
         
-        {/* 메인 컨텐츠 - 헤더 고정에 맞춘 구조 */}
-        <main className="pt-20 px-4 pb-6" ref={mainRef} onScroll={handleScroll} onTouchStart={handleTouchStart}>
+        {/* 메인 컨텐츠 - 고정 위치 (setting 페이지와 동일한 구조) */}
+        <motion.div
+          initial="initial"
+          animate="in"
+          exit="out"
+          className="absolute inset-0 px-4 space-y-6 overflow-y-auto content-area pt-20"
+          style={{ 
+            top: '0px',
+            bottom: '0px',
+            left: '0',
+            right: '0'
+          }}
+        >
           {/* 공지사항 정보 카드 - 빨간색 테마 */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.6 }}
-            className="notice-content mb-6"
+            className="notice-content"
           >
             <div className="bg-[#EF4444] rounded-3xl p-6 text-white shadow-xl">
               <div className="flex items-center space-x-4">
@@ -529,80 +439,97 @@ export default function NoticePage() {
           {/* 메인 컨텐츠 */}
           {!isLoading && (
             <>
-              {/* 에러 상태 표시 */}
-              {error && (
-                <motion.div
+              {notices.length === 0 ? (
+                <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1, duration: 0.6 }}
-                  className="bg-red-50 rounded-2xl p-4 mb-4 notice-content"
+                  transition={{ delay: 0.2, duration: 0.6 }}
+                  className="flex flex-col items-center justify-center py-16 text-gray-400 notice-content"
                 >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-red-900">오류 발생</h3>
-                      <p className="text-sm text-red-600">{error}</p>
-                    </div>
+                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                    <FiBell className="w-6 h-6 text-gray-400" />
                   </div>
+                  <div className="text-base font-medium text-gray-600">등록된 공지사항이 없습니다</div>
+                  <p className="text-xs text-gray-500 mt-1">새로운 소식이 있으면 알려드릴게요</p>
                 </motion.div>
-              )}
-
-              {/* 공지사항 목록 */}
-              <div className="space-y-3">
-                {notices.map((notice, idx) => (
-                  <motion.div
-                    key={notice.nt_idx}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 + (0.1 * idx), duration: 0.6 }}
-                    className="notice-content"
-                  >
-                    <Link 
-                      href={`/setting/notice/${notice.nt_idx}`} 
-                      className="block"
-                      onClick={() => {
-                        // 🎮 공지사항 상세 진입 햅틱 피드백
-                        triggerHapticFeedback(HapticFeedbackType.SELECTION, '공지사항 상세 진입', { 
-                          component: 'notice', 
-                          action: 'view-detail',
-                          noticeId: notice.nt_idx 
-                        });
-                      }}
+              ) : (
+                <>
+                  {/* 에러 상태 표시 */}
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1, duration: 0.6 }}
+                      className="bg-red-50 rounded-2xl p-4 mb-4 notice-content"
                     >
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 card-hover mobile-button">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-start space-x-3 flex-1">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-bold text-base text-gray-900 mb-2 line-clamp-1">{notice.nt_title}</h3>
-                              <div className="flex items-center space-x-3 text-sm text-gray-500 mb-2">
-                                <div className="flex items-center space-x-1">
-                                  <FiCalendar className="w-4 h-4" />
-                                  <span>{formatDate(notice.nt_wdate)}</span>
-                                </div>
-                                <span className="text-gray-400">•</span>
-                                <span>조회 {notice.nt_hit}회</span>
-                              </div>
-                              <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{truncateContent(notice.nt_content)}</p>
-                            </div>
-                          </div>
-                          <div className="text-gray-400 ml-3">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </div>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-red-900">오류 발생</h3>
+                          <p className="text-sm text-red-600">{error}</p>
                         </div>
                       </div>
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
+                    </motion.div>
+                  )}
+
+                  {/* 공지사항 목록 */}
+                  <div className="space-y-3">
+                    {notices.map((notice, idx) => (
+                      <motion.div
+                        key={notice.nt_idx}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 + (0.1 * idx), duration: 0.6 }}
+                        className="notice-content"
+                      >
+                        <Link 
+                          href={`/setting/notice/${notice.nt_idx}`} 
+                          className="block"
+                          onClick={() => {
+                            // 🎮 공지사항 상세 진입 햅틱 피드백
+                            triggerHapticFeedback(HapticFeedbackType.SELECTION, '공지사항 상세 진입', { 
+                              component: 'notice', 
+                              action: 'view-detail',
+                              noticeId: notice.nt_idx 
+                            });
+                          }}
+                        >
+                          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 card-hover mobile-button">
+                            <div className="flex items-start justify-between">
+                              <div className="flex items-start space-x-3 flex-1">
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-bold text-base text-gray-900 mb-2 line-clamp-1">{notice.nt_title}</h3>
+                                  <div className="flex items-center space-x-3 text-sm text-gray-500 mb-2">
+                                    <div className="flex items-center space-x-1">
+                                      <FiCalendar className="w-4 h-4" />
+                                      <span>{formatDate(notice.nt_wdate)}</span>
+                                    </div>
+                                    <span className="text-gray-400">•</span>
+                                    <span>조회 {notice.nt_hit}회</span>
+                                  </div>
+                                  <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">{truncateContent(notice.nt_content)}</p>
+                                </div>
+                              </div>
+                              <div className="text-gray-400 ml-3">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      </motion.div>
+                    ))}
+                  </div>
+                </>
+              )}
             </>
           )}
-        </main>
+        </motion.div>
       </div>
     </>
   );
