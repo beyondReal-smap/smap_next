@@ -383,51 +383,31 @@ export default function PurchasePage() {
       >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
-          variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed setting-header"
-          style={{ 
-            paddingTop: '0px',
-            marginTop: '0px',
-            top: '0px',
-            position: 'fixed',
-            zIndex: 2147483647,
-            left: '0px',
-            right: '0px',
-            width: '100vw'
-          }}
+          variant="enhanced"
+          className="setting-header"
         >
-          <div className="flex items-center justify-between h-full px-4">
-            <AnimatePresence mode="wait">
-              <motion.div 
-                key="purchase-header"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
-                className="setting-header-content motion-div"
-              >
-                <motion.button
-                  onClick={handleBack}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4 }}
-                  className="setting-back-button"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  <FiChevronLeft className="w-5 h-5 text-gray-700" />
-                </motion.button>
-                <div className="setting-header-text">
-                  <h1 className="text-lg font-bold text-gray-900 leading-tight">구독 관리</h1>
-                  <p className="text-xs text-gray-500 leading-tight">결제 내역 및 구독 관리</p>
-                </div>
-              </motion.div>
-            </AnimatePresence>
-            
-            <div className="flex items-center space-x-2">
-              {/* 필요시 추가 버튼들을 여기에 배치 */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+            className="setting-header-content motion-div"
+          >
+            <motion.button
+              onClick={handleBack}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
+              className="setting-back-button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <FiChevronLeft className="w-5 h-5 text-gray-700" />
+            </motion.button>
+            <div className="setting-header-text">
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">구독 관리</h1>
+              <p className="text-xs text-gray-500 leading-tight">결제 내역 및 구독 관리</p>
             </div>
-          </div>
+          </motion.div>
         </AnimatedHeader>
 
         {/* 메인 컨텐츠 */}
