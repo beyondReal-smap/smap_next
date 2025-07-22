@@ -271,7 +271,8 @@ class AuthService {
       localStorage.setItem(this.TOKEN_KEY, token);
       
       // 쿠키에도 토큰 저장 (middleware에서 사용)
-      document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`;
+      const isSecure = window.location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `auth-token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax${isSecure}`;
     }
   }
 
@@ -328,7 +329,8 @@ class AuthService {
       localStorage.removeItem(this.USER_KEY);
       
       // 쿠키에서도 토큰 삭제
-      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax';
+      const isSecure = window.location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = `auth-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax${isSecure}`;
       
       // 🔥 Google SDK 토큰 캐시 정리 (로그아웃 후 재시도 문제 해결)
       try {
@@ -374,7 +376,7 @@ class AuthService {
     if (!token && typeof window !== 'undefined') {
       const cookieToken = document.cookie
         .split('; ')
-        .find(row => row.startsWith('token='))
+        .find(row => row.startsWith('auth-token='))
         ?.split('=')[1];
       
       if (cookieToken && userData) {
