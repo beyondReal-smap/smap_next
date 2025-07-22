@@ -153,19 +153,10 @@ export default function ManualPage() {
       >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
-          variant="simple"
-          className="header-unified"
-          style={{ 
-            zIndex: 2147483647,
-            background: 'rgba(255, 255, 255, 0.98)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
-            boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
-          }}
+          variant="enhanced"
+          className="setting-header"
         >
-          <div className="flex items-center justify-between h-full px-4">
-                    <motion.div 
+          <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
@@ -188,12 +179,7 @@ export default function ManualPage() {
               <h1 className="text-lg font-bold text-gray-900 leading-tight">사용 가이드</h1>
               <p className="text-xs text-gray-500 leading-tight">앱 사용법 및 도움말</p>
             </div>
-            </motion.div>
-            
-            <div className="flex items-center space-x-2">
-              {/* 필요시 추가 버튼들을 여기에 배치 */}
-            </div>
-          </div>
+          </motion.div>
         </AnimatedHeader>
 
         {/* 메인 컨텐츠 - 고정 위치 (setting/notice 페이지와 동일한 구조) */}
@@ -207,7 +193,7 @@ export default function ManualPage() {
             bottom: '0px',
             left: '0',
             right: '0',
-            paddingTop: '80px'
+            paddingTop: '72px'
           }}
         >
           {/* 사용 가이드 정보 카드 - 보라색 테마 */}

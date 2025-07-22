@@ -1029,8 +1029,8 @@ body[data-page="/notice"] .notice-header {
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
-  height: 64px !important;
-  min-height: 64px !important;
+  height: 56px !important;
+  min-height: 56px !important;
   z-index: 100 !important;
   background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(20px) !important;
@@ -1300,7 +1300,13 @@ html.setting-page-active[style*="position: fixed"] {
 }
 
 /* setting 페이지 헤더 스타일 - 한 곳에서 관리 (통일된 56px 높이) */
-.setting-header {
+.setting-header,
+body[data-page="/notice"] .setting-header,
+html[data-page="/notice"] .setting-header,
+body[data-page="/setting/terms"] .setting-header,
+html[data-page="/setting/terms"] .setting-header,
+body[data-page="/setting/notice"] .setting-header,
+html[data-page="/setting/notice"] .setting-header {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
@@ -1959,9 +1965,9 @@ html[data-page="/notice"] .notice-header,
   right: 0 !important;
   z-index: 2147483647 !important;
   width: 100vw !important;
-  height: 64px !important;
-  min-height: 64px !important;
-  max-height: 64px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
   background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -2023,9 +2029,9 @@ html[data-page="/setting"] .setting-header,
   right: 0 !important;
   z-index: 2147483647 !important;
   width: 100vw !important;
-  height: 64px !important;
-  min-height: 64px !important;
-  max-height: 64px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
   background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -2103,17 +2109,16 @@ body[data-page="/setting/terms"] .AnimatedHeader,
 body[data-page="/setting/terms"] [data-framer-component-type="AnimatedHeader"],
 body[data-page="/setting/terms"] header,
 body[data-page="/setting/terms"] .glass-effect,
-body[data-page="/setting/terms"] .setting-header,
-body[data-page="/setting/terms"] .setting-header-content {
+body[data-page="/setting/terms"] .setting-header {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   z-index: 99999 !important;
   width: 100vw !important;
-  height: 64px !important;
-  min-height: 64px !important;
-  max-height: 64px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
   background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -2131,6 +2136,65 @@ body[data-page="/setting/terms"] .setting-header-content {
   user-select: none !important;
   -webkit-user-select: none !important;
   touch-action: manipulation !important;
+}
+
+/* setting/terms의 setting-header-content는 flex 레이아웃 유지 */
+body[data-page="/setting/terms"] .setting-header-content {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  height: 56px !important;
+  padding: 0 16px !important;
+  gap: 12px !important;
+  position: relative !important;
+  width: 100% !important;
+  /* Framer Motion 애니메이션을 위해 transform 제거 */
+  transform: none !important;
+  -webkit-transform: none !important;
+  will-change: auto !important;
+}
+
+/* setting/terms의 motion-div 애니메이션 허용 */
+body[data-page="/setting/terms"] .motion-div {
+  transform: none !important;
+  -webkit-transform: none !important;
+  will-change: auto !important;
+}
+
+/* setting/terms에서 framer-motion 요소들 애니메이션 허용 */
+body[data-page="/setting/terms"] [data-framer-motion],
+body[data-page="/setting/terms"] .motion-div[data-framer-motion],
+body[data-page="/setting/terms"] .setting-header-content[data-framer-motion] {
+  transform: none !important;
+  -webkit-transform: none !important;
+  will-change: transform !important;
+}
+
+/* setting/terms에서 모든 Framer Motion 관련 CSS 충돌 제거 */
+body[data-page="/setting/terms"] * {
+  will-change: auto;
+}
+body[data-page="/setting/terms"] [data-framer-motion],
+body[data-page="/setting/terms"] .motion-div {
+  will-change: transform !important;
+  transform: unset !important;
+  -webkit-transform: unset !important;
+}
+
+/* setting/terms의 setting-back-button 위치 정확히 맞춤 */
+body[data-page="/setting/terms"] .setting-back-button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  padding: 8px !important;
+  position: relative !important;
 }
 
 /* 헤더 내부 요소들 고정 */
@@ -2158,9 +2222,9 @@ body[data-page="/setting/terms"] .fixed.top-0.left-0.right-0.z-20.glass-effect.h
   right: 0 !important;
   z-index: 999999 !important;
   width: 100vw !important;
-  height: 64px !important;
-  min-height: 64px !important;
-  max-height: 64px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
   background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -2231,9 +2295,9 @@ body[data-page="/setting/notice"] .fixed.top-0.left-0.right-0.z-50.glass-effect.
   -webkit-backdrop-filter: blur(20px) !important;
   border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
-  height: 64px !important;
-  min-height: 64px !important;
-  max-height: 64px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
   padding: 0 !important;
   margin: 0 !important;
   display: flex !important;
@@ -3299,7 +3363,9 @@ body[data-page="/setting/inquiry2"] * {
 /* 모든 헤더 높이 통일 - 최고 우선순위 */
 .header-unified,
 header.header-unified,
-.header-unified[style] {
+.header-unified[style],
+body[data-page="/notice"] .setting-header,
+[data-page="/notice"] .setting-header {
   height: 56px !important;
   min-height: 56px !important;
   max-height: 56px !important;

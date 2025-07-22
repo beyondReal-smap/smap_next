@@ -603,34 +603,29 @@ export default function TermsPage() {
         {/* notice 페이지와 동일한 헤더 */}
         <AnimatedHeader 
           variant="enhanced"
-          className="sticky top-0 left-0 right-0 z-20 glass-effect"
+          className="setting-header"
         >
-          <div className="flex items-center justify-between h-full px-4">
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
-              className="setting-header-content motion-div"
+          <motion.div 
+            initial={{ opacity: 0, x: -50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, ease: [0.25, 1, 0.5, 1] }}
+            className="setting-header-content motion-div"
+          >
+            <motion.button 
+              onClick={handleBack}
+              className="setting-back-button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              <motion.button 
-                onClick={handleBack}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4 }}
-                className="setting-back-button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </motion.button>
-              <div className="setting-header-text">
-                <h1 className="text-lg font-bold text-gray-900 leading-tight">약관 및 동의</h1>
-                <p className="text-xs text-gray-500 leading-tight">서비스 이용 약관 관리</p>
-              </div>
-            </motion.div>
-          </div>
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </motion.button>
+            <div className="setting-header-text">
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">약관 및 동의</h1>
+              <p className="text-xs text-gray-500 leading-tight">서비스 이용 약관 관리</p>
+            </div>
+          </motion.div>
         </AnimatedHeader>
 
         {/* 메인 컨텐츠 - notice 페이지와 동일한 구조 */}

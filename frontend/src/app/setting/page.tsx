@@ -455,18 +455,9 @@ export default function SettingsPage() {
       >
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
-          variant="simple"
-          className="header-unified"
-          style={{ 
-            zIndex: 2147483647,
-            background: 'rgba(255, 255, 255, 0.98)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
-            boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
-          }}
+          variant="enhanced"
+          className="setting-header"
         >
-          <div className="flex items-center justify-between h-full px-4">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -490,12 +481,7 @@ export default function SettingsPage() {
               <h1 className="text-lg font-bold text-gray-900 leading-tight">설정</h1>
               <p className="text-xs text-gray-500 leading-tight">계정 및 앱 설정을 관리하세요</p>
             </div>
-            </motion.div>
-            
-            <div className="flex items-center space-x-2">
-              {/* 필요시 추가 버튼들을 여기에 배치 */}
-            </div>
-          </div>
+          </motion.div>
         </AnimatedHeader>
         
         {/* 메인 컨텐츠 - 고정 위치 (schedule 페이지와 동일한 구조) */}

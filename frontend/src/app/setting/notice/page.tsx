@@ -105,44 +105,36 @@ export default function NoticePage() {
       className="fixed inset-0 overflow-hidden bg-gradient-to-br from-blue-50 via-white to-indigo-50"
     >
       <AnimatedHeader 
-        variant="simple"
-        className="fixed top-0 left-0 right-0 z-50 glass-effect"
-        style={{ 
-            zIndex: 2147483647,
-            background: 'rgba(255, 255, 255, 0.98)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
-        }}
+        variant="enhanced"
+        className="setting-header"
       >
-        <div className="flex items-center justify-between h-full px-4">
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
-              className="setting-header-content motion-div"
-            >
-              <motion.button
-                onClick={handleBack}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4 }}
-                className="setting-back-button"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <FiChevronLeft className="w-5 h-5 text-gray-700" />
-              </motion.button>
-              <div className="setting-header-text">
-                <h1 className="text-lg font-bold text-gray-900 leading-tight">공지사항</h1>
-                <p className="text-xs text-gray-500 leading-tight">최신 소식을 확인하세요</p>
-              </div>
-            </motion.div>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+          className="setting-header-content motion-div"
+        >
+          <motion.button
+            onClick={handleBack}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}
+            className="setting-back-button"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <FiChevronLeft className="w-5 h-5 text-gray-700" />
+          </motion.button>
+          <div className="setting-header-text">
+            <h1 className="text-lg font-bold text-gray-900 leading-tight">공지사항</h1>
+            <p className="text-xs text-gray-500 leading-tight">최신 소식을 확인하세요</p>
+          </div>
+        </motion.div>
       </AnimatedHeader>
         
       <main 
-        className="absolute inset-0 pt-20 px-4 pb-6 space-y-6 overflow-y-auto"
+        className="absolute inset-0 px-4 pb-6 space-y-6 overflow-y-auto"
+        style={{ paddingTop: '72px' }}
       >
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
