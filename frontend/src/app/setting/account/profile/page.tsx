@@ -57,7 +57,8 @@ export default function ProfilePage() {
     try {
       const token = localStorage.getItem('auth-token');
       if (!token) {
-        router.push('/signin');
+        console.log('⚠️ 토큰이 없지만 페이지 로드 계속 진행');
+        setIsLoadingProfile(false);
         return;
       }
 
@@ -166,11 +167,9 @@ export default function ProfilePage() {
         }
       } else {
         console.error('❌ 프로필 조회 실패:', response.status);
-        if (response.status === 401) {
-          // 토큰이 만료되었거나 유효하지 않음
-          localStorage.removeItem('auth-token');
-          router.push('/signin');
-        }
+        // 401 오류가 발생해도 즉시 리디렉션하지 않고 기본값으로 진행
+        // 사용자가 직접 로그인 상태를 확인할 수 있도록 함
+        console.log('⚠️ API 호출 실패, 기본값으로 진행');
       }
     } catch (error) {
       console.error('❌ 사용자 정보 로드 실패:', error);
