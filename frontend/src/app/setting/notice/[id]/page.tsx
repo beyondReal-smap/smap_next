@@ -64,14 +64,49 @@ export default function NoticeDetailPage() {
 
   const noticeId = params?.id ? parseInt(params.id as string) : null;
 
-  // 페이지 스크롤 관리
+  // 페이지 스크롤 관리 및 헤더 패딩 강제 제거
   useEffect(() => {
     document.body.style.overflowY = 'auto';
     document.documentElement.style.overflowY = 'auto';
 
+    // 헤더 패딩 강제 제거 - DOM 조작으로 직접 처리
+    const forceRemoveHeaderPadding = () => {
+      const header = document.querySelector('.notice-detail-header') as HTMLElement;
+      if (header) {
+        header.style.setProperty('padding', '0px', 'important');
+        header.style.setProperty('padding-top', '0px', 'important');
+        header.style.setProperty('margin', '0px', 'important');
+        header.style.setProperty('margin-top', '0px', 'important');
+        header.style.setProperty('top', '0px', 'important');
+        header.style.setProperty('position', 'fixed', 'important');
+        header.style.setProperty('transform', 'translateY(0px)', 'important');
+        
+        // 부모 요소들도 확인하고 패딩 제거
+        let parent = header.parentElement;
+        while (parent && parent !== document.body) {
+          if (parent.style.paddingTop) {
+            parent.style.setProperty('padding-top', '0px', 'important');
+          }
+          if (parent.style.marginTop) {
+            parent.style.setProperty('margin-top', '0px', 'important');
+          }
+          parent = parent.parentElement;
+        }
+      }
+    };
+
+    // 초기 실행
+    forceRemoveHeaderPadding();
+    
+    // 약간의 지연 후 다시 실행 (다른 스타일이 적용된 후)
+    const timer1 = setTimeout(forceRemoveHeaderPadding, 100);
+    const timer2 = setTimeout(forceRemoveHeaderPadding, 500);
+
     return () => {
       document.body.style.overflowY = '';
       document.documentElement.style.overflowY = '';
+      clearTimeout(timer1);
+      clearTimeout(timer2);
     };
   }, []);
 
@@ -107,25 +142,48 @@ export default function NoticeDetailPage() {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-50 overflow-hidden">
+    <div 
+      className="fixed inset-0 bg-gray-50 overflow-hidden notice-detail-container" 
+      style={{ 
+        paddingTop: 0, 
+        marginTop: 0, 
+        padding: 0, 
+        margin: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0
+      }}
+    >
       {/* 헤더 - setting/notice 페이지와 스타일 및 애니메이션 동기화 */}
       <motion.header 
-        className="fixed top-0 left-0 right-0 z-20"
+        className="notice-detail-header"                                                                                                                                                                                                                                                                                                                                                                                                                    
         style={{
+          position: 'fixed',
+          top: '0px',
+          left: '0px',
+          right: '0px',
+          zIndex: 20,
           height: '56px',
           background: 'rgba(255, 255, 255, 0.98)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
           borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
-          paddingTop: '0px !important', // 헤더 상단 패딩 강제 제거
+          padding: '0px',
+          paddingTop: '0px',
+          paddingBottom: '0px',
+          margin: '0px',
+          marginTop: '0px',
+          marginBottom: '0px',
+          transform: 'translateY(0px)',
         }}
       >
         <div className="flex items-center justify-between h-full px-4">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3 }} // duration을 0.3으로 변경
-            className="flex items-center space-x-3"
+            transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+            className="flex items-center space-x-3 motion-div"
           >
             <button 
               onClick={handleBack}

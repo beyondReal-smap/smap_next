@@ -37,12 +37,12 @@ export default function NoticeTestPage() {
             borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
         }}
       >
-        <div className="flex items-center justify-between h-14 px-4">
+        <div className="flex items-center justify-between h-full px-4">
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center space-x-3"
+              transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+              className="flex items-center space-x-3 motion-div"
             >
               <button
                 onClick={handleBack}

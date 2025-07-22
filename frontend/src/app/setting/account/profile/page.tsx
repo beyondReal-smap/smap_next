@@ -272,25 +272,20 @@ export default function ProfilePage() {
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5 }}
-          className="setting-header-content"
+          transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+          className="flex items-center space-x-3 motion-div"
         >
-          <motion.button 
+          <button 
             onClick={handleBack}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-            className="setting-back-button"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-          </motion.button>
-          <div className="setting-header-text">
-            <h1 className="text-lg font-bold text-gray-900 leading-tight">프로필 편집</h1>
-            <p className="text-xs text-gray-500 leading-tight">개인 정보를 업데이트하세요</p>
+          </button>
+          <div>
+            <h1 className="text-lg font-bold text-gray-900">프로필 편집</h1>
+            <p className="text-xs text-gray-500">개인 정보를 업데이트하세요</p>
           </div>
         </motion.div>
       </AnimatedHeader>

@@ -69,13 +69,16 @@ header, [role="banner"], .glass-effect, .home-header, .group-header, .schedule-h
   margin-top: 0 !important;
 }
 
-/* 헤더 고정 스타일 강화 */
+/* 헤더 고정 스타일 강화 - 통일된 높이 56px */
 .header-fixed {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   z-index: 20 !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
   background-color: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(10px) !important;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
@@ -1296,16 +1299,16 @@ html.setting-page-active[style*="position: fixed"] {
   backface-visibility: visible !important;
 }
 
-/* setting 페이지 헤더 스타일 - 한 곳에서 관리 */
+/* setting 페이지 헤더 스타일 - 한 곳에서 관리 (통일된 56px 높이) */
 .setting-header {
   position: fixed !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   z-index: 2147483647 !important;
-  height: 64px !important;
-  min-height: 64px !important;
-  max-height: 64px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
   background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -3287,4 +3290,167 @@ body[data-page="/setting/inquiry2"] * {
   -moz-transform: none !important;
   -ms-transform: none !important;
   -o-transform: none !important;
+}
+
+/* ============================================
+   통일된 헤더 애니메이션 및 스타일 표준
+   ============================================ */
+
+/* 모든 헤더 높이 통일 - 최고 우선순위 */
+.header-unified,
+header.header-unified,
+.header-unified[style] {
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 50 !important;
+  display: flex !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+}
+
+/* 헤더 내부 컨테이너 표준 */
+.header-content-spacing {
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  height: 56px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+/* 뒤로가기 버튼과 텍스트 간격 표준 (space-x-3 = 12px) */
+.header-back-text-spacing {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+/* 헤더 텍스트 스타일 표준 */
+.header-title {
+  font-size: 1.125rem !important; /* text-lg */
+  font-weight: 700 !important; /* font-bold */
+  color: rgb(17, 24, 39) !important; /* text-gray-900 */
+  line-height: 1.25 !important; /* leading-tight */
+  margin: 0 !important;
+  margin-bottom: 1px !important; /* 제목과 설명 간격 */
+}
+
+.header-subtitle {
+  font-size: 0.75rem !important; /* text-xs */
+  color: rgb(107, 114, 128) !important; /* text-gray-500 */
+  line-height: 1.25 !important; /* leading-tight */
+  margin: 0 !important;
+  margin-top: 1px !important; /* 제목과 설명 간격 */
+}
+
+/* 모든 헤더 내부 h1, p 태그에 통일된 스타일 적용 */
+.header-unified h1,
+.header-content-spacing h1,
+.header-back-text-spacing h1,
+.header-motion-div h1,
+.motion-div h1,
+.setting-header-content h1,
+.setting-header-text h1 {
+  font-size: 1.125rem !important; /* text-lg */
+  font-weight: 700 !important; /* font-bold */
+  color: rgb(17, 24, 39) !important; /* text-gray-900 */
+  line-height: 1.25 !important; /* leading-tight */
+  margin: 0 !important;
+  margin-bottom: 1px !important; /* 제목과 설명 간격 */
+}
+
+.header-unified p,
+.header-content-spacing p,
+.header-back-text-spacing p,
+.header-motion-div p,
+.motion-div p,
+.setting-header-content p,
+.setting-header-text p {
+  font-size: 0.75rem !important; /* text-xs */
+  color: rgb(107, 114, 128) !important; /* text-gray-500 */
+  line-height: 1.25 !important; /* leading-tight */
+  margin: 0 !important;
+  margin-top: 1px !important; /* 제목과 설명 간격 */
+}
+
+/* 뒤로가기 버튼 표준 스타일 */
+.header-back-button {
+  padding: 8px !important; /* p-2 */
+  border-radius: 9999px !important; /* rounded-full */
+  transition: all 0.2s ease !important;
+  background-color: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+}
+
+.header-back-button:hover {
+  background-color: rgb(243, 244, 246) !important; /* hover:bg-gray-100 */
+}
+
+/* 모든 헤더 내부 뒤로가기 버튼에 통일된 스타일 적용 */
+.header-unified button,
+.header-content-spacing button,
+.header-back-text-spacing button,
+.header-motion-div button,
+.motion-div button {
+  padding: 8px !important; /* p-2 */
+  border-radius: 9999px !important; /* rounded-full */
+  transition: all 0.2s ease !important;
+  background-color: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+}
+
+.header-unified button:hover,
+.header-content-spacing button:hover,
+.header-back-text-spacing button:hover,
+.header-motion-div button:hover,
+.motion-div button:hover {
+  background-color: rgb(243, 244, 246) !important; /* hover:bg-gray-100 */
+}
+
+/* 헤더 애니메이션 motion-div 표준 */
+.header-motion-div {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important; /* space-x-3 */
+}
+
+/* 스크롤바 숨기기 */
+.hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* setting 페이지 스크롤바 숨기기 */
+.content-area {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.content-area::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }

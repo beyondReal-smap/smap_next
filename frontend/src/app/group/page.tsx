@@ -1506,8 +1506,8 @@ function GroupPageContent() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
-                    className="flex items-center space-x-3"
+                    transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+                    className="flex items-center space-x-3 motion-div"
                   >
                     <div className="flex items-center space-x-3">
                       <div>

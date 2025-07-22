@@ -7000,15 +7000,15 @@ export default function ActivelogPage() {
             zIndex: 9999,
             paddingTop: 0,
             marginTop: 0,
-            height: '56px', // h-14
+            height: '56px',
           }}
         >
           <div className="flex items-center justify-between h-14 px-4">
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center space-x-3"
+              transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+              className="flex items-center space-x-3 motion-div"
             >
               <div className="flex items-center space-x-3">
                 <div>

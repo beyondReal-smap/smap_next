@@ -456,52 +456,29 @@ export default function SettingsPage() {
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed setting-header"
+          className="header-unified"
           style={{ 
-            paddingTop: '0px',
-            marginTop: '0px',
-            top: '0px',
-            position: 'fixed',
             zIndex: 2147483647,
-            left: '0px',
-            right: '0px',
-            width: '100vw',
-            height: '64px',
-            minHeight: '64px',
-            maxHeight: '64px',
             background: 'rgba(255, 255, 255, 0.98)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
             boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0',
-            margin: '0',
-            transform: 'translateZ(0)',
-            WebkitTransform: 'translateZ(0)',
-            willChange: 'transform',
-            visibility: 'visible',
-            opacity: '1',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            touchAction: 'manipulation',
-            pointerEvents: 'auto'
           }}
         >
-          <div className="flex items-center justify-between h-14 px-4">
+          <div className="flex items-center justify-between h-full px-4">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center space-x-3"
+            transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+            className="setting-header-content motion-div"
           >
             <motion.button 
               onClick={handleBack}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4 }}
-                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+              className="setting-back-button"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
@@ -509,10 +486,10 @@ export default function SettingsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </motion.button>
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">설정</h1>
-                <p className="text-xs text-gray-500">계정 및 앱 설정을 관리하세요</p>
-              </div>
+            <div className="setting-header-text">
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">설정</h1>
+              <p className="text-xs text-gray-500 leading-tight">계정 및 앱 설정을 관리하세요</p>
+            </div>
             </motion.div>
             
             <div className="flex items-center space-x-2">
@@ -526,12 +503,16 @@ export default function SettingsPage() {
           initial="initial"
           animate="in"
           exit="out"
-          className="absolute inset-0 px-4 space-y-6 overflow-y-auto content-area pt-20"
+          className="absolute inset-0 px-4 space-y-6 content-area hide-scrollbar pt-20"
           style={{ 
             top: '0px',
             bottom: '0px',
             left: '0',
-            right: '0'
+            right: '0',
+            overflow: 'hidden',
+            overflowY: 'auto',
+            scrollbarWidth: 'none', /* Firefox */
+            msOverflowStyle: 'none', /* IE and Edge */
           }}
         >
           {menuSections.map((section, sectionIdx) => (

@@ -372,8 +372,8 @@ export default function ReferrerPage() {
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="setting-header-content"
+            transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+            className="setting-header-content motion-div"
           >
             <motion.button 
               onClick={handleBack}

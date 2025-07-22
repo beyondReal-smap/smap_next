@@ -64,11 +64,19 @@ body {
 }
 
 /* iOS WebView에서 애니메이션 성능 개선 */
-* {
+/* Framer Motion 애니메이션 중인 요소는 제외 */
+*:not([data-framer-motion]):not(.motion-div) {
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+}
+
+/* Framer Motion 애니메이션 요소는 자체 transform 사용 */
+[data-framer-motion], .motion-div {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
 /* iOS WebView에서 지도 컨테이너 최적화 */
@@ -519,4 +527,118 @@ html, body, #__next, main {
 #bottom-navigation-bar * {
   padding-bottom: 0px !important;
   margin-bottom: 0px !important;
+}
+
+/* notice 상세 페이지 헤더 패딩 강제 제거 - 모든 가능한 선택자 조합 */
+.notice-detail-header,
+header.notice-detail-header,
+.notice-detail-header[style],
+header.notice-detail-header[style] {
+  padding: 0px !important;
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  margin: 0px !important;
+  margin-top: 0px !important;
+  margin-bottom: 0px !important;
+  top: 0px !important;
+  position: fixed !important;
+  inset: 0px auto auto 0px !important;
+}
+
+/* notice 상세 페이지 헤더 내부 요소들도 패딩 제거 */
+.notice-detail-header *,
+header.notice-detail-header * {
+  padding-top: 0px !important;
+  margin-top: 0px !important;
+}
+
+/* body, html, 모든 부모 요소에서 notice 상세 페이지 헤더로 전달되는 패딩 차단 */
+html .notice-detail-header,
+body .notice-detail-header,
+div .notice-detail-header,
+main .notice-detail-header,
+* .notice-detail-header {
+  padding: 0px !important;
+  padding-top: 0px !important;
+  margin: 0px !important;
+  margin-top: 0px !important;
+  top: 0px !important;
+}
+
+/* 특정 16px 패딩 강제 제거 */
+.notice-detail-header {
+  padding: 0 !important;
+  margin: 0 !important;
+  top: 0 !important;
+  transform: translateY(0px) !important;
+}
+
+/* 모든 패딩 관련 속성 강제 재설정 */
+header.notice-detail-header {
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+}
+
+/* notice 상세 페이지 컨테이너도 패딩 제거 */
+.notice-detail-container,
+div.notice-detail-container {
+  padding: 0 !important;
+  margin: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+}
+
+/* 16px 패딩을 강제로 제거하는 최종 규칙 */
+.notice-detail-header {
+  padding: 0px !important;
+  margin: 0px !important;
+  top: 0px !important;
+  position: fixed !important;
+  left: 0px !important;
+  right: 0px !important;
+  z-index: 20 !important;
+  height: 56px !important;
+}
+
+/* 모든 가능한 패딩 소스 차단 - 최고 우선순위 */
+.notice-detail-header[style*="padding"],
+header.notice-detail-header[style*="padding"],
+.notice-detail-header[style*="margin"],
+header.notice-detail-header[style*="margin"] {
+  padding: 0px !important;
+  padding-top: 0px !important;
+  padding-bottom: 0px !important;
+  padding-left: 0px !important;
+  padding-right: 0px !important;
+  margin: 0px !important;
+  margin-top: 0px !important;
+  margin-bottom: 0px !important;
+  margin-left: 0px !important;
+  margin-right: 0px !important;
+  top: 0px !important;
+  transform: translateY(0px) !important;
+}
+
+/* iOS SafeArea 무시 */
+.notice-detail-header {
+  padding-top: 0px !important;
+  padding-top: constant(safe-area-inset-top, 0px) !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
+}
+
+/* 모든 부모에서 전달되는 값들 무시 */
+* .notice-detail-header,
+html .notice-detail-header,
+body .notice-detail-header,
+#__next .notice-detail-header,
+main .notice-detail-header {
+  padding: 0px !important;
+  margin: 0px !important;
+  top: 0px !important;
+  position: fixed !important;
 }

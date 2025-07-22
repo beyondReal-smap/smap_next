@@ -22,15 +22,15 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
   // iOS 감지
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   
-  // 안정적인 고정 헤더 스타일
+  // 안정적인 고정 헤더 스타일 - 통일된 56px 높이
   const fixedHeaderStyle: React.CSSProperties = {
     position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
     zIndex: 50,
-    height: '64px',
-    minHeight: '64px',
+    height: '56px !important' as any,
+    minHeight: '56px !important' as any,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',

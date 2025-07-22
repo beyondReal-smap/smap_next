@@ -306,9 +306,9 @@ ${message}
             left: '0px',
             right: '0px',
             width: '100vw',
-            height: '64px',
-            minHeight: '64px',
-            maxHeight: '64px',
+            height: '56px',
+            minHeight: '56px',
+            maxHeight: '56px',
             background: 'rgba(255, 255, 255, 0.98)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
@@ -329,12 +329,12 @@ ${message}
             pointerEvents: 'auto'
           }}
         >
-          <div className="flex items-center justify-between h-14 px-4" style={{ 
+          <div className="flex items-center justify-between px-4" style={{ 
             paddingLeft: '0px', 
             paddingRight: '0px',
-            height: '64px',
-            minHeight: '64px',
-            maxHeight: '64px',
+            height: '56px',
+            minHeight: '56px',
+            maxHeight: '56px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between'
@@ -342,8 +342,8 @@ ${message}
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center space-x-3"
+              transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+              className="flex items-center space-x-3 motion-div"
           >
             <motion.button 
               onClick={handleBack}

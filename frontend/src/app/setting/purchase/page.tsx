@@ -396,25 +396,30 @@ export default function PurchasePage() {
             width: '100vw'
           }}
         >
-          <div className="flex items-center justify-between h-14 px-4">
+          <div className="flex items-center justify-between h-full px-4">
             <AnimatePresence mode="wait">
               <motion.div 
                 key="purchase-header"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="flex items-center space-x-3"
+                transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+                className="setting-header-content motion-div"
               >
-                <button
+                <motion.button
                   onClick={handleBack}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.4 }}
+                  className="setting-back-button"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <FiChevronLeft className="w-5 h-5 text-gray-700" />
-                </button>
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">구독 관리</h1>
-                  <p className="text-xs text-gray-500">결제 내역 및 구독 관리</p>
+                </motion.button>
+                <div className="setting-header-text">
+                  <h1 className="text-lg font-bold text-gray-900 leading-tight">구독 관리</h1>
+                  <p className="text-xs text-gray-500 leading-tight">결제 내역 및 구독 관리</p>
                 </div>
               </motion.div>
             </AnimatePresence>

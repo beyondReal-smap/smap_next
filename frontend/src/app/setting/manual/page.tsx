@@ -154,102 +154,40 @@ export default function ManualPage() {
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="simple"
-          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed setting-header"
+          className="header-unified"
           style={{ 
-            paddingTop: '0px',
-            marginTop: '0px',
-            top: '0px',
-            position: 'fixed',
             zIndex: 2147483647,
-            left: '0px',
-            right: '0px',
-            width: '100vw',
-            height: '64px',
-            minHeight: '64px',
-            maxHeight: '64px',
             background: 'rgba(255, 255, 255, 0.98)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
             borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
             boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0',
-            margin: '0',
-            transform: 'translateZ(0)',
-            WebkitTransform: 'translateZ(0)',
-            willChange: 'transform',
-            visibility: 'visible',
-            opacity: '1',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            touchAction: 'manipulation',
-            pointerEvents: 'auto'
           }}
         >
-          <div className="flex items-center justify-between h-14 px-4" style={{ 
-            paddingLeft: '0px', 
-            paddingRight: '0px',
-            height: '64px',
-            minHeight: '64px',
-            maxHeight: '64px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between'
-          }}>
-          <motion.div 
+          <div className="flex items-center justify-between h-full px-4">
+                    <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="flex items-center space-x-3"
+            transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+            className="setting-header-content motion-div"
           >
             <motion.button 
               onClick={handleBack}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4 }}
-                className="flex items-center justify-center w-10 h-10 hover:bg-gray-100 rounded-full transition-all duration-200"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '40px',
-                  height: '40px',
-                  minWidth: '40px',
-                  minHeight: '40px',
-                  maxWidth: '40px',
-                  maxHeight: '40px'
-                }}
+              className="setting-back-button"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  className="w-5 h-5 text-gray-700" 
-                  fill="none" 
-                  viewBox="0 0 24 24" 
-                  stroke="currentColor"
-                  style={{
-                    width: '20px',
-                    height: '20px',
-                    minWidth: '20px',
-                    minHeight: '20px',
-                    maxWidth: '20px',
-                    maxHeight: '20px',
-                    display: 'block',
-                    margin: '0',
-                    padding: '0',
-                    lineHeight: '1',
-                    verticalAlign: 'middle'
-                  }}
-                >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </motion.button>
-              <div className="flex flex-col justify-center" style={{ margin: '0', padding: '0' }}>
-                <h1 className="text-lg font-bold text-gray-900 leading-tight" style={{ margin: '0', padding: '0', lineHeight: '1.2' }}>사용 가이드</h1>
-                <p className="text-xs text-gray-500 leading-tight" style={{ margin: '0', padding: '0', lineHeight: '1.2' }}>앱 사용법 및 도움말</p>
-              </div>
+            <div className="setting-header-text">
+              <h1 className="text-lg font-bold text-gray-900 leading-tight">사용 가이드</h1>
+              <p className="text-xs text-gray-500 leading-tight">앱 사용법 및 도움말</p>
+            </div>
             </motion.div>
             
             <div className="flex items-center space-x-2">

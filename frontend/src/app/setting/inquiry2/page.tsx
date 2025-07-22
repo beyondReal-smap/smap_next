@@ -297,9 +297,9 @@ export default function NoticePage() {
             left: '0px',
             right: '0px',
             width: '100vw',
-            height: '64px',
-            minHeight: '64px',
-            maxHeight: '64px',
+            height: '56px',
+            minHeight: '56px',
+            maxHeight: '56px',
             background: 'rgba(255, 255, 255, 0.98)',
             backdropFilter: 'blur(20px)',
             WebkitBackdropFilter: 'blur(20px)',
@@ -320,7 +320,7 @@ export default function NoticePage() {
             pointerEvents: 'auto'
           }}
         >
-          <div className="flex items-center justify-between h-14 px-4">
+          <div className="flex items-center justify-between h-full px-4">
             <motion.div 
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}

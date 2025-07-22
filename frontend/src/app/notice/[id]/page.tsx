@@ -65,7 +65,12 @@ export default function NoticeDetailPage() {
           className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
         >
           <div className="flex items-center justify-between h-14 px-4">
-            <div className="flex items-center space-x-3">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+              className="flex items-center space-x-3 motion-div"
+            >
               <button 
                 onClick={handleBack}
                 className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
@@ -76,7 +81,7 @@ export default function NoticeDetailPage() {
                 <h1 className="text-lg font-bold text-gray-900">알림 상세</h1>
                 <p className="text-xs text-gray-500">로딩 중...</p>
               </div>
-            </div>
+            </motion.div>
           </div>
         </AnimatedHeader>
 
@@ -100,7 +105,12 @@ export default function NoticeDetailPage() {
           className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
         >
           <div className="flex items-center justify-between h-14 px-4">
-            <div className="flex items-center space-x-3">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+              className="flex items-center space-x-3 motion-div"
+            >
               <button 
                 onClick={handleBack}
                 className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
@@ -111,7 +121,7 @@ export default function NoticeDetailPage() {
                 <h1 className="text-lg font-bold text-gray-900">알림 상세</h1>
                 <p className="text-xs text-gray-500">알림을 찾을 수 없습니다</p>
               </div>
-            </div>
+            </motion.div>
           </div>
         </AnimatedHeader>
 
@@ -134,37 +144,25 @@ export default function NoticeDetailPage() {
         variant="enhanced"
         className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
       >
-        <motion.div 
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-          className="flex items-center justify-between h-14 px-4"
-        >
-          <div className="flex items-center space-x-3">
-            <motion.button 
+        <div className="flex items-center justify-between h-14 px-4">
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+            className="flex items-center space-x-3 motion-div"
+          >
+            <button 
               onClick={handleBack}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3, duration: 0.4 }}
               className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
             >
               <FiArrowLeft className="w-5 h-5 text-gray-700" />
-            </motion.button>
-            <motion.div 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4, duration: 0.4 }}
-              className="flex items-center space-x-3"
-            >
-              <div>
-                <h1 className="text-lg font-bold text-gray-900">알림 상세</h1>
-                <p className="text-xs text-gray-500">알림 내용을 확인하세요</p>
-              </div>
-            </motion.div>
-          </div>
-        </motion.div>
+            </button>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">알림 상세</h1>
+              <p className="text-xs text-gray-500">알림 내용을 확인하세요</p>
+            </div>
+          </motion.div>
+        </div>
       </AnimatedHeader>
 
       <motion.div
