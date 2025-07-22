@@ -252,93 +252,55 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, [setUserProfile, setUserGroups, setGroupMembers, setScheduleData, setGroupPlaces, setLocationData, setDailyLocationCounts]);
 
-  // 초기 인증 상태 확인
+  // 초기 인증 상태 확인 (로직 단순화 및 강화)
   useEffect(() => {
     let isMounted = true;
-    let initializationTimeout: NodeJS.Timeout;
-    
+
     const initializeAuth = async () => {
+      // 항상 로딩 시작
+      dispatch({ type: 'SET_LOADING', payload: true });
+      
       try {
         console.log('[AUTH CONTEXT] 초기 인증 상태 확인 시작');
-        
-        // 🚫 에러 모달이 표시 중이면 초기화 중단
-        if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-          console.log('[AUTH CONTEXT] 🚫 에러 모달 표시 중 - 초기화 중단');
-          dispatch({ type: 'SET_LOADING', payload: false });
-          return;
-        }
-        
-        // 🚫 모든 리다이렉트가 차단된 상태라면 초기화 중단
-        if (typeof window !== 'undefined' && (window as any).__BLOCK_ALL_REDIRECTS__) {
-          console.log('[AUTH CONTEXT] 🚫 리다이렉트 차단 상태 - 초기화 중단');
-          dispatch({ type: 'SET_LOADING', payload: false });
-          return;
-        }
-        
-        // 초기화 타임아웃 설정 (5초)
-        initializationTimeout = setTimeout(() => {
-          if (isMounted) {
-            console.warn('[AUTH CONTEXT] 초기화 타임아웃, 로딩 상태 해제');
-            dispatch({ type: 'SET_LOADING', payload: false });
-          }
-        }, 5000);
-        
-        // 2. authService에서 로그인 상태 확인
-        const isLoggedInFromService = authService.isLoggedIn();
-        console.log('[AUTH CONTEXT] authService.isLoggedIn():', isLoggedInFromService);
-        
-        if (isLoggedInFromService) {
-          const userData = authService.getUserData();
-          console.log('[AUTH CONTEXT] authService.getUserData():', userData);
-          if (userData && isMounted) {
-            console.log('[AUTH CONTEXT] authService에서 사용자 데이터 발견:', userData.mt_name);
-            dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
-            
-            // 최신 데이터로 갱신 (에러 무시)
-            try {
-              await refreshUserData();
-            } catch (error) {
-              console.warn('[AUTH CONTEXT] 사용자 데이터 갱신 실패 (무시):', error);
-            }
-            
-            // 🚀 authService 사용자 프리로딩 실행 (백그라운드, 에러 무시)
-            if (isMounted) {
-              preloadUserData(userData.mt_idx, 'authService').catch(error => {
-                console.warn('[AUTH] authService 사용자 프리로딩 실패 (무시):', error);
-              });
-            }
-            
-            return;
-          }
-        }
 
-        // 3. 둘 다 없으면 로그인되지 않은 상태
-        if (isMounted) {
-          console.log('[AUTH CONTEXT] 로그인 상태 없음');
-          dispatch({ type: 'SET_LOADING', payload: false });
+        // authService를 통해 토큰과 사용자 데이터를 직접 확인
+        const token = authService.getToken();
+        const userData = authService.getUserData();
+
+        if (token && userData) {
+          console.log('[AUTH CONTEXT] 유효한 토큰과 사용자 데이터 발견:', userData.mt_name);
+          if (isMounted) {
+            dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+            // 프리로딩은 백그라운드에서 비동기적으로 실행 (결과를 기다리지 않음)
+            preloadUserData(userData.mt_idx, 'initial-load').catch(error => {
+              console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
+            });
+          }
+        } else {
+          console.log('[AUTH CONTEXT] 유효한 세션 없음. 로그아웃 상태로 설정.');
+          if (isMounted) {
+            dispatch({ type: 'LOGOUT' });
+          }
         }
-        
       } catch (error) {
-        console.error('[AUTH CONTEXT] 초기 인증 상태 확인 실패:', error);
+        console.error('[AUTH CONTEXT] 초기 인증 상태 확인 중 오류 발생:', error);
         if (isMounted) {
-          dispatch({ type: 'SET_LOADING', payload: false });
+          dispatch({ type: 'LOGOUT' }); // 에러 발생 시 안전하게 로그아웃 처리
         }
       } finally {
-        if (initializationTimeout) {
-          clearTimeout(initializationTimeout);
+        // 데이터 확인이 끝나면 로딩 상태 해제
+        if (isMounted) {
+          dispatch({ type: 'SET_LOADING', payload: false });
         }
       }
     };
 
     initializeAuth();
-    
+
     return () => {
       isMounted = false;
-      if (initializationTimeout) {
-        clearTimeout(initializationTimeout);
-      }
     };
-  }, []);
+  }, [preloadUserData]); // preloadUserData를 의존성 배열에 추가
 
   // 로그인
   const login = async (credentials: LoginRequest): Promise<void> => {
