@@ -13,8 +13,14 @@ const isIOSWebView = () => {
   return !!(webkit?.messageHandlers);
 };
 
-// API 기본 URL 설정 - WebKit 최적화
+// API 기본 URL 설정 - 환경변수 우선 사용
 const getApiBaseUrl = () => {
+  // 환경변수가 설정되어 있으면 우선 사용 (Vercel 환경에서 직접 백엔드 호출)
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    console.log('[API CLIENT] 환경변수 API URL 사용:', process.env.NEXT_PUBLIC_API_URL);
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
   if (typeof window !== 'undefined') {
     const isWebKitEnv = isWebKit();
     const protocol = window.location.protocol;
@@ -37,7 +43,7 @@ const getApiBaseUrl = () => {
     
     return `${protocol}//${host}/api`;
   }
-  return process.env.NEXT_PUBLIC_API_URL || '/api';
+  return '/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -125,18 +131,21 @@ const createApiClientConfig = (): AxiosRequestConfig => {
 // Axios 인스턴스 생성
 const apiClient: CustomApiClient = axios.create(createApiClientConfig()) as CustomApiClient;
 
-// 토큰 관리 유틸리티
+// 토큰 관리 유틸리티 - authService와 동일한 키 사용
+const TOKEN_KEY = 'auth-token';
+const USER_KEY = 'smap_user_data';
+
 const getToken = (): string | null => {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('auth-token'); // 실제 사용하는 키로 변경
+    return localStorage.getItem(TOKEN_KEY);
   }
   return null;
 };
 
 const removeToken = (): void => {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('auth-token'); // 실제 사용하는 키로 변경
-    localStorage.removeItem('smap_user_data');
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
   }
 };
 
@@ -146,20 +155,25 @@ apiClient.interceptors.request.use(
     const isWebKitEnv = isWebKit();
     const isIOSWebViewEnv = isIOSWebView();
     
-    // 동적으로 baseURL 설정 (WebKit 최적화)
-    if (!config.baseURL && typeof window !== 'undefined') {
-      const protocol = window.location.protocol;
-      const host = window.location.host;
-      
-      // WebKit 환경에서는 더 안정적인 URL 구성
-      if (isWebKitEnv) {
-        config.baseURL = `${protocol}//${host}/api`;
-        console.log('[API CLIENT] WebKit 환경 - baseURL 설정:', config.baseURL);
+    // 동적으로 baseURL 설정 (환경변수 우선 사용)
+    if (!config.baseURL) {
+      if (process.env.NEXT_PUBLIC_API_URL) {
+        config.baseURL = process.env.NEXT_PUBLIC_API_URL;
+        console.log('[API CLIENT] 환경변수 baseURL 설정:', config.baseURL);
+      } else if (typeof window !== 'undefined') {
+        const protocol = window.location.protocol;
+        const host = window.location.host;
+        
+        // WebKit 환경에서는 더 안정적인 URL 구성
+        if (isWebKitEnv) {
+          config.baseURL = `${protocol}//${host}/api`;
+          console.log('[API CLIENT] WebKit 환경 - baseURL 설정:', config.baseURL);
+        } else {
+          config.baseURL = `${protocol}//${host}/api`;
+        }
       } else {
-        config.baseURL = `${protocol}//${host}/api`;
+        config.baseURL = '/api';
       }
-    } else if (!config.baseURL) {
-      config.baseURL = '/api';
     }
     
     // WebKit 환경에서 추가 헤더 설정
