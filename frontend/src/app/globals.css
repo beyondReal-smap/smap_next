@@ -2155,23 +2155,23 @@ body[data-page="/setting/terms"] .setting-header-content {
 }
 
 /* setting/terms의 motion-div 애니메이션 허용 */
-body[data-page="/setting/terms"] .motion-div {
+/* body[data-page="/setting/terms"] .motion-div {
   transform: none !important;
   -webkit-transform: none !important;
   will-change: auto !important;
-}
+} */
 
 /* setting/terms에서 framer-motion 요소들 애니메이션 허용 */
-body[data-page="/setting/terms"] [data-framer-motion],
+/* body[data-page="/setting/terms"] [data-framer-motion],
 body[data-page="/setting/terms"] .motion-div[data-framer-motion],
 body[data-page="/setting/terms"] .setting-header-content[data-framer-motion] {
   transform: none !important;
   -webkit-transform: none !important;
   will-change: transform !important;
-}
+} */
 
 /* setting/terms에서 모든 Framer Motion 관련 CSS 충돌 제거 */
-body[data-page="/setting/terms"] * {
+/* body[data-page="/setting/terms"] * {
   will-change: auto;
 }
 body[data-page="/setting/terms"] [data-framer-motion],
@@ -2179,7 +2179,7 @@ body[data-page="/setting/terms"] .motion-div {
   will-change: transform !important;
   transform: unset !important;
   -webkit-transform: unset !important;
-}
+} */
 
 /* setting/terms의 setting-back-button 위치 정확히 맞춤 */
 body[data-page="/setting/terms"] .setting-back-button {

@@ -605,14 +605,17 @@ export default function TermsPage() {
           variant="enhanced"
           className="setting-header"
         >
-          <motion.div 
-            initial={{ opacity: 0, x: -50 }}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, ease: [0.25, 1, 0.5, 1] }}
+            transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
             className="setting-header-content motion-div"
           >
-            <motion.button 
+            <motion.button
               onClick={handleBack}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4 }}
               className="setting-back-button"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
