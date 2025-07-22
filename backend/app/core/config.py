@@ -14,6 +14,7 @@ class Settings(BaseSettings):
         "https://118.67.130.71:3000",  # 프론트엔드 서버
         "https://118.67.130.71:8000",  # 백엔드 서버
         "http://127.0.0.1:3000",  # 로컬 IP
+        "https://nextstep.smap.site", # Vercel 배포 주소 추가
     ]
     
     # MySQL 데이터베이스 설정

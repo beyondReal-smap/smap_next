@@ -13,31 +13,15 @@ const isIOSWebView = () => {
   return !!(webkit?.messageHandlers);
 };
 
-// API 기본 URL 설정 - WebKit 최적화
+// API 기본 URL 설정
 const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    const isWebKitEnv = isWebKit();
-    const protocol = window.location.protocol;
-    const host = window.location.host;
-    
-    console.log('[API CLIENT] 환경 감지:', {
-      isWebKit: isWebKitEnv,
-      isIOSWebView: isIOSWebView(),
-      protocol,
-      host,
-      userAgent: navigator.userAgent
-    });
-    
-    // WebKit 환경에서는 더 안정적인 URL 생성
-    if (isWebKitEnv) {
-      const baseUrl = `${protocol}//${host}/api`;
-      console.log('[API CLIENT] WebKit 최적화 URL:', baseUrl);
-      return baseUrl;
-    }
-    
-    return `${protocol}//${host}/api`;
+  // 서버 사이드에서는 환경 변수를 직접 사용
+  if (typeof window === 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'; // 서버사이드 렌더링을 위한 기본값
   }
-  return process.env.NEXT_PUBLIC_API_URL || '/api';
+  
+  // 클라이언트 사이드에서는 환경 변수를 우선 사용하고, 없으면 현재 호스트를 기준으로 /api 경로 사용
+  return process.env.NEXT_PUBLIC_API_URL || `${window.location.protocol}//${window.location.host}/api`;
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -53,7 +37,7 @@ const createApiClientConfig = (): AxiosRequestConfig => {
   const isIOSWebViewEnv = isIOSWebView();
   
   const config: AxiosRequestConfig = {
-    baseURL: '', // 동적으로 설정
+    baseURL: API_BASE_URL, // 생성 시점에 baseURL 설정
     timeout: isWebKitEnv ? 30000 : 60000, // WebKit에서는 더 짧은 타임아웃 (30초)
     headers: {
       'Content-Type': 'application/json',
@@ -145,22 +129,7 @@ apiClient.interceptors.request.use(
   (config) => {
     const isWebKitEnv = isWebKit();
     const isIOSWebViewEnv = isIOSWebView();
-    
-    // 동적으로 baseURL 설정 (WebKit 최적화)
-    if (!config.baseURL && typeof window !== 'undefined') {
-      const protocol = window.location.protocol;
-      const host = window.location.host;
-      
-      // WebKit 환경에서는 더 안정적인 URL 구성
-      if (isWebKitEnv) {
-        config.baseURL = `${protocol}//${host}/api`;
-        console.log('[API CLIENT] WebKit 환경 - baseURL 설정:', config.baseURL);
-      } else {
-        config.baseURL = `${protocol}//${host}/api`;
-      }
-    } else if (!config.baseURL) {
-      config.baseURL = '/api';
-    }
+    // baseURL이 이미 설정되어 있으므로, 인터셉터에서 재설정하는 로직 제거
     
     // WebKit 환경에서 추가 헤더 설정
     if (isWebKitEnv) {
