@@ -201,7 +201,7 @@ export default function NoticeDetailPage() {
       
       {/* 메인 컨텐츠 */}
       <main 
-        className="absolute inset-0 pt-14 overflow-y-auto"
+        className="absolute inset-0 pt-14 overflow-y-auto hide-scrollbar"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div className="p-4">
