@@ -13,8 +13,8 @@ import { useMapPreloader } from '@/hooks/useMapPreloader';
 // import { useServiceWorker } from '@/hooks/useServiceWorker';
 // import PerformanceMonitor from '@/components/PerformanceMonitor';
 
-// 인증이 필요하지 않은 페이지들 (루트 페이지는 자체적으로 리다이렉트 처리)
-const PUBLIC_ROUTES = ['/signin', '/register', '/register/new-page', '/login', '/social-login', '/', '/group'];
+// 인증이 필요하지 않은 페이지들 (이제 사용되지 않지만, 참고용으로 남겨둠)
+// const PUBLIC_ROUTES = ['/signin', '/register', '/register/new-page', '/login', '/social-login', '/', '/group'];
 
 // 그룹 가입 페이지는 공개 페이지로 처리 (인증 없이도 접근 가능)
 const isGroupJoinPage = (pathname: string) => {
@@ -25,13 +25,12 @@ const isGroupJoinPage = (pathname: string) => {
 
 import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
 
-// 인증 가드 컴포넌트
+// 인증 가드 컴포넌트 (리디렉션 로직 제거)
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, loading } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
 
-  // 앱 시작 시 대기 중인 그룹 가입 처리
+  // 앱 시작 시 대기 중인 그룹 가입 처리 로직은 유지
   useEffect(() => {
     const handlePendingGroupJoin = async () => {
       // 로그인되지 않았거나 로딩 중이면 처리하지 않음
@@ -75,65 +74,10 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     handlePendingGroupJoin();
   }, [isLoggedIn, loading, router]);
 
-  useEffect(() => {
-    // 🚫 전역 에러 모달 플래그 확인 - 모든 네비게이션 차단
-    if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-      console.log('[AUTH GUARD] 🚫 전역 에러 모달 활성화 - 모든 네비게이션 차단');
-      return;
-    }
-
-    // 로딩 중이면 대기
-    if (loading) {
-      return;
-    }
-
-    // 공개 페이지는 인증 체크 안함
-    if (PUBLIC_ROUTES.includes(pathname) || isGroupJoinPage(pathname)) {
-      console.log('[AUTH GUARD] 🟢 공개 페이지 접근 허용:', pathname, {
-        isPublicRoute: PUBLIC_ROUTES.includes(pathname),
-        isGroupJoinPage: isGroupJoinPage(pathname),
-        isLoggedIn,
-        loading
-      });
-      return;
-    }
-
-    // 로그인되지 않은 상태에서 보호된 페이지 접근 시 즉시 signin으로 리다이렉트
-    // 단, 이미 signin 페이지에 있으면 리다이렉트하지 않음
-    if (!isLoggedIn && pathname !== '/signin') {
-      // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
-      if (typeof window !== 'undefined' && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-        console.log('[AUTH GUARD] 🚫 에러 모달 표시 중 - 인증되지 않은 접근 리다이렉트 방지');
-        return;
-      }
-      
-      console.log('[AUTH GUARD] 🔴 인증되지 않은 접근, signin으로 리다이렉트:', pathname, {
-        isLoggedIn,
-        loading,
-        isGroupJoinPage: isGroupJoinPage(pathname),
-        isPublicRoute: PUBLIC_ROUTES.includes(pathname)
-      });
-      router.replace('/signin'); // push 대신 replace 사용으로 뒤로가기 방지
-      return;
-    }
-  }, [isLoggedIn, loading, pathname, router]);
-
-  // 로딩 중이면 로딩 화면 표시
+  // 로딩 중일 때만 스피너를 보여주고, 그 외에는 항상 children을 렌더링
+  // 리디렉션 책임은 하위의 (authenticated)/layout.tsx 로 위임
   if (loading) {
     return <IOSCompatibleSpinner message="로딩 중..." fullScreen />;
-  }
-
-  // 인증되지 않은 사용자가 보호된 페이지에 접근하려는 경우 즉시 리다이렉트
-  // 빈 화면 표시 없이 바로 signin으로 이동
-  if (!isLoggedIn && !PUBLIC_ROUTES.includes(pathname) && !isGroupJoinPage(pathname) && pathname !== '/signin') {
-    console.log('[AUTH GUARD] 🔴 인증되지 않은 사용자, 즉시 signin으로 리다이렉트:', pathname, {
-      isLoggedIn,
-      loading,
-      isGroupJoinPage: isGroupJoinPage(pathname),
-      isPublicRoute: PUBLIC_ROUTES.includes(pathname)
-    });
-    router.push('/signin');
-    return null; // 빈 화면 대신 null 반환으로 즉시 리다이렉트
   }
 
   return <>{children}</>;
