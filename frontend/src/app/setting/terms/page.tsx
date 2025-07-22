@@ -369,11 +369,32 @@ export default function TermsPage() {
   const [isLoadingConsents, setIsLoadingConsents] = useState(true);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
-  // body에 data-page 속성 추가
+  // body에 data-page 속성 추가 및 스크롤 스타일 제어
   useEffect(() => {
     document.body.setAttribute('data-page', '/setting/terms');
+    
+    // 이 페이지에서만 스크롤 허용
+    const html = document.documentElement;
+    const body = document.body;
+    html.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    body.style.height = '100vh';
+    
+    // 메인 컨텐츠 영역만 스크롤 가능하도록 설정
+    const contentElement = document.querySelector('.scrollable-content');
+    if (contentElement) {
+      body.style.overflow = 'hidden';
+      body.style.touchAction = 'none';
+      contentElement.classList.add('scrollable-content');
+    }
+
     return () => {
       document.body.removeAttribute('data-page');
+      // 페이지를 떠날 때 원래 스타일로 복구
+      html.style.overflow = '';
+      body.style.overflow = '';
+      body.style.height = '';
+      body.style.touchAction = '';
     };
   }, []);
 
@@ -576,47 +597,35 @@ export default function TermsPage() {
     <>
       <style jsx global>{pageAnimations}</style>
       <div 
-        className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-amber-50"
+        className="min-h-screen bg-gradient-to-br from-yellow-50 via-white to-amber-50 scrollable-content"
         data-page="/setting/terms"
       >
         {/* notice 페이지와 동일한 헤더 */}
         <AnimatedHeader 
           variant="enhanced"
-          className="fixed top-0 left-0 right-0 z-20 glass-effect header-fixed"
+          className="sticky top-0 left-0 right-0 z-20 glass-effect"
         >
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="flex items-center justify-between h-14 px-4"
-          >
-            <div className="flex items-center space-x-3">
-              <motion.button 
+          <div className="flex items-center justify-between h-14 px-4">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+              className="flex items-center space-x-3"
+            >
+              <button 
                 onClick={handleBack}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3, duration: 0.4 }}
                 className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-              </motion.button>
-              <motion.div 
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4, duration: 0.4 }}
-                className="flex items-center space-x-3"
-              >
-                <div>
-                  <h1 className="text-lg font-bold text-gray-900">약관 및 동의</h1>
-                  <p className="text-xs text-gray-500">서비스 이용 약관 관리</p>
-                </div>
-              </motion.div>
-            </div>
-          </motion.div>
+              </button>
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">약관 및 동의</h1>
+                <p className="text-xs text-gray-500">서비스 이용 약관 관리</p>
+              </div>
+            </motion.div>
+          </div>
         </AnimatedHeader>
 
         {/* 메인 컨텐츠 - notice 페이지와 동일한 구조 */}
