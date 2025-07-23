@@ -80,13 +80,13 @@ export default function ProfilePage() {
       }
 
       // JWT 기반 profile API 사용 (백엔드 폴백 기능 포함)
-      const response = await fetch('/api/auth/profile', {
+      const response = await fetch('/api/v1/members/profile', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
-      console.log('📡 /api/auth/profile 응답 상태:', response.status);
+              console.log('📡 /api/v1/members/profile 응답 상태:', response.status);
 
       if (response.ok) {
         const data = await response.json();

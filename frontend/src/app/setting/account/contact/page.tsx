@@ -38,14 +38,14 @@ export default function ContactPage() {
       console.log('🔄 사용자 연락처 정보 로드 시작');
 
       // 데이터베이스에서 실시간으로 사용자 정보 가져오기
-      const response = await fetch('/api/auth/profile', {
+      const response = await fetch('/api/v1/members/profile', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-      console.log('📡 /api/auth/profile 응답 상태:', response.status);
+              console.log('📡 /api/v1/members/profile 응답 상태:', response.status);
 
       if (response.ok) {
         const data = await response.json();
