@@ -438,7 +438,7 @@ export default function SettingsPage() {
       component: 'setting', 
       action: 'back-navigation' 
     });
-    router.back();
+    router.push('/home');
   };
 
   return (
