@@ -46,7 +46,7 @@ export async function GET(
 
     // 백엔드 API 호출
     const backendUrl = process.env.NODE_ENV === 'production' 
-      ? (process.env.BACKEND_URL || 'https://nextstep.smap.site')
+      ? (process.env.BACKEND_URL || 'https://118.67.130.71')
       : (process.env.BACKEND_URL || 'https://118.67.130.71:8000');
     
     console.log('[CONSENT API] 사용된 백엔드 URL:', backendUrl);

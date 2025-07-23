@@ -3,7 +3,7 @@ import { verifyJWT } from '@/lib/auth';
 
 // 운영 환경에서는 다른 백엔드 URL 사용
 const BACKEND_URL = process.env.NODE_ENV === 'production' 
-  ? (process.env.BACKEND_URL || 'https://nextstep.smap.site')
+  ? (process.env.BACKEND_URL || 'https://118.67.130.71')
   : (process.env.BACKEND_URL || 'https://118.67.130.71:8000');
 
 // node-fetch를 대안으로 사용
@@ -124,9 +124,13 @@ export async function GET(request: NextRequest) {
     console.log('📡 백엔드 요청 시작...');
     console.log('🔧 실제 요청 URL:', `${BACKEND_URL}/api/v1/members/me`);
     
-    let response;
+    // fetchWithFallback 함수 사용
+    console.log('📡 백엔드 요청 시작...');
+    console.log('🔧 실제 요청 URL:', `${BACKEND_URL}/api/v1/members/me`);
+    
+    let backendData;
     try {
-      response = await fetch(`${BACKEND_URL}/api/v1/members/me`, {
+      backendData = await fetchWithFallback(`${BACKEND_URL}/api/v1/members/me`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -134,25 +138,18 @@ export async function GET(request: NextRequest) {
         },
       });
       
-      console.log('📡 백엔드 응답 상태:', response.status);
-      console.log('📡 백엔드 응답 헤더:', Object.fromEntries(response.headers.entries()));
+      console.log('📡 백엔드 응답 성공');
     } catch (fetchError) {
       console.error('❌ 백엔드 요청 실패:', fetchError);
       return NextResponse.json(
-        { success: false, message: '백엔드 서버에 연결할 수 없습니다.' },
+        { 
+          success: false, 
+          message: '백엔드 서버에 연결할 수 없습니다.',
+          error: fetchError instanceof Error ? fetchError.message : String(fetchError)
+        },
         { status: 503 }
       );
     }
-
-    if (!response.ok) {
-      console.error('[Profile API] 백엔드 응답 오류:', response.status, response.statusText);
-      return NextResponse.json(
-        { success: false, message: '프로필 조회에 실패했습니다.' },
-        { status: response.status }
-      );
-    }
-
-    const backendData = await response.json();
     console.log('🔍 FastAPI 서버 응답:', JSON.stringify(backendData, null, 2));
     console.log('✅ FastAPI 백엔드 프로필 조회 성공');
     
