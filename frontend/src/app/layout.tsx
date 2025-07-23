@@ -115,6 +115,42 @@ export const viewport: Viewport = {
 
 export const metadata = getMetadata()
 
+// iOS WebView 감지 및 초기화
+function IOSWebViewInitializer() {
+  if (typeof window !== 'undefined') {
+    // iOS WebView 감지
+    const isIOSWebView = window.webkit && window.webkit.messageHandlers;
+    
+    if (isIOSWebView) {
+      console.log('[LAYOUT] iOS WebView 감지됨, 초기화 시작');
+      
+      // iOS WebView에서 페이지 로드 완료 알림
+      try {
+        const messageHandlers = (window.webkit?.messageHandlers as any);
+        if (messageHandlers?.pageLoaded) {
+          messageHandlers.pageLoaded.postMessage({
+            url: window.location.href,
+            pathname: window.location.pathname,
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent
+          });
+        }
+      } catch (error) {
+        console.warn('[LAYOUT] iOS WebView 메시지 전송 실패:', error);
+      }
+      
+      // iOS WebView에서 라우팅 문제 해결
+      if (window.location.pathname === '/' && !window.location.search.includes('ios')) {
+        console.log('[LAYOUT] iOS WebView 루트 경로에서 리다이렉트 방지');
+        // 루트 경로에서 자동 리다이렉트 방지
+        window.history.replaceState(null, '', '/?ios=true');
+      }
+    }
+  }
+  
+  return null;
+}
+
 export default function RootLayout({
   children,
 }: {
