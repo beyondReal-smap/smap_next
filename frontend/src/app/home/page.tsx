@@ -81,6 +81,7 @@ import { MapSkeleton } from '@/components/common/MapSkeleton';
 import { FiLoader, FiChevronDown, FiUser, FiCalendar } from 'react-icons/fi';
 import { FaCrown } from 'react-icons/fa';
 import config, { API_KEYS, detectLanguage, MAP_CONFIG } from '../../config';
+import { cubicBezier } from 'framer-motion';
 import mapService, { 
   MapType as MapTypeService, 
   MAP_API_KEYS, 
@@ -5295,26 +5296,28 @@ export default function HomePage() {
       };
     }, [isSidebarOpen]);
 
-  // 사이드바 애니메이션 variants (모바일 사파리 최적화)
+  // 사이드바 애니메이션 variants (고급스러운 효과)
   const sidebarVariants = {
     closed: {
-      x: '-100%',
+      x: -40,
+      opacity: 0,
+      scale: 0.98,
+      filter: 'blur(2px)',
+      boxShadow: '0 0 0 rgba(0,0,0,0)',
       transition: {
-        type: 'spring' as const,
-        stiffness: 500, // 300에서 500으로 높여서 더 빠르게
-        damping: 40, // 30에서 40으로 높여서 더 안정적
-        mass: 0.6, // 0.8에서 0.6으로 줄여서 더 가볍게
-        duration: 0.3 // 0.4에서 0.3으로 줄여서 더 빠르게
+        duration: 0.35,
+        ease: cubicBezier(0.4, 0.0, 0.2, 1)
       }
     },
     open: {
       x: 0,
+      opacity: 1,
+      scale: 1,
+      filter: 'blur(0px)',
+      boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
       transition: {
-        type: 'spring' as const,
-        stiffness: 500, // 300에서 500으로 높여서 더 빠르게
-        damping: 40, // 30에서 40으로 높여서 더 안정적
-        mass: 0.6, // 0.8에서 0.6으로 줄여서 더 가볍게
-        duration: 0.3 // 0.4에서 0.3으로 줄여서 더 빠르게
+        duration: 0.45,
+        ease: cubicBezier(0.4, 0.0, 0.2, 1)
       }
     }
   };
@@ -5322,15 +5325,13 @@ export default function HomePage() {
   const sidebarOverlayVariants = {
     closed: {
       opacity: 0,
-      transition: {
-        duration: 0.2 // 0.3에서 0.2로 줄여서 더 빠르게
-      }
+      filter: 'blur(0px)',
+      transition: { duration: 0.2 }
     },
     open: {
       opacity: 1,
-      transition: {
-        duration: 0.2 // 0.3에서 0.2로 줄여서 더 빠르게
-      }
+      filter: 'blur(2.5px)',
+      transition: { duration: 0.35 }
     }
   };
 
@@ -5338,16 +5339,18 @@ export default function HomePage() {
     closed: {
       opacity: 0,
       x: -30,
+      scale: 0.98,
       transition: {
-        duration: 0.2 // 사이드바와 완전히 동일한 duration
+        duration: 0.2
       }
     },
     open: {
       opacity: 1,
       x: 0,
+      scale: 1,
       transition: {
-        duration: 0.2, // 사이드바와 완전히 동일한 duration
-        delay: 0.02 // 최소한의 지연
+        duration: 0.25,
+        delay: 0.05
       }
     }
   };
@@ -5847,7 +5850,8 @@ export default function HomePage() {
                      background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                      borderColor: 'rgba(1, 19, 163, 0.1)',
                      height: 'calc(100vh - 40px)',
-                     // 모바일 사파리 최적화
+                     borderRadius: '0 18px 18px 0',
+                     boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
                      transform: 'translateZ(0)',
                      willChange: 'transform',
                      backfaceVisibility: 'hidden',

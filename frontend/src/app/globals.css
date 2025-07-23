@@ -2093,15 +2093,6 @@ body[data-page="/setting/terms"] .setting-header {
   /* 모든 스타일 무효화 - 위의 새로운 스타일이 적용됨 */
 }
 
-/* ===== SETTING/TERMS 페이지 헤더 고정 - 모든 충돌 제거 ===== */
-/* 기존 모든 setting/terms 관련 스타일 무효화 */
-body[data-page="/setting/terms"] * {
-  position: static !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-  will-change: auto !important;
-}
-
 /* 헤더만 완전 고정 */
 body[data-page="/setting/terms"] .header-fixed,
 body[data-page="/setting/terms"] .fixed.top-0.left-0.right-0.z-20.glass-effect.header-fixed,
@@ -2148,10 +2139,16 @@ body[data-page="/setting/terms"] .setting-header-content {
   gap: 12px !important;
   position: relative !important;
   width: 100% !important;
-  /* Framer Motion 애니메이션을 위해 transform 제거 */
-  transform: none !important;
-  -webkit-transform: none !important;
-  will-change: auto !important;
+  /* transform: none !important; */
+  /* -webkit-transform: none !important; */
+  /* will-change: auto !important; */
+}
+
+/* setting/terms에서 motion-div 애니메이션 허용 */
+body[data-page="/setting/terms"] .setting-header-content.motion-div {
+  transform: unset !important;
+  -webkit-transform: unset !important;
+  will-change: transform !important;
 }
 
 /* setting/terms의 motion-div 애니메이션 허용 */
@@ -2202,10 +2199,10 @@ body[data-page="/setting/terms"] .header-fixed *,
 body[data-page="/setting/terms"] .fixed.top-0.left-0.right-0.z-20.glass-effect.header-fixed *,
 body[data-page="/setting/terms"] .AnimatedHeader *,
 body[data-page="/setting/terms"] .setting-header * {
-  position: static !important;
-  transform: none !important;
-  -webkit-transform: none !important;
-  will-change: auto !important;
+  /* position: static !important; */
+  /* transform: none !important; */
+  /* -webkit-transform: none !important; */
+  /* will-change: auto !important; */
 }
 
 /* 메인 콘텐츠 패딩 조정 */
@@ -3519,4 +3516,18 @@ body[data-page="/notice"] .setting-header,
 
 .content-area::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
+}
+
+body[data-page="/setting/terms"] *:not(.motion-div):not([data-framer-motion]) {
+  position: static !important;
+  /* transform: none !important; */
+  /* -webkit-transform: none !important; */
+  /* will-change: auto !important; */
+}
+
+body[data-page="/setting/terms"] .motion-div,
+body[data-page="/setting/terms"] [data-framer-motion] {
+  will-change: transform !important;
+  transform: unset !important;
+  -webkit-transform: unset !important;
 }

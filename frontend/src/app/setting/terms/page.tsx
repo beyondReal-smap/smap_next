@@ -478,7 +478,7 @@ export default function TermsPage() {
       component: 'terms', 
       action: 'back-navigation' 
     });
-    router.back();
+    router.push('/setting');
   };
 
   // 약관 상세 보기
@@ -605,13 +605,13 @@ export default function TermsPage() {
           variant="enhanced"
           className="setting-header"
         >
-          <motion.div
+          <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
-            className="setting-header-content motion-div"
+            className="setting-header-content"
           >
-            <motion.button
+            <motion.button 
               onClick={handleBack}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -624,11 +624,12 @@ export default function TermsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </motion.button>
-            <div className="setting-header-text">
+              <div className="setting-header-text">
               <h1 className="text-lg font-bold text-gray-900 leading-tight">약관 및 동의</h1>
               <p className="text-xs text-gray-500 leading-tight">서비스 이용 약관 관리</p>
             </div>
-          </motion.div>
+            </motion.div>
+          {/* </motion.div> */}
         </AnimatedHeader>
 
         {/* 메인 컨텐츠 - notice 페이지와 동일한 구조 */}
@@ -636,13 +637,14 @@ export default function TermsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="px-4 pt-20 space-y-6 pb-24"
+          className="px-4 space-y-6 pb-24"
         >
           {/* 동의 현황 카드 - 노란색 테마 */}
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.6 }}
+            className="mt-4"
           >
             <div className="bg-[#EBB305] rounded-3xl p-6 text-white shadow-xl">
               <div className="flex items-center space-x-4">

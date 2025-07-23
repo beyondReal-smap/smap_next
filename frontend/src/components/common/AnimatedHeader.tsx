@@ -61,16 +61,16 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
   // 애니메이션 변형
   const animationVariants = {
     simple: {
-      initial: { opacity: 0, x: -30 },
+      initial: duration === 0 ? { opacity: 1, x: 0 } : { opacity: 0, x: -30 },
       animate: { opacity: 1, x: 0 },
-      exit: { opacity: 0, x: -30 },
-      transition: { duration: 0.5, delay }
+      exit: duration === 0 ? { opacity: 1, x: 0 } : { opacity: 0, x: -30 },
+      transition: { duration: duration === 0 ? 0 : 0.5, delay }
     },
     enhanced: {
-      initial: { opacity: 0, y: -20, scale: 0.95 },
-      animate: { opacity: 1, y: 0, scale: 1 },
-      exit: { opacity: 0, y: -20, scale: 0.95 },
-      transition: { duration, delay }
+      initial: duration === 0 ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: -30, scale: 0.95 },
+      animate: { opacity: 1, x: 0, scale: 1 },
+      exit: duration === 0 ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: -30, scale: 0.95 },
+      transition: { duration: duration === 0 ? 0 : duration, delay }
     }
   };
 

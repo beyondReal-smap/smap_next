@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { hapticFeedback } from '@/utils/haptic';
 import memberService from '@/services/memberService';
+import { cubicBezier } from 'framer-motion';
 
 // Dynamic Imports for better code splitting
 const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
@@ -283,15 +284,25 @@ const floatingCardVariants = {
 // 사이드바 애니메이션 - 더 부드럽고 자연스럽게
 const sidebarVariants = {
   closed: {
-    x: '-100%',
+    x: -40,
+    opacity: 0,
+    scale: 0.98,
+    filter: 'blur(2px)',
+    boxShadow: '0 0 0 rgba(0,0,0,0)',
     transition: {
-      duration: 0.25 // 더 빠르고 부드럽게
+      duration: 0.35,
+      ease: cubicBezier(0.4, 0.0, 0.2, 1)
     }
   },
   open: {
     x: 0,
+    opacity: 1,
+    scale: 1,
+    filter: 'blur(0px)',
+    boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
     transition: {
-      duration: 0.25 // 더 빠르고 부드럽게
+      duration: 0.45,
+      ease: cubicBezier(0.4, 0.0, 0.2, 1)
     }
   }
 };
@@ -7469,6 +7480,7 @@ export default function ActivelogPage() {
               height: '100vh',
               maxHeight: '100vh',
               position: 'fixed',
+              borderRadius: '0 18px 18px 0',
               // 모바일 사파리 최적화
               transform: 'translateZ(0)',
               willChange: 'transform',

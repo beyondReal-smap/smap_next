@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { hapticFeedback } from '../../../utils/haptic';
+import { cubicBezier } from 'framer-motion';
 
 export default function BottomNavBar() {
   const pathname = usePathname();
@@ -209,49 +210,43 @@ export default function BottomNavBar() {
                   )}
                   
                   {/* 랜덤 깜빡이는 점 효과 */}
-                  {isActive && (
-                    <>
+                  {isActive && (() => {
+                    // 3개 점의 위치(원형 배치)
+                    const radius = 14;
+                    const centerX = 10;
+                    const centerY = 10;
+                    const dotCount = 3;
+                    const hotPink = '#ff1b6b';
+                    // 3개 위치 각도 (120도 간격)
+                    const angles = [ -90, 30, 150 ];
+                    // 점 위치 인덱스를 useRef로 고정
+                    const dotIndexRef = React.useRef<number | null>(null);
+                    if (dotIndexRef.current === null) {
+                      dotIndexRef.current = Math.floor(Math.random() * dotCount);
+                    }
+                    const randomIndex = dotIndexRef.current;
+                    const angle = angles[randomIndex] * Math.PI / 180;
+                    const x = centerX + radius * Math.cos(angle);
+                    const y = centerY + radius * Math.sin(angle);
+                    return (
                       <div
-                        className="absolute random-blink-dot"
+                        key={randomIndex}
+                        className="random-blink-dot"
                         style={{
-                          top: '-4px',
-                          right: '-4px',
+                          position: 'absolute' as const,
+                          left: `${x}px`,
+                          top: `${y}px`,
                           width: '4px',
                           height: '4px',
-                          background: '#0113A3',
+                          background: hotPink,
                           borderRadius: '50%',
-                          animation: 'randomBlink 2s infinite',
-                          animationDelay: `${randomDelays[0]}s`
+                          animation: `sparkle 1.2s infinite`,
+                          animationDelay: `${randomDelays[randomIndex % 3]}s`,
+                          boxShadow: '0 0 6px 2px #ff1b6b66',
                         }}
                       />
-                      <div
-                        className="absolute random-blink-dot"
-                        style={{
-                          top: '12px',
-                          left: '-6px',
-                          width: '3px',
-                          height: '3px',
-                          background: '#0113A3',
-                          borderRadius: '50%',
-                          animation: 'randomBlink 2.5s infinite',
-                          animationDelay: `${randomDelays[1]}s`
-                        }}
-                      />
-                      <div
-                        className="absolute random-blink-dot"
-                        style={{
-                          bottom: '-2px',
-                          right: '-2px',
-                          width: '2px',
-                          height: '2px',
-                          background: '#0113A3',
-                          borderRadius: '50%',
-                          animation: 'randomBlink 1.8s infinite',
-                          animationDelay: `${randomDelays[2]}s`
-                        }}
-                      />
-                    </>
-                  )}
+                    );
+                  })()}
                   
                   {/* 홈 아이콘 */}
                   {icon === 'home' && (
