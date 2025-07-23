@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyJWT } from '@/lib/auth';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
 
@@ -80,52 +81,57 @@ async function fetchWithFallback(url: string, options: any = {}): Promise<any> {
 
 export async function GET(request: NextRequest) {
   try {
-    // Authorization 헤더 전달
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader) {
+    // JWT 토큰 검증
+    const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
+                  request.cookies.get('token')?.value;
+    
+    if (!token) {
+      console.log('[Profile API] 토큰 없음');
       return NextResponse.json(
-        { 
-          success: false, 
-          message: '인증 토큰이 필요합니다.' 
-        },
+        { success: false, message: '인증이 필요합니다.' },
+        { status: 401 }
+      );
+    }
+
+    const decoded = verifyJWT(token);
+    if (!decoded) {
+      console.log('[Profile API] 토큰 검증 실패');
+      return NextResponse.json(
+        { success: false, message: '유효하지 않은 토큰입니다.' },
         { status: 401 }
       );
     }
 
     console.log('🔄 FastAPI 백엔드로 사용자 프로필 조회 요청 전달');
-    console.log('🔑 Authorization 헤더:', authHeader.substring(0, 50) + '...');
+    console.log('🔑 토큰 검증 성공, 사용자 ID:', decoded.mt_idx);
     console.log('🌐 백엔드 URL:', `${BACKEND_URL}/api/v1/members/me`);
+    console.log('🌐 전체 요청 URL:', `${BACKEND_URL}/api/v1/members/me`);
+    console.log('🌍 환경 변수 BACKEND_URL:', process.env.BACKEND_URL);
+    console.log('🔧 사용된 BACKEND_URL:', BACKEND_URL);
 
     // FastAPI 백엔드 API 호출 (fetchWithFallback 사용)
-    const backendData = await fetchWithFallback(`${BACKEND_URL}/api/v1/members/me`, {
+    console.log('📡 백엔드 요청 시작...');
+    const response = await fetch(`${BACKEND_URL}/api/v1/members/me`, {
       method: 'GET',
       headers: {
-        'Authorization': authHeader,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
     });
 
-    console.log('🔍 FastAPI 서버 응답:', JSON.stringify(backendData, null, 2));
-
-    if (backendData.success || backendData.result === 'Y') {
-      console.log('✅ FastAPI 백엔드 프로필 조회 성공');
-      
-      return NextResponse.json({
-        success: true,
-        data: backendData.data,
-        message: backendData.message || '프로필 조회가 성공했습니다.'
-      });
-    } else {
-      console.log('❌ FastAPI 백엔드 프로필 조회 실패:', backendData.message);
-      console.log('❌ 전체 응답 데이터:', JSON.stringify(backendData, null, 2));
-      
+    if (!response.ok) {
+      console.error('[Profile API] 백엔드 응답 오류:', response.status, response.statusText);
       return NextResponse.json(
-        { 
-          success: false, 
-          message: backendData.message || '프로필 조회에 실패했습니다.' 
-        },
-        { status: 400 }
+        { success: false, message: '프로필 조회에 실패했습니다.' },
+        { status: response.status }
       );
     }
+
+    const backendData = await response.json();
+    console.log('🔍 FastAPI 서버 응답:', JSON.stringify(backendData, null, 2));
+    console.log('✅ FastAPI 백엔드 프로필 조회 성공');
+    
+    return NextResponse.json(backendData);
 
   } catch (error) {
     console.error('❌ 프로필 조회 API 오류:', error);
