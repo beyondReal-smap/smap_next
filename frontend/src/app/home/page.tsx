@@ -824,6 +824,13 @@ export default function HomePage() {
   const [criticalError, setCriticalError] = useState<string | null>(null);
   const [renderAttempts, setRenderAttempts] = useState(0);
   
+  // 🗺️ 지도 로딩 에러 처리 상태
+  const [mapLoadError, setMapLoadError] = useState<string | null>(null);
+  const [mapRetryCount, setMapRetryCount] = useState(0);
+  const [showMapRetryButton, setShowMapRetryButton] = useState(false);
+  const [mapLoadTimeout, setMapLoadTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [naverMapLoadFailed, setNaverMapLoadFailed] = useState(false);
+  
   // 🚨 iOS 시뮬레이터 디버깅 - 즉시 실행 로그
   console.log('🏠 [HOME] HomePage 컴포넌트 시작');
   
@@ -874,8 +881,13 @@ export default function HomePage() {
     return () => {
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+      
+      // 타임아웃 정리
+      if (mapLoadTimeout) {
+        clearTimeout(mapLoadTimeout);
+      }
     };
-  }, []);
+  }, [mapLoadTimeout]);
   const router = useRouter();
   // 인증 관련 상태 추가
   const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
@@ -2071,6 +2083,11 @@ export default function HomePage() {
     
     // 페이지 재방문 시에도 지도가 제대로 표시되도록 강제 초기화
     const forceMapInitialization = () => {
+      // 에러 상태 리셋
+      setMapLoadError(null);
+      setShowMapRetryButton(false);
+      setMapRetryCount(0);
+      
       // API 로드 상태 재검증
       const isNaverReady = window.naver?.maps && naverMapsLoaded;
       const isGoogleReady = window.google?.maps && googleMapsLoaded;
@@ -2247,7 +2264,56 @@ export default function HomePage() {
   };
 
   // Naver Maps API 로드 함수 (프리로딩 최적화 + iOS WebView 지원)
+  // 🗺️ 지도 로딩 에러 처리 함수
+  const handleMapLoadError = (error: string, retryFunction: () => void) => {
+    console.error('[HOME] 🗺️ 지도 로딩 에러:', error);
+    setMapLoadError(error);
+    setShowMapRetryButton(true);
+    setIsMapLoading(false);
+    
+    // 에러 메시지 설정
+    let userMessage = '지도를 불러오는 중 문제가 발생했습니다.';
+    if (error.includes('네트워크')) {
+      userMessage = '네트워크 연결을 확인해주세요.';
+    } else if (error.includes('인증')) {
+      userMessage = '지도 서비스 인증에 문제가 있습니다.';
+    } else if (error.includes('타임아웃')) {
+      userMessage = '지도 로딩 시간이 초과되었습니다.';
+    }
+    
+    setMapLoadError(userMessage);
+    
+    // 재시도 횟수 제한 (최대 3회)
+    if (mapRetryCount < 3) {
+      console.log(`[HOME] 🗺️ 지도 재시도 ${mapRetryCount + 1}/3`);
+    } else {
+      console.log('[HOME] 🗺️ 지도 재시도 횟수 초과');
+      setMapLoadError('지도 로딩에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    }
+  };
+
+  // 🗺️ 지도 재시도 함수
+  const retryMapLoading = () => {
+    console.log('[HOME] 🗺️ 지도 재시도 시작');
+    setMapLoadError(null);
+    setShowMapRetryButton(false);
+    setMapRetryCount(prev => prev + 1);
+    setIsMapLoading(true);
+    
+    // 기존 타임아웃 정리
+    if (mapLoadTimeout) {
+      clearTimeout(mapLoadTimeout);
+    }
+    
+    // 네이버 지도 재시도
+    loadNaverMapsAPI();
+  };
+
   const loadNaverMapsAPI = () => {
+    // 에러 상태 초기화
+    setMapLoadError(null);
+    setShowMapRetryButton(false);
+    
     // iOS WebView 감지
     const isIOSWebView = typeof window !== 'undefined' && 
                         window.webkit && 
@@ -2352,15 +2418,10 @@ export default function HomePage() {
           hasErrorOccurred = true;
           console.error('[HOME] 네이버 지도 API 인증/서버 오류 감지:', errorMessage);
           
-          // 구글맵으로 전환하지 않고 네이버맵 재시도
-          setIsMapLoading(false);
-          setNaverMapsLoaded(false);
-          
-          // 네이버맵 재시도
-          setTimeout(() => {
-            console.log('[HOME] 네이버 지도 오류 후 재시도...');
-            loadNaverMapsAPI();
-          }, 5000);
+          // 에러 처리 함수 호출
+          const errorType = errorMessage.includes('Unauthorized') ? '인증' : 
+                           errorMessage.includes('Internal Server Error') ? '서버' : '네트워크';
+          handleMapLoadError(`${errorType} 오류가 발생했습니다.`, loadNaverMapsAPI);
           
           // 에러 리스너 제거
           if (errorListener) {
@@ -2399,17 +2460,11 @@ export default function HomePage() {
       };
       
       script.onerror = () => {
-        console.error('[HOME] 네이버 지도 백업 로드 실패 - 재시도 중...');
+        console.error('[HOME] 네이버 지도 백업 로드 실패');
         hasErrorOccurred = true;
-        setIsMapLoading(false);
         
-        // 네이버맵 로딩 재시도 (구글맵으로 전환하지 않음)
-        setTimeout(() => {
-          if (!naverMapsLoaded) {
-            console.log('[HOME] 네이버맵 재시도 중...');
-            loadNaverMapsAPI();
-          }
-        }, 2000);
+        // 에러 처리 함수 호출
+        handleMapLoadError('지도 스크립트 로드에 실패했습니다.', loadNaverMapsAPI);
         
         // 에러 리스너 제거
         if (errorListener) {
@@ -2428,18 +2483,13 @@ export default function HomePage() {
       
       // iOS WebView에서는 더 긴 타임아웃 설정 (15초)
       const timeout = isIOSWebView ? 15000 : 10000;
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         if (!naverMapsLoaded && !hasErrorOccurred) {
-          console.warn(`[HOME] 네이버 지도 로딩 타임아웃 (${timeout}ms) - 재시도 중...`);
+          console.warn(`[HOME] 네이버 지도 로딩 타임아웃 (${timeout}ms)`);
           hasErrorOccurred = true;
           
-          // 네이버맵 재시도 (구글맵으로 전환하지 않음)
-          setTimeout(() => {
-            if (!naverMapsLoaded) {
-              console.log('[HOME] 네이버맵 타임아웃 후 재시도...');
-              loadNaverMapsAPI();
-            }
-          }, 3000);
+          // 에러 처리 함수 호출
+          handleMapLoadError('지도 로딩 시간이 초과되었습니다.', loadNaverMapsAPI);
           
           // 에러 리스너 제거
           if (errorListener) {
@@ -2448,6 +2498,9 @@ export default function HomePage() {
           }
         }
       }, timeout);
+      
+      // 타임아웃 ID 저장
+      setMapLoadTimeout(timeoutId);
     }
   };
 
@@ -5730,6 +5783,52 @@ export default function HomePage() {
               showMemberList={false}
               className="absolute top-0 left-0 w-full h-full z-5" 
             />
+          )}
+
+          {/* 🗺️ 지도 로딩 에러 UI */}
+          {mapLoadError && showMapRetryButton && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="absolute inset-0 flex items-center justify-center z-20 bg-white/95 backdrop-blur-sm"
+            >
+              <div className="bg-white rounded-2xl p-6 shadow-xl border border-gray-200 max-w-sm mx-4 text-center">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">지도 로딩 실패</h3>
+                <p className="text-gray-600 mb-6">{mapLoadError}</p>
+                <div className="space-y-3">
+                  {mapRetryCount < 3 && (
+                    <button
+                      onClick={retryMapLoading}
+                      disabled={isMapLoading}
+                      className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isMapLoading ? '재시도 중...' : '다시 시도'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setMapLoadError(null);
+                      setShowMapRetryButton(false);
+                      setMapRetryCount(0);
+                    }}
+                    className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    닫기
+                  </button>
+                </div>
+                {mapRetryCount >= 3 && (
+                  <p className="text-sm text-gray-500 mt-3">
+                    재시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.
+                  </p>
+                )}
+              </div>
+            </motion.div>
           )}
 
           <div 
