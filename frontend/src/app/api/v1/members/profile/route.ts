@@ -92,6 +92,19 @@ export async function GET(request: NextRequest) {
     console.log('[Profile API] 요청 URL:', request.url);
     console.log('[Profile API] 요청 헤더:', Object.fromEntries(request.headers.entries()));
     
+    // 헬스 체크 요청인지 확인
+    const url = new URL(request.url);
+    if (url.searchParams.get('health') === 'check') {
+      console.log('[Profile API] 헬스 체크 요청 감지');
+      return NextResponse.json({
+        success: true,
+        message: 'Profile API is working',
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV,
+        backendUrl: BACKEND_URL
+      });
+    }
+    
     // JWT 토큰 검증
     const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
                   request.cookies.get('token')?.value;

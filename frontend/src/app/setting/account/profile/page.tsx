@@ -59,8 +59,16 @@ export default function ProfilePage() {
       setShowRetryButton(false);
       setMessage('');
       const token = localStorage.getItem('auth-token');
+      
+      console.log('🔍 토큰 확인 시작');
+      console.log('🔍 localStorage에서 토큰 존재 여부:', !!token);
+      console.log('🔍 토큰 길이:', token ? token.length : 0);
+      console.log('🔍 토큰 시작 부분:', token ? token.substring(0, 20) + '...' : '없음');
+      
       if (!token) {
         console.log('⚠️ 토큰이 없지만 페이지 로드 계속 진행');
+        setMessage('로그인이 필요합니다. 다시 로그인해주세요.');
+        setShowRetryButton(true);
         setIsLoadingProfile(false);
         return;
       }
@@ -79,9 +87,36 @@ export default function ProfilePage() {
           console.log('🔍 JWT 토큰에 mt_gender 있는지:', payload.mt_gender);
           console.log('🔍 JWT 토큰에 mt_hp 있는지:', payload.mt_hp);
           console.log('🔍 JWT 토큰에 mt_email 있는지:', payload.mt_email);
+          
+          // 토큰 만료 시간 확인
+          if (payload.exp) {
+            const expDate = new Date(payload.exp * 1000);
+            const now = new Date();
+            console.log('🔍 토큰 만료 시간:', expDate.toISOString());
+            console.log('🔍 현재 시간:', now.toISOString());
+            console.log('🔍 토큰 만료 여부:', now > expDate ? '만료됨' : '유효함');
+            
+            if (now > expDate) {
+              console.log('❌ 토큰이 만료되었습니다.');
+              setMessage('로그인이 만료되었습니다. 다시 로그인해주세요.');
+              setShowRetryButton(true);
+              setIsLoadingProfile(false);
+              return;
+            }
+          }
+        } else {
+          console.log('❌ JWT 토큰 형식이 올바르지 않습니다.');
+          setMessage('토큰 형식이 올바르지 않습니다. 다시 로그인해주세요.');
+          setShowRetryButton(true);
+          setIsLoadingProfile(false);
+          return;
         }
       } catch (jwtError) {
         console.error('❌ JWT 토큰 파싱 오류:', jwtError);
+        setMessage('토큰을 확인할 수 없습니다. 다시 로그인해주세요.');
+        setShowRetryButton(true);
+        setIsLoadingProfile(false);
+        return;
       }
 
       console.log('📡 API 요청 시작...');
@@ -214,6 +249,36 @@ export default function ProfilePage() {
   };
 
   const handleRetry = () => {
+    // 토큰이 없거나 만료된 경우 로그인 페이지로 이동
+    const token = localStorage.getItem('auth-token');
+    if (!token) {
+      console.log('🔀 토큰이 없어서 로그인 페이지로 이동');
+      router.push('/login');
+      return;
+    }
+    
+    // 토큰 만료 확인
+    try {
+      const tokenParts = token.split('.');
+      if (tokenParts.length === 3) {
+        const payload = JSON.parse(atob(tokenParts[1]));
+        if (payload.exp) {
+          const expDate = new Date(payload.exp * 1000);
+          const now = new Date();
+          if (now > expDate) {
+            console.log('🔀 토큰이 만료되어 로그인 페이지로 이동');
+            router.push('/login');
+            return;
+          }
+        }
+      }
+    } catch (error) {
+      console.log('🔀 토큰 파싱 오류로 로그인 페이지로 이동');
+      router.push('/login');
+      return;
+    }
+    
+    // 토큰이 유효한 경우 프로필 다시 로드
     setIsLoadingProfile(true);
     loadUserProfile();
   };
