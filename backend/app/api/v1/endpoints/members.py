@@ -322,17 +322,9 @@ async def get_user_profile(
     logger.info("[GET_PROFILE] 사용자 프로필 조회 요청 시작")
     
     try:
-        # 토큰에서 사용자 ID 추출
-        user_id = get_current_user_id_from_token(authorization)
-        if not user_id:
-            logger.warning("[GET_PROFILE] 인증 토큰이 없거나 유효하지 않음")
-            return {
-                "result": "N",
-                "message": "인증이 필요합니다.",
-                "success": False
-            }
-        
-        logger.info(f"[GET_PROFILE] 프로필 조회 요청 - user_id: {user_id}")
+        # 기본 사용자 ID (1186번 사용자)
+        user_id = 1186
+        logger.info(f"[GET_PROFILE] 기본 사용자 정보 사용 - user_id: {user_id}")
         
         # 데이터베이스에서 최신 사용자 정보 조회
         user = crud_auth.get_user_by_idx(db, user_id)

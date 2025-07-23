@@ -2841,13 +2841,46 @@ export default function HomePage() {
     // 3초 후 지도 로딩 상태를 강제로 완료 처리
     const forceCompleteTimeout = setTimeout(() => {
       if (isMapLoading) {
-        console.log('[HOME] 지도 로딩 타임아웃 - 강제 완료 처리 (UX 개선)');
-        setIsMapLoading(false);
+        // 지도 인스턴스가 실제로 생성됐는지 확인
+        let isMapInstanceCreated = false;
+        if (mapType === 'naver') {
+          isMapInstanceCreated = !!(naverMap && naverMap.current && typeof naverMap.current.getCenter === 'function');
+        } else if (mapType === 'google') {
+          isMapInstanceCreated = !!(map && map.current && typeof map.current.getCenter === 'function');
+        }
+        if (!isMapInstanceCreated) {
+          // 지도 인스턴스가 없으면 자동 재시도 또는 지도 타입 전환
+          if (mapRetryCount < 2) {
+            console.warn('[HOME] 지도 인스턴스 생성 실패 - 자동 재시도', mapRetryCount + 1);
+            setMapRetryCount(prev => prev + 1);
+            setMapLoadError('지도를 불러오지 못했습니다. 자동으로 다시 시도합니다.');
+            setIsMapLoading(true);
+            if (mapType === 'naver') {
+              loadNaverMapsAPI();
+            } else {
+              loadGoogleMapsAPI();
+            }
+          } else if (mapRetryCount === 2) {
+            // 3번째 실패 시 지도 타입 전환
+            const nextMapType = mapType === 'naver' ? 'google' : 'naver';
+            setMapRetryCount(prev => prev + 1);
+            setMapLoadError('지도를 불러오지 못했습니다. 다른 지도 서비스로 전환합니다.');
+            setMapType(nextMapType);
+            setIsMapLoading(true);
+          } else {
+            // 3회 이상 실패 시 강제 새로고침
+            setMapLoadError('지도를 3회 이상 불러오지 못했습니다. 앱을 새로고침합니다.');
+            setTimeout(() => {
+              window.location.reload();
+            }, 1500);
+          }
+        } else {
+          setIsMapLoading(false);
+        }
       }
     }, 3000);
-
     return () => clearTimeout(forceCompleteTimeout);
-  }, [isMapLoading]);
+  }, [isMapLoading, mapType, mapRetryCount]);
 
   // 컴포넌트 언마운트 시 리소스 정리
   useEffect(() => {
