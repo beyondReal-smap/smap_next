@@ -84,10 +84,13 @@ async function fetchWithFallback(url: string, options: any = {}): Promise<any> {
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('[Profile API] 요청 시작');
+    console.log('=== [Profile API] 요청 시작 ===');
     console.log('[Profile API] NODE_ENV:', process.env.NODE_ENV);
     console.log('[Profile API] 환경 변수 BACKEND_URL:', process.env.BACKEND_URL);
+    console.log('[Profile API] 환경 변수 NEXT_PUBLIC_BACKEND_URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
     console.log('[Profile API] 사용된 BACKEND_URL:', BACKEND_URL);
+    console.log('[Profile API] 요청 URL:', request.url);
+    console.log('[Profile API] 요청 헤더:', Object.fromEntries(request.headers.entries()));
     
     // JWT 토큰 검증
     const token = request.headers.get('authorization')?.replace('Bearer ', '') ||

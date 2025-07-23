@@ -66,6 +66,8 @@ export default function ProfilePage() {
       }
 
       console.log('🔄 사용자 프로필 정보 로드 시작');
+      console.log('🌐 현재 URL:', window.location.href);
+      console.log('🔧 API 엔드포인트:', '/api/v1/members/profile');
       
       // JWT 토큰 내용 확인 (디버깅용)
       try {
@@ -82,6 +84,9 @@ export default function ProfilePage() {
         console.error('❌ JWT 토큰 파싱 오류:', jwtError);
       }
 
+      console.log('📡 API 요청 시작...');
+      const startTime = Date.now();
+      
       // JWT 기반 profile API 사용 (백엔드 폴백 기능 포함)
       const response = await fetch('/api/v1/members/profile', {
         method: 'GET',
@@ -90,7 +95,10 @@ export default function ProfilePage() {
         },
       });
       
+      const endTime = Date.now();
       console.log('📡 /api/v1/members/profile 응답 상태:', response.status);
+      console.log('⏱️ 요청 소요 시간:', endTime - startTime, 'ms');
+      console.log('📡 응답 헤더:', Object.fromEntries(response.headers.entries()));
 
       if (response.ok) {
         const data = await response.json();
@@ -197,6 +205,7 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error('❌ 프로필 로드 중 예외 발생:', error);
+      console.error('❌ 에러 상세:', error instanceof Error ? error.message : String(error));
       setMessage('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
       setShowRetryButton(true);
     } finally {

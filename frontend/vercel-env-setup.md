@@ -1,7 +1,7 @@
 # Vercel 환경변수 설정 가이드
 
 ## 문제 상황
-로컬에서는 정상 동작하지만 Vercel에 배포된 페이지에서 `/api/v1/members/profile` API가 503 에러를 반환하는 문제가 발생하고 있습니다.
+로컬에서는 정상 동작하지만 Vercel에 배포된 페이지에서 `/api/v1/members/profile` API가 503 에러를 반환하거나 로그조차 안 나오는 문제가 발생하고 있습니다.
 
 ## 원인
 Vercel의 서버리스 함수에서 백엔드 서버로 연결할 때 환경변수가 올바르게 설정되지 않아 발생하는 문제입니다.
@@ -60,8 +60,29 @@ curl -k https://118.67.130.71:8000/api/v1/health
 ### 방화벽 설정
 백엔드 서버의 방화벽에서 8000 포트가 열려있는지 확인하세요.
 
+## 디버깅 방법
+
+### 1. Vercel 함수 로그 확인
+1. Vercel 대시보드 → 프로젝트 → **Functions** 탭
+2. `/api/v1/members/profile` 함수 클릭
+3. **Logs** 탭에서 에러 메시지 확인
+
+### 2. 환경변수 확인
+Vercel 함수에서 환경변수가 제대로 로드되는지 확인:
+```javascript
+console.log('BACKEND_URL:', process.env.BACKEND_URL);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+```
+
+### 3. 네트워크 요청 확인
+브라우저 개발자 도구 → Network 탭에서:
+- `/api/v1/members/profile` 요청이 실제로 발생하는지 확인
+- 요청/응답 상태 코드 확인
+- 요청 헤더에 Authorization 토큰이 포함되는지 확인
+
 ## 참고 사항
 
 - 환경변수는 배포 후에만 적용됩니다
 - `NEXT_PUBLIC_` 접두사가 붙은 변수는 클라이언트 사이드에서도 접근 가능합니다
-- 환경변수 변경 후에는 반드시 재배포가 필요합니다 
+- 환경변수 변경 후에는 반드시 재배포가 필요합니다
+- Vercel의 서버리스 함수는 콜드 스타트로 인해 첫 요청이 느릴 수 있습니다 

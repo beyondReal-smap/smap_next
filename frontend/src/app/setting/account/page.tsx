@@ -536,8 +536,15 @@ export default function AccountSettingsPage() {
                             setProfileImg(fallbackSrc);
                           }}
                         />
-                        <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-2 shadow-lg group-hover:scale-110 transition-transform">
-                          <FiCamera className="w-4 h-4 text-blue-600" />
+                        <div 
+                          className="absolute bg-white rounded-full p-1.5 shadow-lg group-hover:scale-110 transition-transform"
+                          style={{
+                            bottom: '12px',
+                            right: '10px',
+                            transform: 'translate(50%, 50%)'
+                          }}
+                        >
+                          <FiCamera className="w-3 h-3 text-blue-600" />
                         </div>
                       </div>
                     </button>
