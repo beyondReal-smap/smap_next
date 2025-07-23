@@ -8,6 +8,8 @@ export async function GET(
   const { member_id } = await params;
   try {
     console.log('[CONSENT API] 동의 정보 조회 요청:', member_id);
+    console.log('[CONSENT API] NODE_ENV:', process.env.NODE_ENV);
+    console.log('[CONSENT API] 환경 변수 BACKEND_URL:', process.env.BACKEND_URL);
     
     // JWT 토큰 검증
     const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
@@ -43,7 +45,13 @@ export async function GET(
     }
 
     // 백엔드 API 호출
-    const backendUrl = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
+    const backendUrl = process.env.NODE_ENV === 'production' 
+      ? (process.env.BACKEND_URL || 'https://nextstep.smap.site')
+      : (process.env.BACKEND_URL || 'https://118.67.130.71:8000');
+    
+    console.log('[CONSENT API] 사용된 백엔드 URL:', backendUrl);
+    console.log('[CONSENT API] 전체 요청 URL:', `${backendUrl}/api/v1/members/consent/${requestedUserId}`);
+    
     const response = await fetch(`${backendUrl}/api/v1/members/consent/${requestedUserId}`, {
       headers: {
         'Authorization': `Bearer ${token}`,

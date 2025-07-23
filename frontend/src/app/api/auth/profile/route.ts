@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyJWT } from '@/lib/auth';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'https://118.67.130.71:8000';
+// 운영 환경에서는 다른 백엔드 URL 사용
+const BACKEND_URL = process.env.NODE_ENV === 'production' 
+  ? (process.env.BACKEND_URL || 'https://nextstep.smap.site')
+  : (process.env.BACKEND_URL || 'https://118.67.130.71:8000');
 
 // node-fetch를 대안으로 사용
 let nodeFetch: any = null;
@@ -81,9 +84,17 @@ async function fetchWithFallback(url: string, options: any = {}): Promise<any> {
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('[Profile API] 요청 시작');
+    console.log('[Profile API] NODE_ENV:', process.env.NODE_ENV);
+    console.log('[Profile API] 환경 변수 BACKEND_URL:', process.env.BACKEND_URL);
+    console.log('[Profile API] 사용된 BACKEND_URL:', BACKEND_URL);
+    
     // JWT 토큰 검증
     const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
                   request.cookies.get('token')?.value;
+    
+    console.log('[Profile API] 토큰 존재 여부:', !!token);
+    console.log('[Profile API] Authorization 헤더:', request.headers.get('authorization')?.substring(0, 50) + '...');
     
     if (!token) {
       console.log('[Profile API] 토큰 없음');
@@ -94,6 +105,8 @@ export async function GET(request: NextRequest) {
     }
 
     const decoded = verifyJWT(token);
+    console.log('[Profile API] JWT 검증 결과:', !!decoded);
+    
     if (!decoded) {
       console.log('[Profile API] 토큰 검증 실패');
       return NextResponse.json(
@@ -106,18 +119,30 @@ export async function GET(request: NextRequest) {
     console.log('🔑 토큰 검증 성공, 사용자 ID:', decoded.mt_idx);
     console.log('🌐 백엔드 URL:', `${BACKEND_URL}/api/v1/members/me`);
     console.log('🌐 전체 요청 URL:', `${BACKEND_URL}/api/v1/members/me`);
-    console.log('🌍 환경 변수 BACKEND_URL:', process.env.BACKEND_URL);
-    console.log('🔧 사용된 BACKEND_URL:', BACKEND_URL);
 
     // FastAPI 백엔드 API 호출 (fetchWithFallback 사용)
     console.log('📡 백엔드 요청 시작...');
-    const response = await fetch(`${BACKEND_URL}/api/v1/members/me`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    console.log('🔧 실제 요청 URL:', `${BACKEND_URL}/api/v1/members/me`);
+    
+    let response;
+    try {
+      response = await fetch(`${BACKEND_URL}/api/v1/members/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('📡 백엔드 응답 상태:', response.status);
+      console.log('📡 백엔드 응답 헤더:', Object.fromEntries(response.headers.entries()));
+    } catch (fetchError) {
+      console.error('❌ 백엔드 요청 실패:', fetchError);
+      return NextResponse.json(
+        { success: false, message: '백엔드 서버에 연결할 수 없습니다.' },
+        { status: 503 }
+      );
+    }
 
     if (!response.ok) {
       console.error('[Profile API] 백엔드 응답 오류:', response.status, response.statusText);
