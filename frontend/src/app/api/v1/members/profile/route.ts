@@ -3,7 +3,7 @@ import { verifyJWT } from '@/lib/auth';
 
 // 운영 환경에서는 다른 백엔드 URL 사용
 const BACKEND_URL = process.env.NODE_ENV === 'production' 
-  ? (process.env.BACKEND_URL || 'https://118.67.130.71')
+  ? (process.env.BACKEND_URL || 'https://118.67.130.71:8000')  // 포트 번호 추가
   : (process.env.BACKEND_URL || 'https://118.67.130.71:8000');
 
 // node-fetch를 대안으로 사용
@@ -124,10 +124,6 @@ export async function GET(request: NextRequest) {
     console.log('📡 백엔드 요청 시작...');
     console.log('🔧 실제 요청 URL:', `${BACKEND_URL}/api/v1/members/me`);
     
-    // fetchWithFallback 함수 사용
-    console.log('📡 백엔드 요청 시작...');
-    console.log('🔧 실제 요청 URL:', `${BACKEND_URL}/api/v1/members/me`);
-    
     let backendData;
     try {
       backendData = await fetchWithFallback(`${BACKEND_URL}/api/v1/members/me`, {
@@ -141,10 +137,23 @@ export async function GET(request: NextRequest) {
       console.log('📡 백엔드 응답 성공');
     } catch (fetchError) {
       console.error('❌ 백엔드 요청 실패:', fetchError);
+      
+      // 더 구체적인 에러 메시지 제공
+      let errorMessage = '백엔드 서버에 연결할 수 없습니다.';
+      if (fetchError instanceof Error) {
+        if (fetchError.message.includes('fetch')) {
+          errorMessage = '네트워크 연결에 실패했습니다.';
+        } else if (fetchError.message.includes('timeout')) {
+          errorMessage = '서버 응답 시간이 초과되었습니다.';
+        } else if (fetchError.message.includes('503')) {
+          errorMessage = '백엔드 서버가 일시적으로 사용할 수 없습니다.';
+        }
+      }
+      
       return NextResponse.json(
         { 
           success: false, 
-          message: '백엔드 서버에 연결할 수 없습니다.',
+          message: errorMessage,
           error: fetchError instanceof Error ? fetchError.message : String(fetchError)
         },
         { status: 503 }

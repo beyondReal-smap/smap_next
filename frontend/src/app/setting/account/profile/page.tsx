@@ -43,6 +43,7 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [message, setMessage] = useState('');
+  const [showRetryButton, setShowRetryButton] = useState(false);
   
   // 생년월일 선택 모달 상태
   const [isBirthModalOpen, setIsBirthModalOpen] = useState(false);
@@ -55,6 +56,8 @@ export default function ProfilePage() {
 
   const loadUserProfile = async () => {
     try {
+      setShowRetryButton(false);
+      setMessage('');
       const token = localStorage.getItem('auth-token');
       if (!token) {
         console.log('⚠️ 토큰이 없지만 페이지 로드 계속 진행');
@@ -86,7 +89,8 @@ export default function ProfilePage() {
           'Authorization': `Bearer ${token}`,
         },
       });
-              console.log('📡 /api/v1/members/profile 응답 상태:', response.status);
+      
+      console.log('📡 /api/v1/members/profile 응답 상태:', response.status);
 
       if (response.ok) {
         const data = await response.json();
@@ -167,15 +171,42 @@ export default function ProfilePage() {
         }
       } else {
         console.error('❌ 프로필 조회 실패:', response.status);
+        
+        // 에러 응답 내용 확인
+        try {
+          const errorData = await response.json();
+          console.error('❌ 에러 응답 내용:', errorData);
+          
+          // 사용자에게 에러 메시지 표시
+          if (errorData.message) {
+            setMessage(`프로필 조회 실패: ${errorData.message}`);
+          } else {
+            setMessage('프로필 정보를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.');
+          }
+        } catch (parseError) {
+          console.error('❌ 에러 응답 파싱 실패:', parseError);
+          setMessage('프로필 정보를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.');
+        }
+        
+        // 재시도 버튼 표시
+        setShowRetryButton(true);
+        
         // 401 오류가 발생해도 즉시 리디렉션하지 않고 기본값으로 진행
         // 사용자가 직접 로그인 상태를 확인할 수 있도록 함
         console.log('⚠️ API 호출 실패, 기본값으로 진행');
       }
     } catch (error) {
-      console.error('❌ 사용자 정보 로드 실패:', error);
+      console.error('❌ 프로필 로드 중 예외 발생:', error);
+      setMessage('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
+      setShowRetryButton(true);
     } finally {
       setIsLoadingProfile(false);
     }
+  };
+
+  const handleRetry = () => {
+    setIsLoadingProfile(true);
+    loadUserProfile();
   };
 
   // 뒤로가기 핸들러
@@ -302,6 +333,36 @@ export default function ProfilePage() {
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
         className="px-4 pt-20 space-y-6 pb-24"
       >
+        {/* 에러 메시지 및 재시도 버튼 */}
+        {message && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="bg-red-50 border border-red-200 rounded-2xl p-4"
+          >
+            <div className="flex items-start space-x-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-red-100">
+                <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm text-red-800 mb-2">{message}</p>
+                {showRetryButton && (
+                  <button
+                    onClick={handleRetry}
+                    disabled={isLoadingProfile}
+                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isLoadingProfile ? '재시도 중...' : '다시 시도'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* 프로필 정보 안내 카드 */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
