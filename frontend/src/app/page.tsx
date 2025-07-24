@@ -13,8 +13,8 @@ export default function RootPage() {
 
   // iOS WebView 감지
   const isIOSWebView = typeof window !== 'undefined' && 
-    window.webkit && 
-    window.webkit.messageHandlers;
+    (window as any).webkit && 
+    (window as any).webkit.messageHandlers;
 
   useEffect(() => {
     console.log('[ROOT PAGE] 인증 상태 체크:', { 
@@ -104,8 +104,8 @@ export default function RootPage() {
     if (isIOSWebView && typeof window !== 'undefined') {
       console.log('[ROOT PAGE] iOS WebView 페이지 로드 완료 알림');
       try {
-        if (window.webkit.messageHandlers.pageLoaded) {
-          window.webkit.messageHandlers.pageLoaded.postMessage({
+        if ((window as any).webkit?.messageHandlers?.pageLoaded) {
+          (window as any).webkit.messageHandlers.pageLoaded.postMessage({
             url: window.location.href,
             pathname: window.location.pathname,
             timestamp: new Date().toISOString()
