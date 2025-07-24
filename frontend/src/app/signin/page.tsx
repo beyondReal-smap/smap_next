@@ -2738,6 +2738,17 @@ const SignInPage = () => {
       return;
     }
     
+    // iOS WebView 환경 감지
+    const isIOSWebView = typeof window !== 'undefined' && window.webkit && window.webkit.messageHandlers;
+    if (isIOSWebView) {
+      // 시스템 브라우저로 Google OAuth URL 리디렉션
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID';
+      const redirectUri = encodeURIComponent('https://nextstep.smap.site/auth');
+      const scope = encodeURIComponent('openid email profile');
+      const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=token&scope=${scope}`;
+      window.location.href = oauthUrl;
+      return;
+    }
     // 이전 로그인 시도 정리
     if ((window as any).__PAGE_FROZEN__) {
       console.log('[GOOGLE LOGIN] 이전 로그인 시도 정리 중...');
@@ -2836,13 +2847,15 @@ const SignInPage = () => {
     console.log('🚨 [FORCE CREATE] 웹에서 MessageHandler 강제 생성 시도');
     
     try {
-      const webkit = (window as any).webkit;
-      
-      if (!webkit) {
+      // 1. window.webkit이 없으면 먼저 생성
+      if (!(window as any).webkit) {
         console.log('🚨 [FORCE CREATE] WebKit 객체 생성 시도');
         (window as any).webkit = {};
       }
+      // 2. 이제 webkit을 읽음
+      const webkit = (window as any).webkit;
       
+      // 3. messageHandlers가 없으면 생성
       if (!webkit.messageHandlers) {
         console.log('🚨 [FORCE CREATE] messageHandlers 객체 생성 시도');
         webkit.messageHandlers = {};
