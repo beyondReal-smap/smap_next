@@ -263,11 +263,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         console.log('[AUTH CONTEXT] 초기 인증 상태 확인 시작');
 
+        // iOS 앱에서 전달된 토큰 확인 (URL 파라미터)
+        let iosToken = null;
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          iosToken = urlParams.get('mt_token_id');
+          
+          if (iosToken) {
+            console.log('[AUTH CONTEXT] iOS 앱에서 전달된 토큰 발견:', iosToken.substring(0, 20) + '...');
+            
+            // iOS 토큰을 로컬 스토리지에 저장
+            localStorage.setItem('auth-token', iosToken);
+            
+            // 위치 정보도 저장
+            const mtLat = urlParams.get('mt_lat');
+            const mtLong = urlParams.get('mt_long');
+            if (mtLat && mtLong) {
+              localStorage.setItem('user-location', JSON.stringify({
+                lat: parseFloat(mtLat),
+                long: parseFloat(mtLong),
+                timestamp: new Date().toISOString()
+              }));
+            }
+          }
+        }
+
         // authService를 통해 토큰과 사용자 데이터를 직접 확인
         const token = authService.getToken();
         const userData = authService.getUserData();
 
-        if (token && userData) {
+        if ((token || iosToken) && userData) {
           console.log('[AUTH CONTEXT] 유효한 토큰과 사용자 데이터 발견:', userData.mt_name);
           if (isMounted) {
             dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
@@ -275,6 +300,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             preloadUserData(userData.mt_idx, 'initial-load').catch(error => {
               console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
             });
+          }
+        } else if (iosToken) {
+          // iOS 토큰은 있지만 사용자 데이터가 없는 경우
+          console.log('[AUTH CONTEXT] iOS 토큰은 있지만 사용자 데이터 없음, 기본 사용자 정보 생성');
+          
+          // 기본 사용자 정보 생성 (iOS 앱에서 전달된 정보 기반)
+          const defaultUserData = {
+            mt_idx: 1186, // 기본 사용자 ID
+            mt_name: 'iOS 사용자',
+            mt_nickname: 'iOS 사용자',
+            mt_email: 'ios@example.com',
+            mt_hp: '',
+            mt_type: 1, // 숫자로 수정
+            mt_wdate: new Date().toISOString(),
+            mt_ldate: new Date().toISOString()
+          };
+          
+          if (isMounted) {
+            dispatch({ type: 'LOGIN_SUCCESS', payload: defaultUserData });
+            // 사용자 데이터를 로컬 스토리지에 저장
+            localStorage.setItem('smap_user_data', JSON.stringify(defaultUserData));
           }
         } else {
           console.log('[AUTH CONTEXT] 유효한 세션 없음. 로그아웃 상태로 설정.');

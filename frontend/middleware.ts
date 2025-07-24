@@ -1,23 +1,16 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// 인증이 필요하지 않은 공개 경로들
+// 공개 경로 (인증 없이 접근 가능)
 const publicPaths = [
-  '/', // 루트 경로 추가 (iOS WebView에서 빈 화면 방지)
   '/signin',
-  '/register',
-  '/register-new',
+  '/register', 
+  '/register/new-page',
   '/login',
   '/social-login',
-  '/api/auth',
-  '/_next',
-  '/favicon.ico',
-  '/images',
-  '/icons',
-  '/test-api',
-  '/test-google',
-  '/test-haptic',
-  '/test-location-modal'
+  '/',
+  '/group',
+  '/auth'  // iOS 앱 인증 경로 추가
 ];
 
 // 그룹 가입 페이지 패턴 (정규표현식)
