@@ -3275,7 +3275,7 @@ const SignInPage = () => {
           transition={{ duration: 1 }}
         />
         
-        {/* 떠다니는 원형 요소들 */}
+        {/* 떠다니는 원형 요소들 (3개만 남김) */}
         <motion.div
           className="absolute top-20 left-10 w-24 h-24 bg-white/20 rounded-full blur-xl"
           style={{ zIndex: 1 }}
