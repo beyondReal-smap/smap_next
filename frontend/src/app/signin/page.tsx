@@ -1759,40 +1759,35 @@ const SignInPage = () => {
 
   // 인증 상태 확인 및 리다이렉트 처리 (강화된 네비게이션 차단)
   useEffect(() => {
+    // 에러 모달이 표시 중이면 아무것도 하지 않음 (최상단에 추가)
+    if (showErrorModal) {
+      return;
+    }
     // 간단한 네비게이션 차단 플래그 확인
     if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
       console.log('[SIGNIN] 🚫 구글 로그인 중 - 네비게이션 차단');
       return undefined;
     }
-    
     // 에러 모달이 표시 중이면 아무것도 하지 않음
-    if (showErrorModal) {
-      return undefined;
-    }
-    
+    // (이미 위에서 처리)
     // 로딩 중이면 대기
     if (loading) {
       return undefined;
     }
-
     // URL에서 탈퇴 완료 플래그 확인
     const urlParams = new URLSearchParams(window.location.search);
     const isFromWithdraw = urlParams.get('from') === 'withdraw';
-    
     if (isFromWithdraw) {
       console.log('[SIGNIN] 탈퇴 후 접근 - 자동 로그인 건너뛰기');
-      
       // URL에서 from 파라미터 제거
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('from');
       window.history.replaceState({}, '', newUrl.toString());
-      
       if (isCheckingAuth) {
         setIsCheckingAuth(false);
       }
       return undefined;
     }
-
     // 로그인된 사용자는 홈으로 리다이렉트 (차단 플래그 재확인)
     if (isLoggedIn && !isRedirectingRef.current) {
       // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
@@ -1800,25 +1795,21 @@ const SignInPage = () => {
         console.log('[SIGNIN] 🚫 에러 모달 표시 중 - 홈 리다이렉트 차단');
         return undefined;
       }
-      
       // 리다이렉트 직전에 다시 한 번 차단 플래그 확인
       if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
         console.log('[SIGNIN] 🚫 로그인된 사용자지만 구글 로그인 중 - 홈 리다이렉트 차단');
         return undefined;
       }
-      
       console.log('[SIGNIN] 로그인된 사용자 감지, /home으로 리다이렉트');
       isRedirectingRef.current = true;
       router.replace('/home');
       return undefined;
     }
-
     // 로그인되지 않은 상태에서만 페이지 표시
     if (!isLoggedIn && isCheckingAuth) {
       console.log('[SIGNIN] 로그인되지 않은 상태, 로그인 페이지 표시');
       setIsCheckingAuth(false);
     }
-    
     // cleanup 함수: 컴포넌트 언마운트 시 플래그 리셋
     return () => {
       isRedirectingRef.current = false;
@@ -2670,17 +2661,15 @@ const SignInPage = () => {
   // 에러 표시 헬퍼 함수 (단순화된 버전)
   const showError = (message: string) => {
     console.log('[SIGNIN] showError 함수 시작:', message);
-    
-    // 로딩 상태 해제
+    // 모든 상태를 명확히 false로
     setIsLoading(false);
-    
+    setIsCheckingAuth(false);
+    isRedirectingRef.current = false;
     // 🔥 에러 모달 플래그 설정
     (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
-    
     // 에러 모달 표시
     setErrorModalMessage(message);
     setShowErrorModal(true);
-    
     console.log('[SIGNIN] ✅ showError 함수 완료');
   };
 
