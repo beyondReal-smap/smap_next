@@ -1593,6 +1593,10 @@ const SignInPage = () => {
             script.src = 'https://accounts.google.com/gsi/client';
             script.async = true;
             script.defer = true;
+            script.crossOrigin = 'anonymous';
+            
+            // Content-Type 문제 해결을 위한 추가 설정
+            script.setAttribute('type', 'text/javascript');
             
             // 스크립트 로드 완료 대기
             await new Promise((resolve, reject) => {
@@ -1600,8 +1604,8 @@ const SignInPage = () => {
                 console.log('[GOOGLE SDK] Google Identity Services SDK 로드 완료');
                 resolve(true);
               };
-              script.onerror = () => {
-                console.error('[GOOGLE SDK] Google Identity Services SDK 로드 실패');
+              script.onerror = (error) => {
+                console.error('[GOOGLE SDK] Google Identity Services SDK 로드 실패:', error);
                 reject(new Error('SDK 로드 실패'));
               };
               
@@ -1632,6 +1636,23 @@ const SignInPage = () => {
         } catch (sdkError) {
           console.error('[GOOGLE SDK] 동적 로드 실패:', sdkError);
           
+          // iOS WebView 환경에서는 네이티브 로그인으로 폴백
+          if (isIOSWebView) {
+            console.log('[GOOGLE SDK] iOS WebView 환경 - 네이티브 로그인으로 폴백');
+            try {
+              if ((window as any).webkit?.messageHandlers?.smapIos) {
+                (window as any).webkit.messageHandlers.smapIos.postMessage({
+                  type: 'googleSignIn',
+                  param: '',
+                  timestamp: Date.now()
+                });
+                return;
+              }
+            } catch (nativeError) {
+              console.error('[GOOGLE SDK] 네이티브 로그인 폴백 실패:', nativeError);
+            }
+          }
+          
           // 최대 2회까지만 재시도
           if (retryCount < 2) {
             console.log('[GOOGLE SDK] 3초 후 기존 재시도 로직 실행...');
@@ -1647,7 +1668,7 @@ const SignInPage = () => {
           }
         }
         
-        throw new Error('Google 로그인을 사용할 수 없습니다.');
+        throw new Error('Google 로그인을 사용할 수 없습니다. 전화번호 로그인을 이용해주세요.');
       }
       
     } catch (error: any) {
