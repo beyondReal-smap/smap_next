@@ -22,7 +22,7 @@ const initialState: AuthState = {
   isLoggedIn: false,
   user: null,
   selectedGroup: null,
-  loading: true,
+  loading: false, // 초기 로딩 상태를 false로 변경
   error: null,
   isPreloadingComplete: false,
 };
@@ -260,6 +260,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // 항상 로딩 시작
       dispatch({ type: 'SET_LOADING', payload: true });
       
+      // 타임아웃 설정 (1초 후 강제로 로딩 해제)
+      const timeoutId = setTimeout(() => {
+        console.log('[AUTH CONTEXT] 초기화 타임아웃 - 강제 로딩 해제');
+        if (isMounted) {
+          dispatch({ type: 'SET_LOADING', payload: false });
+        }
+      }, 1000);
+      
       try {
         console.log('[AUTH CONTEXT] 초기 인증 상태 확인 시작');
 
@@ -297,9 +305,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           if (isMounted) {
             dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
             // 프리로딩은 백그라운드에서 비동기적으로 실행 (결과를 기다리지 않음)
-            preloadUserData(userData.mt_idx, 'initial-load').catch(error => {
-              console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
-            });
+            setTimeout(() => {
+              preloadUserData(userData.mt_idx, 'initial-load').catch(error => {
+                console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
+              });
+            }, 100);
           }
         } else if (iosToken) {
           // iOS 토큰은 있지만 사용자 데이터가 없는 경우
@@ -334,6 +344,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           dispatch({ type: 'LOGOUT' }); // 에러 발생 시 안전하게 로그아웃 처리
         }
       } finally {
+        // 타임아웃 정리
+        clearTimeout(timeoutId);
+        
         // 데이터 확인이 끝나면 로딩 상태 해제
         if (isMounted) {
           dispatch({ type: 'SET_LOADING', payload: false });
@@ -346,7 +359,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => {
       isMounted = false;
     };
-  }, [preloadUserData]); // preloadUserData를 의존성 배열에 추가
+  }, []); // 의존성 배열 비움 - 무한 루프 방지
 
   // 로그인
   const login = async (credentials: LoginRequest): Promise<void> => {
