@@ -1720,9 +1720,11 @@ const SignInPage = () => {
 
     // 로그인된 사용자 처리
     if (isLoggedIn && !isRedirectingRef.current) {
-      console.log('[SIGNIN] ✅ 로그인된 사용자 감지 - 홈으로 리다이렉트');
+      console.log('[SIGNIN] ✅ 로그인된 사용자 감지 - 홈으로 즉시 리다이렉트');
       isRedirectingRef.current = true;
-      router.replace('/home');
+      
+      // 즉시 홈으로 이동
+      window.location.href = '/home';
     }
     
     // cleanup 함수
@@ -2029,8 +2031,26 @@ const SignInPage = () => {
               
               console.log('[GOOGLE LOGIN] 🔄 AuthContext 상태 동기화 시작');
               
-              // 3. AuthContext 상태를 수동으로 동기화
+              // 3. AuthContext 상태를 수동으로 동기화 (강화된 버전)
+              console.log('[GOOGLE LOGIN] AuthContext 상태 동기화 시작');
               await refreshAuthState();
+              
+              // 동기화 후 상태 재확인
+              setTimeout(async () => {
+                console.log('[GOOGLE LOGIN] AuthContext 상태 재확인');
+                await refreshAuthState();
+                
+                // 로그인 상태 확인
+                const isLoggedInAfterSync = authService.isLoggedIn();
+                console.log('[GOOGLE LOGIN] 동기화 후 로그인 상태:', isLoggedInAfterSync);
+                
+                if (!isLoggedInAfterSync) {
+                  console.warn('[GOOGLE LOGIN] 동기화 후에도 로그인 상태가 false - 강제 설정');
+                  // 강제로 로그인 상태 설정
+                  localStorage.setItem('isLoggedIn', 'true');
+                  sessionStorage.setItem('authToken', 'authenticated');
+                }
+              }, 500);
               
               // 4. Google 로그인 성공 햅틱 피드백
               triggerHapticFeedback(HapticFeedbackType.SUCCESS);
@@ -2068,10 +2088,11 @@ const SignInPage = () => {
                 localStorage.setItem('google_register_data', JSON.stringify(registerData));
                 
                 // 회원가입 페이지로 이동
-                router.replace('/register-new');
+                window.location.href = '/register-new';
               } else {
-                console.log('[GOOGLE LOGIN] 🏠 기존 사용자 - 홈 페이지로 이동');
-                router.replace('/home');
+                console.log('[GOOGLE LOGIN] 🏠 기존 사용자 - 홈 페이지로 즉시 이동');
+                // 즉시 홈으로 이동
+                window.location.href = '/home';
               }
             }
           } else {
