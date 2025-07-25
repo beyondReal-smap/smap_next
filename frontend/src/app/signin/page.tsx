@@ -3242,6 +3242,11 @@ const SignInPage = () => {
   }
   */
 
+  // 인증 체크 중이면서 에러 모달이 없을 때만 아무것도 렌더링하지 않음
+  if (isCheckingAuth && !showErrorModal) {
+    return null;
+  }
+
   return (
     <>
       {/* 움직이는 배경 레이어 */}
