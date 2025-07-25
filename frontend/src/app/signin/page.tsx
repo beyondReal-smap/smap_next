@@ -1758,73 +1758,70 @@ const SignInPage = () => {
     console.log('[SIGNIN] 페이지 로드 시 이전 상태 정리 완료');
   }, []);
 
-  // 인증 상태 확인 및 리다이렉트 처리 (강화된 네비게이션 차단)
+  // 🚨 메인 인증 상태 및 리다이렉트 관리 useEffect
   useEffect(() => {
-    // 에러 모달이 표시 중이면 아무것도 하지 않음 (최상단에 추가)
+    console.log('[SIGNIN] 🔍 인증 상태 체크:', {
+      isLoggedIn,
+      loading,
+      showErrorModal,
+      isCheckingAuth,
+      __SIGNIN_ERROR_MODAL_ACTIVE__: (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__,
+      __AUTH_FAILED__: (window as any).__AUTH_FAILED__,
+      __BLOCK_ALL_REDIRECTS__: (window as any).__BLOCK_ALL_REDIRECTS__
+    });
+
+    // 🚫 에러 모달이 표시 중이면 모든 리다이렉트 차단
     if (showErrorModal) {
       console.log('[SIGNIN] 🚫 에러 모달 표시 중 - 모든 리다이렉트 차단');
       return;
     }
-    
-    // 🔥 인증 실패 플래그 확인
+
+    // 🚫 인증 실패 플래그가 설정되어 있으면 모든 리다이렉트 차단
     if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-      console.log('[SIGNIN] 🚫 인증 실패 플래그 감지 - 리다이렉트 차단');
+      console.log('[SIGNIN] 🚫 인증 실패 플래그(__SIGNIN_ERROR_MODAL_ACTIVE__) 감지 - 리다이렉트 차단');
       return;
     }
-    
-    // 간단한 네비게이션 차단 플래그 확인
-    if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
-      console.log('[SIGNIN] 🚫 구글 로그인 중 - 네비게이션 차단');
-      return undefined;
+
+    // 🚫 인증 실패 플래그가 설정되어 있으면 모든 리다이렉트 차단
+    if ((window as any).__AUTH_FAILED__) {
+      console.log('[SIGNIN] 🚫 인증 실패 플래그(__AUTH_FAILED__) 감지 - 리다이렉트 차단');
+      return;
     }
-    
-    // 로딩 중이면 대기
-    if (loading) {
-      return undefined;
+
+    // 🚫 리다이렉트 차단 플래그가 설정되어 있으면 모든 리다이렉트 차단
+    if ((window as any).__BLOCK_ALL_REDIRECTS__) {
+      console.log('[SIGNIN] 🚫 리다이렉트 차단 플래그(__BLOCK_ALL_REDIRECTS__) 감지 - 리다이렉트 차단');
+      return;
     }
-    
-    // URL에서 탈퇴 완료 플래그 확인
-    const urlParams = new URLSearchParams(window.location.search);
-    const isFromWithdraw = urlParams.get('from') === 'withdraw';
-    if (isFromWithdraw) {
-      console.log('[SIGNIN] 탈퇴 후 접근 - 자동 로그인 건너뛰기');
-      // URL에서 from 파라미터 제거
-      const newUrl = new URL(window.location.href);
-      newUrl.searchParams.delete('from');
-      window.history.replaceState({}, '', newUrl.toString());
-      if (isCheckingAuth) {
-        setIsCheckingAuth(false);
-      }
-      return undefined;
+
+    // 로딩 중이거나 인증 확인 중이면 대기
+    if (loading || isCheckingAuth) {
+      console.log('[SIGNIN] 🔄 로딩/인증 확인 중 - 대기');
+      return;
     }
-    
-    // 🔥 로그인된 사용자는 홈으로 리다이렉트 (강화된 차단 조건)
+
+    // 로그인된 사용자 처리
     if (isLoggedIn && !isRedirectingRef.current) {
-      // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
-      if (showErrorModal) {
-        console.log('[SIGNIN] 🚫 에러 모달 표시 중 - 홈 리다이렉트 차단');
-        return undefined;
-      }
+      console.log('[SIGNIN] ✅ 로그인된 사용자 감지');
       
-      // 🚫 인증 실패 플래그가 있으면 리다이렉트 방지
+      // 🚫 추가 안전장치: 인증 실패 플래그 재확인
       if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
-        console.log('[SIGNIN] 🚫 인증 실패 플래그 감지 - 홈 리다이렉트 차단');
+        console.log('[SIGNIN] 🚫 홈 리다이렉트 직전 인증 실패 플래그 재확인 - 차단');
         return undefined;
       }
       
-      // 🚫 인증 실패 플래그가 있으면 리다이렉트 방지
       if ((window as any).__AUTH_FAILED__) {
-        console.log('[SIGNIN] 🚫 인증 실패 플래그(__AUTH_FAILED__) 감지 - 홈 리다이렉트 차단');
+        console.log('[SIGNIN] 🚫 홈 리다이렉트 직전 인증 실패 플래그(__AUTH_FAILED__) 재확인 - 차단');
         return undefined;
       }
-      
-      // 리다이렉트 직전에 다시 한 번 차단 플래그 확인
+
+      // 🚫 구글 로그인 진행 중이면 홈 리다이렉트 차단
       if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
         console.log('[SIGNIN] 🚫 로그인된 사용자지만 구글 로그인 중 - 홈 리다이렉트 차단');
         return undefined;
       }
       
-      console.log('[SIGNIN] 로그인된 사용자 감지, /home으로 리다이렉트');
+      console.log('[SIGNIN] ✅ 홈으로 리다이렉트 실행');
       isRedirectingRef.current = true;
       router.replace('/home');
       return undefined;
@@ -1857,7 +1854,11 @@ const SignInPage = () => {
   // URL 파라미터에서 에러 메시지 확인 (로그아웃 후 에러 모달 방지)
   useEffect(() => {
     const error = searchParams.get('error');
+    const message = searchParams.get('message');
+    
     if (error) {
+      console.log('[SIGNIN] URL 에러 파라미터 감지:', { error, message });
+      
       // 🔥 로그아웃 후 에러 모달 방지 - 컴포넌트 마운트 후 1초 이내의 에러는 무시
       const timeSinceMount = Date.now() - (componentMountedRef.current ? 0 : Date.now());
       if (timeSinceMount < 1000) {
@@ -1865,52 +1866,67 @@ const SignInPage = () => {
         // URL에서 error 파라미터만 제거
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.delete('error');
+        newUrl.searchParams.delete('message');
         window.history.replaceState({}, '', newUrl.toString());
         return;
       }
       
       let errorMessage = '';
-      switch (error) {
-        case 'AccessDenied':
-          errorMessage = '비활성화된 계정입니다. 고객센터에 문의해주세요.';
-          break;
-        case 'OAuthSignin':
-          errorMessage = '소셜 로그인 중 오류가 발생했습니다.';
-          break;
-        case 'OAuthCallback':
-          errorMessage = '소셜 로그인 콜백 처리 중 오류가 발생했습니다.';
-          break;
-        case 'OAuthCreateAccount':
-          errorMessage = '계정 생성 중 오류가 발생했습니다.';
-          break;
-        case 'EmailCreateAccount':
-          errorMessage = '이메일 계정 생성 중 오류가 발생했습니다.';
-          break;
-        case 'Callback':
-          errorMessage = '로그인 처리 중 오류가 발생했습니다.';
-          break;
-        case 'OAuthAccountNotLinked':
-          errorMessage = '이미 다른 방법으로 가입된 이메일입니다.';
-          break;
-        case 'EmailSignin':
-          errorMessage = '이메일 로그인 중 오류가 발생했습니다.';
-          break;
-        case 'CredentialsSignin':
-          errorMessage = '로그인 정보가 올바르지 않습니다.';
-          break;
-        case 'SessionRequired':
-          errorMessage = '로그인이 필요합니다.';
-          break;
-        default:
-          errorMessage = '로그인 중 오류가 발생했습니다.';
+      
+      // 🚨 Auth 페이지에서 전달된 에러 메시지 처리
+      if (error === 'auth_failed' && message) {
+        errorMessage = decodeURIComponent(message);
+        console.log('[SIGNIN] Auth 페이지 에러 메시지:', errorMessage);
+      } else {
+        // 기존 에러 타입 처리
+        switch (error) {
+          case 'AccessDenied':
+            errorMessage = '비활성화된 계정입니다. 고객센터에 문의해주세요.';
+            break;
+          case 'OAuthSignin':
+            errorMessage = '소셜 로그인 중 오류가 발생했습니다.';
+            break;
+          case 'OAuthCallback':
+            errorMessage = '소셜 로그인 콜백 처리 중 오류가 발생했습니다.';
+            break;
+          case 'OAuthCreateAccount':
+            errorMessage = '계정 생성 중 오류가 발생했습니다.';
+            break;
+          case 'EmailCreateAccount':
+            errorMessage = '이메일 계정 생성 중 오류가 발생했습니다.';
+            break;
+          case 'Callback':
+            errorMessage = '로그인 처리 중 오류가 발생했습니다.';
+            break;
+          case 'OAuthAccountNotLinked':
+            errorMessage = '이미 다른 방법으로 가입된 이메일입니다.';
+            break;
+          case 'EmailSignin':
+            errorMessage = '이메일 로그인 중 오류가 발생했습니다.';
+            break;
+          case 'CredentialsSignin':
+            errorMessage = '로그인 정보가 올바르지 않습니다.';
+            break;
+          case 'SessionRequired':
+            errorMessage = '로그인이 필요합니다.';
+            break;
+          default:
+            errorMessage = '로그인 중 오류가 발생했습니다.';
+        }
       }
       
+      // 🚨 인증 실패 플래그 설정
+      (window as any).__AUTH_FAILED__ = true;
+      (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+      
+      console.log('[SIGNIN] 에러 모달 표시:', errorMessage);
       setErrorModalMessage(errorMessage);
       setShowErrorModal(true);
       
       // URL에서 error 파라미터 제거
       const newUrl = new URL(window.location.href);
       newUrl.searchParams.delete('error');
+      newUrl.searchParams.delete('message');
       window.history.replaceState({}, '', newUrl.toString());
     }
   }, [searchParams]);

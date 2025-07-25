@@ -49,7 +49,6 @@ export async function POST(request: NextRequest) {
       });
 
       console.log('[AUTH CALLBACK] 백엔드 응답 상태:', response.status);
-      console.log('[AUTH CALLBACK] 백엔드 응답 헤더:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -58,11 +57,37 @@ export async function POST(request: NextRequest) {
           statusText: response.statusText,
           errorText
         });
-        
+
+        // 422 에러 특별 처리
+        if (response.status === 422) {
+          return NextResponse.json(
+            { 
+              success: false, 
+              error: '유효하지 않은 토큰입니다. 다시 로그인해주세요.',
+              details: '토큰이 만료되었거나 형식이 올바르지 않습니다.'
+            },
+            { status: 422 }
+          );
+        }
+
+        // 401 에러 처리
+        if (response.status === 401) {
+          return NextResponse.json(
+            { 
+              success: false, 
+              error: '인증에 실패했습니다. 다시 로그인해주세요.',
+              details: '토큰이 유효하지 않거나 만료되었습니다.'
+            },
+            { status: 401 }
+          );
+        }
+
+        // 기타 서버 오류
         return NextResponse.json(
           { 
             success: false, 
-            error: `백엔드 서버 오류: ${response.status} - ${response.statusText}` 
+            error: `서버 오류가 발생했습니다. (${response.status})`,
+            details: errorText
           },
           { status: response.status }
         );
@@ -71,31 +96,7 @@ export async function POST(request: NextRequest) {
       const data = await response.json();
       console.log('[AUTH CALLBACK] 백엔드 응답 데이터:', data);
 
-      if (data.success) {
-        // 성공 시 쿠키에 토큰 설정
-        const response = NextResponse.json({
-          success: true,
-          user: data.user,
-          message: '인증이 완료되었습니다.'
-        });
-
-        if (data.token) {
-          response.cookies.set('auth-token', data.token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 7 * 24 * 60 * 60, // 7일
-          });
-        }
-
-        return response;
-      } else {
-        console.error('[AUTH CALLBACK] 백엔드 인증 실패:', data.error);
-        return NextResponse.json(
-          { success: false, error: data.error || '인증에 실패했습니다.' },
-          { status: 400 }
-        );
-      }
+      return NextResponse.json(data);
     } catch (fetchError: any) {
       console.error('[AUTH CALLBACK] 백엔드 API 호출 실패:', fetchError);
       

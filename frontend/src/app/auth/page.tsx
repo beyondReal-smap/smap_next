@@ -30,78 +30,49 @@ export default function AuthPage() {
           return;
         }
 
-        // 백엔드 API로 토큰 전송
-        console.log('[AUTH] 백엔드 API 호출 시작');
-        
-        try {
-          const response = await fetch('/api/auth/callback', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              tokenId,
-              lat: lat ? parseFloat(lat) : null,
-              long: long ? parseFloat(long) : null,
-            }),
-          });
+        // 백엔드 API 호출
+        const response = await fetch('/api/auth/callback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            tokenId,
+            lat: parseFloat(lat || '0'),
+            long: parseFloat(long || '0')
+          }),
+        });
 
-          console.log('[AUTH] 백엔드 응답 상태:', response.status);
-          console.log('[AUTH] 백엔드 응답 헤더:', Object.fromEntries(response.headers.entries()));
+        const result = await response.json();
+        console.log('[AUTH] 백엔드 응답:', result);
 
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[AUTH] 백엔드 오류 응답:', {
-              status: response.status,
-              statusText: response.statusText,
-              errorText
-            });
-            
-            setStatus('error');
-            setMessage(`서버 오류가 발생했습니다. (${response.status}) 다시 시도해주세요.`);
-            return;
-          }
-
-          const data = await response.json();
-          console.log('[AUTH] 백엔드 응답 데이터:', data);
-
-          if (data.success) {
-            console.log('[AUTH] 인증 성공');
-            setStatus('success');
-            setMessage('로그인 성공! 홈으로 이동합니다...');
-            
-            // 2초 후 홈으로 리다이렉트
-            setTimeout(() => {
-              router.replace('/home');
-            }, 2000);
-          } else {
-            console.error('[AUTH] 인증 실패:', data.error);
-            setStatus('error');
-            setMessage(data.error || '인증에 실패했습니다. 다시 시도해주세요.');
-          }
-        } catch (fetchError: any) {
-          console.error('[AUTH] 백엔드 API 호출 실패:', fetchError);
+        if (result.success) {
+          setStatus('success');
+          setMessage('인증이 완료되었습니다. 홈으로 이동합니다...');
           
-          // 네트워크 오류인지 확인
-          if (fetchError instanceof TypeError && fetchError.message.includes('fetch')) {
-            setStatus('error');
-            setMessage('서버에 연결할 수 없습니다. 네트워크 연결을 확인하고 다시 시도해주세요.');
-            return;
-          }
-          
-          // 타임아웃 오류인지 확인
-          if (fetchError.name === 'AbortError') {
-            setStatus('error');
-            setMessage('요청 시간이 초과되었습니다. 다시 시도해주세요.');
-            return;
-          }
-          
-          throw fetchError; // 다른 오류는 상위로 전파
+          // 성공 시 홈으로 리다이렉트
+          setTimeout(() => {
+            router.replace('/home');
+          }, 2000);
+        } else {
+          throw new Error(result.error || '인증에 실패했습니다.');
         }
-      } catch (error) {
-        console.error('[AUTH] 인증 처리 중 오류:', error);
+      } catch (error: any) {
+        console.error('[AUTH] 인증 처리 실패:', error);
+        
+        // 🚨 인증 실패 플래그 설정
+        (window as any).__AUTH_FAILED__ = true;
+        (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+        
         setStatus('error');
-        setMessage('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
+        setMessage('인증에 실패했습니다. 로그인 페이지로 이동합니다...');
+        
+        // 실패 시 signin 페이지로 리다이렉트 (에러 상태와 함께)
+        setTimeout(() => {
+          // 에러 메시지를 URL 파라미터로 전달
+          const errorMessage = encodeURIComponent(error.message || '인증에 실패했습니다.');
+          router.replace(`/signin?error=auth_failed&message=${errorMessage}`);
+        }, 2000);
       }
     };
 
