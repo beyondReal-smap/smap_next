@@ -2661,18 +2661,24 @@ const SignInPage = () => {
 
   // 에러 표시 헬퍼 함수 (단순화된 버전)
   const showError = (message: string) => {
-    console.log('[SIGNIN] showError 함수 시작:', message);
-    // 모든 상태를 명확히 false로
-    setIsLoading(false);
-    setIsCheckingAuth(false);
-    isRedirectingRef.current = false;
-    // 🔥 에러 모달 플래그 설정
-    (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
-    // 에러 모달 표시
-    setErrorModalMessage(message);
-    setShowErrorModal(true);
-    console.log('[SIGNIN] ✅ showError 함수 완료');
-  };
+  console.log('[SIGNIN] showError 함수 시작:', message);
+  // 모든 상태를 명확히 false로
+  setIsLoading(false);
+  setIsCheckingAuth(false);
+  isRedirectingRef.current = false;
+  // 🔥 에러 모달 플래그 설정
+  (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+  // 에러 모달 표시
+  setErrorModalMessage(message);
+  setShowErrorModal(true);
+  console.log('[SIGNIN] ✅ showError 함수 완료');
+  console.log('[SIGNIN] 🔍 에러 모달 상태 확인:', {
+    showErrorModal: true,
+    errorModalMessage: message,
+    isCheckingAuth: false,
+    isLoading: false
+  });
+};
 
   // iOS bridge 로드 대기 함수
   const waitForIosBridge = async (maxWait = 3000) => {
@@ -3243,10 +3249,24 @@ const SignInPage = () => {
   }
   */
 
-  // 인증 체크 중이면서 에러 모달이 없을 때만 아무것도 렌더링하지 않음
+  // 인증 체크 중이면서 에러 모달이 없을 때만 로딩 스피너 표시
   if (isCheckingAuth && !showErrorModal) {
-    return null;
+    console.log('[SIGNIN] 🔍 로딩 스피너 표시 조건:', { isCheckingAuth, showErrorModal });
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <IOSCompatibleSpinner size="lg" />
+      </div>
+    );
   }
+
+  // 디버깅: 렌더링 상태 로그
+  console.log('[SIGNIN] 🔍 렌더링 상태:', {
+    isCheckingAuth,
+    showErrorModal,
+    errorModalMessage,
+    isLoading,
+    isLoggedIn
+  });
 
   return (
     <>
