@@ -17,6 +17,7 @@ import { comprehensivePreloadData } from '@/services/dataPreloadService';
 // 카카오 관련 import 제거
 import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
 import groupService from '@/services/groupService';
+import { API_KEYS } from '@/config/index';
 
 
 // 카카오 SDK 타입 정의
@@ -1352,7 +1353,7 @@ const SignInPage = () => {
         console.log('[GOOGLE SDK] Google Identity Services 초기화');
         
         // 🔥 Client ID 설정 (하드코딩으로 문제 해결)
-        const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '283271180972-lamjiad6ljpa02fk30k6nh6arqq4rc4o.apps.googleusercontent.com';
+        const clientId = API_KEYS.GOOGLE_CLIENT_ID;
         
         console.log('[GOOGLE SDK] Client ID 확인:', {
           hasPublicEnv: !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
@@ -2752,7 +2753,7 @@ const SignInPage = () => {
     const isIOSWebView = typeof window !== 'undefined' && window.webkit && window.webkit.messageHandlers;
     if (isIOSWebView) {
       // 시스템 브라우저로 Google OAuth URL 리디렉션
-      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID';
+      const clientId = API_KEYS.GOOGLE_CLIENT_ID;
       const redirectUri = encodeURIComponent('https://nextstep.smap.site/auth');
       const scope = encodeURIComponent('openid email profile');
       const oauthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=token&scope=${scope}`;
