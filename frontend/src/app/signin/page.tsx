@@ -1762,19 +1762,27 @@ const SignInPage = () => {
   useEffect(() => {
     // 에러 모달이 표시 중이면 아무것도 하지 않음 (최상단에 추가)
     if (showErrorModal) {
+      console.log('[SIGNIN] 🚫 에러 모달 표시 중 - 모든 리다이렉트 차단');
       return;
     }
+    
+    // 🔥 인증 실패 플래그 확인
+    if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+      console.log('[SIGNIN] 🚫 인증 실패 플래그 감지 - 리다이렉트 차단');
+      return;
+    }
+    
     // 간단한 네비게이션 차단 플래그 확인
     if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
       console.log('[SIGNIN] 🚫 구글 로그인 중 - 네비게이션 차단');
       return undefined;
     }
-    // 에러 모달이 표시 중이면 아무것도 하지 않음
-    // (이미 위에서 처리)
+    
     // 로딩 중이면 대기
     if (loading) {
       return undefined;
     }
+    
     // URL에서 탈퇴 완료 플래그 확인
     const urlParams = new URLSearchParams(window.location.search);
     const isFromWithdraw = urlParams.get('from') === 'withdraw';
@@ -1789,28 +1797,45 @@ const SignInPage = () => {
       }
       return undefined;
     }
-    // 로그인된 사용자는 홈으로 리다이렉트 (차단 플래그 재확인)
+    
+    // 🔥 로그인된 사용자는 홈으로 리다이렉트 (강화된 차단 조건)
     if (isLoggedIn && !isRedirectingRef.current) {
       // 🚫 에러 모달이 표시 중이면 리다이렉트 방지
       if (showErrorModal) {
         console.log('[SIGNIN] 🚫 에러 모달 표시 중 - 홈 리다이렉트 차단');
         return undefined;
       }
+      
+      // 🚫 인증 실패 플래그가 있으면 리다이렉트 방지
+      if ((window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+        console.log('[SIGNIN] 🚫 인증 실패 플래그 감지 - 홈 리다이렉트 차단');
+        return undefined;
+      }
+      
+      // 🚫 인증 실패 플래그가 있으면 리다이렉트 방지
+      if ((window as any).__AUTH_FAILED__) {
+        console.log('[SIGNIN] 🚫 인증 실패 플래그(__AUTH_FAILED__) 감지 - 홈 리다이렉트 차단');
+        return undefined;
+      }
+      
       // 리다이렉트 직전에 다시 한 번 차단 플래그 확인
       if ((window as any).__GOOGLE_LOGIN_IN_PROGRESS__) {
         console.log('[SIGNIN] 🚫 로그인된 사용자지만 구글 로그인 중 - 홈 리다이렉트 차단');
         return undefined;
       }
+      
       console.log('[SIGNIN] 로그인된 사용자 감지, /home으로 리다이렉트');
       isRedirectingRef.current = true;
       router.replace('/home');
       return undefined;
     }
+    
     // 로그인되지 않은 상태에서만 페이지 표시
     if (!isLoggedIn && isCheckingAuth) {
       console.log('[SIGNIN] 로그인되지 않은 상태, 로그인 페이지 표시');
       setIsCheckingAuth(false);
     }
+    
     // cleanup 함수: 컴포넌트 언마운트 시 플래그 리셋
     return () => {
       isRedirectingRef.current = false;
@@ -2630,6 +2655,10 @@ const SignInPage = () => {
     // 로딩 상태 해제
     setIsLoading(false);
     
+    // 🔥 인증 실패 플래그 정리
+    (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = false;
+    (window as any).__AUTH_FAILED__ = false;
+    
     // 전화번호는 유지하고 비밀번호만 초기화
     console.log('[SIGNIN] 🔄 에러 모달 닫기 - 전화번호 유지, 비밀번호 초기화');
     setPassword('');
@@ -2662,21 +2691,38 @@ const SignInPage = () => {
   // 에러 표시 헬퍼 함수 (단순화된 버전)
   const showError = (message: string) => {
   console.log('[SIGNIN] showError 함수 시작:', message);
-  // 모든 상태를 명확히 false로
+  
+  // 🔥 모든 상태를 명확히 false로 설정
   setIsLoading(false);
   setIsCheckingAuth(false);
   isRedirectingRef.current = false;
-  // 🔥 에러 모달 플래그 설정
-  (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+  
+  // 🔥 인증 상태 강제 초기화 (중요!)
+  if (typeof window !== 'undefined') {
+    // localStorage에서 인증 관련 데이터 제거
+    localStorage.removeItem('auth-token');
+    localStorage.removeItem('smap_user_data');
+    localStorage.removeItem('isLoggedIn');
+    sessionStorage.removeItem('authToken');
+    
+    // 전역 인증 상태 초기화
+    (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+    (window as any).__AUTH_FAILED__ = true;
+    
+    console.log('[SIGNIN] 🔥 인증 상태 강제 초기화 완료');
+  }
+  
   // 에러 모달 표시
   setErrorModalMessage(message);
   setShowErrorModal(true);
+  
   console.log('[SIGNIN] ✅ showError 함수 완료');
   console.log('[SIGNIN] 🔍 에러 모달 상태 확인:', {
     showErrorModal: true,
     errorModalMessage: message,
     isCheckingAuth: false,
-    isLoading: false
+    isLoading: false,
+    authFailed: true
   });
 };
 
