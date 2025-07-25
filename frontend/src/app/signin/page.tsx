@@ -3268,6 +3268,51 @@ const SignInPage = () => {
     isLoggedIn
   });
 
+  // 🔥 강제 안전장치: 에러 모달이 true면 무조건 메인 UI 렌더링
+  if (showErrorModal) {
+    console.log('[SIGNIN] 🔥 에러 모달이 활성화됨 - 강제 메인 UI 렌더링');
+  }
+
+  // 🔥 전역 에러 핸들러: 인증 실패 시 강제로 에러 모달 표시
+  useEffect(() => {
+    const handleGlobalError = (event: ErrorEvent) => {
+      console.log('[SIGNIN] 🔥 전역 에러 감지:', event.error);
+      
+      // 인증 관련 에러인지 확인
+      if (event.error?.message?.includes('인증 실패') || 
+          event.error?.message?.includes('서버 오류') ||
+          event.message?.includes('인증 실패') ||
+          event.message?.includes('서버 오류')) {
+        console.log('[SIGNIN] 🔥 인증 에러 감지 - 강제 에러 모달 표시');
+        showError('로그인에 실패했습니다. 다시 시도해주세요.');
+      }
+    };
+
+    // 전역 에러 리스너 등록
+    window.addEventListener('error', handleGlobalError);
+    
+    // 언마운트 시 리스너 제거
+    return () => {
+      window.removeEventListener('error', handleGlobalError);
+    };
+  }, []);
+
+  // 🔥 강제 에러 모달 표시 (백업 안전장치)
+  useEffect(() => {
+    const checkForAuthErrors = () => {
+      // 5초 후에도 에러 모달이 표시되지 않았다면 강제로 표시
+      setTimeout(() => {
+        if (!showErrorModal && (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__) {
+          console.log('[SIGNIN] 🔥 백업 안전장치 - 강제 에러 모달 표시');
+          setShowErrorModal(true);
+          setErrorModalMessage('로그인에 실패했습니다. 다시 시도해주세요.');
+        }
+      }, 5000);
+    };
+
+    checkForAuthErrors();
+  }, [showErrorModal]);
+
   return (
     <>
       {/* 움직이는 배경 레이어 */}
