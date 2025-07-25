@@ -912,15 +912,41 @@ export default function HomePage() {
   
   // 🔧 사용자 정보 디버깅
   useEffect(() => {
-    if (user) {
-      console.log('🔧 [HOME] AuthContext 사용자 정보 확인:', {
+    console.log('🔧 [HOME] AuthContext 상태 확인:', {
+      hasUser: !!user,
+      userInfo: user ? {
         mt_idx: user.mt_idx,
         mt_name: user.mt_name,
-        mt_email: user.mt_email,
-        isLoggedIn,
-        authLoading,
-        isPreloadingComplete
-      });
+        mt_email: user.mt_email
+      } : null,
+      isLoggedIn,
+      authLoading,
+      isPreloadingComplete
+    });
+    
+    // 사용자 정보가 없지만 로그인 상태인 경우 강제로 확인
+    if (!user && isLoggedIn) {
+      console.log('🔧 [HOME] 사용자 정보가 없지만 로그인 상태 - 강제 확인');
+      
+      // localStorage에서 사용자 정보 확인
+      try {
+        const storedUserData = localStorage.getItem('smap_user_data');
+        if (storedUserData) {
+          const parsedUserData = JSON.parse(storedUserData);
+          console.log('🔧 [HOME] localStorage에서 사용자 정보 발견:', parsedUserData);
+          
+          // AuthContext 상태 강제 업데이트
+          if (typeof (window as any).__AUTH_CONTEXT_DISPATCH__ === 'function') {
+            console.log('🔧 [HOME] AuthContext 상태 강제 업데이트');
+            (window as any).__AUTH_CONTEXT_DISPATCH__({ 
+              type: 'LOGIN_SUCCESS', 
+              payload: parsedUserData 
+            });
+          }
+        }
+      } catch (error) {
+        console.error('🔧 [HOME] localStorage 사용자 정보 확인 실패:', error);
+      }
     }
   }, [user, isLoggedIn, authLoading, isPreloadingComplete]);
 

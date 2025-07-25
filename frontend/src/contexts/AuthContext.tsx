@@ -128,6 +128,19 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  
+  // 전역으로 dispatch 함수 노출 (구글 로그인 후 상태 업데이트용)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__AUTH_CONTEXT_DISPATCH__ = dispatch;
+    }
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as any).__AUTH_CONTEXT_DISPATCH__;
+      }
+    };
+  }, []);
   const [preloadingUsers, setPreloadingUsers] = useState<Set<number>>(new Set()); // 프리로딩 중인 사용자 ID 추적
   
   // DataCache 사용
@@ -299,14 +312,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // authService를 통해 토큰과 사용자 데이터를 직접 확인
         const token = authService.getToken();
         const userData = authService.getUserData();
+        
+        // localStorage에서도 사용자 데이터 확인 (구글 로그인 후 저장된 데이터)
+        let localStorageUserData = null;
+        try {
+          const storedUserData = localStorage.getItem('smap_user_data');
+          if (storedUserData) {
+            localStorageUserData = JSON.parse(storedUserData);
+            console.log('[AUTH CONTEXT] localStorage에서 사용자 데이터 발견:', localStorageUserData?.mt_name);
+          }
+        } catch (error) {
+          console.warn('[AUTH CONTEXT] localStorage 사용자 데이터 파싱 실패:', error);
+        }
 
-        if ((token || iosToken) && userData) {
-          console.log('[AUTH CONTEXT] 유효한 토큰과 사용자 데이터 발견:', userData.mt_name);
+        if ((token || iosToken) && (userData || localStorageUserData)) {
+          const finalUserData = userData || localStorageUserData;
+          console.log('[AUTH CONTEXT] 유효한 토큰과 사용자 데이터 발견:', finalUserData.mt_name);
           if (isMounted) {
-            dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
+            dispatch({ type: 'LOGIN_SUCCESS', payload: finalUserData });
             // 프리로딩은 백그라운드에서 비동기적으로 실행 (결과를 기다리지 않음)
             setTimeout(() => {
-              preloadUserData(userData.mt_idx, 'initial-load').catch(error => {
+              preloadUserData(finalUserData.mt_idx, 'initial-load').catch(error => {
                 console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
               });
             }, 100);

@@ -2033,7 +2033,22 @@ const SignInPage = () => {
               
               // 3. AuthContext 상태를 수동으로 동기화 (강화된 버전)
               console.log('[GOOGLE LOGIN] AuthContext 상태 동기화 시작');
-              await refreshAuthState();
+              
+              // 강제로 AuthContext 상태 업데이트
+              try {
+                // AuthContext의 dispatch를 직접 호출하여 상태 업데이트
+                if (typeof (window as any).__AUTH_CONTEXT_DISPATCH__ === 'function') {
+                  console.log('[GOOGLE LOGIN] AuthContext dispatch 직접 호출');
+                  (window as any).__AUTH_CONTEXT_DISPATCH__({ 
+                    type: 'LOGIN_SUCCESS', 
+                    payload: data.user 
+                  });
+                }
+                
+                await refreshAuthState();
+              } catch (syncError) {
+                console.error('[GOOGLE LOGIN] AuthContext 동기화 실패:', syncError);
+              }
               
               // 동기화 후 상태 재확인
               setTimeout(async () => {
@@ -2049,6 +2064,14 @@ const SignInPage = () => {
                   // 강제로 로그인 상태 설정
                   localStorage.setItem('isLoggedIn', 'true');
                   sessionStorage.setItem('authToken', 'authenticated');
+                  
+                  // AuthContext 상태도 강제 업데이트
+                  if (typeof (window as any).__AUTH_CONTEXT_DISPATCH__ === 'function') {
+                    (window as any).__AUTH_CONTEXT_DISPATCH__({ 
+                      type: 'LOGIN_SUCCESS', 
+                      payload: data.user 
+                    });
+                  }
                 }
               }, 500);
               
@@ -2090,9 +2113,12 @@ const SignInPage = () => {
                 // 회원가입 페이지로 이동
                 window.location.href = '/register-new';
               } else {
-                console.log('[GOOGLE LOGIN] 🏠 기존 사용자 - 홈 페이지로 즉시 이동');
-                // 즉시 홈으로 이동
-                window.location.href = '/home';
+                console.log('[GOOGLE LOGIN] 🏠 기존 사용자 - 홈 페이지로 이동 (지연)');
+                // AuthContext 상태가 설정될 시간을 주고 홈으로 이동
+                setTimeout(() => {
+                  console.log('[GOOGLE LOGIN] 홈으로 이동 실행');
+                  window.location.href = '/home';
+                }, 1000);
               }
             }
           } else {
