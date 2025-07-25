@@ -21,52 +21,101 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // SSL 인증서 문제 해결을 위한 설정
+    process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
+
     // 백엔드 API로 토큰 전송
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://api.smap.site';
-    const response = await fetch(`${backendUrl}/api/auth/google/callback`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        tokenId,
-        lat,
-        long,
-      }),
-    });
-
-    const data = await response.json();
-    console.log('[AUTH CALLBACK] 백엔드 응답:', {
-      status: response.status,
-      success: data.success,
-      hasUser: !!data.user,
-      hasToken: !!data.token
-    });
-
-    if (response.ok && data.success) {
-      // 성공 시 쿠키에 토큰 설정
-      const response = NextResponse.json({
-        success: true,
-        user: data.user,
-        message: '인증이 완료되었습니다.'
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
+    console.log('[AUTH CALLBACK] 백엔드 URL:', backendUrl);
+    
+    try {
+      const response = await fetch(`${backendUrl}/api/v1/auth/google-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'User-Agent': 'SMAP-NextJS-AuthCallback/1.0'
+        },
+        body: JSON.stringify({
+          idToken: tokenId,
+          userInfo: {
+            email: 'temp@example.com', // 임시 이메일
+            name: 'Temporary User'
+          },
+          source: 'auth_callback'
+        }),
+        // 타임아웃 설정
+        signal: AbortSignal.timeout(10000)
       });
 
-      if (data.token) {
-        response.cookies.set('auth-token', data.token, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'lax',
-          maxAge: 7 * 24 * 60 * 60, // 7일
+      console.log('[AUTH CALLBACK] 백엔드 응답 상태:', response.status);
+      console.log('[AUTH CALLBACK] 백엔드 응답 헤더:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[AUTH CALLBACK] 백엔드 오류 응답:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText
         });
+        
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `백엔드 서버 오류: ${response.status} - ${response.statusText}` 
+          },
+          { status: response.status }
+        );
       }
 
-      return response;
-    } else {
-      console.error('[AUTH CALLBACK] 백엔드 인증 실패:', data.error);
-      return NextResponse.json(
-        { success: false, error: data.error || '인증에 실패했습니다.' },
-        { status: 400 }
-      );
+      const data = await response.json();
+      console.log('[AUTH CALLBACK] 백엔드 응답 데이터:', data);
+
+      if (data.success) {
+        // 성공 시 쿠키에 토큰 설정
+        const response = NextResponse.json({
+          success: true,
+          user: data.user,
+          message: '인증이 완료되었습니다.'
+        });
+
+        if (data.token) {
+          response.cookies.set('auth-token', data.token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60, // 7일
+          });
+        }
+
+        return response;
+      } else {
+        console.error('[AUTH CALLBACK] 백엔드 인증 실패:', data.error);
+        return NextResponse.json(
+          { success: false, error: data.error || '인증에 실패했습니다.' },
+          { status: 400 }
+        );
+      }
+    } catch (fetchError: any) {
+      console.error('[AUTH CALLBACK] 백엔드 API 호출 실패:', fetchError);
+      
+      // 네트워크 오류인지 확인
+      if (fetchError instanceof TypeError && fetchError.message.includes('fetch')) {
+        return NextResponse.json(
+          { success: false, error: '백엔드 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.' },
+          { status: 503 }
+        );
+      }
+      
+      // 타임아웃 오류인지 확인
+      if (fetchError.name === 'AbortError') {
+        return NextResponse.json(
+          { success: false, error: '요청 시간이 초과되었습니다. 다시 시도해주세요.' },
+          { status: 408 }
+        );
+      }
+      
+      throw fetchError; // 다른 오류는 상위로 전파
     }
   } catch (error) {
     console.error('[AUTH CALLBACK] 처리 중 오류:', error);

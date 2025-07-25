@@ -32,34 +32,71 @@ export default function AuthPage() {
 
         // 백엔드 API로 토큰 전송
         console.log('[AUTH] 백엔드 API 호출 시작');
-        const response = await fetch('/api/auth/callback', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            tokenId,
-            lat: lat ? parseFloat(lat) : null,
-            long: long ? parseFloat(long) : null,
-          }),
-        });
+        
+        try {
+          const response = await fetch('/api/auth/callback', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              tokenId,
+              lat: lat ? parseFloat(lat) : null,
+              long: long ? parseFloat(long) : null,
+            }),
+          });
 
-        const data = await response.json();
-        console.log('[AUTH] 백엔드 응답:', data);
+          console.log('[AUTH] 백엔드 응답 상태:', response.status);
+          console.log('[AUTH] 백엔드 응답 헤더:', Object.fromEntries(response.headers.entries()));
 
-        if (data.success) {
-          console.log('[AUTH] 인증 성공');
-          setStatus('success');
-          setMessage('로그인 성공! 홈으로 이동합니다...');
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[AUTH] 백엔드 오류 응답:', {
+              status: response.status,
+              statusText: response.statusText,
+              errorText
+            });
+            
+            setStatus('error');
+            setMessage(`서버 오류가 발생했습니다. (${response.status}) 다시 시도해주세요.`);
+            return;
+          }
+
+          const data = await response.json();
+          console.log('[AUTH] 백엔드 응답 데이터:', data);
+
+          if (data.success) {
+            console.log('[AUTH] 인증 성공');
+            setStatus('success');
+            setMessage('로그인 성공! 홈으로 이동합니다...');
+            
+            // 2초 후 홈으로 리다이렉트
+            setTimeout(() => {
+              router.replace('/home');
+            }, 2000);
+          } else {
+            console.error('[AUTH] 인증 실패:', data.error);
+            setStatus('error');
+            setMessage(data.error || '인증에 실패했습니다. 다시 시도해주세요.');
+          }
+        } catch (fetchError: any) {
+          console.error('[AUTH] 백엔드 API 호출 실패:', fetchError);
           
-          // 2초 후 홈으로 리다이렉트
-          setTimeout(() => {
-            router.replace('/home');
-          }, 2000);
-        } else {
-          console.error('[AUTH] 인증 실패:', data.error);
-          setStatus('error');
-          setMessage(data.error || '인증에 실패했습니다. 다시 시도해주세요.');
+          // 네트워크 오류인지 확인
+          if (fetchError instanceof TypeError && fetchError.message.includes('fetch')) {
+            setStatus('error');
+            setMessage('서버에 연결할 수 없습니다. 네트워크 연결을 확인하고 다시 시도해주세요.');
+            return;
+          }
+          
+          // 타임아웃 오류인지 확인
+          if (fetchError.name === 'AbortError') {
+            setStatus('error');
+            setMessage('요청 시간이 초과되었습니다. 다시 시도해주세요.');
+            return;
+          }
+          
+          throw fetchError; // 다른 오류는 상위로 전파
         }
       } catch (error) {
         console.error('[AUTH] 인증 처리 중 오류:', error);
@@ -72,23 +109,23 @@ export default function AuthPage() {
   }, [searchParams, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full"
+        className="max-w-md w-full bg-white rounded-lg shadow-lg p-8"
       >
         <div className="text-center">
           {status === 'loading' && (
             <>
               <motion.div
                 animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-6"
+                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                className="mx-auto w-12 h-12 text-blue-600 mb-4"
               >
-                <FiLoader className="w-8 h-8 text-blue-600" />
+                <FiLoader className="w-full h-full" />
               </motion.div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">인증 처리 중</h1>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">인증 처리 중</h2>
               <p className="text-gray-600">{message}</p>
             </>
           )}
@@ -98,11 +135,11 @@ export default function AuthPage() {
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6"
+                className="mx-auto w-12 h-12 text-green-600 mb-4"
               >
-                <FiCheckCircle className="w-8 h-8 text-green-600" />
+                <FiCheckCircle className="w-full h-full" />
               </motion.div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">로그인 성공!</h1>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">인증 성공</h2>
               <p className="text-gray-600">{message}</p>
             </>
           )}
@@ -112,15 +149,15 @@ export default function AuthPage() {
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6"
+                className="mx-auto w-12 h-12 text-red-600 mb-4"
               >
-                <FiAlertCircle className="w-8 h-8 text-red-600" />
+                <FiAlertCircle className="w-full h-full" />
               </motion.div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">인증 실패</h1>
-              <p className="text-gray-600 mb-6">{message}</p>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">인증 실패</h2>
+              <p className="text-gray-600 mb-4">{message}</p>
               <button
                 onClick={() => router.push('/signin')}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 로그인 페이지로 돌아가기
               </button>
