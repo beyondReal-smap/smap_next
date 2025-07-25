@@ -550,35 +550,20 @@ const SignInPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   // 안전한 useAuth 접근
-  let authContextData;
-  try {
-    authContextData = useAuth();
-  } catch (error) {
-    console.error('[SIGNIN] useAuth 컨텍스트 오류:', error);
-    authContextData = {
-      login: () => Promise.resolve(),
-      isLoggedIn: false,
-      loading: false,
-      error: null,
-      setError: () => {},
-      refreshAuthState: () => Promise.resolve()
-    };
-  }
-  const { login, isLoggedIn, loading, error, setError, refreshAuthState } = authContextData;
-  
-  // 🆕 DataCache 접근
-  let dataCacheContextData;
-  try {
-    dataCacheContextData = useDataCache();
-  } catch (error) {
-    console.error('[SIGNIN] useDataCache 컨텍스트 오류:', error);
-    dataCacheContextData = {
-      saveComprehensiveData: () => {},
-      saveToLocalStorage: () => {},
-      loadFromLocalStorage: () => null
-    };
-  }
-  const { saveComprehensiveData } = dataCacheContextData;
+  const authContextData = useAuth();
+  const dataCacheContextData = useDataCache();
+
+  // fallback 처리 (값이 undefined/null일 때만)
+  const {
+    login = () => Promise.resolve(),
+    isLoggedIn = false,
+    loading = false,
+    error = null,
+    setError = () => {},
+    refreshAuthState = () => Promise.resolve()
+  } = authContextData || {};
+
+  const { saveComprehensiveData = () => {}, saveToLocalStorage = () => {}, loadFromLocalStorage = () => null } = dataCacheContextData || {};
   
   // 리다이렉트 중복 실행 방지 플래그
   const isRedirectingRef = useRef(false);

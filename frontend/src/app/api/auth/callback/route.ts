@@ -49,54 +49,29 @@ export async function POST(request: NextRequest) {
       });
 
       console.log('[AUTH CALLBACK] 백엔드 응답 상태:', response.status);
-
+      
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[AUTH CALLBACK] 백엔드 오류 응답:', {
+        console.error('[AUTH CALLBACK] 백엔드 API 오류:', {
           status: response.status,
           statusText: response.statusText,
-          errorText
+          error: errorText
         });
-
-        // 422 에러 특별 처리
-        if (response.status === 422) {
-          return NextResponse.json(
-            { 
-              success: false, 
-              error: '유효하지 않은 토큰입니다. 다시 로그인해주세요.',
-              details: '토큰이 만료되었거나 형식이 올바르지 않습니다.'
-            },
-            { status: 422 }
-          );
-        }
-
-        // 401 에러 처리
-        if (response.status === 401) {
-          return NextResponse.json(
-            { 
-              success: false, 
-              error: '인증에 실패했습니다. 다시 로그인해주세요.',
-              details: '토큰이 유효하지 않거나 만료되었습니다.'
-            },
-            { status: 401 }
-          );
-        }
-
-        // 기타 서버 오류
+        
         return NextResponse.json(
           { 
             success: false, 
-            error: `서버 오류가 발생했습니다. (${response.status})`,
-            details: errorText
+            error: `백엔드 서버 오류 (${response.status}): ${response.statusText}` 
           },
           { status: response.status }
         );
       }
 
       const data = await response.json();
-      console.log('[AUTH CALLBACK] 백엔드 응답 데이터:', data);
-
-      return NextResponse.json(data);
+      console.log('[AUTH CALLBACK] 백엔드 응답 성공:', data);
+      
+      return NextResponse.json({ success: true, data });
+      
     } catch (fetchError: any) {
       console.error('[AUTH CALLBACK] 백엔드 API 호출 실패:', fetchError);
       
@@ -118,10 +93,15 @@ export async function POST(request: NextRequest) {
       
       throw fetchError; // 다른 오류는 상위로 전파
     }
-  } catch (error) {
-    console.error('[AUTH CALLBACK] 처리 중 오류:', error);
+    
+  } catch (error: any) {
+    console.error('[AUTH CALLBACK] 예상치 못한 오류:', error);
+    
     return NextResponse.json(
-      { success: false, error: '서버 오류가 발생했습니다.' },
+      { 
+        success: false, 
+        error: '인증 처리 중 오류가 발생했습니다. 다시 시도해주세요.' 
+      },
       { status: 500 }
     );
   }
