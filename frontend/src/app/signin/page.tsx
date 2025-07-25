@@ -2689,42 +2689,42 @@ const SignInPage = () => {
 
 
   // 에러 표시 헬퍼 함수 (단순화된 버전)
-  const showError = (message: string) => {
-  console.log('[SIGNIN] showError 함수 시작:', message);
-  
-  // 🔥 모든 상태를 명확히 false로 설정
-  setIsLoading(false);
-  setIsCheckingAuth(false);
-  isRedirectingRef.current = false;
-  
-  // 🔥 인증 상태 강제 초기화 (중요!)
-  if (typeof window !== 'undefined') {
-    // localStorage에서 인증 관련 데이터 제거
-    localStorage.removeItem('auth-token');
-    localStorage.removeItem('smap_user_data');
-    localStorage.removeItem('isLoggedIn');
-    sessionStorage.removeItem('authToken');
-    
-    // 전역 인증 상태 초기화
-    (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
-    (window as any).__AUTH_FAILED__ = true;
-    
-    console.log('[SIGNIN] 🔥 인증 상태 강제 초기화 완료');
-  }
-  
-  // 에러 모달 표시
-  setErrorModalMessage(message);
-  setShowErrorModal(true);
-  
-  console.log('[SIGNIN] ✅ showError 함수 완료');
-  console.log('[SIGNIN] 🔍 에러 모달 상태 확인:', {
-    showErrorModal: true,
-    errorModalMessage: message,
-    isCheckingAuth: false,
-    isLoading: false,
-    authFailed: true
-  });
-};
+  const showError = async (message: string) => {
+    console.log('[SIGNIN] showError 함수 시작:', message);
+    // 모든 상태를 명확히 false로
+    setIsLoading(false);
+    setIsCheckingAuth(false);
+    isRedirectingRef.current = false;
+    // 인증 상태 강제 초기화 (중요!)
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth-token');
+      localStorage.removeItem('smap_user_data');
+      localStorage.removeItem('isLoggedIn');
+      sessionStorage.removeItem('authToken');
+      (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
+      (window as any).__AUTH_FAILED__ = true;
+      console.log('[SIGNIN] 🔥 인증 상태 강제 초기화 완료');
+    }
+    // 🔥 인증 Context 강제 동기화
+    if (typeof refreshAuthState === 'function') {
+      try {
+        await refreshAuthState();
+        console.log('[SIGNIN] 🔥 인증 상태 강제 동기화 완료');
+      } catch (e) {
+        console.warn('[SIGNIN] 인증 상태 동기화 실패:', e);
+      }
+    }
+    setErrorModalMessage(message);
+    setShowErrorModal(true);
+    console.log('[SIGNIN] ✅ showError 함수 완료');
+    console.log('[SIGNIN] 🔍 에러 모달 상태 확인:', {
+      showErrorModal: true,
+      errorModalMessage: message,
+      isCheckingAuth: false,
+      isLoading: false,
+      authFailed: true
+    });
+  };
 
   // iOS bridge 로드 대기 함수
   const waitForIosBridge = async (maxWait = 3000) => {
