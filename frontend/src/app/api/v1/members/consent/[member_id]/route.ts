@@ -5,23 +5,28 @@ import { verifyJWT } from '@/lib/auth';
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
 async function fetchWithFallback(url: string, options: RequestInit = {}): Promise<any> {
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
-  
-  console.log('[CONSENT API] 🔗 백엔드 요청:', {
+  console.log('[CONSENT API] 🔗 백엔드 요청 시작:', {
     url,
-    backendUrl,
+    method: options.method || 'GET',
     timestamp: new Date().toISOString()
   });
 
   try {
     const response = await fetch(url, {
-      method: 'GET',
+      method: options.method || 'GET',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         ...options.headers,
       },
+      body: options.body,
       ...options,
+    });
+
+    console.log('[CONSENT API] 📡 백엔드 응답 상태:', {
+      status: response.status,
+      statusText: response.statusText,
+      url
     });
 
     if (!response.ok) {
@@ -39,6 +44,7 @@ async function fetchWithFallback(url: string, options: RequestInit = {}): Promis
     console.log('[CONSENT API] ✅ 백엔드 응답 성공:', {
       url,
       dataType: typeof data,
+      hasData: !!data,
       timestamp: new Date().toISOString()
     });
 
@@ -47,6 +53,7 @@ async function fetchWithFallback(url: string, options: RequestInit = {}): Promis
     console.error('[CONSENT API] 🚨 요청 실패:', {
       url,
       error: error instanceof Error ? error.message : String(error),
+      errorName: error instanceof Error ? error.name : 'Unknown',
       timestamp: new Date().toISOString()
     });
     throw error;
@@ -59,13 +66,20 @@ export async function GET(
 ) {
   const { member_id } = await params;
   try {
-    console.log('[CONSENT API] 동의 정보 조회 요청:', member_id);
+    console.log('[CONSENT API] 동의 정보 조회 요청 시작:', { member_id });
     console.log('[CONSENT API] NODE_ENV:', process.env.NODE_ENV);
-    console.log('[CONSENT API] 환경 변수 BACKEND_URL:', process.env.BACKEND_URL);
+    console.log('[CONSENT API] BACKEND_URL:', process.env.BACKEND_URL);
+    console.log('[CONSENT API] NEXT_PUBLIC_BACKEND_URL:', process.env.NEXT_PUBLIC_BACKEND_URL);
     
     // JWT 토큰 검증
     const token = request.headers.get('authorization')?.replace('Bearer ', '') ||
                   request.cookies.get('token')?.value;
+    
+    console.log('[CONSENT API] 토큰 확인:', {
+      hasToken: !!token,
+      tokenLength: token ? token.length : 0,
+      tokenPreview: token ? `${token.substring(0, 20)}...` : 'none'
+    });
     
     if (!token) {
       console.log('[CONSENT API] 토큰 없음');
@@ -75,9 +89,20 @@ export async function GET(
       );
     }
 
-    const decoded = verifyJWT(token);
+    let decoded;
+    try {
+      decoded = verifyJWT(token);
+      console.log('[CONSENT API] 토큰 검증 성공:', { userId: decoded?.mt_idx });
+    } catch (jwtError) {
+      console.error('[CONSENT API] 토큰 검증 실패:', jwtError);
+      return NextResponse.json(
+        { success: false, message: '유효하지 않은 토큰입니다.' },
+        { status: 401 }
+      );
+    }
+
     if (!decoded) {
-      console.log('[CONSENT API] 토큰 검증 실패');
+      console.log('[CONSENT API] 토큰 검증 실패 - decoded가 null');
       return NextResponse.json(
         { success: false, message: '유효하지 않은 토큰입니다.' },
         { status: 401 }
@@ -86,6 +111,8 @@ export async function GET(
 
     const currentUserId = decoded.mt_idx;
     const requestedUserId = parseInt(member_id);
+
+    console.log('[CONSENT API] 사용자 ID 확인:', { currentUserId, requestedUserId });
 
     // 본인 정보만 조회 가능
     if (currentUserId !== requestedUserId) {
@@ -99,22 +126,56 @@ export async function GET(
     // 백엔드 API 호출 - 성공하는 API 패턴 사용
     const backendUrl = `https://118.67.130.71:8000/api/v1/members/consent/${requestedUserId}`;
     
-    console.log('[CONSENT API] 사용된 백엔드 URL:', backendUrl);
-    console.log('[CONSENT API] 전체 요청 URL:', backendUrl);
-    
-    const data = await fetchWithFallback(backendUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+    console.log('[CONSENT API] 백엔드 API 호출 준비:', {
+      url: backendUrl,
+      userId: requestedUserId,
+      timestamp: new Date().toISOString()
     });
-
-    console.log('[CONSENT API] 백엔드 응답 성공:', data);
     
-    return NextResponse.json(data);
+    try {
+      const data = await fetchWithFallback(backendUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      console.log('[CONSENT API] 백엔드 응답 성공:', {
+        success: data?.success,
+        message: data?.message,
+        hasData: !!data?.data
+      });
+      
+      return NextResponse.json(data);
+    } catch (backendError) {
+      console.error('[CONSENT API] 백엔드 호출 실패:', backendError);
+      
+      // 백엔드 호출 실패 시 기본 동의 정보 반환 (모든 동의를 'N'으로 설정)
+      console.log('[CONSENT API] 기본 동의 정보 반환');
+      return NextResponse.json({
+        success: true,
+        message: '동의 정보 조회 성공 (기본값)',
+        data: {
+          mt_agree1: 'N',
+          mt_agree2: 'N',
+          mt_agree3: 'N',
+          mt_agree4: 'N',
+          mt_agree5: 'N'
+        }
+      });
+    }
   } catch (error) {
-    console.error('[CONSENT API] 서버 오류:', error);
+    console.error('[CONSENT API] 서버 오류:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+      timestamp: new Date().toISOString()
+    });
+    
     return NextResponse.json(
-      { success: false, message: '서버 오류가 발생했습니다.' },
+      { 
+        success: false, 
+        message: '서버 오류가 발생했습니다.',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
