@@ -28,7 +28,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import authService from '@/services/authService';
 import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 import AnimatedHeader from '../../../components/common/AnimatedHeader';
-import apiClient from '@/services/apiClient';
 
 // 모바일 최적화된 CSS 애니메이션 (노란색 테마)
 const pageAnimations = `
@@ -386,8 +385,17 @@ export default function TermsPage() {
   const [isLoadingConsents, setIsLoadingConsents] = useState(true);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
+  // 컴포넌트 마운트 확인
+  useEffect(() => {
+    console.log('[TERMS] 컴포넌트 마운트됨');
+    return () => {
+      console.log('[TERMS] 컴포넌트 언마운트됨');
+    };
+  }, []);
+
   // body에 data-page 속성 추가 및 스크롤 스타일 제어
   useEffect(() => {
+    console.log('[TERMS] 페이지 스타일 설정 시작');
     document.body.setAttribute('data-page', '/setting/terms');
     
     // 이 페이지에서만 스크롤 허용
@@ -406,6 +414,7 @@ export default function TermsPage() {
     }
 
     return () => {
+      console.log('[TERMS] 페이지 스타일 복구');
       document.body.removeAttribute('data-page');
       // 페이지를 떠날 때 원래 스타일로 복구
       html.style.overflow = '';
@@ -418,6 +427,9 @@ export default function TermsPage() {
   // 사용자 동의 정보 로드
   useEffect(() => {
     console.log('[TERMS] useEffect 실행 - user 상태:', user);
+    console.log('[TERMS] user 타입:', typeof user);
+    console.log('[TERMS] user.mt_idx:', user?.mt_idx);
+    
     if (user?.mt_idx) {
       console.log('[TERMS] 사용자 정보 확인됨, 동의 정보 로드 시작:', user.mt_idx);
       loadUserConsents();
@@ -425,6 +437,16 @@ export default function TermsPage() {
       console.log('[TERMS] 사용자 정보가 없음, 로딩 상태 false로 설정');
       setIsLoadingConsents(false);
     }
+  }, [user]);
+
+  // 추가: user 변화 감지
+  useEffect(() => {
+    console.log('[TERMS] user 변화 감지:', {
+      hasUser: !!user,
+      userId: user?.mt_idx,
+      userName: user?.mt_name,
+      timestamp: new Date().toISOString()
+    });
   }, [user]);
 
   // 사용자의 동의 정보를 로드하는 함수
