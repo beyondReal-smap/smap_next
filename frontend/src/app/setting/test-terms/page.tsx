@@ -8,7 +8,7 @@
   console.log(`🚨🚨🚨🚨🚨 [TEST-TERMS-${uniqueId}] 파일 즉시 실행됨!!!`, {
     uniqueId,
     timestamp,
-    buildTime: '2025-01-24T10:30:00Z', // 빌드 타임 표시
+    buildTime: '2025-01-24T10:35:00Z', // 강제 재배포 트리거
     userAgent: navigator.userAgent,
     isIOS: /iPhone|iPad|iPod/i.test(navigator.userAgent),
     isWebKit: /WebKit/i.test(navigator.userAgent),
