@@ -1,19 +1,42 @@
 "use client";
 
-// 🚨🚨🚨 즉시 실행 - iOS WebView 환경 확인
+// 🚨🚨🚨 즉시 실행 - 캐시 무력화 및 iOS WebView 환경 확인
 (function() {
-  console.log('🚨🚨🚨🚨🚨 [TEST-TERMS] 파일 즉시 실행됨!!!', {
-    timestamp: new Date().toISOString(),
+  const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const timestamp = new Date().toISOString();
+  
+  console.log(`🚨🚨🚨🚨🚨 [TEST-TERMS-${uniqueId}] 파일 즉시 실행됨!!!`, {
+    uniqueId,
+    timestamp,
+    buildTime: '2025-01-24T10:30:00Z', // 빌드 타임 표시
     userAgent: navigator.userAgent,
     isIOS: /iPhone|iPad|iPod/i.test(navigator.userAgent),
     isWebKit: /WebKit/i.test(navigator.userAgent),
-    location: window.location.href
+    location: window.location.href,
+    protocol: window.location.protocol,
+    host: window.location.host,
+    pathname: window.location.pathname
   });
+  
+  // 즉시 alert로도 확인
+  if (window.location.pathname.includes('test-terms')) {
+    alert(`🚨 TEST-TERMS 로드됨! ID: ${uniqueId.substr(-6)}`);
+  }
   
   // iOS WebView 환경에서 알림
   if (/iPhone|iPad|iPod/i.test(navigator.userAgent) || /WebKit/i.test(navigator.userAgent)) {
-    console.log('🚨🚨🚨 [TEST-TERMS] iOS/WebKit 환경 감지됨!');
+    console.log(`🚨🚨🚨 [TEST-TERMS-${uniqueId}] iOS/WebKit 환경 감지됨!`);
   }
+  
+  // 글로벌 함수로 상태 확인 가능하게
+  (window as any).SMAP_DEBUG_TEST_TERMS = () => {
+    console.log(`🚨🚨🚨 [TEST-TERMS-${uniqueId}] 글로벌 디버그 호출됨`, {
+      timestamp: new Date().toISOString(),
+      uniqueId,
+      location: window.location.href
+    });
+    alert(`TEST-TERMS 디버그: ${uniqueId.substr(-6)} - ${timestamp}`);
+  };
 })();
 
 import React, { useState, useEffect } from 'react';
@@ -238,7 +261,7 @@ export default function TestTermsPage() {
         throw new Error('인증 토큰이 없습니다.');
       }
 
-      console.log('🚨��🚨 [TEST-TERMS] 동의 상태 변경 API 호출:', { field: term.dbField, value: newConsentValue });
+      console.log('🚨🚨🚨 [TEST-TERMS] 동의 상태 변경 API 호출:', { field: term.dbField, value: newConsentValue });
       
       const response = await fetch('/api/v1/members/consent', {
         method: 'POST',

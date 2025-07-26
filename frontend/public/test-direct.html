@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>직접 HTML 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            color: white;
+            padding: 20px;
+            margin: 0;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(0,0,0,0.3);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+        }
+        .button {
+            background: #fff;
+            color: #333;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 직접 HTML 테스트 🚨</h1>
+        <p>이 파일이 보인다면 정적 파일은 정상 배포됨</p>
+        <p id="timestamp"></p>
+        <button class="button" onclick="testFunction()">테스트 버튼</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // 즉시 실행
+        console.log('🚨🚨🚨 직접 HTML 파일 로드됨!!!', {
+            timestamp: new Date().toISOString(),
+            location: window.location.href,
+            userAgent: navigator.userAgent
+        });
+        
+        alert('🚨 직접 HTML 테스트 파일이 로드되었습니다!');
+        
+        document.getElementById('timestamp').textContent = 
+            '로드 시간: ' + new Date().toISOString();
+        
+        function testFunction() {
+            console.log('🚨🚨🚨 직접 HTML 테스트 버튼 클릭됨!');
+            alert('직접 HTML 테스트 버튼이 클릭되었습니다!');
+            document.getElementById('result').innerHTML = 
+                '<p style="color: yellow;">버튼 클릭됨: ' + new Date().toISOString() + '</p>';
+        }
+        
+        // 글로벌 함수
+        window.SMAP_DIRECT_HTML_TEST = () => {
+            console.log('🚨🚨🚨 직접 HTML 글로벌 함수 호출됨!');
+            alert('직접 HTML 글로벌 함수가 호출되었습니다!');
+        };
+    </script>
+</body>
+</html> 
