@@ -4,6 +4,10 @@ import { useRouter } from 'next/navigation';
 import { FiFileText, FiShield, FiMapPin, FiUsers, FiGlobe } from 'react-icons/fi';
 import { useAuth } from '@/contexts/AuthContext';
 
+// 🚨🚨🚨 파일 로드 확인 - 즉시 실행
+console.log('🚨🚨🚨🚨🚨 [TERMS] 파일이 로드되었습니다!!! 시간:', new Date().toISOString());
+alert('🚨 TERMS 페이지 파일이 로드되었습니다!');
+
 // 전역 디버깅 함수 등록
 if (typeof window !== 'undefined') {
   (window as any).SMAP_TERMS_DEBUG = () => {
