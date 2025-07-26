@@ -1292,6 +1292,14 @@ export default function HomePage() {
     }
   }, []);
 
+  // 그룹 목록이 로드되었을 때 첫 번째 그룹 자동 선택
+  useEffect(() => {
+    if (userGroups.length > 0 && !selectedGroupId && !isUserDataLoading) {
+      console.log('[HOME] 그룹 목록 로드됨 - 첫 번째 그룹 자동 선택:', userGroups[0].sgt_title, 'ID:', userGroups[0].sgt_idx);
+      setSelectedGroupId(userGroups[0].sgt_idx);
+    }
+  }, [userGroups.length, selectedGroupId, isUserDataLoading]);
+
   // 그룹 멤버 및 스케줄 데이터 가져오기
   useEffect(() => {
     let isMounted = true;
@@ -5735,7 +5743,7 @@ export default function HomePage() {
                  </svg>
                  {/* 읽지 않은 알림이 있을 때만 빨간색 점 표시 */}
                  {hasNewNotifications && (
-                   <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse">
+                   <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse">
                  </div>
                  )}
                </button>
