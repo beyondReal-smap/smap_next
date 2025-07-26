@@ -4,6 +4,19 @@ import { useRouter } from 'next/navigation';
 import { FiFileText, FiShield, FiMapPin, FiUsers, FiGlobe } from 'react-icons/fi';
 import { useAuth } from '@/contexts/AuthContext';
 
+// 전역 디버깅 함수 등록
+if (typeof window !== 'undefined') {
+  (window as any).SMAP_TERMS_DEBUG = () => {
+    console.log('🚨🚨🚨 [TERMS DEBUG] 전역 함수 호출됨!');
+    console.log('🚨🚨🚨 [TERMS DEBUG] 현재 URL:', window.location.href);
+    console.log('🚨🚨🚨 [TERMS DEBUG] 현재 시간:', new Date().toISOString());
+  };
+  
+  // 즉시 실행
+  console.log('🚨🚨🚨 [TERMS] 파일 로드됨!');
+  (window as any).SMAP_TERMS_DEBUG();
+}
+
 // 간단한 약관 데이터
 const TERMS_DATA = [
   {
@@ -36,37 +49,40 @@ const TERMS_DATA = [
 ];
 
 export default function TermsPage() {
-  console.log('🚨 [TERMS] 컴포넌트 시작');
+  console.log('🚨🚨🚨 [TERMS] 컴포넌트 시작!!!');
   
   const router = useRouter();
   const { user } = useAuth();
   const [terms, setTerms] = useState(TERMS_DATA);
   const [isLoadingConsents, setIsLoadingConsents] = useState(true);
 
-  console.log('🚨 [TERMS] user 상태:', user);
+  console.log('🚨🚨🚨 [TERMS] user 상태:', user);
 
   useEffect(() => {
-    console.log('🚨 [TERMS] useEffect 실행');
+    console.log('🚨🚨🚨 [TERMS] useEffect 실행!!!');
     
     // 사용자 정보가 있으면 동의 정보 조회 시뮬레이션
     if (user?.mt_idx) {
-      console.log('🚨 [TERMS] 사용자 정보 있음, API 호출 예정:', user.mt_idx);
+      console.log('🚨🚨🚨 [TERMS] 사용자 정보 있음, API 호출 예정:', user.mt_idx);
       
       // 일단 기본값으로 설정
       setTimeout(() => {
-        console.log('🚨 [TERMS] 로딩 완료');
+        console.log('🚨🚨🚨 [TERMS] 로딩 완료!!!');
         setIsLoadingConsents(false);
       }, 1000);
     } else {
-      console.log('🚨 [TERMS] 사용자 정보 없음');
+      console.log('🚨🚨🚨 [TERMS] 사용자 정보 없음!!!');
       setIsLoadingConsents(false);
     }
   }, [user]);
 
   const handleBack = () => {
-    console.log('🚨 [TERMS] 뒤로가기 클릭');
+    console.log('🚨🚨🚨 [TERMS] 뒤로가기 클릭!!!');
     router.push('/setting');
   };
+
+  // 컴포넌트가 렌더링되고 있는지 확인
+  console.log('🚨🚨🚨 [TERMS] 렌더링 중!!!');
 
   return (
     <div style={{ padding: '20px', minHeight: '100vh', backgroundColor: '#f9f9f9' }}>
@@ -86,13 +102,32 @@ export default function TermsPage() {
         >
           ← 뒤로
         </button>
-        <h1 style={{ margin: 0, fontSize: '24px' }}>약관 및 동의</h1>
+        <h1 style={{ margin: 0, fontSize: '24px' }}>약관 및 동의 🚨</h1>
+      </div>
+
+      {/* 디버그 정보 */}
+      <div style={{ 
+        backgroundColor: 'red', 
+        color: 'white', 
+        padding: '10px', 
+        marginBottom: '20px',
+        borderRadius: '8px'
+      }}>
+        <p>🚨 디버그: 컴포넌트가 렌더링되고 있습니다!</p>
+        <p>🚨 현재 시간: {new Date().toISOString()}</p>
+        <p>🚨 사용자: {user?.mt_name || '없음'}</p>
+        <button 
+          onClick={() => console.log('🚨🚨🚨 디버그 버튼 클릭됨!')}
+          style={{ padding: '5px', backgroundColor: 'white', color: 'red', border: 'none', borderRadius: '4px' }}
+        >
+          디버그 버튼
+        </button>
       </div>
 
       {/* 로딩 상태 */}
       {isLoadingConsents ? (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
-          <p>동의 정보를 불러오는 중...</p>
+        <div style={{ textAlign: 'center', padding: '40px', backgroundColor: 'yellow' }}>
+          <p>🚨 동의 정보를 불러오는 중...</p>
         </div>
       ) : (
         /* 약관 목록 */
