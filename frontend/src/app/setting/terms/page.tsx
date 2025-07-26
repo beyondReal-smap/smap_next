@@ -434,31 +434,28 @@ export default function TermsPage() {
 
     setIsLoadingConsents(true);
     try {
-      console.log(`[TERMS] 동의 정보 조회 시작 - user_id: ${user.mt_idx}`);
-      
-      // 토큰 확인
       const token = localStorage.getItem('auth-token');
-      console.log('[TERMS] 토큰 확인:', token ? '토큰 있음' : '토큰 없음');
-      
-      // 프론트엔드 API 라우트를 통해 동의 정보 조회
-      const response = await apiClient.get(`/v1/members/consent/${user.mt_idx}`);
+      if (!token) {
+        console.error('토큰이 없습니다.');
+        setIsLoadingConsents(false);
+        return;
+      }
 
-      const result = response.data;
-      console.log('[TERMS] 동의 정보 조회 응답:', result);
+      const response = await fetch(`/api/v1/members/consent/${user.mt_idx}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
+      const result = await response.json();
       if (result.success && result.data) {
-        // 백엔드에서 받은 동의 정보로 상태 업데이트
         const userConsents = result.data;
-        
         setTerms(prev => prev.map(term => ({
           ...term,
           isConsented: userConsents[term.dbField as keyof typeof userConsents] === 'Y'
         })));
-        
-        console.log('[TERMS] 동의 정보 로드 성공:', userConsents);
       } else {
-        console.error('[TERMS] 동의 정보 조회 실패:', result.message);
-        // 실패 시 기본값으로 설정
         setTerms(prev => prev.map(term => ({
           ...term,
           isConsented: false
@@ -466,10 +463,8 @@ export default function TermsPage() {
       }
     } catch (error) {
       console.error('[TERMS] 동의 정보 로드 실패:', error);
-      
-      // 에러 발생 시 사용자 컨텍스트에서 가져오기 (폴백)
+      // 폴백 로직은 기존과 동일하게 유지
       if (user) {
-        console.log('[TERMS] 폴백: 사용자 컨텍스트에서 동의 정보 가져오기');
         const userConsents = {
           mt_agree1: user.mt_agree1 || 'N',
           mt_agree2: user.mt_agree2 || 'N',
@@ -477,16 +472,15 @@ export default function TermsPage() {
           mt_agree4: user.mt_agree4 || 'N',
           mt_agree5: user.mt_agree5 || 'N'
         };
-
         setTerms(prev => prev.map(term => ({
           ...term,
           isConsented: userConsents[term.dbField as keyof typeof userConsents] === 'Y'
-                 })));
-       }
-     } finally {
-       setIsLoadingConsents(false);
-     }
-   };
+        })));
+      }
+    } finally {
+      setIsLoadingConsents(false);
+    }
+  };
 
   // 뒤로가기 핸들러
   const handleBack = () => {
