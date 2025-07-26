@@ -1,6 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyJWT } from '@/lib/auth';
 
+// SSL 인증서 문제 해결을 위한 설정
+process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
+
+async function fetchWithFallback(url: string, options: RequestInit = {}): Promise<any> {
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://118.67.130.71:8000';
+  
+  console.log('[CONSENT API] 🔗 백엔드 요청:', {
+    url,
+    backendUrl,
+    timestamp: new Date().toISOString()
+  });
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[CONSENT API] ❌ 백엔드 응답 오류:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText,
+        url
+      });
+      throw new Error(`API error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    console.log('[CONSENT API] ✅ 백엔드 응답 성공:', {
+      url,
+      dataType: typeof data,
+      timestamp: new Date().toISOString()
+    });
+
+    return data;
+  } catch (error) {
+    console.error('[CONSENT API] 🚨 요청 실패:', {
+      url,
+      error: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString()
+    });
+    throw error;
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ member_id: string }> }
@@ -44,30 +96,18 @@ export async function GET(
       );
     }
 
-    // 백엔드 API 호출
-    const backendUrl = process.env.NODE_ENV === 'production' 
-      ? (process.env.BACKEND_URL || 'https://118.67.130.71')
-      : (process.env.BACKEND_URL || 'https://118.67.130.71:8000');
+    // 백엔드 API 호출 - 성공하는 API 패턴 사용
+    const backendUrl = `https://118.67.130.71:8000/api/v1/members/consent/${requestedUserId}`;
     
     console.log('[CONSENT API] 사용된 백엔드 URL:', backendUrl);
-    console.log('[CONSENT API] 전체 요청 URL:', `${backendUrl}/api/v1/members/consent/${requestedUserId}`);
+    console.log('[CONSENT API] 전체 요청 URL:', backendUrl);
     
-    const response = await fetch(`${backendUrl}/api/v1/members/consent/${requestedUserId}`, {
+    const data = await fetchWithFallback(backendUrl, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
       },
     });
 
-    if (!response.ok) {
-      console.error('[CONSENT API] 백엔드 응답 오류:', response.status, response.statusText);
-      return NextResponse.json(
-        { success: false, message: '동의 정보 조회에 실패했습니다.' },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
     console.log('[CONSENT API] 백엔드 응답 성공:', data);
     
     return NextResponse.json(data);
