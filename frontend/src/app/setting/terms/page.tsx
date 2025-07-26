@@ -417,109 +417,80 @@ export default function TermsPage() {
 
   // 사용자 동의 정보 로드
   useEffect(() => {
-    if (user) {
+    console.log('[TERMS] useEffect 실행 - user 상태:', user);
+    if (user?.mt_idx) {
+      console.log('[TERMS] 사용자 정보 확인됨, 동의 정보 로드 시작:', user.mt_idx);
       loadUserConsents();
     } else {
+      console.log('[TERMS] 사용자 정보가 없음, 로딩 상태 false로 설정');
       setIsLoadingConsents(false);
     }
   }, [user]);
 
   // 사용자의 동의 정보를 로드하는 함수
   const loadUserConsents = async () => {
+    console.log('[TERMS] loadUserConsents 시작');
+    
     if (!user?.mt_idx) {
-      console.error('사용자 정보가 없습니다.');
+      console.error('[TERMS] 사용자 정보가 없습니다.');
       setIsLoadingConsents(false);
       return;
     }
 
+    console.log('[TERMS] 동의 정보 조회 시작 - user_id:', user.mt_idx);
     setIsLoadingConsents(true);
+    
     try {
-      console.log(`[TERMS] 동의 정보 조회 시작 - user_id: ${user.mt_idx}`);
-      console.log('[TERMS] 현재 URL:', window.location.href);
-      
       const token = localStorage.getItem('auth-token');
-      console.log('[TERMS] 토큰 확인:', {
-        hasToken: !!token,
-        tokenLength: token ? token.length : 0,
-        tokenPreview: token ? `${token.substring(0, 20)}...` : 'none'
-      });
+      console.log('[TERMS] 토큰 확인:', token ? '토큰 있음' : '토큰 없음');
       
       if (!token) {
-        console.error('토큰이 없습니다.');
+        console.error('[TERMS] 토큰이 없습니다.');
         setIsLoadingConsents(false);
         return;
       }
 
-      // 배포 환경에서도 안전하게 작동하도록 절대 URL 사용
-      const baseUrl = window.location.origin;
-      const apiUrl = `${baseUrl}/api/v1/members/consent/${user.mt_idx}`;
-      
-      console.log('[TERMS] API 호출 준비:', {
-        baseUrl,
-        apiUrl,
-        method: 'GET',
-        userId: user.mt_idx
-      });
+      const apiUrl = `/api/v1/members/consent/${user.mt_idx}`;
+      console.log('[TERMS] API 호출 시작:', apiUrl);
 
-      const startTime = Date.now();
       const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
         },
       });
-      
-      const endTime = Date.now();
-      console.log('[TERMS] API 응답 상태:', {
-        status: response.status,
-        statusText: response.statusText,
-        responseTime: endTime - startTime,
-        url: apiUrl
-      });
 
+      console.log('[TERMS] API 응답 상태:', response.status);
+      
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[TERMS] API 응답 오류:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorText,
-          url: apiUrl
-        });
-        throw new Error(`API error: ${response.status} - ${errorText}`);
+        console.error('[TERMS] API 응답 오류:', response.status, response.statusText);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('[TERMS] API 응답 데이터:', {
-        success: result.success,
-        message: result.message,
-        hasData: !!result.data,
-        data: result.data
-      });
+      console.log('[TERMS] 동의 정보 조회 응답:', result);
 
       if (result.success && result.data) {
         const userConsents = result.data;
+        console.log('[TERMS] 동의 정보 데이터:', userConsents);
+        
         setTerms(prev => prev.map(term => ({
           ...term,
           isConsented: userConsents[term.dbField as keyof typeof userConsents] === 'Y'
         })));
-        console.log('[TERMS] 동의 정보 로드 성공:', userConsents);
+        
+        console.log('[TERMS] 동의 정보 로드 성공');
       } else {
-        console.error('[TERMS] 동의 정보 조회 실패:', result.message);
+        console.warn('[TERMS] 동의 정보 조회 실패, 기본값 설정:', result.message);
         setTerms(prev => prev.map(term => ({
           ...term,
           isConsented: false
         })));
       }
     } catch (error) {
-      console.error('[TERMS] 동의 정보 로드 실패:', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : 'No stack trace',
-        userId: user?.mt_idx
-      });
+      console.error('[TERMS] 동의 정보 로드 실패:', error);
       
-      // 폴백 로직은 기존과 동일하게 유지
+      // 폴백 로직: 사용자 컨텍스트에서 가져오기
       if (user) {
         console.log('[TERMS] 폴백: 사용자 컨텍스트에서 동의 정보 가져오기');
         const userConsents = {
@@ -529,13 +500,16 @@ export default function TermsPage() {
           mt_agree4: user.mt_agree4 || 'N',
           mt_agree5: user.mt_agree5 || 'N'
         };
+        
+        console.log('[TERMS] 폴백 동의 정보:', userConsents);
+        
         setTerms(prev => prev.map(term => ({
           ...term,
           isConsented: userConsents[term.dbField as keyof typeof userConsents] === 'Y'
         })));
-        console.log('[TERMS] 폴백 동의 정보 설정 완료:', userConsents);
       }
     } finally {
+      console.log('[TERMS] 동의 정보 로딩 완료');
       setIsLoadingConsents(false);
     }
   };
@@ -586,7 +560,7 @@ export default function TermsPage() {
 
     console.log('[TOGGLE] 클릭된 약관:', term.title, '현재 상태:', term.isConsented);
 
-    // 필수 약관은 변경할 수 없음
+    
     if (term.isRequired) {
       // 🎮 필수 약관 변경 시도 시 경고 햅틱 피드백
       triggerHapticFeedback(HapticFeedbackType.ERROR, '필수 약관 변경 불가', { 
@@ -618,70 +592,34 @@ export default function TermsPage() {
     setIsLoading(true);
     try {
       const newConsentValue = term.isConsented ? 'N' : 'Y';
-      
-      console.log('[TOGGLE] 동의 상태 변경 요청:', {
-        field: term.dbField,
-        value: newConsentValue,
-        termTitle: term.title
-      });
-      
       const token = localStorage.getItem('auth-token');
+      
       if (!token) {
-        throw new Error('토큰이 없습니다.');
+        throw new Error('인증 토큰이 없습니다.');
       }
 
-      // 배포 환경에서도 안전하게 작동하도록 절대 URL 사용
-      const baseUrl = window.location.origin;
-      const apiUrl = `${baseUrl}/api/v1/members/consent`;
+      console.log('[TERMS] 동의 상태 변경 API 호출:', { field: term.dbField, value: newConsentValue });
       
-      console.log('[TOGGLE] API 호출 준비:', {
-        baseUrl,
-        apiUrl,
-        method: 'POST',
-        field: term.dbField,
-        value: newConsentValue
-      });
-
-      const startTime = Date.now();
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/api/v1/members/consent', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
         },
         body: JSON.stringify({
           field: term.dbField,
           value: newConsentValue
         }),
       });
-      
-      const endTime = Date.now();
-      console.log('[TOGGLE] API 응답 상태:', {
-        status: response.status,
-        statusText: response.statusText,
-        responseTime: endTime - startTime,
-        url: apiUrl
-      });
+
+      console.log('[TERMS] 동의 상태 변경 API 응답 상태:', response.status);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[TOGGLE] API 응답 오류:', {
-          status: response.status,
-          statusText: response.statusText,
-          errorText,
-          url: apiUrl
-        });
-        throw new Error(`API error: ${response.status} - ${errorText}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('[TOGGLE] API 응답 데이터:', {
-        success: result.success,
-        message: result.message,
-        field: result.field,
-        value: result.value
-      });
+      console.log('[TERMS] 개별 동의 상태 변경 응답:', result);
 
       if (!result.success) {
         throw new Error(result.message || '동의 상태 변경 실패');
@@ -690,14 +628,9 @@ export default function TermsPage() {
       // API 성공 - 낙관적 업데이트가 이미 되어있으므로 추가 업데이트 불필요
       setShowSuccessToast(true);
       setTimeout(() => setShowSuccessToast(false), 3000);
-      console.log('[TOGGLE] 개별 동의 상태 변경 성공');
+      console.log('[TERMS] 개별 동의 상태 변경 성공');
     } catch (error) {
-      console.error('[TOGGLE] 동의 상태 변경 실패:', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : 'No stack trace',
-        termId,
-        termTitle: term?.title
-      });
+      console.error('[TERMS] 동의 상태 변경 실패:', error);
       
       // API 실패 시 원래 상태로 되돌리기
       setTerms(prevTerms => 
