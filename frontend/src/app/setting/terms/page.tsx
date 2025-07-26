@@ -374,8 +374,14 @@ const CONSENT_HISTORY: ConsentHistory[] = [
   };
 
 export default function TermsPage() {
+  // 🚨 즉시 실행 테스트 로그
+  console.log('🚨 [TERMS] TermsPage 컴포넌트 실행됨 - 타임스탬프:', new Date().toISOString());
+  console.log('🚨 [TERMS] 현재 URL:', window.location.href);
+  
   const router = useRouter();
   const { user } = useAuth();
+
+  console.log('🚨 [TERMS] useAuth 훅 실행됨 - user:', user);
 
   const [terms, setTerms] = useState(TERMS_DATA);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -384,6 +390,8 @@ export default function TermsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingConsents, setIsLoadingConsents] = useState(true);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+  console.log('🚨 [TERMS] 상태 초기화 완료');
 
   // 컴포넌트 마운트 확인
   useEffect(() => {
