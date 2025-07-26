@@ -1,4 +1,21 @@
 "use client";
+
+// 🚨🚨🚨 즉시 실행 - iOS WebView 환경 확인
+(function() {
+  console.log('🚨🚨🚨🚨🚨 [TEST-TERMS] 파일 즉시 실행됨!!!', {
+    timestamp: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    isIOS: /iPhone|iPad|iPod/i.test(navigator.userAgent),
+    isWebKit: /WebKit/i.test(navigator.userAgent),
+    location: window.location.href
+  });
+  
+  // iOS WebView 환경에서 알림
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent) || /WebKit/i.test(navigator.userAgent)) {
+    console.log('🚨🚨🚨 [TEST-TERMS] iOS/WebKit 환경 감지됨!');
+  }
+})();
+
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FiFileText, FiShield, FiMapPin, FiUsers, FiGlobe } from 'react-icons/fi';
@@ -66,6 +83,21 @@ export default function TestTermsPage() {
 
   console.log('🚨🚨🚨 [TEST-TERMS] user 상태:', user);
 
+  // 글로벌 디버그 함수 등록
+  useEffect(() => {
+    (window as any).SMAP_TEST_TERMS_DEBUG = () => {
+      console.log('🚨🚨🚨 [TEST-TERMS] 글로벌 디버그 함수 호출됨!', {
+        user: user,
+        terms: terms,
+        isLoadingConsents: isLoadingConsents,
+        timestamp: new Date().toISOString()
+      });
+      alert(`TEST-TERMS 디버그: user=${user?.mt_idx}, loading=${isLoadingConsents}`);
+    };
+    
+    console.log('🚨🚨🚨 [TEST-TERMS] 글로벌 함수 등록 완료: window.SMAP_TEST_TERMS_DEBUG()');
+  }, [user, terms, isLoadingConsents]);
+
   useEffect(() => {
     console.log('🚨🚨🚨 [TEST-TERMS] useEffect 실행!!!');
     
@@ -101,12 +133,22 @@ export default function TestTermsPage() {
       const apiUrl = `/api/v1/members/consent/${user.mt_idx}`;
       console.log('🚨🚨🚨 [TEST-TERMS] API 호출 시작:', apiUrl);
 
-      const response = await fetch(apiUrl, {
+      // iOS WebView 환경을 위한 fetch 옵션
+      const fetchOptions = {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
-      });
+        credentials: 'same-origin' as RequestCredentials,
+        // iOS WebView에서 타임아웃 설정
+        signal: AbortSignal.timeout(30000)
+      };
+
+      console.log('🚨🚨🚨 [TEST-TERMS] Fetch 옵션:', fetchOptions);
+
+      const response = await fetch(apiUrl, fetchOptions);
 
       console.log('🚨🚨🚨 [TEST-TERMS] API 응답 상태:', response.status);
       
@@ -196,7 +238,7 @@ export default function TestTermsPage() {
         throw new Error('인증 토큰이 없습니다.');
       }
 
-      console.log('🚨🚨🚨 [TEST-TERMS] 동의 상태 변경 API 호출:', { field: term.dbField, value: newConsentValue });
+      console.log('🚨��🚨 [TEST-TERMS] 동의 상태 변경 API 호출:', { field: term.dbField, value: newConsentValue });
       
       const response = await fetch('/api/v1/members/consent', {
         method: 'POST',
