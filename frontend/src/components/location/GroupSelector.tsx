@@ -132,6 +132,8 @@ const GroupSelector = memo(({
 }: GroupSelectorProps) => {
   const selectedGroup = userGroups.find(g => g.sgt_idx === selectedGroupId);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [isButtonClicking, setIsButtonClicking] = useState(false);
 
   // 사이드바가 닫힐 때 드롭다운도 함께 닫기
   useEffect(() => {
@@ -147,10 +149,39 @@ const GroupSelector = memo(({
         ref={buttonRef}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          
+          console.log('[GroupSelector] 마우스 다운, 현재 상태:', isGroupSelectorOpen);
+          
+          // 그룹 선택 중이거나 버튼 클릭 중이면 무시
+          if (isSelecting || isButtonClicking) {
+            console.log('[GroupSelector] 마우스 다운 무시 - 선택 중 또는 버튼 클릭 중');
+            return;
+          }
+          
+          // 버튼 클릭 중 플래그 설정
+          setIsButtonClicking(true);
+          
+          // 드롭다운이 열려있으면 닫기, 닫혀있으면 열기
+          if (isGroupSelectorOpen) {
+            console.log('[GroupSelector] 드롭다운 닫기 시도');
+            onClose();
+          } else {
+            console.log('[GroupSelector] 드롭다운 열기 시도');
+            onOpen();
+          }
+          
+          // 짧은 딜레이 후 플래그 해제
+          setTimeout(() => {
+            setIsButtonClicking(false);
+          }, 300);
+        }}
         onClick={(e) => {
           e.stopPropagation();
-          console.log('[GroupSelector] 버튼 클릭됨, 현재 상태:', isGroupSelectorOpen);
-          isGroupSelectorOpen ? onClose() : onOpen();
+          e.preventDefault();
+          // onClick은 무시하고 onMouseDown에서만 처리
         }}
         className="group-selector w-full px-4 py-3 rounded-xl flex items-center justify-between text-left focus:outline-none transition-all duration-300 bg-white/50 border"
         style={{ borderColor: 'rgba(1, 19, 163, 0.2)' }}
@@ -188,11 +219,17 @@ const GroupSelector = memo(({
                 e.preventDefault();
                 console.log('[GroupSelector] 그룹 선택 클릭:', group.sgt_idx, group.sgt_title);
                 
-                // 즉시 onGroupSelect 호출하고 드롭다운 닫기
+                // 그룹 선택 중 플래그 설정
+                setIsSelecting(true);
+                
+                // 즉시 드롭다운 닫기 후 그룹 선택 (순서 중요)
+                onClose();
+                onGroupSelect(group.sgt_idx);
+                
+                // 짧은 딜레이 후 플래그 해제
                 setTimeout(() => {
-                  onGroupSelect(group.sgt_idx);
-                  onClose();
-                }, 0);
+                  setIsSelecting(false);
+                }, 500);
               }}
               className={`w-full px-4 py-3 text-left text-sm focus:outline-none transition-colors flex items-center justify-between border-b border-gray-100 last:border-b-0 ${
                 selectedGroupId === group.sgt_idx 

@@ -299,7 +299,7 @@ const sidebarVariants = {
     filter: 'blur(2px)',
     boxShadow: '0 0 0 rgba(0,0,0,0)',
     transition: {
-      duration: 0.35,
+      duration: 0.6,
       ease: cubicBezier(0.4, 0.0, 0.2, 1)
     }
   },
@@ -310,7 +310,7 @@ const sidebarVariants = {
     filter: 'blur(0px)',
     boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
     transition: {
-      duration: 0.45,
+      duration: 0.7,
       ease: cubicBezier(0.4, 0.0, 0.2, 1)
     }
   }
@@ -320,12 +320,12 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     filter: 'blur(0px)',
-    transition: { duration: 0.2 }
+    transition: { duration: 0.4 }
   },
   open: {
     opacity: 1,
     filter: 'blur(2.5px)',
-    transition: { duration: 0.35 }
+    transition: { duration: 0.5 }
   }
 };
 
@@ -335,7 +335,7 @@ const sidebarContentVariants = {
     x: -30,
     scale: 0.98,
     transition: {
-      duration: 0.2
+      duration: 0.4
     }
   },
   open: {
@@ -343,8 +343,8 @@ const sidebarContentVariants = {
     x: 0,
     scale: 1,
     transition: {
-      duration: 0.25,
-      delay: 0.05
+      duration: 0.5,
+      delay: 0.1
     }
   }
 };
@@ -1604,10 +1604,10 @@ export default function LocationPage() {
   const handleGroupSelect = useCallback(async (groupId: number) => {
     console.log('[handleGroupSelect] 그룹 선택:', groupId, '현재 선택된 그룹:', selectedGroupId);
     
-    // 현재 선택된 그룹과 동일한 그룹을 선택한 경우 드롭다운만 닫기
+    // 드롭다운은 이미 GroupSelector에서 닫혔으므로 여기서는 다시 열지 않음
+    // 현재 선택된 그룹과 동일한 그룹을 선택한 경우 아무것도 하지 않음
     if (selectedGroupId === groupId) {
-      console.log('[handleGroupSelect] 동일한 그룹 선택 - 드롭다운만 닫음');
-      setIsGroupSelectorOpen(false);
+      console.log('[handleGroupSelect] 동일한 그룹 선택 - 아무것도 하지 않음');
       return;
     }
     
@@ -4982,42 +4982,7 @@ export default function LocationPage() {
   }, [isSidebarOpen]);
 
   // 그룹 선택 드롭다운 외부 클릭 시 닫기
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (isGroupSelectorOpen) {
-        const target = event.target as HTMLElement;
-        
-        // 그룹 드롭다운 관련 요소들을 더 구체적으로 확인
-        const isGroupDropdownContainer = target.closest('[data-group-dropdown-container]');
-        const isGroupDropdownButton = target.closest('[data-group-selector]');
-        const isGroupDropdownMenu = target.closest('[data-group-dropdown-menu]');
-        const isGroupDropdownOption = target.closest('[data-group-option]');
-        const isGroupSelector = target.closest('.group-selector');
-        
-        // 그룹 드롭다운 관련 요소가 아닌 외부 클릭인 경우에만 닫기
-        if (!isGroupDropdownContainer && !isGroupDropdownButton && !isGroupDropdownMenu && !isGroupDropdownOption && !isGroupSelector) {
-          console.log('[handleClickOutside] 그룹 드롭다운 외부 클릭 감지 - 드롭다운 닫기');
-          setIsGroupSelectorOpen(false);
-        } else {
-          console.log('[handleClickOutside] 그룹 드롭다운 내부 클릭 감지 - 드롭다운 유지');
-        }
-      }
-    };
-
-    if (isGroupSelectorOpen) {
-      // 더 긴 지연을 주어 그룹 선택 클릭이 완전히 처리된 후 리스너 추가
-      const timer = setTimeout(() => {
-        document.addEventListener('mousedown', handleClickOutside);
-        document.addEventListener('touchstart', handleClickOutside);
-      }, 100);
-      
-      return () => {
-        clearTimeout(timer);
-        document.removeEventListener('mousedown', handleClickOutside);
-        document.removeEventListener('touchstart', handleClickOutside);
-      };
-    }
-  }, [isGroupSelectorOpen]);
+  // 그룹 드롭다운 외부 클릭 감지 - GroupSelector 컴포넌트 내부에서 처리하므로 제거
 
   // InfoWindow 외부 클릭 감지
   useEffect(() => {
@@ -5676,7 +5641,7 @@ export default function LocationPage() {
               initial="closed"
               animate="open"
               exit="closed"
-              className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[99999] flex flex-col"
+              className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[99999] flex flex-col"
               style={{ 
                 background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                 borderColor: 'rgba(1, 19, 163, 0.1)',
@@ -5688,7 +5653,8 @@ export default function LocationPage() {
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden',
                 WebkitPerspective: 1000,
-                WebkitTransform: 'translateZ(0)'
+                WebkitTransform: 'translateZ(0)',
+                left: '-10px'
               }}
             >
               <motion.div
@@ -5696,7 +5662,7 @@ export default function LocationPage() {
                 initial="closed"
                 animate="open"
                 exit="closed"
-                className="p-8 h-full flex flex-col relative z-10"
+                className="p-6 h-full flex flex-col relative z-10"
               >
                 {/* 헤더 */}
                 <div className="flex items-center justify-between mb-6">
@@ -5755,8 +5721,7 @@ export default function LocationPage() {
                         console.log('[GroupSelector onGroupSelect] 다른 그룹 선택 - handleGroupSelect 호출');
                         handleGroupSelect(groupId);
                       } else {
-                        console.log('[GroupSelector onGroupSelect] 같은 그룹 선택 - 드롭다운만 닫기');
-                        setIsGroupSelectorOpen(false);
+                        console.log('[GroupSelector onGroupSelect] 같은 그룹 선택 - 아무것도 하지 않음 (GroupSelector에서 이미 처리됨)');
                       }
                     }}
                   />
@@ -6172,7 +6137,7 @@ export default function LocationPage() {
               initial="closed"
               animate="open"
               exit="closed"
-              className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[99999] flex flex-col"
+              className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[99999] flex flex-col"
                                    style={{ 
                        background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                        borderColor: 'rgba(1, 19, 163, 0.1)',
@@ -6192,7 +6157,7 @@ export default function LocationPage() {
                 initial="closed"
                 animate="open"
                 exit="closed"
-                className="p-8 h-full flex flex-col relative z-10"
+                className="p-6 h-full flex flex-col relative z-10"
               >
                 {/* 개선된 헤더 */}
                 <div className="flex items-center justify-between mb-6">
@@ -6251,8 +6216,7 @@ export default function LocationPage() {
                         console.log('[GroupSelector onGroupSelect] 다른 그룹 선택 - handleGroupSelect 호출');
                         handleGroupSelect(groupId);
                       } else {
-                        console.log('[GroupSelector onGroupSelect] 같은 그룹 선택 - 드롭다운만 닫기');
-                        setIsGroupSelectorOpen(false);
+                        console.log('[GroupSelector onGroupSelect] 같은 그룹 선택 - 아무것도 하지 않음 (GroupSelector에서 이미 처리됨)');
                       }
                     }}
                   />

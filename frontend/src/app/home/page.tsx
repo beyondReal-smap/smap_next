@@ -5425,7 +5425,7 @@ export default function HomePage() {
       filter: 'blur(2px)',
       boxShadow: '0 0 0 rgba(0,0,0,0)',
       transition: {
-        duration: 0.35,
+        duration: 0.6,
         ease: cubicBezier(0.4, 0.0, 0.2, 1)
       }
     },
@@ -5436,7 +5436,7 @@ export default function HomePage() {
       filter: 'blur(0px)',
       boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
       transition: {
-        duration: 0.45,
+        duration: 0.7,
         ease: cubicBezier(0.4, 0.0, 0.2, 1)
       }
     }
@@ -5446,12 +5446,12 @@ export default function HomePage() {
     closed: {
       opacity: 0,
       filter: 'blur(0px)',
-      transition: { duration: 0.2 }
+      transition: { duration: 0.4 }
     },
     open: {
       opacity: 1,
       filter: 'blur(2.5px)',
-      transition: { duration: 0.35 }
+      transition: { duration: 0.5 }
     }
   };
 
@@ -5461,7 +5461,7 @@ export default function HomePage() {
       x: -30,
       scale: 0.98,
       transition: {
-        duration: 0.2
+        duration: 0.4
       }
     },
     open: {
@@ -5469,8 +5469,8 @@ export default function HomePage() {
       x: 0,
       scale: 1,
       transition: {
-        duration: 0.25,
-        delay: 0.05
+        duration: 0.5,
+        delay: 0.1
       }
     }
   };
@@ -6010,7 +6010,7 @@ export default function HomePage() {
                    initial="closed"
                    animate="open"
                    exit="closed"
-                   className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[999999] flex flex-col"
+                   className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[999999] flex flex-col"
                    onClick={(e) => e.stopPropagation()}
                    style={{ 
                      background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
