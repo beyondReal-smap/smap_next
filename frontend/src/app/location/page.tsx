@@ -290,6 +290,23 @@ const pageVariants = {
   }
 };
 
+// 안드로이드 기기 감지 함수
+const isAndroid = () => {
+  if (typeof window !== 'undefined') {
+    return /Android/i.test(navigator.userAgent);
+  }
+  return false;
+};
+
+// 안드로이드 상태바 높이 계산
+const getAndroidStatusBarHeight = () => {
+  if (typeof window !== 'undefined' && isAndroid()) {
+    // 안드로이드 상태바 높이는 보통 24-48px 정도
+    return '24px';
+  }
+  return '0px';
+};
+
 // 사이드바 애니메이션 variants (고급스러운 효과)
 const sidebarVariants = {
   closed: {
@@ -5138,7 +5155,7 @@ export default function LocationPage() {
             variant="simple"
             className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed location-header"
             style={{ 
-              paddingTop: '0px',
+              paddingTop: getAndroidStatusBarHeight(),
               marginTop: '0px',
               top: '0px',
               position: 'fixed'
