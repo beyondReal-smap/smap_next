@@ -378,15 +378,6 @@ export default function TermsPage() {
   const router = useRouter();
   const { user, loading: authLoading, isLoggedIn, error: authError } = useAuth();
   
-  // 디버깅용 로그 추가
-  console.log('[TERMS PAGE] 렌더링:', {
-    hasUser: !!user,
-    authLoading,
-    isLoggedIn,
-    authError,
-    timestamp: new Date().toISOString()
-  });
-
   const [terms, setTerms] = useState(TERMS_DATA);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [selectedTerm, setSelectedTerm] = useState<Term | null>(null);
@@ -395,15 +386,109 @@ export default function TermsPage() {
   const [isLoadingConsents, setIsLoadingConsents] = useState(true);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
+  // 렌더링 상태 로그 (상태 변수들이 선언된 후)
+  useEffect(() => {
+    console.log('[TERMS API] 🎨 페이지 렌더링 상태:', {
+      component: 'TermsPage',
+      userContext: {
+        hasUser: !!user,
+        userId: user?.mt_idx,
+        userName: user?.mt_name,
+        userEmail: user?.mt_email
+      },
+      authState: {
+        authLoading,
+        isLoggedIn,
+        hasAuthError: !!authError,
+        errorMessage: authError?.toString()
+      },
+      termsState: {
+        totalTerms: terms.length,
+        consentedTerms: terms.filter(t => t.isConsented).length,
+        requiredTerms: terms.filter(t => t.isRequired).length,
+        isLoadingConsents
+      },
+      pageState: {
+        isLoading,
+        showPreviewModal,
+        showConsentModal,
+        showSuccessToast,
+        selectedTermId: selectedTerm?.id
+      },
+      environment: {
+        pathname: window.location.pathname,
+        search: window.location.search,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }, [user, terms, isLoadingConsents, isLoading, showPreviewModal, showConsentModal, showSuccessToast, selectedTerm, authLoading, isLoggedIn, authError]);
+
   // 토큰 및 인증 상태 디버깅
   useEffect(() => {
-    console.log('[TERMS DEBUG] 토큰 및 localStorage 상태 확인:', {
-      token: localStorage.getItem('auth-token') ? '토큰 있음' : '토큰 없음',
-      userData: localStorage.getItem('smap_user_data') ? '사용자 데이터 있음' : '사용자 데이터 없음',
-      currentURL: window.location.href,
+    const authTokens = {
+      authToken: localStorage.getItem('auth-token'),
+      token: localStorage.getItem('token'),
+      userData: localStorage.getItem('smap_user_data'),
+      userInfo: localStorage.getItem('user_info'),
+      userId: localStorage.getItem('user_id')
+    };
+
+    const authState = {
+      hasAuthToken: !!authTokens.authToken,
+      hasToken: !!authTokens.token,
+      hasUserData: !!authTokens.userData,
+      hasUserInfo: !!authTokens.userInfo,
+      hasUserId: !!authTokens.userId,
+      preferredToken: authTokens.authToken || authTokens.token
+    };
+
+    console.log('[TERMS API] 🔐 인증 상태 종합 분석:', {
+      tokens: {
+        authToken: authState.hasAuthToken ? `${authTokens.authToken?.substring(0, 20)}...` : 'None',
+        token: authState.hasToken ? `${authTokens.token?.substring(0, 20)}...` : 'None',
+        preferredToken: authState.preferredToken ? `${authState.preferredToken.substring(0, 20)}...` : 'None'
+      },
+      localStorage: {
+        userData: authState.hasUserData,
+        userInfo: authState.hasUserInfo,
+        userId: authTokens.userId || 'None'
+      },
+      environment: {
+        currentURL: window.location.href,
+        userAgent: navigator.userAgent.substring(0, 100) + '...',
+        isIOSWebView: /iPhone.*AppleWebKit(?!.*Safari)/i.test(navigator.userAgent),
+        isAndroid: /Android/i.test(navigator.userAgent)
+      },
+      apiClient: {
+        hasApiClient: typeof apiClient !== 'undefined',
+        baseURL: process.env.NEXT_PUBLIC_API_URL || '/api'
+      },
       timestamp: new Date().toISOString()
     });
-  }, []);
+
+    // API 클라이언트 상태 확인
+    if (typeof apiClient !== 'undefined') {
+      console.log('[TERMS API] 📡 API 클라이언트 상태:', {
+        type: 'apiClient available',
+        hasInterceptors: true,
+        baseURL: process.env.NEXT_PUBLIC_API_URL || '/api'
+      });
+    } else {
+      console.warn('[TERMS API] ⚠️ API 클라이언트를 찾을 수 없습니다');
+    }
+
+    // 사용자 컨텍스트 상태 로깅
+    console.log('[TERMS API] 👤 사용자 컨텍스트 상태:', {
+      hasUser: !!user,
+      userMtIdx: user?.mt_idx,
+      userName: user?.mt_name,
+      userEmail: user?.mt_email,
+      authLoading,
+      isLoggedIn,
+      authError: authError?.toString(),
+      timestamp: new Date().toISOString()
+    });
+  }, [user, authLoading, isLoggedIn, authError]);
 
   // body에 data-page 속성 추가 및 스크롤 스타일 제어
   useEffect(() => {
@@ -436,21 +521,42 @@ export default function TermsPage() {
 
   // 사용자 동의 정보 로드
   useEffect(() => {
-    console.log('[TERMS DEBUG] useEffect 실행됨:', {
+    console.log('[TERMS API] 🔄 useEffect 트리거됨:', {
       hasUser: !!user,
       userInfo: user ? {
         mt_idx: user.mt_idx,
         mt_name: user.mt_name,
-        mt_email: user.mt_email
+        mt_email: user.mt_email,
+        hasConsentFields: {
+          mt_agree1: typeof user.mt_agree1 !== 'undefined',
+          mt_agree2: typeof user.mt_agree2 !== 'undefined',
+          mt_agree3: typeof user.mt_agree3 !== 'undefined',
+          mt_agree4: typeof user.mt_agree4 !== 'undefined',
+          mt_agree5: typeof user.mt_agree5 !== 'undefined'
+        }
       } : null,
+      authContext: {
+        authLoading,
+        isLoggedIn,
+        hasAuthError: !!authError
+      },
       timestamp: new Date().toISOString()
     });
     
     if (user) {
-      console.log('[TERMS DEBUG] 사용자 정보 있음, loadUserConsents 호출');
+      console.log('[TERMS API] ✅ 사용자 정보 확인됨, loadUserConsents 호출 예정:', {
+        userId: user.mt_idx,
+        userName: user.mt_name,
+        loadFunctionReady: typeof loadUserConsents === 'function'
+      });
       loadUserConsents();
     } else {
-      console.log('[TERMS DEBUG] 사용자 정보 없음, 로딩 상태 false로 설정');
+      console.log('[TERMS API] ⏳ 사용자 정보 없음, 로딩 상태 false로 설정:', {
+        reason: 'No user context',
+        willRetryWhenUserLoads: true,
+        authLoading,
+        isLoggedIn
+      });
       setIsLoadingConsents(false);
     }
   }, [user]);
@@ -464,43 +570,101 @@ export default function TermsPage() {
     }
 
     setIsLoadingConsents(true);
+    const startTime = Date.now();
+    
     try {
-      console.log(`[TERMS] 동의 정보 조회 시작 - user_id: ${user.mt_idx}`);
+      console.log(`[TERMS API] 🚀 동의 정보 조회 시작 - user_id: ${user.mt_idx}`);
       
-      // 토큰 확인
-      const token = localStorage.getItem('auth-token');
-      console.log('[TERMS] 토큰 확인:', token ? '토큰 있음' : '토큰 없음');
+      // 토큰 확인 및 로깅 강화
+      const token = localStorage.getItem('auth-token') || localStorage.getItem('token');
+      console.log('[TERMS API] 🔑 토큰 확인:', {
+        hasAuthToken: !!localStorage.getItem('auth-token'),
+        hasToken: !!localStorage.getItem('token'),
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'None',
+        userId: user.mt_idx,
+        timestamp: new Date().toISOString()
+      });
+      
+      // API 호출 전 상태 로깅
+      console.log('[TERMS API] 📤 API 호출 준비:', {
+        endpoint: `/v1/members/consent/${user.mt_idx}`,
+        method: 'GET',
+        hasAuthorization: !!token,
+        userAgent: navigator.userAgent,
+        url: window.location.href
+      });
       
       // 프론트엔드 API 라우트를 통해 동의 정보 조회
       const response = await apiClient.get(`/v1/members/consent/${user.mt_idx}`);
+      const responseTime = Date.now() - startTime;
+
+      console.log('[TERMS API] ✅ 응답 수신:', {
+        status: response.status,
+        statusText: response.statusText,
+        responseTime: `${responseTime}ms`,
+        hasData: !!response.data,
+        timestamp: new Date().toISOString()
+      });
 
       const result = response.data;
-      console.log('[TERMS] 동의 정보 조회 응답:', result);
+      console.log('[TERMS API] 📊 응답 데이터 분석:', {
+        success: result?.success,
+        message: result?.message,
+        hasConsentData: !!result?.data,
+        dataKeys: result?.data ? Object.keys(result.data) : [],
+        responseTime: `${responseTime}ms`
+      });
 
       if (result.success && result.data) {
         // 백엔드에서 받은 동의 정보로 상태 업데이트
         const userConsents = result.data;
+        
+        // 동의 정보 상세 로깅
+        console.log('[TERMS API] 🎯 동의 정보 상세:', {
+          mt_agree1: userConsents.mt_agree1,
+          mt_agree2: userConsents.mt_agree2,
+          mt_agree3: userConsents.mt_agree3,
+          mt_agree4: userConsents.mt_agree4,
+          mt_agree5: userConsents.mt_agree5,
+          consentCount: Object.values(userConsents).filter(v => v === 'Y').length
+        });
         
         setTerms(prev => prev.map(term => ({
           ...term,
           isConsented: userConsents[term.dbField as keyof typeof userConsents] === 'Y'
         })));
         
-        console.log('[TERMS] 동의 정보 로드 성공:', userConsents);
+        console.log('[TERMS API] ✅ 동의 정보 로드 성공 완료:', {
+          responseTime: `${responseTime}ms`,
+          totalTerms: TERMS_DATA.length,
+          consentedTerms: Object.values(userConsents).filter(v => v === 'Y').length
+        });
       } else {
-        console.error('[TERMS] 동의 정보 조회 실패:', result.message);
+        console.error('[TERMS API] ❌ 응답 실패:', {
+          success: result?.success,
+          message: result?.message,
+          responseTime: `${responseTime}ms`
+        });
+        
         // 실패 시 기본값으로 설정
         setTerms(prev => prev.map(term => ({
           ...term,
           isConsented: false
         })));
       }
-    } catch (error) {
-      console.error('[TERMS] 동의 정보 로드 실패:', error);
+    } catch (error: any) {
+      const responseTime = Date.now() - startTime;
+      console.error('[TERMS API] 💥 오류 발생:', {
+        errorMessage: error?.message,
+        errorResponse: error?.response?.data,
+        errorStatus: error?.response?.status,
+        responseTime: `${responseTime}ms`,
+        errorStack: error?.stack
+      });
       
       // 에러 발생 시 사용자 컨텍스트에서 가져오기 (폴백)
       if (user) {
-        console.log('[TERMS] 폴백: 사용자 컨텍스트에서 동의 정보 가져오기');
+        console.log('[TERMS API] 🔄 폴백: 사용자 컨텍스트에서 동의 정보 가져오기');
         const userConsents = {
           mt_agree1: user.mt_agree1 || 'N',
           mt_agree2: user.mt_agree2 || 'N',
@@ -509,15 +673,18 @@ export default function TermsPage() {
           mt_agree5: user.mt_agree5 || 'N'
         };
 
+        console.log('[TERMS API] 📝 폴백 동의 정보:', userConsents);
+
         setTerms(prev => prev.map(term => ({
           ...term,
           isConsented: userConsents[term.dbField as keyof typeof userConsents] === 'Y'
-                 })));
-       }
-     } finally {
-       setIsLoadingConsents(false);
-     }
-   };
+        })));
+      }
+    } finally {
+      setIsLoadingConsents(false);
+      console.log('[TERMS API] 🏁 동의 정보 로드 프로세스 완료');
+    }
+  };
 
   // 뒤로가기 핸들러
   const handleBack = () => {
@@ -556,17 +723,35 @@ export default function TermsPage() {
   // 동의 상태 변경
   const handleConsentToggle = async (termId: string) => {
     if (!user) {
+      console.warn('[TERMS API] ⚠️ 로그인되지 않은 사용자의 동의 변경 시도');
       alert('로그인이 필요합니다.');
       return;
     }
 
     const term = terms.find(t => t.id === termId);
-    if (!term) return;
+    if (!term) {
+      console.error('[TERMS API] ❌ 유효하지 않은 약관 ID:', termId);
+      return;
+    }
 
-    console.log('[TOGGLE] 클릭된 약관:', term.title, '현재 상태:', term.isConsented);
+    console.log('[TERMS API] 🎯 동의 상태 변경 시작:', {
+      termId: term.id,
+      termTitle: term.title,
+      dbField: term.dbField,
+      currentState: term.isConsented,
+      isRequired: term.isRequired,
+      userId: user.mt_idx,
+      timestamp: new Date().toISOString()
+    });
 
     // 필수 약관은 변경할 수 없음
     if (term.isRequired) {
+      console.warn('[TERMS API] ⚠️ 필수 약관 변경 시도:', {
+        termId: term.id,
+        termTitle: term.title,
+        userId: user.mt_idx
+      });
+      
       // 🎮 필수 약관 변경 시도 시 경고 햅틱 피드백
       triggerHapticFeedback(HapticFeedbackType.ERROR, '필수 약관 변경 불가', { 
         component: 'terms', 
@@ -576,6 +761,15 @@ export default function TermsPage() {
       alert('필수 약관은 변경할 수 없습니다.');
       return;
     }
+
+    const newConsentValue = term.isConsented ? 'N' : 'Y';
+    console.log('[TERMS API] 🔄 동의 상태 변경 세부사항:', {
+      termId: term.id,
+      dbField: term.dbField,
+      previousValue: term.isConsented ? 'Y' : 'N',
+      newValue: newConsentValue,
+      action: term.isConsented ? 'revoke' : 'grant'
+    });
 
     // 🎮 동의 상태 변경 햅틱 피드백
     triggerHapticFeedback(HapticFeedbackType.SELECTION, `약관 동의 ${term.isConsented ? '해제' : '설정'}`, { 
@@ -595,17 +789,45 @@ export default function TermsPage() {
     );
 
     setIsLoading(true);
+    const startTime = Date.now();
+    
     try {
-      const newConsentValue = term.isConsented ? 'N' : 'Y';
+      // 토큰 확인
+      const token = localStorage.getItem('auth-token') || localStorage.getItem('token');
+      console.log('[TERMS API] 🔑 동의 변경 API 호출 준비:', {
+        endpoint: '/v1/members/consent',
+        method: 'POST',
+        hasToken: !!token,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : 'None',
+        payload: {
+          field: term.dbField,
+          value: newConsentValue
+        }
+      });
       
       // 프론트엔드 API 라우트를 통해 개별 동의 상태 변경
       const response = await apiClient.post('/v1/members/consent', {
         field: term.dbField,
         value: newConsentValue
       });
+      
+      const responseTime = Date.now() - startTime;
+      console.log('[TERMS API] ✅ 동의 변경 응답 수신:', {
+        status: response.status,
+        statusText: response.statusText,
+        responseTime: `${responseTime}ms`,
+        hasData: !!response.data,
+        timestamp: new Date().toISOString()
+      });
 
       const result = response.data;
-      console.log('[TERMS] 개별 동의 상태 변경 응답:', result);
+      console.log('[TERMS API] 📊 동의 변경 응답 분석:', {
+        success: result?.success,
+        message: result?.message,
+        responseTime: `${responseTime}ms`,
+        termId: term.id,
+        newValue: newConsentValue
+      });
 
       if (!result.success) {
         throw new Error(result.message || '동의 상태 변경 실패');
@@ -614,9 +836,28 @@ export default function TermsPage() {
       // API 성공 - 낙관적 업데이트가 이미 되어있으므로 추가 업데이트 불필요
       setShowSuccessToast(true);
       setTimeout(() => setShowSuccessToast(false), 3000);
-      console.log('[TERMS] 개별 동의 상태 변경 성공');
-    } catch (error) {
-      console.error('동의 상태 변경 실패:', error);
+      
+      console.log('[TERMS API] ✅ 동의 상태 변경 성공:', {
+        termId: term.id,
+        termTitle: term.title,
+        dbField: term.dbField,
+        newValue: newConsentValue,
+        responseTime: `${responseTime}ms`,
+        userId: user.mt_idx
+      });
+      
+    } catch (error: any) {
+      const responseTime = Date.now() - startTime;
+      console.error('[TERMS API] 💥 동의 상태 변경 실패:', {
+        termId: term.id,
+        termTitle: term.title,
+        dbField: term.dbField,
+        errorMessage: error?.message,
+        errorResponse: error?.response?.data,
+        errorStatus: error?.response?.status,
+        responseTime: `${responseTime}ms`,
+        errorStack: error?.stack
+      });
       
       // API 실패 시 원래 상태로 되돌리기
       setTerms(prevTerms => 
@@ -627,9 +868,15 @@ export default function TermsPage() {
         )
       );
       
+      console.log('[TERMS API] 🔄 UI 상태 롤백 완료:', {
+        termId: term.id,
+        rolledBackTo: term.isConsented ? 'consented' : 'not-consented'
+      });
+      
       alert('동의 상태 변경에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setIsLoading(false);
+      console.log('[TERMS API] 🏁 동의 상태 변경 프로세스 완료');
     }
   };
 
