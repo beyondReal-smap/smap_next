@@ -632,17 +632,28 @@ export default function TermsPage() {
       timestamp: new Date().toISOString()
     });
     
-    if (user) {
-      console.log('[TERMS API] ✅ 사용자 정보 확인됨, loadUserConsents 호출 예정:', {
-        userId: user.mt_idx,
-        userName: user.mt_name,
+    // test-debug와 동일한 방식: user 정보가 없어도 localStorage에서 가져와서 시도
+    const userId = user?.mt_idx || localStorage.getItem('user_id') || '1186';
+    
+    console.log('[TERMS API] 🎯 사용자 ID 결정:', {
+      fromUser: user?.mt_idx,
+      fromLocalStorage: localStorage.getItem('user_id'),
+      finalUserId: userId,
+      source: user?.mt_idx ? 'AuthContext' : localStorage.getItem('user_id') ? 'localStorage' : 'default'
+    });
+    
+    if (userId) {
+      console.log('[TERMS API] ✅ 사용자 ID 확인됨, loadUserConsents 호출 예정:', {
+        userId: userId,
+        userName: user?.mt_name || 'Unknown',
         loadFunctionReady: typeof loadUserConsents === 'function'
       });
-      loadUserConsents();
+      
+      // loadUserConsents를 userId와 함께 호출하도록 수정 필요
+      loadUserConsents(userId);
     } else {
-      console.log('[TERMS API] ⏳ 사용자 정보 없음, 로딩 상태 false로 설정:', {
-        reason: 'No user context',
-        willRetryWhenUserLoads: true,
+      console.log('[TERMS API] ⏳ 사용자 ID 없음, 로딩 상태 false로 설정:', {
+        reason: 'No user ID available',
         authLoading,
         isLoggedIn
       });
@@ -651,9 +662,12 @@ export default function TermsPage() {
   }, [user]);
 
   // 사용자의 동의 정보를 로드하는 함수
-  const loadUserConsents = async () => {
-    if (!user?.mt_idx) {
-      console.error('사용자 정보가 없습니다.');
+  const loadUserConsents = async (userId?: string | number) => {
+    // test-debug와 동일한 방식: 여러 소스에서 userId 확인
+    const targetUserId = userId || user?.mt_idx || localStorage.getItem('user_id') || '1186';
+    
+    if (!targetUserId) {
+      console.error('[TERMS API] ❌ 사용자 ID를 찾을 수 없습니다.');
       setIsLoadingConsents(false);
       return;
     }
@@ -662,7 +676,7 @@ export default function TermsPage() {
     const startTime = Date.now();
     
     try {
-      console.log(`[TERMS API] 🚀 동의 정보 조회 시작 - user_id: ${user.mt_idx}`);
+      console.log(`[TERMS API] 🚀 동의 정보 조회 시작 - user_id: ${targetUserId}`);
       
       // 토큰 확인 및 로깅 강화
       const token = localStorage.getItem('auth-token') || localStorage.getItem('token');
@@ -670,13 +684,13 @@ export default function TermsPage() {
         hasAuthToken: !!localStorage.getItem('auth-token'),
         hasToken: !!localStorage.getItem('token'),
         tokenPreview: token ? `${token.substring(0, 20)}...` : 'None',
-        userId: user.mt_idx,
+        userId: targetUserId,
         timestamp: new Date().toISOString()
       });
       
       // API 호출 전 상태 로깅
       console.log('[TERMS API] 📤 API 호출 준비:', {
-        endpoint: `/v1/members/consent/${user.mt_idx}`,
+        endpoint: `/v1/members/consent/${targetUserId}`,
         method: 'GET',
         hasAuthorization: !!token,
         userAgent: navigator.userAgent,
@@ -684,7 +698,7 @@ export default function TermsPage() {
       });
       
       // 프론트엔드 API 라우트를 통해 동의 정보 조회
-      const response = await apiClient.get(`/v1/members/consent/${user.mt_idx}`);
+      const response = await apiClient.get(`/v1/members/consent/${targetUserId}`);
       const responseTime = Date.now() - startTime;
 
       console.log('[TERMS API] ✅ 응답 수신:', {
