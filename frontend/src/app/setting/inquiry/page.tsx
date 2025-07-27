@@ -390,7 +390,7 @@ ${message}
             </motion.button>
               <div className="flex flex-col justify-center" style={{ margin: '0', padding: '0' }}>
                 <h1 className="text-lg font-bold text-gray-900 leading-tight" style={{ margin: '0', padding: '0', lineHeight: '1.2' }}>1:1 문의</h1>
-                <p className="text-xs text-gray-500 leading-tight" style={{ margin: '0', padding: '0', lineHeight: '1.2' }}>궁금한 점을 문의하세요</p>
+                <p className="text-xs text-gray-500 leading-tight mt-1" style={{ margin: '0', padding: '0', lineHeight: '1.2', marginTop: '4px' }}>궁금한 점을 문의하세요</p>
               </div>
             </motion.div>
             
@@ -411,7 +411,7 @@ ${message}
             bottom: '0px',
             left: '0',
             right: '0',
-            paddingTop: '80px'
+            paddingTop: '56px'
           }}
         >
           {/* 1:1 문의 정보 카드 - 주황색 테마 */}
