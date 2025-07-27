@@ -4092,10 +4092,10 @@ export default function SchedulePage() {
               <AnimatePresence mode="wait">
                 <motion.div 
                   key="schedule-header"
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 0, x: -40 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+                  exit={{ opacity: 0, x: -40 }}
+                  transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
                   className="flex items-center space-x-3 motion-div"
                 >
                   <div className="flex items-center space-x-3">
