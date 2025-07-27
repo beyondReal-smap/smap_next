@@ -6012,7 +6012,7 @@ export default function HomePage() {
                    setIsSidebarOpen(false);
                  }}
                  style={{
-                   // 모바일 사파리 최적화
+                   // 모바일 사파리 최적화 ㅡㅡ,m nbnm,     ,.l kjmnhybgvftgbn8u7jn'
                    transform: 'translateZ(0)',
                    willChange: 'opacity',
                    backfaceVisibility: 'hidden',
