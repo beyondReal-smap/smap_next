@@ -24,7 +24,7 @@ import { cubicBezier } from 'framer-motion';
 // Dynamic Imports for better code splitting
 const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
   loading: () => (
-    <div className="h-14 bg-gradient-to-r from-[#667eea] to-[#764ba2] animate-pulse" />
+    <div className="h-[62px] bg-gradient-to-r from-[#667eea] to-[#764ba2] animate-pulse" />
   ),
   ssr: false
 });
@@ -7011,10 +7011,10 @@ export default function ActivelogPage() {
             zIndex: 9999,
             paddingTop: 0,
             marginTop: 0,
-            height: '56px',
+            height: '62px',
           }}
         >
-          <div className="flex items-center justify-between h-14 px-4">
+          <div className="flex items-center justify-between h-[62px] px-4">
             <motion.div 
               initial={{ opacity: 0, x: -40 }}
               animate={{ opacity: 1, x: 0 }}

@@ -3376,6 +3376,20 @@ body[data-page="/notice"] .setting-header,
   box-sizing: border-box !important;
 }
 
+/* activelog 페이지 헤더 높이 62px로 설정 */
+body[data-page="/activelog"] .header-fixed,
+body[data-page="/activelog"] header,
+body[data-page="/activelog"] .glass-effect,
+body[data-page="/activelog"] .activelog-header {
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+}
+
+body[data-page="/activelog"] .header-content-spacing {
+  height: 62px !important;
+}
+
 /* 헤더 내부 컨테이너 표준 */
 .header-content-spacing {
   padding-left: 16px !important;
