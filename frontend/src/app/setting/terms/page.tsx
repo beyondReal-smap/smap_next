@@ -608,6 +608,38 @@ export default function TermsPage() {
     };
   }, []);
 
+  // 모달 표시 시 body overflow 제어
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    
+    if (showPreviewModal) {
+      // 모달이 열릴 때: overflow 허용
+      console.log('[TERMS MODAL] 모달 열림 - body overflow 허용');
+      html.style.overflow = 'visible';
+      body.style.overflow = 'visible';
+      body.style.height = 'auto';
+      body.style.position = 'relative';
+    } else {
+      // 모달이 닫힐 때: 원래 스타일로 복구
+      console.log('[TERMS MODAL] 모달 닫힘 - body overflow 제한');
+      html.style.overflow = 'hidden';
+      body.style.overflow = 'hidden';
+      body.style.height = '100vh';
+      body.style.position = '';
+    }
+    
+    return () => {
+      // 컴포넌트 언마운트 시 정리
+      if (showPreviewModal) {
+        html.style.overflow = 'hidden';
+        body.style.overflow = 'hidden';
+        body.style.height = '100vh';
+        body.style.position = '';
+      }
+    };
+  }, [showPreviewModal]);
+
   // 사용자 동의 정보 로드
   useEffect(() => {
     console.log('[TERMS API] 🔄 useEffect 트리거됨:', {
@@ -1165,12 +1197,24 @@ export default function TermsPage() {
         {/* 약관 미리보기 모달 */}
         {showPreviewModal && selectedTerm && (
           <div 
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
+            className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 backdrop-blur-sm" 
             onClick={() => setShowPreviewModal(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 9999
+            }}
           >
             <div 
               className="w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 shadow-2xl animate-slideInFromBottom max-h-[80vh] overflow-y-auto"
               onClick={e => e.stopPropagation()}
+              style={{
+                position: 'relative',
+                zIndex: 10000
+              }}
             >
               <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
               
