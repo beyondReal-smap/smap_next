@@ -11,23 +11,6 @@ interface UserContact {
   mt_email: string;
 }
 
-  // 안드로이드 기기 감지 함수
-  const isAndroid = () => {
-    if (typeof window !== 'undefined') {
-      return /Android/i.test(navigator.userAgent);
-    }
-    return false;
-  };
-
-  // 안드로이드 상태바 높이 계산
-  const getAndroidStatusBarHeight = () => {
-    if (typeof window !== 'undefined' && isAndroid()) {
-      // 안드로이드 상태바 높이는 보통 24-48px 정도
-      return '24px';
-    }
-    return '0px';
-  };
-
 export default function ContactPage() {
   const router = useRouter();
   const [contact, setContact] = useState<UserContact>({
@@ -55,14 +38,14 @@ export default function ContactPage() {
       console.log('🔄 사용자 연락처 정보 로드 시작');
 
       // 데이터베이스에서 실시간으로 사용자 정보 가져오기
-      const response = await fetch('/api/v1/members/profile', {
+      const response = await fetch('/api/auth/profile', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-              console.log('📡 /api/v1/members/profile 응답 상태:', response.status);
+      console.log('📡 /api/auth/profile 응답 상태:', response.status);
 
       if (response.ok) {
         const data = await response.json();
@@ -199,7 +182,6 @@ export default function ContactPage() {
       <AnimatedHeader 
         variant="enhanced"
         className="setting-header"
-        style={{ paddingTop: getAndroidStatusBarHeight() }}
       >
         <motion.div
           initial={{ opacity: 0, x: -20 }}

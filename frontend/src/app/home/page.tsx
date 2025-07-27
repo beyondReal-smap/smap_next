@@ -824,13 +824,6 @@ export default function HomePage() {
   const [criticalError, setCriticalError] = useState<string | null>(null);
   const [renderAttempts, setRenderAttempts] = useState(0);
   
-  // 🗺️ 지도 로딩 에러 처리 상태
-  const [mapLoadError, setMapLoadError] = useState<string | null>(null);
-  const [mapRetryCount, setMapRetryCount] = useState(0);
-  const [showMapRetryButton, setShowMapRetryButton] = useState(false);
-  const [mapLoadTimeout, setMapLoadTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [naverMapLoadFailed, setNaverMapLoadFailed] = useState(false);
-  
   // 🚨 iOS 시뮬레이터 디버깅 - 즉시 실행 로그
   console.log('🏠 [HOME] HomePage 컴포넌트 시작');
   
@@ -881,13 +874,8 @@ export default function HomePage() {
     return () => {
       window.removeEventListener('error', handleError);
       window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-      
-      // 타임아웃 정리
-      if (mapLoadTimeout) {
-        clearTimeout(mapLoadTimeout);
-      }
     };
-  }, [mapLoadTimeout]);
+  }, []);
   const router = useRouter();
   // 인증 관련 상태 추가
   const { user, isLoggedIn, loading: authLoading, isPreloadingComplete } = useAuth();
@@ -912,41 +900,15 @@ export default function HomePage() {
   
   // 🔧 사용자 정보 디버깅
   useEffect(() => {
-    console.log('🔧 [HOME] AuthContext 상태 확인:', {
-      hasUser: !!user,
-      userInfo: user ? {
+    if (user) {
+      console.log('🔧 [HOME] AuthContext 사용자 정보 확인:', {
         mt_idx: user.mt_idx,
         mt_name: user.mt_name,
-        mt_email: user.mt_email
-      } : null,
-      isLoggedIn,
-      authLoading,
-      isPreloadingComplete
-    });
-    
-    // 사용자 정보가 없지만 로그인 상태인 경우 강제로 확인
-    if (!user && isLoggedIn) {
-      console.log('🔧 [HOME] 사용자 정보가 없지만 로그인 상태 - 강제 확인');
-      
-      // localStorage에서 사용자 정보 확인
-      try {
-        const storedUserData = localStorage.getItem('smap_user_data');
-        if (storedUserData) {
-          const parsedUserData = JSON.parse(storedUserData);
-          console.log('🔧 [HOME] localStorage에서 사용자 정보 발견:', parsedUserData);
-          
-          // AuthContext 상태 강제 업데이트
-          if (typeof (window as any).__AUTH_CONTEXT_DISPATCH__ === 'function') {
-            console.log('🔧 [HOME] AuthContext 상태 강제 업데이트');
-            (window as any).__AUTH_CONTEXT_DISPATCH__({ 
-              type: 'LOGIN_SUCCESS', 
-              payload: parsedUserData 
-            });
-          }
-        }
-      } catch (error) {
-        console.error('🔧 [HOME] localStorage 사용자 정보 확인 실패:', error);
-      }
+        mt_email: user.mt_email,
+        isLoggedIn,
+        authLoading,
+        isPreloadingComplete
+      });
     }
   }, [user, isLoggedIn, authLoading, isPreloadingComplete]);
 
@@ -1291,14 +1253,6 @@ export default function HomePage() {
       setLocationName("서울시");
     }
   }, []);
-
-  // 그룹 목록이 로드되었을 때 첫 번째 그룹 자동 선택
-  useEffect(() => {
-    if (userGroups.length > 0 && !selectedGroupId && !isUserDataLoading) {
-      console.log('[HOME] 그룹 목록 로드됨 - 첫 번째 그룹 자동 선택:', userGroups[0].sgt_title, 'ID:', userGroups[0].sgt_idx);
-      setSelectedGroupId(userGroups[0].sgt_idx);
-    }
-  }, [userGroups.length, selectedGroupId, isUserDataLoading]);
 
   // 그룹 멤버 및 스케줄 데이터 가져오기
   useEffect(() => {
@@ -2117,11 +2071,6 @@ export default function HomePage() {
     
     // 페이지 재방문 시에도 지도가 제대로 표시되도록 강제 초기화
     const forceMapInitialization = () => {
-      // 에러 상태 리셋
-      setMapLoadError(null);
-      setShowMapRetryButton(false);
-      setMapRetryCount(0);
-      
       // API 로드 상태 재검증
       const isNaverReady = window.naver?.maps && naverMapsLoaded;
       const isGoogleReady = window.google?.maps && googleMapsLoaded;
@@ -2298,56 +2247,7 @@ export default function HomePage() {
   };
 
   // Naver Maps API 로드 함수 (프리로딩 최적화 + iOS WebView 지원)
-  // 🗺️ 지도 로딩 에러 처리 함수
-  const handleMapLoadError = (error: string, retryFunction: () => void) => {
-    console.error('[HOME] 🗺️ 지도 로딩 에러:', error);
-    setMapLoadError(error);
-    setShowMapRetryButton(true);
-    setIsMapLoading(false);
-    
-    // 에러 메시지 설정
-    let userMessage = '지도를 불러오는 중 문제가 발생했습니다.';
-    if (error.includes('네트워크')) {
-      userMessage = '네트워크 연결을 확인해주세요.';
-    } else if (error.includes('인증')) {
-      userMessage = '지도 서비스 인증에 문제가 있습니다.';
-    } else if (error.includes('타임아웃')) {
-      userMessage = '지도 로딩 시간이 초과되었습니다.';
-    }
-    
-    setMapLoadError(userMessage);
-    
-    // 재시도 횟수 제한 (최대 3회)
-    if (mapRetryCount < 3) {
-      console.log(`[HOME] 🗺️ 지도 재시도 ${mapRetryCount + 1}/3`);
-    } else {
-      console.log('[HOME] 🗺️ 지도 재시도 횟수 초과');
-      setMapLoadError('지도 로딩에 실패했습니다. 잠시 후 다시 시도해주세요.');
-    }
-  };
-
-  // 🗺️ 지도 재시도 함수
-  const retryMapLoading = () => {
-    console.log('[HOME] 🗺️ 지도 재시도 시작');
-    setMapLoadError(null);
-    setShowMapRetryButton(false);
-    setMapRetryCount(prev => prev + 1);
-    setIsMapLoading(true);
-    
-    // 기존 타임아웃 정리
-    if (mapLoadTimeout) {
-      clearTimeout(mapLoadTimeout);
-    }
-    
-    // 네이버 지도 재시도
-    loadNaverMapsAPI();
-  };
-
   const loadNaverMapsAPI = () => {
-    // 에러 상태 초기화
-    setMapLoadError(null);
-    setShowMapRetryButton(false);
-    
     // iOS WebView 감지
     const isIOSWebView = typeof window !== 'undefined' && 
                         window.webkit && 
@@ -2452,10 +2352,15 @@ export default function HomePage() {
           hasErrorOccurred = true;
           console.error('[HOME] 네이버 지도 API 인증/서버 오류 감지:', errorMessage);
           
-          // 에러 처리 함수 호출
-          const errorType = errorMessage.includes('Unauthorized') ? '인증' : 
-                           errorMessage.includes('Internal Server Error') ? '서버' : '네트워크';
-          handleMapLoadError(`${errorType} 오류가 발생했습니다.`, loadNaverMapsAPI);
+          // 구글맵으로 전환하지 않고 네이버맵 재시도
+          setIsMapLoading(false);
+          setNaverMapsLoaded(false);
+          
+          // 네이버맵 재시도
+          setTimeout(() => {
+            console.log('[HOME] 네이버 지도 오류 후 재시도...');
+            loadNaverMapsAPI();
+          }, 5000);
           
           // 에러 리스너 제거
           if (errorListener) {
@@ -2494,11 +2399,17 @@ export default function HomePage() {
       };
       
       script.onerror = () => {
-        console.error('[HOME] 네이버 지도 백업 로드 실패');
+        console.error('[HOME] 네이버 지도 백업 로드 실패 - 재시도 중...');
         hasErrorOccurred = true;
+        setIsMapLoading(false);
         
-        // 에러 처리 함수 호출
-        handleMapLoadError('지도 스크립트 로드에 실패했습니다.', loadNaverMapsAPI);
+        // 네이버맵 로딩 재시도 (구글맵으로 전환하지 않음)
+        setTimeout(() => {
+          if (!naverMapsLoaded) {
+            console.log('[HOME] 네이버맵 재시도 중...');
+            loadNaverMapsAPI();
+          }
+        }, 2000);
         
         // 에러 리스너 제거
         if (errorListener) {
@@ -2517,13 +2428,18 @@ export default function HomePage() {
       
       // iOS WebView에서는 더 긴 타임아웃 설정 (15초)
       const timeout = isIOSWebView ? 15000 : 10000;
-      const timeoutId = setTimeout(() => {
+      setTimeout(() => {
         if (!naverMapsLoaded && !hasErrorOccurred) {
-          console.warn(`[HOME] 네이버 지도 로딩 타임아웃 (${timeout}ms)`);
+          console.warn(`[HOME] 네이버 지도 로딩 타임아웃 (${timeout}ms) - 재시도 중...`);
           hasErrorOccurred = true;
           
-          // 에러 처리 함수 호출
-          handleMapLoadError('지도 로딩 시간이 초과되었습니다.', loadNaverMapsAPI);
+          // 네이버맵 재시도 (구글맵으로 전환하지 않음)
+          setTimeout(() => {
+            if (!naverMapsLoaded) {
+              console.log('[HOME] 네이버맵 타임아웃 후 재시도...');
+              loadNaverMapsAPI();
+            }
+          }, 3000);
           
           // 에러 리스너 제거
           if (errorListener) {
@@ -2532,9 +2448,6 @@ export default function HomePage() {
           }
         }
       }, timeout);
-      
-      // 타임아웃 ID 저장
-      setMapLoadTimeout(timeoutId);
     }
   };
 
@@ -2875,46 +2788,13 @@ export default function HomePage() {
     // 3초 후 지도 로딩 상태를 강제로 완료 처리
     const forceCompleteTimeout = setTimeout(() => {
       if (isMapLoading) {
-        // 지도 인스턴스가 실제로 생성됐는지 확인
-        let isMapInstanceCreated = false;
-        if (mapType === 'naver') {
-          isMapInstanceCreated = !!(naverMap && naverMap.current && typeof naverMap.current.getCenter === 'function');
-        } else if (mapType === 'google') {
-          isMapInstanceCreated = !!(map && map.current && typeof map.current.getCenter === 'function');
-        }
-        if (!isMapInstanceCreated) {
-          // 지도 인스턴스가 없으면 자동 재시도 또는 지도 타입 전환
-          if (mapRetryCount < 2) {
-            console.warn('[HOME] 지도 인스턴스 생성 실패 - 자동 재시도', mapRetryCount + 1);
-            setMapRetryCount(prev => prev + 1);
-            setMapLoadError('지도를 불러오지 못했습니다. 자동으로 다시 시도합니다.');
-            setIsMapLoading(true);
-            if (mapType === 'naver') {
-              loadNaverMapsAPI();
-            } else {
-              loadGoogleMapsAPI();
-            }
-          } else if (mapRetryCount === 2) {
-            // 3번째 실패 시 지도 타입 전환
-            const nextMapType = mapType === 'naver' ? 'google' : 'naver';
-            setMapRetryCount(prev => prev + 1);
-            setMapLoadError('지도를 불러오지 못했습니다. 다른 지도 서비스로 전환합니다.');
-            setMapType(nextMapType);
-            setIsMapLoading(true);
-          } else {
-            // 3회 이상 실패 시 강제 새로고침
-            setMapLoadError('지도를 3회 이상 불러오지 못했습니다. 앱을 새로고침합니다.');
-            setTimeout(() => {
-              window.location.reload();
-            }, 1500);
-          }
-        } else {
-          setIsMapLoading(false);
-        }
+        console.log('[HOME] 지도 로딩 타임아웃 - 강제 완료 처리 (UX 개선)');
+        setIsMapLoading(false);
       }
     }, 3000);
+
     return () => clearTimeout(forceCompleteTimeout);
-  }, [isMapLoading, mapType, mapRetryCount]);
+  }, [isMapLoading]);
 
   // 컴포넌트 언마운트 시 리소스 정리
   useEffect(() => {
@@ -5416,23 +5296,6 @@ export default function HomePage() {
       };
     }, [isSidebarOpen]);
 
-  // 안드로이드 기기 감지 함수
-  const isAndroid = () => {
-    if (typeof window !== 'undefined') {
-      return /Android/i.test(navigator.userAgent);
-    }
-    return false;
-  };
-
-  // 안드로이드 상태바 높이 계산
-  const getAndroidStatusBarHeight = () => {
-    if (typeof window !== 'undefined' && isAndroid()) {
-      // 안드로이드 상태바 높이는 보통 24-48px 정도
-      return '24px';
-    }
-    return '0px';
-  };
-
   // 사이드바 애니메이션 variants (고급스러운 효과)
   const sidebarVariants = {
     closed: {
@@ -5442,7 +5305,7 @@ export default function HomePage() {
       filter: 'blur(2px)',
       boxShadow: '0 0 0 rgba(0,0,0,0)',
       transition: {
-        duration: 0.6,
+        duration: 0.35,
         ease: cubicBezier(0.4, 0.0, 0.2, 1)
       }
     },
@@ -5453,7 +5316,7 @@ export default function HomePage() {
       filter: 'blur(0px)',
       boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
       transition: {
-        duration: 0.7,
+        duration: 0.45,
         ease: cubicBezier(0.4, 0.0, 0.2, 1)
       }
     }
@@ -5463,12 +5326,12 @@ export default function HomePage() {
     closed: {
       opacity: 0,
       filter: 'blur(0px)',
-      transition: { duration: 0.4 }
+      transition: { duration: 0.2 }
     },
     open: {
       opacity: 1,
       filter: 'blur(2.5px)',
-      transition: { duration: 0.5 }
+      transition: { duration: 0.35 }
     }
   };
 
@@ -5478,7 +5341,7 @@ export default function HomePage() {
       x: -30,
       scale: 0.98,
       transition: {
-        duration: 0.4
+        duration: 0.2
       }
     },
     open: {
@@ -5486,8 +5349,8 @@ export default function HomePage() {
       x: 0,
       scale: 1,
       transition: {
-        duration: 0.5,
-        delay: 0.1
+        duration: 0.25,
+        delay: 0.05
       }
     }
   };
@@ -5677,7 +5540,7 @@ export default function HomePage() {
           variant="simple"
           className={`fixed top-0 left-0 right-0 glass-effect header-fixed home-header ${isSidebarOpen ? 'z-40' : 'z-50'}`}
           style={{ 
-            paddingTop: getAndroidStatusBarHeight(),
+            paddingTop: '0px',
             marginTop: '0px',
             top: '0px',
             position: 'fixed'
@@ -5760,7 +5623,7 @@ export default function HomePage() {
                  </svg>
                  {/* 읽지 않은 알림이 있을 때만 빨간색 점 표시 */}
                  {hasNewNotifications && (
-                   <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse">
+                   <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full animate-pulse">
                  </div>
                  )}
                </button>
@@ -5869,52 +5732,6 @@ export default function HomePage() {
             />
           )}
 
-          {/* 🗺️ 지도 로딩 에러 UI */}
-          {mapLoadError && showMapRetryButton && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="absolute inset-0 flex items-center justify-center z-20 bg-white/95 backdrop-blur-sm"
-            >
-              <div className="bg-white rounded-2xl p-6 shadow-xl border border-gray-200 max-w-sm mx-4 text-center">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.47-.881-6.08-2.33" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">지도 로딩 실패</h3>
-                <p className="text-gray-600 mb-6">{mapLoadError}</p>
-                <div className="space-y-3">
-                  {mapRetryCount < 3 && (
-                    <button
-                      onClick={retryMapLoading}
-                      disabled={isMapLoading}
-                      className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {isMapLoading ? '재시도 중...' : '다시 시도'}
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      setMapLoadError(null);
-                      setShowMapRetryButton(false);
-                      setMapRetryCount(0);
-                    }}
-                    className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-200 transition-colors"
-                  >
-                    닫기
-                  </button>
-                </div>
-                {mapRetryCount >= 3 && (
-                  <p className="text-sm text-gray-500 mt-3">
-                    재시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.
-                  </p>
-                )}
-              </div>
-            </motion.div>
-          )}
-
           <div 
             ref={googleMapContainer} 
             className="w-full h-full absolute top-0 left-0" 
@@ -6012,7 +5829,7 @@ export default function HomePage() {
                    setIsSidebarOpen(false);
                  }}
                  style={{
-                   // 모바일 사파리 최적화 ㅡㅡ,m nbnm,     ,.l kjmnhybgvftgbn8u7jn'
+                   // 모바일 사파리 최적화
                    transform: 'translateZ(0)',
                    willChange: 'opacity',
                    backfaceVisibility: 'hidden',
@@ -6027,7 +5844,7 @@ export default function HomePage() {
                    initial="closed"
                    animate="open"
                    exit="closed"
-                   className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[999999] flex flex-col"
+                   className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[999999] flex flex-col"
                    onClick={(e) => e.stopPropagation()}
                    style={{ 
                      background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',

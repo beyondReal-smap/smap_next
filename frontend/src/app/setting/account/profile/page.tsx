@@ -32,23 +32,6 @@ function Portal({ children }: { children: React.ReactNode }) {
   return createPortal(children, document.body);
 }
 
-  // 안드로이드 기기 감지 함수
-  const isAndroid = () => {
-    if (typeof window !== 'undefined') {
-      return /Android/i.test(navigator.userAgent);
-    }
-    return false;
-  };
-
-  // 안드로이드 상태바 높이 계산
-  const getAndroidStatusBarHeight = () => {
-    if (typeof window !== 'undefined' && isAndroid()) {
-      // 안드로이드 상태바 높이는 보통 24-48px 정도
-      return '24px';
-    }
-    return '0px';
-  };
-
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile>({
@@ -60,7 +43,6 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [message, setMessage] = useState('');
-  const [showRetryButton, setShowRetryButton] = useState(false);
   
   // 생년월일 선택 모달 상태
   const [isBirthModalOpen, setIsBirthModalOpen] = useState(false);
@@ -73,26 +55,14 @@ export default function ProfilePage() {
 
   const loadUserProfile = async () => {
     try {
-      setShowRetryButton(false);
-      setMessage('');
       const token = localStorage.getItem('auth-token');
-      
-      console.log('🔍 토큰 확인 시작');
-      console.log('🔍 localStorage에서 토큰 존재 여부:', !!token);
-      console.log('🔍 토큰 길이:', token ? token.length : 0);
-      console.log('🔍 토큰 시작 부분:', token ? token.substring(0, 20) + '...' : '없음');
-      
       if (!token) {
         console.log('⚠️ 토큰이 없지만 페이지 로드 계속 진행');
-        setMessage('로그인이 필요합니다. 다시 로그인해주세요.');
-        setShowRetryButton(true);
         setIsLoadingProfile(false);
         return;
       }
 
       console.log('🔄 사용자 프로필 정보 로드 시작');
-      console.log('🌐 현재 URL:', window.location.href);
-      console.log('🔧 API 엔드포인트:', '/api/v1/members/profile');
       
       // JWT 토큰 내용 확인 (디버깅용)
       try {
@@ -104,53 +74,19 @@ export default function ProfilePage() {
           console.log('🔍 JWT 토큰에 mt_gender 있는지:', payload.mt_gender);
           console.log('🔍 JWT 토큰에 mt_hp 있는지:', payload.mt_hp);
           console.log('🔍 JWT 토큰에 mt_email 있는지:', payload.mt_email);
-          
-          // 토큰 만료 시간 확인
-          if (payload.exp) {
-            const expDate = new Date(payload.exp * 1000);
-            const now = new Date();
-            console.log('🔍 토큰 만료 시간:', expDate.toISOString());
-            console.log('🔍 현재 시간:', now.toISOString());
-            console.log('🔍 토큰 만료 여부:', now > expDate ? '만료됨' : '유효함');
-            
-            if (now > expDate) {
-              console.log('❌ 토큰이 만료되었습니다.');
-              setMessage('로그인이 만료되었습니다. 다시 로그인해주세요.');
-              setShowRetryButton(true);
-              setIsLoadingProfile(false);
-              return;
-            }
-          }
-        } else {
-          console.log('❌ JWT 토큰 형식이 올바르지 않습니다.');
-          setMessage('토큰 형식이 올바르지 않습니다. 다시 로그인해주세요.');
-          setShowRetryButton(true);
-          setIsLoadingProfile(false);
-          return;
         }
       } catch (jwtError) {
         console.error('❌ JWT 토큰 파싱 오류:', jwtError);
-        setMessage('토큰을 확인할 수 없습니다. 다시 로그인해주세요.');
-        setShowRetryButton(true);
-        setIsLoadingProfile(false);
-        return;
       }
 
-      console.log('📡 API 요청 시작...');
-      const startTime = Date.now();
-      
       // JWT 기반 profile API 사용 (백엔드 폴백 기능 포함)
-      const response = await fetch('/api/v1/members/profile', {
+      const response = await fetch('/api/auth/profile', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
-      const endTime = Date.now();
-      console.log('📡 /api/v1/members/profile 응답 상태:', response.status);
-      console.log('⏱️ 요청 소요 시간:', endTime - startTime, 'ms');
-      console.log('📡 응답 헤더:', Object.fromEntries(response.headers.entries()));
+      console.log('📡 /api/auth/profile 응답 상태:', response.status);
 
       if (response.ok) {
         const data = await response.json();
@@ -231,73 +167,15 @@ export default function ProfilePage() {
         }
       } else {
         console.error('❌ 프로필 조회 실패:', response.status);
-        
-        // 에러 응답 내용 확인
-        try {
-          const errorData = await response.json();
-          console.error('❌ 에러 응답 내용:', errorData);
-          
-          // 사용자에게 에러 메시지 표시
-          if (errorData.message) {
-            setMessage(`프로필 조회 실패: ${errorData.message}`);
-          } else {
-            setMessage('프로필 정보를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.');
-          }
-        } catch (parseError) {
-          console.error('❌ 에러 응답 파싱 실패:', parseError);
-          setMessage('프로필 정보를 불러올 수 없습니다. 잠시 후 다시 시도해주세요.');
-        }
-        
-        // 재시도 버튼 표시
-        setShowRetryButton(true);
-        
         // 401 오류가 발생해도 즉시 리디렉션하지 않고 기본값으로 진행
         // 사용자가 직접 로그인 상태를 확인할 수 있도록 함
         console.log('⚠️ API 호출 실패, 기본값으로 진행');
       }
     } catch (error) {
-      console.error('❌ 프로필 로드 중 예외 발생:', error);
-      console.error('❌ 에러 상세:', error instanceof Error ? error.message : String(error));
-      setMessage('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
-      setShowRetryButton(true);
+      console.error('❌ 사용자 정보 로드 실패:', error);
     } finally {
       setIsLoadingProfile(false);
     }
-  };
-
-  const handleRetry = () => {
-    // 토큰이 없거나 만료된 경우 로그인 페이지로 이동
-    const token = localStorage.getItem('auth-token');
-    if (!token) {
-      console.log('🔀 토큰이 없어서 로그인 페이지로 이동');
-      router.push('/login');
-      return;
-    }
-    
-    // 토큰 만료 확인
-    try {
-      const tokenParts = token.split('.');
-      if (tokenParts.length === 3) {
-        const payload = JSON.parse(atob(tokenParts[1]));
-        if (payload.exp) {
-          const expDate = new Date(payload.exp * 1000);
-          const now = new Date();
-          if (now > expDate) {
-            console.log('🔀 토큰이 만료되어 로그인 페이지로 이동');
-            router.push('/login');
-            return;
-          }
-        }
-      }
-    } catch (error) {
-      console.log('🔀 토큰 파싱 오류로 로그인 페이지로 이동');
-      router.push('/login');
-      return;
-    }
-    
-    // 토큰이 유효한 경우 프로필 다시 로드
-    setIsLoadingProfile(true);
-    loadUserProfile();
   };
 
   // 뒤로가기 핸들러
@@ -390,7 +268,6 @@ export default function ProfilePage() {
       <AnimatedHeader 
         variant="enhanced"
         className="setting-header"
-        style={{ paddingTop: getAndroidStatusBarHeight() }}
       >
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -425,36 +302,6 @@ export default function ProfilePage() {
         transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
         className="px-4 pt-20 space-y-6 pb-24"
       >
-        {/* 에러 메시지 및 재시도 버튼 */}
-        {message && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="bg-red-50 border border-red-200 rounded-2xl p-4"
-          >
-            <div className="flex items-start space-x-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 bg-red-100">
-                <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-red-800 mb-2">{message}</p>
-                {showRetryButton && (
-                  <button
-                    onClick={handleRetry}
-                    disabled={isLoadingProfile}
-                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {isLoadingProfile ? '재시도 중...' : '다시 시도'}
-                  </button>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
         {/* 프로필 정보 안내 카드 */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}

@@ -52,16 +52,8 @@ const createApiClientConfig = (): AxiosRequestConfig => {
   const isWebKitEnv = isWebKit();
   const isIOSWebViewEnv = isIOSWebView();
   
-  // baseURL을 동적으로 설정
-  let baseURL = '/api'; // 기본값
-  if (typeof window !== 'undefined') {
-    const protocol = window.location.protocol;
-    const host = window.location.host;
-    baseURL = `${protocol}//${host}/api`;
-  }
-  
   const config: AxiosRequestConfig = {
-    baseURL: baseURL, // 동적으로 설정된 baseURL 사용
+    baseURL: '', // 동적으로 설정
     timeout: isWebKitEnv ? 30000 : 60000, // WebKit에서는 더 짧은 타임아웃 (30초)
     headers: {
       'Content-Type': 'application/json',
@@ -123,7 +115,6 @@ const createApiClientConfig = (): AxiosRequestConfig => {
   console.log('[API CLIENT] 설정 생성 완료:', {
     isWebKit: isWebKitEnv,
     isIOSWebView: isIOSWebViewEnv,
-    baseURL: config.baseURL,
     timeout: config.timeout,
     headers: config.headers
   });
@@ -155,8 +146,21 @@ apiClient.interceptors.request.use(
     const isWebKitEnv = isWebKit();
     const isIOSWebViewEnv = isIOSWebView();
     
-    // baseURL이 이미 설정되어 있으므로 추가 설정 불필요
-    console.log('[API CLIENT] 요청 인터셉터 - baseURL 확인:', config.baseURL);
+    // 동적으로 baseURL 설정 (WebKit 최적화)
+    if (!config.baseURL && typeof window !== 'undefined') {
+      const protocol = window.location.protocol;
+      const host = window.location.host;
+      
+      // WebKit 환경에서는 더 안정적인 URL 구성
+      if (isWebKitEnv) {
+        config.baseURL = `${protocol}//${host}/api`;
+        console.log('[API CLIENT] WebKit 환경 - baseURL 설정:', config.baseURL);
+      } else {
+        config.baseURL = `${protocol}//${host}/api`;
+      }
+    } else if (!config.baseURL) {
+      config.baseURL = '/api';
+    }
     
     // WebKit 환경에서 추가 헤더 설정
     if (isWebKitEnv) {

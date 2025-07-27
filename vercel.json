@@ -6,7 +6,7 @@
   "devCommand": "cd frontend && npm run dev",
   "regions": ["icn1"],
   "functions": {
-    "frontend/src/app/**": {
+    "frontend/app/**": {
       "maxDuration": 30
     }
   },

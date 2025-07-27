@@ -281,23 +281,6 @@ const floatingCardVariants = {
   }
 };
 
-// 안드로이드 기기 감지 함수
-const isAndroid = () => {
-  if (typeof window !== 'undefined') {
-    return /Android/i.test(navigator.userAgent);
-  }
-  return false;
-};
-
-// 안드로이드 상태바 높이 계산
-const getAndroidStatusBarHeight = () => {
-  if (typeof window !== 'undefined' && isAndroid()) {
-    // 안드로이드 상태바 높이는 보통 24-48px 정도
-    return '24px';
-  }
-  return '0px';
-};
-
 // 사이드바 애니메이션 - 더 부드럽고 자연스럽게
 const sidebarVariants = {
   closed: {
@@ -307,7 +290,7 @@ const sidebarVariants = {
     filter: 'blur(2px)',
     boxShadow: '0 0 0 rgba(0,0,0,0)',
     transition: {
-      duration: 0.6,
+      duration: 0.35,
       ease: cubicBezier(0.4, 0.0, 0.2, 1)
     }
   },
@@ -318,7 +301,7 @@ const sidebarVariants = {
     filter: 'blur(0px)',
     boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
     transition: {
-      duration: 0.7,
+      duration: 0.45,
       ease: cubicBezier(0.4, 0.0, 0.2, 1)
     }
   }
@@ -328,13 +311,13 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.4
+      duration: 0.2 // 0.25에서 0.2로 줄여서 더 빠르게
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.5
+      duration: 0.2 // 0.25에서 0.2로 줄여서 더 빠르게
     }
   }
 };
@@ -344,15 +327,15 @@ const sidebarContentVariants = {
     opacity: 0,
     x: -30,
     transition: {
-      duration: 0.4
+      duration: 0.25 // 사이드바와 동일한 duration으로 맞춤
     }
   },
   open: {
     opacity: 1,
     x: 0,
     transition: {
-      duration: 0.5,
-      delay: 0.1,
+      duration: 0.25, // 사이드바와 완전히 동일한 duration
+      delay: 0, // 지연 제거
       staggerChildren: 0, // 순차 애니메이션 제거
       delayChildren: 0 // 자식 요소 지연 제거
     }
@@ -7026,7 +7009,7 @@ export default function ActivelogPage() {
             left: 0,
             right: 0,
             zIndex: 9999,
-            paddingTop: getAndroidStatusBarHeight(),
+            paddingTop: 0,
             marginTop: 0,
             height: '56px',
           }}
@@ -7488,7 +7471,7 @@ export default function ActivelogPage() {
             initial="closed"
             animate="open"
             exit="closed"
-            className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[9999] flex flex-col"
+            className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[9999] flex flex-col"
             style={{ 
               background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
               borderColor: 'rgba(1, 19, 163, 0.1)',

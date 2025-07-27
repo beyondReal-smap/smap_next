@@ -226,8 +226,7 @@ export const detectLanguage = (): string => {
 // 환경 변수 (Next.js의 환경 변수와 통합)
 export const ENV = {
   NODE_ENV: process.env.NODE_ENV || 'development',
-  API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://118.67.130.71:8000',
-  BACKEND_URL: process.env.BACKEND_URL || 'https://118.67.130.71:8000',
+  API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.smap.site',
 };
 
 export default {

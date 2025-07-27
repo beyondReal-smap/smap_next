@@ -1013,15 +1013,6 @@ function GroupPageContent() {
     return /Android/.test(navigator.userAgent);
   };
 
-  // 안드로이드 상태바 높이 계산
-  const getAndroidStatusBarHeight = () => {
-    if (typeof window !== 'undefined' && isAndroid()) {
-      // 안드로이드 상태바 높이는 보통 24-48px 정도
-      return '24px';
-    }
-    return '0px';
-  };
-
   const isMobile = () => {
     return isIOS() || isAndroid();
   };
@@ -1501,7 +1492,7 @@ function GroupPageContent() {
             variant="simple"
             className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed group-header"
             style={{ 
-              paddingTop: getAndroidStatusBarHeight(),
+              paddingTop: '0px',
               marginTop: '0px',
               top: '0px',
               position: 'fixed'

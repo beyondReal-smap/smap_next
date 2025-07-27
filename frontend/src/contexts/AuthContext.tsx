@@ -22,7 +22,7 @@ const initialState: AuthState = {
   isLoggedIn: false,
   user: null,
   selectedGroup: null,
-  loading: false, // 초기 로딩 상태를 false로 변경
+  loading: true,
   error: null,
   isPreloadingComplete: false,
 };
@@ -128,19 +128,6 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
-  
-  // 전역으로 dispatch 함수 노출 (구글 로그인 후 상태 업데이트용)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      (window as any).__AUTH_CONTEXT_DISPATCH__ = dispatch;
-    }
-    
-    return () => {
-      if (typeof window !== 'undefined') {
-        delete (window as any).__AUTH_CONTEXT_DISPATCH__;
-      }
-    };
-  }, []);
   const [preloadingUsers, setPreloadingUsers] = useState<Set<number>>(new Set()); // 프리로딩 중인 사용자 ID 추적
   
   // DataCache 사용
@@ -273,90 +260,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // 항상 로딩 시작
       dispatch({ type: 'SET_LOADING', payload: true });
       
-      // 타임아웃 설정 (1초 후 강제로 로딩 해제)
-      const timeoutId = setTimeout(() => {
-        console.log('[AUTH CONTEXT] 초기화 타임아웃 - 강제 로딩 해제');
-        if (isMounted) {
-          dispatch({ type: 'SET_LOADING', payload: false });
-        }
-      }, 1000);
-      
       try {
         console.log('[AUTH CONTEXT] 초기 인증 상태 확인 시작');
-
-        // iOS 앱에서 전달된 토큰 확인 (URL 파라미터)
-        let iosToken = null;
-        if (typeof window !== 'undefined') {
-          const urlParams = new URLSearchParams(window.location.search);
-          iosToken = urlParams.get('mt_token_id');
-          
-          if (iosToken) {
-            console.log('[AUTH CONTEXT] iOS 앱에서 전달된 토큰 발견:', iosToken.substring(0, 20) + '...');
-            
-            // iOS 토큰을 로컬 스토리지에 저장
-            localStorage.setItem('auth-token', iosToken);
-            
-            // 위치 정보도 저장
-            const mtLat = urlParams.get('mt_lat');
-            const mtLong = urlParams.get('mt_long');
-            if (mtLat && mtLong) {
-              localStorage.setItem('user-location', JSON.stringify({
-                lat: parseFloat(mtLat),
-                long: parseFloat(mtLong),
-                timestamp: new Date().toISOString()
-              }));
-            }
-          }
-        }
 
         // authService를 통해 토큰과 사용자 데이터를 직접 확인
         const token = authService.getToken();
         const userData = authService.getUserData();
-        
-        // localStorage에서도 사용자 데이터 확인 (구글 로그인 후 저장된 데이터)
-        let localStorageUserData = null;
-        try {
-          const storedUserData = localStorage.getItem('smap_user_data');
-          if (storedUserData) {
-            localStorageUserData = JSON.parse(storedUserData);
-            console.log('[AUTH CONTEXT] localStorage에서 사용자 데이터 발견:', localStorageUserData?.mt_name);
-          }
-        } catch (error) {
-          console.warn('[AUTH CONTEXT] localStorage 사용자 데이터 파싱 실패:', error);
-        }
 
-        if ((token || iosToken) && (userData || localStorageUserData)) {
-          const finalUserData = userData || localStorageUserData;
-          console.log('[AUTH CONTEXT] 유효한 토큰과 사용자 데이터 발견:', finalUserData.mt_name);
+        if (token && userData) {
+          console.log('[AUTH CONTEXT] 유효한 토큰과 사용자 데이터 발견:', userData.mt_name);
           if (isMounted) {
-            dispatch({ type: 'LOGIN_SUCCESS', payload: finalUserData });
+            dispatch({ type: 'LOGIN_SUCCESS', payload: userData });
             // 프리로딩은 백그라운드에서 비동기적으로 실행 (결과를 기다리지 않음)
-            setTimeout(() => {
-              preloadUserData(finalUserData.mt_idx, 'initial-load').catch(error => {
-                console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
-              });
-            }, 100);
-          }
-        } else if (iosToken) {
-          // iOS 토큰은 있지만 사용자 데이터가 없는 경우
-          console.log('[AUTH CONTEXT] iOS 토큰은 있지만 사용자 데이터 없음, 기본 사용자 정보 생성');
-          
-          // 기본 사용자 정보 생성 (iOS 앱에서 전달된 정보 기반)
-          const defaultUserData = {
-            mt_idx: 1186, // 기본 사용자 ID
-            mt_name: 'iOS 사용자',
-            mt_nickname: 'iOS 사용자',
-            mt_email: 'ios@example.com',
-            mt_hp: '',
-            mt_type: 1, // 숫자로 수정
-            mt_wdate: new Date().toISOString(),
-            mt_ldate: new Date().toISOString()
-          };
-          
-          if (isMounted) {
-            dispatch({ type: 'LOGIN_SUCCESS', payload: defaultUserData });
-            // 사용자 데이터를 로컬 스토리지에 저장
-            localStorage.setItem('smap_user_data', JSON.stringify(defaultUserData));
+            preloadUserData(userData.mt_idx, 'initial-load').catch(error => {
+              console.warn('[AUTH] 초기 프리로딩 실패 (무시):', error);
+            });
           }
         } else {
           console.log('[AUTH CONTEXT] 유효한 세션 없음. 로그아웃 상태로 설정.');
@@ -370,9 +288,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           dispatch({ type: 'LOGOUT' }); // 에러 발생 시 안전하게 로그아웃 처리
         }
       } finally {
-        // 타임아웃 정리
-        clearTimeout(timeoutId);
-        
         // 데이터 확인이 끝나면 로딩 상태 해제
         if (isMounted) {
           dispatch({ type: 'SET_LOADING', payload: false });
@@ -385,7 +300,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => {
       isMounted = false;
     };
-  }, []); // 의존성 배열 비움 - 무한 루프 방지
+  }, [preloadUserData]); // preloadUserData를 의존성 배열에 추가
 
   // 로그인
   const login = async (credentials: LoginRequest): Promise<void> => {
