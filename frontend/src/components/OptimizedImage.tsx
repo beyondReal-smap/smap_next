@@ -18,6 +18,7 @@ interface OptimizedImageProps {
   loading?: 'lazy' | 'eager'
   onLoad?: () => void
   onError?: () => void
+  aspectRatio?: number // CLS 방지를 위한 가로세로 비율
 }
 
 export default function OptimizedImage({
@@ -27,14 +28,15 @@ export default function OptimizedImage({
   height,
   className = '',
   priority = false,
-  placeholder = 'empty',
+  placeholder = 'blur',
   blurDataURL,
   sizes,
   fill = false,
-  quality = 80,
+  quality = 85, // 품질 개선
   loading = 'lazy',
   onLoad,
-  onError
+  onError,
+  aspectRatio = 1 // 기본 1:1 비율
 }: OptimizedImageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
@@ -50,18 +52,25 @@ export default function OptimizedImage({
     onError?.()
   }, [onError])
 
-  // 기본 블러 데이터 URL (1x1 투명 픽셀)
-  const defaultBlurDataURL = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyJckliyjqTzSlT54b6bk+h0R//2Q=='
+  // 개선된 블러 데이터 URL (4x4 회색 이미지)
+  const defaultBlurDataURL = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRjNGNEY2Ii8+Cjwvc3ZnPgo='
+
+  // CLS 방지를 위한 컨테이너 스타일
+  const containerStyle = fill ? {} : {
+    width: width || 'auto',
+    height: height || 'auto',
+    aspectRatio: aspectRatio ? `${aspectRatio}` : undefined,
+  }
 
   // 에러 상태일 때 표시할 기본 이미지
   if (hasError) {
     return (
       <div 
-        className={`bg-gray-200 flex items-center justify-center ${className}`}
-        style={{ width, height }}
+        className={`bg-gray-100 flex items-center justify-center rounded ${className}`}
+        style={containerStyle}
       >
         <svg 
-          className="w-8 h-8 text-gray-400" 
+          className="w-6 h-6 text-gray-400" 
           fill="none" 
           stroke="currentColor" 
           viewBox="0 0 24 24"
@@ -78,12 +87,15 @@ export default function OptimizedImage({
   }
 
   return (
-    <div className={`relative ${className}`}>
-      {/* 로딩 스켈레톤 */}
+    <div 
+      className={`relative overflow-hidden ${className}`}
+      style={containerStyle}
+    >
+      {/* 로딩 스켈레톤 - CLS 방지 */}
       {isLoading && (
         <div 
-          className="absolute inset-0 bg-gray-200 animate-pulse rounded"
-          style={{ width, height }}
+          className="absolute inset-0 skeleton rounded"
+          style={containerStyle}
         />
       )}
       
@@ -97,18 +109,18 @@ export default function OptimizedImage({
         priority={priority}
         placeholder={placeholder}
         blurDataURL={blurDataURL || defaultBlurDataURL}
-        sizes={sizes || (fill ? '100vw' : undefined)}
+        sizes={sizes || (fill ? '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw' : undefined)}
         quality={quality}
         loading={loading}
         onLoad={handleLoad}
         onError={handleError}
         className={`transition-opacity duration-300 ${
           isLoading ? 'opacity-0' : 'opacity-100'
-        }`}
-        style={{
+        } ${fill ? 'object-cover' : ''}`}
+        style={fill ? {
           objectFit: 'cover',
           objectPosition: 'center'
-        }}
+        } : undefined}
       />
     </div>
   )

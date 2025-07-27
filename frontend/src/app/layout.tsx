@@ -131,8 +131,25 @@ export default function RootLayout({
         {/* 프리로드 최적화 */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link rel="preload" href="/fonts/LINESeedKR-Rg.woff2" as="font" type="font/woff2" crossOrigin="" />
+        <link rel="preload" href="/fonts/LINESeedKR-Bd.woff2" as="font" type="font/woff2" crossOrigin="" />
         
-        {/* 폰트 프리로드 제거 - CSS에서 필요시 로드되도록 함 */}
+        {/* 성능 최적화 리소스 힌트 */}
+        <link rel="dns-prefetch" href="//nextstep.smap.site" />
+        <link rel="preconnect" href="https://nextstep.smap.site" />
+        
+        {/* Critical CSS inline - LCP 개선 */}
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            html { font-size: 16px; line-height: 1.5; }
+            body { font-family: var(--font-line-seed), -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; }
+            .header-fixed { height: 64px !important; min-height: 64px !important; }
+            .navigation-fixed { height: 80px !important; min-height: 80px !important; }
+            .prevent-layout-shift { contain: layout style paint; will-change: auto; }
+            .skeleton { background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; }
+            @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+          `
+        }} />
         
         {/* 전역 에러 핸들러 (가장 먼저 로드) */}
         <script src="/error-handler.js" async></script>

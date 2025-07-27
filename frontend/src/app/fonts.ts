@@ -17,7 +17,7 @@ import localFont from 'next/font/local';
 //   variable: '--font-paperlogy',
 // });
 
-// 기존 LINE SEED 폰트 정의 활성화 (최적화)
+// 기존 LINE SEED 폰트 정의 활성화 (CLS 최적화)
 export const lineSeed = localFont({
   src: [
     {
@@ -34,6 +34,8 @@ export const lineSeed = localFont({
   variable: '--font-line-seed',
   display: 'swap', // 폰트 로딩 최적화
   preload: true, // 명시적으로 preload 활성화
+  fallback: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'], // CLS 방지
+  adjustFontFallback: false, // 자동 폴백 조정 비활성화로 CLS 방지
 });
 
 // 시스템 폰트 대신 lineSeed 폰트 사용

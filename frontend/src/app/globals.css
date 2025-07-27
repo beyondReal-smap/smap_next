@@ -2151,7 +2151,7 @@ body[data-page="/setting/terms"] .setting-header-content.motion-div {
   will-change: transform !important;
 }
 
-/* setting/terms의 motion-div 애니메이션 허용 */
+/* setting/terms에서 motion-div 애니메이션 허용 */
 /* body[data-page="/setting/terms"] .motion-div {
   transform: none !important;
   -webkit-transform: none !important;
@@ -3530,4 +3530,137 @@ body[data-page="/setting/terms"] [data-framer-motion] {
   will-change: transform !important;
   transform: unset !important;
   -webkit-transform: unset !important;
+}
+
+/* CLS(Cumulative Layout Shift) 최적화 */
+/* 이미지와 컨텐츠 영역의 고정 크기 보장 */
+.prevent-layout-shift {
+  contain: layout style paint;
+  will-change: auto;
+}
+
+/* 이미지 컨테이너 고정 크기 */
+.image-container {
+  position: relative;
+  overflow: hidden;
+  contain: layout;
+}
+
+.image-container::before {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 0;
+  padding-bottom: 100%; /* 1:1 비율 */
+}
+
+.image-container img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 아바타 이미지 고정 크기 */
+.avatar-container {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  contain: layout;
+}
+
+.avatar-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* 스켈레톤 로딩 스타일 */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* 고정 헤더 크기 보장 */
+.header-fixed {
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+}
+
+/* 하단 네비게이션 고정 크기 */
+.navigation-fixed {
+  height: 80px !important;
+  min-height: 80px !important;
+  max-height: 80px !important;
+}
+
+/* 콘텐츠 영역 안정적 높이 */
+.content-area {
+  min-height: calc(100vh - 144px); /* 헤더(64px) + 네비게이션(80px) */
+  contain: layout;
+}
+
+/* 리스트 아이템 고정 높이 */
+.list-item {
+  min-height: 72px;
+  contain: layout;
+}
+
+/* 카드 컴포넌트 고정 크기 */
+.card-component {
+  contain: layout style;
+  will-change: auto;
+}
+
+/* 버튼 고정 크기 */
+.button-fixed {
+  min-height: 44px;
+  contain: layout;
+}
+
+/* 폰트 로딩 최적화 - CLS 방지 */
+@font-face {
+  font-family: 'lineSeed';
+  src: url('/fonts/LINESeedKR-Rg.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 100%;
+}
+
+@font-face {
+  font-family: 'lineSeed';
+  src: url('/fonts/LINESeedKR-Bd.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+  size-adjust: 100%;
+}
+
+/* 기본 폰트 크기 고정으로 CLS 방지 */
+html {
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+body {
+  font-family: 'lineSeed', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
 }

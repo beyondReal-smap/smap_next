@@ -7,7 +7,25 @@ const nextConfig = {
   experimental: {
     optimizeCss: true,
     scrollRestoration: true,
-    optimizePackageImports: ['framer-motion'],
+    optimizePackageImports: ['framer-motion', '@heroicons/react', 'react-icons'],
+    turbo: {
+      rules: {
+        '*.svg': {
+          loaders: ['@svgr/webpack'],
+          as: '*.js',
+        },
+      },
+    },
+  },
+
+  // 컴파일러 최적화
+  compiler: {
+    // CSS 최적화
+    styledComponents: false,
+    // 번들 크기 최적화
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn']
+    } : false,
   },
   
   // 폰트 최적화는 기본으로 활성화되어 있음
@@ -20,7 +38,7 @@ const nextConfig = {
     },
   }),
   
-  // 이미지 최적화 (기본 설정)
+  // 이미지 최적화 개선
   images: {
     remotePatterns: [
       {
@@ -34,7 +52,11 @@ const nextConfig = {
         hostname: '**',
       }
     ],
-    unoptimized: true,
+    unoptimized: false, // 이미지 최적화 활성화
+    formats: ['image/webp', 'image/avif'], // 모던 이미지 포맷 사용
+    minimumCacheTTL: 60 * 60 * 24 * 365, // 1년 캐시
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     domains: [
       'localhost',
       'nextstep.smap.site', 
