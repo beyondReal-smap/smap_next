@@ -2,9 +2,21 @@
 
 import { useEffect, useState } from 'react';
 
+interface ApiTestResult {
+  endpoint: string;
+  method: string;
+  status: 'pending' | 'success' | 'error';
+  statusCode?: number;
+  data?: any;
+  error?: string;
+  responseTime?: number;
+}
+
 export default function TestDebugPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [count, setCount] = useState(0);
+  const [apiResults, setApiResults] = useState<ApiTestResult[]>([]);
+  const [isTestingAPIs, setIsTestingAPIs] = useState(false);
 
   // 로그를 화면과 콘솔 양쪽에 출력하는 함수
   const addLog = (message: string) => {
@@ -27,6 +39,88 @@ export default function TestDebugPage() {
     setLogs(prev => [...prev, logMessage]);
   };
 
+  // API 테스트 함수
+  const testAPI = async (endpoint: string, method: string = 'GET', body?: any): Promise<ApiTestResult> => {
+    const startTime = Date.now();
+    const result: ApiTestResult = {
+      endpoint,
+      method,
+      status: 'pending'
+    };
+
+    try {
+      addLog(`API 테스트 시작: ${method} ${endpoint}`);
+      
+      const options: RequestInit = {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      };
+
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(endpoint, options);
+      const responseTime = Date.now() - startTime;
+      
+      result.statusCode = response.status;
+      result.responseTime = responseTime;
+
+      if (response.ok) {
+        const data = await response.json();
+        result.status = 'success';
+        result.data = data;
+        addLog(`✅ API 성공: ${endpoint} (${response.status}) - ${responseTime}ms`);
+      } else {
+        result.status = 'error';
+        const errorText = await response.text();
+        result.error = `HTTP ${response.status}: ${errorText}`;
+        addLog(`❌ API 실패: ${endpoint} (${response.status}) - ${errorText}`);
+      }
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      result.status = 'error';
+      result.responseTime = responseTime;
+      result.error = error instanceof Error ? error.message : String(error);
+      addLog(`💥 API 오류: ${endpoint} - ${result.error}`);
+    }
+
+    return result;
+  };
+
+  // 전체 API 테스트 실행
+  const runAPITests = async () => {
+    setIsTestingAPIs(true);
+    setApiResults([]);
+    addLog('=== API 테스트 시작 ===');
+
+    const apiEndpoints = [
+      { endpoint: '/api/auth', method: 'GET' },
+      { endpoint: '/api/v1/test', method: 'GET' },
+      { endpoint: '/api/test-backend', method: 'GET' },
+      { endpoint: '/api/groups', method: 'GET' },
+      { endpoint: '/api/members', method: 'GET' },
+      { endpoint: '/api/orders', method: 'GET' },
+      { endpoint: '/api/kakao-search', method: 'GET' },
+    ];
+
+    const results: ApiTestResult[] = [];
+
+    for (const api of apiEndpoints) {
+      const result = await testAPI(api.endpoint, api.method);
+      results.push(result);
+      setApiResults([...results]); // 실시간 업데이트
+      
+      // 각 API 테스트 간 짧은 지연
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    addLog('=== API 테스트 완료 ===');
+    setIsTestingAPIs(false);
+  };
+
   useEffect(() => {
     addLog('페이지 로드됨! URL: ' + window.location.href);
     
@@ -35,7 +129,6 @@ export default function TestDebugPage() {
       addLog('iOS Bridge 테스트 시작');
       
       if (typeof window !== 'undefined') {
-        // 전역 테스트 함수들 호출
         try {
           if ((window as any).TEST_ENV) {
             addLog('TEST_ENV 함수 호출');
@@ -66,16 +159,22 @@ export default function TestDebugPage() {
     // 1초 후에 iOS Bridge 테스트
     setTimeout(testIOSBridge, 1000);
     
-    // 1초마다 로그 출력 (10번)
+    // 3초 후에 자동으로 API 테스트 시작
+    setTimeout(() => {
+      addLog('자동 API 테스트 시작...');
+      runAPITests();
+    }, 3000);
+    
+    // 1초마다 로그 출력 (5번만)
     let intervalCount = 0;
     const interval = setInterval(() => {
       intervalCount++;
       setCount(intervalCount);
       addLog(`${intervalCount}번째 반복 로그 - 카운트: ${intervalCount}`);
       
-      if (intervalCount >= 10) {
+      if (intervalCount >= 5) {
         clearInterval(interval);
-        addLog('로그 출력 완료!');
+        addLog('반복 로그 출력 완료!');
       }
     }, 1000);
 
@@ -85,12 +184,30 @@ export default function TestDebugPage() {
     };
   }, []);
 
+  const getStatusColor = (status: ApiTestResult['status']) => {
+    switch (status) {
+      case 'success': return '#00ff00';
+      case 'error': return '#ff0000';
+      case 'pending': return '#ffff00';
+      default: return '#ffffff';
+    }
+  };
+
+  const getStatusIcon = (status: ApiTestResult['status']) => {
+    switch (status) {
+      case 'success': return '✅';
+      case 'error': return '❌';
+      case 'pending': return '⏳';
+      default: return '⚪';
+    }
+  };
+
   return (
     <div style={{ 
       padding: '20px', 
       backgroundColor: '#ff0000', 
       color: 'white', 
-      fontSize: '16px',
+      fontSize: '14px',
       minHeight: '100vh',
       fontFamily: 'monospace'
     }}>
@@ -103,6 +220,72 @@ export default function TestDebugPage() {
         <p>⏰ 페이지 로드 시간: {new Date().toLocaleTimeString()}</p>
       </div>
 
+      {/* API 테스트 섹션 */}
+      <div style={{ 
+        backgroundColor: 'rgba(0,0,0,0.4)', 
+        padding: '15px', 
+        borderRadius: '8px',
+        marginBottom: '20px'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+          <h3>🔌 API 연결 테스트</h3>
+          <button 
+            onClick={runAPITests}
+            disabled={isTestingAPIs}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: isTestingAPIs ? '#666' : '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: isTestingAPIs ? 'not-allowed' : 'pointer',
+              fontSize: '12px'
+            }}
+          >
+            {isTestingAPIs ? '테스트 중...' : 'API 테스트 다시 실행'}
+          </button>
+        </div>
+        
+        {apiResults.length > 0 && (
+          <div style={{ marginBottom: '15px' }}>
+            {apiResults.map((result, index) => (
+              <div key={index} style={{ 
+                marginBottom: '8px',
+                padding: '8px',
+                backgroundColor: 'rgba(255,255,255,0.1)',
+                borderRadius: '4px',
+                fontSize: '12px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>
+                    {getStatusIcon(result.status)} {result.method} {result.endpoint}
+                  </span>
+                  <span style={{ color: getStatusColor(result.status) }}>
+                    {result.statusCode ? `${result.statusCode}` : ''} 
+                    {result.responseTime ? ` (${result.responseTime}ms)` : ''}
+                  </span>
+                </div>
+                {result.error && (
+                  <div style={{ marginTop: '4px', color: '#ffaaaa', fontSize: '10px' }}>
+                    오류: {result.error}
+                  </div>
+                )}
+                {result.data && (
+                  <div style={{ marginTop: '4px', color: '#aaffaa', fontSize: '10px', maxHeight: '100px', overflow: 'auto' }}>
+                    응답: {JSON.stringify(result.data, null, 2)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div style={{ fontSize: '12px', color: '#cccccc' }}>
+          {isTestingAPIs ? '⏳ API 테스트 진행 중...' : `📊 총 ${apiResults.length}개 API 테스트 완료`}
+        </div>
+      </div>
+
+      {/* 로그 섹션 */}
       <div style={{ 
         backgroundColor: 'rgba(0,0,0,0.3)', 
         padding: '10px', 
