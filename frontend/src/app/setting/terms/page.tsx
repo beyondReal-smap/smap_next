@@ -376,7 +376,16 @@ const CONSENT_HISTORY: ConsentHistory[] = [
 
 export default function TermsPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading, isLoggedIn, error: authError } = useAuth();
+  
+  // 디버깅용 로그 추가
+  console.log('[TERMS PAGE] 렌더링:', {
+    hasUser: !!user,
+    authLoading,
+    isLoggedIn,
+    authError,
+    timestamp: new Date().toISOString()
+  });
 
   const [terms, setTerms] = useState(TERMS_DATA);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -385,6 +394,16 @@ export default function TermsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingConsents, setIsLoadingConsents] = useState(true);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+
+  // 토큰 및 인증 상태 디버깅
+  useEffect(() => {
+    console.log('[TERMS DEBUG] 토큰 및 localStorage 상태 확인:', {
+      token: localStorage.getItem('auth-token') ? '토큰 있음' : '토큰 없음',
+      userData: localStorage.getItem('smap_user_data') ? '사용자 데이터 있음' : '사용자 데이터 없음',
+      currentURL: window.location.href,
+      timestamp: new Date().toISOString()
+    });
+  }, []);
 
   // body에 data-page 속성 추가 및 스크롤 스타일 제어
   useEffect(() => {
@@ -417,9 +436,21 @@ export default function TermsPage() {
 
   // 사용자 동의 정보 로드
   useEffect(() => {
+    console.log('[TERMS DEBUG] useEffect 실행됨:', {
+      hasUser: !!user,
+      userInfo: user ? {
+        mt_idx: user.mt_idx,
+        mt_name: user.mt_name,
+        mt_email: user.mt_email
+      } : null,
+      timestamp: new Date().toISOString()
+    });
+    
     if (user) {
+      console.log('[TERMS DEBUG] 사용자 정보 있음, loadUserConsents 호출');
       loadUserConsents();
     } else {
+      console.log('[TERMS DEBUG] 사용자 정보 없음, 로딩 상태 false로 설정');
       setIsLoadingConsents(false);
     }
   }, [user]);
