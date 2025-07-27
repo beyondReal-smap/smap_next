@@ -17,6 +17,17 @@ export default function TestDebugPage() {
   const [count, setCount] = useState(0);
   const [apiResults, setApiResults] = useState<ApiTestResult[]>([]);
   const [isTestingAPIs, setIsTestingAPIs] = useState(false);
+  const [authInfo, setAuthInfo] = useState<{
+    hasToken: boolean;
+    tokenPreview: string;
+    userId: string;
+    userInfo: any;
+  }>({
+    hasToken: false,
+    tokenPreview: '',
+    userId: '',
+    userInfo: null
+  });
 
   // 로그를 화면과 콘솔 양쪽에 출력하는 함수
   const addLog = (message: string) => {
@@ -51,11 +62,24 @@ export default function TestDebugPage() {
     try {
       addLog(`API 테스트 시작: ${method} ${endpoint}`);
       
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      // 인증이 필요한 API들에 자동으로 토큰 추가
+      if (endpoint.includes('/v1/members/') || endpoint.includes('/v1/groups/') || endpoint.includes('/v1/notices/')) {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+          addLog(`🔑 토큰 추가됨: ${endpoint}`);
+        } else {
+          addLog(`⚠️ 토큰 없음: ${endpoint} (인증 필요한 API)`);
+        }
+      }
+
       const options: RequestInit = {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        }
+        headers
       };
 
       if (body) {
@@ -73,6 +97,11 @@ export default function TestDebugPage() {
         result.status = 'success';
         result.data = data;
         addLog(`✅ API 성공: ${endpoint} (${response.status}) - ${responseTime}ms`);
+        
+        // 성공 응답의 주요 정보 로깅
+        if (data.success !== undefined) {
+          addLog(`📊 응답 상태: ${data.success ? '성공' : '실패'} - ${data.message || '메시지 없음'}`);
+        }
       } else {
         result.status = 'error';
         const errorText = await response.text();
@@ -100,10 +129,12 @@ export default function TestDebugPage() {
       { endpoint: '/api/auth', method: 'GET' },
       { endpoint: '/api/v1/test', method: 'GET' },
       { endpoint: '/api/test-backend', method: 'GET' },
+      { endpoint: '/api/v1/members/profile', method: 'GET' },
+      { endpoint: '/api/v1/members/consent/1186', method: 'GET' },
+      { endpoint: '/api/v1/groups/member/1186', method: 'GET' },
+      { endpoint: '/api/v1/notices', method: 'GET' },
       { endpoint: '/api/groups', method: 'GET' },
       { endpoint: '/api/members', method: 'GET' },
-      { endpoint: '/api/orders', method: 'GET' },
-      { endpoint: '/api/kakao-search', method: 'GET' },
     ];
 
     const results: ApiTestResult[] = [];
@@ -121,8 +152,29 @@ export default function TestDebugPage() {
     setIsTestingAPIs(false);
   };
 
+  // 인증 정보 확인 함수
+  const checkAuthInfo = () => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      const userId = localStorage.getItem('user_id');
+      const userInfo = localStorage.getItem('user_info');
+      
+      setAuthInfo({
+        hasToken: !!token,
+        tokenPreview: token ? `${token.substring(0, 20)}...` : '',
+        userId: userId || '',
+        userInfo: userInfo ? JSON.parse(userInfo) : null
+      });
+
+      addLog(`🔐 인증 정보 확인: 토큰=${!!token}, 사용자ID=${userId || '없음'}`);
+    }
+  };
+
   useEffect(() => {
     addLog('페이지 로드됨! URL: ' + window.location.href);
+    
+    // 초기 인증 정보 확인
+    checkAuthInfo();
     
     // iOS Bridge 함수들 테스트
     const testIOSBridge = () => {
@@ -159,10 +211,11 @@ export default function TestDebugPage() {
     // 1초 후에 iOS Bridge 테스트
     setTimeout(testIOSBridge, 1000);
     
-    // 3초 후에 자동으로 API 테스트 시작
+    // 3초 후에 인증 정보 재확인 후 API 테스트 시작
     setTimeout(() => {
       addLog('자동 API 테스트 시작...');
-      runAPITests();
+      checkAuthInfo(); // 인증 정보 재확인
+      setTimeout(() => runAPITests(), 500); // 0.5초 후에 API 테스트 시작
     }, 3000);
     
     // 1초마다 로그 출력 (5번만)
@@ -218,6 +271,39 @@ export default function TestDebugPage() {
         <p>📱 현재 카운트: {count}</p>
         <p>🌐 URL: {typeof window !== 'undefined' ? window.location.href : 'Server'}</p>
         <p>⏰ 페이지 로드 시간: {new Date().toLocaleTimeString()}</p>
+      </div>
+
+      {/* 인증 정보 섹션 */}
+      <div style={{ 
+        backgroundColor: 'rgba(0,0,0,0.4)', 
+        padding: '15px', 
+        borderRadius: '8px',
+        marginBottom: '20px'
+      }}>
+        <h3>🔑 인증 정보</h3>
+        <p>토큰 존재: {authInfo.hasToken ? '예' : '아니오'}</p>
+        <p>토큰 미리보기: {authInfo.tokenPreview}</p>
+        <p>사용자 ID: {authInfo.userId || '없음'}</p>
+        {authInfo.userInfo && (
+          <div style={{ marginTop: '10px', fontSize: '12px', color: '#aaffaa' }}>
+            사용자 정보: {JSON.stringify(authInfo.userInfo, null, 2)}
+          </div>
+        )}
+        <button 
+          onClick={checkAuthInfo}
+          style={{
+            marginTop: '10px',
+            padding: '8px 16px',
+            backgroundColor: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px'
+          }}
+        >
+          인증 정보 확인
+        </button>
       </div>
 
       {/* API 테스트 섹션 */}
