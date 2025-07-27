@@ -378,6 +378,13 @@ export default function TermsPage() {
   const router = useRouter();
   const { user, loading: authLoading, isLoggedIn, error: authError } = useAuth();
   
+  // 즉시 실행되는 초기 상태 확인
+  console.log('[TERMS API] 🚀 페이지 초기화 시작:', {
+    timestamp: new Date().toISOString(),
+    url: typeof window !== 'undefined' ? window.location.href : 'Server',
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 100) + '...' : 'Server'
+  });
+
   const [terms, setTerms] = useState(TERMS_DATA);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [selectedTerm, setSelectedTerm] = useState<Term | null>(null);
@@ -421,6 +428,88 @@ export default function TermsPage() {
         timestamp: new Date().toISOString()
       }
     });
+
+    // 전역 디버깅 함수 등록
+    if (typeof window !== 'undefined') {
+      (window as any).TERMS_DEBUG = {
+        // 현재 상태 확인
+        checkStatus: () => {
+          console.log('[TERMS DEBUG] 📊 현재 상태 종합:', {
+            user: user ? {
+              mt_idx: user.mt_idx,
+              mt_name: user.mt_name,
+              mt_email: user.mt_email
+            } : 'No user',
+            tokens: {
+              authToken: localStorage.getItem('auth-token') ? 'EXISTS' : 'MISSING',
+              token: localStorage.getItem('token') ? 'EXISTS' : 'MISSING',
+              userData: localStorage.getItem('smap_user_data') ? 'EXISTS' : 'MISSING'
+            },
+            authContext: { authLoading, isLoggedIn, hasError: !!authError },
+            terms: {
+              total: terms.length,
+              consented: terms.filter(t => t.isConsented).length,
+              loading: isLoadingConsents
+            }
+          });
+        },
+        
+        // 수동으로 동의 정보 로드 테스트
+        testLoadConsents: async () => {
+          console.log('[TERMS DEBUG] 🧪 수동 동의 정보 로드 테스트 시작');
+          if (!user?.mt_idx) {
+            console.error('[TERMS DEBUG] ❌ 사용자 정보 없음');
+            return;
+          }
+          try {
+            await loadUserConsents();
+            console.log('[TERMS DEBUG] ✅ 수동 테스트 완료');
+          } catch (error) {
+            console.error('[TERMS DEBUG] ❌ 수동 테스트 실패:', error);
+          }
+        },
+
+        // API 직접 테스트
+        testDirectAPI: async (userId?: number) => {
+          const targetUserId = userId || user?.mt_idx || 1186; // 기본값 1186
+          console.log('[TERMS DEBUG] 🎯 직접 API 호출 테스트:', targetUserId);
+          
+          try {
+            const response = await fetch(`/api/v1/members/consent/${targetUserId}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth-token') || localStorage.getItem('token')}`
+              }
+            });
+            
+            console.log('[TERMS DEBUG] 📡 직접 API 응답:', {
+              status: response.status,
+              statusText: response.statusText,
+              headers: Object.fromEntries(response.headers.entries())
+            });
+            
+            const data = await response.json();
+            console.log('[TERMS DEBUG] 📄 응답 데이터:', data);
+            return data;
+          } catch (error) {
+            console.error('[TERMS DEBUG] 💥 직접 API 오류:', error);
+          }
+        },
+
+        // 강제 리로드
+        forceReload: () => {
+          console.log('[TERMS DEBUG] 🔄 강제 페이지 리로드');
+          window.location.reload();
+        }
+      };
+
+      console.log('[TERMS DEBUG] 🛠️ 전역 디버깅 함수 등록 완료:');
+      console.log('  - TERMS_DEBUG.checkStatus() - 현재 상태 확인');
+      console.log('  - TERMS_DEBUG.testLoadConsents() - 동의 정보 로드 테스트');
+      console.log('  - TERMS_DEBUG.testDirectAPI(userId?) - 직접 API 호출');
+      console.log('  - TERMS_DEBUG.forceReload() - 강제 페이지 리로드');
+    }
   }, [user, terms, isLoadingConsents, isLoading, showPreviewModal, showConsentModal, showSuccessToast, selectedTerm, authLoading, isLoggedIn, authError]);
 
   // 토큰 및 인증 상태 디버깅
