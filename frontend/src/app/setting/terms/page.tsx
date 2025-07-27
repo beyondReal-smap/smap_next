@@ -98,6 +98,53 @@ html, body {
     transform: scale(0.95);
     opacity: 0;
   }
+}
+
+/* 모달 전체 화면 스타일 - 최고 우선순위 */
+.modal-full-screen {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  margin: 0 !important;
+  padding: 24px !important;
+  padding-bottom: 32px !important;
+  position: relative !important;
+  z-index: 9999 !important;
+  box-sizing: border-box !important;
+  border-radius: 12px 12px 0 0 !important;
+  overflow-y: auto !important;
+  background: white !important;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* 모달 컨테이너 스타일 오버라이드 */
+.modal-full-screen * {
+  max-width: none !important;
+  width: auto !important;
+}
+
+/* container-mobile 클래스 오버라이드 */
+.modal-full-screen.container-mobile {
+  max-width: 100vw !important;
+  width: 100vw !important;
+}
+
+/* 모달 강제 전체화면 스타일 */
+.modal-force-fullscreen {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  height: 100vh !important;
+  width: 100vw !important;
+  max-width: none !important;
+  max-height: none !important;
+  transform: none !important;
+  will-change: auto !important;
+  z-index: 10000 !important;
+}
   to {
     transform: scale(1);
     opacity: 1;
@@ -407,6 +454,13 @@ export default function TermsPage() {
     }
   }, [user]);
 
+  // 컴포넌트 언마운트 시 body overflow 정리
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, []);
+
   // 사용자의 동의 정보를 로드하는 함수
   const loadUserConsents = async () => {
     if (!user?.mt_idx) {
@@ -503,6 +557,16 @@ export default function TermsPage() {
     });
     setSelectedTerm(term);
     setShowPreviewModal(true);
+    // 모달 열릴 때 body overflow 제어
+    document.body.style.overflow = 'hidden';
+  };
+
+  // 모달 닫기
+  const handleCloseModal = () => {
+    setShowPreviewModal(false);
+    setSelectedTerm(null);
+    // 모달 닫힐 때 body overflow 복원
+    document.body.style.overflow = 'auto';
   };
 
   // 동의 상태 변경
@@ -766,14 +830,52 @@ export default function TermsPage() {
         {/* 약관 미리보기 모달 */}
         {showPreviewModal && selectedTerm && (
           <div 
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
-            onClick={() => setShowPreviewModal(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backdropFilter: 'blur(4px)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'center'
+            }}
+            onClick={handleCloseModal}
           >
-            <div 
-              className="w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 shadow-2xl animate-slideInFromBottom max-h-[80vh] overflow-y-auto"
+            <motion.div 
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ 
+                type: 'spring',
+                damping: 25,
+                stiffness: 300,
+                duration: 0.4
+              }}
+              style={{
+                position: 'absolute',
+                top: 0,
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '100vh',
+                width: '100vw',
+                backgroundColor: 'white',
+                borderRadius: '12px 12px 0 0',
+                boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.15)',
+                overflowY: 'auto',
+                padding: '24px',
+                paddingBottom: '32px',
+                zIndex: 10000,
+                maxWidth: 'none',
+                maxHeight: 'none'
+              }}
               onClick={e => e.stopPropagation()}
             >
-              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
+                              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6 cursor-grab active:cursor-grabbing"></div>
               
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -819,13 +921,13 @@ export default function TermsPage() {
                 </button>
                 
                 <button
-                  onClick={() => setShowPreviewModal(false)}
+                  onClick={handleCloseModal}
                   className="w-full py-4 rounded-2xl bg-gray-100 text-gray-700 font-medium mobile-button"
                 >
                   닫기
                 </button>
               </div>
-            </div>
+            </motion.div>
           </div>
         )}
       </div>
