@@ -10,7 +10,8 @@ const publicPaths = [
   '/social-login',
   '/',
   '/group',
-  '/auth'  // iOS 앱 인증 경로 추가
+  '/auth',  // iOS 앱 인증 경로 추가
+  '/setting'  // 설정 페이지들은 클라이언트사이드에서 인증 처리
 ];
 
 // 그룹 가입 페이지 패턴 (정규표현식)
