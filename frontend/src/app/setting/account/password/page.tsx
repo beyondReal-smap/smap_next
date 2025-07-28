@@ -17,6 +17,7 @@ import {
 import { HiCheckCircle } from 'react-icons/hi2';
 import { AlertModal } from '@/components/ui';
 import AnimatedHeader from '../../../../components/common/AnimatedHeader';
+import { triggerHapticFeedback, HapticFeedbackType } from '@/utils/haptic';
 
 // 비밀번호 강도 검사 함수
 const checkPasswordStrength = (password: string) => {
@@ -119,6 +120,11 @@ export default function PasswordChangePage() {
 
   // 뒤로가기 핸들러
   const handleBack = () => {
+    // 🎮 뒤로가기 햅틱 피드백
+    triggerHapticFeedback(HapticFeedbackType.SELECTION, '비밀번호 변경 뒤로가기', { 
+      component: 'password-setting', 
+      action: 'back-navigation' 
+    });
     router.push('/setting/account');
   };
 
@@ -216,7 +222,131 @@ export default function PasswordChangePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+    <>
+      <style jsx global>{`
+        html, body {
+          width: 100%;
+          overflow-x: hidden;
+          position: relative;
+          /* iOS WebView 최적화 */
+          -webkit-text-size-adjust: 100%;
+          -webkit-overflow-scrolling: touch;
+          /* iOS safe-area 완전 무시 */
+          padding-top: 0px !important;
+          margin-top: 0px !important;
+        }
+
+        /* iOS 전용 스타일 */
+        @supports (-webkit-touch-callout: none) {
+          html, body {
+            position: fixed !important;
+            width: 100% !important;
+            height: 100% !important;
+            overflow: hidden !important;
+          }
+          
+          #__next {
+            height: 100% !important;
+            overflow: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          
+          #setting-page-container {
+            height: 100vh !important;
+            height: -webkit-fill-available !important;
+            overflow: hidden !important;
+          }
+          
+          .content-area {
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          
+          /* iOS 헤더 강제 표시 */
+          header, .glass-effect, .header-fixed, .setting-header {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 999999 !important;
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            transform: translateZ(0) translateY(0) !important;
+            will-change: transform !important;
+            background: rgba(255, 255, 255, 0.98) !important;
+            backdrop-filter: blur(10px) !important;
+            -webkit-backdrop-filter: blur(10px) !important;
+            height: 56px !important;
+            min-height: 56px !important;
+            max-height: 56px !important;
+            width: 100% !important;
+            margin: 0 !important;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+          }
+          
+          /* iOS 헤더 내부 요소 */
+          header *, .setting-header * {
+            pointer-events: auto !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+          }
+        }
+
+        /* 비밀번호 페이지에서 네비게이션 바 완전 제거 */
+        body[data-page="/setting"] #bottom-navigation-bar,
+        body[data-page*="/setting"] #bottom-navigation-bar,
+        html[data-page="/setting"] #bottom-navigation-bar,
+        html[data-page*="/setting"] #bottom-navigation-bar {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          position: absolute !important;
+          bottom: -100px !important;
+          z-index: -1 !important;
+        }
+        
+        /* 비밀번호 페이지에서 네비게이션 바 관련 여백 제거 */
+        body[data-page="/setting"] .pb-24,
+        body[data-page*="/setting"] .pb-24,
+        body[data-page="/setting"] .pb-20,
+        body[data-page*="/setting"] .pb-20 {
+          padding-bottom: 0 !important;
+        }
+        
+        /* 스크롤바 숨기기 */
+        body, html {
+          overflow-x: hidden !important;
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+        
+        body::-webkit-scrollbar,
+        html::-webkit-scrollbar {
+          display: none !important;
+        }
+        
+        /* 모든 스크롤 가능한 요소에서 스크롤바 숨기기 */
+        * {
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+        
+        *::-webkit-scrollbar {
+          display: none !important;
+        }
+        
+        /* 헤더 고정 스타일 */
+        .setting-header {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          z-index: 999999 !important;
+        }
+      `}</style>
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50" data-page="/setting/account/password">
       {/* 통일된 헤더 애니메이션 */}
       <AnimatedHeader 
         variant="simple"
@@ -570,5 +700,6 @@ export default function PasswordChangePage() {
         type="success"
       />
     </div>
+    </>
   );
 } 
