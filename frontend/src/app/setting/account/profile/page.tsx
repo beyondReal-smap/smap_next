@@ -180,7 +180,7 @@ export default function ProfilePage() {
 
   // 뒤로가기 핸들러
   const handleBack = () => {
-    router.back();
+    router.push('/setting/account');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -97,7 +97,7 @@ export default function NoticePage() {
 
   const handleBack = () => {
     triggerHapticFeedback(HapticFeedbackType.SELECTION);
-    router.back();
+    router.push('/setting');
   };
 
   return (

@@ -75,7 +75,7 @@ export default function WithdrawPage() {
 
   // 뒤로가기 핸들러 - password 페이지와 동일
   const handleBack = () => {
-    router.back();
+    router.push('/setting/account');
   };
 
   const handleBackNavigation = () => {
@@ -84,7 +84,7 @@ export default function WithdrawPage() {
       setCurrentStep(currentStep - 1);
       setError('');
     } else {
-      router.back();
+      router.push('/setting/account');
     }
   };
 
@@ -347,36 +347,70 @@ export default function WithdrawPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-orange-50" data-page="/setting/account/withdraw">
       {/* 통일된 헤더 애니메이션 */}
       <AnimatedHeader 
-        variant="enhanced"
-        className="setting-header"
+        variant="simple"
+        className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed setting-header"
+        style={{ 
+          paddingTop: '0px',
+          marginTop: '0px',
+          top: '0px',
+          position: 'fixed',
+          zIndex: 2147483647,
+          height: '62px',
+          minHeight: '62px',
+          maxHeight: '62px',
+          width: '100vw',
+          left: '0px',
+          right: '0px',
+          backgroundColor: 'rgba(255, 255, 255, 0.98)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
+          boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          transform: 'translateZ(0)',
+          WebkitTransform: 'translateZ(0)',
+          willChange: 'transform',
+          visibility: 'visible',
+          opacity: 1,
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          touchAction: 'manipulation',
+          pointerEvents: 'auto',
+          overflow: 'visible',
+          clip: 'auto',
+          clipPath: 'none',
+          WebkitClipPath: 'none'
+        }}
       >
-                  <motion.div 
+        <div className="flex items-center justify-between h-14" style={{ paddingLeft: '0px', paddingRight: '16px' }}>
+          <motion.div 
             initial={{ opacity: 0, x: -40 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="setting-header-content motion-div"
+            className="flex items-center space-x-3"
           >
-          <motion.button 
-            onClick={handleBackNavigation}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-            className="setting-back-button"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </motion.button>
-          <div className="setting-header-text">
-            <h1 className="text-lg font-bold text-gray-900 leading-tight">회원탈퇴</h1>
-            <p className="text-xs text-gray-500 leading-tight">신중하게 결정해주세요</p>
-          </div>
-        </motion.div>
+            <motion.button 
+              onClick={handleBackNavigation}
+              className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </motion.button>
+            <div className="flex items-center space-x-3">
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">회원탈퇴</h1>
+                <p className="text-xs text-gray-500">신중하게 결정해주세요</p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </AnimatedHeader>
 
       {/* 스크롤 가능한 메인 컨텐츠 */}

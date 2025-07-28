@@ -445,7 +445,7 @@ export default function AccountSettingsPage() {
       component: 'account-setting', 
       action: 'back-navigation' 
     });
-    router.back();
+    router.push('/setting');
   };
 
   // 메뉴 아이템 클릭 핸들러

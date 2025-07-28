@@ -150,7 +150,7 @@ export default function InquiryPage() {
       component: 'inquiry', 
       action: 'back-navigation' 
     });
-    router.back();
+    router.push('/setting');
   };
 
   // 이메일 형식 검증 함수

@@ -302,7 +302,7 @@ export default function PurchasePage() {
       component: 'purchase', 
       action: 'back-navigation' 
     });
-    router.back();
+    router.push('/setting');
   };
 
   // 주문 상태별 필터링

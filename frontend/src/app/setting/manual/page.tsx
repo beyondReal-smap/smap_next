@@ -136,7 +136,7 @@ export default function ManualPage() {
       component: 'manual', 
       action: 'back-navigation' 
     });
-    router.back();
+    router.push('/setting');
   };
 
   return (
