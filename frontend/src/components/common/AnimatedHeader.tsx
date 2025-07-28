@@ -10,14 +10,14 @@ interface AnimatedHeaderProps {
   duration?: number;
 }
 
-// iOS WebView 완벽 호환 고정 헤더 (애니메이션 포함)
+// iOS WebView 완벽 호환 고정 헤더 (애니메이션 제거로 깜빡임 방지)
 const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
   children,
   className = 'glass-effect header-fixed',
   style = {},
   variant = 'simple',
   delay = 0,
-  duration = 0.6
+  duration = 0
 }) => {
   // iOS 감지
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -41,7 +41,9 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
     willChange: 'auto',
     WebkitBackfaceVisibility: 'hidden',
     backfaceVisibility: 'hidden',
-    // 애니메이션을 위해 opacity와 visibility 제거
+    // 깜빡임 방지를 위해 즉시 표시
+    opacity: 1,
+    visibility: 'visible',
     display: 'flex',
     alignItems: 'center',
     // 모든 여백 완전 제거
@@ -58,19 +60,19 @@ const AnimatedHeader: React.FC<AnimatedHeaderProps> = ({
     ...style
   };
 
-  // 애니메이션 변형
+  // 애니메이션 비활성화로 깜빡임 방지
   const animationVariants = {
     simple: {
-      initial: duration === 0 ? { opacity: 1, x: 0 } : { opacity: 0, x: -30 },
+      initial: { opacity: 1, x: 0 },
       animate: { opacity: 1, x: 0 },
-      exit: duration === 0 ? { opacity: 1, x: 0 } : { opacity: 0, x: -30 },
-      transition: { duration: duration === 0 ? 0 : 0.5, delay }
+      exit: { opacity: 1, x: 0 },
+      transition: { duration: 0, delay: 0 }
     },
     enhanced: {
-      initial: duration === 0 ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: -30, scale: 0.95 },
+      initial: { opacity: 1, x: 0, scale: 1 },
       animate: { opacity: 1, x: 0, scale: 1 },
-      exit: duration === 0 ? { opacity: 1, x: 0, scale: 1 } : { opacity: 0, x: -30, scale: 0.95 },
-      transition: { duration: duration === 0 ? 0 : duration, delay }
+      exit: { opacity: 1, x: 0, scale: 1 },
+      transition: { duration: 0, delay: 0 }
     }
   };
 

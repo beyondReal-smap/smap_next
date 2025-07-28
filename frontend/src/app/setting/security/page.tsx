@@ -211,9 +211,6 @@ export default function SecurityPage() {
             <motion.button 
               onClick={handleBack}
               disabled={isExiting}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4 }}
               className="setting-back-button"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
