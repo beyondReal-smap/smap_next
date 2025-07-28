@@ -164,7 +164,7 @@ export default function NoticeDetailPage() {
           left: '0px',
           right: '0px',
           zIndex: 20,
-          height: '56px',
+          height: '62px',
           background: 'rgba(255, 255, 255, 0.98)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
@@ -178,11 +178,11 @@ export default function NoticeDetailPage() {
           transform: 'translateY(0px)',
         }}
       >
-        <div className="flex items-center justify-between h-full px-4">
+        <div className="flex items-center justify-between h-full" style={{ paddingLeft: '0px', paddingRight: '16px' }}>
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -40 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
+            transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="flex items-center space-x-3 motion-div"
           >
             <button 

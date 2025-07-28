@@ -988,8 +988,8 @@ body[data-page="/notice"] .notice-header {
   background: #fff !important;
   box-shadow: 0 2px 16px rgba(0,0,0,0.04) !important;
   border-bottom: 1px solid #eee !important;
-  height: 64px !important;
-  min-height: 64px !important;
+  height: 62px !important;
+  min-height: 62px !important;
   padding: 0 !important;
   margin: 0 !important;
   display: flex !important;
@@ -1299,7 +1299,7 @@ html.setting-page-active[style*="position: fixed"] {
   backface-visibility: visible !important;
 }
 
-/* setting 페이지 헤더 스타일 - 한 곳에서 관리 (통일된 56px 높이) */
+/* setting 페이지 헤더 스타일 - 한 곳에서 관리 (통일된 62px 높이) */
 .setting-header,
 body[data-page="/notice"] .setting-header,
 html[data-page="/notice"] .setting-header,
@@ -1312,9 +1312,9 @@ html[data-page="/setting/notice"] .setting-header {
   left: 0 !important;
   right: 0 !important;
   z-index: 2147483647 !important;
-  height: 56px !important;
-  min-height: 56px !important;
-  max-height: 56px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
   background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -1337,8 +1337,8 @@ html[data-page="/setting/notice"] .setting-header {
   display: flex !important;
   align-items: center !important;
   justify-content: flex-start !important;
-  height: 56px !important;
-  padding: 0 16px !important;
+  height: 62px !important;
+  padding: 0 0px !important;
   gap: 12px !important;
 }
 
@@ -1425,8 +1425,8 @@ body[data-page="/notice"] .notice-header {
   background: #fff !important;
   box-shadow: 0 2px 16px rgba(0,0,0,0.04) !important;
   border-bottom: 1px solid #eee !important;
-  height: 64px !important;
-  min-height: 64px !important;
+  height: 62px !important;
+  min-height: 62px !important;
   padding: 0 !important;
   margin: 0 !important;
   display: flex !important;
@@ -2018,38 +2018,11 @@ html[data-page="/setting"],
 
 /* setting 페이지 헤더 최강 고정 */
 body.setting-page-active .setting-header,
-html.setting-page-active .setting-header,
-.setting-page-active .setting-header,
-body[data-page="/setting"] .setting-header,
-html[data-page="/setting"] .setting-header,
-[data-page="/setting"] .setting-header {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  z-index: 2147483647 !important;
-  width: 100vw !important;
-  height: 56px !important;
-  min-height: 56px !important;
-  max-height: 56px !important;
-  background: rgba(255, 255, 255, 0.98) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
-  display: flex !important;
-  align-items: center !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  transform: translateZ(0) !important;
-  -webkit-transform: translateZ(0) !important;
-  will-change: transform !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
-  touch-action: manipulation !important;
-  pointer-events: auto !important;
+body[data-page="/setting/account/profile"] .header-fixed,
+body[data-page="/setting/account/profile"] .setting-header {
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
 }
 
 /* setting 페이지 메인 컨텐츠 스타일 */
@@ -2329,9 +2302,9 @@ body[data-page="/setting/notice"] * {
   right: 0 !important;
   z-index: 2147483647 !important;
   width: 100vw !important;
-  height: 64px !important;
-  min-height: 64px !important;
-  max-height: 64px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
   background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -2370,9 +2343,9 @@ body[data-page="/setting/notice"] * {
   right: 0 !important;
   z-index: 2147483647 !important;
   width: 100vw !important;
-  height: 64px !important;
-  min-height: 64px !important;
-  max-height: 64px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
   background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -2481,7 +2454,7 @@ div.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header,
   right: 0 !important;
   bottom: 0 !important;
   overflow-y: auto !important;
-  padding-top: 56px !important;
+  padding-top: 80px !important;
   -webkit-overflow-scrolling: touch !important;
 }
 
@@ -2527,19 +2500,19 @@ div.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header,
 #setting-inquiry-page-container .header-fixed {
   padding: 0 !important;
   margin: 0 !important;
-  height: 56px !important;
-  min-height: 56px !important;
-  max-height: 56px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
 }
 
 #setting-inquiry-page-container .header-fixed > div {
-  padding-left: 16px !important;
+  padding-left: 0px !important;
   padding-right: 16px !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
-  height: 56px !important;
-  min-height: 56px !important;
-  max-height: 56px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
 }
 
 /* setting/inquiry 페이지 헤더 텍스트 정렬 강화 */
@@ -2569,9 +2542,9 @@ div.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.notice-header,
 #setting-inquiry-page-container .header-fixed .flex.items-center.space-x-3 {
   display: flex !important;
   align-items: center !important;
-  height: 56px !important;
-  min-height: 56px !important;
-  max-height: 56px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
   justify-content: flex-start !important;
   gap: 12px !important;
   height: 100% !important;
@@ -2919,9 +2892,9 @@ body[data-page="/setting/notice/[id]"] .fixed.top-0.left-0.right-0.z-50.glass-ef
   -webkit-backdrop-filter: blur(20px) !important;
   border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
-  height: 64px !important;
-  min-height: 64px !important;
-  max-height: 64px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
   padding: 0 !important;
   margin: 0 !important;
   display: flex !important;
@@ -3048,10 +3021,123 @@ body[data-page="/setting/notice/[id]"] .header-fixed {
 }
 
 body[data-page="/setting/notice/[id]"] .header-fixed > div {
-  padding-left: 16px !important;
+  padding-left: 0px !important;
   padding-right: 16px !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 강제 오버라이드 */
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="padding-left"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="padding-left: 16px"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="padding-left: 16px !important"] {
+  padding-left: 0px !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 높이 강제 오버라이드 */
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="height"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="height: 55px"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="height: 56px"] {
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 최강 오버라이드 */
+body[data-page="/setting/notice/[id]"] .header-fixed > div,
+body[data-page="/setting/notice/[id]"] .header-fixed > div[class*="flex"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[class*="items-center"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[class*="justify-between"] {
+  padding-left: 0px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+  margin: 0 !important;
+  border: none !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 인라인 스타일 오버라이드 */
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style] {
+  padding-left: 0px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 모든 가능한 높이 오버라이드 */
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="height: 55px"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="height: 56px"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="height: 64px"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="min-height: 55px"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="min-height: 56px"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="min-height: 64px"] {
+  padding-left: 0px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+}
+
+/* setting/notice/[id] 페이지 헤더 모든 가능한 패딩 오버라이드 */
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="padding-left: 16px"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="padding-left: 16px !important"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="padding-left: 1rem"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[style*="padding-left: 1rem !important"] {
+  padding-left: 0px !important;
+}
+
+/* setting/notice/[id] 페이지 Tailwind CSS 클래스 오버라이드 */
+body[data-page="/setting/notice/[id]"] .header-fixed > div.px-4,
+body[data-page="/setting/notice/[id]"] .header-fixed > div.pl-4,
+body[data-page="/setting/notice/[id]"] .header-fixed > div.pl-4,
+body[data-page="/setting/notice/[id]"] .header-fixed > div.h-14,
+body[data-page="/setting/notice/[id]"] .header-fixed > div.h-14,
+body[data-page="/setting/notice/[id]"] .header-fixed > div.min-h-14,
+body[data-page="/setting/notice/[id]"] .header-fixed > div.max-h-14 {
+  padding-left: 0px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+}
+
+/* setting/notice/[id] 페이지 모든 가능한 높이 값 오버라이드 */
+body[data-page="/setting/notice/[id]"] .header-fixed > div {
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+  padding-left: 0px !important;
+}
+
+/* setting/notice/[id] 페이지 최강 오버라이드 - 모든 스타일 덮어쓰기 */
+body[data-page="/setting/notice/[id]"] .header-fixed > div,
+body[data-page="/setting/notice/[id]"] .header-fixed > div *,
+body[data-page="/setting/notice/[id]"] .header-fixed > div[class*="flex"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[class*="items-center"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[class*="justify-between"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[class*="h-"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[class*="px-"],
+body[data-page="/setting/notice/[id]"] .header-fixed > div[class*="pl-"] {
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+  padding-left: 0px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
 }
 
 /* setting/notice/[id] 페이지 헤더 텍스트 정렬 강화 */
@@ -3167,7 +3253,7 @@ body[data-page="/setting/notice/[id]"] .header-fixed .flex.items-center.space-x-
 }
 
 #setting-notice-detail-page-container .header-fixed > div {
-  padding-left: 16px !important;
+  padding-left: 0px !important;
   padding-right: 16px !important;
   padding-top: 0 !important;
   padding-bottom: 0 !important;
@@ -3690,4 +3776,424 @@ body {
   font-family: 'lineSeed', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 16px;
   line-height: 1.5;
+}
+
+/* ============================================
+   setting/account/profile 페이지 헤더 고정 스타일
+   ============================================ */
+
+/* setting/account/profile 페이지 헤더 고정 스타일 */
+body[data-page="/setting/account/profile"] .header-fixed,
+body[data-page="/setting/account/profile"] header,
+body[data-page="/setting/account/profile"] .setting-header,
+body[data-page="/setting/account/profile"] .fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.setting-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  z-index: 2147483647 !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+}
+
+/* setting/account/profile 페이지 메인 컨텐츠 영역 여백 조정 */
+body[data-page="/setting/account/profile"] .px-4.pt-20.space-y-6.pb-24 {
+  padding-top: 80px !important;
+  margin-top: 0 !important;
+}
+
+/* setting/account/profile 페이지 강제 스타일 오버라이드 */
+body[data-page="/setting/account/profile"] * {
+  box-sizing: border-box !important;
+}
+
+/* 전역 헤더 고정 - data-page 없이도 작동 */
+.fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.setting-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  z-index: 2147483647 !important;
+  width: 100vw !important;
+  height: 64px !important;
+  min-height: 64px !important;
+  max-height: 64px !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+}
+
+/* setting/account/profile 페이지 헤더 버튼 정렬 강화 */
+body[data-page="/setting/account/profile"] .header-fixed button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+body[data-page="/setting/account/profile"] .header-fixed button svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* setting/account/profile 페이지 헤더 패딩 제거 */
+body[data-page="/setting/account/profile"] .header-fixed {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+body[data-page="/setting/account/profile"] .header-fixed > div {
+  padding-left: 0px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* setting/account/profile 페이지 헤더 텍스트 정렬 강화 */
+body[data-page="/setting/account/profile"] .header-fixed h1,
+body[data-page="/setting/account/profile"] .header-fixed p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  display: block !important;
+}
+
+body[data-page="/setting/account/profile"] .header-fixed .flex.flex-col {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+}
+
+/* setting/account/profile 페이지 뒤로가기 버튼과 텍스트 상하 정렬 */
+body[data-page="/setting/account/profile"] .header-fixed .flex.items-center.space-x-3 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* setting/account/profile 페이지 뒤로가기 버튼과 텍스트 간격 조정 */
+body[data-page="/setting/account/profile"] .header-fixed .flex.items-center.space-x-3 > * {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body[data-page="/setting/account/profile"] .header-fixed .flex.items-center.space-x-3 button {
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
+body[data-page="/setting/account/profile"] .header-fixed .flex.items-center.space-x-3 div {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* setting/account/profile 페이지 컨테이너 스타일 */
+#setting-account-profile-page-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+/* setting/account/profile 페이지 헤더 최강 고정 */
+body[data-page="/setting/account/profile"] *[class*="header"],
+body[data-page="/setting/account/profile"] *[class*="Header"],
+body[data-page="/setting/account/profile"] *[class*="fixed"],
+body[data-page="/setting/account/profile"] *[class*="top-0"],
+body[data-page="/setting/account/profile"] *[class*="z-50"],
+body[data-page="/setting/account/profile"] *[class*="glass-effect"],
+body[data-page="/setting/account/profile"] *[class*="setting-header"],
+body[data-page="/setting/account/profile"] .AnimatedHeader,
+body[data-page="/setting/account/profile"] [class*="AnimatedHeader"],
+body[data-page="/setting/account/profile"] .fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.setting-header,
+body[data-page="/setting/account/profile"] motion.header,
+body[data-page="/setting/account/profile"] [data-framer-motion],
+body[data-page="/setting/account/profile"] header,
+body[data-page="/setting/account/profile"] .motion-header {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  z-index: 2147483647 !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+  overflow: visible !important;
+  clip: auto !important;
+  clip-path: none !important;
+  -webkit-clip-path: none !important;
+}
+
+#setting-account-profile-page-container .profile-main-content {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  overflow-y: auto !important;
+  padding-top: 80px !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* setting/account/profile 페이지 헤더 버튼 정렬 강화 */
+#setting-account-profile-page-container .header-fixed button {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  max-width: 40px !important;
+  max-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+}
+
+#setting-account-profile-page-container .header-fixed button svg {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* setting/account/profile 페이지 헤더 패딩 제거 */
+#setting-account-profile-page-container .header-fixed {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+#setting-account-profile-page-container .header-fixed > div {
+  padding-left: 0px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* setting/account/profile 페이지 헤더 텍스트 정렬 강화 */
+#setting-account-profile-page-container .header-fixed h1,
+#setting-account-profile-page-container .header-fixed p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  display: block !important;
+}
+
+#setting-account-profile-page-container .header-fixed .flex.flex-col {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+}
+
+/* setting/account/profile 페이지 뒤로가기 버튼과 텍스트 상하 정렬 */
+#setting-account-profile-page-container .header-fixed .flex.items-center.space-x-3 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* setting/account/profile 페이지 뒤로가기 버튼과 텍스트 간격 조정 */
+#setting-account-profile-page-container .header-fixed .flex.items-center.space-x-3 > * {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#setting-account-profile-page-container .header-fixed .flex.items-center.space-x-3 button {
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
+#setting-account-profile-page-container .header-fixed .flex.items-center.space-x-3 div {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* setting/account/profile 페이지 헤더 강제 오버라이드 */
+#setting-account-profile-page-container .header-fixed > div[style*="padding-left"],
+#setting-account-profile-page-container .header-fixed > div[style*="padding-left: 16px"],
+#setting-account-profile-page-container .header-fixed > div[style*="padding-left: 16px !important"] {
+  padding-left: 0px !important;
+}
+
+/* setting/account/profile 페이지 Tailwind CSS 클래스 오버라이드 */
+#setting-account-profile-page-container .header-fixed > div.px-4,
+#setting-account-profile-page-container .header-fixed > div.pl-4 {
+  padding-left: 0px !important;
+  padding-right: 16px !important;
+}
+
+/* setting/account/profile 페이지 최강 오버라이드 */
+body[data-page="/setting/account/profile"] .header-fixed > div,
+body[data-page="/setting/account/profile"] .header-fixed > div[class*="flex"],
+body[data-page="/setting/account/profile"] .header-fixed > div[class*="items-center"],
+body[data-page="/setting/account/profile"] .header-fixed > div[class*="justify-between"],
+body[data-page="/setting/account/profile"] .header-fixed > div[class*="h-"],
+body[data-page="/setting/account/profile"] .header-fixed > div[class*="px-"],
+body[data-page="/setting/account/profile"] .header-fixed > div[class*="pl-"] {
+  padding-left: 0px !important;
+  padding-right: 16px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+/* setting/account/profile 페이지 헤더 강제 고정 */
+body[data-page="/setting/account/profile"] .header-fixed,
+body[data-page="/setting/account/profile"] .setting-header,
+body[data-page="/setting/account/profile"] .fixed.top-0.left-0.right-0.z-50.glass-effect.header-fixed.setting-header,
+body[data-page="/setting/account/profile"] AnimatedHeader,
+body[data-page="/setting/account/profile"] [class*="AnimatedHeader"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100vw !important;
+  z-index: 2147483647 !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid rgba(229, 231, 235, 0.8) !important;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08) !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  pointer-events: auto !important;
+  overflow: visible !important;
+  clip: auto !important;
+  clip-path: none !important;
+  -webkit-clip-path: none !important;
 }

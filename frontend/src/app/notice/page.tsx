@@ -231,16 +231,13 @@ function groupByDate(list: PushLog[]): Record<string, PushLog[]> {
         className="setting-header"
       >
         <motion.div 
-          initial={{ opacity: 0, x: -20 }}
+          initial={{ opacity: 0, x: -40 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
-          className="setting-header-content motion-div"
+          transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="flex items-center space-x-3 motion-div"
         >
           <motion.button
             onClick={handleBack}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
             className="setting-back-button"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}

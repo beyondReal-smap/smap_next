@@ -467,40 +467,101 @@ export default function AccountSettingsPage() {
   return (
     <>
       <style jsx global>{pageAnimations}</style>
-      <div className="flex flex-col h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
+      <style jsx global>{`
+        /* 설정 페이지에서 네비게이션 바 완전 제거 */
+        body[data-page="/setting"] #bottom-navigation-bar,
+        body[data-page*="/setting"] #bottom-navigation-bar,
+        html[data-page="/setting"] #bottom-navigation-bar,
+        html[data-page*="/setting"] #bottom-navigation-bar,
+        body[data-page="/setting/account"] #bottom-navigation-bar,
+        html[data-page="/setting/account"] #bottom-navigation-bar {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          position: absolute !important;
+          bottom: -100px !important;
+          z-index: -1 !important;
+        }
+        
+        /* 설정 페이지에서 네비게이션 바 관련 여백 제거 */
+        body[data-page="/setting"] .pb-24,
+        body[data-page*="/setting"] .pb-24,
+        body[data-page="/setting"] .pb-20,
+        body[data-page*="/setting"] .pb-20,
+        body[data-page="/setting/account"] .pb-24,
+        body[data-page="/setting/account"] .pb-20 {
+          padding-bottom: 0 !important;
+        }
+        
+        /* 스크롤바 숨기기 */
+        body, html {
+          overflow-x: hidden !important;
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+        
+        body::-webkit-scrollbar,
+        html::-webkit-scrollbar {
+          display: none !important;
+        }
+        
+        /* 모달 내부 스크롤바도 숨기기 */
+        .modal-content::-webkit-scrollbar,
+        .modal-backdrop::-webkit-scrollbar {
+          display: none !important;
+        }
+        
+        /* 모든 스크롤 가능한 요소에서 스크롤바 숨기기 */
+        * {
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+        
+        *::-webkit-scrollbar {
+          display: none !important;
+        }
+      `}</style>
+      <div className="flex flex-col h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50" data-page="/setting/account">
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
-          variant="enhanced"
-          className="setting-header"
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed setting-header"
+          style={{ 
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px',
+            position: 'fixed'
+          }}
         >
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
-            className="setting-header-content motion-div"
-          >
-            <motion.button 
-              onClick={handleBack}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4 }}
-              className="setting-back-button"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+          <div className="flex items-center justify-between h-14">
+            <motion.div 
+              initial={{ opacity: 0, x: -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="flex items-center space-x-3 motion-div"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </motion.button>
-            <div className="setting-header-text">
-              <h1 className="text-lg font-bold text-gray-900 leading-tight">계정설정</h1>
-              <p className="text-xs text-gray-500 leading-tight">프로필 및 개인정보 관리</p>
-            </div>
-          </motion.div>
+              <motion.button 
+                onClick={handleBack}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </motion.button>
+              <div className="flex items-center space-x-3">
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">계정설정</h1>
+                  <p className="text-xs text-gray-500">프로필 및 개인정보 관리</p>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </AnimatedHeader>
 
         {/* 스크롤 가능한 메인 컨텐츠 */}
-        <div className="flex-1 overflow-y-auto pb-24 px-4 pt-20">
+        <div className="flex-1 overflow-y-auto px-4 pt-20" style={{ paddingBottom: '0px' }}>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -536,8 +597,8 @@ export default function AccountSettingsPage() {
                             setProfileImg(fallbackSrc);
                           }}
                         />
-                        <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-2 shadow-lg group-hover:scale-110 transition-transform">
-                          <FiCamera className="w-4 h-4 text-blue-600" />
+                        <div className="absolute bg-white rounded-full p-2 shadow-lg group-hover:scale-90 transition-transform" style={{ bottom: '4px', right: '0px', transform: 'translateY(8px)' }}>
+                          <FiCamera className="w-3 h-3 text-blue-600" />
                         </div>
                       </div>
                     </button>
@@ -630,16 +691,18 @@ export default function AccountSettingsPage() {
 
         {/* 프로필 사진 변경 모달 */}
         {showSheet && (
-          <div 
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
+                                <div 
+            className="fixed inset-0 flex items-end justify-center bg-black/50 backdrop-blur-sm" 
+            style={{ zIndex: 9999999 }}
             onClick={closeModal}
           >
-            <div 
-              className={`w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 shadow-2xl ${
-                isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
-              }`}
-              onClick={e => e.stopPropagation()}
-            >
+              <div 
+                className={`w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 shadow-2xl ${
+                  isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
+                }`}
+                style={{ marginBottom: '-30px', borderRadius: '24px 24px 0px 0px' }}
+                onClick={e => e.stopPropagation()}
+              >
               <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
               
               <div className="text-center mb-6">

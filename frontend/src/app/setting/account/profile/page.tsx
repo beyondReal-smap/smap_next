@@ -263,37 +263,195 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* 통일된 헤더 애니메이션 */}
-      <AnimatedHeader 
-        variant="enhanced"
-        className="setting-header"
-      >
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, ease: [0.25, 1, 0.5, 1] }}
-          className="setting-header-content motion-div"
+    <>
+      <style jsx global>{`
+        html, body {
+          width: 100%;
+          overflow-x: hidden;
+          position: relative;
+          /* iOS WebView 최적화 */
+          -webkit-text-size-adjust: 100%;
+          -webkit-overflow-scrolling: touch;
+          /* iOS safe-area 완전 무시 */
+          padding-top: 0px !important;
+          margin-top: 0px !important;
+        }
+
+        /* iOS 전용 스타일 */
+        @supports (-webkit-touch-callout: none) {
+          html, body {
+            position: fixed !important;
+            width: 100% !important;
+            height: 100% !important;
+            overflow: hidden !important;
+          }
+          
+          #__next {
+            height: 100% !important;
+            overflow: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          
+          #setting-page-container {
+            height: 100vh !important;
+            height: -webkit-fill-available !important;
+            overflow: hidden !important;
+          }
+          
+          .content-area {
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+          }
+          
+          /* iOS 헤더 강제 표시 */
+          header, .glass-effect, .header-fixed, .setting-header {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 999999 !important;
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            transform: translateZ(0) translateY(0) !important;
+            will-change: transform !important;
+            background: rgba(255, 255, 255, 0.98) !important;
+            backdrop-filter: blur(10px) !important;
+            -webkit-backdrop-filter: blur(10px) !important;
+            height: 56px !important;
+            min-height: 56px !important;
+            max-height: 56px !important;
+            width: 100% !important;
+            margin: 0 !important;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+          }
+          
+          /* iOS 헤더 내부 요소 */
+          header *, .setting-header * {
+            pointer-events: auto !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+          }
+        }
+
+        /* 프로필 페이지에서 네비게이션 바 완전 제거 */
+        body[data-page="/setting"] #bottom-navigation-bar,
+        body[data-page*="/setting"] #bottom-navigation-bar,
+        html[data-page="/setting"] #bottom-navigation-bar,
+        html[data-page*="/setting"] #bottom-navigation-bar {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          position: absolute !important;
+          bottom: -100px !important;
+          z-index: -1 !important;
+        }
+        
+        /* 프로필 페이지에서 네비게이션 바 관련 여백 제거 */
+        body[data-page="/setting"] .pb-24,
+        body[data-page*="/setting"] .pb-24,
+        body[data-page="/setting"] .pb-20,
+        body[data-page*="/setting"] .pb-20 {
+          padding-bottom: 0 !important;
+        }
+        
+        /* 스크롤바 숨기기 */
+        body, html {
+          overflow-x: hidden !important;
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+        
+        body::-webkit-scrollbar,
+        html::-webkit-scrollbar {
+          display: none !important;
+        }
+        
+        /* 모든 스크롤 가능한 요소에서 스크롤바 숨기기 */
+        * {
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+        
+        *::-webkit-scrollbar {
+          display: none !important;
+        }
+        
+        /* 헤더 고정 스타일 */
+        .setting-header {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          z-index: 999999 !important;
+        }
+      `}</style>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50" data-page="/setting/account/profile">
+        {/* 통일된 헤더 애니메이션 */}
+        <AnimatedHeader 
+          variant="simple"
+          className="fixed top-0 left-0 right-0 z-50 glass-effect header-fixed setting-header"
+          style={{ 
+            paddingTop: '0px',
+            marginTop: '0px',
+            top: '0px',
+            position: 'fixed',
+            zIndex: 2147483647,
+            height: '62px',
+            minHeight: '62px',
+            maxHeight: '62px',
+            width: '100vw',
+            left: '0px',
+            right: '0px',
+            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            borderBottom: '1px solid rgba(229, 231, 235, 0.8)',
+            boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            transform: 'translateZ(0)',
+            WebkitTransform: 'translateZ(0)',
+            willChange: 'transform',
+            visibility: 'visible',
+            opacity: 1,
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            touchAction: 'manipulation',
+            pointerEvents: 'auto',
+            overflow: 'visible',
+            clip: 'auto',
+            clipPath: 'none',
+            WebkitClipPath: 'none'
+          }}
         >
-          <motion.button
-            onClick={handleBack}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-            className="setting-back-button"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </motion.button>
-          <div className="setting-header-text">
-            <h1 className="text-lg font-bold text-gray-900 leading-tight">프로필 편집</h1>
-            <p className="text-xs text-gray-500 leading-tight">개인 정보를 업데이트하세요</p>
+          <div className="flex items-center justify-between h-14" style={{ paddingLeft: '0px', paddingRight: '16px' }}>
+            <motion.div
+              initial={{ opacity: 0, x: -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+              className="flex items-center space-x-3 motion-div"
+            >
+              <motion.button
+                onClick={handleBack}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-200"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </motion.button>
+              <div className="flex items-center space-x-3">
+                <div>
+                  <h1 className="text-lg font-bold text-gray-900">프로필 편집</h1>
+                  <p className="text-xs text-gray-500">개인 정보를 업데이트하세요</p>
+                </div>
+              </div>
+            </motion.div>
           </div>
-        </motion.div>
-      </AnimatedHeader>
+        </AnimatedHeader>
 
       {/* 스크롤 가능한 메인 컨텐츠 */}
       <motion.div
@@ -647,5 +805,6 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
     </div>
+    </>
   );
 } 
