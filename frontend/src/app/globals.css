@@ -4403,6 +4403,27 @@ body[data-page="/schedule"] .absolute {
   transform: translateZ(0) !important;
 }
 
+/* Location 페이지 그룹 선택기 버튼 클릭 이벤트 강제 활성화 */
+body[data-page="/location"] .group-selector {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+body[data-page="/location"] .group-selector:active {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Location 페이지 그룹 선택기 버튼 클릭 이벤트 강제 활성화 */
+body[data-page="/location"] button[data-group-selector="true"] {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
 /* 멤버 선택 영역 z-index 낮춤 */
 body[data-page="/schedule"] div[style*="zIndex: 1"] {
   z-index: -2147483647 !important;

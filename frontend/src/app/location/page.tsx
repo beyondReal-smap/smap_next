@@ -5749,6 +5749,13 @@ export default function LocationPage() {
                       console.log('[GroupSelector] onClose 호출됨');
                       setIsGroupSelectorOpen(false);
                     }}
+                    onToggleSelector={() => {
+                      console.log('[GroupSelector] onToggleSelector 호출됨, 현재 상태:', isGroupSelectorOpen);
+                      // 강제로 상태를 반대로 변경
+                      const newState = !isGroupSelectorOpen;
+                      console.log('[GroupSelector] 새로운 상태:', newState);
+                      setIsGroupSelectorOpen(newState);
+                    }}
                     onGroupSelect={(groupId) => {
                       if (selectedGroupId !== groupId) {
                         handleGroupSelect(groupId);

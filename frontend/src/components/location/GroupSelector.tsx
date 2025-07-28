@@ -59,12 +59,35 @@ const DropdownPortal = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        target.current && !target.current.contains(event.target as Node) &&
-        dropdownRef.current && !dropdownRef.current.contains(event.target as Node)
-      ) {
-        onClose();
+      console.log('[handleClickOutside] 이벤트 발생:', event.target);
+      
+      // 클릭된 요소가 그룹 선택 버튼인지 확인
+      if (event.target === target.current) {
+        console.log('[handleClickOutside] 그룹 선택 버튼 직접 클릭 - 무시');
+        return;
       }
+      
+      // 그룹 선택 버튼을 클릭한 경우는 무시
+      if (target.current && target.current.contains(event.target as Node)) {
+        console.log('[handleClickOutside] 그룹 선택 버튼 클릭 - 무시');
+        return;
+      }
+      
+      // 드롭다운 영역을 클릭한 경우도 무시
+      if (dropdownRef.current && dropdownRef.current.contains(event.target as Node)) {
+        console.log('[handleClickOutside] 드롭다운 영역 클릭 - 무시');
+        return;
+      }
+      
+      // 클릭된 요소가 버튼의 data-group-selector 속성을 가진 요소인지 확인
+      const clickedElement = event.target as HTMLElement;
+      if (clickedElement && clickedElement.closest('[data-group-selector="true"]')) {
+        console.log('[handleClickOutside] 그룹 선택 버튼 관련 요소 클릭 - 무시');
+        return;
+      }
+      
+      console.log('[handleClickOutside] 외부 클릭 - 드롭다운 닫기');
+      onClose();
     };
     
     const calculatePosition = () => {
@@ -147,10 +170,23 @@ const GroupSelector = memo(({
         ref={buttonRef}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
+        onMouseDown={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+        }}
         onClick={(e) => {
           e.stopPropagation();
+          e.preventDefault();
           console.log('[GroupSelector] 버튼 클릭됨, 현재 상태:', isGroupSelectorOpen);
-          isGroupSelectorOpen ? onClose() : onOpen();
+          
+          // 드롭다운이 열려있으면 무조건 닫기, 닫혀있으면 열기
+          if (isGroupSelectorOpen) {
+            console.log('[GroupSelector] 드롭다운 닫기');
+            onClose();
+          } else {
+            console.log('[GroupSelector] 드롭다운 열기');
+            onOpen();
+          }
         }}
         className="group-selector w-full px-4 py-3 rounded-xl flex items-center justify-between text-left focus:outline-none transition-all duration-300 bg-white/50 border"
         style={{ borderColor: 'rgba(1, 19, 163, 0.2)' }}
@@ -193,10 +229,8 @@ const GroupSelector = memo(({
                   onClose();
                 } else {
                   // 다른 그룹을 선택했을 때는 onGroupSelect 호출하고 드롭다운 닫기
-                  setTimeout(() => {
-                    onGroupSelect(group.sgt_idx);
-                    onClose();
-                  }, 0);
+                  onGroupSelect(group.sgt_idx);
+                  onClose();
                 }
               }}
               className={`w-full px-4 py-3 text-left text-sm focus:outline-none transition-colors flex items-center justify-between border-b border-gray-100 last:border-b-0 ${
