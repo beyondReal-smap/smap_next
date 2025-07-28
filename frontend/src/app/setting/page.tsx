@@ -363,18 +363,18 @@ export default function SettingsPage() {
         },
       ]
     },
-    // {
-    //   title: '약관 & 정책',
-    //   items: [
-    //     { 
-    //       label: '약관 및 정책', 
-    //       href: '/setting/terms', 
-    //       icon: FiFileText,
-    //       color: 'bg-yellow-500',
-    //       description: '이용약관 및 개인정보처리방침'
-    //     },
-    //   ]
-    // },
+    {
+      title: '약관 & 정책',
+      items: [
+        { 
+          label: '약관 및 정책', 
+          href: '/setting/terms', 
+          icon: FiFileText,
+          color: 'bg-yellow-500',
+          description: '이용약관 및 개인정보처리방침'
+        },
+      ]
+    },
     {
       title: '고객 지원',
       items: [

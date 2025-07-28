@@ -293,14 +293,14 @@ const pageVariants = {
 // 사이드바 애니메이션 variants (고급스러운 효과)
 const sidebarVariants = {
   closed: {
-    x: -40,
+    x: -30,
     opacity: 0,
-    scale: 0.98,
-    filter: 'blur(2px)',
+    scale: 0.99,
+    filter: 'blur(1px)',
     boxShadow: '0 0 0 rgba(0,0,0,0)',
     transition: {
-      duration: 0.35,
-      ease: cubicBezier(0.4, 0.0, 0.2, 1)
+      duration: 0.6,
+      ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
     }
   },
   open: {
@@ -310,8 +310,8 @@ const sidebarVariants = {
     filter: 'blur(0px)',
     boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
     transition: {
-      duration: 0.45,
-      ease: cubicBezier(0.4, 0.0, 0.2, 1)
+      duration: 0.7,
+      ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
     }
   }
 };
@@ -5676,7 +5676,7 @@ export default function LocationPage() {
               initial="closed"
               animate="open"
               exit="closed"
-              className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[99999] flex flex-col"
+              className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[99999] flex flex-col"
               style={{ 
                 background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                 borderColor: 'rgba(1, 19, 163, 0.1)',
@@ -5750,13 +5750,8 @@ export default function LocationPage() {
                       setIsGroupSelectorOpen(false);
                     }}
                     onGroupSelect={(groupId) => {
-                      console.log('[GroupSelector onGroupSelect] 그룹 선택 시도:', groupId, '현재 선택된 그룹:', selectedGroupId);
                       if (selectedGroupId !== groupId) {
-                        console.log('[GroupSelector onGroupSelect] 다른 그룹 선택 - handleGroupSelect 호출');
                         handleGroupSelect(groupId);
-                      } else {
-                        console.log('[GroupSelector onGroupSelect] 같은 그룹 선택 - 드롭다운만 닫기');
-                        setIsGroupSelectorOpen(false);
                       }
                     }}
                   />
@@ -6172,7 +6167,7 @@ export default function LocationPage() {
               initial="closed"
               animate="open"
               exit="closed"
-              className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[99999] flex flex-col"
+              className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[99999] flex flex-col"
                                    style={{ 
                        background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
                        borderColor: 'rgba(1, 19, 163, 0.1)',

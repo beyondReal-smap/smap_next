@@ -46,7 +46,7 @@ import FloatingButton from '../../components/common/FloatingButton';
 // Dynamic Imports for better code splitting
 const AnimatedHeader = dynamic(() => import('../../components/common/AnimatedHeader'), {
   loading: () => (
-    <div className="h-14 bg-gradient-to-r from-[#0113A3] to-[#001a8a] animate-pulse" />
+    <div className="h-14 bg-white animate-pulse" />
   ),
   ssr: false
 });
@@ -97,6 +97,81 @@ const getDefaultImage = (gender: number | null | undefined, index: number): stri
 const getSafeImageUrl = (photoUrl: string | null, gender: number | null | undefined, index: number): string => {
   // 실제 사진이 있으면 사용하고, 없으면 기본 이미지 사용
   return photoUrl ?? getDefaultImage(gender, index);
+};
+
+// GroupDropdownPortal 컴포넌트 (activelog의 GroupSelector에서 가져옴)
+const GroupDropdownPortal = ({
+  children,
+  target,
+  onClose,
+}: {
+  children: React.ReactNode;
+  target: React.RefObject<HTMLElement | null>;
+  onClose: () => void;
+}) => {
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        target.current && !target.current.contains(event.target as Node) &&
+        dropdownRef.current && !dropdownRef.current.contains(event.target as Node)
+      ) {
+        onClose();
+      }
+    };
+    
+    const calculatePosition = () => {
+      if (target.current) {
+        const rect = target.current.getBoundingClientRect();
+        setPosition({
+          top: rect.bottom + window.scrollY + 8,
+          left: rect.left + window.scrollX,
+          width: rect.width,
+        });
+      }
+    };
+
+    calculatePosition();
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('resize', calculatePosition);
+    window.addEventListener('scroll', calculatePosition, true);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', calculatePosition);
+      window.removeEventListener('scroll', calculatePosition, true);
+    };
+  }, [target, onClose]);
+
+  if (!position) return null;
+
+  return createPortal(
+    <div
+      ref={dropdownRef}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+      }}
+      className="absolute rounded-xl z-[99999] overflow-hidden bg-white shadow-2xl border border-gray-200/80"
+      style={{
+        top: position.top,
+        left: position.left,
+        width: position.width,
+        maxHeight: '40vh',
+        overflowY: 'auto'
+      }}
+      data-group-dropdown-menu="true"
+    >
+      {children}
+    </div>,
+    document.body
+  );
 };
 
 // 모바일 최적화된 CSS 스타일
@@ -801,6 +876,7 @@ export default function SchedulePage() {
   const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [isGroupSelectorOpen, setIsGroupSelectorOpen] = useState(false);
+  const groupButtonRef = useRef<HTMLButtonElement>(null);
   const [isLoadingGroups, setIsLoadingGroups] = useState(false);
   const [scheduleGroupMembers, setScheduleGroupMembers] = useState<ScheduleGroupMember[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
@@ -2388,40 +2464,53 @@ export default function SchedulePage() {
   const fetchUserGroups = useCallback(async () => {
     try {
       console.log('[fetchUserGroups] 그룹 목록 조회 시작');
+      setIsLoadingGroups(true);
+      
       const data = await groupService.getCurrentUserGroups();
-      setUserGroups(data);
-      console.log('[fetchUserGroups] 그룹 목록 조회 완료:', data.length, '개 그룹');
+      console.log('[fetchUserGroups] API 응답 데이터:', data);
       
-      // 그룹 로딩 단계 완료
-      updateLoadingStep('groups', true);
-      
-      // 첫 번째 그룹 선택
-      if (data.length > 0) {
-        const firstGroup = data[0];
-        setSelectedGroupId(firstGroup.sgt_idx);
-        console.log('[fetchUserGroups] 첫 번째 그룹 선택:', firstGroup.sgt_title);
+      if (Array.isArray(data)) {
+        setUserGroups(data);
+        console.log('[fetchUserGroups] 그룹 목록 조회 완료:', data.length, '개 그룹');
+        console.log('[fetchUserGroups] 그룹 목록:', data.map(g => ({ id: g.sgt_idx, title: g.sgt_title })));
         
-        // 그룹 멤버 데이터 로드
-        await fetchGroupMembers(firstGroup.sgt_idx);
+        // 그룹 로딩 단계 완료
+        updateLoadingStep('groups', true);
         
-        // 현재 월 데이터 로드
-        const currentYear = dayjs().year();
-        const currentMonth = dayjs().month() + 1;
-        await loadAllGroupSchedules(currentYear, currentMonth);
+        // 첫 번째 그룹 선택
+        if (data.length > 0) {
+          const firstGroup = data[0];
+          setSelectedGroupId(firstGroup.sgt_idx);
+          console.log('[fetchUserGroups] 첫 번째 그룹 선택:', firstGroup.sgt_title);
+          
+          // 그룹 멤버 데이터 로드
+          await fetchGroupMembers(firstGroup.sgt_idx);
+          
+          // 현재 월 데이터 로드
+          const currentYear = dayjs().year();
+          const currentMonth = dayjs().month() + 1;
+          await loadAllGroupSchedules(currentYear, currentMonth);
+        } else {
+          console.log('[fetchUserGroups] 그룹이 없습니다');
+          updateLoadingStep('schedules', true);
+          updateLoadingStep('calendar', true);
+          updateLoadingStep('ui', true);
+          setIsInitialLoading(false);
+        }
       } else {
-        console.log('[fetchUserGroups] 그룹이 없습니다');
-        updateLoadingStep('schedules', true);
-        updateLoadingStep('calendar', true);
-        updateLoadingStep('ui', true);
-        setIsInitialLoading(false);
+        console.error('[fetchUserGroups] API 응답이 배열이 아닙니다:', data);
+        setUserGroups([]);
       }
     } catch (error) {
       console.error('[fetchUserGroups] 그룹 목록 조회 오류:', error);
+      setUserGroups([]);
       updateLoadingStep('groups', true); // 오류 시에도 다음 단계로 진행
       updateLoadingStep('schedules', true);
       updateLoadingStep('calendar', true);
       updateLoadingStep('ui', true);
       setIsInitialLoading(false);
+    } finally {
+      setIsLoadingGroups(false);
     }
   }, [updateLoadingStep]);
 
@@ -5961,8 +6050,9 @@ export default function SchedulePage() {
                         {/* 그룹 선택 */}
                     <div className="mb-4">
                           <label className="block text-sm font-medium text-gray-700 mb-2">그룹 선택</label>
-                          <div className="relative group-selector-container">
+                          <div className="relative group-selector-container" style={{ zIndex: 2147483647, position: 'relative' }}>
                           <button
+                            ref={groupButtonRef}
                             type="button"
                             onClick={() => !newEvent.id && setIsGroupSelectorOpen(!isGroupSelectorOpen)} // newEvent.id가 있으면 클릭 비활성화
                             disabled={!!newEvent.id} // 수정 모드일 때 비활성화
@@ -5977,6 +6067,11 @@ export default function SchedulePage() {
                                   ? userGroups.find(g => g.sgt_idx === selectedGroupId)?.sgt_title || '그룹을 선택하세요'
                                   : '그룹을 선택하세요'
                                 }
+                                {userGroups.length > 0 && (
+                                  <span className="text-xs text-gray-400 ml-2">
+                                    ({userGroups.length}개)
+                                  </span>
+                                )}
                               </span>
                               <FiChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isGroupSelectorOpen ? 'rotate-180' : ''}`} />
                             </button>
@@ -5984,12 +6079,9 @@ export default function SchedulePage() {
                             {/* 그룹 드롭다운 */}
                             <AnimatePresence>
                               {isGroupSelectorOpen && !newEvent.id && ( // newEvent.id가 있으면 드롭다운 숨김
-                                <motion.div
-                                  initial={{ opacity: 0, y: -10 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  exit={{ opacity: 0, y: -10 }}
-                                  transition={{ duration: 0.2 }}
-                                  className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-48 overflow-y-auto scroll-container"
+                                <GroupDropdownPortal
+                                  target={groupButtonRef}
+                                  onClose={() => setIsGroupSelectorOpen(false)}
                                 >
                                   {isLoadingGroups ? (
                                     <div className="p-4 text-center text-gray-500">
@@ -5997,24 +6089,38 @@ export default function SchedulePage() {
                                       그룹 목록을 불러오는 중...
                                     </div>
                                   ) : userGroups.length > 0 ? (
-                                    userGroups.map((group) => (
-                                    <button
-                                      key={group.sgt_idx}
-                                      type="button"
-                                      onClick={() => handleGroupSelect(group.sgt_idx)}
-                                        className={`w-full px-4 py-2 text-left text-sm font-medium hover:bg-gray-50 transition-colors duration-150 ${
-                                          selectedGroupId === group.sgt_idx ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'
-                                        }`}
-                                      >
-                                        {group.sgt_title}
-                                    </button>
-                                    ))
+                                    <>
+                                      {/* 디버깅 정보 */}
+                                      <div className="p-2 text-xs text-gray-400 border-b border-gray-100">
+                                        총 {userGroups.length}개 그룹 로드됨
+                                      </div>
+                                      {userGroups
+                                        .sort((a, b) => a.sgt_title.localeCompare(b.sgt_title, 'ko', { numeric: true }))
+                                        .map((group, index) => (
+                                      <button
+                                        key={group.sgt_idx}
+                                        type="button"
+                                        onClick={() => handleGroupSelect(group.sgt_idx)}
+                                          className={`w-full px-4 py-2 text-left text-sm font-medium hover:bg-gray-50 transition-colors duration-150 ${
+                                            selectedGroupId === group.sgt_idx ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-700'
+                                          }`}
+                                        >
+                                          <div className="flex items-center justify-between">
+                                            <span>{group.sgt_title}</span>
+                                            <span className="text-xs text-gray-400">ID: {group.sgt_idx}</span>
+                                          </div>
+                                      </button>
+                                      ))}
+                                    </>
                                   ) : (
                                     <div className="p-4 text-center text-gray-500">
-                                      참여 중인 그룹이 없습니다
+                                      <div className="mb-2">참여 중인 그룹이 없습니다</div>
+                                      <div className="text-xs text-gray-400">
+                                        디버그: userGroups.length = {userGroups.length}
+                                      </div>
                                     </div>
                                   )}
-                                </motion.div>
+                                </GroupDropdownPortal>
                               )}
                             </AnimatePresence>
                           </div>
@@ -6022,7 +6128,7 @@ export default function SchedulePage() {
 
                     {/* 멤버 선택 */}
                     {selectedGroupId && (
-                      <div>
+                      <div style={{ zIndex: -2147483647, position: 'relative' }}>
                         <label className="block text-sm font-medium text-gray-700 mb-3">멤버 선택</label>
                         {isFetchingMembers ? (
                           <div className="text-center py-6 text-gray-500">
@@ -6030,8 +6136,16 @@ export default function SchedulePage() {
                             멤버 목록을 불러오는 중...
                           </div>
                         ) : scheduleGroupMembers.length > 0 ? (
-                          <div className="flex overflow-x-auto space-x-4 pt-2 pb-2 px-3 -mx-1">
-                            {scheduleGroupMembers.map((member, index) => (
+                          <div className="flex overflow-x-auto space-x-4 pt-2 pb-2 px-3 -mx-1" style={{ zIndex: -2147483647, position: 'relative' }}>
+                            {scheduleGroupMembers
+                              .sort((a, b) => {
+                                // 먼저 선택된 멤버를 맨 앞으로
+                                if (a.isSelected && !b.isSelected) return -1;
+                                if (!a.isSelected && b.isSelected) return 1;
+                                // 그 다음 이름순 정렬
+                                return a.name.localeCompare(b.name, 'ko', { numeric: true });
+                              })
+                              .map((member, index) => (
                               <motion.div 
                               key={member.id}
                         initial={{ opacity: 0, y: 20 }}

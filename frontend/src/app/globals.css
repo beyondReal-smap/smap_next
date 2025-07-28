@@ -2080,9 +2080,9 @@ body[data-page="/setting/terms"] .setting-header {
   right: 0 !important;
   z-index: 99999 !important;
   width: 100vw !important;
-  height: 56px !important;
-  min-height: 56px !important;
-  max-height: 56px !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  max-height: 62px !important;
   background: rgba(255, 255, 255, 0.98) !important;
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
@@ -2107,8 +2107,9 @@ body[data-page="/setting/terms"] .setting-header-content {
   display: flex !important;
   align-items: center !important;
   justify-content: flex-start !important;
-  height: 56px !important;
+  height: 62px !important;
   padding: 0 16px !important;
+  padding-left: 0px !important;
   gap: 12px !important;
   position: relative !important;
   width: 100% !important;
@@ -2122,6 +2123,50 @@ body[data-page="/setting/terms"] .setting-header-content.motion-div {
   transform: unset !important;
   -webkit-transform: unset !important;
   will-change: transform !important;
+}
+
+/* setting/terms 뒤로가기 버튼 앞 padding 제거 */
+body[data-page="/setting/terms"] .setting-back-button {
+  padding-left: 0px !important;
+  margin-left: 0px !important;
+}
+
+body[data-page="/setting/terms"] .setting-header-content > *:first-child {
+  padding-left: 0px !important;
+  margin-left: 0px !important;
+}
+
+/* setting/terms 모달 강제 표시 */
+body[data-page="/setting/terms"] div[style*="z-index: 2147483647"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 2147483647 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+body[data-page="/setting/terms"] div[style*="z-index: 2147483647"] > div {
+  position: relative !important;
+  width: 90% !important;
+  max-width: 400px !important;
+  background-color: white !important;
+  border-radius: 24px !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15) !important;
+  overflow-y: auto !important;
+  padding: 24px !important;
+  padding-bottom: 32px !important;
+  z-index: 2147483647 !important;
+  max-height: 80vh !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
 }
 
 /* setting/terms에서 motion-div 애니메이션 허용 */
@@ -4196,4 +4241,188 @@ body[data-page="/setting/account/profile"] [class*="AnimatedHeader"] {
   clip: auto !important;
   clip-path: none !important;
   -webkit-clip-path: none !important;
+}
+
+/* 그룹 드롭다운 z-index 강제 설정 */
+.group-selector-container {
+  z-index: 2147483647 !important;
+  position: relative !important;
+}
+
+.group-selector-container .absolute {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+}
+
+/* 스케줄 페이지 멤버 선택 영역 강제 z-index 낮춤 */
+body[data-page="/schedule"] div[style*="overflow-x-auto"] {
+  z-index: -999999 !important;
+  position: relative !important;
+}
+
+/* 스케줄 페이지 멤버 선택 영역 내부 요소들도 z-index 낮춤 */
+body[data-page="/schedule"] div[style*="overflow-x-auto"] * {
+  z-index: -999999 !important;
+  position: relative !important;
+}
+
+/* 스케줄 페이지 멤버 선택 영역의 스크롤 컨테이너 강제 z-index 낮춤 */
+body[data-page="/schedule"] div.flex.overflow-x-auto {
+  z-index: -2147483647 !important;
+  position: relative !important;
+}
+
+/* 스케줄 페이지 멤버 선택 영역의 스크롤 컨테이너 내부 요소들도 z-index 낮춤 */
+body[data-page="/schedule"] div.flex.overflow-x-auto * {
+  z-index: -2147483647 !important;
+  position: relative !important;
+}
+
+/* 스케줄 페이지 그룹 드롭다운 강제 최상위 */
+body[data-page="/schedule"] .group-selector-container .absolute {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+}
+
+/* 스케줄 페이지 그룹 드롭다운 내부 모든 요소 최상위 */
+body[data-page="/schedule"] .group-selector-container .absolute * {
+  z-index: 2147483647 !important;
+  position: relative !important;
+}
+
+/* 스케줄 페이지 그룹 드롭다운 강제 최상위 (computed 스타일 오버라이드) */
+body[data-page="/schedule"] .group-selector-container .absolute[style*="zIndex: 2147483647"] {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+}
+
+/* 스케줄 페이지 그룹 드롭다운 모든 가능한 z-index 값 오버라이드 */
+body[data-page="/schedule"] .group-selector-container .absolute[style*="z-index"],
+body[data-page="/schedule"] .group-selector-container .absolute[style*="zIndex"] {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+}
+
+/* 스케줄 페이지 그룹 드롭다운 computed 스타일 강제 오버라이드 */
+body[data-page="/schedule"] .group-selector-container .absolute {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+  transform: translateZ(0) !important;
+}
+
+/* 스케줄 페이지 그룹 드롭다운 최종 강제 오버라이드 */
+body[data-page="/schedule"] div[style*="zIndex: 2147483647"] {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+  transform: translateZ(0) !important;
+}
+
+/* 스케줄 페이지 그룹 드롭다운 모든 z-index 값 무시하고 최상위로 */
+body[data-page="/schedule"] .group-selector-container .absolute,
+body[data-page="/schedule"] .group-selector-container .absolute[style],
+body[data-page="/schedule"] .group-selector-container .absolute[style*="z-index"],
+body[data-page="/schedule"] .group-selector-container .absolute[style*="zIndex"] {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+  transform: translateZ(0) !important;
+}
+
+/* computed 스타일 z-index: 999999 강제 오버라이드 */
+body[data-page="/schedule"] .group-selector-container .absolute[style*="z-index: 999999"],
+body[data-page="/schedule"] .group-selector-container .absolute[style*="zIndex: 999999"] {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+  transform: translateZ(0) !important;
+}
+
+/* 모든 가능한 z-index 값 강제 오버라이드 */
+body[data-page="/schedule"] .group-selector-container .absolute[style*="z-index"],
+body[data-page="/schedule"] .group-selector-container .absolute[style*="zIndex"] {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+  transform: translateZ(0) !important;
+}
+
+/* 스케줄 페이지 모든 드롭다운 강제 최상위 */
+body[data-page="/schedule"] .absolute {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+  transform: translateZ(0) !important;
+}
+
+/* 스케줄 페이지 모든 드롭다운 내부 요소들도 최상위 */
+body[data-page="/schedule"] .absolute * {
+  z-index: 2147483647 !important;
+  position: relative !important;
+}
+
+/* 스케줄 페이지 모든 motion.div 드롭다운 최상위 */
+body[data-page="/schedule"] .absolute.motion-div {
+  z-index: 2147483647 !important;
+  position: absolute !important;
+  transform: translateZ(0) !important;
+}
+
+/* 스케줄 페이지 그룹 드롭다운 position 강제 변경 */
+body[data-page="/schedule"] .group-selector-container .absolute,
+body[data-page="/schedule"] .group-selector-container .absolute[style*="position: relative"],
+body[data-page="/schedule"] .group-selector-container .absolute[style*="position:relative"] {
+  position: absolute !important;
+  z-index: 2147483647 !important;
+  transform: translateZ(0) !important;
+}
+
+/* 스케줄 페이지 모든 드롭다운 position 강제 변경 */
+body[data-page="/schedule"] .absolute[style*="position: relative"],
+body[data-page="/schedule"] .absolute[style*="position:relative"] {
+  position: absolute !important;
+  z-index: 2147483647 !important;
+  transform: translateZ(0) !important;
+}
+
+/* 스케줄 페이지 computed 스타일 완전 오버라이드 */
+body[data-page="/schedule"] .group-selector-container .absolute,
+body[data-page="/schedule"] .group-selector-container .absolute[style],
+body[data-page="/schedule"] .group-selector-container .absolute[style*="z-index"],
+body[data-page="/schedule"] .group-selector-container .absolute[style*="zIndex"],
+body[data-page="/schedule"] .group-selector-container .absolute[style*="position"],
+body[data-page="/schedule"] .group-selector-container .absolute[style*="Position"] {
+  position: absolute !important;
+  z-index: 2147483647 !important;
+  transform: translateZ(0) !important;
+  top: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+  margin-top: 4px !important;
+}
+
+/* 스케줄 페이지 모든 absolute 요소 강제 설정 */
+body[data-page="/schedule"] .absolute {
+  position: absolute !important;
+  z-index: 2147483647 !important;
+  transform: translateZ(0) !important;
+}
+
+/* 멤버 선택 영역 z-index 낮춤 */
+body[data-page="/schedule"] div[style*="zIndex: 1"] {
+  z-index: -2147483647 !important;
+  position: relative !important;
+}
+
+/* 멤버 선택 영역 강제 z-index 낮춤 */
+body[data-page="/schedule"] div[style*="zIndex: -1"] {
+  z-index: -2147483647 !important;
+  position: relative !important;
+}
+
+/* 멤버 선택 영역 최종 강제 z-index 낮춤 */
+body[data-page="/schedule"] div[style*="zIndex: -2147483647"] {
+  z-index: -2147483647 !important;
+  position: relative !important;
+}
+
+/* 그룹 드롭다운 강제 최상위 */
+.group-selector-container .absolute {
+  z-index: 2147483647 !important;
+  position: absolute !important;
 }

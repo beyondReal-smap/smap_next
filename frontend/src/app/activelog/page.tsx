@@ -284,14 +284,14 @@ const floatingCardVariants = {
 // 사이드바 애니메이션 - 더 부드럽고 자연스럽게
 const sidebarVariants = {
   closed: {
-    x: -40,
+    x: -30,
     opacity: 0,
-    scale: 0.98,
-    filter: 'blur(2px)',
+    scale: 0.99,
+    filter: 'blur(1px)',
     boxShadow: '0 0 0 rgba(0,0,0,0)',
     transition: {
-      duration: 0.35,
-      ease: cubicBezier(0.4, 0.0, 0.2, 1)
+      duration: 0.6,
+      ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
     }
   },
   open: {
@@ -301,8 +301,8 @@ const sidebarVariants = {
     filter: 'blur(0px)',
     boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
     transition: {
-      duration: 0.45,
-      ease: cubicBezier(0.4, 0.0, 0.2, 1)
+      duration: 0.7,
+      ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
     }
   }
 };
@@ -7471,7 +7471,7 @@ export default function ActivelogPage() {
             initial="closed"
             animate="open"
             exit="closed"
-            className="fixed left-0 top-0 w-80 shadow-2xl border-r z-[9999] flex flex-col"
+            className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[9999] flex flex-col"
             style={{ 
               background: 'linear-gradient(to bottom right, #f0f9ff, #fdf4ff)',
               borderColor: 'rgba(1, 19, 163, 0.1)',

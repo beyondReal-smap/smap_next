@@ -668,6 +668,11 @@ export default function TermsPage() {
         <AnimatedHeader 
           variant="enhanced"
           className="setting-header"
+          style={{
+            height: '62px',
+            minHeight: '62px',
+            maxHeight: '62px'
+          }}
         >
           <motion.div 
             initial={{ opacity: 0, x: -40 }}
@@ -838,17 +843,19 @@ export default function TermsPage() {
               bottom: 0,
               backgroundColor: 'rgba(0, 0, 0, 0.5)',
               backdropFilter: 'blur(4px)',
-              zIndex: 9999,
+              zIndex: 2147483647,
               display: 'flex',
-              alignItems: 'flex-end',
-              justifyContent: 'center'
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100vw',
+              height: '100vh'
             }}
             onClick={handleCloseModal}
           >
             <motion.div 
-              initial={{ y: '100%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '100%' }}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
               transition={{ 
                 type: 'spring',
                 damping: 25,
@@ -856,27 +863,22 @@ export default function TermsPage() {
                 duration: 0.4
               }}
               style={{
-                position: 'absolute',
-                top: 0,
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: '100vh',
-                width: '100vw',
+                position: 'relative',
+                width: '90%',
+                maxWidth: '400px',
                 backgroundColor: 'white',
-                borderRadius: '12px 12px 0 0',
-                boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.15)',
+                borderRadius: '24px',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
                 overflowY: 'auto',
                 padding: '24px',
                 paddingBottom: '32px',
-                zIndex: 10000,
-                maxWidth: 'none',
-                maxHeight: 'none'
+                zIndex: 2147483647,
+                maxHeight: '80vh',
+                transform: 'translateZ(0)',
+                WebkitTransform: 'translateZ(0)'
               }}
               onClick={e => e.stopPropagation()}
             >
-                              <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6 cursor-grab active:cursor-grabbing"></div>
-              
               <div className="text-center mb-6">
                 <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
                   <selectedTerm.icon className="w-8 h-8 text-yellow-600" />

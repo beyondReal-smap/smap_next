@@ -188,11 +188,16 @@ const GroupSelector = memo(({
                 e.preventDefault();
                 console.log('[GroupSelector] 그룹 선택 클릭:', group.sgt_idx, group.sgt_title);
                 
-                // 즉시 onGroupSelect 호출하고 드롭다운 닫기
-                setTimeout(() => {
-                  onGroupSelect(group.sgt_idx);
+                // 같은 그룹을 선택했을 때는 드롭다운만 닫기
+                if (selectedGroupId === group.sgt_idx) {
                   onClose();
-                }, 0);
+                } else {
+                  // 다른 그룹을 선택했을 때는 onGroupSelect 호출하고 드롭다운 닫기
+                  setTimeout(() => {
+                    onGroupSelect(group.sgt_idx);
+                    onClose();
+                  }, 0);
+                }
               }}
               className={`w-full px-4 py-3 text-left text-sm focus:outline-none transition-colors flex items-center justify-between border-b border-gray-100 last:border-b-0 ${
                 selectedGroupId === group.sgt_idx 

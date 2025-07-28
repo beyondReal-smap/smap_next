@@ -520,8 +520,25 @@ export default function AccountSettingsPage() {
         *::-webkit-scrollbar {
           display: none !important;
         }
+
+        /* setting/account 페이지에서 bottom navigation 바 완전 제거 */
+        body[data-page="/setting/account"] #bottom-navigation-bar,
+        html[data-page="/setting/account"] #bottom-navigation-bar {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          position: absolute !important;
+          bottom: -100px !important;
+          z-index: -1 !important;
+        }
+        
+        /* setting/account 페이지에서 bottom navigation 바 관련 여백 제거 */
+        body[data-page="/setting/account"] .pb-24,
+        body[data-page="/setting/account"] .pb-20 {
+          padding-bottom: 0 !important;
+        }
       `}</style>
-      <div className="flex flex-col h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50" data-page="/setting/account">
+      <div className="fixed inset-0 bg-gradient-to-br from-indigo-50 via-white to-purple-50" data-page="/setting/account">
         {/* 통일된 헤더 애니메이션 */}
         <AnimatedHeader 
           variant="simple"
@@ -560,8 +577,24 @@ export default function AccountSettingsPage() {
           </div>
         </AnimatedHeader>
 
-        {/* 스크롤 가능한 메인 컨텐츠 */}
-        <div className="flex-1 overflow-y-auto px-4 pt-20" style={{ paddingBottom: '0px' }}>
+        {/* 메인 컨텐츠 - 고정 위치 (setting 페이지와 동일한 구조) */}
+        <motion.div
+          initial="initial"
+          animate="in"
+          exit="out"
+          className="absolute inset-0 px-4 space-y-6 content-area hide-scrollbar pt-20"
+          style={{ 
+            top: '0px',
+            bottom: '0px',
+            left: '0',
+            right: '0',
+            overflow: 'hidden',
+            overflowY: 'auto',
+            scrollbarWidth: 'none', /* Firefox */
+            msOverflowStyle: 'none', /* IE and Edge */
+            paddingBottom: '100px', /* 아래쪽 padding 영역 추가 */
+          }}
+        >
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -687,7 +720,7 @@ export default function AccountSettingsPage() {
               ))}
             </div>
           </motion.div>
-        </div>
+        </motion.div>
 
         {/* 프로필 사진 변경 모달 */}
         {showSheet && (
@@ -700,7 +733,7 @@ export default function AccountSettingsPage() {
                 className={`w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 shadow-2xl ${
                   isClosing ? 'animate-slideOutToBottom' : 'animate-slideInFromBottom'
                 }`}
-                style={{ marginBottom: '-30px', borderRadius: '24px 24px 0px 0px' }}
+                style={{ marginBottom: '-1px', borderRadius: '24px 24px 0px 0px' }}
                 onClick={e => e.stopPropagation()}
               >
               <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
