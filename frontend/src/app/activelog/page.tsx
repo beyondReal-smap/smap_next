@@ -281,27 +281,21 @@ const floatingCardVariants = {
   }
 };
 
-// 사이드바 애니메이션 - 더 부드럽고 자연스럽게
+// 사이드바 애니메이션 - 네모 캘린더 깜빡임 방지를 위해 단순화
 const sidebarVariants = {
   closed: {
     x: -30,
     opacity: 0,
-    scale: 0.99,
-    filter: 'blur(1px)',
-    boxShadow: '0 0 0 rgba(0,0,0,0)',
     transition: {
-      duration: 0.6,
+      duration: 0.3,
       ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
     }
   },
   open: {
     x: 0,
     opacity: 1,
-    scale: 1,
-    filter: 'blur(0px)',
-    boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
     transition: {
-      duration: 0.7,
+      duration: 0.3,
       ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
     }
   }
@@ -311,13 +305,13 @@ const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
     transition: {
-      duration: 0.2 // 0.25에서 0.2로 줄여서 더 빠르게
+      duration: 0.15
     }
   },
   open: {
     opacity: 1,
     transition: {
-      duration: 0.2 // 0.25에서 0.2로 줄여서 더 빠르게
+      duration: 0.15
     }
   }
 };
@@ -325,36 +319,34 @@ const sidebarOverlayVariants = {
 const sidebarContentVariants = {
   closed: {
     opacity: 0,
-    x: -30,
+    x: -20,
     transition: {
-      duration: 0.25 // 사이드바와 동일한 duration으로 맞춤
+      duration: 0.2
     }
   },
   open: {
     opacity: 1,
     x: 0,
     transition: {
-      duration: 0.25, // 사이드바와 완전히 동일한 duration
-      delay: 0, // 지연 제거
-      staggerChildren: 0, // 순차 애니메이션 제거
-      delayChildren: 0 // 자식 요소 지연 제거
+      duration: 0.2,
+      delay: 0,
+      staggerChildren: 0,
+      delayChildren: 0
     }
   }
 };
 
-// 멤버 아이템 애니메이션 - 부드럽고 일관된 애니메이션
+// 멤버 아이템 애니메이션 - 네모 캘린더 깜빡임 방지를 위해 단순화
 const memberItemVariants = {
   closed: { 
     opacity: 0,
-    x: -5, // 움직임을 더 줄여서 부드럽게
-    scale: 0.98 // 스케일 변화 최소화
+    x: -10
   },
   open: { 
     opacity: 1,
     x: 0,
-    scale: 1,
     transition: {
-      duration: 0.2 // 더 빠르게
+      duration: 0.15
     }
   }
 };
@@ -7481,6 +7473,7 @@ export default function ActivelogPage() {
               maxHeight: '100vh',
               position: 'fixed',
               borderRadius: '0 18px 18px 0',
+              boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
               // 모바일 사파리 최적화
               transform: 'translateZ(0)',
               willChange: 'transform',
