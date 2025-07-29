@@ -1325,6 +1325,12 @@ const SignInPage = () => {
   const handleGoogleSDKLogin = async (retryCount: number = 0) => {
     console.log('[GOOGLE SDK] 웹 Google SDK를 통한 로그인 시작', retryCount > 0 ? `(재시도 ${retryCount})` : '');
     
+    // 안드로이드에서는 웹 SDK 사용 금지
+    if (isAndroidWebView) {
+      console.log('[GOOGLE SDK] 안드로이드에서는 웹 SDK 사용 금지');
+      throw new Error('안드로이드에서는 네이티브 구글 로그인만 사용 가능합니다.');
+    }
+    
     // 중복 호출 방지
     if ((window as any).__GOOGLE_SDK_LOGIN_IN_PROGRESS__) {
       console.log('[GOOGLE SDK] 이미 로그인 진행 중, 중복 호출 무시');
@@ -2789,7 +2795,7 @@ const SignInPage = () => {
     if (isAndroidWebView && (window as any).AndroidGoogleSignIn) {
       console.log('[GOOGLE LOGIN] 안드로이드 네이티브 구글 로그인 호출');
       console.log('[GOOGLE LOGIN] AndroidGoogleSignIn 객체 확인:', (window as any).AndroidGoogleSignIn);
-      console.log('[GOOGLE LOGIN] startGoogleSignIn 함수 확인:', typeof (window as any).AndroidGoogleSignIn?.startGoogleSignIn);
+      console.log('[GOOGLE LOGIN] signIn 함수 확인:', typeof (window as any).AndroidGoogleSignIn?.signIn);
       
       try {
         console.log('[GOOGLE LOGIN] signIn 함수 호출 시작');
@@ -2800,7 +2806,9 @@ const SignInPage = () => {
         console.error('[GOOGLE LOGIN] 안드로이드 네이티브 구글 로그인 실패:', error);
         console.error('[GOOGLE LOGIN] 오류 상세:', error?.message);
         console.error('[GOOGLE LOGIN] 오류 스택:', error?.stack);
-        setError('Google 로그인에 실패했습니다. 다시 시도해주세요.');
+        
+        // 안드로이드에서 네이티브 로그인 실패 시 에러 표시
+        setError('Google 로그인 설정 오류입니다. 앱을 다시 시작해주세요.');
         setIsLoading(false);
         delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
         try {
@@ -2817,6 +2825,20 @@ const SignInPage = () => {
         hasAndroidGoogleSignIn: !!(window as any).AndroidGoogleSignIn,
         androidGoogleSignInType: typeof (window as any).AndroidGoogleSignIn
       });
+      
+      // 안드로이드에서 네이티브 인터페이스가 없으면 에러 표시
+      if (isAndroidWebView) {
+        setError('Google 로그인 설정 오류입니다. 앱을 다시 시작해주세요.');
+        setIsLoading(false);
+        delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
+        try {
+          unfreezePage();
+        } catch (unfreezeError) {
+          console.warn('[GOOGLE LOGIN] 안드로이드 인터페이스 없음 시 페이지 고정 해제 실패:', unfreezeError);
+        }
+        window.removeEventListener('beforeunload', preventBeforeUnload);
+        return;
+      }
     }
     
     // iOS 네이티브에 구글 로그인 시작 알림
@@ -2827,9 +2849,9 @@ const SignInPage = () => {
         param: '',
         timestamp: Date.now()
       });
-    } else {
+    } else if (!isAndroidWebView) {
+      // 안드로이드가 아닌 경우에만 웹 SDK 사용
       console.log('[GOOGLE LOGIN] iOS 네이티브 핸들러 없음, 웹 SDK로 폴백');
-      // 웹 SDK로 폴백
       try {
         await handleGoogleSDKLogin();
       } catch (error) {
@@ -2844,6 +2866,19 @@ const SignInPage = () => {
         }
         window.removeEventListener('beforeunload', preventBeforeUnload);
       }
+      return;
+    } else {
+      // 안드로이드에서 네이티브 인터페이스가 없으면 에러 표시
+      console.log('[GOOGLE LOGIN] 안드로이드에서 네이티브 인터페이스 없음');
+      setError('Google 로그인 설정 오류입니다. 앱을 다시 시작해주세요.');
+      setIsLoading(false);
+      delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
+      try {
+        unfreezePage();
+      } catch (unfreezeError) {
+        console.warn('[GOOGLE LOGIN] 안드로이드 인터페이스 없음 시 페이지 고정 해제 실패:', unfreezeError);
+      }
+      window.removeEventListener('beforeunload', preventBeforeUnload);
       return;
     }
     
