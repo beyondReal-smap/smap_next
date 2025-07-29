@@ -2792,29 +2792,60 @@ const SignInPage = () => {
     window.addEventListener('beforeunload', preventBeforeUnload);
     
     // 안드로이드 네이티브 구글 로그인 확인
-    if (isAndroidWebView && (window as any).AndroidGoogleSignIn) {
-      console.log('[GOOGLE LOGIN] 안드로이드 네이티브 구글 로그인 호출');
+    if (isAndroidWebView) {
+      console.log('[GOOGLE LOGIN] 안드로이드 환경 감지');
       console.log('[GOOGLE LOGIN] AndroidGoogleSignIn 객체 확인:', (window as any).AndroidGoogleSignIn);
-      console.log('[GOOGLE LOGIN] signIn 함수 확인:', typeof (window as any).AndroidGoogleSignIn?.signIn);
+      console.log('[GOOGLE LOGIN] 인터페이스 준비 상태:', (window as any).__ANDROID_GOOGLE_SIGNIN_READY__);
       
-      try {
-        console.log('[GOOGLE LOGIN] signIn 함수 호출 시작');
-        (window as any).AndroidGoogleSignIn.signIn();
-        console.log('[GOOGLE LOGIN] 안드로이드 네이티브 구글 로그인 시작됨');
-        return; // 안드로이드에서는 네이티브 로그인만 사용
-      } catch (error: any) {
-        console.error('[GOOGLE LOGIN] 안드로이드 네이티브 구글 로그인 실패:', error);
-        console.error('[GOOGLE LOGIN] 오류 상세:', error?.message);
-        console.error('[GOOGLE LOGIN] 오류 스택:', error?.stack);
-        
-        // 안드로이드에서 네이티브 로그인 실패 시 에러 표시
+      // 인터페이스 준비 상태 확인
+      if (!(window as any).__ANDROID_GOOGLE_SIGNIN_READY__) {
+        console.error('[GOOGLE LOGIN] AndroidGoogleSignIn 인터페이스가 아직 준비되지 않음');
         setError('Google 로그인 설정 오류입니다. 앱을 다시 시작해주세요.');
         setIsLoading(false);
         delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
         try {
           unfreezePage();
         } catch (unfreezeError) {
-          console.warn('[GOOGLE LOGIN] 안드로이드 실패 시 페이지 고정 해제 실패:', unfreezeError);
+          console.warn('[GOOGLE LOGIN] 인터페이스 미준비 시 페이지 고정 해제 실패:', unfreezeError);
+        }
+        window.removeEventListener('beforeunload', preventBeforeUnload);
+        return;
+      }
+      
+      // 함수 존재 여부를 더 정확히 확인
+      const androidGoogleSignIn = (window as any).AndroidGoogleSignIn;
+      if (androidGoogleSignIn && typeof androidGoogleSignIn.signIn === 'function') {
+        try {
+          console.log('[GOOGLE LOGIN] signIn 함수 호출 시작');
+          androidGoogleSignIn.signIn();
+          console.log('[GOOGLE LOGIN] 안드로이드 네이티브 구글 로그인 시작됨');
+          return; // 안드로이드에서는 네이티브 로그인만 사용
+        } catch (error: any) {
+          console.error('[GOOGLE LOGIN] 안드로이드 네이티브 구글 로그인 실패:', error);
+          console.error('[GOOGLE LOGIN] 오류 상세:', error?.message);
+          console.error('[GOOGLE LOGIN] 오류 스택:', error?.stack);
+          
+          // 안드로이드에서 네이티브 로그인 실패 시 에러 표시
+          setError('Google 로그인 설정 오류입니다. 앱을 다시 시작해주세요.');
+          setIsLoading(false);
+          delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
+          try {
+            unfreezePage();
+          } catch (unfreezeError) {
+            console.warn('[GOOGLE LOGIN] 안드로이드 실패 시 페이지 고정 해제 실패:', unfreezeError);
+          }
+          window.removeEventListener('beforeunload', preventBeforeUnload);
+          return;
+        }
+      } else {
+        console.error('[GOOGLE LOGIN] AndroidGoogleSignIn.signIn 함수가 존재하지 않음');
+        setError('Google 로그인 설정 오류입니다. 앱을 다시 시작해주세요.');
+        setIsLoading(false);
+        delete (window as any).__GOOGLE_LOGIN_IN_PROGRESS__;
+        try {
+          unfreezePage();
+        } catch (unfreezeError) {
+          console.warn('[GOOGLE LOGIN] 안드로이드 함수 없음 시 페이지 고정 해제 실패:', unfreezeError);
         }
         window.removeEventListener('beforeunload', preventBeforeUnload);
         return;
