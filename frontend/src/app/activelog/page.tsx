@@ -328,26 +328,20 @@ const sidebarContentVariants = {
     opacity: 1,
     x: 0,
     transition: {
-      duration: 0.2,
-      delay: 0,
-      staggerChildren: 0,
-      delayChildren: 0
+      duration: 0.2
     }
   }
 };
 
-// 멤버 아이템 애니메이션 - 네모 캘린더 깜빡임 방지를 위해 단순화
+// 멤버 아이템 애니메이션 제거
 const memberItemVariants = {
   closed: { 
-    opacity: 0,
-    x: -10
+    opacity: 1,
+    x: 0
   },
   open: { 
     opacity: 1,
-    x: 0,
-    transition: {
-      duration: 0.15
-    }
+    x: 0
   }
 };
 
