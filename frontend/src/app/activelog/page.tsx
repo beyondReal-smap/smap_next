@@ -332,27 +332,27 @@ const sidebarContentVariants = {
     x: 0,
     scale: 1,
     transition: {
-      duration: 0.25,
-      delay: 0.05,
-      staggerChildren: 0.08,
-      delayChildren: 0.1
+      duration: 0.5,
+      staggerChildren: 0.02,
+      delayChildren: 0
     }
   }
 };
 
-// 멤버 아이템 애니메이션 - 순차적으로 나타나는 효과
+// 멤버 아이템 애니메이션 - 빠른 슬라이드인 애니메이션
 const memberItemVariants = {
   closed: { 
     opacity: 0,
-    x: -20,
-    scale: 0.95
+    x: -15,
+    scale: 0.98
   },
   open: { 
     opacity: 1,
     x: 0,
     scale: 1,
     transition: {
-      duration: 0.4
+      duration: 0.3,
+      ease: "easeOut" as const
     }
   }
 };
@@ -7595,7 +7595,12 @@ export default function ActivelogPage() {
                   }}
                 >
                   {groupMembers.length > 0 ? (
-                    <motion.div variants={sidebarContentVariants} className="space-y-2">
+                    <motion.div 
+                      variants={sidebarContentVariants} 
+                      initial="closed"
+                      animate="open"
+                      className="space-y-2"
+                    >
                       {sortGroupMembers(groupMembers).map((member, index) => (
                         <motion.div
                           key={member.id}
@@ -7643,7 +7648,7 @@ export default function ActivelogPage() {
                                     } as React.CSSProperties
                                   : {}
                                 }
-                                                                         transition={{ type: "spring", stiffness: 300 }}
+                                                                                                                                                   transition={{ duration: 0.2 }}
                               >
                                 <Image 
                                   src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
