@@ -281,22 +281,26 @@ const floatingCardVariants = {
   }
 };
 
-// 사이드바 애니메이션 - 네모 캘린더 깜빡임 방지를 위해 단순화
+// 사이드바 애니메이션 - 안정적인 애니메이션
 const sidebarVariants = {
   closed: {
     x: -30,
     opacity: 0,
+    scale: 0.99,
+    filter: 'blur(1px)',
+    boxShadow: '0 0 0 rgba(0,0,0,0)',
     transition: {
-      duration: 0.3,
-      ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
+      duration: 0.4
     }
   },
   open: {
     x: 0,
     opacity: 1,
+    scale: 1,
+    filter: 'blur(0px)',
+    boxShadow: '0 8px 32px rgba(31,41,55,0.18), 0 1.5px 6px rgba(0,0,0,0.08)',
     transition: {
-      duration: 0.3,
-      ease: cubicBezier(0.25, 0.46, 0.45, 0.94)
+      duration: 0.5
     }
   }
 };
@@ -304,22 +308,21 @@ const sidebarVariants = {
 const sidebarOverlayVariants = {
   closed: {
     opacity: 0,
-    transition: {
-      duration: 0.15
-    }
+    filter: 'blur(0px)',
+    transition: { duration: 0.2 }
   },
   open: {
     opacity: 1,
-    transition: {
-      duration: 0.15
-    }
+    filter: 'blur(2.5px)',
+    transition: { duration: 0.35 }
   }
 };
 
 const sidebarContentVariants = {
   closed: {
     opacity: 0,
-    x: -20,
+    x: -30,
+    scale: 0.98,
     transition: {
       duration: 0.2
     }
@@ -327,21 +330,30 @@ const sidebarContentVariants = {
   open: {
     opacity: 1,
     x: 0,
+    scale: 1,
     transition: {
-      duration: 0.2
+      duration: 0.25,
+      delay: 0.05,
+      staggerChildren: 0.08,
+      delayChildren: 0.1
     }
   }
 };
 
-// 멤버 아이템 애니메이션 제거
+// 멤버 아이템 애니메이션 - 순차적으로 나타나는 효과
 const memberItemVariants = {
   closed: { 
-    opacity: 1,
-    x: 0
+    opacity: 0,
+    x: -20,
+    scale: 0.95
   },
   open: { 
     opacity: 1,
-    x: 0
+    x: 0,
+    scale: 1,
+    transition: {
+      duration: 0.4
+    }
   }
 };
 
@@ -5601,13 +5613,15 @@ export default function ActivelogPage() {
     console.log(`[${instanceId.current}] 기존 데이터 초기화 완료, 새 그룹 데이터 로딩 시작`);
   }, [setSelectedGroupId, setGroupMembers, setSelectedDate, setDailyCountsData, setMemberActivityData]);
 
-  // 그룹별 멤버 수 조회 - 중복 실행 방지 및 캐시 없이 직접 조회
+  // 그룹별 멤버 수 조회 - 캐시 시스템 적용
   const groupMemberCountsLoadingRef = useRef<boolean>(false);
+  const groupMemberCountsCacheRef = useRef<Record<number, { count: number; timestamp: number }>>({});
+  const CACHE_DURATION = 5 * 60 * 1000; // 5분 캐시
   
   useEffect(() => {
     if (!isMainInstance.current) return;
     if (!userGroups || userGroups.length === 0) return;
-    if (groupMemberCountsLoadingRef.current) return; // 이미 실행 중이면 중복 실행 방지
+    if (groupMemberCountsLoadingRef.current) return;
     
     groupMemberCountsLoadingRef.current = true;
     
@@ -5615,34 +5629,49 @@ export default function ActivelogPage() {
       console.log(`[${instanceId.current}] 그룹 멤버 수 조회 시작:`, userGroups.length, '개 그룹');
       
       const counts: Record<number, number> = {};
+      const now = Date.now();
       
-      // 모든 그룹의 멤버 수를 병렬로 조회
-      await Promise.all(userGroups.map(async (group) => {
-        try {
-          const count = await getGroupMemberCount(group.sgt_idx);
-          counts[group.sgt_idx] = count;
-          console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수:`, count);
-        } catch (error) {
-          console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
-          counts[group.sgt_idx] = 0;
+      // 캐시된 데이터가 있는지 확인하고 유효한 데이터 사용
+      const validGroups = userGroups.filter(group => {
+        const cached = groupMemberCountsCacheRef.current[group.sgt_idx];
+        if (cached && (now - cached.timestamp) < CACHE_DURATION) {
+          counts[group.sgt_idx] = cached.count;
+          console.log(`[${instanceId.current}] 캐시된 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 사용:`, cached.count);
+          return false; // 캐시된 데이터가 있으면 API 호출하지 않음
         }
-      }));
+        return true; // 캐시가 없거나 만료된 경우 API 호출
+      });
+      
+      if (validGroups.length > 0) {
+        // 캐시되지 않은 그룹들만 병렬로 조회
+        await Promise.all(validGroups.map(async (group) => {
+          try {
+            const count = await getGroupMemberCount(group.sgt_idx);
+            counts[group.sgt_idx] = count;
+            // 캐시에 저장
+            groupMemberCountsCacheRef.current[group.sgt_idx] = { count, timestamp: now };
+            console.log(`[${instanceId.current}] 그룹 ${group.sgt_title}(${group.sgt_idx}) 멤버 수 조회:`, count);
+          } catch (error) {
+            console.error(`[${instanceId.current}] 그룹 ${group.sgt_idx} 멤버 수 조회 실패:`, error);
+            counts[group.sgt_idx] = 0;
+          }
+        }));
+      }
       
       setGroupMemberCounts(counts);
       console.log(`[${instanceId.current}] 전체 그룹 멤버 수 조회 완료:`, counts);
       groupMemberCountsLoadingRef.current = false;
     };
     
-    // 5초 후 실행
-    const timer = setTimeout(loadGroupMemberCounts, 5000);
+    // 즉시 실행 (5초 지연 제거)
+    loadGroupMemberCounts();
     
     return () => {
-      clearTimeout(timer);
       groupMemberCountsLoadingRef.current = false;
     };
   }, [userGroups]);
 
-  // 그룹 멤버 수를 가져오는 함수 - 직접 조회
+  // 그룹 멤버 수를 가져오는 함수 - 캐시 적용
   const getGroupMemberCount = async (groupId: number): Promise<number> => {
     try {
       console.log(`[${instanceId.current}] 그룹 ${groupId} 멤버 수 조회 시작`);
@@ -5653,6 +5682,17 @@ export default function ActivelogPage() {
     } catch (error) {
       console.error(`[${instanceId.current}] 그룹 ${groupId} 멤버 수 조회 실패:`, error);
       return 0;
+    }
+  };
+
+  // 캐시 무효화 함수
+  const invalidateGroupMemberCountsCache = (groupId?: number) => {
+    if (groupId) {
+      delete groupMemberCountsCacheRef.current[groupId];
+      console.log(`[${instanceId.current}] 그룹 ${groupId} 멤버 수 캐시 무효화`);
+    } else {
+      groupMemberCountsCacheRef.current = {};
+      console.log(`[${instanceId.current}] 모든 그룹 멤버 수 캐시 무효화`);
     }
   };
 
@@ -7094,7 +7134,7 @@ export default function ActivelogPage() {
                 animate="animate"
                 exit="exit"
                 className="absolute left-0 right-0 z-40 z-floating-card flex justify-center px-4"
-                style={{ top: '66px', left: '20px', right: '20px' }}
+                style={{ top: '68px', left: '20px', right: '20px' }}
               >
                 <motion.div
                   whileHover={{ 
@@ -7179,24 +7219,24 @@ export default function ActivelogPage() {
                     ) : (
                       <div className="flex items-center space-x-3">
                         <div className="flex flex-col items-center justify-center" style={{ minWidth: '50px' }}>
-                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-orange-400 to-orange-500 flex items-center justify-center mb-0.5">
-                            <FiTrendingUp className="w-2.5 h-2.5 text-white" />
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-400 to-red-500 flex items-center justify-center mb-0.5">
+                            <FiTrendingUp className="w-3 h-3 text-white" />
                           </div>
                           <span className="text-xs font-semibold text-gray-700 whitespace-nowrap" style={{ minWidth: '50px', textAlign: 'center' }}>
                             {locationSummary.distance}
                           </span>
                         </div>
                         <div className="flex flex-col items-center justify-center" style={{ minWidth: '45px' }}>
-                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center mb-0.5">
-                            <FiClock className="w-2.5 h-2.5 text-white" />
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center mb-0.5">
+                            <FiClock className="w-3 h-3 text-white" />
                           </div>
                           <span className="text-xs font-semibold text-gray-700 whitespace-nowrap" style={{ minWidth: '45px', textAlign: 'center' }}>
                             {locationSummary.time}
                           </span>
                         </div>
                         <div className="flex flex-col items-center justify-center" style={{ minWidth: '55px' }}>
-                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-400 to-green-500 flex items-center justify-center mb-0.5">
-                            <FiZap className="w-2.5 h-2.5 text-white" />
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center mb-0.5">
+                            <FiZap className="w-3 h-3 text-white" />
                           </div>
                           <span className="text-xs font-semibold text-gray-700 whitespace-nowrap" style={{ minWidth: '55px', textAlign: 'center' }}>
                             {locationSummary.steps}
@@ -7404,57 +7444,13 @@ export default function ActivelogPage() {
         }}
       />
 
-      {/* 사이드바 오버레이 */}
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <motion.div
-            variants={sidebarOverlayVariants}
-            initial="closed"
-            animate="open"
-            exit="closed"
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998]"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('[사이드바] 오버레이 클릭으로 닫기');
-              // 드롭다운이 열려있으면 사이드바를 닫지 않음
-              if (isGroupSelectorOpen) {
-                console.log('[사이드바] 드롭다운이 열려있어서 사이드바 닫기 취소');
-                return;
-              }
-              
-              // 닫기 상태 설정하여 중복 처리 방지
-              sidebarClosingRef.current = true;
-              
-              // 사이드바 닫기
-              setIsSidebarOpen(false);
-              
-              // 일정 시간 후 닫기 상태 해제
-              setTimeout(() => {
-                sidebarClosingRef.current = false;
-              }, 500);
-            }}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.preventDefault()}
-            onTouchEnd={(e) => e.stopPropagation()}
-            style={{
-              // 모바일 사파리 최적화
-              transform: 'translateZ(0)',
-              willChange: 'opacity',
-              backfaceVisibility: 'hidden',
-              WebkitBackfaceVisibility: 'hidden'
-            }}
-          />
-        )}
-      </AnimatePresence>
-
       {/* 사이드바 */}
       <AnimatePresence>
         {isSidebarOpen && (
           <motion.div
             ref={sidebarRef}
             variants={sidebarVariants}
-            initial="closed"
+            initial={isSidebarOpen ? "open" : "closed"}
             animate="open"
             exit="closed"
             className="fixed left-0 top-0 w-72 shadow-2xl border-r z-[9999] flex flex-col"
@@ -7492,7 +7488,7 @@ export default function ActivelogPage() {
           >
             <motion.div
               variants={sidebarContentVariants}
-              initial="closed"
+              initial={isSidebarOpen ? "open" : "closed"}
               animate="open"
               exit="closed"
               className="p-6 h-full flex flex-col relative z-10 overflow-hidden sidebar-content"
@@ -7579,7 +7575,12 @@ export default function ActivelogPage() {
                   <h3 className="text-base font-semibold text-gray-800">멤버 목록</h3>
                   <div className="flex-1 h-px bg-gradient-to-r from-emerald-200/50 to-transparent"></div>
                   <span className="text-xs text-gray-500 bg-white/60 px-2 py-1 rounded-full backdrop-blur-sm">
-                    {groupMembers.length}명
+                    {selectedGroupId && groupMemberCounts[selectedGroupId] !== undefined 
+                      ? `${groupMemberCounts[selectedGroupId]}명`
+                      : groupMembers.length > 0 
+                        ? `${groupMembers.length}명`
+                        : '로딩 중...'
+                    }
                   </span>
                 </div>
                 <div 
