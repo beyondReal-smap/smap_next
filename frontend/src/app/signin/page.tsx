@@ -3770,7 +3770,15 @@ const SignInPage = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999]"
+            className="fixed top-0 left-0 right-0 bottom-0 bg-black/60 backdrop-blur-sm z-[9999]"
+            style={{
+              width: '100vw',
+              height: '100vh',
+              minWidth: '100vw',
+              minHeight: '100vh',
+              maxWidth: '100vw',
+              maxHeight: '100vh'
+            }}
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 console.log('[SIGNIN] 배경 클릭으로 에러 모달 닫기');
@@ -3784,7 +3792,15 @@ const SignInPage = () => {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            className="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center p-4"
+            style={{
+              width: '100vw',
+              height: '100vh',
+              minWidth: '100vw',
+              minHeight: '100vh',
+              maxWidth: '100vw',
+              maxHeight: '100vh'
+            }}
           >
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto">
               <div className="p-6">
@@ -3828,7 +3844,17 @@ const SignInPage = () => {
 
         {/* 전체 화면 로딩 스피너 */}
         {isLoading && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div 
+            className="fixed top-0 left-0 right-0 bottom-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9998]"
+            style={{
+              width: '100vw',
+              height: '100vh',
+              minWidth: '100vw',
+              minHeight: '100vh',
+              maxWidth: '100vw',
+              maxHeight: '100vh'
+            }}
+          >
             <div className="bg-white px-6 py-4 rounded-xl shadow-lg">
               <IOSCompatibleSpinner size="md" message="처리 중..." />
             </div>
