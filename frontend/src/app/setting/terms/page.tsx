@@ -830,49 +830,55 @@ export default function TermsPage() {
         </AnimatePresence>
 
         {/* 약관 미리보기 모달 */}
-        {showPreviewModal && selectedTerm && (
-          <div 
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              backdropFilter: 'blur(4px)',
-              zIndex: 2147483647,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '100vw',
-              height: '100vh'
-            }}
-            onClick={handleCloseModal}
-          >
+        <AnimatePresence>
+          {showPreviewModal && selectedTerm && (
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                position: 'absolute',
+                top: '62px',
+                left: '0',
+                right: '0',
+                bottom: '0',
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                backdropFilter: 'blur(8px)',
+                zIndex: 999999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                height: 'calc(100vh - 62px)',
+                padding: '20px'
+              }}
+              onClick={handleCloseModal}
+            >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
               transition={{ 
                 type: 'spring',
                 damping: 25,
                 stiffness: 300,
-                duration: 0.4
+                duration: 0.3
               }}
               style={{
                 position: 'relative',
-                width: '90%',
+                width: '100%',
                 maxWidth: '400px',
                 backgroundColor: 'white',
-                borderRadius: '24px',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+                borderRadius: '20px',
+                boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
                 overflowY: 'auto',
                 padding: '24px',
                 paddingBottom: '32px',
-                zIndex: 2147483647,
-                maxHeight: '80vh',
+                zIndex: 1000000,
+                maxHeight: '85vh',
                 transform: 'translateZ(0)',
-                WebkitTransform: 'translateZ(0)'
+                WebkitTransform: 'translateZ(0)',
+                border: '1px solid rgba(255, 255, 255, 0.2)'
               }}
               onClick={e => e.stopPropagation()}
             >
@@ -927,8 +933,9 @@ export default function TermsPage() {
                 </button>
               </div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
+      </AnimatePresence>
       </div>
     </>
   );
