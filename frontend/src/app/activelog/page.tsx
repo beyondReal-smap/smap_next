@@ -321,7 +321,7 @@ const sidebarOverlayVariants = {
 const sidebarContentVariants = {
   closed: {
     opacity: 0,
-    x: -30,
+    x: -20,
     transition: {
       duration: 0.2
     }
@@ -330,24 +330,22 @@ const sidebarContentVariants = {
     opacity: 1,
     x: 0,
     transition: {
-      duration: 0.4,
-      staggerChildren: 0.05,
-      delayChildren: 0
+      duration: 0.3
     }
   }
 };
 
-// 멤버 아이템 애니메이션 - 부드러운 슬라이드인 애니메이션
+// 멤버 아이템 애니메이션 - 간단한 슬라이딩 애니메이션
 const memberItemVariants = {
   closed: { 
     opacity: 0,
-    x: -20
+    x: -30
   },
   open: { 
     opacity: 1,
     x: 0,
     transition: {
-      duration: 0.4,
+      duration: 0.3,
       ease: "easeOut" as const
     }
   }
@@ -7602,21 +7600,17 @@ export default function ActivelogPage() {
                           key={member.id}
                           id={`member-${member.id}`}
                           variants={memberItemVariants}
-                          whileTap={{ scale: 0.98 }}
                           onClick={(e) => {
                             console.log('[멤버 클릭] 멤버 선택:', member.name);
                             handleMemberSelect(member.id, e);
                             // 멤버 선택 시 사이드바는 자동으로 닫힘 (handleMemberSelect에서 처리)
                           }}
-                          className={`p-4 rounded-xl cursor-pointer transition-all duration-200 backdrop-blur-sm touch-optimized ${
+                          className={`p-4 rounded-xl cursor-pointer transition-colors duration-200 backdrop-blur-sm touch-optimized ${
                             member.isSelected 
                               ? 'border-2 shadow-lg' 
                               : 'bg-white/60 hover:bg-white/90 border hover:shadow-md'
                           }`}
                           style={{
-                            willChange: 'auto',
-                            transform: 'translateZ(0)',
-                            WebkitTransform: 'translateZ(0)',
                             ...(member.isSelected 
                               ? { 
                                   background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.8), rgba(253, 244, 255, 0.8))',
@@ -7631,7 +7625,7 @@ export default function ActivelogPage() {
                         >
                           <div className="flex items-center space-x-4">
                             <div className="relative">
-                              <motion.div 
+                              <div 
                                 className={`w-12 h-12 rounded-full overflow-hidden ${
                                   member.isSelected 
                                     ? 'ring-3 shadow-lg' 
@@ -7644,7 +7638,6 @@ export default function ActivelogPage() {
                                     } as React.CSSProperties
                                   : {}
                                 }
-                                                                                                                                                   transition={{ duration: 0.2 }}
                               >
                                 <Image 
                                   src={getSafeImageUrl(member.photo, member.mt_gender, member.original_index)}
@@ -7663,7 +7656,7 @@ export default function ActivelogPage() {
                                     }
                                   }}
                                 />
-                              </motion.div>
+                              </div>
                               
                               {/* 리더/오너 왕관 표시 */}
                               {member.sgdt_owner_chk === 'Y' && (
@@ -7752,11 +7745,11 @@ export default function ActivelogPage() {
                                     return (
                                       <div
                                         key={`calendar-${i}`}
-                                        className={`w-4 h-4 rounded transition-all duration-200 flex items-center justify-center text-[10px] font-bold select-none
+                                        className={`w-4 h-4 rounded transition-colors duration-200 flex items-center justify-center text-[10px] font-bold select-none
                                           ${isSelected
                                             ? 'bg-gradient-to-br from-pink-500 to-rose-500 border border-pink-600 ring-2 ring-pink-300 shadow-md text-white'
                                             : hasLog
-                                              ? 'bg-indigo-400/80 border border-indigo-500/30 cursor-pointer hover:bg-indigo-500/90 hover:scale-110 text-white' 
+                                              ? 'bg-indigo-400/80 border border-indigo-500/30 cursor-pointer hover:bg-indigo-500/90 text-white' 
                                               : 'bg-gray-50 border border-gray-200/50 text-gray-300'}
                                           ${isToday ? 'ring-2 ring-indigo-400' : ''}
                                         `}
