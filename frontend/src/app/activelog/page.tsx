@@ -322,7 +322,6 @@ const sidebarContentVariants = {
   closed: {
     opacity: 0,
     x: -30,
-    scale: 0.98,
     transition: {
       duration: 0.2
     }
@@ -330,28 +329,25 @@ const sidebarContentVariants = {
   open: {
     opacity: 1,
     x: 0,
-    scale: 1,
     transition: {
-      duration: 0.5,
-      staggerChildren: 0.02,
+      duration: 0.4,
+      staggerChildren: 0.05,
       delayChildren: 0
     }
   }
 };
 
-// 멤버 아이템 애니메이션 - 빠른 슬라이드인 애니메이션
+// 멤버 아이템 애니메이션 - 부드러운 슬라이드인 애니메이션
 const memberItemVariants = {
   closed: { 
     opacity: 0,
-    x: -15,
-    scale: 0.98
+    x: -20
   },
   open: { 
     opacity: 1,
     x: 0,
-    scale: 1,
     transition: {
-      duration: 0.3,
+      duration: 0.4,
       ease: "easeOut" as const
     }
   }
