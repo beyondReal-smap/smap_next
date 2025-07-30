@@ -3364,7 +3364,7 @@ const SignInPage = () => {
           }}
           animate={{ x: ['0vw', '-100vw', '0vw'] }}
           transition={{ 
-            duration: 25, 
+            duration: 10, 
             repeat: Infinity, 
             ease: 'linear',
             type: 'tween'
