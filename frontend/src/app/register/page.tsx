@@ -460,8 +460,8 @@ export default function RegisterPage() {
     const socialProvider = urlParams.get('social');
     
     if (socialProvider) {
-      // sessionStorage에서 소셜 로그인 데이터 확인
-      const socialData = sessionStorage.getItem('socialLoginData');
+      // localStorage에서 소셜 로그인 데이터 확인 (login 페이지에서 localStorage에 저장함)
+      const socialData = localStorage.getItem('socialLoginData');
       if (socialData) {
         try {
           const parsedData: SocialLoginData = JSON.parse(socialData);
@@ -484,8 +484,8 @@ export default function RegisterPage() {
           
           console.log(`🔥 [REGISTER] ${parsedData.provider} 소셜 로그인 데이터 로드 완료`);
           
-          // 사용 완료 후 sessionStorage에서 제거
-          sessionStorage.removeItem('socialLoginData');
+          // 사용 완료 후 localStorage에서 제거
+          localStorage.removeItem('socialLoginData');
           
         } catch (error) {
           console.error('🔥 [REGISTER] 소셜 로그인 데이터 파싱 오류:', error);

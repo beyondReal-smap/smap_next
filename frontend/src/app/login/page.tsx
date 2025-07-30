@@ -123,10 +123,10 @@ export default function LoginPage() {
           // 신규 회원 - register 페이지로 이동하면서 구글 정보 전달
           const socialData = {
             provider: 'google',
-            email: data.data.user.mt_email,
-            name: data.data.user.mt_name,
-            nickname: data.data.user.mt_nickname,
-            profile_image: data.data.user.mt_file1,
+            email: data.data.user.email,
+            name: data.data.user.name,
+            nickname: data.data.user.nickname,
+            profile_image: data.data.user.profile_image,
             google_id: data.data.user.google_id
           };
           
@@ -184,10 +184,10 @@ export default function LoginPage() {
           // 신규 회원 - register 페이지로 이동하면서 카카오 정보 전달
           const socialData = {
             provider: 'kakao',
-            email: data.data.user.mt_email,
-            name: data.data.user.mt_name,
-            nickname: data.data.user.mt_nickname,
-            profile_image: data.data.user.mt_file1,
+            email: data.data.user.email,
+            name: data.data.user.name,
+            nickname: data.data.user.nickname,
+            profile_image: data.data.user.profile_image,
             kakao_id: data.data.user.kakao_id
           };
           
