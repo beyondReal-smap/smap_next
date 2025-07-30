@@ -16,6 +16,7 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import { comprehensivePreloadData } from '@/services/dataPreloadService';
 // 카카오 관련 import 제거
 import IOSCompatibleSpinner from '@/components/common/IOSCompatibleSpinner';
+import SplashScreen from '@/components/common/SplashScreen';
 import groupService from '@/services/groupService';
 
 
@@ -546,6 +547,7 @@ const SignInPage = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
   // 안전한 useAuth 접근
@@ -3332,19 +3334,30 @@ const SignInPage = () => {
 
   return (
     <>
-      {/* WebKit 호환 배경 레이어 */}
-      <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        zIndex: 0,
-        overflow: 'hidden',
-        pointerEvents: 'none',
-        WebkitTransform: 'translateZ(0)',
-        transform: 'translateZ(0)',
-      }}>
+      {/* 스플래시 화면 - 모든 콘텐츠를 가림 */}
+      {showSplash && (
+        <SplashScreen
+          onComplete={() => setShowSplash(false)}
+          duration={2500}
+        />
+      )}
+
+      {/* 스플래시가 끝난 후에만 배경과 로그인 영역 표시 */}
+      {!showSplash && (
+        <>
+          {/* WebKit 호환 배경 레이어 */}
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            zIndex: 0,
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            WebkitTransform: 'translateZ(0)',
+            transform: 'translateZ(0)',
+          }}>
         <motion.div
           style={{
             width: '200vw',
@@ -3878,6 +3891,8 @@ const SignInPage = () => {
           </div>
         )}
       </motion.div>
+        </>
+      )}
     </>
   );
 };
