@@ -3332,7 +3332,7 @@ const SignInPage = () => {
 
   return (
     <>
-      {/* 움직이는 배경 레이어 */}
+      {/* WebKit 호환 배경 레이어 */}
       <div style={{
         position: 'fixed',
         top: 0,
@@ -3342,6 +3342,8 @@ const SignInPage = () => {
         zIndex: 0,
         overflow: 'hidden',
         pointerEvents: 'none',
+        WebkitTransform: 'translateZ(0)',
+        transform: 'translateZ(0)',
       }}>
         <motion.div
           style={{
@@ -3353,9 +3355,20 @@ const SignInPage = () => {
             top: 0,
             left: 0,
             zIndex: 0,
+            WebkitTransform: 'translateZ(0)',
+            transform: 'translateZ(0)',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden',
+            WebkitPerspective: '1000px',
+            perspective: '1000px',
           }}
           animate={{ x: ['0vw', '-100vw', '0vw'] }}
-          transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
+          transition={{ 
+            duration: 25, 
+            repeat: Infinity, 
+            ease: 'linear',
+            type: 'tween'
+          }}
         />
       </div>
 
@@ -3386,10 +3399,16 @@ const SignInPage = () => {
           transition={{ duration: 1 }}
         />
         
-        {/* 떠다니는 원형 요소들 */}
+        {/* WebKit 호환 떠다니는 원형 요소들 */}
         <motion.div
           className="absolute top-20 left-10 w-24 h-24 bg-white/20 rounded-full blur-xl"
-          style={{ zIndex: 1 }}
+          style={{ 
+            zIndex: 1,
+            WebkitTransform: 'translateZ(0)',
+            transform: 'translateZ(0)',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden'
+          }}
           animate={{
             y: [0, -40, 0],
             x: [0, 30, 0],
@@ -3399,12 +3418,19 @@ const SignInPage = () => {
           transition={{
             duration: 10,
             repeat: Infinity,
-            ease: 'easeInOut'
+            ease: 'easeInOut',
+            type: 'tween'
           }}
         />
         <motion.div
           className="absolute bottom-32 right-16 w-40 h-40 bg-white/15 rounded-full blur-xl"
-          style={{ zIndex: 1 }}
+          style={{ 
+            zIndex: 1,
+            WebkitTransform: 'translateZ(0)',
+            transform: 'translateZ(0)',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden'
+          }}
           animate={{
             y: [0, 50, 0],
             x: [0, -40, 0],
@@ -3415,12 +3441,19 @@ const SignInPage = () => {
             duration: 15,
             repeat: Infinity,
             ease: 'easeInOut',
-            delay: 3
+            delay: 3,
+            type: 'tween'
           }}
         />
         <motion.div
           className="absolute top-1/2 left-1/3 w-20 h-20 bg-white/18 rounded-full blur-lg"
-          style={{ zIndex: 1 }}
+          style={{ 
+            zIndex: 1,
+            WebkitTransform: 'translateZ(0)',
+            transform: 'translateZ(0)',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden'
+          }}
           animate={{
             y: [0, -30, 0],
             x: [0, 25, 0],
@@ -3431,12 +3464,19 @@ const SignInPage = () => {
             duration: 12,
             repeat: Infinity,
             ease: 'easeInOut',
-            delay: 6
+            delay: 6,
+            type: 'tween'
           }}
         />
         <motion.div
           className="absolute top-1/4 right-1/4 w-16 h-16 bg-white/12 rounded-full blur-md"
-          style={{ zIndex: 1 }}
+          style={{ 
+            zIndex: 1,
+            WebkitTransform: 'translateZ(0)',
+            transform: 'translateZ(0)',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden'
+          }}
           animate={{
             y: [0, 35, 0],
             x: [0, -20, 0],
@@ -3447,12 +3487,19 @@ const SignInPage = () => {
             duration: 8,
             repeat: Infinity,
             ease: 'easeInOut',
-            delay: 1
+            delay: 1,
+            type: 'tween'
           }}
         />
         <motion.div
           className="absolute bottom-1/4 left-1/3 w-28 h-28 bg-white/10 rounded-full blur-lg"
-          style={{ zIndex: 1 }}
+          style={{ 
+            zIndex: 1,
+            WebkitTransform: 'translateZ(0)',
+            transform: 'translateZ(0)',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden'
+          }}
           animate={{
             y: [0, -25, 0],
             x: [0, 35, 0],
@@ -3463,7 +3510,8 @@ const SignInPage = () => {
             duration: 18,
             repeat: Infinity,
             ease: 'easeInOut',
-            delay: 4
+            delay: 4,
+            type: 'tween'
           }}
         />
                 <motion.div 
@@ -3475,56 +3523,20 @@ const SignInPage = () => {
             position: 'relative',
             transform: 'translateZ(0)'
           }}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{
-            type: "spring",
-            stiffness: 200,
-            damping: 30,
-            delay: 0.5,
-            duration: 1.5
-          }}
-          whileHover={{ 
-            scale: 1.02,
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
-          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
         >
         <motion.div 
           className="text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{
-            type: "spring",
-            stiffness: 300,
-            damping: 25,
-            delay: 0.5,
-            duration: 0.6
-          }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
         >
-                      <motion.h2 
+                      <h2 
             className="text-2xl font-bold tracking-tight text-gray-900 flex items-center justify-center gap-3"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{
-              type: "spring",
-              stiffness: 250,
-              damping: 25,
-              delay: 0.8,
-              duration: 1.2
-            }}
           >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{
-                type: "spring",
-                stiffness: 300,
-                damping: 20,
-                delay: 1.0,
-                duration: 1.0
-              }}
-              whileHover={{ scale: 1.1 }}
-            >
+            <div>
               <Image 
                 src="/images/smap_logo.webp" 
                 alt="SMAP Logo"
@@ -3533,50 +3545,19 @@ const SignInPage = () => {
                 className="rounded-lg shadow-md"
                 priority
               />
-            </motion.div>
-            <motion.span
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{
-                type: "spring",
-                stiffness: 250,
-                damping: 25,
-                delay: 1.2,
-                duration: 1.0
-              }}
-            >
+            </div>
+            <span>
               SMAP 로그인
-            </motion.span>
-          </motion.h2>
-          <motion.p 
-            className="mt-2 text-sm text-gray-600"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              type: "spring",
-              stiffness: 250,
-              damping: 25,
-              delay: 1.5,
-              duration: 1.0
-            }}
-          >
+            </span>
+          </h2>
+          <p className="mt-2 text-sm text-gray-600">
             계정에 로그인하여 서비스를 이용하세요.
-          </motion.p>
+          </p>
         </motion.div>
 
         <div className="space-y-4">
           {/* 전화번호 입력 */}
-          <motion.div
-            initial={{ opacity: 0, x: -30, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{
-              type: "spring",
-              stiffness: 300,
-              damping: 25,
-              delay: 1.8,
-              duration: 0.8
-            }}
-          >
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               전화번호
             </label>
@@ -3616,20 +3597,10 @@ const SignInPage = () => {
             {formErrors.phoneNumber && (
               <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>{formErrors.phoneNumber}</p>
             )}
-          </motion.div>
+          </div>
 
           {/* 비밀번호 입력 */}
-          <motion.div
-            initial={{ opacity: 0, x: -30, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{
-              type: "spring",
-              stiffness: 300,
-              damping: 25,
-              delay: 2.0,
-              duration: 0.8
-            }}
-          >
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               비밀번호
             </label>
@@ -3668,21 +3639,12 @@ const SignInPage = () => {
             {formErrors.password && (
               <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>{formErrors.password}</p>
             )}
-          </motion.div>
+          </div>
         </div>
 
         {/* 로그인 버튼 */}
-        <motion.form 
+        <form 
           onSubmit={handlePhoneNumberLogin}
-          initial={{ opacity: 0, y: 30, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{
-            type: "spring",
-            stiffness: 300,
-            damping: 25,
-            delay: 2.2,
-            duration: 0.8
-          }}
         >
           <button
             type="submit"
@@ -3700,21 +3662,10 @@ const SignInPage = () => {
               '전화번호로 로그인'
             )}
           </button>
-        </motion.form>
+                  </form>
 
         {/* 그룹 3: 구분선, Google 로그인 버튼, 회원가입 링크 - 한번에 등장 */}
-        <motion.div 
-          className="mt-4"
-          initial={{ opacity: 0, y: 30, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{
-            type: "spring",
-            stiffness: 300,
-            damping: 25,
-            delay: 2.8,
-            duration: 1.0
-          }}
-        >
+        <div className="mt-4">
           <div className="relative">
             <div className="absolute inset-0 flex items-center" aria-hidden="true">
               <div className="w-full border-t border-gray-300" />
@@ -3825,7 +3776,7 @@ const SignInPage = () => {
               </Link>
             </p>
           </div>
-        </motion.div>
+        </div>
       </motion.div>
 
       {/* 에러 모달 - 단순화된 버전 */}
