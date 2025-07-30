@@ -510,6 +510,8 @@ export default function RegisterPage() {
             mt_email: parsedData.email || '',
             mt_name: parsedData.name || parsedData.given_name || 'Google User',
             mt_nickname: parsedData.nickname || parsedData.given_name || parsedData.name || 'Google User',
+            // 구글 로그인 시 비밀번호는 자동으로 설정 (실제로는 사용되지 않지만 유효성 검사를 위해)
+            mt_pwd: parsedData.provider === 'google' ? 'google_auto_password_123' : '',
             isSocialLogin: true,
             socialProvider: parsedData.provider,
             socialId: parsedData.kakao_id || parsedData.google_id || ''
@@ -1154,6 +1156,11 @@ export default function RegisterPage() {
         mt_show: 'Y'
       };
 
+      // 구글 로그인 시 비밀번호 제거 (실제로는 사용되지 않음)
+      if (registerData.isSocialLogin && registerData.socialProvider === 'google') {
+        delete requestData.mt_pwd;
+      }
+
       // 소셜 로그인이 아닌 경우에만 전화번호 하이픈 제거
       if (!registerData.isSocialLogin) {
         requestData.mt_id = registerData.mt_id.replace(/-/g, '');
@@ -1406,7 +1413,15 @@ export default function RegisterPage() {
         const isEmailValid = !registerData.mt_email || 
           /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(registerData.mt_email);
         
-        // 비밀번호 강도 검사
+        // 구글 로그인 시 비밀번호 검사 건너뛰기
+        if (registerData.isSocialLogin && registerData.socialProvider === 'google') {
+          return registerData.mt_name && 
+                 registerData.mt_nickname &&
+                 !emailError && // 이메일 에러가 없어야 함
+                 isEmailValid; // 빈 값이거나 유효한 이메일
+        }
+        
+        // 일반 회원가입 시 비밀번호 검사
         const isPasswordStrong = Object.values(passwordStrength).every(Boolean);
         
         return registerData.mt_pwd && 
@@ -1913,7 +1928,7 @@ export default function RegisterPage() {
                 )}
                 <p className="text-sm text-gray-600" style={{ wordBreak: 'keep-all' }}>
                   {registerData.isSocialLogin && registerData.socialProvider === 'google' 
-                    ? '구글 계정 정보가 미리 입력되었습니다. 필요시 수정해주세요' 
+                    ? '구글 계정 정보가 자동으로 입력되었습니다. 필요시 수정해주세요' 
                     : '서비스 이용을 위한 기본 정보를 입력해주세요'
                   }
                 </p>
@@ -1929,166 +1944,153 @@ export default function RegisterPage() {
                       </svg>
                       <div className="text-sm text-blue-800">
                         <p className="font-medium mb-1">구글 계정 정보가 자동으로 입력되었습니다</p>
-                        <p className="text-xs">이름, 닉네임, 이메일이 구글 계정에서 가져와져 미리 입력되었습니다. 필요시 수정하실 수 있습니다.</p>
+                        <p className="text-xs">이름, 닉네임, 이메일이 구글 계정에서 가져와져 미리 입력되었습니다. 비밀번호는 구글 계정으로 자동 설정되므로 입력이 필요하지 않습니다.</p>
                       </div>
                     </div>
                   </div>
                 )}
                 
-                {/* 비밀번호 */}
-            <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    비밀번호
-              </label>
-                  {registerData.isSocialLogin && registerData.socialProvider === 'google' && (
-                <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
-                  구글 계정으로 로그인하므로 비밀번호는 자동으로 설정됩니다 (변경 불가)
-                </p>
-              )}
-                  <div className="relative register-input-container px-0.5">
-                    <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                      <FiLock className="w-4 h-4 transition-colors duration-200" 
-                        style={{color: focusedField === 'password' ? '#0114a2' : '#9CA3AF'}} />
-                    </div>
-              <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={registerData.mt_pwd}
-                      onChange={(e) => {
-                        if (registerData.isSocialLogin && registerData.socialProvider === 'google') return; // 구글 로그인 시 변경 불가
-                        const password = e.target.value;
-                        setRegisterData(prev => ({ ...prev, mt_pwd: password }));
-                        validatePassword(password);
-                      }}
-                      onFocus={(e) => {
-                        if (!registerData.isSocialLogin || registerData.socialProvider !== 'google') {
-                          setFocusedField('password');
-                          e.target.style.boxShadow = '0 0 0 2px #0114a2';
-                        }
-                      }}
-                      onBlur={(e) => {
-                        setFocusedField(null);
-                        e.target.style.boxShadow = '';
-                      }}
-                      placeholder={registerData.isSocialLogin && registerData.socialProvider === 'google' ? '구글 계정으로 자동 설정' : "8자 이상, 대소문자, 숫자, 특수문자 포함"}
-                      disabled={registerData.isSocialLogin && registerData.socialProvider === 'google'}
-                      className={`w-full pl-11 pr-10 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
-                        registerData.isSocialLogin && registerData.socialProvider === 'google' ? 'bg-gray-50 cursor-not-allowed' : ''
-                      }`}
-                      style={{ outline: 'none' }}
-                    />
-                    <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                                            <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {/* 비밀번호 강도 표시기 */}
-                  {registerData.mt_pwd && (
-                    <div className="mt-2 space-y-1.5">
-                      <div className="flex space-x-1">
-                        {Object.values(passwordStrength).map((isValid, index) => (
-                          <div
-                            key={index}
-                            className={`h-1 flex-1 rounded-full transition-colors ${
-                              isValid ? 'bg-green-500' : 'bg-gray-200'
-                            }`}
-                          />
-                        ))}
+                {/* 비밀번호 - 구글 로그인 시 숨김 */}
+                {(!registerData.isSocialLogin || registerData.socialProvider !== 'google') && (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        비밀번호
+                      </label>
+                      <div className="relative register-input-container px-0.5">
+                        <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                          <FiLock className="w-4 h-4 transition-colors duration-200" 
+                            style={{color: focusedField === 'password' ? '#0114a2' : '#9CA3AF'}} />
+                        </div>
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={registerData.mt_pwd}
+                          onChange={(e) => {
+                            const password = e.target.value;
+                            setRegisterData(prev => ({ ...prev, mt_pwd: password }));
+                            validatePassword(password);
+                          }}
+                          onFocus={(e) => {
+                            setFocusedField('password');
+                            e.target.style.boxShadow = '0 0 0 2px #0114a2';
+                          }}
+                          onBlur={(e) => {
+                            setFocusedField(null);
+                            e.target.style.boxShadow = '';
+                          }}
+                          placeholder="8자 이상, 대소문자, 숫자, 특수문자 포함"
+                          className="w-full pl-11 pr-10 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
+                          style={{ outline: 'none' }}
+                        />
+                        <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                          >
+                            {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
+                          </button>
+                        </div>
                       </div>
                       
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                        {[
-                          { key: 'minLength', label: '8자+', valid: passwordStrength.minLength },
-                          { key: 'hasUppercase', label: '대문자', valid: passwordStrength.hasUppercase },
-                          { key: 'hasLowercase', label: '소문자', valid: passwordStrength.hasLowercase },
-                          { key: 'hasNumber', label: '숫자', valid: passwordStrength.hasNumber },
-                          { key: 'hasSpecialChar', label: '특수문자', valid: passwordStrength.hasSpecialChar }
-                        ].map(({ key, label, valid }) => (
-                          <div key={key} className={`flex items-center space-x-1 ${valid ? 'text-green-600' : 'text-gray-500'}`}>
-                            <div className={`w-1.5 h-1.5 rounded-full ${valid ? 'bg-green-500' : 'bg-gray-300'}`} />
-                            <span>{label}</span>
+                      {/* 비밀번호 강도 표시기 */}
+                      {registerData.mt_pwd && (
+                        <div className="mt-2 space-y-1.5">
+                          <div className="flex space-x-1">
+                            {Object.values(passwordStrength).map((isValid, index) => (
+                              <div
+                                key={index}
+                                className={`h-1 flex-1 rounded-full transition-colors ${
+                                  isValid ? 'bg-green-500' : 'bg-gray-200'
+                                }`}
+                              />
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                          
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                            {[
+                              { key: 'minLength', label: '8자+', valid: passwordStrength.minLength },
+                              { key: 'hasUppercase', label: '대문자', valid: passwordStrength.hasUppercase },
+                              { key: 'hasLowercase', label: '소문자', valid: passwordStrength.hasLowercase },
+                              { key: 'hasNumber', label: '숫자', valid: passwordStrength.hasNumber },
+                              { key: 'hasSpecialChar', label: '특수문자', valid: passwordStrength.hasSpecialChar }
+                            ].map(({ key, label, valid }) => (
+                              <div key={key} className={`flex items-center space-x-1 ${valid ? 'text-green-600' : 'text-gray-500'}`}>
+                                <div className={`w-1.5 h-1.5 rounded-full ${valid ? 'bg-green-500' : 'bg-gray-300'}`} />
+                                <span>{label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {passwordError && (
+                        <p className="text-red-500 text-sm mt-2" style={{ wordBreak: 'keep-all' }}>{passwordError}</p>
+                      )}
                     </div>
-                  )}
-                  
-                  {passwordError && (
-                    <p className="text-red-500 text-sm mt-2" style={{ wordBreak: 'keep-all' }}>{passwordError}</p>
-              )}
-            </div>
 
-                {/* 비밀번호 확인 */}
-            <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    비밀번호 확인
-              </label>
-                  <div className="relative register-input-container px-0.5">
-                    <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                      <FiLock className="w-4 h-4 transition-colors duration-200" 
-                        style={{color: focusedField === 'passwordConfirm' ? '#0114a2' : '#9CA3AF'}} />
+                    {/* 비밀번호 확인 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        비밀번호 확인
+                      </label>
+                      <div className="relative register-input-container px-0.5">
+                        <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                          <FiLock className="w-4 h-4 transition-colors duration-200" 
+                            style={{color: focusedField === 'passwordConfirm' ? '#0114a2' : '#9CA3AF'}} />
+                        </div>
+                        <input
+                          type={showPasswordConfirm ? 'text' : 'password'}
+                          value={passwordConfirm}
+                          onChange={(e) => {
+                            setPasswordConfirm(e.target.value);
+                          }}
+                          onFocus={(e) => {
+                            setFocusedField('passwordConfirm');
+                            e.target.style.boxShadow = '0 0 0 2px #0114a2';
+                          }}
+                          onBlur={(e) => {
+                            setFocusedField(null);
+                            e.target.style.boxShadow = '';
+                          }}
+                          placeholder="비밀번호를 다시 입력해주세요"
+                          className="w-full pl-11 pr-12 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
+                          style={{ outline: 'none' }}
+                        />
+                        <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
+                          <button
+                            type="button"
+                            onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                          >
+                            {showPasswordConfirm ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      {passwordConfirm && passwordConfirm !== registerData.mt_pwd && (
+                        <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>비밀번호가 일치하지 않습니다</p>
+                      )}
+                      {passwordConfirm && passwordConfirm === registerData.mt_pwd && registerData.mt_pwd && (
+                        <p className="text-green-500 text-sm mt-1 flex items-center" style={{ wordBreak: 'keep-all' }}>
+                          <FiCheck className="w-4 h-4 mr-1" />
+                          비밀번호가 일치합니다
+                        </p>
+                      )}
                     </div>
-              <input
-                      type={showPasswordConfirm ? 'text' : 'password'}
-                      value={passwordConfirm}
-                      onChange={(e) => {
-                        if (registerData.isSocialLogin && registerData.socialProvider === 'google') return; // 구글 로그인 시 변경 불가
-                        setPasswordConfirm(e.target.value);
-                      }}
-                      onFocus={(e) => {
-                        if (!registerData.isSocialLogin || registerData.socialProvider !== 'google') {
-                          setFocusedField('passwordConfirm');
-                          e.target.style.boxShadow = '0 0 0 2px #0114a2';
-                        }
-                      }}
-                      onBlur={(e) => {
-                        setFocusedField(null);
-                        e.target.style.boxShadow = '';
-                      }}
-                      placeholder={registerData.isSocialLogin && registerData.socialProvider === 'google' ? '구글 계정으로 자동 설정' : "비밀번호를 다시 입력해주세요"}
-                      disabled={registerData.isSocialLogin && registerData.socialProvider === 'google'}
-                      className={`w-full pl-11 pr-12 py-2.5 px-1 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input ${
-                        registerData.isSocialLogin && registerData.socialProvider === 'google' ? 'bg-gray-50 cursor-not-allowed' : ''
-                      }`}
-                      style={{ outline: 'none' }}
-                    />
-                    <div className="absolute right-2.5" style={{top: '50%', transform: 'translateY(-50%)'}}>
-                      <button
-                        type="button"
-                        onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
-                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        {showPasswordConfirm ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  {passwordConfirm && passwordConfirm !== registerData.mt_pwd && (
-                    <p className="text-red-500 text-sm mt-1" style={{ wordBreak: 'keep-all' }}>비밀번호가 일치하지 않습니다</p>
-                  )}
-                  {passwordConfirm && passwordConfirm === registerData.mt_pwd && registerData.mt_pwd && (
-                    <p className="text-green-500 text-sm mt-1 flex items-center" style={{ wordBreak: 'keep-all' }}>
-                      <FiCheck className="w-4 h-4 mr-1" />
-                      비밀번호가 일치합니다
-                    </p>
-              )}
-            </div>
+                  </>
+                )}
 
                 {/* 이름 */}
-            <div className="px-0.5">
+                <div className="px-0.5">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     이름
-              </label>
-              {registerData.isSocialLogin && registerData.socialProvider === 'google' && (
-                <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
-                  구글 계정에서 가져온 이름이 미리 입력되었습니다
-                </p>
-              )}
-              <input
+                  </label>
+                  {registerData.isSocialLogin && registerData.socialProvider === 'google' && (
+                    <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
+                      구글 계정에서 가져온 이름이 자동으로 입력되었습니다
+                    </p>
+                  )}
+                  <input
                     type="text"
                     value={registerData.mt_name}
                     onChange={(e) => setRegisterData(prev => ({ ...prev, mt_name: e.target.value }))}
@@ -2106,10 +2108,10 @@ export default function RegisterPage() {
                     닉네임
                   </label>
                   {registerData.isSocialLogin && registerData.socialProvider === 'google' && (
-                <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
-                  구글 계정에서 가져온 닉네임이 미리 입력되었습니다
-                </p>
-              )}
+                    <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
+                      구글 계정에서 가져온 닉네임이 자동으로 입력되었습니다
+                    </p>
+                  )}
                   <input
                     type="text"
                     value={registerData.mt_nickname}
