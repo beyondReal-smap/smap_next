@@ -1025,9 +1025,12 @@ export default function RegisterPage() {
         // iOS 네이티브 위치 권한 요청
         (window as any).webkit.messageHandlers.smapIos.postMessage({
           type: 'requestLocationPermission',
-          param: '',
+          param: {
+            source: 'user_click',
+            timestamp: Date.now()
+          },
           timestamp: Date.now(),
-          source: 'register_location'
+          source: 'user_click'
         });
 
         console.log('📱 [LOCATION] iOS 네이티브 위치 권한 요청 호출 완료');

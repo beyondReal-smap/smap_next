@@ -519,7 +519,10 @@ const SignInPage = () => {
       const savedErrorFlag = sessionStorage.getItem('__SIGNIN_ERROR_MODAL_ACTIVE__') === 'true';
       const savedRedirectBlock = sessionStorage.getItem('__BLOCK_ALL_REDIRECTS__') === 'true';
       
-      if (savedErrorFlag || savedRedirectBlock) {
+      // 처음 방문 시에는 에러 모달 복원하지 않음
+      const isFirstVisit = !document.referrer || document.referrer.includes(window.location.origin + '/signin');
+      
+      if ((savedErrorFlag || savedRedirectBlock) && !isFirstVisit) {
         console.log('[SIGNIN] 🔄 페이지 로드 시 브라우저 저장소에서 에러 모달 상태 복원');
         
         const savedErrorMessage = sessionStorage.getItem('__SIGNIN_ERROR_MESSAGE__') || '';
@@ -531,6 +534,12 @@ const SignInPage = () => {
         if (savedErrorMessage) {
           setErrorModalMessage(savedErrorMessage);
         }
+      } else if (isFirstVisit) {
+        console.log('[SIGNIN] 처음 방문이므로 에러 모달 상태 복원하지 않음');
+        // 처음 방문 시 sessionStorage 정리
+        sessionStorage.removeItem('__SIGNIN_ERROR_MODAL_ACTIVE__');
+        sessionStorage.removeItem('__SIGNIN_ERROR_MESSAGE__');
+        sessionStorage.removeItem('__BLOCK_ALL_REDIRECTS__');
       }
     } catch (error) {
       console.warn('[SIGNIN] sessionStorage 접근 실패:', error);
@@ -1838,10 +1847,21 @@ const SignInPage = () => {
   //   }
   // }, []);
 
-  // URL 파라미터에서 에러 메시지 확인 (로그아웃 후 에러 모달 방지)
+  // URL 파라미터에서 에러 메시지 확인 (처음 방문 시 에러 모달 방지)
   useEffect(() => {
     const error = searchParams.get('error');
     if (error) {
+      // 🔥 처음 방문 시 에러 모달 방지
+      const isFirstVisit = !document.referrer || document.referrer.includes(window.location.origin + '/signin');
+      if (isFirstVisit) {
+        console.log('[SIGNIN] 처음 방문 시 에러 파라미터 감지 - 무시:', error);
+        // URL에서 error 파라미터만 제거
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('error');
+        window.history.replaceState({}, '', newUrl.toString());
+        return;
+      }
+      
       // 🔥 로그아웃 후 에러 모달 방지 - 컴포넌트 마운트 후 1초 이내의 에러는 무시
       const timeSinceMount = Date.now() - (componentMountedRef.current ? 0 : Date.now());
       if (timeSinceMount < 1000) {

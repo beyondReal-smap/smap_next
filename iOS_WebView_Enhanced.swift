@@ -1504,6 +1504,19 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
     private func handleLocationPermissionRequest(param: Any?) {
         print("📍 [LOCATION] 위치 권한 요청 처리 시작")
         
+        // 자동 위치 권한 요청 차단 (사용자가 명시적으로 요청한 경우만 허용)
+        if let paramDict = param as? [String: Any],
+           let source = paramDict["source"] as? String {
+            print("📍 [LOCATION] 요청 소스: \(source)")
+            
+            // 자동 요청인 경우 차단
+            if source == "auto" || source == "page_load" || source == "register_location" {
+                print("🚫 [LOCATION] 자동 위치 권한 요청 차단됨")
+                sendLocationPermissionResult(success: false, error: "사용자 동의 없이 자동으로 위치 권한을 요청할 수 없습니다.")
+                return
+            }
+        }
+        
         // 위치 서비스 활성화 상태 먼저 확인
         guard CLLocationManager.locationServicesEnabled() else {
             print("❌ [LOCATION] 위치 서비스가 비활성화됨")
@@ -1572,20 +1585,20 @@ extension EnhancedWebViewController: WKScriptMessageHandler {
         
         DispatchQueue.main.async {
             let alert = UIAlertController(
-                title: NSLocalizedString("LOCATION_PERMISSION_TITLE", comment: "위치 권한 요청"),
-                message: NSLocalizedString("LOCATION_PERMISSION_MESSAGE", comment: "서비스 이용을 위해 위치 권한이 필요합니다. 설정에서 위치 권한을 허용해주세요."),
+                title: "위치 권한 요청",
+                message: "서비스 이용을 위해 위치 권한이 필요합니다. 설정에서 위치 권한을 허용해주세요.",
                 preferredStyle: .alert
             )
             
             alert.addAction(UIAlertAction(
-                title: NSLocalizedString("LOCATION_PERMISSION_SETTINGS", comment: "설정으로 이동"),
+                title: "설정으로 이동",
                 style: .default
             ) { _ in
                 self.openAppSettings()
             })
             
             alert.addAction(UIAlertAction(
-                title: NSLocalizedString("LOCATION_PERMISSION_CANCEL", comment: "취소"),
+                title: "취소",
                 style: .cancel
             ) { _ in
                 self.sendLocationPermissionResult(success: false, error: "사용자가 권한 요청을 취소했습니다.")
