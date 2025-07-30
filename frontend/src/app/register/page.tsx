@@ -170,8 +170,9 @@ export default function RegisterPage() {
         }
       }
       
-      /* iOS 초기 렌더링 제어 */
+      /* iOS 애니메이션 최적화 */
       @supports (-webkit-touch-callout: none) {
+        /* iOS 초기 렌더링 제어 */
         .register-content-area {
           opacity: 0;
           visibility: hidden;
@@ -181,6 +182,27 @@ export default function RegisterPage() {
         .register-content-area.ios-ready {
           opacity: 1;
           visibility: visible;
+        }
+        
+        /* iOS 애니메이션 성능 최적화 */
+        .register-content-area,
+        .register-scroll-area,
+        .register-content {
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+          -webkit-perspective: 1000px;
+          perspective: 1000px;
+        }
+        
+        /* 애니메이션 요소들에 하드웨어 가속 적용 */
+        [data-framer-motion-component-id] {
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+          will-change: transform, opacity;
         }
         
         /* iOS에서 체크박스 렌더링 안정화 */
@@ -269,6 +291,20 @@ export default function RegisterPage() {
           border: solid white;
           border-width: 0 2px 2px 0;
           transform: rotate(45deg);
+        }
+        
+        /* iOS 애니메이션 중간 끊김 방지 */
+        .register-content-area * {
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
+        }
+        
+        /* 스크롤 성능 최적화 */
+        .register-scroll-area {
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
         }
       }
     `;
@@ -841,16 +877,33 @@ export default function RegisterPage() {
     const steps = Object.values(REGISTER_STEPS);
     const currentIndex = steps.indexOf(currentStep);
     
+    // iOS에서 애니메이션 전환 최적화
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
     // 소셜 로그인 시 전화번호 인증 단계 건너뛰기
     if (registerData.isSocialLogin) {
       if (currentStep === REGISTER_STEPS.TERMS) {
-        setCurrentStep(REGISTER_STEPS.BASIC_INFO);
+        // iOS에서는 약간의 지연을 두어 애니메이션이 완료된 후 전환
+        if (isIOS) {
+          setTimeout(() => {
+            setCurrentStep(REGISTER_STEPS.BASIC_INFO);
+          }, 50);
+        } else {
+          setCurrentStep(REGISTER_STEPS.BASIC_INFO);
+        }
         return;
       }
     }
     
     if (currentIndex < steps.length - 1) {
-      setCurrentStep(steps[currentIndex + 1]);
+      // iOS에서는 약간의 지연을 두어 애니메이션이 완료된 후 전환
+      if (isIOS) {
+        setTimeout(() => {
+          setCurrentStep(steps[currentIndex + 1]);
+        }, 50);
+      } else {
+        setCurrentStep(steps[currentIndex + 1]);
+      }
     }
   };
 
@@ -1386,28 +1439,71 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className={`register-content-area ${isIOSReady ? 'ios-ready' : ''}`}>
+    <div 
+      className={`register-content-area ${isIOSReady ? 'ios-ready' : ''}`}
+      style={{
+        // iOS 애니메이션 최적화
+        willChange: 'auto',
+        transform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+        WebkitTransform: 'translateZ(0)',
+        WebkitBackfaceVisibility: 'hidden'
+      }}
+    >
       {/* 진행률 바 - 상단 고정 */}
       {currentStep !== REGISTER_STEPS.COMPLETE && (
         <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200 z-40">
           <motion.div 
             className="h-full"
-            style={{backgroundColor: '#0114a2'}}
+            style={{
+              backgroundColor: '#0114a2',
+              // iOS 애니메이션 최적화
+              willChange: 'width',
+              transform: 'translateZ(0)', // 하드웨어 가속 활성화
+              backfaceVisibility: 'hidden'
+            }}
             initial={{ width: 0 }}
             animate={{ width: `${getProgress()}%` }}
-            transition={{ duration: 0.5 }}
+            transition={{ 
+              duration: 0.5,
+              ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+              type: "tween"
+            }}
           />
         </div>
       )}
 
       {/* 스크롤 가능한 메인 콘텐츠 영역 */}
-      <div className="register-scroll-area" style={{ 
-        paddingTop: currentStep !== REGISTER_STEPS.COMPLETE ? '24px' : '20px', // 진행률 바 공간
-        paddingBottom: currentStep !== REGISTER_STEPS.COMPLETE ? '100px' : '20px' // 하단 버튼 공간
-      }}>
+      <div 
+        className="register-scroll-area" 
+        style={{ 
+          paddingTop: currentStep !== REGISTER_STEPS.COMPLETE ? '24px' : '20px', // 진행률 바 공간
+          paddingBottom: currentStep !== REGISTER_STEPS.COMPLETE ? '100px' : '20px', // 하단 버튼 공간
+          // iOS 애니메이션 최적화
+          willChange: 'auto',
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          WebkitTransform: 'translateZ(0)',
+          WebkitBackfaceVisibility: 'hidden'
+        }}
+      >
         <div className="flex-1 flex items-center justify-center min-h-0">
           <div className="w-full max-w-md mx-auto py-4 register-content">
-            <AnimatePresence mode="wait">
+            <AnimatePresence 
+              mode="wait"
+              initial={false}
+              onExitComplete={() => {
+                // iOS에서 애니메이션 완료 후 추가 정리 작업
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                if (isIOS) {
+                  // iOS에서 스크롤 위치 강제 초기화
+                  const scrollArea = document.querySelector('.register-scroll-area') as HTMLElement;
+                  if (scrollArea) {
+                    scrollArea.scrollTop = 0;
+                  }
+                }
+              }}
+            >
           {/* 약관 동의 단계 */}
           {currentStep === REGISTER_STEPS.TERMS && (
             <motion.div
@@ -1415,6 +1511,11 @@ export default function RegisterPage() {
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
+              transition={{ 
+                duration: 0.3,
+                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                type: "tween"
+              }}
               className="space-y-3"
               data-step="terms"
               style={{
@@ -1423,7 +1524,11 @@ export default function RegisterPage() {
                 opacity: 1,
                 display: 'block',
                 position: 'relative',
-                zIndex: 1
+                zIndex: 1,
+                // iOS 애니메이션 최적화
+                willChange: 'transform, opacity',
+                transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                backfaceVisibility: 'hidden'
               }}
             >
               <div className="text-center mb-4">
@@ -1534,7 +1639,18 @@ export default function RegisterPage() {
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
+              transition={{ 
+                duration: 0.3,
+                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                type: "tween"
+              }}
               className="w-full h-full flex flex-col justify-center"
+              style={{
+                // iOS 애니메이션 최적화
+                willChange: 'transform, opacity',
+                transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                backfaceVisibility: 'hidden'
+              }}
             >
               <div className="text-center mb-6">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
@@ -1602,7 +1718,18 @@ export default function RegisterPage() {
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
+              transition={{ 
+                duration: 0.3,
+                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                type: "tween"
+              }}
               className="w-full h-full flex flex-col justify-center"
+              style={{
+                // iOS 애니메이션 최적화
+                willChange: 'transform, opacity',
+                transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                backfaceVisibility: 'hidden'
+              }}
             >
               <div className="text-center mb-6">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
@@ -1753,7 +1880,18 @@ export default function RegisterPage() {
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
+              transition={{ 
+                duration: 0.3,
+                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                type: "tween"
+              }}
               className="w-full h-full flex flex-col"
+              style={{
+                // iOS 애니메이션 최적화
+                willChange: 'transform, opacity',
+                transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                backfaceVisibility: 'hidden'
+              }}
             >
               <div className="text-center mb-4">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
@@ -2055,7 +2193,18 @@ export default function RegisterPage() {
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
+              transition={{ 
+                duration: 0.3,
+                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                type: "tween"
+              }}
               className="w-full h-full flex flex-col justify-center"
+              style={{
+                // iOS 애니메이션 최적화
+                willChange: 'transform, opacity',
+                transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                backfaceVisibility: 'hidden'
+              }}
             >
               <div className="text-center mb-6">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
@@ -2140,7 +2289,18 @@ export default function RegisterPage() {
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -50 }}
+              transition={{ 
+                duration: 0.3,
+                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                type: "tween"
+              }}
               className="w-full h-full flex flex-col justify-center"
+              style={{
+                // iOS 애니메이션 최적화
+                willChange: 'transform, opacity',
+                transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                backfaceVisibility: 'hidden'
+              }}
             >
               <div className="text-center mb-6">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
@@ -2271,7 +2431,18 @@ export default function RegisterPage() {
               key="complete"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
+              transition={{ 
+                duration: 0.4,
+                ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+                type: "tween"
+              }}
               className="w-full h-full flex flex-col justify-center text-center"
+              style={{
+                // iOS 애니메이션 최적화
+                willChange: 'transform, opacity',
+                transform: 'translateZ(0)', // 하드웨어 가속 활성화
+                backfaceVisibility: 'hidden'
+              }}
             >
               <motion.div
                 initial={{ scale: 0 }}
@@ -2366,6 +2537,11 @@ export default function RegisterPage() {
           <motion.div 
             initial={{ y: 100 }}
             animate={{ y: 0 }}
+            transition={{ 
+              duration: 0.4,
+              ease: [0.4, 0.0, 0.2, 1], // iOS 최적화된 이징
+              type: "tween"
+            }}
             className="p-4 safe-area-bottom"
             data-bottom-button
             style={{ 
@@ -2373,7 +2549,11 @@ export default function RegisterPage() {
               background: 'linear-gradient(to bottom right, rgba(240, 249, 255, 0.95), rgba(253, 244, 255, 0.95))',
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
-              borderTop: '1px solid rgba(229, 231, 235, 0.3)'
+              borderTop: '1px solid rgba(229, 231, 235, 0.3)',
+              // iOS 애니메이션 최적화
+              willChange: 'transform',
+              transform: 'translateZ(0)', // 하드웨어 가속 활성화
+              backfaceVisibility: 'hidden'
             }}
           >
             <motion.button
