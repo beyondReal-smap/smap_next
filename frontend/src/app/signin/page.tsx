@@ -121,13 +121,16 @@ const SignInPage = () => {
       router.replace('/home');
     }
     
-    // sessionStorage에서 상태 복원
+    // sessionStorage에서 상태 복원 (처음 방문 시에는 복원하지 않음)
     const savedModalState = sessionStorage.getItem('signin_error_modal_active');
     const savedRedirectBlock = sessionStorage.getItem('block_all_redirects');
     const savedPhoneNumber = sessionStorage.getItem('signin_phone_number');
     const savedErrorMessage = sessionStorage.getItem('signin_error_message');
     
-    if (savedModalState === 'true') {
+    // 페이지가 처음 로드되었는지 확인 (document.referrer가 비어있거나 같은 페이지인 경우)
+    const isFirstVisit = !document.referrer || document.referrer.includes(window.location.origin + '/signin');
+    
+    if (savedModalState === 'true' && !isFirstVisit) {
       console.log('[REDIRECT BLOCK] sessionStorage에서 모달 상태 복원');
       (window as any).__SIGNIN_ERROR_MODAL_ACTIVE__ = true;
       (window as any).__BLOCK_ALL_REDIRECTS__ = true;
@@ -138,6 +141,11 @@ const SignInPage = () => {
         setShowErrorModal(true);
         console.log('[REDIRECT BLOCK] 에러 모달 상태 복원:', savedErrorMessage);
       }
+    } else if (isFirstVisit) {
+      console.log('[REDIRECT BLOCK] 처음 방문이므로 에러 모달 상태 복원하지 않음');
+      // 처음 방문 시 sessionStorage 정리
+      sessionStorage.removeItem('signin_error_modal_active');
+      sessionStorage.removeItem('signin_error_message');
     }
     
     if (savedRedirectBlock === 'true') {
