@@ -291,8 +291,8 @@ input, textarea, select {
 }
 
 .terms-checkbox.checked {
-  background-color: #0113A3;
-  border-color: #0113A3;
+  background-color: #0114a2;
+  border-color: #0114a2;
 }
 `;
 
@@ -524,7 +524,7 @@ function RegisterLayoutContent({
                   {!isComplete && (
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center space-x-1">
-                        <span className="text-xs font-semibold" style={{color: '#0113A3'}}>
+                        <span className="text-xs font-semibold" style={{color: '#0114a2'}}>
                           {getCurrentStepNumber()}
                         </span>
                         <span className="text-xs text-gray-400">/</span>

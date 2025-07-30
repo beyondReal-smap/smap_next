@@ -35,31 +35,36 @@ const TERMS_DATA = [
     id: 'mt_agree1',
     title: '서비스 이용약관',
     required: true,
-    content: 'SMAP 서비스 이용에 관한 기본 약관입니다.'
+    content: 'SMAP 서비스 이용에 관한 기본 약관입니다.',
+    link: 'https://schedulemap.notion.site/30b32b5ad0bc4f99a39b28c0fe5f1de4?source=copy_link'
   },
   {
     id: 'mt_agree2', 
     title: '개인정보 처리방침',
     required: true,
-    content: '개인정보 수집, 이용, 보관에 관한 정책입니다.'
+    content: '개인정보 수집, 이용, 보관에 관한 정책입니다.',
+    link: 'https://schedulemap.notion.site/2ac62e02f97b4d61945d68c2d89109e9?source=copy_link'
   },
   {
     id: 'mt_agree3',
     title: '위치기반서비스 이용약관',
     required: true,
-    content: '위치정보 수집 및 이용에 관한 약관입니다.'
+    content: '위치정보 수집 및 이용에 관한 약관입니다.',
+    link: 'https://schedulemap.notion.site/69cf94c6a04e471d8c3e3043f95baefb?source=copy_link'
   },
   {
     id: 'mt_agree4',
     title: '개인정보 제3자 제공 동의',
     required: false,
-    content: '서비스 향상을 위한 개인정보 제3자 제공 동의입니다.'
+    content: '서비스 향상을 위한 개인정보 제3자 제공 동의입니다.',
+    link: 'https://schedulemap.notion.site/3-21b302dcaba0490fbaa9430618a74f01?source=copy_link'
   },
   {
     id: 'mt_agree5',
     title: '마케팅 정보 수신 동의',
     required: false,
-    content: '이벤트, 혜택 등 마케팅 정보 수신 동의입니다.'
+    content: '이벤트, 혜택 등 마케팅 정보 수신 동의입니다.',
+    link: 'https://schedulemap.notion.site/7e35638d106f433f86fa95f88ba6efb1?source=copy_link'
   }
 ];
 
@@ -188,11 +193,68 @@ export default function RegisterPage() {
           width: 16px;
           height: 16px;
           flex-shrink: 0;
+          transition: all 0.2s ease;
         }
         
         input[type="checkbox"]:checked {
-          background-color: #0113A3;
-          border-color: #0113A3;
+          background-color: #0114a2 !important;
+          border-color: #0114a2 !important;
+        }
+        
+        input[type="checkbox"]:checked::after {
+          content: '';
+          position: absolute;
+          left: 4px;
+          top: 1px;
+          width: 4px;
+          height: 8px;
+          border: solid white;
+          border-width: 0 2px 2px 0;
+          transform: rotate(45deg);
+        }
+        
+        /* 모든 체크박스에 일관된 스타일 적용 */
+        input[type="checkbox"].w-4.h-4.rounded,
+        input[type="checkbox"].w-4.h-4.rounded.flex-shrink-0,
+        input[type="checkbox"][class*="w-4"][class*="h-4"][class*="rounded"] {
+          -webkit-appearance: none !important;
+          appearance: none !important;
+          background-color: #fff !important;
+          border: 2px solid #d1d5db !important;
+          border-radius: 4px !important;
+          display: inline-block !important;
+          position: relative !important;
+          width: 16px !important;
+          height: 16px !important;
+          flex-shrink: 0 !important;
+          transition: all 0.2s ease !important;
+        }
+        
+        input[type="checkbox"].w-4.h-4.rounded:checked,
+        input[type="checkbox"].w-4.h-4.rounded.flex-shrink-0:checked,
+        input[type="checkbox"][class*="w-4"][class*="h-4"][class*="rounded"]:checked {
+          background-color: #0114a2 !important;
+          border-color: #0114a2 !important;
+        }
+        
+        input[type="checkbox"].w-4.h-4.rounded:checked::after,
+        input[type="checkbox"].w-4.h-4.rounded.flex-shrink-0:checked::after,
+        input[type="checkbox"][class*="w-4"][class*="h-4"][class*="rounded"]:checked::after {
+          content: '';
+          position: absolute;
+          left: 4px;
+          top: 1px;
+          width: 4px;
+          height: 8px;
+          border: solid white;
+          border-width: 0 2px 2px 0;
+          transform: rotate(45deg);
+        }
+        
+        /* 모든 체크박스 강제 적용 */
+        input[type="checkbox"]:checked {
+          background-color: #0114a2 !important;
+          border-color: #0114a2 !important;
         }
         
         input[type="checkbox"]:checked::after {
@@ -1311,7 +1373,7 @@ export default function RegisterPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+                          <div className="w-8 h-8 border-4 border-gray-200 border-t-[#0114a2] rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 text-sm">로딩 중...</p>
         </div>
       </div>
@@ -1325,7 +1387,7 @@ export default function RegisterPage() {
         <div className="absolute top-0 left-0 right-0 h-1 bg-gray-200 z-40">
           <motion.div 
             className="h-full"
-            style={{backgroundColor: '#0113A3'}}
+            style={{backgroundColor: '#0114a2'}}
             initial={{ width: 0 }}
             animate={{ width: `${getProgress()}%` }}
             transition={{ duration: 0.5 }}
@@ -1360,7 +1422,7 @@ export default function RegisterPage() {
               }}
             >
               <div className="text-center mb-4">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
                   <FiFileText className="w-5 h-5 text-white" />
                 </div>
                 <h2 className="text-lg font-bold text-gray-900 mb-1">
@@ -1376,8 +1438,8 @@ export default function RegisterPage() {
                   }
                 </p>
                 {registerData.isSocialLogin && (
-                  <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-xs text-blue-700">
+                                  <div className="mt-3 p-3 bg-[#0114a2]/10 rounded-lg border border-[#0114a2]/20">
+                  <p className="text-xs text-[#0114a2]">
                       📧 <strong>{registerData.mt_email}</strong><br/>
                       전화번호 인증 없이 간편하게 가입할 수 있습니다
                     </p>
@@ -1393,6 +1455,17 @@ export default function RegisterPage() {
                     checked={TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean)}
                     onChange={(e) => handleAllAgree(e.target.checked)}
                     className="w-4 h-4 rounded"
+                    style={{
+                      WebkitAppearance: 'none',
+                      appearance: 'none',
+                      backgroundColor: TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#fff',
+                      border: `2px solid ${TERMS_DATA.every(term => registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#d1d5db'}`,
+                      borderRadius: '4px',
+                      position: 'relative',
+                      width: '16px',
+                      height: '16px',
+                      flexShrink: 0
+                    }}
                   />
                   <span className="font-medium text-gray-900 text-sm">전체 동의</span>
                 </label>
@@ -1402,23 +1475,47 @@ export default function RegisterPage() {
               <div className="space-y-2">
                 {TERMS_DATA.map((term) => (
                   <div key={term.id} className="bg-white border border-gray-200 rounded-lg p-3">
-                    <label className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={registerData[term.id as keyof RegisterData] as boolean}
-                        onChange={(e) => handleTermAgree(term.id, e.target.checked)}
-                        className="w-4 h-4 rounded flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium text-gray-900 truncate">{term.title}</span>
-                          {term.required && (
-                            <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full flex-shrink-0">필수</span>
-                          )}
+                    <div className="flex items-center space-x-2">
+                      <label className="flex items-center space-x-2 cursor-pointer flex-1">
+                        <input
+                          type="checkbox"
+                          checked={registerData[term.id as keyof RegisterData] as boolean}
+                          onChange={(e) => handleTermAgree(term.id, e.target.checked)}
+                          className="w-4 h-4 rounded flex-shrink-0"
+                          style={{
+                            WebkitAppearance: 'none',
+                            appearance: 'none',
+                            backgroundColor: (registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#fff',
+                            border: `2px solid ${(registerData[term.id as keyof RegisterData] as boolean) ? '#0114a2' : '#d1d5db'}`,
+                            borderRadius: '4px',
+                            position: 'relative',
+                            width: '16px',
+                            height: '16px',
+                            flexShrink: 0
+                          }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-medium text-gray-900 truncate">{term.title}</span>
+                            {term.required && (
+                              <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full flex-shrink-0">필수</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{term.content}</p>
                         </div>
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{term.content}</p>
+                      </label>
+                      
+                      {/* 오른쪽 화살표 - 약관 링크로 이동 */}
+                      <div 
+                        className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(term.link, '_blank');
+                        }}
+                      >
+                        <FiChevronRight className="w-4 h-4 text-gray-400" />
                       </div>
-                    </label>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1435,7 +1532,7 @@ export default function RegisterPage() {
               className="w-full h-full flex flex-col justify-center"
             >
               <div className="text-center mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
                   <FiPhone className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">전화번호 인증</h2>
@@ -1450,7 +1547,7 @@ export default function RegisterPage() {
                   <div className="relative register-input-container">
                     <div className="absolute left-6 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
                       <FiPhone className="w-4 h-4 transition-colors duration-200" 
-                        style={{color: focusedField === 'phone' ? '#0113A3' : '#9CA3AF'}} />
+                        style={{color: focusedField === 'phone' ? '#0114a2' : '#9CA3AF'}} />
                     </div>
               <input
                       type="tel"
@@ -1459,7 +1556,7 @@ export default function RegisterPage() {
                       onFocus={(e) => {
                         setFocusedField('phone');
                         handlePhoneInputFocus();
-                        e.target.style.boxShadow = '0 0 0 2px #0113A3';
+                        e.target.style.boxShadow = '0 0 0 2px #0114a2';
                       }}
                       onBlur={(e) => {
                         setFocusedField(null);
@@ -1481,10 +1578,10 @@ export default function RegisterPage() {
                     style={{backgroundColor: '#eff6ff', border: '1px solid #c7d2fe'}}
                   >
                     <div className="flex items-center space-x-2">
-                      <FiCheck className="w-5 h-5" style={{color: '#0113A3'}} />
+                      <FiCheck className="w-5 h-5" style={{color: '#0114a2'}} />
                       <span className="font-medium" style={{color: '#1e40af'}}>인증번호가 발송되었습니다</span>
                     </div>
-                    <p className="text-sm mt-1" style={{ wordBreak: 'keep-all', color: '#0113A3' }}>
+                    <p className="text-sm mt-1" style={{ wordBreak: 'keep-all', color: '#0114a2' }}>
                       {registerData.mt_id}로 인증번호를 발송했습니다
                     </p>
                   </motion.div>
@@ -1503,7 +1600,7 @@ export default function RegisterPage() {
               className="w-full h-full flex flex-col justify-center"
             >
               <div className="text-center mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
                   <FiShield className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">인증번호 입력</h2>
@@ -1545,7 +1642,7 @@ export default function RegisterPage() {
                     placeholder="123456"
                     maxLength={6}
                     className="w-full px-5 py-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent text-center text-2xl font-mono tracking-widest register-input"
-                    onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0113A3'}
+                    onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0114a2'}
                     onBlur={(e) => e.target.style.boxShadow = ''}
                     style={{ outline: 'none' }}
                   />
@@ -1635,7 +1732,7 @@ export default function RegisterPage() {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     className="flex-1 py-3 text-white rounded-xl font-semibold disabled:opacity-50"
-                    style={{backgroundColor: '#0113A3'}}
+                    style={{backgroundColor: '#0114a2'}}
                   >
                     {isLoading ? '확인 중...' : '확인'}
                   </motion.button>
@@ -1654,7 +1751,7 @@ export default function RegisterPage() {
               className="w-full h-full flex flex-col"
             >
               <div className="text-center mb-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
                   <FiUser className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">기본 정보</h2>
@@ -1670,7 +1767,7 @@ export default function RegisterPage() {
                   <div className="relative register-input-container px-0.5">
                     <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
                       <FiLock className="w-4 h-4 transition-colors duration-200" 
-                        style={{color: focusedField === 'password' ? '#0113A3' : '#9CA3AF'}} />
+                        style={{color: focusedField === 'password' ? '#0114a2' : '#9CA3AF'}} />
                     </div>
               <input
                       type={showPassword ? 'text' : 'password'}
@@ -1682,7 +1779,7 @@ export default function RegisterPage() {
                       }}
                       onFocus={(e) => {
                         setFocusedField('password');
-                        e.target.style.boxShadow = '0 0 0 2px #0113A3';
+                        e.target.style.boxShadow = '0 0 0 2px #0114a2';
                       }}
                       onBlur={(e) => {
                         setFocusedField(null);
@@ -1747,7 +1844,7 @@ export default function RegisterPage() {
                   <div className="relative register-input-container px-0.5">
                     <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
                       <FiLock className="w-4 h-4 transition-colors duration-200" 
-                        style={{color: focusedField === 'passwordConfirm' ? '#0113A3' : '#9CA3AF'}} />
+                        style={{color: focusedField === 'passwordConfirm' ? '#0114a2' : '#9CA3AF'}} />
                     </div>
               <input
                       type={showPasswordConfirm ? 'text' : 'password'}
@@ -1755,7 +1852,7 @@ export default function RegisterPage() {
                       onChange={(e) => setPasswordConfirm(e.target.value)}
                       onFocus={(e) => {
                         setFocusedField('passwordConfirm');
-                        e.target.style.boxShadow = '0 0 0 2px #0113A3';
+                        e.target.style.boxShadow = '0 0 0 2px #0114a2';
                       }}
                       onBlur={(e) => {
                         setFocusedField(null);
@@ -1797,7 +1894,7 @@ export default function RegisterPage() {
                     onChange={(e) => setRegisterData(prev => ({ ...prev, mt_name: e.target.value }))}
                     placeholder="실명을 입력해주세요"
                     className="w-full px-5 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
-                    onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0113A3'}
+                    onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0114a2'}
                     onBlur={(e) => e.target.style.boxShadow = ''}
                     style={{ outline: 'none' }}
                   />
@@ -1814,7 +1911,7 @@ export default function RegisterPage() {
                     onChange={(e) => setRegisterData(prev => ({ ...prev, mt_nickname: e.target.value }))}
                     placeholder="다른 사용자에게 표시될 닉네임"
                     className="w-full px-5 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-offset-0 focus:border-transparent register-input"
-                    onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0113A3'}
+                    onFocus={(e) => e.target.style.boxShadow = '0 0 0 2px #0114a2'}
                     onBlur={(e) => e.target.style.boxShadow = ''}
                     style={{ outline: 'none' }}
                   />
@@ -1826,14 +1923,14 @@ export default function RegisterPage() {
                     {registerData.isSocialLogin ? 'ID (이메일)' : '이메일 (선택)'}
                   </label>
                   {registerData.isSocialLogin && (
-                    <p className="text-xs text-blue-600 mb-2" style={{ wordBreak: 'keep-all' }}>
+                    <p className="text-xs text-[#0114a2] mb-2" style={{ wordBreak: 'keep-all' }}>
                       {registerData.socialProvider === 'google' ? '구글' : '카카오'} 계정의 이메일이 ID로 사용됩니다
                     </p>
                   )}
                   <div className="relative register-input-container px-0.5">
                     <div className="absolute left-5 z-10 pointer-events-none" style={{top: '50%', transform: 'translateY(-50%)'}}>
                       <FiMail className="w-4 h-4 transition-colors duration-200" 
-                        style={{color: focusedField === 'email' ? '#0113A3' : '#9CA3AF'}} />
+                        style={{color: focusedField === 'email' ? '#0114a2' : '#9CA3AF'}} />
                     </div>
                     <input
                       type="email"
@@ -1847,7 +1944,7 @@ export default function RegisterPage() {
                       onFocus={(e) => {
                         if (!registerData.isSocialLogin) {
                           setFocusedField('email');
-                          e.target.style.boxShadow = '0 0 0 2px #0113A3';
+                          e.target.style.boxShadow = '0 0 0 2px #0114a2';
                         }
                       }}
                       onBlur={(e) => {
@@ -1894,7 +1991,7 @@ export default function RegisterPage() {
               className="w-full h-full flex flex-col justify-center"
             >
               <div className="text-center mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
                   <FiHeart className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">프로필 정보</h2>
@@ -1910,10 +2007,10 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     onClick={handleBirthModalOpen}
-                    className="w-full flex items-center px-4 py-3 border border-gray-200 rounded-xl transition-colors text-left hover:border-blue-300"
+                    className="w-full flex items-center px-4 py-3 border border-gray-200 rounded-xl transition-colors text-left hover:border-[#0114a2]/30"
                     onFocus={(e) => {
                       setFocusedField('birth');
-                      (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0113A3';
+                      (e.target as HTMLButtonElement).style.boxShadow = '0 0 0 2px #0114a2';
                     }}
                     onBlur={(e) => {
                       setFocusedField(null);
@@ -1921,7 +2018,7 @@ export default function RegisterPage() {
                     }}
                   >
                     <FiCalendar className="w-5 h-5 mr-3 transition-colors duration-200" 
-                      style={{color: focusedField === 'birth' ? '#0113A3' : '#9CA3AF'}} />
+                      style={{color: focusedField === 'birth' ? '#0114a2' : '#9CA3AF'}} />
                     <span className={registerData.mt_birth ? 'text-gray-900' : 'text-gray-500'}>
                       {registerData.mt_birth 
                         ? dayjs(registerData.mt_birth).format('YYYY년 MM월 DD일')
@@ -1947,7 +2044,7 @@ export default function RegisterPage() {
                           : 'border-gray-200 text-gray-700 hover:border-gray-300'
                       }`}
                       style={registerData.mt_gender === 1 
-                        ? {borderColor: '#0113A3', backgroundColor: '#eff6ff', color: '#1e40af'} 
+                        ? {borderColor: '#0114a2', backgroundColor: '#eff6ff', color: '#1e40af'} 
                         : {}}
                     >
                       남성
@@ -1979,7 +2076,7 @@ export default function RegisterPage() {
               className="w-full h-full flex flex-col justify-center"
             >
               <div className="text-center mb-6">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
                   <FiMapPin className="w-6 h-6 text-white" />
                 </div>
                 <h2 className="text-xl font-bold text-gray-900 mb-1">위치 정보</h2>
@@ -2017,10 +2114,10 @@ export default function RegisterPage() {
                 {!registerData.mt_lat && !registerData.mt_long && !locationLoading && !locationError && (
                   <div className="rounded-xl p-4" style={{backgroundColor: '#eff6ff', border: '1px solid #c7d2fe'}}>
                     <div className="flex items-center space-x-2 mb-2">
-                      <FiMapPin className="w-5 h-5" style={{color: '#0113A3'}} />
+                      <FiMapPin className="w-5 h-5" style={{color: '#0114a2'}} />
                       <span className="font-medium" style={{color: '#1e40af'}}>위치 정보 설정</span>
                     </div>
-                    <p className="text-sm mb-4" style={{ wordBreak: 'keep-all', color: '#0113A3' }}>
+                    <p className="text-sm mb-4" style={{ wordBreak: 'keep-all', color: '#0114a2' }}>
                       그룹 멤버들과의 위치 공유, 주변 정보 제공 등을 위해 위치 정보가 필요합니다.
                     </p>
                     <motion.button
@@ -2028,7 +2125,7 @@ export default function RegisterPage() {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       className="w-full py-3 text-white rounded-xl font-semibold shadow-lg"
-                      style={{backgroundColor: '#0113A3'}}
+                      style={{backgroundColor: '#0114a2'}}
                     >
                       현재 위치 가져오기
                     </motion.button>
@@ -2037,12 +2134,12 @@ export default function RegisterPage() {
 
                 {/* 로딩 상태 */}
                 {locationLoading && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="bg-[#0114a2]/10 border border-[#0114a2]/20 rounded-xl p-4">
                     <div className="flex items-center space-x-3 mb-2">
-                      <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-blue-700 font-medium">위치 정보를 가져오는 중...</span>
+                      <div className="w-5 h-5 border-2 border-[#0114a2] border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-[#0114a2] font-medium">위치 정보를 가져오는 중...</span>
                     </div>
-                    <p className="text-blue-600 text-sm" style={{ wordBreak: 'keep-all' }}>
+                    <p className="text-[#0114a2] text-sm" style={{ wordBreak: 'keep-all' }}>
                       브라우저에서 위치 권한을 요청할 수 있습니다.<br />
                       '허용'을 선택해주세요.
                     </p>
@@ -2241,7 +2338,7 @@ export default function RegisterPage() {
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
               style={(isStepValid() && !locationLoading) 
-                ? {backgroundColor: '#0113A3'} 
+                ? {backgroundColor: '#0114a2'} 
                 : {}}
             >
               {isLoading ? '처리 중...' : 
@@ -2315,7 +2412,7 @@ export default function RegisterPage() {
               <div className="p-6">
                                   {/* 헤더 */}
                   <div className="text-center mb-4">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0113A3'}}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2" style={{backgroundColor: '#0114a2'}}>
                       <FiCalendar className="w-6 h-6 text-white" />
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 mb-1">생년월일 선택</h3>
@@ -2364,9 +2461,9 @@ export default function RegisterPage() {
                     <button
                       onClick={handleCalendarToday}
                       className="text-sm transition-colors"
-                      style={{color: '#0113A3'}}
+                      style={{color: '#0114a2'}}
                       onMouseEnter={(e) => (e.target as HTMLButtonElement).style.color = '#1e40af'}
-                      onMouseLeave={(e) => (e.target as HTMLButtonElement).style.color = '#0113A3'}
+                      onMouseLeave={(e) => (e.target as HTMLButtonElement).style.color = '#0114a2'}
                     >
                       오늘로 이동
               </button>
@@ -2386,7 +2483,7 @@ export default function RegisterPage() {
                 <div className="grid grid-cols-7 gap-1 mb-3">
                   {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
                     <div key={day} className={`h-8 flex items-center justify-center text-xs font-bold ${
-                      index === 0 ? 'text-red-600' : index === 6 ? 'text-blue-600' : 'text-gray-700'
+                      index === 0 ? 'text-red-600' : index === 6 ? 'text-[#0114a2]' : 'text-gray-700'
                     }`}>
                       {day}
                     </div>
@@ -2426,7 +2523,7 @@ export default function RegisterPage() {
                             ${isFuture ? 'text-gray-300 cursor-not-allowed' : ''}
                           `}
                           style={isSelected 
-                            ? {backgroundColor: '#0113A3'} 
+                            ? {backgroundColor: '#0114a2'} 
                             : isToday && !isSelected 
                               ? {backgroundColor: '#eff6ff', color: '#1e40af'}
                               : {}}
@@ -2467,7 +2564,7 @@ export default function RegisterPage() {
                         : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     }`}
                     style={selectedDate 
-                      ? {backgroundColor: '#0113A3'}
+                      ? {backgroundColor: '#0114a2'}
                       : {}}
                   >
                     확인
